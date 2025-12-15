@@ -1874,7 +1874,17 @@ export default function ProjectDetailPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Assign To</label>
                 <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2">
-                  {project.members?.filter(m => m.invitationStatus === 'accepted').map(member => (
+                  {/* Deduplicate members by user._id */}
+                  {(() => {
+                    const seenIds = new Set()
+                    return project.members?.filter(m => {
+                      if (m.invitationStatus !== 'accepted') return false
+                      if (!m.user?._id) return false
+                      const memberId = m.user._id.toString()
+                      if (seenIds.has(memberId)) return false
+                      seenIds.add(memberId)
+                      return true
+                    }).map(member => (
                     <label key={member.user._id} className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
                       <input
                         type="checkbox"
@@ -1898,6 +1908,7 @@ export default function ProjectDetailPage() {
                         {member.user.firstName} {member.user.lastName}
                       </span>
                     </label>
+                  ))})()}
                   ))}
                 </div>
               </div>

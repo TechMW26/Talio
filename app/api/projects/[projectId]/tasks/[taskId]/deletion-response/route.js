@@ -57,12 +57,35 @@ export async function POST(request, { params }) {
 
     // Check permissions - only project head, admins, or assignees can respond
     const isAdmin = ['admin', 'god_admin'].includes(user.role)
-    const projectHeadIds = project.projectHeads && project.projectHeads.length > 0 
-      ? project.projectHeads.map(h => h.toString())
-      : project.projectHead 
-        ? [project.projectHead.toString()] 
-        : []
+    
+    // Build list of project head IDs (handle both array and single field)
+    const projectHeadIds = []
+    if (project.projectHeads && project.projectHeads.length > 0) {
+      projectHeadIds.push(...project.projectHeads.map(h => h.toString()))
+    }
+    if (project.projectHead) {
+      const headId = project.projectHead.toString()
+      if (!projectHeadIds.includes(headId)) {
+        projectHeadIds.push(headId)
+      }
+    }
+    // Also check createdBy as they should have head-level permissions
+    if (project.createdBy) {
+      const creatorId = project.createdBy.toString()
+      if (!projectHeadIds.includes(creatorId)) {
+        projectHeadIds.push(creatorId)
+      }
+    }
+    
     const isProjectHead = projectHeadIds.includes(user.employeeId.toString())
+    
+    console.log('[Deletion Response] Permission check:', {
+      userId: user.employeeId.toString(),
+      projectHeadIds,
+      isAdmin,
+      isProjectHead,
+      role: user.role
+    })
     
     // Check if user is an assignee
     const isAssignee = await TaskAssignee.findOne({
@@ -74,7 +97,11 @@ export async function POST(request, { params }) {
     // Only project head, admin, or assignee (if not the requester) can respond
     const isRequester = task.deletionRequest.requestedBy.toString() === user.employeeId.toString()
     
-    if (!isAdmin && !isProjectHead && (!isAssignee || isRequester)) {
+    // Project heads and admins can always respond
+    // Assignees can respond only if they are not the requester
+    const canRespond = isAdmin || isProjectHead || (isAssignee && !isRequester)
+    
+    if (!canRespond) {
       return NextResponse.json({ 
         success: false, 
         message: 'You do not have permission to respond to this deletion request' 

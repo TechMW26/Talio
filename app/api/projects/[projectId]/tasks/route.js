@@ -218,25 +218,27 @@ export async function POST(request, { params }) {
     // Assign to users
     const assignedNames = []
     for (const assigneeId of assigneeIds) {
+      const assigneeIdStr = assigneeId.toString()
+      
       // Verify assignee is an accepted member
       const isMember = await ProjectMember.findOne({
         project: projectId,
-        user: assigneeId,
+        user: assigneeIdStr,
         invitationStatus: 'accepted'
       })
 
-      if (!isMember && assigneeId !== user.employeeId.toString()) {
+      if (!isMember && assigneeIdStr !== user.employeeId.toString()) {
         continue // Skip non-members
       }
 
       const assignee = await TaskAssignee.create({
         task: task._id,
-        user: assigneeId,
+        user: assigneeIdStr,
         assignedBy: user.employeeId,
-        assignmentStatus: assigneeId === user.employeeId.toString() ? 'accepted' : 'pending'
+        assignmentStatus: assigneeIdStr === user.employeeId.toString() ? 'accepted' : 'pending'
       })
 
-      const assigneeEmployee = await Employee.findById(assigneeId)
+      const assigneeEmployee = await Employee.findById(assigneeIdStr)
       assignedNames.push(`${assigneeEmployee.firstName} ${assigneeEmployee.lastName}`)
 
       // Create task_assigned timeline event
@@ -245,13 +247,13 @@ export async function POST(request, { params }) {
         type: 'task_assigned',
         createdBy: user.employeeId,
         relatedTask: task._id,
-        relatedMember: assigneeId,
+        relatedMember: assigneeIdStr,
         description: `Task "${title}" was assigned to ${assigneeEmployee.firstName} ${assigneeEmployee.lastName}`,
         metadata: { taskTitle: title, assigneeName: `${assigneeEmployee.firstName} ${assigneeEmployee.lastName}` }
       })
 
       // Send notification if not self-assignment
-      if (assigneeId !== user.employeeId.toString()) {
+      if (assigneeIdStr !== user.employeeId.toString()) {
         await notifyTaskAssigned(project, task, assigneeEmployee, creatorEmployee)
       }
     }

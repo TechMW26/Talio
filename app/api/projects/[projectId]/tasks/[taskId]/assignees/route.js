@@ -107,10 +107,12 @@ export async function POST(request, { params }) {
     const createdAssignees = []
 
     for (const assigneeId of assigneeIds) {
+      const assigneeIdStr = assigneeId.toString()
+      
       // Check if already assigned
       const existingAssignment = await TaskAssignee.findOne({
         task: taskId,
-        user: assigneeId
+        user: assigneeIdStr
       })
 
       if (existingAssignment) {
@@ -120,22 +122,22 @@ export async function POST(request, { params }) {
       // Verify assignee is an accepted member
       const isMember = await ProjectMember.findOne({
         project: projectId,
-        user: assigneeId,
+        user: assigneeIdStr,
         invitationStatus: 'accepted'
       })
 
-      if (!isMember && assigneeId !== user.employeeId.toString()) {
+      if (!isMember && assigneeIdStr !== user.employeeId.toString()) {
         continue // Skip non-members
       }
 
       const assignee = await TaskAssignee.create({
         task: taskId,
-        user: assigneeId,
+        user: assigneeIdStr,
         assignedBy: user.employeeId,
-        assignmentStatus: assigneeId === user.employeeId.toString() ? 'accepted' : 'pending'
+        assignmentStatus: assigneeIdStr === user.employeeId.toString() ? 'accepted' : 'pending'
       })
 
-      const assigneeEmployee = await Employee.findById(assigneeId)
+      const assigneeEmployee = await Employee.findById(assigneeIdStr)
 
       // Create timeline event
       await createTimelineEvent({
@@ -143,7 +145,7 @@ export async function POST(request, { params }) {
         type: 'task_assigned',
         createdBy: user.employeeId,
         relatedTask: taskId,
-        relatedMember: assigneeId,
+        relatedMember: assigneeIdStr,
         description: `Task "${task.title}" was assigned to ${assigneeEmployee.firstName} ${assigneeEmployee.lastName}`,
         metadata: { 
           taskTitle: task.title, 
@@ -152,7 +154,7 @@ export async function POST(request, { params }) {
       })
 
       // Send notification if not self-assignment
-      if (assigneeId !== user.employeeId.toString()) {
+      if (assigneeIdStr !== user.employeeId.toString()) {
         await notifyTaskAssigned(project, task, assigneeEmployee, assignerEmployee)
       }
 

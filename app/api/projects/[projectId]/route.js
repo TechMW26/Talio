@@ -59,12 +59,22 @@ export async function GET(request, { params }) {
       }
     }
 
-    // Get members
-    const members = await ProjectMember.find({ project: projectId })
+    // Get members and deduplicate (in case any duplicates exist in DB)
+    const allMembers = await ProjectMember.find({ project: projectId })
       .populate('user', 'firstName lastName profilePicture email employeeCode department')
       .populate('invitedBy', 'firstName lastName')
       .populate('sourceDepartment', 'name')
       .sort({ role: 1, createdAt: 1 })
+    
+    // Deduplicate members by user._id, keeping the first occurrence (usually 'head' role due to sort)
+    const seenUserIds = new Set()
+    const members = allMembers.filter(m => {
+      if (!m.user || !m.user._id) return false
+      const userId = m.user._id.toString()
+      if (seenUserIds.has(userId)) return false
+      seenUserIds.add(userId)
+      return true
+    })
 
     // Get task statistics
     const taskStats = await getProjectTaskStats(projectId)
