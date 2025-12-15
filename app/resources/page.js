@@ -6,27 +6,27 @@ import { Download, Check } from 'lucide-react';
 // ============================================
 // RELEASE CONFIGURATION - Update for new releases
 // ============================================
-const RELEASE_VERSION = '1.0.3';
+const RELEASE_VERSION = '1.1.0';
 
 // Direct download URLs from GitHub Releases (exact file names)
 const DOWNLOADS = {
   mac: {
     arm64: {
-      url: 'https://github.com/avirajsharma-ops/Tailo/releases/download/v1.0.3/Talio-1.0.3-arm64.dmg',
+      url: 'https://github.com/avirajsharma-ops/Talio/releases/download/v1.1.0/Talio-1.0.0-arm64.dmg',
       label: 'Apple Silicon',
-      size: '~95 MB'
+      size: '~91 MB'
     },
     x64: {
-      url: 'https://github.com/avirajsharma-ops/Tailo/releases/download/v1.0.3/Talio-1.0.3-x64.dmg',
+      url: 'https://github.com/avirajsharma-ops/Talio/releases/download/v1.1.0/Talio-1.0.0.dmg',
       label: 'Intel (x64)',
-      size: '~100 MB'
+      size: '~95 MB'
     }
   },
   windows: {
     universal: {
-      url: 'https://github.com/avirajsharma-ops/Tailo/releases/download/v1.0.3/Talio-Setup-1.0.3.exe',
+      url: 'https://github.com/avirajsharma-ops/Talio/releases/download/v1.1.0/Talio.Setup.1.0.0.exe',
       label: 'Universal (32 & 64-bit)',
-      size: '~138 MB'
+      size: '~160 MB'
     }
   }
 };
