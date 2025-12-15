@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ============================================
-# Talio HRMS - Production Deployment Script
+# Talio - Production Deployment Script
 # ============================================
 # One-command deployment for Ubuntu/Debian servers
 # Uses modern Docker commands (docker compose)
@@ -46,7 +46,7 @@ while [[ $# -gt 0 ]]; do
             shift 2
             ;;
         --help)
-            echo "Talio HRMS - Production Deployment Script"
+            echo "Talio - Production Deployment Script"
             echo ""
             echo "Usage: ./deploy-production.sh [options]"
             echo ""
@@ -454,6 +454,9 @@ show_status() {
     else
         echo "URL: http://${DOMAIN}"
     fi
+    echo ""
+    echo "Note: Old service workers will be automatically"
+    echo "      unregistered on user's next visit."
     echo "============================================"
 }
 
@@ -461,7 +464,7 @@ show_status() {
 main() {
     echo ""
     echo "============================================"
-    echo "  Talio HRMS - Production Deployment"
+    echo "  Talio - Production Deployment"
     echo "============================================"
     echo "  Domain: ${DOMAIN}"
     echo "============================================"

@@ -4,39 +4,15 @@ import { useEffect } from 'react'
 
 /**
  * ErrorPageCache Component
- * - Registers the service worker for offline functionality
  * - Caches the offline page in localStorage as backup
  * - Caches the error fallback page for error scenarios
+ * 
+ * Note: Service Worker registration removed - using native apps instead of PWA
  */
 export default function ErrorPageCache() {
   useEffect(() => {
     // Only run in browser
     if (typeof window === 'undefined') return
-
-    // Register Service Worker for offline functionality
-    const registerServiceWorker = async () => {
-      if ('serviceWorker' in navigator) {
-        try {
-          const registration = await navigator.serviceWorker.register('/sw.js', {
-            scope: '/'
-          })
-          
-          console.log('[Talio] Service Worker registered:', registration.scope)
-          
-          // Check for updates
-          registration.addEventListener('updatefound', () => {
-            const newWorker = registration.installing
-            newWorker?.addEventListener('statechange', () => {
-              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                console.log('[Talio] New service worker available')
-              }
-            })
-          })
-        } catch (error) {
-          console.error('[Talio] Service Worker registration failed:', error)
-        }
-      }
-    }
 
     // Cache offline page in localStorage as backup
     const cacheOfflinePage = async () => {
@@ -68,9 +44,6 @@ export default function ErrorPageCache() {
       }
     }
 
-    // Register service worker immediately
-    registerServiceWorker()
-
     // Check if we need to cache pages (cache for 7 days)
     const offlineCachedAt = localStorage.getItem('talio_offline_page_cached_at')
     const errorCachedAt = localStorage.getItem('talio_error_page_cached_at')
@@ -88,6 +61,16 @@ export default function ErrorPageCache() {
     
     if (shouldCacheError) {
       cacheErrorPage()
+    }
+
+    // Unregister any existing service workers (cleanup from previous PWA)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(registrations => {
+        registrations.forEach(registration => {
+          registration.unregister()
+          console.log('[Talio] Unregistered old service worker')
+        })
+      })
     }
   }, [])
 

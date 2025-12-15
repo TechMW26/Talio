@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# HRMS PWA Deployment Script for Digital Ocean Ubuntu Server
+# Talio Deployment Script for Digital Ocean Ubuntu Server
 # Usage: ./deploy.sh
 
 set -e
 
-echo "🚀 Starting HRMS PWA Deployment to Digital Ocean..."
+echo "🚀 Starting Talio Deployment to Digital Ocean..."
 
 # Colors for output
 RED='\033[0;31m'
@@ -134,7 +134,7 @@ sleep 30
 
 # Check if services are running
 if docker-compose ps | grep -q "Up"; then
-    print_success "HRMS PWA is now running!"
+    print_success "Talio is now running!"
     print_success "Access your application at: http://$(curl -s ifconfig.me)"
     print_success "Local access: http://localhost"
 else
@@ -158,27 +158,26 @@ sudo ufw allow 80/tcp
 sudo ufw allow 443/tcp
 sudo ufw --force enable
 
-print_success "🎉 HRMS PWA deployment completed successfully!"
-print_status "Your PWA is now accessible and ready for users to install!"
+print_success "🎉 Talio deployment completed successfully!"
+print_status "Your application is now accessible!"
 
 # Display final information
 echo ""
-echo "=================================================="
+echo "================================================="
 echo "🎊 DEPLOYMENT SUMMARY"
-echo "=================================================="
+echo "================================================="
 echo "✅ Docker and Docker Compose installed"
-echo "✅ HRMS PWA application deployed"
+echo "✅ Talio application deployed"
 echo "✅ Nginx reverse proxy configured"
 echo "✅ Firewall configured"
-echo "✅ PWA features enabled"
 echo ""
 echo "🌐 Access URL: http://$(curl -s ifconfig.me)"
-echo "📱 Users can install the PWA from any modern browser"
-echo "🔄 Application runs with offline support"
+echo "📱 Native apps available for download from the app"
+echo "🔄 Application runs with offline detection"
 echo ""
 echo "📝 Next steps:"
 echo "1. Configure your domain name"
 echo "2. Set up SSL certificates for HTTPS"
 echo "3. Update NEXTAUTH_URL in .env file"
-echo "4. Test PWA installation on mobile devices"
+echo "4. Download native apps from /download page"
 echo "=================================================="

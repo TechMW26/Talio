@@ -181,7 +181,7 @@ export default function SettingsPage() {
             <FaCog className="w-6 h-6 text-indigo-600" />
             Settings
           </h1>
-          <p className="text-gray-600 mt-1">Configure your HRMS system</p>
+          <p className="text-gray-600 mt-1">Configure your Talio system</p>
         </div>
       </div>
 

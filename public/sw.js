@@ -1,5 +1,5 @@
 // Talio Service Worker - Handles offline functionality
-const CACHE_NAME = 'talio-offline-v1';
+const CACHE_NAME = 'talio-offline-v2';
 const OFFLINE_URL = '/offline.html';
 
 // Assets to cache immediately on install

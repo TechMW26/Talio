@@ -438,7 +438,7 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
 
             <div className="back-footer">
               If found, please return to<br />
-              <span>Talio HRMS</span>
+              <span>Talio</span>
             </div>
           </div>
         </div>

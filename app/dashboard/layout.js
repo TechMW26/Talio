@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import BottomNav from '@/components/BottomNav'
-import PWAInstaller, { OfflineIndicator } from '@/components/PWAInstaller'
 import OutOfPremisesPopup from '@/components/OutOfPremisesPopup'
 import OfflineDetector from '@/components/OfflineDetector'
 import ChatWidgetContainer from '@/components/chat/ChatWidgetContainer'
@@ -161,8 +160,6 @@ export default function DashboardLayout({ children }) {
 
               {/* Right Side Content - Flex Column */}
               <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
-                {/* Offline Indicator */}
-                <OfflineIndicator />
 
                 {/* Header - Static at top of right column */}
                 <Header toggleSidebar={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
@@ -194,9 +191,6 @@ export default function DashboardLayout({ children }) {
                 {/* Bottom Navigation for Mobile */}
                 <BottomNav />
               </div>
-
-              {/* PWA Install Prompt */}
-              <PWAInstaller />
 
               {/* Out of Premises Popup */}
               <OutOfPremisesPopup />

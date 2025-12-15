@@ -82,7 +82,7 @@ export default function ResourcesPage() {
           <path d="M2 17L12 22L22 17" />
           <path d="M2 12L12 17L22 12" />
         </svg>
-        <span className="text-2xl font-bold text-white">Talio HRMS</span>
+        <span className="text-2xl font-bold text-white">Talio</span>
       </div>
 
       <div className="max-w-2xl w-full text-center">
