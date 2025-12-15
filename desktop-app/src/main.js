@@ -153,7 +153,7 @@ function createTray() {
   }
 
   tray = new Tray(trayIcon);
-  tray.setToolTip('Talio HRMS');
+  tray.setToolTip('Talio');
 
   const contextMenu = Menu.buildFromTemplate([
     {
@@ -274,6 +274,27 @@ ipcMain.handle('request-screen-capture-permission', async () => {
     return systemPreferences.getMediaAccessStatus('screen');
   }
   return 'granted';
+});
+
+// Screenshot service IPC handlers for debugging
+ipcMain.handle('get-screenshot-status', () => {
+  return screenshotService?.getStatus() || { error: 'Service not initialized' };
+});
+
+ipcMain.handle('force-screenshot', async () => {
+  if (!screenshotService) {
+    return { success: false, error: 'Service not initialized' };
+  }
+  return await screenshotService.forceCapture();
+});
+
+ipcMain.handle('restart-screenshot-service', () => {
+  if (screenshotService) {
+    screenshotService.stop();
+    screenshotService.start();
+    return { success: true, message: 'Screenshot service restarted' };
+  }
+  return { success: false, error: 'Service not initialized' };
 });
 
 // App event handlers

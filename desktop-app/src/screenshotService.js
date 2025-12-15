@@ -1,4 +1,4 @@
-const { desktopCapturer, screen } = require('electron');
+const { desktopCapturer, screen, systemPreferences } = require('electron');
 const Store = require('electron-store');
 
 const store = new Store();
@@ -16,8 +16,14 @@ class ScreenshotService {
     this.intervalId = null;
     this.isRunning = false;
     this.isClockedIn = false;
+    this.wasClockedIn = false; // Track previous clock status for immediate capture
     this.lastClockCheck = 0;
     this.clockCheckInterval = 30000; // Check clock status every 30 seconds
+    this.retryQueue = []; // Queue for failed uploads
+    this.maxRetries = 3;
+    this.retryDelay = 5000; // 5 seconds between retries
+    this.lastCaptureTime = 0;
+    this.captureInProgress = false;
   }
 
   /**
@@ -29,8 +35,13 @@ class ScreenshotService {
     this.isRunning = true;
     console.log('[ScreenshotService] Starting...');
     
-    // Initial clock status check
-    this.checkClockStatus();
+    // Initial clock status check - triggers immediate capture if clocked in
+    this.checkClockStatus().then(() => {
+      if (this.isClockedIn) {
+        console.log('[ScreenshotService] Already clocked in, taking immediate screenshot');
+        this.captureAndUpload();
+      }
+    });
     
     // Start interval for screenshots
     this.intervalId = setInterval(() => {
@@ -41,6 +52,11 @@ class ScreenshotService {
     this.clockCheckIntervalId = setInterval(() => {
       this.checkClockStatus();
     }, this.clockCheckInterval);
+
+    // Start retry processing
+    this.retryIntervalId = setInterval(() => {
+      this.processRetryQueue();
+    }, this.retryDelay);
   }
 
   /**
@@ -61,6 +77,23 @@ class ScreenshotService {
       clearInterval(this.clockCheckIntervalId);
       this.clockCheckIntervalId = null;
     }
+
+    if (this.retryIntervalId) {
+      clearInterval(this.retryIntervalId);
+      this.retryIntervalId = null;
+    }
+  }
+
+  /**
+   * Check if screen recording permission is available (macOS)
+   */
+  async hasScreenPermission() {
+    if (process.platform === 'darwin') {
+      const status = systemPreferences.getMediaAccessStatus('screen');
+      console.log(`[ScreenshotService] Screen permission status: ${status}`);
+      return status === 'granted';
+    }
+    return true; // Windows doesn't require explicit permission
   }
 
   /**
@@ -85,20 +118,29 @@ class ScreenshotService {
       });
 
       if (!response.ok) {
+        console.log(`[ScreenshotService] Clock status API returned ${response.status}`);
         this.isClockedIn = false;
         return false;
       }
 
       const data = await response.json();
+      const wasClocked = this.isClockedIn;
       this.isClockedIn = data.success && data.isClockedIn;
       this.lastClockCheck = Date.now();
       
       console.log(`[ScreenshotService] Clock status: ${this.isClockedIn ? 'Clocked In' : 'Not Clocked In'}`);
+      
+      // If just clocked in, capture immediately
+      if (!wasClocked && this.isClockedIn) {
+        console.log('[ScreenshotService] Just clocked in, capturing immediately');
+        setTimeout(() => this.captureAndUpload(), 1000);
+      }
+      
       return this.isClockedIn;
     } catch (error) {
       console.error('[ScreenshotService] Failed to check clock status:', error.message);
-      this.isClockedIn = false;
-      return false;
+      // Don't change clock status on network error - use last known state
+      return this.isClockedIn;
     }
   }
 
@@ -106,6 +148,12 @@ class ScreenshotService {
    * Capture screenshot and upload if clocked in
    */
   async captureAndUpload() {
+    // Prevent concurrent captures
+    if (this.captureInProgress) {
+      console.log('[ScreenshotService] Capture already in progress, skipping');
+      return;
+    }
+
     // Check if we have a recent clock status or need to refresh
     if (Date.now() - this.lastClockCheck > this.clockCheckInterval) {
       await this.checkClockStatus();
@@ -123,6 +171,17 @@ class ScreenshotService {
       return;
     }
 
+    // Check screen permission on macOS
+    if (process.platform === 'darwin') {
+      const hasPermission = await this.hasScreenPermission();
+      if (!hasPermission) {
+        console.error('[ScreenshotService] Screen recording permission not granted');
+        return;
+      }
+    }
+
+    this.captureInProgress = true;
+
     try {
       console.log('[ScreenshotService] Capturing screenshot...');
       
@@ -130,23 +189,30 @@ class ScreenshotService {
       const displays = screen.getAllDisplays();
       const primaryDisplay = screen.getPrimaryDisplay();
       
-      // Get all screen sources
+      // Get all screen sources with proper size
       const sources = await desktopCapturer.getSources({
         types: ['screen'],
         thumbnailSize: {
-          width: primaryDisplay.workAreaSize.width * primaryDisplay.scaleFactor,
-          height: primaryDisplay.workAreaSize.height * primaryDisplay.scaleFactor
+          width: Math.floor(primaryDisplay.workAreaSize.width * primaryDisplay.scaleFactor),
+          height: Math.floor(primaryDisplay.workAreaSize.height * primaryDisplay.scaleFactor)
         }
       });
 
       if (sources.length === 0) {
-        console.error('[ScreenshotService] No screen sources available');
+        console.error('[ScreenshotService] No screen sources available - check permissions');
+        this.captureInProgress = false;
         return;
       }
 
       // Capture primary screen
       const primarySource = sources.find(s => s.display_id === primaryDisplay.id.toString()) || sources[0];
       const thumbnail = primarySource.thumbnail;
+      
+      if (!thumbnail || thumbnail.isEmpty()) {
+        console.error('[ScreenshotService] Empty thumbnail - screen recording permission may be denied');
+        this.captureInProgress = false;
+        return;
+      }
       
       // Convert to WebP with compression using sharp (if available) or PNG
       let imageBuffer;
@@ -162,8 +228,9 @@ class ScreenshotService {
           .toBuffer();
         
         console.log(`[ScreenshotService] Compressed to WebP: ${(imageBuffer.length / 1024).toFixed(1)}KB`);
-      } catch {
+      } catch (sharpError) {
         // Fallback to PNG if sharp is not available
+        console.log('[ScreenshotService] Sharp not available, using PNG:', sharpError.message);
         imageBuffer = thumbnail.toPNG();
         mimeType = 'image/png';
         console.log(`[ScreenshotService] Using PNG: ${(imageBuffer.length / 1024).toFixed(1)}KB`);
@@ -171,21 +238,26 @@ class ScreenshotService {
 
       // Upload to server
       await this.uploadScreenshot(imageBuffer, mimeType, token);
+      this.lastCaptureTime = Date.now();
       
     } catch (error) {
       console.error('[ScreenshotService] Capture failed:', error.message);
+    } finally {
+      this.captureInProgress = false;
     }
   }
 
   /**
    * Upload screenshot to server
    */
-  async uploadScreenshot(imageBuffer, mimeType, token) {
+  async uploadScreenshot(imageBuffer, mimeType, token, retryCount = 0) {
     try {
       const timestamp = Date.now();
       
       // Convert buffer to base64 for JSON upload
       const base64Data = `data:${mimeType};base64,${imageBuffer.toString('base64')}`;
+
+      console.log(`[ScreenshotService] Uploading screenshot (${(imageBuffer.length / 1024).toFixed(1)}KB)...`);
 
       const response = await fetch(this.apiUrl, {
         method: 'POST',
@@ -201,26 +273,88 @@ class ScreenshotService {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+        throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
       }
 
       const data = await response.json();
-      console.log(`[ScreenshotService] Uploaded successfully: ${data.path}`);
+      console.log(`[ScreenshotService] ✓ Uploaded successfully: ${data.path}`);
       
       return data;
     } catch (error) {
-      console.error('[ScreenshotService] Upload failed:', error.message);
+      console.error(`[ScreenshotService] Upload failed (attempt ${retryCount + 1}):`, error.message);
       
-      // Store failed uploads for retry (optional)
-      const failedUploads = store.get('failedUploads', []);
-      failedUploads.push({
-        timestamp: Date.now(),
-        error: error.message
-      });
-      // Keep only last 10 failed uploads
-      store.set('failedUploads', failedUploads.slice(-10));
+      // Add to retry queue if not exceeded max retries
+      if (retryCount < this.maxRetries) {
+        this.retryQueue.push({
+          imageBuffer,
+          mimeType,
+          token,
+          retryCount: retryCount + 1,
+          timestamp: Date.now()
+        });
+        console.log(`[ScreenshotService] Added to retry queue (${this.retryQueue.length} pending)`);
+      } else {
+        console.error('[ScreenshotService] Max retries exceeded, discarding screenshot');
+        // Store failed uploads info for debugging
+        const failedUploads = store.get('failedUploads', []);
+        failedUploads.push({
+          timestamp: Date.now(),
+          error: error.message
+        });
+        // Keep only last 10 failed uploads
+        store.set('failedUploads', failedUploads.slice(-10));
+      }
       
       throw error;
+    }
+  }
+
+  /**
+   * Process retry queue for failed uploads
+   */
+  async processRetryQueue() {
+    if (this.retryQueue.length === 0) return;
+
+    const item = this.retryQueue.shift();
+    if (!item) return;
+
+    // Check if item is too old (more than 5 minutes)
+    if (Date.now() - item.timestamp > 5 * 60 * 1000) {
+      console.log('[ScreenshotService] Retry item too old, discarding');
+      return;
+    }
+
+    console.log(`[ScreenshotService] Processing retry queue (${this.retryQueue.length + 1} items)`);
+
+    try {
+      await this.uploadScreenshot(item.imageBuffer, item.mimeType, item.token, item.retryCount);
+    } catch (error) {
+      // Error already logged in uploadScreenshot
+    }
+  }
+
+  /**
+   * Force capture now (for debugging/testing)
+   */
+  async forceCapture() {
+    console.log('[ScreenshotService] Force capture requested');
+    const token = this.getAuthToken();
+    if (!token) {
+      console.error('[ScreenshotService] No auth token for force capture');
+      return { success: false, error: 'No auth token' };
+    }
+
+    // Temporarily set clocked in to true for force capture
+    const wasClockedIn = this.isClockedIn;
+    this.isClockedIn = true;
+    
+    try {
+      await this.captureAndUpload();
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    } finally {
+      this.isClockedIn = wasClockedIn;
     }
   }
 
@@ -232,7 +366,11 @@ class ScreenshotService {
       isRunning: this.isRunning,
       isClockedIn: this.isClockedIn,
       lastClockCheck: this.lastClockCheck,
-      interval: this.interval
+      lastCaptureTime: this.lastCaptureTime,
+      captureInProgress: this.captureInProgress,
+      retryQueueLength: this.retryQueue.length,
+      interval: this.interval,
+      failedUploads: store.get('failedUploads', [])
     };
   }
 }

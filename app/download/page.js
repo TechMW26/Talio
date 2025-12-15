@@ -25,7 +25,7 @@ export default function DownloadPage() {
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-8 text-white text-center">
           <Smartphone className="w-16 h-16 mx-auto mb-4" />
-          <h1 className="text-3xl font-bold mb-2">Talio HRMS</h1>
+          <h1 className="text-3xl font-bold mb-2">Talio</h1>
           <p className="text-blue-100">Download the Android App</p>
         </div>
 

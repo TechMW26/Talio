@@ -1,7 +1,7 @@
-# Talio HRMS - AI Agent Instructions
+# Talio - AI Agent Instructions
 
 ## 🧠 Project Overview
-Talio is a comprehensive HRMS (Human Resource Management System) built with **Next.js 14 (App Router)**, **MongoDB**, and a **Custom Node.js Server** for real-time capabilities. It features an AI assistant named "MAYA" and productivity monitoring tools.
+Talio is a comprehensive workforce management platform built with **Next.js 14 (App Router)**, **MongoDB**, and a **Custom Node.js Server** for real-time capabilities. It features an AI assistant named "MAYA" and productivity monitoring tools.
 
 ## 🏗 Architecture & Core Components
 

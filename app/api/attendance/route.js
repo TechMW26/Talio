@@ -438,7 +438,7 @@ export async function POST(request) {
             'If this was not you, please contact your HR/administrator.',
             '',
             'Thanks,',
-            'Talio HRMS',
+            'Talio',
           ]
 
           await sendEmail({
@@ -680,7 +680,7 @@ export async function POST(request) {
             'If this was not you, please contact your HR/administrator.',
             '',
             'Thanks,',
-            'Talio HRMS',
+            'Talio',
           ]
 
           await sendEmail({

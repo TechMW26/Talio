@@ -1,6 +1,6 @@
 # Talio Desktop Application
 
-Cross-platform desktop application for Talio HRMS with productivity monitoring.
+Cross-platform desktop application for Talio with productivity monitoring.
 
 ## Features
 

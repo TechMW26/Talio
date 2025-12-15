@@ -275,7 +275,7 @@ export default function ProjectDetailPage() {
       document.title = `${project.name} | Projects | Talio`
     }
     return () => {
-      document.title = 'Talio HRMS'
+      document.title = 'Talio'
     }
   }, [project?.name])
 

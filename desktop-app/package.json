@@ -1,7 +1,7 @@
 {
   "name": "talio-desktop",
   "version": "1.0.0",
-  "description": "Talio HRMS Desktop Application",
+  "description": "Talio Desktop Application",
   "main": "src/main.js",
   "author": "Talio",
   "license": "MIT",
@@ -18,7 +18,7 @@
     "clean": "rimraf dist"
   },
   "build": {
-    "appId": "com.talio.hrms",
+    "appId": "com.talio.app",
     "productName": "Talio",
     "copyright": "Copyright © 2024 Talio",
     "asar": true,

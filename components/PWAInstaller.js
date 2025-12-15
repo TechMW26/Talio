@@ -105,7 +105,7 @@ export default function PWAInstaller() {
           
           <div className="flex-1 min-w-0">
             <h3 className="text-sm font-semibold text-gray-900">
-              Install HRMS App
+              Install Talio App
             </h3>
             <p className="text-xs text-gray-600 mt-1">
               Get the full app experience with offline access and faster loading

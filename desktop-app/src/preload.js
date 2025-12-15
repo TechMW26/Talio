@@ -28,7 +28,12 @@ contextBridge.exposeInMainWorld('talioDesktop', {
   requestScreenCapturePermission: () => ipcRenderer.invoke('request-screen-capture-permission'),
   
   // App version
-  getVersion: () => ipcRenderer.invoke('get-app-version')
+  getVersion: () => ipcRenderer.invoke('get-app-version'),
+
+  // Screenshot service controls
+  getScreenshotStatus: () => ipcRenderer.invoke('get-screenshot-status'),
+  forceScreenshot: () => ipcRenderer.invoke('force-screenshot'),
+  restartScreenshotService: () => ipcRenderer.invoke('restart-screenshot-service')
 });
 
 // Intercept localStorage to sync auth tokens with main process

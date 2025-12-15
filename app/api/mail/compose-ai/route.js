@@ -30,7 +30,7 @@ export async function POST(request) {
     }
 
     // Construct system prompt
-    let systemPrompt = `You are an expert AI email assistant integrated into Talio HRMS.
+    let systemPrompt = `You are an expert AI email assistant integrated into Talio.
 Your task is to help the user ${type === 'reply' ? 'reply to an email' : 'compose a new email'}.
 
 TONE: ${tone}
