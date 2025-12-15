@@ -45,7 +45,7 @@ export default function DownloadPage() {
             <Smartphone className="w-12 h-12" />
             <Monitor className="w-12 h-12" />
           </div>
-          <h1 className="text-3xl font-bold mb-2">Talio</h1>
+          <h1 className="text-3xl font-bold mb-2">Talio HRMS</h1>
           <p className="text-blue-100">Download for your platform</p>
         </div>
 

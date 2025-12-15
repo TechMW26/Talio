@@ -1,7 +1,7 @@
 {
   "name": "Talio",
   "short_name": "Talio",
-  "description": "Complete solution for managing employees, attendance, productivity, and more",
+  "description": "Complete HRMS solution for managing employees, attendance, payroll, and more",
   "start_url": "/",
   "display": "standalone",
   "display_override": ["window-controls-overlay"],

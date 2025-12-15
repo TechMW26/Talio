@@ -44,14 +44,14 @@ const shadowsIntoLight = Shadows_Into_Light({
 })
 
 export const metadata = {
-  title: 'Talio - Workforce Management Platform',
-  description: 'Complete solution for managing employees, attendance, productivity, and more',
+  title: 'Talio HRMS - Human Resource Management System',
+  description: 'Complete HRMS solution for managing employees, attendance, payroll, and more',
   manifest: '/manifest.json',
 
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'Talio',
+    title: 'Talio HRMS',
   },
   icons: {
     icon: [
@@ -75,8 +75,8 @@ export const metadata = {
     'mobile-web-app-capable': 'yes',
     'apple-mobile-web-app-capable': 'yes',
     'apple-mobile-web-app-status-bar-style': 'default',
-    'apple-mobile-web-app-title': 'Talio',
-    'application-name': 'Talio',
+    'apple-mobile-web-app-title': 'Talio HRMS',
+    'application-name': 'Talio HRMS',
     'msapplication-TileColor': '#ffffff',
     'msapplication-TileImage': '/icons/icon-144x144.png',
   },
