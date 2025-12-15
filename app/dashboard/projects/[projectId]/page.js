@@ -1908,8 +1908,7 @@ export default function ProjectDetailPage() {
                         {member.user.firstName} {member.user.lastName}
                       </span>
                     </label>
-                  ))
-                  })()}
+                  ))})()}
                 </div>
               </div>
 
