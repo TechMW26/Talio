@@ -31,9 +31,9 @@ export default function DownloadPage() {
   // GitHub release URLs
   const downloadLinks = {
     android: '/downloads/talio-hrms-app.apk',
-    macIntel: 'https://github.com/avirajsharma-ops/Talio/releases/download/v1.1.0/Talio-1.0.0.dmg',
-    macArm: 'https://github.com/avirajsharma-ops/Talio/releases/download/v1.1.0/Talio-1.0.0-arm64.dmg',
-    windows: 'https://github.com/avirajsharma-ops/Talio/releases/download/v1.1.0/Talio.Setup.1.0.0.exe',
+    macIntel: 'https://github.com/avirajsharma-ops/Talio/releases/download/v1.2.0/Talio-macOS-Intel.dmg',
+    macArm: 'https://github.com/avirajsharma-ops/Talio/releases/download/v1.2.0/Talio-macOS-ARM.dmg',
+    windows: 'https://github.com/avirajsharma-ops/Talio/releases/download/v1.2.0/Talio-Windows.exe',
   }
 
   return (

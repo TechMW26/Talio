@@ -12,19 +12,19 @@ const RELEASE_VERSION = '1.1.0';
 const DOWNLOADS = {
   mac: {
     arm64: {
-      url: 'https://github.com/avirajsharma-ops/Talio/releases/download/v1.1.0/Talio-1.0.0-arm64.dmg',
+      url: 'https://github.com/avirajsharma-ops/Talio/releases/download/v1.2.0/Talio-macOS-ARM.dmg',
       label: 'Apple Silicon',
       size: '~91 MB'
     },
     x64: {
-      url: 'https://github.com/avirajsharma-ops/Talio/releases/download/v1.1.0/Talio-1.0.0.dmg',
+      url: 'https://github.com/avirajsharma-ops/Talio/releases/download/v1.2.0/Talio-macOS-Intel.dmg',
       label: 'Intel (x64)',
       size: '~95 MB'
     }
   },
   windows: {
     universal: {
-      url: 'https://github.com/avirajsharma-ops/Talio/releases/download/v1.1.0/Talio.Setup.1.0.0.exe',
+      url: 'https://github.com/avirajsharma-ops/Talio/releases/download/v1.2.0/Talio-Windows.exe',
       label: 'Universal (32 & 64-bit)',
       size: '~160 MB'
     }

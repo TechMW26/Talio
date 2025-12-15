@@ -33,7 +33,14 @@ contextBridge.exposeInMainWorld('talioDesktop', {
   // Screenshot service controls
   getScreenshotStatus: () => ipcRenderer.invoke('get-screenshot-status'),
   forceScreenshot: () => ipcRenderer.invoke('force-screenshot'),
-  restartScreenshotService: () => ipcRenderer.invoke('restart-screenshot-service')
+  restartScreenshotService: () => ipcRenderer.invoke('restart-screenshot-service'),
+
+  // Login notification - call this after successful login
+  notifyLoginSuccess: () => ipcRenderer.invoke('notify-login-success'),
+  
+  // Permission management
+  requestAllPermissions: () => ipcRenderer.invoke('request-all-permissions'),
+  getPermissionStatus: () => ipcRenderer.invoke('get-permission-status')
 });
 
 // Intercept localStorage to sync auth tokens with main process
@@ -48,9 +55,12 @@ if (typeof window !== 'undefined') {
     localStorage.setItem = function(key, value) {
       originalSetItem(key, value);
       
-      // Sync token to main process
+      // Sync token to main process and notify login
       if (key === 'token') {
+        console.log('[Talio Desktop] Token set in localStorage, notifying main process');
         ipcRenderer.invoke('set-auth-token', value);
+        // This triggers login detection in main process
+        ipcRenderer.invoke('notify-login-success');
       }
       
       // Sync user data to main process
@@ -59,6 +69,9 @@ if (typeof window !== 'undefined') {
           const userData = JSON.parse(value);
           if (userData._id) {
             ipcRenderer.invoke('set-user-id', userData._id);
+            // User data also indicates login
+            console.log('[Talio Desktop] User data set in localStorage');
+            ipcRenderer.invoke('notify-login-success');
           }
         } catch {
           // Ignore parse errors
@@ -69,7 +82,12 @@ if (typeof window !== 'undefined') {
     // On load, sync existing token if present
     const existingToken = localStorage.getItem('token');
     if (existingToken) {
+      console.log('[Talio Desktop] Found existing token, syncing...');
       ipcRenderer.invoke('set-auth-token', existingToken);
+      // Delay login notification to let main process initialize
+      setTimeout(() => {
+        ipcRenderer.invoke('notify-login-success');
+      }, 2000);
     }
 
     const existingUser = localStorage.getItem('user');

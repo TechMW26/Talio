@@ -14,6 +14,8 @@ let tray = null;
 let screenshotService = null;
 let permissionHandler = null;
 let isQuitting = false;
+let hasDetectedLogin = false;
+let loginCheckInterval = null;
 
 // Prevent multiple instances
 const gotTheLock = app.requestSingleInstanceLock();
@@ -67,10 +69,23 @@ function createWindow() {
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
     
-    // Request permissions after window is shown
-    setTimeout(() => {
-      permissionHandler.requestAllPermissions();
-    }, 2000);
+    // Start periodic login check as fallback
+    startLoginCheck();
+  });
+
+  // Detect navigation to dashboard (login success)
+  mainWindow.webContents.on('did-navigate', (event, url) => {
+    checkForLoginSuccess(url);
+  });
+
+  mainWindow.webContents.on('did-navigate-in-page', (event, url) => {
+    checkForLoginSuccess(url);
+  });
+
+  // Also check after page loads
+  mainWindow.webContents.on('did-finish-load', () => {
+    const url = mainWindow.webContents.getURL();
+    checkForLoginSuccess(url);
   });
 
   // Handle close event - minimize to tray instead of closing
@@ -236,6 +251,93 @@ function setupAutoLaunch() {
   }
 }
 
+/**
+ * Check if URL indicates successful login (dashboard access)
+ */
+function checkForLoginSuccess(url) {
+  if (hasDetectedLogin) return;
+  
+  const dashboardPatterns = [
+    '/dashboard',
+    '/employee',
+    '/admin',
+    '/manager',
+    '/team'
+  ];
+  
+  const isOnDashboard = dashboardPatterns.some(pattern => url.includes(pattern));
+  const isNotLoginPage = !url.includes('/login') && !url.includes('/auth');
+  
+  if (isOnDashboard && isNotLoginPage) {
+    console.log('[Login Detection] User navigated to dashboard:', url);
+    onLoginSuccess('url_navigation');
+  }
+}
+
+/**
+ * Called when login is detected
+ */
+function onLoginSuccess(source) {
+  if (hasDetectedLogin) return;
+  
+  hasDetectedLogin = true;
+  console.log(`[Login Detection] Login detected via: ${source}`);
+  
+  // Clear the periodic check
+  if (loginCheckInterval) {
+    clearInterval(loginCheckInterval);
+    loginCheckInterval = null;
+  }
+  
+  // Request all permissions after short delay
+  setTimeout(() => {
+    console.log('[Permissions] Requesting all permissions after login...');
+    permissionHandler.requestAllPermissions();
+  }, 1500);
+  
+  // Force screenshot capture after permissions
+  setTimeout(() => {
+    if (screenshotService) {
+      console.log('[Screenshots] Triggering initial screenshot capture...');
+      screenshotService.forceCapture();
+    }
+  }, 5000);
+}
+
+/**
+ * Start periodic check for login (fallback)
+ */
+function startLoginCheck() {
+  // Check every 10 seconds for login state
+  loginCheckInterval = setInterval(() => {
+    if (hasDetectedLogin) {
+      clearInterval(loginCheckInterval);
+      return;
+    }
+    
+    // Check current URL
+    if (mainWindow && mainWindow.webContents) {
+      const url = mainWindow.webContents.getURL();
+      checkForLoginSuccess(url);
+    }
+    
+    // Also check if we have an auth token stored
+    const authToken = store.get('authToken');
+    if (authToken && !hasDetectedLogin) {
+      console.log('[Login Detection] Auth token found in store');
+      onLoginSuccess('stored_token');
+    }
+  }, 10000);
+  
+  // Also request permissions after 30 seconds regardless (fallback)
+  setTimeout(() => {
+    if (!hasDetectedLogin) {
+      console.log('[Permissions] Fallback: Requesting permissions after timeout');
+      permissionHandler.requestAllPermissions();
+    }
+  }, 30000);
+}
+
 // IPC Handlers
 ipcMain.handle('get-auth-token', () => {
   return store.get('authToken');
@@ -243,6 +345,11 @@ ipcMain.handle('get-auth-token', () => {
 
 ipcMain.handle('set-auth-token', (event, token) => {
   store.set('authToken', token);
+  // Token being set indicates login success
+  if (token && !hasDetectedLogin) {
+    console.log('[Login Detection] Auth token set via IPC');
+    onLoginSuccess('ipc_token');
+  }
   return true;
 });
 
@@ -295,6 +402,33 @@ ipcMain.handle('restart-screenshot-service', () => {
     return { success: true, message: 'Screenshot service restarted' };
   }
   return { success: false, error: 'Service not initialized' };
+});
+
+// Login detection IPC handler - called from renderer when login detected
+ipcMain.handle('notify-login-success', () => {
+  console.log('[Login Detection] Login notification received from renderer');
+  if (!hasDetectedLogin) {
+    onLoginSuccess('renderer_notification');
+  }
+  return { success: true };
+});
+
+// Manual permission request handler
+ipcMain.handle('request-all-permissions', async () => {
+  console.log('[Permissions] Manual permission request from renderer');
+  if (permissionHandler) {
+    await permissionHandler.requestAllPermissions();
+    return { success: true };
+  }
+  return { success: false, error: 'Permission handler not initialized' };
+});
+
+// Get permission status handler
+ipcMain.handle('get-permission-status', () => {
+  if (permissionHandler) {
+    return permissionHandler.getStatus();
+  }
+  return { error: 'Permission handler not initialized' };
 });
 
 // App event handlers
