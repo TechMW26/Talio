@@ -4,7 +4,7 @@ import { FaHistory } from 'react-icons/fa'
 
 export default function RecentActivitiesWidget() {
     return (
-        <div className="p-4 sm:p-6">
+        <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
             <div className="mb-4">
                 <h3 className="text-base sm:text-lg font-bold text-gray-800">Recent Activities</h3>
             </div>

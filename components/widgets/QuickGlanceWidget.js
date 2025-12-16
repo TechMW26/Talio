@@ -133,7 +133,7 @@ export default function QuickGlanceWidget({
   }, [todayAttendance])
 
   return (
-    <div className="p-4 sm:p-6">
+    <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <FaClock className="w-5 h-5 text-primary-500" />
@@ -164,7 +164,7 @@ export default function QuickGlanceWidget({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2 flex-1">
         {/* Check In Time */}
         <div className="bg-gray-50 rounded-lg p-3">
           <div className="flex items-center gap-2 mb-2">

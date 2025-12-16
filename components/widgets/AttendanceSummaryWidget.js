@@ -32,7 +32,7 @@ export default function AttendanceSummaryWidget({ employeeId }) {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-6 animate-pulse">
+      <div className="p-4 sm:p-6 animate-pulse flex-1 flex flex-col h-full">
         <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
         <div className="grid grid-cols-3 gap-4">
           <div className="h-20 bg-gray-200 rounded"></div>
@@ -46,7 +46,7 @@ export default function AttendanceSummaryWidget({ employeeId }) {
   const currentMonth = new Date().toLocaleString('default', { month: 'long' })
 
   return (
-    <div className="p-4 sm:p-6">
+  <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
       <div className="mb-4">
         <h3 className="text-base sm:text-lg font-bold text-gray-800">
           Attendance - {currentMonth}

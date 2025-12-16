@@ -7,7 +7,7 @@ import { FaBuilding } from 'react-icons/fa'
 export default function DepartmentChartWidget({ departmentStats = [] }) {
   if (!departmentStats || departmentStats.length === 0) {
     return (
-      <div className="p-4 sm:p-6">
+      <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
         <div className="mb-4">
           <h3 className="text-base sm:text-lg font-bold text-gray-800">Department Distribution</h3>
         </div>
@@ -20,11 +20,11 @@ export default function DepartmentChartWidget({ departmentStats = [] }) {
   }
 
   return (
-    <div className="p-4 sm:p-6">
+    <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
       <div className="mb-4">
         <h3 className="text-base sm:text-lg font-bold text-gray-800">Department Distribution</h3>
       </div>
-      <div className="h-64">
+      <div className="flex-1 min-h-0">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie

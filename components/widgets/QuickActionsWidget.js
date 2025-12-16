@@ -16,19 +16,19 @@ export default function QuickActionsWidget() {
     ]
 
     return (
-        <div className="p-4 sm:p-6">
+        <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
             <div className="mb-4">
                 <h3 className="text-base sm:text-lg font-bold text-gray-800">Quick Actions</h3>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 flex-1">
                 {actions.map((action, index) => {
                     const Icon = action.icon
                     return (
                         <button
                             key={index}
                             onClick={() => router.push(action.path)}
-                            className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors flex flex-col items-center gap-2 text-center"
+                            className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors flex flex-col items-center gap-2 text-center h-full"
                         >
                             <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
                                 <Icon className="w-5 h-5 text-primary-600" />

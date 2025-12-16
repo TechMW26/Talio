@@ -3,21 +3,7 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { FaGripVertical, FaTimes } from 'react-icons/fa'
-import { useState } from 'react'
-
-// Widget color palette - elegant gradient borders
-const WIDGET_COLORS = [
-  { border: 'border-l-4 border-l-blue-500', shadow: 'shadow-blue-100' },
-  { border: 'border-l-4 border-l-emerald-500', shadow: 'shadow-emerald-100' },
-  { border: 'border-l-4 border-l-violet-500', shadow: 'shadow-violet-100' },
-  { border: 'border-l-4 border-l-amber-500', shadow: 'shadow-amber-100' },
-  { border: 'border-l-4 border-l-rose-500', shadow: 'shadow-rose-100' },
-  { border: 'border-l-4 border-l-cyan-500', shadow: 'shadow-cyan-100' },
-  { border: 'border-l-4 border-l-indigo-500', shadow: 'shadow-indigo-100' },
-  { border: 'border-l-4 border-l-teal-500', shadow: 'shadow-teal-100' },
-  { border: 'border-l-4 border-l-orange-500', shadow: 'shadow-orange-100' },
-  { border: 'border-l-4 border-l-pink-500', shadow: 'shadow-pink-100' },
-]
+import { useState, useEffect } from 'react'
 
 export default function DraggableWidget({
   id,
@@ -29,9 +15,15 @@ export default function DraggableWidget({
   removable = true,
 }) {
   const [showControls, setShowControls] = useState(false)
-  
-  // Get color based on index (cycles through colors)
-  const color = WIDGET_COLORS[colorIndex % WIDGET_COLORS.length]
+  const [isVisible, setIsVisible] = useState(false)
+
+  // Trigger entrance animation on mount with staggered delay based on index
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsVisible(true)
+    }, colorIndex * 80) // Stagger by 80ms per widget
+    return () => clearTimeout(timer)
+  }, [colorIndex])
 
   const {
     attributes,
@@ -44,16 +36,27 @@ export default function DraggableWidget({
 
   const sortableStyle = {
     transform: CSS.Transform.toString(transform),
-    transition,
+    // No transition during drag for instant movement, smooth transition after drop
+    transition: isDragging ? 'none' : (transition || 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'),
     zIndex: isDragging ? 50 : 'auto',
-    opacity: isDragging ? 0.8 : 1,
   }
+
+  // Separate entrance animation classes from drag classes
+  const entranceClasses = isVisible 
+    ? 'opacity-100 translate-y-0 scale-100' 
+    : 'opacity-0 translate-y-4 scale-[0.97]'
 
   return (
     <div
       ref={setNodeRef}
       style={sortableStyle}
-      className={`relative group bg-white ${color.border} border border-gray-100 shadow-sm hover:shadow-md transition-shadow h-full ${isDragging ? 'ring-2 ring-primary-500 shadow-xl' : ''} ${className}`}
+      className={`
+        relative group bg-white border border-gray-100/50 h-full
+        ${isDragging ? '' : 'transition-all duration-500 ease-out'}
+        ${entranceClasses}
+        ${isDragging ? 'ring-2 ring-primary-500 shadow-2xl' : 'shadow-sm hover:shadow-xl hover:scale-[1.01]'}
+        ${className}
+      `}
       onMouseEnter={() => setShowControls(true)}
       onMouseLeave={() => setShowControls(false)}
     >

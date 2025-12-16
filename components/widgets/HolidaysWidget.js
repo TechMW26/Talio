@@ -47,7 +47,7 @@ export default function HolidaysWidget({ limit = 5 }) {
 
     if (loading) {
         return (
-            <div className="p-4 sm:p-6 animate-pulse">
+            <div className="p-4 sm:p-6 animate-pulse flex-1 flex flex-col h-full">
                 <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
                 <div className="space-y-3">
                     {[1, 2, 3].map(i => (
@@ -59,7 +59,7 @@ export default function HolidaysWidget({ limit = 5 }) {
     }
 
     return (
-        <div className="p-4 sm:p-6">
+        <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
             <div className="flex items-center justify-between mb-4">
                 <h3 className="text-base sm:text-lg font-bold text-gray-800">Upcoming Holidays</h3>
                 <button

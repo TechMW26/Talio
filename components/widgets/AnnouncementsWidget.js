@@ -32,7 +32,7 @@ export default function AnnouncementsWidget() {
 
     if (loading) {
         return (
-            <div className="p-4 sm:p-6 animate-pulse">
+            <div className="p-4 sm:p-6 animate-pulse flex-1 flex flex-col h-full">
                 <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
                 <div className="space-y-3">
                     {[1, 2].map(i => (
@@ -44,7 +44,7 @@ export default function AnnouncementsWidget() {
     }
 
     return (
-        <div className="p-4 sm:p-6">
+        <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
             <div className="flex items-center justify-between mb-4">
                 <h3 className="text-base sm:text-lg font-bold text-gray-800">Announcements</h3>
                 <button
@@ -55,28 +55,30 @@ export default function AnnouncementsWidget() {
                 </button>
             </div>
 
-            {announcements.length === 0 ? (
-                <div className="text-center py-6 text-gray-500">
-                    <FaBullhorn className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                    <p className="text-sm">No announcements</p>
-                </div>
-            ) : (
-                <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {announcements.slice(0, 5).map((announcement) => (
-                        <div
-                            key={announcement._id}
-                            className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-                            onClick={() => router.push(`/dashboard/announcements/${announcement._id}`)}
-                        >
-                            <h4 className="text-sm font-medium text-gray-800 truncate mb-1">{announcement.title}</h4>
-                            <p className="text-xs text-gray-600 line-clamp-2">{announcement.message}</p>
-                            <p className="text-xs text-gray-400 mt-2">
-                                {new Date(announcement.createdAt).toLocaleDateString()}
-                            </p>
-                        </div>
-                    ))}
-                </div>
-            )}
+            <div className="flex-1 flex flex-col">
+                {announcements.length === 0 ? (
+                    <div className="text-center py-6 text-gray-500 flex-1 flex flex-col justify-center">
+                        <FaBullhorn className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                        <p className="text-sm">No announcements</p>
+                    </div>
+                ) : (
+                    <div className="space-y-2 overflow-y-auto flex-1">
+                        {announcements.slice(0, 5).map((announcement) => (
+                            <div
+                                key={announcement._id}
+                                className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
+                                onClick={() => router.push(`/dashboard/announcements/${announcement._id}`)}
+                            >
+                                <h4 className="text-sm font-medium text-gray-800 truncate mb-1">{announcement.title}</h4>
+                                <p className="text-xs text-gray-600 line-clamp-2">{announcement.message}</p>
+                                <p className="text-xs text-gray-400 mt-2">
+                                    {new Date(announcement.createdAt).toLocaleDateString()}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
         </div>
     )
 }

@@ -11,10 +11,11 @@ export default function CheckInOutWidget({
   onClockIn,
   onClockOut,
 }) {
+
   const getStatus = () => {
-    if (!todayAttendance?.checkIn) return { text: 'Not Checked In', color: 'text-amber-200', bgColor: 'bg-amber-500/30', icon: FaTimesCircle }
-    if (todayAttendance?.checkOut) return { text: 'Day Complete', color: 'text-white/80', bgColor: 'bg-white/20', icon: FaCheckCircle }
-    return { text: 'Working', color: 'text-emerald-200', bgColor: 'bg-emerald-500/30', icon: FaCheckCircle }
+    if (!todayAttendance?.checkIn) return { text: 'Not Checked In', color: 'text-amber-800', bgColor: 'bg-amber-100', icon: FaTimesCircle, pulse: false }
+    if (todayAttendance?.checkOut) return { text: 'Day Complete', color: 'text-emerald-800', bgColor: 'bg-emerald-100', icon: FaCheckCircle, pulse: false }
+    return { text: 'Working', color: 'text-emerald-800', bgColor: 'bg-emerald-100', icon: FaCheckCircle, pulse: true }
   }
 
   const status = getStatus()
@@ -37,64 +38,70 @@ export default function CheckInOutWidget({
 
   return (
     <div
+      className="relative rounded-[30px] shadow-2xl p-5 sm:p-6 text-white h-full flex flex-col justify-between overflow-hidden"
       style={{ background: 'var(--color-accent-gradient)' }}
-      className="rounded-[30px] shadow-lg p-5 sm:p-6 text-white h-full flex flex-col"
     >
-      {/* Profile Row */}
-      <div className="flex items-start gap-4 flex-1">
-        {/* Profile Image */}
-        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden bg-white/20 flex items-center justify-center flex-shrink-0 shadow-lg border-2 border-white/30">
-          {employeeData?.profilePicture ? (
-            <img src={employeeData.profilePicture} alt="Profile" className="w-full h-full object-cover" />
-          ) : (
-            <FaUser className="w-8 h-8 sm:w-10 sm:h-10 text-white/90" />
-          )}
-        </div>
-        
-        {/* User Info */}
-        <div className="flex-1 min-w-0">
-          {/* Status Badge */}
-          <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full ${status.bgColor} mb-1.5`}>
-            <StatusIcon className={`w-2.5 h-2.5 ${status.color}`} />
-            <span className={`text-[10px] font-semibold ${status.color}`}>{status.text}</span>
+      {/* Content - Takes remaining space (details aligned top) */}
+      <div className="relative z-10 flex-1 flex flex-col justify-start">
+
+        {/* Profile Row */}
+        <div className="flex items-center gap-5">
+          {/* Profile Image - Clean Circle */}
+          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 shadow-xl ring-4 ring-white/25">
+            {employeeData?.profilePicture ? (
+              <img src={employeeData.profilePicture} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center">
+                <FaUser className="w-10 h-10 sm:w-12 sm:h-12 text-white" />
+              </div>
+            )}
           </div>
           
-          {/* Name */}
-          <h2 className="text-lg sm:text-xl font-bold tracking-wide leading-tight truncate">
-            {employeeData ? `${employeeData.firstName || ''} ${employeeData.lastName || ''}`.trim() :
-              (user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : 'User')}
-          </h2>
-          
-          {/* Employee Code */}
-          <p className="text-[11px] font-medium text-white/70 mt-0.5">
-            {employeeData?.employeeCode || user?.employeeCode || user?.employeeNumber || '---'}
-          </p>
-
-          {/* Designation & Department */}
-          {(designationText || departmentName) && (
-            <p className="text-xs text-white/80 mt-1 truncate">
-              {designationText}{designationText && departmentName ? ' • ' : ''}{departmentName}
+          {/* User Info */}
+          <div className="flex-1 min-w-0">
+            {/* Status Badge with Animation */}
+            <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full ${status.bgColor} mb-2 transition-all duration-300 hover:scale-105`}>
+              <StatusIcon className={`w-3 h-3 ${status.color} ${status.pulse ? 'animate-pulse' : ''}`} />
+              <span className={`text-xs font-semibold ${status.color}`}>{status.text}</span>
+            </div>
+            
+            {/* Name */}
+            <h2 className="text-xl sm:text-2xl font-bold tracking-wide leading-tight truncate drop-shadow-sm">
+              {employeeData ? `${employeeData.firstName || ''} ${employeeData.lastName || ''}`.trim() :
+                (user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : 'User')}
+            </h2>
+            
+            {/* Employee Code */}
+            <p className="text-xs font-medium text-white/60 mt-1">
+              {employeeData?.employeeCode || user?.employeeCode || user?.employeeNumber || '---'}
             </p>
-          )}
+
+            {/* Designation & Department */}
+            {(designationText || departmentName) && (
+              <p className="text-sm text-white/75 mt-1.5 truncate">
+                {designationText}{designationText && departmentName ? ' • ' : ''}{departmentName}
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Action Buttons */}
-      <div className="flex gap-3 mt-4">
+      <div className="relative z-10 flex gap-3 mt-5">
         <button
           onClick={onClockIn}
           disabled={attendanceLoading || (todayAttendance && todayAttendance.checkIn)}
-          className="btn-theme-primary disabled:opacity-40 disabled:cursor-not-allowed px-4 py-2.5 rounded-xl font-bold text-sm shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center flex-1 gap-2"
+          className="disabled:opacity-40 disabled:cursor-not-allowed px-5 py-3.5 rounded-full font-bold text-sm shadow-lg transition-all duration-200 flex items-center justify-center flex-1 gap-2 bg-blue-500/30 hover:bg-blue-500/40 hover:shadow-xl active:scale-[0.98] text-white"
         >
-          <FaSignInAlt className="w-3.5 h-3.5" />
+          <FaSignInAlt className="w-4 h-4" />
           <span>Check In</span>
         </button>
         <button
           onClick={onClockOut}
           disabled={attendanceLoading || !todayAttendance || !todayAttendance.checkIn || todayAttendance.checkOut}
-          className="btn-theme-secondary disabled:opacity-40 disabled:cursor-not-allowed px-4 py-2.5 rounded-xl font-bold text-sm shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center flex-1 gap-2"
+          className="disabled:opacity-40 disabled:cursor-not-allowed px-5 py-3.5 rounded-full font-bold text-sm shadow-lg transition-all duration-200 flex items-center justify-center flex-1 gap-2 bg-white text-blue-600 hover:bg-gray-50 hover:shadow-xl active:scale-[0.98]"
         >
-          <FaSignOutAlt className="w-3.5 h-3.5" />
+          <FaSignOutAlt className="w-4 h-4" />
           <span>Check Out</span>
         </button>
       </div>
