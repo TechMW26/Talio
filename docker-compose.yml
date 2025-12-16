@@ -2,7 +2,10 @@ services:
   app:
     build:
       context: .
+      dockerfile: Dockerfile
+      # Enable BuildKit for faster builds with caching
       args:
+        - BUILDKIT_INLINE_CACHE=1
         - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-https://app.talio.in}
         - NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME:-Talio HRMS}
         - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
@@ -10,6 +13,9 @@ services:
         - NEXT_PUBLIC_ELEVENLABS_VOICE_ID=${NEXT_PUBLIC_ELEVENLABS_VOICE_ID}
         - NEXT_PUBLIC_ELEVENLABS_API_URL=${NEXT_PUBLIC_ELEVENLABS_API_URL}
         - NEXT_PUBLIC_GEMINI_API_KEY=${NEXT_PUBLIC_GEMINI_API_KEY}
+      cache_from:
+        - talio-app:latest
+    image: talio-app:latest
     container_name: talio-app
     env_file:
       - .env
@@ -39,4 +45,22 @@ services:
       - EMAIL_FROM_EMAIL=${EMAIL_FROM_EMAIL}
     ports:
       - "3000:3000"
+    volumes:
+      # Persist uploads across container restarts
+      - ./public/uploads:/app/public/uploads
     restart: unless-stopped
+    # Resource limits for production
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # Graceful shutdown
+    stop_grace_period: 30s

@@ -3,6 +3,7 @@ import { verifyToken } from '@/lib/auth'
 import { writeFile, mkdir } from 'fs/promises'
 import path from 'path'
 import { existsSync } from 'fs'
+import { optimizeImage, isValidImage } from '@/lib/imageOptimization'
 
 // Configure route for larger file uploads (10MB)
 export const config = {
@@ -15,6 +16,9 @@ export const config = {
 
 // Next.js App Router specific config
 export const maxDuration = 60 // 60 seconds timeout for large uploads
+
+// Image MIME types that should be optimized
+const OPTIMIZABLE_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif']
 
 export async function POST(request) {
   try {
@@ -50,27 +54,48 @@ export async function POST(request) {
       await mkdir(uploadsDir, { recursive: true })
     }
 
-    // Generate unique filename
-    const timestamp = Date.now()
-    const originalName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
-    const filename = `${timestamp}-${originalName}`
-    const filepath = path.join(uploadsDir, filename)
-
-    // Convert file to buffer and save
+    // Convert file to buffer
     const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
+    let buffer = Buffer.from(bytes)
+    let finalFilename
+    let optimizationInfo = null
+
+    // Optimize images before saving
+    const isImage = OPTIMIZABLE_TYPES.includes(file.type)
+    if (isImage && await isValidImage(buffer)) {
+      const { buffer: optimizedBuffer, metadata } = await optimizeImage(buffer, {
+        type: 'large',
+        format: 'webp',
+        quality: 80
+      })
+      buffer = optimizedBuffer
+      optimizationInfo = metadata
+      
+      // Change extension to webp for optimized images
+      const originalName = file.name.replace(/\.[^/.]+$/, '').replace(/[^a-zA-Z0-9.-]/g, '_')
+      finalFilename = `${Date.now()}-${originalName}.webp`
+    } else {
+      // Non-image files - keep original
+      const originalName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
+      finalFilename = `${Date.now()}-${originalName}`
+    }
+
+    const filepath = path.join(uploadsDir, finalFilename)
     await writeFile(filepath, buffer)
 
     // Return the URL
-    const fileUrl = `/uploads/chat/${filename}`
+    const fileUrl = `/uploads/chat/${finalFilename}`
 
     return NextResponse.json({
       success: true,
       data: {
         fileUrl,
         fileName: file.name,
-        fileType: file.type,
-        fileSize: file.size
+        fileType: isImage ? 'image/webp' : file.type,
+        fileSize: buffer.length,
+        originalSize: file.size,
+        optimized: !!optimizationInfo,
+        ...(optimizationInfo && { compressionRatio: optimizationInfo.compressionRatio })
       }
     })
   } catch (error) {

@@ -74,10 +74,7 @@ export default function TodayTasksWidget({ limit = 5 }) {
     return (
         <div className="p-4 sm:p-6">
             <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                    <FaTasks className="w-5 h-5 text-primary-500" />
-                    <h3 className="text-base sm:text-lg font-bold text-gray-800">Today's Tasks</h3>
-                </div>
+                <h3 className="text-base sm:text-lg font-bold text-gray-800">Today's Tasks</h3>
                 <a
                     href="/dashboard/projects"
                     className="text-primary-600 hover:text-primary-800 text-sm font-medium"

@@ -47,8 +47,7 @@ export default function AttendanceSummaryWidget({ employeeId }) {
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="flex items-center gap-2 mb-4">
-        <FaClock className="w-5 h-5 text-primary-500" />
+      <div className="mb-4">
         <h3 className="text-base sm:text-lg font-bold text-gray-800">
           Attendance - {currentMonth}
         </h3>

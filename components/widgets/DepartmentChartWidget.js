@@ -8,8 +8,7 @@ export default function DepartmentChartWidget({ departmentStats = [] }) {
   if (!departmentStats || departmentStats.length === 0) {
     return (
       <div className="p-4 sm:p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <FaBuilding className="w-5 h-5 text-primary-500" />
+        <div className="mb-4">
           <h3 className="text-base sm:text-lg font-bold text-gray-800">Department Distribution</h3>
         </div>
         <div className="text-center py-6 text-gray-500">
@@ -22,8 +21,7 @@ export default function DepartmentChartWidget({ departmentStats = [] }) {
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="flex items-center gap-2 mb-4">
-        <FaBuilding className="w-5 h-5 text-primary-500" />
+      <div className="mb-4">
         <h3 className="text-base sm:text-lg font-bold text-gray-800">Department Distribution</h3>
       </div>
       <div className="h-64">

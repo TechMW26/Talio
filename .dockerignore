@@ -54,12 +54,43 @@ Thumbs.db
 # Git
 .git
 .gitignore
+.github
 
-# Docker (these don’t need to go inside the image)
+# Docker (these don't need to go inside the image)
 Dockerfile
-docker-compose.yml
+Dockerfile.*
+docker-compose*.yml
 .dockerignore
 
 # Temporary files
 tmp/
 temp/
+
+# Development and build artifacts
+android/
+desktop-app/
+windows-app/
+extension/
+release/
+release-builds/
+infra/
+scripts/
+*.apk
+*.aab
+
+# Documentation and non-essential files
+*.md
+!README.md
+*.txt
+*.log
+
+# Test files
+*.test.js
+*.spec.js
+__tests__/
+coverage/
+
+# Large binary files
+*.zip
+*.tar
+*.tar.gz

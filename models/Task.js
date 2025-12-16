@@ -45,6 +45,22 @@ const TaskSchema = new mongoose.Schema({
   completedAt: {
     type: Date
   },
+  // Rejection tracking
+  lastRejectedAt: {
+    type: Date
+  },
+  lastRejectedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Employee'
+  },
+  rejectionCount: {
+    type: Number,
+    default: 0
+  },
+  lastRejectionReason: {
+    type: String,
+    trim: true
+  },
   // Subtasks/micro tasks for granular progress tracking
   subtasks: [{
     _id: {

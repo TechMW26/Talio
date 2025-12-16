@@ -168,7 +168,7 @@ export async function PUT(request, { params }) {
     }
 
     const body = await request.json()
-    const { approvalId, action, remark } = body
+    const { approvalId, action, remark, unmarkSubtasks } = body
 
     if (!approvalId) {
       return NextResponse.json({ success: false, message: 'Approval ID is required' }, { status: 400 })
@@ -185,7 +185,7 @@ export async function PUT(request, { params }) {
     const approve = action === 'approve'
 
     try {
-      const result = await respondToCompletionApproval(approvalId, employee, approve, remark)
+      const result = await respondToCompletionApproval(approvalId, employee, approve, remark, unmarkSubtasks)
       
       // Get all accepted members for notification
       const memberUserIds = await getProjectMemberUserIds(projectId)

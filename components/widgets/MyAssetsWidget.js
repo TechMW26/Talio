@@ -46,10 +46,7 @@ export default function MyAssetsWidget({ user }) {
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <FaLaptop className="w-5 h-5 text-primary-500" />
-          <h3 className="text-base sm:text-lg font-bold text-gray-800">My Assets</h3>
-        </div>
+        <h3 className="text-base sm:text-lg font-bold text-gray-800">My Assets</h3>
         <span className="text-xs font-medium bg-primary-100 text-primary-800 px-2 py-1 rounded-full">
           {assets.length}
         </span>

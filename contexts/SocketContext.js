@@ -157,6 +157,30 @@ export function SocketProvider({ children }) {
     }
   }, [socket, isConnected])
 
+  // Join a project room
+  const joinProject = useCallback((projectId) => {
+    if (socket && isConnected) {
+      socket.emit('join-project', projectId)
+      console.log(`📂 [Socket.IO Client] Joining project:${projectId}`)
+    }
+  }, [socket, isConnected])
+
+  // Leave a project room
+  const leaveProject = useCallback((projectId) => {
+    if (socket && isConnected) {
+      socket.emit('leave-project', projectId)
+      console.log(`📂 [Socket.IO Client] Leaving project:${projectId}`)
+    }
+  }, [socket, isConnected])
+
+  // Subscribe to task update events (for real-time sync when project head rejects/updates tasks)
+  const onTaskUpdated = useCallback((callback) => {
+    if (socket) {
+      socket.on('task_updated', callback)
+      return () => socket.off('task_updated', callback)
+    }
+  }, [socket])
+
   // Send a message
   const sendMessage = useCallback((chatId, message) => {
     if (socket && isConnected) {
@@ -377,6 +401,8 @@ export function SocketProvider({ children }) {
     currentUserId,
     joinChat,
     leaveChat,
+    joinProject,
+    leaveProject,
     sendMessage,
     sendTyping,
     sendStopTyping,
@@ -388,6 +414,7 @@ export function SocketProvider({ children }) {
     onUserLeft,
     onMessageRead,
     onTaskUpdate,
+    onTaskUpdated,
     onAnnouncement,
     onMessageReaction,
     onMessageDeleted,

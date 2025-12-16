@@ -250,6 +250,20 @@ export async function PUT(request, { params }) {
       }, { status: 403 })
     }
 
+    // STRICT ENFORCEMENT: If task is in 'review' status and 100% complete,
+    // only project head/admin can uncheck subtasks (through rejection flow)
+    if (task.status === 'review' && !isProjectHead && !isAdmin) {
+      const completedCount = task.subtasks.filter(st => st.completed).length
+      const currentProgress = Math.round((completedCount / task.subtasks.length) * 100)
+      
+      if (currentProgress === 100 && completed === false) {
+        return NextResponse.json({ 
+          success: false, 
+          message: 'Task is under review. Subtasks cannot be modified until the project head reviews the task.' 
+        }, { status: 403 })
+      }
+    }
+
     // Find the subtask in the array
     if (!task.subtasks || task.subtasks.length === 0) {
       return NextResponse.json({ success: false, message: 'No subtasks found on this task' }, { status: 404 })

@@ -8,6 +8,8 @@ import ProjectApprovalRequest from '@/models/ProjectApprovalRequest'
 import User from '@/models/User'
 import Employee from '@/models/Employee'
 import { createTimelineEvent, calculateCompletionPercentage } from '@/lib/projectService'
+import { notifyTaskReviewRejected } from '@/lib/projectNotifications'
+import { sendEmail, emailTemplates } from '@/lib/mailer'
 
 // PUT - Approve or reject a request
 export async function PUT(request, { params }) {
@@ -67,7 +69,14 @@ export async function PUT(request, { params }) {
     }
 
     const body = await request.json()
-    const { action, comment } = body
+    const { 
+      action, 
+      comment, 
+      unmarkSubtasks, 
+      subtasksToUnmark, // Array of subtask IDs to unmark
+      subtaskComments,  // Object mapping subtask IDs to comments
+      newStatus         // For tasks without subtasks - the new status to set
+    } = body
 
     if (!action || !['approve', 'reject'].includes(action)) {
       return NextResponse.json({ 
@@ -187,20 +196,183 @@ export async function PUT(request, { params }) {
     } else {
       // Handle rejection
       if ((approvalRequest.type === 'task_completion' || approvalRequest.type === 'task_review') && approvalRequest.relatedTask) {
-        // For task completion/review rejection, set status back to in-progress
-        await Task.findByIdAndUpdate(approvalRequest.relatedTask._id, {
-          status: 'in-progress'
-        })
+        const task = await Task.findById(approvalRequest.relatedTask._id)
+        
+        if (task) {
+          // Determine the new status
+          let targetStatus = 'in-progress'
+          
+          // For tasks without subtasks, allow project head to specify the status
+          if ((!task.subtasks || task.subtasks.length === 0) && newStatus) {
+            const validStatuses = ['todo', 'in-progress', 'on-hold']
+            if (validStatuses.includes(newStatus)) {
+              targetStatus = newStatus
+            }
+          }
+          
+          task.status = targetStatus
+          
+          // Track rejection details
+          task.lastRejectedAt = new Date()
+          task.lastRejectedBy = user.employeeId
+          task.rejectionCount = (task.rejectionCount || 0) + 1
+          task.lastRejectionReason = comment || ''
+          
+          // Handle subtask unmarking and track unmarked names
+          const unmarkedSubtaskNames = []
+          
+          if (task.subtasks && task.subtasks.length > 0) {
+            if (subtasksToUnmark && subtasksToUnmark.length > 0) {
+              // Selective unmarking - only unmark specified subtasks
+              task.subtasks.forEach(st => {
+                if (subtasksToUnmark.includes(st._id.toString())) {
+                  st.completed = false
+                  st.completedAt = null
+                  st.completedBy = null
+                  unmarkedSubtaskNames.push(st.title)
+                  // Add rejection comment to subtask if provided
+                  if (subtaskComments && subtaskComments[st._id.toString()]) {
+                    st.rejectionComment = subtaskComments[st._id.toString()]
+                    st.rejectedAt = new Date()
+                    st.rejectedBy = user.employeeId
+                  }
+                }
+              })
+            } else if (unmarkSubtasks) {
+              // Legacy: unmark all subtasks
+              task.subtasks.forEach(st => {
+                if (st.completed) {
+                  unmarkedSubtaskNames.push(st.title)
+                }
+                st.completed = false
+                st.completedAt = null
+                st.completedBy = null
+              })
+            }
+            
+            // Recalculate task progress percentage based on subtasks
+            const completedCount = task.subtasks.filter(st => st.completed).length
+            task.progressPercentage = task.subtasks.length > 0 
+              ? Math.round((completedCount / task.subtasks.length) * 100)
+              : 0
+          } else {
+            // No subtasks - set progress to 0
+            task.progressPercentage = 0
+          }
+          
+          await task.save()
+
+          // Emit socket event for real-time update with updated progress
+          if (global.io) {
+            global.io.to(`project:${approvalRequest.project}`).emit('task_updated', {
+              _id: task._id,
+              status: task.status,
+              subtasks: task.subtasks,
+              progressPercentage: task.progressPercentage,
+              lastRejectedAt: task.lastRejectedAt,
+              lastRejectionReason: task.lastRejectionReason,
+              rejectionCount: task.rejectionCount
+            })
+          }
+          
+          // Recalculate project completion percentage
+          calculateCompletionPercentage(approvalRequest.project).catch(console.error)
+          
+          // Get task assignees for notifications
+          const taskAssignees = await TaskAssignee.find({ 
+            task: task._id, 
+            assignmentStatus: 'accepted' 
+          }).populate('user', 'firstName lastName email')
+          
+          const assigneeEmployeeIds = taskAssignees.map(ta => ta.user._id)
+          const assigneeUserIds = await User.find({ 
+            employeeId: { $in: assigneeEmployeeIds } 
+          }).select('_id email')
+          
+          // Get rejector employee details
+          const rejectorEmployee = await Employee.findById(user.employeeId).select('firstName lastName')
+          
+          // Send push notifications to assignees
+          if (assigneeUserIds.length > 0) {
+            notifyTaskReviewRejected(
+              project, 
+              task, 
+              rejectorEmployee, 
+              assigneeUserIds.map(u => u._id),
+              comment,
+              unmarkedSubtaskNames
+            ).catch(console.error)
+          }
+          
+          // Send email notifications to assignees
+          for (const assignee of taskAssignees) {
+            if (assignee.user?.email) {
+              const assigneeUser = await User.findOne({ employeeId: assignee.user._id }).select('email')
+              if (assigneeUser?.email) {
+                const emailSubject = `Task Rejected: ${task.title}`
+                const emailBody = `
+                  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); padding: 20px; border-radius: 10px 10px 0 0;">
+                      <h1 style="color: white; margin: 0; font-size: 24px;">❌ Task Rejected</h1>
+                    </div>
+                    <div style="background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; border-top: none; border-radius: 0 0 10px 10px;">
+                      <p style="color: #374151; font-size: 16px;">Hi ${assignee.user.firstName},</p>
+                      <p style="color: #374151; font-size: 16px;">Your task has been rejected by <strong>${rejectorEmployee?.firstName} ${rejectorEmployee?.lastName}</strong>.</p>
+                      
+                      <div style="background: white; border: 1px solid #fecaca; border-left: 4px solid #ef4444; padding: 15px; margin: 15px 0; border-radius: 5px;">
+                        <h3 style="color: #991b1b; margin: 0 0 10px 0;">${task.title}</h3>
+                        <p style="color: #6b7280; margin: 0;">Project: <strong>${project.name}</strong></p>
+                        ${comment ? `<p style="color: #dc2626; margin: 10px 0 0 0;"><strong>Reason:</strong> ${comment}</p>` : ''}
+                      </div>
+                      
+                      ${unmarkedSubtaskNames.length > 0 ? `
+                        <div style="background: #fef2f2; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                          <p style="color: #991b1b; font-weight: bold; margin: 0 0 10px 0;">Subtasks marked incomplete:</p>
+                          <ul style="color: #b91c1c; margin: 0; padding-left: 20px;">
+                            ${unmarkedSubtaskNames.map(name => `<li>${name}</li>`).join('')}
+                          </ul>
+                        </div>
+                      ` : ''}
+                      
+                      <p style="color: #374151; font-size: 14px;">Please review the feedback and update the task accordingly.</p>
+                      
+                      <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'https://app.talio.in'}/dashboard/projects/${project._id}?task=${task._id}" 
+                         style="display: inline-block; background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 15px;">
+                        View Task
+                      </a>
+                    </div>
+                  </div>
+                `
+                
+                sendEmail({
+                  to: assigneeUser.email,
+                  subject: emailSubject,
+                  html: emailBody
+                }).catch(err => console.error('Failed to send rejection email:', err))
+              }
+            }
+          }
+          
+          // Create timeline event for rejection (with red color indicator)
+          createTimelineEvent({
+            project: approvalRequest.project,
+            type: 'task_rejected',
+            createdBy: user.employeeId,
+            relatedTask: task._id,
+            description: `Task "${task.title}" review rejected${comment ? `: ${comment}` : ''}`,
+            metadata: { 
+              requestType: approvalRequest.type, 
+              rejectionComment: comment, 
+              unmarkSubtasks,
+              subtasksUnmarked: unmarkedSubtaskNames,
+              subtaskComments,
+              newStatus: targetStatus,
+              isRejection: true,
+              colorCode: 'red'
+            }
+          }).catch(console.error)
+        }
       }
-      
-      // Create timeline event for rejection
-      createTimelineEvent({
-        project: approvalRequest.project,
-        type: 'comment_added',
-        createdBy: user.employeeId,
-        description: `Request rejected: ${approvalRequest.type.replace('_', ' ')}${comment ? ` - ${comment}` : ''}`,
-        metadata: { requestType: approvalRequest.type, rejectionComment: comment }
-      }).catch(console.error)
     }
 
     return NextResponse.json({

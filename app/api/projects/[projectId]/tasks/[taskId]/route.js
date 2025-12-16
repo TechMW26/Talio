@@ -175,24 +175,40 @@ export async function PUT(request, { params }) {
       changes.push('Description updated')
     }
     if (status && status !== task.status) {
+      // Calculate task progress from subtasks
+      let taskProgress = 0
+      if (task.subtasks && task.subtasks.length > 0) {
+        const completedCount = task.subtasks.filter(st => st.completed).length
+        taskProgress = Math.round((completedCount / task.subtasks.length) * 100)
+      }
+      
+      // STRICT ENFORCEMENT: Cannot change from 'review' status when 100% complete (except project head/admin)
+      if (task.status === 'review' && taskProgress === 100 && !isProjectHead && !isAdmin) {
+        return NextResponse.json({ 
+          success: false, 
+          message: 'Task is under review and cannot be modified. Please wait for project head approval.' 
+        }, { status: 403 })
+      }
+      
       // If assignee marks as completed, require approval from project head(s)
       if (status === 'completed' && !isProjectHead && !isAdmin) {
-        updates.status = 'completed-pending-approval'
-        changes.push(`Status changed from ${oldStatus} to pending approval`)
+        // STRICTLY ENFORCE REVIEW STATUS
+        updates.status = 'review'
+        changes.push(`Status changed from ${oldStatus} to review`)
         
-        // Create approval request for task completion
+        // Create approval request for task review (instead of completion)
         const ProjectApprovalRequest = (await import('@/models/ProjectApprovalRequest')).default
         await ProjectApprovalRequest.create({
           project: projectId,
-          type: 'task_completion',
+          type: 'task_review',
           status: 'pending',
           requestedBy: user.employeeId,
           relatedTask: taskId,
-          reason: `Task "${task.title}" completed and pending approval`,
+          reason: `Task "${task.title}" submitted for review (100% complete)`,
           metadata: {
             taskTitle: task.title,
             taskPriority: task.priority,
-            completedBy: user.employeeId
+            submittedBy: user.employeeId
           }
         })
       } else if (status === 'review' && !isProjectHead && !isAdmin) {

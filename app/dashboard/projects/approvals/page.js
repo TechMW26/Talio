@@ -54,6 +54,12 @@ export default function ApprovalsPage() {
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [selectedRequest, setSelectedRequest] = useState(null)
   const [rejectComment, setRejectComment] = useState('')
+  const [unmarkSubtasks, setUnmarkSubtasks] = useState(false)
+  const [subtasksToUnmark, setSubtasksToUnmark] = useState([]) // Array of subtask IDs
+  const [subtaskComments, setSubtaskComments] = useState({}) // Object mapping subtask ID to comment
+  const [newStatus, setNewStatus] = useState('in-progress') // For tasks without subtasks
+  const [taskDetails, setTaskDetails] = useState(null) // Full task details for rejection modal
+  const [loadingTask, setLoadingTask] = useState(false)
 
   // Auto-refresh refs
   const refreshIntervalRef = useRef(null)
@@ -157,19 +163,70 @@ export default function ApprovalsPage() {
     }
   }
 
+  // Fetch task details when opening reject modal for task_review or task_completion
+  const openRejectModal = async (request) => {
+    setSelectedRequest(request)
+    setRejectComment('')
+    setUnmarkSubtasks(false)
+    setSubtasksToUnmark([])
+    setSubtaskComments({})
+    setNewStatus('in-progress')
+    setTaskDetails(null)
+    setShowRejectModal(true)
+
+    // If it's a task review/completion, fetch full task details including subtasks
+    if ((request.type === 'task_review' || request.type === 'task_completion') && request.relatedTask?._id) {
+      try {
+        setLoadingTask(true)
+        const token = localStorage.getItem('token')
+        const res = await fetch(`/api/projects/${request.project._id || request.project}/tasks/${request.relatedTask._id}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+        const data = await res.json()
+        if (data.success) {
+          setTaskDetails(data.data)
+        }
+      } catch (error) {
+        console.error('Error fetching task details:', error)
+      } finally {
+        setLoadingTask(false)
+      }
+    }
+  }
+
   const handleReject = async () => {
     if (!selectedRequest) return
 
     try {
       setProcessingId(selectedRequest._id)
       const token = localStorage.getItem('token')
+      
+      // Build request body based on task type
+      const requestBody = { 
+        action: 'reject', 
+        comment: rejectComment
+      }
+      
+      // For tasks with subtasks, include which ones to unmark
+      if (taskDetails?.subtasks && taskDetails.subtasks.length > 0) {
+        if (subtasksToUnmark.length > 0) {
+          requestBody.subtasksToUnmark = subtasksToUnmark
+          requestBody.subtaskComments = subtaskComments
+        } else if (unmarkSubtasks) {
+          requestBody.unmarkSubtasks = true
+        }
+      } else {
+        // For tasks without subtasks, include the new status
+        requestBody.newStatus = newStatus
+      }
+      
       const response = await fetch(`/api/projects/approvals/${selectedRequest._id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ action: 'reject', comment: rejectComment })
+        body: JSON.stringify(requestBody)
       })
 
       const data = await response.json()
@@ -179,6 +236,11 @@ export default function ApprovalsPage() {
         setShowRejectModal(false)
         setSelectedRequest(null)
         setRejectComment('')
+        setUnmarkSubtasks(false)
+        setSubtasksToUnmark([])
+        setSubtaskComments({})
+        setNewStatus('in-progress')
+        setTaskDetails(null)
         fetchRequests()
       } else {
         playNotificationSound(NotificationSoundTypes.WARNING)
@@ -432,10 +494,7 @@ export default function ApprovalsPage() {
                         Approve
                       </button>
                       <button
-                        onClick={() => {
-                          setSelectedRequest(request)
-                          setShowRejectModal(true)
-                        }}
+                        onClick={() => openRejectModal(request)}
                         disabled={processingId === request._id}
                         className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 flex items-center gap-2"
                       >
@@ -476,35 +535,158 @@ export default function ApprovalsPage() {
       {/* Reject Modal */}
       {showRejectModal && selectedRequest && (
       <Portal>
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-modal-enter">
-            <div className="px-6 py-4 bg-gray-50">
-              <h3 className="text-xl font-bold text-gray-900">Reject Request</h3>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl animate-modal-enter my-8">
+            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+              <h3 className="text-xl font-bold text-gray-900">Reject Task Review</h3>
+              {selectedRequest.relatedTask?.title && (
+                <p className="text-sm text-gray-500 mt-1">Task: {selectedRequest.relatedTask.title}</p>
+              )}
             </div>
-            <div className="p-6">
-              <p className="text-gray-600 text-sm mb-4">
-                Are you sure you want to reject this {requestTypeLabels[selectedRequest.type].toLowerCase()} request?
-              </p>
-              
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Reason (optional)
-                </label>
-                <textarea
-                  value={rejectComment}
-                  onChange={(e) => setRejectComment(e.target.value)}
-                  placeholder="Provide a reason for rejection..."
-                  rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
-                />
-              </div>
+            <div className="p-6 max-h-[70vh] overflow-y-auto">
+              {loadingTask ? (
+                <div className="flex items-center justify-center py-8">
+                  <FaSpinner className="animate-spin text-2xl text-gray-400" />
+                </div>
+              ) : (
+                <>
+                  <div className="mb-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Rejection Reason
+                    </label>
+                    <textarea
+                      value={rejectComment}
+                      onChange={(e) => setRejectComment(e.target.value)}
+                      placeholder="Explain why this task is being rejected..."
+                      rows={3}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+                    />
+                  </div>
 
-              <div className="flex justify-end gap-3">
+                  {/* For tasks WITH subtasks - show subtask selection */}
+                  {taskDetails?.subtasks && taskDetails.subtasks.length > 0 ? (
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <label className="block text-sm font-medium text-gray-700">
+                          Select subtasks to mark as incomplete
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (subtasksToUnmark.length === taskDetails.subtasks.length) {
+                              setSubtasksToUnmark([])
+                            } else {
+                              setSubtasksToUnmark(taskDetails.subtasks.map(st => st._id))
+                            }
+                          }}
+                          className="text-xs text-primary-600 hover:text-primary-700"
+                        >
+                          {subtasksToUnmark.length === taskDetails.subtasks.length ? 'Deselect All' : 'Select All'}
+                        </button>
+                      </div>
+                      <div className="space-y-3 max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-3 bg-gray-50">
+                        {taskDetails.subtasks.map((subtask) => {
+                          const isSelected = subtasksToUnmark.includes(subtask._id)
+                          return (
+                            <div key={subtask._id} className={`p-3 rounded-lg border transition-all ${
+                              isSelected ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white'
+                            }`}>
+                              <div className="flex items-start gap-3">
+                                <input
+                                  type="checkbox"
+                                  id={`subtask-${subtask._id}`}
+                                  checked={isSelected}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSubtasksToUnmark(prev => [...prev, subtask._id])
+                                    } else {
+                                      setSubtasksToUnmark(prev => prev.filter(id => id !== subtask._id))
+                                      // Also remove comment
+                                      setSubtaskComments(prev => {
+                                        const copy = { ...prev }
+                                        delete copy[subtask._id]
+                                        return copy
+                                      })
+                                    }
+                                  }}
+                                  className="w-4 h-4 mt-1 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                                />
+                                <div className="flex-1">
+                                  <label htmlFor={`subtask-${subtask._id}`} className="text-sm font-medium text-gray-800 cursor-pointer">
+                                    {subtask.title}
+                                  </label>
+                                  {subtask.completed && (
+                                    <span className="ml-2 text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded">
+                                      Completed
+                                    </span>
+                                  )}
+                                  {isSelected && (
+                                    <div className="mt-2">
+                                      <input
+                                        type="text"
+                                        placeholder="Add comment for this subtask (optional)..."
+                                        value={subtaskComments[subtask._id] || ''}
+                                        onChange={(e) => setSubtaskComments(prev => ({
+                                          ...prev,
+                                          [subtask._id]: e.target.value
+                                        }))}
+                                        className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      {subtasksToUnmark.length > 0 && (
+                        <p className="text-sm text-red-600 mt-2">
+                          {subtasksToUnmark.length} subtask(s) will be marked as incomplete
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    /* For tasks WITHOUT subtasks - show status selection */
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Set task status to
+                      </label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { value: 'todo', label: 'To Do', color: 'bg-gray-100 border-gray-300 text-gray-700' },
+                          { value: 'in-progress', label: 'In Progress', color: 'bg-blue-100 border-blue-300 text-blue-700' },
+                          { value: 'on-hold', label: 'On Hold', color: 'bg-yellow-100 border-yellow-300 text-yellow-700' }
+                        ].map(status => (
+                          <button
+                            key={status.value}
+                            type="button"
+                            onClick={() => setNewStatus(status.value)}
+                            className={`px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${
+                              newStatus === status.value 
+                                ? `${status.color} ring-2 ring-offset-1 ring-primary-500` 
+                                : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
+                            }`}
+                          >
+                            {status.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200">
                 <button
                   onClick={() => {
                     setShowRejectModal(false)
                     setSelectedRequest(null)
                     setRejectComment('')
+                    setSubtasksToUnmark([])
+                    setSubtaskComments({})
+                    setNewStatus('in-progress')
+                    setTaskDetails(null)
                   }}
                   className="btn-secondary"
                   disabled={processingId}
@@ -513,10 +695,17 @@ export default function ApprovalsPage() {
                 </button>
                 <button
                   onClick={handleReject}
-                  disabled={processingId}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+                  disabled={processingId || loadingTask}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
                 >
-                  {processingId ? 'Rejecting...' : 'Reject Request'}
+                  {processingId ? (
+                    <>
+                      <FaSpinner className="animate-spin" />
+                      Rejecting...
+                    </>
+                  ) : (
+                    'Reject Task'
+                  )}
                 </button>
               </div>
             </div>

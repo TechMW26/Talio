@@ -84,6 +84,18 @@ app.prepare().then(() => {
       });
     });
 
+    // Join a project room
+    socket.on('join-project', (projectId) => {
+      socket.join(`project:${projectId}`);
+      console.log(`📂 [Socket.IO] User ${socket.userId || socket.id} joined project:${projectId}`);
+    });
+
+    // Leave a project room
+    socket.on('leave-project', (projectId) => {
+      socket.leave(`project:${projectId}`);
+      console.log(`📂 [Socket.IO] User ${socket.userId || socket.id} left project:${projectId}`);
+    });
+
     // Leave a chat room
     socket.on('leave-chat', (chatId) => {
       socket.leave(`chat:${chatId}`);

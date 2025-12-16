@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   DndContext,
   closestCenter,
@@ -8,7 +8,6 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  DragOverlay,
 } from '@dnd-kit/core'
 import {
   SortableContext,
@@ -19,7 +18,10 @@ import DraggableWidget from './DraggableWidget'
 import AddWidgetModal from './AddWidgetModal'
 import { useDashboardWidgets } from '@/hooks/useDashboardWidgets'
 import { WIDGET_REGISTRY } from '@/lib/widgetRegistry'
-import { FaPlus, FaUndo, FaCog, FaGripVertical } from 'react-icons/fa'
+import { FaPlus, FaUndo, FaCog, FaTh, FaThLarge } from 'react-icons/fa'
+
+// Layout storage key
+const LAYOUT_STORAGE_KEY = 'dashboard_layout_columns'
 
 export default function CustomizableDashboard({
   userId,
@@ -28,8 +30,27 @@ export default function CustomizableDashboard({
   className = 'space-y-5',
 }) {
   const [showAddModal, setShowAddModal] = useState(false)
-  const [activeId, setActiveId] = useState(null)
   const [isEditMode, setIsEditMode] = useState(false)
+  const [columnLayout, setColumnLayout] = useState(2) // Default to 2 columns for desktop
+
+  // Load saved column layout
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedLayout = localStorage.getItem(`${LAYOUT_STORAGE_KEY}_${userId}`)
+      if (savedLayout) {
+        setColumnLayout(parseInt(savedLayout, 10))
+      }
+    }
+  }, [userId])
+
+  // Save column layout
+  const toggleColumnLayout = () => {
+    const newLayout = columnLayout === 1 ? 2 : 1
+    setColumnLayout(newLayout)
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`${LAYOUT_STORAGE_KEY}_${userId}`, newLayout.toString())
+    }
+  }
 
   const {
     enabledWidgets,
@@ -53,17 +74,8 @@ export default function CustomizableDashboard({
     })
   )
 
-  const handleDragStart = (event) => {
-    setActiveId(event.active.id)
-  }
-
   const handleDragEndWithReset = (event) => {
     handleDragEnd(event)
-    setActiveId(null)
-  }
-
-  const handleDragCancel = () => {
-    setActiveId(null)
   }
 
   const handleAddWidget = (widget) => {
@@ -73,9 +85,6 @@ export default function CustomizableDashboard({
   const handleRemoveWidget = (widgetId) => {
     removeWidget(widgetId)
   }
-
-  // Get active widget for overlay
-  const activeWidget = activeId ? WIDGET_REGISTRY[activeId] : null
 
   // Loading skeleton
   if (!isInitialized) {
@@ -140,6 +149,34 @@ export default function CustomizableDashboard({
             <span>Reset</span>
           </button>
 
+          {/* Column Layout Toggle - Desktop Only */}
+          <div className="hidden md:flex items-center border border-gray-200 rounded-lg overflow-hidden">
+            <button
+              onClick={() => columnLayout !== 1 && toggleColumnLayout()}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors ${
+                columnLayout === 1
+                  ? 'bg-primary-500 text-white'
+                  : 'text-gray-500 hover:bg-gray-100'
+              }`}
+              title="Single column layout"
+            >
+              <FaTh className="w-3 h-3" />
+              <span>1 Col</span>
+            </button>
+            <button
+              onClick={() => columnLayout !== 2 && toggleColumnLayout()}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors ${
+                columnLayout === 2
+                  ? 'bg-primary-500 text-white'
+                  : 'text-gray-500 hover:bg-gray-100'
+              }`}
+              title="Two column layout"
+            >
+              <FaThLarge className="w-3 h-3" />
+              <span>2 Col</span>
+            </button>
+          </div>
+
           {/* Add Widget Button */}
           <button
             onClick={() => setShowAddModal(true)}
@@ -180,16 +217,14 @@ export default function CustomizableDashboard({
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
-          onDragStart={handleDragStart}
           onDragEnd={handleDragEndWithReset}
-          onDragCancel={handleDragCancel}
         >
           <SortableContext
             items={orderedWidgets.map(w => w.id)}
             strategy={rectSortingStrategy}
           >
-            <div className={className}>
-              {orderedWidgets.map((widget) => {
+            <div className={`${columnLayout === 2 ? 'grid md:grid-cols-2 gap-5' : className}`} style={columnLayout === 2 ? { gridAutoRows: '1fr' } : {}}>
+              {orderedWidgets.map((widget, index) => {
                 const WidgetContent = widgetComponents[widget.id]
 
                 return (
@@ -197,11 +232,10 @@ export default function CustomizableDashboard({
                     key={widget.id}
                     id={widget.id}
                     title={widget.name}
+                    colorIndex={index}
                     onRemove={isEditMode ? handleRemoveWidget : null}
                     removable={isEditMode}
-                    collapsible={true}
-                    className="rounded-2xl"
-                    style={{ backgroundColor: 'var(--color-bg-card)' }}
+                    className="rounded-[30px] overflow-hidden"
                   >
                     {WidgetContent}
                   </DraggableWidget>
@@ -209,29 +243,6 @@ export default function CustomizableDashboard({
               })}
             </div>
           </SortableContext>
-
-          {/* Drag Overlay */}
-          <DragOverlay adjustScale={false}>
-            {activeWidget ? (
-              <div
-                className="rounded-2xl shadow-2xl ring-2 ring-primary-500 opacity-95 overflow-hidden"
-                style={{
-                  backgroundColor: 'var(--color-bg-card)',
-                  maxHeight: '300px',
-                }}
-              >
-                <div className="p-4 flex items-center gap-2 bg-primary-50 border-b border-primary-100">
-                  <FaGripVertical className="w-4 h-4 text-primary-500" />
-                  <span className="text-sm font-medium text-primary-700">
-                    {activeWidget.name}
-                  </span>
-                </div>
-                <div className="p-4 opacity-50 blur-[1px]">
-                  {widgetComponents[activeWidget.id]}
-                </div>
-              </div>
-            ) : null}
-          </DragOverlay>
         </DndContext>
       )}
 

@@ -8,8 +8,7 @@ export default function KPIStatsWidget({ statsData }) {
 
   return (
     <div className="p-4 sm:p-6">
-      <div className="flex items-center gap-2 mb-4">
-        <FaChartBar className="w-5 h-5 text-primary-500" />
+      <div className="mb-4">
         <h3 className="text-base sm:text-lg font-bold text-gray-800">Key Statistics</h3>
       </div>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-2">

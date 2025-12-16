@@ -3,6 +3,18 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams, useParams } from 'next/navigation'
 import toast from 'react-hot-toast'
+import { useSocket } from '@/contexts/SocketContext'
+import { 
+  HiOutlineArrowLeft, HiOutlinePencil, HiOutlinePlus, HiOutlineUsers, 
+  HiOutlineClipboardDocumentList, HiOutlineCalendarDays, HiOutlineCheckCircle, 
+  HiOutlineClock, HiOutlineExclamationTriangle, HiOutlineChatBubbleLeftRight,
+  HiOutlineChartBar, HiOutlineCheck, HiOutlineXMark, 
+  HiOutlineTrash, HiOutlineUserPlus, HiOutlineArchiveBox, HiOutlineChatBubbleOvalLeftEllipsis, 
+  HiOutlineClock as HiOutlineHistory, HiOutlineChevronDown, HiOutlineChevronUp, 
+  HiOutlinePlay, HiOutlineEye, HiOutlineDocumentText, HiOutlineArrowRight,
+  HiOutlineLockClosed, HiOutlineArrowPath, HiOutlineArrowsRightLeft,
+  HiOutlineMagnifyingGlass
+} from 'react-icons/hi2'
 import { 
   FaArrowLeft, FaEdit, FaPlus, FaUsers, FaTasks, FaCalendarAlt,
   FaCheckCircle, FaClock, FaExclamationTriangle, FaComments,
@@ -59,6 +71,9 @@ export default function ProjectDetailPage() {
   const { projectId } = useParams()
   const router = useRouter()
   const searchParams = useSearchParams()
+  
+  // Socket for real-time updates
+  const { joinProject, leaveProject, onTaskUpdated } = useSocket()
   
   const [project, setProject] = useState(null)
   const [tasks, setTasks] = useState([])
@@ -278,6 +293,34 @@ export default function ProjectDetailPage() {
       document.title = 'Talio'
     }
   }, [project?.name])
+
+  // Socket: Join project room and listen for real-time task updates
+  useEffect(() => {
+    if (projectId) {
+      // Join project room for real-time updates
+      joinProject(projectId)
+      
+      // Listen for task updates (e.g., when project head rejects/unmarks subtasks)
+      const unsubscribe = onTaskUpdated((updatedTask) => {
+        console.log('🔄 [Socket] Task updated in real-time:', updatedTask._id)
+        // Update the task in the local state
+        setTasks(prev => prev.map(task => 
+          task._id === updatedTask._id ? { ...task, ...updatedTask } : task
+        ))
+        // If this task is currently selected, update it too
+        setSelectedTask(prev => 
+          prev && prev._id === updatedTask._id ? { ...prev, ...updatedTask } : prev
+        )
+        // Show a notification
+        toast.success('Task updated by project head', { icon: '🔄' })
+      })
+      
+      return () => {
+        leaveProject(projectId)
+        if (unsubscribe) unsubscribe()
+      }
+    }
+  }, [projectId, joinProject, leaveProject, onTaskUpdated])
 
   const handleCreateNote = async (e) => {
     e.preventDefault()
@@ -1109,86 +1152,86 @@ export default function ProjectDetailPage() {
 
       {/* Stats Row */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4">
+        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-              <FaCalendarAlt className="text-blue-600 dark:text-blue-400" />
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <HiOutlineCalendarDays className="w-5 h-5 text-blue-600" />
             </div>
             <div>
-              <p className="text-xs font-medium text-gray-600 dark:text-black-300">Deadline</p>
-              <p className="font-semibold text-gray-900 dark:text-black">{formatDate(project.endDate)}</p>
+              <p className="text-2xl font-bold text-gray-800">{formatDate(project.endDate)}</p>
+              <p className="text-sm text-gray-500">Deadline</p>
             </div>
           </div>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4">
+        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-              <FaChartLine className="text-green-600 dark:text-green-400" />
+            <div className="p-2 bg-green-100 rounded-lg">
+              <HiOutlineChartBar className="w-5 h-5 text-green-600" />
             </div>
             <div>
-              <p className="text-xs font-medium text-gray-600 dark:text-black-300">Progress</p>
-              <p className="font-semibold text-gray-900 dark:text-black">{project.completionPercentage || 0}%</p>
+              <p className="text-2xl font-bold text-gray-800">{project.completionPercentage || 0}%</p>
+              <p className="text-sm text-gray-500">Progress</p>
             </div>
           </div>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4">
+        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-              <FaTasks className="text-purple-600 dark:text-purple-400" />
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <HiOutlineClipboardDocumentList className="w-5 h-5 text-purple-600" />
             </div>
             <div>
-              <p className="text-xs font-medium text-gray-600 dark:text-black-300">Tasks</p>
-              <p className="font-semibold text-gray-900 dark:text-black">
+              <p className="text-2xl font-bold text-gray-800">
                 {project.taskStats?.completed || 0}/{project.taskStats?.total || 0}
               </p>
+              <p className="text-sm text-gray-500">Tasks</p>
             </div>
           </div>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4">
+        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
-              <FaUsers className="text-orange-600 dark:text-orange-400" />
+            <div className="p-2 bg-orange-100 rounded-lg">
+              <HiOutlineUsers className="w-5 h-5 text-orange-600" />
             </div>
             <div>
-              <p className="text-xs font-medium text-gray-600 dark:text-black-300">Members</p>
-              <p className="font-semibold text-gray-900 dark:text-black">{project.members?.length || 0}</p>
+              <p className="text-2xl font-bold text-gray-800">{project.members?.length || 0}</p>
+              <p className="text-sm text-gray-500">Members</p>
             </div>
           </div>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4">
+        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
-              <FaExclamationTriangle className="text-red-600 dark:text-red-400" />
+            <div className="p-2 bg-red-100 rounded-lg">
+              <HiOutlineExclamationTriangle className="w-5 h-5 text-red-600" />
             </div>
             <div>
-              <p className="text-xs font-medium text-gray-600 dark:text-black-300">Overdue Tasks</p>
-              <p className="font-semibold text-gray-900 dark:text-black">{project.taskStats?.overdue || 0}</p>
+              <p className="text-2xl font-bold text-gray-800">{project.taskStats?.overdue || 0}</p>
+              <p className="text-sm text-gray-500">Overdue Tasks</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
         <div className="">
           <nav className="flex overflow-x-auto">
             {[
-              { id: 'overview', label: 'Overview', icon: FaChartLine },
-              { id: 'tasks', label: 'Tasks', icon: FaTasks },
-              { id: 'members', label: 'Members', icon: FaUsers },
-              { id: 'notes', label: 'Notes', icon: FaStickyNote },
-              { id: 'timeline', label: 'Activity', icon: FaHistory }
+              { id: 'overview', label: 'Overview', icon: HiOutlineChartBar },
+              { id: 'tasks', label: 'Tasks', icon: HiOutlineClipboardDocumentList },
+              { id: 'members', label: 'Members', icon: HiOutlineUsers },
+              { id: 'notes', label: 'Notes', icon: HiOutlineDocumentText },
+              { id: 'timeline', label: 'Activity', icon: HiOutlineChatBubbleLeftRight }
             ].map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center px-6 py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+                className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   activeTab === tab.id
-                    ? 'border-primary-500 text-primary-600 dark:text-primary-400'
-                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
               >
-                <tab.icon className="mr-2" />
+                <tab.icon className="w-5 h-5" />
                 {tab.label}
               </button>
             ))}
@@ -1231,18 +1274,37 @@ export default function ProjectDetailPage() {
                         const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'completed'
                         const hasRejectedAssignee = task.assignees?.some(a => a.assignmentStatus === 'rejected')
                         const needsReassignment = hasRejectedAssignee && !task.assignees?.some(a => a.assignmentStatus === 'accepted')
+                        
+                        // Check if task was recently rejected (within last 24 hours)
+                        const wasRecentlyRejected = task.lastRejectedAt && 
+                          (new Date() - new Date(task.lastRejectedAt)) < 24 * 60 * 60 * 1000
+                        const rejectionCount = task.rejectionCount || 0
 
                         return (
                           <div
                             key={task._id}
                             onClick={() => setSelectedTask(task)}
                             className={`bg-white rounded-lg shadow-sm border transition-all cursor-pointer p-3 ${
-                              needsReassignment 
-                                ? 'border-orange-400 border-2 bg-orange-50 hover:shadow-md hover:border-orange-500' 
-                                : 'border-gray-100 hover:shadow-md hover:border-primary-200'
+                              wasRecentlyRejected
+                                ? 'border-red-400 border-2 bg-red-50 hover:shadow-md hover:border-red-500'
+                                : needsReassignment 
+                                  ? 'border-orange-400 border-2 bg-orange-50 hover:shadow-md hover:border-orange-500' 
+                                  : 'border-gray-100 hover:shadow-md hover:border-primary-200'
                             }`}
                           >
-                            {needsReassignment && (
+                            {/* Rejection indicator */}
+                            {wasRecentlyRejected && (
+                              <div className="flex items-center gap-1 text-red-600 text-xs font-medium mb-2 bg-red-100 px-2 py-1 rounded-md">
+                                <HiOutlineXMark className="w-3 h-3" />
+                                <span>Rejected{rejectionCount > 1 ? ` (${rejectionCount}x)` : ''}</span>
+                                {task.lastRejectionReason && (
+                                  <span className="text-red-500 truncate max-w-[150px]" title={task.lastRejectionReason}>
+                                    : {task.lastRejectionReason}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            {needsReassignment && !wasRecentlyRejected && (
                               <div className="flex items-center gap-1 text-orange-600 text-xs font-medium mb-2">
                                 <FaExclamationTriangle className="w-3 h-3" />
                                 <span>Needs Reassignment</span>
@@ -1391,6 +1453,18 @@ export default function ProjectDetailPage() {
           {/* Timeline/Activity Tab */}
           {activeTab === 'timeline' && (
             <div>
+              {/* Search Bar */}
+              <div className="mb-4">
+                <div className="relative">
+                  <HiOutlineMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search activity..."
+                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                  />
+                </div>
+              </div>
+
               {/* Add Comment Form */}
               {isAcceptedMember && (
                 <form onSubmit={handleAddComment} className="mb-6">
@@ -1400,71 +1474,170 @@ export default function ProjectDetailPage() {
                       value={newComment}
                       onChange={(e) => setNewComment(e.target.value)}
                       placeholder="Add a comment or update..."
-                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                     />
                     <button
                       type="submit"
                       disabled={submitting || !newComment.trim()}
-                      className="btn-primary"
+                      className="btn-primary flex items-center gap-2 rounded-xl"
                     >
-                      <FaComment className="mr-2" />
+                      <HiOutlineChatBubbleOvalLeftEllipsis className="w-5 h-5" />
                       Post
                     </button>
                   </div>
                 </form>
               )}
 
-              {/* Timeline Events */}
-              <div className="space-y-4">
-                {timeline.map(event => (
-                  <div key={event._id} className="flex gap-4">
-                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
-                      {event.createdBy?.profilePicture ? (
-                        <img src={event.createdBy.profilePicture} alt="" className="w-full h-full rounded-full object-cover" />
-                      ) : (
-                        <span className="text-gray-500 text-sm">
-                          {event.createdBy?.firstName?.[0]}{event.createdBy?.lastName?.[0]}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-medium text-gray-800">
-                          {event.createdBy?.firstName} {event.createdBy?.lastName}
-                        </span>
-                        <span className="text-xs text-gray-400">{formatDateTime(event.createdAt)}</span>
+              {/* GitHub-style Timeline with Branch Visualization */}
+              <div className="relative">
+                {/* Main vertical line */}
+                <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-gradient-to-b from-indigo-200 via-gray-200 to-gray-100" />
+                
+                <div className="space-y-0">
+                  {timeline.map((event, index) => {
+                    // Get event type icon and color
+                    const getEventStyle = (type) => {
+                      switch (type) {
+                        case 'task_created':
+                          return { icon: HiOutlinePlus, bg: 'bg-blue-500', color: 'text-white', branch: 'blue' }
+                        case 'task_completed':
+                          return { icon: HiOutlineCheckCircle, bg: 'bg-green-500', color: 'text-white', branch: 'green' }
+                        case 'task_rejected':
+                        case 'task_review_rejected':
+                          return { icon: HiOutlineXMark, bg: 'bg-red-500', color: 'text-white', branch: 'red' }
+                        case 'task_assigned':
+                          return { icon: HiOutlineUserPlus, bg: 'bg-purple-500', color: 'text-white', branch: 'purple' }
+                        case 'subtask_completed':
+                        case 'subtask_updated':
+                          return { icon: HiOutlineCheck, bg: 'bg-teal-400', color: 'text-white', branch: 'teal', isSubLevel: true }
+                        case 'comment_added':
+                          return { icon: HiOutlineChatBubbleOvalLeftEllipsis, bg: 'bg-gray-400', color: 'text-white', branch: 'gray' }
+                        case 'project_approved':
+                          return { icon: HiOutlineCheckCircle, bg: 'bg-emerald-500', color: 'text-white', branch: 'emerald' }
+                        case 'project_rejected':
+                          return { icon: HiOutlineXMark, bg: 'bg-red-500', color: 'text-white', branch: 'red' }
+                        case 'member_joined':
+                          return { icon: HiOutlineUsers, bg: 'bg-indigo-500', color: 'text-white', branch: 'indigo' }
+                        case 'status_changed':
+                          return { icon: HiOutlineArrowPath, bg: 'bg-amber-500', color: 'text-white', branch: 'amber' }
+                        default:
+                          return { icon: HiOutlineHistory, bg: 'bg-gray-400', color: 'text-white', branch: 'gray' }
+                      }
+                    }
+                    const style = getEventStyle(event.type)
+                    const EventIcon = style.icon
+                    const isSubLevel = style.isSubLevel || event.type.includes('subtask') || event.metadata?.isSubtask
+                    const isLast = index === timeline.length - 1
+
+                    return (
+                      <div key={event._id} className="relative flex items-start group">
+                        {/* Branch connector for sub-level items */}
+                        {isSubLevel && (
+                          <div className="absolute left-5 top-5 w-6 h-0.5 bg-gray-300" />
+                        )}
+                        
+                        {/* Node/Dot on the timeline */}
+                        <div className={`relative z-10 flex-shrink-0 ${isSubLevel ? 'ml-6' : ''}`}>
+                          <div className={`w-10 h-10 rounded-full ${style.bg} flex items-center justify-center shadow-md ring-4 ring-white`}>
+                            <EventIcon className={`w-5 h-5 ${style.color}`} />
+                          </div>
+                          {/* Connector line to next item */}
+                          {!isLast && (
+                            <div className={`absolute top-10 left-1/2 -translate-x-1/2 w-0.5 h-6 ${
+                              isSubLevel ? 'bg-gray-200' : 'bg-transparent'
+                            }`} />
+                          )}
+                        </div>
+                        
+                        {/* Event Content */}
+                        <div className={`flex-1 ml-4 pb-6 ${isSubLevel ? 'ml-4' : 'ml-4'}`}>
+                          <div className={`p-4 rounded-xl border transition-all hover:shadow-md ${
+                            isSubLevel 
+                              ? 'bg-gray-50 border-gray-200 ml-2' 
+                              : 'bg-white border-gray-100 hover:border-gray-200'
+                          }`}>
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <div className="flex items-center gap-2">
+                                {event.createdBy?.profilePicture ? (
+                                  <img src={event.createdBy.profilePicture} alt="" className="w-6 h-6 rounded-full object-cover" />
+                                ) : (
+                                  <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center text-xs font-medium text-primary-700">
+                                    {event.createdBy?.firstName?.[0]}{event.createdBy?.lastName?.[0]}
+                                  </div>
+                                )}
+                                <span className="font-medium text-gray-800 text-sm">
+                                  {event.createdBy?.firstName} {event.createdBy?.lastName}
+                                </span>
+                              </div>
+                              <span className={`text-xs px-2 py-0.5 rounded-full ${
+                                style.bg.replace('500', '100').replace('400', '100')
+                              } ${style.bg.replace('bg-', 'text-').replace('500', '700').replace('400', '700')}`}>
+                                {event.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                              </span>
+                              <span className="text-xs text-gray-400 ml-auto">{formatDateTime(event.createdAt)}</span>
+                            </div>
+                            <p className="text-gray-600 text-sm mt-1">{event.description}</p>
+                            
+                            {/* Task link if present */}
+                            {event.relatedTask && (
+                              <div className="mt-2 inline-flex items-center gap-1 text-xs text-primary-600 bg-primary-50 px-2 py-1 rounded-md">
+                                <HiOutlineClipboardDocumentList className="w-3 h-3" />
+                                {event.relatedTask.title || 'Related Task'}
+                              </div>
+                            )}
+                            
+                            {/* Show rejection details */}
+                            {(event.metadata?.rejectionReason || event.metadata?.rejectionComment) && (
+                              <div className="mt-3 p-3 bg-red-50 border border-red-100 rounded-lg">
+                                <p className="text-sm font-medium text-red-700 mb-1 flex items-center gap-1">
+                                  <HiOutlineXMark className="w-4 h-4" />
+                                  Rejection Details
+                                </p>
+                                <p className="text-sm text-red-600">{event.metadata.rejectionReason || event.metadata.rejectionComment}</p>
+                                {event.metadata.subtasksUnmarked && event.metadata.subtasksUnmarked.length > 0 && (
+                                  <div className="mt-2 pt-2 border-t border-red-100">
+                                    <p className="text-xs font-medium text-red-700 mb-1">Subtasks marked incomplete:</p>
+                                    <ul className="text-xs text-red-600 list-disc list-inside">
+                                      {event.metadata.subtasksUnmarked.map((st, idx) => (
+                                        <li key={idx}>{st}</li>
+                                      ))}
+                                    </ul>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            
+                            {/* Show remark if present */}
+                            {event.metadata?.remark && !event.metadata?.rejectionReason && !event.metadata?.rejectionComment && (
+                              <div className={`mt-3 p-3 rounded-lg ${
+                                event.type === 'project_rejected' ? 'bg-red-50 border border-red-100' : 'bg-blue-50 border border-blue-100'
+                              }`}>
+                                <p className={`text-sm font-medium mb-1 ${
+                                  event.type === 'project_rejected' ? 'text-red-700' : 'text-blue-700'
+                                }`}>Remark:</p>
+                                <p className={`text-sm ${
+                                  event.type === 'project_rejected' ? 'text-red-600' : 'text-blue-600'
+                                }`}>{event.metadata.remark}</p>
+                              </div>
+                            )}
+                            
+                            {event.commentContent && (
+                              <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                                <p className="text-gray-700 text-sm">{event.commentContent}</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <p className="text-gray-600">{event.description}</p>
-                      {/* Show rejection reason if present */}
-                      {event.metadata?.rejectionReason && (
-                        <div className="mt-2 p-3 bg-red-50 border border-red-100 rounded-lg">
-                          <p className="text-sm font-medium text-red-700 mb-1">Rejection Reason:</p>
-                          <p className="text-sm text-red-600">{event.metadata.rejectionReason}</p>
-                        </div>
-                      )}
-                      {/* Show remark if present (for project rejection/approval) */}
-                      {event.metadata?.remark && !event.metadata?.rejectionReason && (
-                        <div className={`mt-2 p-3 rounded-lg ${
-                          event.type === 'project_rejected' ? 'bg-red-50 border border-red-100' : 'bg-blue-50 border border-blue-100'
-                        }`}>
-                          <p className={`text-sm font-medium mb-1 ${
-                            event.type === 'project_rejected' ? 'text-red-700' : 'text-blue-700'
-                          }`}>Remark:</p>
-                          <p className={`text-sm ${
-                            event.type === 'project_rejected' ? 'text-red-600' : 'text-blue-600'
-                          }`}>{event.metadata.remark}</p>
-                        </div>
-                      )}
-                      {event.commentContent && (
-                        <div className="mt-2 p-3 bg-gray-50 rounded-lg">
-                          <p className="text-gray-700">{event.commentContent}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                    )
+                  })}
+                </div>
+                
                 {timeline.length === 0 && (
-                  <p className="text-center text-gray-500 py-8">No activity yet</p>
+                  <div className="text-center py-12">
+                    <HiOutlineHistory className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-500">No activity yet</p>
+                  </div>
                 )}
               </div>
             </div>
@@ -1477,9 +1650,9 @@ export default function ProjectDetailPage() {
               {isAcceptedMember && !showCreateNote && !editingNote && (
                 <button
                   onClick={() => setShowCreateNote(true)}
-                  className="btn-primary mb-6"
+                  className="btn-primary mb-6 flex items-center gap-2"
                 >
-                  <FaPlus className="mr-2" />
+                  <FaPlus />
                   Add Note
                 </button>
               )}
@@ -2472,10 +2645,10 @@ export default function ProjectDetailPage() {
                         setShowEditTaskModal(true)
                         setSelectedTask(null)
                       }}
-                      className="p-2 hover:bg-blue-50 rounded-lg text-blue-600"
-                      title="Edit Task"
+                      className="btn-primary flex items-center gap-2 text-sm py-1.5 px-3"
                     >
                       <FaEdit />
+                      Edit Task
                     </button>
                   )
                 })()}
@@ -2548,6 +2721,39 @@ export default function ProjectDetailPage() {
                   </div>
                 )}
               </div>
+
+              {/* Rejection History */}
+              {selectedTask.lastRejectedAt && (
+                <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <HiOutlineXMark className="w-5 h-5 text-red-600" />
+                    <h4 className="text-sm font-medium text-red-700">Review Rejected</h4>
+                    {selectedTask.rejectionCount > 1 && (
+                      <span className="text-xs bg-red-200 text-red-700 px-2 py-0.5 rounded-full">
+                        {selectedTask.rejectionCount} times
+                      </span>
+                    )}
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <p className="text-red-600">
+                      <span className="font-medium">Last Rejected:</span>{' '}
+                      {new Date(selectedTask.lastRejectedAt).toLocaleString()}
+                    </p>
+                    {selectedTask.lastRejectedBy && (
+                      <p className="text-red-600">
+                        <span className="font-medium">Rejected By:</span>{' '}
+                        {selectedTask.lastRejectedBy.firstName} {selectedTask.lastRejectedBy.lastName}
+                      </p>
+                    )}
+                    {selectedTask.lastRejectionReason && (
+                      <div className="mt-2 bg-white p-3 rounded border border-red-200">
+                        <p className="text-xs text-red-500 mb-1">Reason:</p>
+                        <p className="text-gray-700">{selectedTask.lastRejectionReason}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Assignees */}
               {selectedTask.assignees && selectedTask.assignees.length > 0 && (

@@ -13,10 +13,7 @@ export default function LeaveRequestsWidget({
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <FaCalendarCheck className="w-5 h-5 text-primary-500" />
-          <h3 className="text-base sm:text-lg font-bold text-gray-800">Leave Requests</h3>
-        </div>
+        <h3 className="text-base sm:text-lg font-bold text-gray-800">Leave Requests</h3>
         <button
           onClick={() => router.push('/dashboard/leave/approvals')}
           className="text-primary-600 hover:text-primary-800 text-sm font-medium"

@@ -46,10 +46,7 @@ export default function MyHelpdeskWidget({ user }) {
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <FaHeadset className="w-5 h-5 text-primary-500" />
-          <h3 className="text-base sm:text-lg font-bold text-gray-800">Helpdesk</h3>
-        </div>
+        <h3 className="text-base sm:text-lg font-bold text-gray-800">Helpdesk</h3>
         <button 
           onClick={() => router.push('/dashboard/helpdesk')}
           className="text-primary-600 hover:text-primary-800 text-sm font-medium flex items-center gap-1"

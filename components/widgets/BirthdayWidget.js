@@ -5,8 +5,7 @@ import { FaBirthdayCake } from 'react-icons/fa'
 export default function BirthdayWidget() {
     return (
         <div className="p-4 sm:p-6">
-            <div className="flex items-center gap-2 mb-4">
-                <FaBirthdayCake className="w-5 h-5 text-primary-500" />
+            <div className="mb-4">
                 <h3 className="text-base sm:text-lg font-bold text-gray-800">Upcoming Birthdays</h3>
             </div>
             <div className="text-center py-6 text-gray-500">

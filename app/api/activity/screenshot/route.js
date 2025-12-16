@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
 import { writeFile, mkdir, access, constants } from 'fs/promises';
 import path from 'path';
+import { optimizeScreenshot } from '@/lib/imageOptimization';
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
@@ -114,21 +115,27 @@ export async function POST(request) {
     
     if (screenshot instanceof File) {
       buffer = Buffer.from(await screenshot.arrayBuffer());
-      const ext = screenshot.type?.includes('png') ? 'png' : 'webp';
-      fileName = `${timeString}.${ext}`;
+      fileName = `${timeString}.webp`;
     } else if (typeof screenshot === 'string') {
       // Handle base64 data
-      const matches = screenshot.match(/^data:image\/(\w+);base64,/);
-      const ext = matches ? (matches[1] === 'png' ? 'png' : 'webp') : 'webp';
       const base64Data = screenshot.replace(/^data:image\/\w+;base64,/, '');
       buffer = Buffer.from(base64Data, 'base64');
-      fileName = `${timeString}.${ext}`;
+      fileName = `${timeString}.webp`;
     } else {
       console.log('[Screenshot] Invalid screenshot format:', typeof screenshot);
       return NextResponse.json(
         { error: 'Invalid screenshot format' },
         { status: 400 }
       );
+    }
+
+    // Optimize screenshot for storage (compress to webp)
+    const originalSize = buffer.length;
+    try {
+      buffer = await optimizeScreenshot(buffer);
+      console.log(`[Screenshot] Optimized: ${(originalSize / 1024).toFixed(1)}KB -> ${(buffer.length / 1024).toFixed(1)}KB (${((1 - buffer.length / originalSize) * 100).toFixed(0)}% saved)`);
+    } catch (optError) {
+      console.warn('[Screenshot] Optimization failed, using original:', optError.message);
     }
 
     const filePath = path.join(activityDir, fileName);

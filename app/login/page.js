@@ -1,9 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { FaEnvelope, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa'
+
+// Spline animation URL - cached in localStorage for faster perceived loading
+const SPLINE_URL = 'https://my.spline.design/100followersfocus-GCaB9DZhMZTNOxJCBwYFlptI/'
+const ANIMATION_CACHE_KEY = 'talio_login_animation_loaded'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -14,6 +18,32 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [checking, setChecking] = useState(true)
+  const [animationLoaded, setAnimationLoaded] = useState(false)
+  const [showAnimation, setShowAnimation] = useState(false)
+
+  // Handle iframe load event
+  const handleAnimationLoad = useCallback(() => {
+    setAnimationLoaded(true)
+    // Store in localStorage that animation has been loaded before
+    try {
+      localStorage.setItem(ANIMATION_CACHE_KEY, 'true')
+    } catch (e) {
+      // Ignore localStorage errors
+    }
+  }, [])
+
+  // Check if animation was previously loaded for faster initial render
+  useEffect(() => {
+    const wasLoaded = localStorage.getItem(ANIMATION_CACHE_KEY)
+    // Show animation immediately if it was loaded before (browser will use HTTP cache)
+    if (wasLoaded) {
+      setShowAnimation(true)
+    } else {
+      // Delay showing animation to prioritize login form rendering
+      const timer = setTimeout(() => setShowAnimation(true), 100)
+      return () => clearTimeout(timer)
+    }
+  }, [])
 
   // Check if user is already logged in
   useEffect(() => {
@@ -258,17 +288,29 @@ export default function LoginPage() {
       {/* Background gradient overlay - allows clicks through to iframe */}
       <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#1a0a2e]/30 to-[#1a0a2e]/80 pointer-events-none z-10" />
       
-      {/* Spline 3D Animation - Full background with mouse interaction */}
-      <div className="absolute inset-0 w-full h-full z-0">
-        <iframe 
-          src='https://my.spline.design/100followersfocus-GCaB9DZhMZTNOxJCBwYFlptI/' 
-          frameBorder='0' 
-          width='100%' 
-          height='100%'
-          className="absolute inset-0 scale-110"
-          style={{ pointerEvents: 'auto' }}
-        />
+      {/* Fallback gradient background - shown while animation loads */}
+      <div className={`absolute inset-0 bg-gradient-to-br from-[#1a0a2e] via-[#2d1b4e] to-[#1a0a2e] transition-opacity duration-500 ${animationLoaded ? 'opacity-0' : 'opacity-100'}`}>
+        {/* Animated gradient orbs as fallback */}
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
       </div>
+      
+      {/* Spline 3D Animation - Lazy loaded for performance */}
+      {showAnimation && (
+        <div className={`absolute inset-0 w-full h-full z-0 transition-opacity duration-500 ${animationLoaded ? 'opacity-100' : 'opacity-0'}`}>
+          <iframe 
+            src={SPLINE_URL}
+            frameBorder='0' 
+            width='100%' 
+            height='100%'
+            className="absolute inset-0 scale-110"
+            style={{ pointerEvents: 'auto' }}
+            loading="lazy"
+            onLoad={handleAnimationLoad}
+            title="Background Animation"
+          />
+        </div>
+      )}
 
       {/* Login Form - Centered */}
       <div className="relative z-20 min-h-screen flex items-center justify-center px-4 py-8 pointer-events-none">

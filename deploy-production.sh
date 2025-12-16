@@ -370,25 +370,55 @@ pull_latest_code() {
 deploy_docker() {
     log_info "Deploying with Docker..."
     
-    # Stop existing containers
-    log_info "Stopping existing containers..."
-    docker_compose down 2>/dev/null || true
+    # Enable BuildKit for faster builds
+    export DOCKER_BUILDKIT=1
+    export COMPOSE_DOCKER_CLI_BUILD=1
     
-    # Clean up old images to save space
-    log_info "Cleaning up old images..."
-    docker image prune -f > /dev/null 2>&1 || true
+    # Check if we can do zero-downtime deployment
+    RUNNING_CONTAINER=$(docker_compose ps -q app 2>/dev/null || true)
     
-    # Build with cache for faster builds
-    log_info "Building Docker image..."
-    docker_compose build
-    
-    # Start containers
-    log_info "Starting containers..."
-    docker_compose up -d
+    if [ -n "$RUNNING_CONTAINER" ]; then
+        log_info "Performing zero-downtime deployment..."
+        
+        # Build new image while old container is still running
+        log_info "Building new Docker image (old container still serving traffic)..."
+        docker_compose build --build-arg BUILDKIT_INLINE_CACHE=1
+        
+        # Quick container swap
+        log_info "Swapping to new container..."
+        docker_compose up -d --force-recreate --no-deps app
+    else
+        log_info "No existing container, doing fresh deployment..."
+        
+        # Clean up old images to save space
+        log_info "Cleaning up old images..."
+        docker image prune -f > /dev/null 2>&1 || true
+        
+        # Build with cache for faster builds
+        log_info "Building Docker image..."
+        docker_compose build --build-arg BUILDKIT_INLINE_CACHE=1
+        
+        # Start containers
+        log_info "Starting containers..."
+        docker_compose up -d
+    fi
     
     # Wait and check
-    log_info "Waiting for application to start..."
-    sleep 10
+    log_info "Waiting for application to start (health check)..."
+    
+    # Health check loop
+    for i in {1..30}; do
+        if curl -sf http://localhost:3000/api/health > /dev/null 2>&1; then
+            log_success "Application is healthy and responding!"
+            break
+        fi
+        if [ $i -eq 30 ]; then
+            log_error "Health check failed after 30 seconds"
+            docker_compose logs --tail=50
+            exit 1
+        fi
+        sleep 1
+    done
     
     if docker_compose ps | grep -q "Up\|running"; then
         log_success "Docker containers are running"
@@ -397,6 +427,10 @@ deploy_docker() {
         docker_compose logs --tail=50
         exit 1
     fi
+    
+    # Clean up old images after successful deployment
+    log_info "Cleaning up dangling images..."
+    docker image prune -f > /dev/null 2>&1 || true
 }
 
 # Seed database
