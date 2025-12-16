@@ -73,7 +73,10 @@ export default function TeamAttendanceWidget() {
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-base sm:text-lg font-bold text-gray-800">Team Attendance Today</h3>
+        <div className="flex items-center gap-2">
+          <FaUsers className="w-5 h-5 text-primary-500" />
+          <h3 className="text-base sm:text-lg font-bold text-gray-800">Team Attendance</h3>
+        </div>
         <button
           onClick={() => router.push('/dashboard/attendance')}
           className="text-primary-600 hover:text-primary-800 text-sm font-medium"
@@ -83,21 +86,21 @@ export default function TeamAttendanceWidget() {
       </div>
 
       {/* Summary Stats */}
-      <div className="grid grid-cols-3 gap-3 mb-4">
-        <div className="bg-blue-50 rounded-lg p-3 text-center">
-          <FaUsers className="w-4 h-4 mx-auto text-blue-600 mb-1" />
-          <p className="text-lg font-bold text-blue-700">{teamAttendance.length}</p>
-          <p className="text-xs text-blue-600">Total</p>
+      <div className="grid grid-cols-3 gap-2 mb-4">
+        <div className="bg-gray-50 rounded-lg p-3 text-center">
+          <FaUsers className="w-4 h-4 mx-auto text-primary-600 mb-1" />
+          <p className="text-lg font-bold text-primary-600">{teamAttendance.length}</p>
+          <p className="text-xs text-gray-600">Total</p>
         </div>
-        <div className="bg-green-50 rounded-lg p-3 text-center">
+        <div className="bg-gray-50 rounded-lg p-3 text-center">
           <FaCheck className="w-4 h-4 mx-auto text-green-600 mb-1" />
-          <p className="text-lg font-bold text-green-700">{present.length}</p>
-          <p className="text-xs text-green-600">Present</p>
+          <p className="text-lg font-bold text-green-600">{present.length}</p>
+          <p className="text-xs text-gray-600">Present</p>
         </div>
-        <div className="bg-red-50 rounded-lg p-3 text-center">
+        <div className="bg-gray-50 rounded-lg p-3 text-center">
           <FaTimes className="w-4 h-4 mx-auto text-red-600 mb-1" />
-          <p className="text-lg font-bold text-red-700">{absent.length}</p>
-          <p className="text-xs text-red-600">Absent</p>
+          <p className="text-lg font-bold text-red-600">{absent.length}</p>
+          <p className="text-xs text-gray-600">Absent</p>
         </div>
       </div>
 

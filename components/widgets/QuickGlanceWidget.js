@@ -1,7 +1,7 @@
 'use client'
 
 import { FaClock, FaSignInAlt, FaSignOutAlt, FaCheckCircle } from 'react-icons/fa'
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 
 // Helper to calculate displayed status based on time and settings
 function getDisplayedStatus(todayAttendance, companySettings) {
@@ -69,10 +69,76 @@ export default function QuickGlanceWidget({
     [todayAttendance, companySettings]
   )
 
+  // State to track dynamic work hours (updates every minute)
+  const [currentWorkHours, setCurrentWorkHours] = useState('')
+
+  // Calculate work hours dynamically
+  useEffect(() => {
+    const calculateWorkHours = () => {
+      // If already checked out, use the stored workHours
+      if (todayAttendance?.checkOut) {
+        const hours = todayAttendance.workHours
+        if (hours) {
+          // Format as Xh Ym
+          const h = Math.floor(hours)
+          const m = Math.round((hours - h) * 60)
+          setCurrentWorkHours(m > 0 ? `${h}h ${m}m` : `${h}h`)
+        } else {
+          // Calculate from checkIn and checkOut
+          const checkIn = new Date(todayAttendance.checkIn)
+          const checkOut = new Date(todayAttendance.checkOut)
+          const diffMs = checkOut - checkIn
+          const diffHours = diffMs / (1000 * 60 * 60)
+          const h = Math.floor(diffHours)
+          const m = Math.round((diffHours - h) * 60)
+          setCurrentWorkHours(m > 0 ? `${h}h ${m}m` : `${h}h`)
+        }
+        return
+      }
+
+      // If checked in but not checked out, calculate live hours
+      if (todayAttendance?.checkIn) {
+        const checkIn = new Date(todayAttendance.checkIn)
+        const now = new Date()
+        const diffMs = now - checkIn
+        const diffHours = diffMs / (1000 * 60 * 60)
+        
+        if (diffHours < 0) {
+          setCurrentWorkHours('0h 0m')
+          return
+        }
+        
+        const h = Math.floor(diffHours)
+        const m = Math.round((diffHours - h) * 60)
+        setCurrentWorkHours(m > 0 ? `${h}h ${m}m` : `${h}h`)
+        return
+      }
+
+      // No check-in yet
+      setCurrentWorkHours('--:--')
+    }
+
+    // Calculate immediately
+    calculateWorkHours()
+
+    // Update every minute if user is checked in but not checked out
+    let intervalId = null
+    if (todayAttendance?.checkIn && !todayAttendance?.checkOut) {
+      intervalId = setInterval(calculateWorkHours, 60000) // Update every minute
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId)
+    }
+  }, [todayAttendance])
+
   return (
-    <div style={{ backgroundColor: 'var(--color-bg-card)' }} className="rounded-2xl p-4 sm:p-6">
+    <div className="p-4 sm:p-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-base sm:text-lg font-bold text-gray-800">Quick Glance</h3>
+        <div className="flex items-center gap-2">
+          <FaClock className="w-5 h-5 text-primary-500" />
+          <h3 className="text-base sm:text-lg font-bold text-gray-800">Quick Glance</h3>
+        </div>
         <div className="flex items-center gap-2">
           <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${isCountingDown
               ? remainingTime > 3600 ? 'bg-green-100'
@@ -86,7 +152,7 @@ export default function QuickGlanceWidget({
                     : 'text-red-600'
                 : 'text-gray-600'
               }`} />
-            <span className={`text-sm sm:text-base font-bold ${isCountingDown
+            <span className={`text-sm font-bold ${isCountingDown
                 ? remainingTime > 3600 ? 'text-green-700'
                   : remainingTime > 1800 ? 'text-yellow-700'
                     : 'text-red-700'
@@ -98,77 +164,74 @@ export default function QuickGlanceWidget({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 gap-2">
         {/* Check In Time */}
-        <div>
+        <div className="bg-gray-50 rounded-lg p-3">
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-4 h-4 rounded-full bg-gray-200 flex items-center justify-center">
-              <FaSignInAlt className="w-2.5 h-2.5 text-gray-600" />
+            <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
+              <FaSignInAlt className="w-3 h-3 text-green-600" />
             </div>
-            <p className="text-xs font-medium text-gray-600">Check In Time</p>
+            <p className="text-xs font-medium text-gray-600">Check In</p>
           </div>
-          <div className="bg-green-100 rounded-lg p-3">
-            <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800">
-              {todayAttendance?.checkIn
-                ? new Date(todayAttendance.checkIn).toLocaleTimeString('en-IN', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  hour12: true
-                })
-                : '--:--'}
-            </p>
-          </div>
+          <p className="text-lg font-bold text-gray-800">
+            {todayAttendance?.checkIn
+              ? new Date(todayAttendance.checkIn).toLocaleTimeString('en-IN', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+              })
+              : '--:--'}
+          </p>
         </div>
 
         {/* Check Out Time */}
-        <div>
+        <div className="bg-gray-50 rounded-lg p-3">
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-4 h-4 rounded-full bg-gray-200 flex items-center justify-center">
-              <FaSignOutAlt className="w-2.5 h-2.5 text-gray-600" />
+            <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center">
+              <FaSignOutAlt className="w-3 h-3 text-red-600" />
             </div>
-            <p className="text-xs font-medium text-gray-600">Check Out Time</p>
+            <p className="text-xs font-medium text-gray-600">Check Out</p>
           </div>
-          <div className="bg-red-100 rounded-lg p-3">
-            <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800">
-              {todayAttendance?.checkOut
-                ? new Date(todayAttendance.checkOut).toLocaleTimeString('en-IN', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  hour12: true
-                })
-                : '--:--'}
-            </p>
-          </div>
+          <p className="text-lg font-bold text-gray-800">
+            {todayAttendance?.checkOut
+              ? new Date(todayAttendance.checkOut).toLocaleTimeString('en-IN', {
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+              })
+              : '--:--'}
+          </p>
         </div>
 
         {/* Work Hours */}
-        <div>
+        <div className="bg-gray-50 rounded-lg p-3">
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-4 h-4 rounded-full bg-gray-200 flex items-center justify-center">
-              <FaClock className="w-2.5 h-2.5 text-gray-600" />
+            <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center">
+              <FaClock className="w-3 h-3 text-primary-600" />
             </div>
             <p className="text-xs font-medium text-gray-600">Work Hours</p>
           </div>
-          <div className="bg-yellow-100 rounded-lg p-3">
-            <p className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800">
-              {todayAttendance?.workHours ? `${todayAttendance.workHours}h` : '--:--'}
-            </p>
-          </div>
+          <p className="text-lg font-bold text-gray-800">
+            {currentWorkHours}
+          </p>
         </div>
 
         {/* Work Status */}
-        <div>
+        <div className="bg-gray-50 rounded-lg p-3">
           <div className="flex items-center gap-2 mb-2">
-            <div className="w-4 h-4 rounded-full bg-gray-200 flex items-center justify-center">
-              <FaCheckCircle className="w-2.5 h-2.5 text-gray-600" />
+            <div className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center">
+              <FaCheckCircle className="w-3 h-3 text-purple-600" />
             </div>
-            <p className="text-xs font-medium text-gray-600">Work Status</p>
+            <p className="text-xs font-medium text-gray-600">Status</p>
           </div>
-          <div className={`rounded-lg p-3 ${displayedStatus.bgColor}`}>
-            <p className="text-sm sm:text-base md:text-lg font-bold text-gray-800 capitalize">
-              {displayedStatus.label}
-            </p>
-          </div>
+          <p className={`text-sm font-bold capitalize ${
+            displayedStatus.status === 'present' || displayedStatus.status === 'in-progress' ? 'text-green-700' :
+            displayedStatus.status === 'absent' ? 'text-red-700' :
+            displayedStatus.status === 'on-leave' ? 'text-orange-700' :
+            'text-gray-700'
+          }`}>
+            {displayedStatus.label}
+          </p>
         </div>
       </div>
     </div>

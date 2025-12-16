@@ -125,29 +125,46 @@ export default function RecentActivityWidget({ limit = 6 }) {
 
     if (loading) {
         return (
-            <div className="animate-pulse space-y-3">
-                {[1, 2, 3, 4].map(i => (
-                    <div key={i} className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-gray-200 rounded-full"></div>
-                        <div className="flex-1 space-y-1">
-                            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                            <div className="h-3 bg-gray-200 rounded w-1/4"></div>
+            <div className="p-4 sm:p-6 animate-pulse">
+                <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
+                <div className="space-y-3">
+                    {[1, 2, 3, 4].map(i => (
+                        <div key={i} className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-gray-200 rounded-full"></div>
+                            <div className="flex-1 space-y-1">
+                                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                                <div className="h-3 bg-gray-200 rounded w-1/4"></div>
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    ))}
+                </div>
             </div>
         )
     }
 
     return (
-        <div className="space-y-1">
+        <div className="p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                    <FaHistory className="w-5 h-5 text-primary-500" />
+                    <h3 className="text-base sm:text-lg font-bold text-gray-800">Recent Activity</h3>
+                </div>
+                <a
+                    href="/dashboard/attendance"
+                    className="text-primary-600 hover:text-primary-800 text-sm font-medium"
+                >
+                    View All
+                </a>
+            </div>
+            
+            <div className="space-y-2 max-h-48 overflow-y-auto">
             {activities.map((activity, index) => (
-                <div key={index} className="flex items-start gap-3 p-2 hover:bg-gray-50 rounded-lg transition-colors">
-                    <div className="flex-shrink-0 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                <div key={index} className="flex items-start gap-3 p-2 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
+                    <div className="flex-shrink-0 w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
                         {getActivityIcon(activity.type)}
                     </div>
                     <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-900 truncate">{activity.description}</p>
+                        <p className="text-sm text-gray-800 truncate">{activity.description}</p>
                         <p className="text-xs text-gray-500 flex items-center gap-1">
                             <FaClock className="w-3 h-3" />
                             {formatTime(activity.time)}
@@ -155,13 +172,7 @@ export default function RecentActivityWidget({ limit = 6 }) {
                     </div>
                 </div>
             ))}
-
-            <a
-                href="/dashboard/attendance"
-                className="block text-center text-sm text-primary-600 hover:text-primary-700 mt-4 pt-2 border-t"
-            >
-                View full history →
-            </a>
+            </div>
         </div>
     )
 }

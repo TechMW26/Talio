@@ -142,13 +142,15 @@ export default function ProjectTasksWidget({ limit = 5, showPendingAcceptance = 
 
   if (loading) {
     return (
-      <div className="rounded-lg p-3 sm:p-6" style={{ backgroundColor: 'var(--color-bg-card)' }}>
-        <div className="flex items-center space-x-3 mb-4">
-          <FaProjectDiagram className="w-5 h-5 text-primary-500" />
-          <h3 className="text-sm sm:text-base font-bold text-gray-800">Today's Project Tasks</h3>
+      <div className="animate-pulse">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-5 h-5 bg-gray-200 rounded"></div>
+          <div className="h-5 bg-gray-200 rounded w-1/3"></div>
         </div>
-        <div className="flex items-center justify-center py-8">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-500"></div>
+        <div className="space-y-2">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-16 bg-gray-200 rounded"></div>
+          ))}
         </div>
       </div>
     )
@@ -157,11 +159,11 @@ export default function ProjectTasksWidget({ limit = 5, showPendingAcceptance = 
   const allTasks = showPendingAcceptance ? [...pendingTasks, ...tasks] : tasks
 
   return (
-    <div className="rounded-lg p-3 sm:p-6" style={{ backgroundColor: 'var(--color-bg-card)' }}>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 space-y-2 sm:space-y-0">
-        <div className="flex items-center space-x-3">
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
           <FaProjectDiagram className="w-5 h-5 text-primary-500" />
-          <h3 className="text-sm sm:text-base font-bold text-gray-800">Today's Project Tasks</h3>
+          <h3 className="text-base sm:text-lg font-bold text-gray-800">Project Tasks</h3>
           {allTasks.length > 0 && (
             <span className="px-2 py-0.5 bg-primary-100 text-primary-700 text-xs rounded-full">
               {allTasks.length}
@@ -170,25 +172,24 @@ export default function ProjectTasksWidget({ limit = 5, showPendingAcceptance = 
         </div>
         <button
           onClick={() => router.push('/dashboard/projects/my-tasks')}
-          className="text-primary-600 hover:text-primary-800 text-sm font-medium flex items-center"
+          className="text-primary-600 hover:text-primary-800 text-sm font-medium"
         >
           View All
-          <FaChevronRight className="ml-1 w-3 h-3" />
         </button>
       </div>
 
       {allTasks.length === 0 ? (
-        <div className="text-center py-8">
-          <FaCheckCircle className="w-10 h-10 text-green-300 mx-auto mb-2" />
-          <p className="text-gray-500 text-sm">No project tasks due today</p>
+        <div className="text-center py-6 text-gray-500">
+          <FaProjectDiagram className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+          <p className="text-sm">No project tasks due today</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-2 max-h-48 overflow-y-auto">
           {/* Pending Acceptance Tasks */}
           {showPendingAcceptance && pendingTasks.map(task => (
             <div
               key={task._id}
-              className="p-3 rounded-lg border border-yellow-200 bg-yellow-50"
+              className="p-3 bg-yellow-50 rounded-lg border border-yellow-200"
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
@@ -196,7 +197,7 @@ export default function ProjectTasksWidget({ limit = 5, showPendingAcceptance = 
                     <FaClock className="w-3 h-3 text-yellow-600" />
                     <span className="text-xs text-yellow-700 font-medium">Pending Acceptance</span>
                   </div>
-                  <h4 className="text-sm font-medium text-gray-900 truncate">{task.title}</h4>
+                  <h4 className="text-sm font-medium text-gray-800 truncate">{task.title}</h4>
                   <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
                     <span className="truncate">{task.project?.name}</span>
                     {task.dueDate && (
@@ -239,17 +240,16 @@ export default function ProjectTasksWidget({ limit = 5, showPendingAcceptance = 
             return (
               <div
                 key={task._id}
-                className={`p-3 rounded-lg border ${taskOverdue ? 'border-red-200 bg-red-50' : 'border-gray-100 bg-gray-50'
-                  }`}
+                className={`p-3 rounded-lg ${taskOverdue ? 'bg-red-50' : 'bg-gray-50'} hover:bg-gray-100 transition-colors`}
               >
                 <div className="flex items-start justify-between">
-                  <div className="flex items-start space-x-3 flex-1 min-w-0">
+                  <div className="flex items-start gap-3 flex-1 min-w-0">
                     <div className={`p-1.5 rounded ${statusColors[task.status]}`}>
                       <StatusIcon className="w-3 h-3" />
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="text-sm font-medium text-gray-900 truncate">{task.title}</h4>
+                        <h4 className="text-sm font-medium text-gray-800 truncate">{task.title}</h4>
                         <span className={`px-1.5 py-0.5 rounded text-xs ${priorityColors[task.priority]}`}>
                           {task.priority}
                         </span>
@@ -286,7 +286,7 @@ export default function ProjectTasksWidget({ limit = 5, showPendingAcceptance = 
                         handleUpdateStatus(task, nextStatus[task.status])
                       }}
                       disabled={respondingTo === task._id}
-                      className="px-2 py-1 text-xs bg-primary-100 text-primary-700 rounded hover:bg-primary-200 disabled:opacity-50 flex-shrink-0 ml-2"
+                      className="px-2 py-1 text-xs bg-primary-100 text-primary-600 rounded hover:bg-primary-200 disabled:opacity-50 flex-shrink-0 ml-2"
                     >
                       {task.status === 'todo' ? 'Start' :
                         task.status === 'in-progress' ? 'Review' :

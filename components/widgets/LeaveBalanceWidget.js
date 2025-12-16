@@ -43,14 +43,6 @@ export default function LeaveBalanceWidget({ employeeId }) {
         )
     }
 
-    const colorClasses = [
-        'bg-blue-50 text-blue-700 border-blue-200',
-        'bg-green-50 text-green-700 border-green-200',
-        'bg-purple-50 text-purple-700 border-purple-200',
-        'bg-orange-50 text-orange-700 border-orange-200',
-        'bg-pink-50 text-pink-700 border-pink-200',
-    ]
-
     return (
         <div className="p-4 sm:p-6">
             <div className="flex items-center gap-2 mb-4">
@@ -59,27 +51,30 @@ export default function LeaveBalanceWidget({ employeeId }) {
             </div>
 
             {balances.length === 0 ? (
-                <p className="text-center text-gray-500 py-4">No leave balance data</p>
+                <div className="text-center py-6 text-gray-500">
+                    <FaCalendarAlt className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                    <p className="text-sm">No leave balance data</p>
+                </div>
             ) : (
-                <div className="space-y-3">
+                <div className="space-y-2 max-h-48 overflow-y-auto">
                     {balances.map((balance, index) => (
                         <div
                             key={balance._id || index}
-                            className={`p-3 rounded-lg border ${colorClasses[index % colorClasses.length]}`}
+                            className="p-3 bg-gray-50 rounded-lg"
                         >
-                            <div className="flex items-center justify-between">
-                                <span className="text-sm font-medium">{balance.leaveType?.name || 'Leave'}</span>
-                                <span className="text-lg font-bold">{balance.remaining || 0} days</span>
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-sm font-medium text-gray-800">{balance.leaveType?.name || 'Leave'}</span>
+                                <span className="text-lg font-bold text-primary-600">{balance.remaining || 0} days</span>
                             </div>
-                            <div className="mt-2 h-2 bg-white/50 rounded-full overflow-hidden">
+                            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
                                 <div
-                                    className="h-full bg-current opacity-60 rounded-full transition-all"
+                                    className="h-full bg-primary-500 rounded-full transition-all"
                                     style={{
                                         width: `${Math.min(100, ((balance.used || 0) / (balance.total || 1)) * 100)}%`
                                     }}
                                 />
                             </div>
-                            <div className="flex justify-between mt-1 text-xs opacity-75">
+                            <div className="flex justify-between mt-1 text-xs text-gray-500">
                                 <span>Used: {balance.used || 0}</span>
                                 <span>Total: {balance.total || 0}</span>
                             </div>

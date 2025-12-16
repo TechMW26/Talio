@@ -30,31 +30,50 @@ export default function MyAssetsWidget({ user }) {
     }
   }
 
-  if (loading) return <div className="animate-pulse h-32 bg-gray-100 rounded-lg"></div>
+  if (loading) {
+    return (
+      <div className="p-4 sm:p-6 animate-pulse">
+        <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
+        <div className="space-y-3">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="h-12 bg-gray-200 rounded"></div>
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   return (
-    <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100 h-full">
-      <div className="flex justify-between items-center mb-3">
-        <h3 className="font-semibold text-gray-800 flex items-center gap-2">
-          <FaLaptop className="text-blue-500" /> My Assets
-        </h3>
-        <span className="text-xs font-medium bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+    <div className="p-4 sm:p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <FaLaptop className="w-5 h-5 text-primary-500" />
+          <h3 className="text-base sm:text-lg font-bold text-gray-800">My Assets</h3>
+        </div>
+        <span className="text-xs font-medium bg-primary-100 text-primary-800 px-2 py-1 rounded-full">
           {assets.length}
         </span>
       </div>
       {assets.length === 0 ? (
-        <p className="text-sm text-gray-500">No assets assigned.</p>
+        <div className="text-center py-6 text-gray-500">
+          <FaLaptop className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+          <p className="text-sm">No assets assigned</p>
+        </div>
       ) : (
-        <div className="space-y-2 max-h-40 overflow-y-auto">
+        <div className="space-y-2 max-h-48 overflow-y-auto">
           {assets.map(asset => (
-            <div key={asset._id} className="flex items-center justify-between text-sm p-2 bg-gray-50 rounded">
-              <div>
-                <p className="font-medium text-gray-800">{asset.name}</p>
+            <div key={asset._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-gray-800 truncate">{asset.name}</p>
                 <p className="text-xs text-gray-500">{asset.assetId || asset.uin}</p>
               </div>
-              <div className="text-xs text-gray-500 capitalize">
+              <span className={`text-xs px-2 py-1 rounded-full capitalize ${
+                asset.status === 'active' ? 'bg-green-100 text-green-700' :
+                asset.status === 'maintenance' ? 'bg-yellow-100 text-yellow-700' :
+                'bg-gray-100 text-gray-700'
+              }`}>
                 {asset.status}
-              </div>
+              </span>
             </div>
           ))}
         </div>

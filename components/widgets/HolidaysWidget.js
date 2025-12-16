@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { FaCalendarAlt, FaGift } from 'react-icons/fa'
+import { useRouter } from 'next/navigation'
 
 export default function HolidaysWidget({ limit = 5 }) {
+    const router = useRouter()
     const [holidays, setHolidays] = useState([])
     const [loading, setLoading] = useState(true)
 
@@ -45,40 +47,57 @@ export default function HolidaysWidget({ limit = 5 }) {
 
     if (loading) {
         return (
-            <div className="animate-pulse space-y-3">
-                {[1, 2, 3].map(i => (
-                    <div key={i} className="h-12 bg-gray-200 rounded"></div>
-                ))}
+            <div className="p-4 sm:p-6 animate-pulse">
+                <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
+                <div className="space-y-3">
+                    {[1, 2, 3].map(i => (
+                        <div key={i} className="h-16 bg-gray-200 rounded"></div>
+                    ))}
+                </div>
             </div>
         )
     }
 
     return (
-        <div className="space-y-3">
+        <div className="p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                    <FaGift className="w-5 h-5 text-primary-500" />
+                    <h3 className="text-base sm:text-lg font-bold text-gray-800">Upcoming Holidays</h3>
+                </div>
+                <button
+                    onClick={() => router.push('/dashboard/holidays')}
+                    className="text-primary-600 hover:text-primary-800 text-sm font-medium"
+                >
+                    View All
+                </button>
+            </div>
+            
+            <div className="space-y-2 max-h-48 overflow-y-auto">
             {holidays.length > 0 ? (
                 holidays.map((holiday, index) => {
                     const daysUntil = getDaysUntil(holiday.date)
                     return (
                         <div
                             key={holiday._id || index}
-                            className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-100"
+                            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                         >
-                            <div className="flex items-center space-x-3">
-                                <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                                    <FaGift className="w-5 h-5 text-purple-600" />
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
+                                    <FaGift className="w-5 h-5 text-primary-600" />
                                 </div>
-                                <div>
-                                    <p className="text-sm font-medium text-gray-900">{holiday.name}</p>
+                                <div className="min-w-0">
+                                    <p className="text-sm font-medium text-gray-800 truncate">{holiday.name}</p>
                                     <p className="text-xs text-gray-500">{formatDate(holiday.date)}</p>
                                 </div>
                             </div>
-                            <div className="text-right">
+                            <div className="flex-shrink-0 ml-2">
                                 {daysUntil === 0 ? (
-                                    <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full font-medium">Today!</span>
+                                    <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full font-medium">Today!</span>
                                 ) : daysUntil === 1 ? (
-                                    <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full font-medium">Tomorrow</span>
+                                    <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-full font-medium">Tomorrow</span>
                                 ) : daysUntil > 0 ? (
-                                    <span className="text-xs text-gray-500">{daysUntil} days</span>
+                                    <span className="text-xs text-gray-500 font-medium">{daysUntil} days</span>
                                 ) : (
                                     <span className="text-xs text-gray-400">Passed</span>
                                 )}
@@ -88,10 +107,11 @@ export default function HolidaysWidget({ limit = 5 }) {
                 })
             ) : (
                 <div className="text-center py-6 text-gray-500">
-                    <FaCalendarAlt className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                    <FaGift className="w-8 h-8 mx-auto mb-2 text-gray-400" />
                     <p className="text-sm">No upcoming holidays</p>
                 </div>
             )}
+            </div>
         </div>
     )
 }

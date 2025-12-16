@@ -56,37 +56,48 @@ export default function GoalsWidget({ userId }) {
 
     return (
         <div className="p-4 sm:p-6">
-            <h3 className="text-base sm:text-lg font-bold text-gray-800 mb-4">My Goals</h3>
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                    <FaBullseye className="w-5 h-5 text-primary-500" />
+                    <h3 className="text-base sm:text-lg font-bold text-gray-800">My Goals</h3>
+                </div>
+                <a
+                    href="/dashboard/performance/goals"
+                    className="text-primary-600 hover:text-primary-800 text-sm font-medium"
+                >
+                    View All
+                </a>
+            </div>
 
             {/* Stats Grid */}
             <div className="grid grid-cols-4 gap-2 mb-4">
-                <div className="bg-blue-50 rounded-lg p-2 text-center">
-                    <p className="text-lg font-bold text-blue-700">{stats.total}</p>
-                    <p className="text-xs text-blue-600">Total</p>
+                <div className="bg-gray-50 rounded-lg p-2 text-center">
+                    <p className="text-lg font-bold text-primary-600">{stats.total}</p>
+                    <p className="text-xs text-gray-600">Total</p>
                 </div>
-                <div className="bg-green-50 rounded-lg p-2 text-center">
-                    <p className="text-lg font-bold text-green-700">{stats.completed}</p>
-                    <p className="text-xs text-green-600">Done</p>
+                <div className="bg-gray-50 rounded-lg p-2 text-center">
+                    <p className="text-lg font-bold text-green-600">{stats.completed}</p>
+                    <p className="text-xs text-gray-600">Done</p>
                 </div>
-                <div className="bg-yellow-50 rounded-lg p-2 text-center">
-                    <p className="text-lg font-bold text-yellow-700">{stats.inProgress}</p>
-                    <p className="text-xs text-yellow-600">Active</p>
+                <div className="bg-gray-50 rounded-lg p-2 text-center">
+                    <p className="text-lg font-bold text-blue-600">{stats.inProgress}</p>
+                    <p className="text-xs text-gray-600">Active</p>
                 </div>
-                <div className="bg-red-50 rounded-lg p-2 text-center">
-                    <p className="text-lg font-bold text-red-700">{stats.overdue}</p>
-                    <p className="text-xs text-red-600">Overdue</p>
+                <div className="bg-gray-50 rounded-lg p-2 text-center">
+                    <p className="text-lg font-bold text-red-600">{stats.overdue}</p>
+                    <p className="text-xs text-gray-600">Overdue</p>
                 </div>
             </div>
 
             {/* Goals List */}
             {goals.length === 0 ? (
                 <div className="text-center py-6 text-gray-500">
-                    <FaBullseye className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                    <FaBullseye className="w-8 h-8 mx-auto mb-2 text-gray-400" />
                     <p className="text-sm">No goals set yet</p>
                     <p className="text-xs mt-1">Visit Performance section to create goals</p>
                 </div>
             ) : (
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-48 overflow-y-auto">
                     {goals.map((goal) => (
                         <div key={goal._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                             <div className="flex-1 min-w-0">
@@ -110,21 +121,12 @@ export default function GoalsWidget({ userId }) {
                                 ) : goal.isOverdue ? (
                                     <FaExclamationTriangle className="w-5 h-5 text-red-600" />
                                 ) : (
-                                    <FaHourglassHalf className="w-5 h-5 text-blue-600" />
+                                    <FaHourglassHalf className="w-5 h-5 text-primary-600" />
                                 )}
                             </div>
                         </div>
                     ))}
                 </div>
-            )}
-
-            {goals.length > 0 && (
-                <a
-                    href="/dashboard/performance/goals"
-                    className="block mt-4 text-center text-sm text-primary-600 hover:text-primary-700 font-medium"
-                >
-                    View All Goals →
-                </a>
             )}
         </div>
     )

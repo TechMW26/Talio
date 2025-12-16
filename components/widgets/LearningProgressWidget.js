@@ -58,19 +58,19 @@ export default function LearningProgressWidget({ limit = 4 }) {
         switch (status) {
             case 'Completed':
                 return (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
+                    <span className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">
                         <FaCheckCircle className="w-3 h-3" /> Completed
                     </span>
                 )
             case 'In Progress':
                 return (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
+                    <span className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-700">
                         <FaSpinner className="w-3 h-3" /> In Progress
                     </span>
                 )
             default:
                 return (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">
+                    <span className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-700">
                         <FaPlayCircle className="w-3 h-3" /> Not Started
                     </span>
                 )
@@ -79,23 +79,40 @@ export default function LearningProgressWidget({ limit = 4 }) {
 
     if (loading) {
         return (
-            <div className="animate-pulse space-y-4">
-                {[1, 2, 3].map(i => (
-                    <div key={i} className="space-y-2">
-                        <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                        <div className="h-2 bg-gray-200 rounded"></div>
-                    </div>
-                ))}
+            <div className="p-4 sm:p-6 animate-pulse">
+                <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
+                <div className="space-y-3">
+                    {[1, 2, 3].map(i => (
+                        <div key={i} className="space-y-2">
+                            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                            <div className="h-2 bg-gray-200 rounded"></div>
+                        </div>
+                    ))}
+                </div>
             </div>
         )
     }
 
     return (
-        <div className="space-y-4">
+        <div className="p-4 sm:p-6">
+            <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                    <FaGraduationCap className="w-5 h-5 text-primary-500" />
+                    <h3 className="text-base sm:text-lg font-bold text-gray-800">Learning Progress</h3>
+                </div>
+                <a
+                    href="/dashboard/learning"
+                    className="text-primary-600 hover:text-primary-800 text-sm font-medium"
+                >
+                    View All
+                </a>
+            </div>
+            
+            <div className="space-y-3 max-h-48 overflow-y-auto">
             {courses.map((course, index) => (
-                <div key={index} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                        <h4 className="text-sm font-medium text-gray-900 truncate pr-2 flex-1">
+                <div key={index} className="p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-sm font-medium text-gray-800 truncate pr-2 flex-1">
                             {course.course || course.title}
                         </h4>
                         {getStatusBadge(course.status)}
@@ -103,21 +120,15 @@ export default function LearningProgressWidget({ limit = 4 }) {
                     <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
                             className={`h-2 rounded-full transition-all duration-300 ${course.progress === 100 ? 'bg-green-600' :
-                                    course.progress > 0 ? 'bg-blue-600' : 'bg-gray-300'
+                                    course.progress > 0 ? 'bg-primary-600' : 'bg-gray-300'
                                 }`}
                             style={{ width: `${course.progress}%` }}
                         ></div>
                     </div>
-                    <p className="text-xs text-gray-500">{course.progress}% complete</p>
+                    <p className="text-xs text-gray-500 mt-1">{course.progress}% complete</p>
                 </div>
             ))}
-
-            <a
-                href="/dashboard/learning"
-                className="block text-center text-sm text-primary-600 hover:text-primary-700 mt-4"
-            >
-                View all courses →
-            </a>
+            </div>
         </div>
     )
 }

@@ -59,16 +59,19 @@ export default function AnnouncementsWidget() {
             </div>
 
             {announcements.length === 0 ? (
-                <p className="text-center text-gray-500 py-4">No announcements</p>
+                <div className="text-center py-6 text-gray-500">
+                    <FaBullhorn className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+                    <p className="text-sm">No announcements</p>
+                </div>
             ) : (
-                <div className="space-y-3 max-h-64 overflow-y-auto">
-                    {announcements.slice(0, 3).map((announcement) => (
+                <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {announcements.slice(0, 5).map((announcement) => (
                         <div
                             key={announcement._id}
-                            className="p-3 rounded-lg bg-gradient-to-r from-primary-50 to-purple-50 border border-primary-100 hover:shadow-md transition-shadow cursor-pointer"
+                            className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
                             onClick={() => router.push(`/dashboard/announcements/${announcement._id}`)}
                         >
-                            <h4 className="font-semibold text-gray-800 text-sm mb-1">{announcement.title}</h4>
+                            <h4 className="text-sm font-medium text-gray-800 truncate mb-1">{announcement.title}</h4>
                             <p className="text-xs text-gray-600 line-clamp-2">{announcement.message}</p>
                             <p className="text-xs text-gray-400 mt-2">
                                 {new Date(announcement.createdAt).toLocaleDateString()}
