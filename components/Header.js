@@ -6,6 +6,7 @@ import { FaBars, FaBell, FaUser, FaSignOutAlt, FaCog, FaSearch, FaComments, FaTi
 import toast from 'react-hot-toast'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
+import { useChatWidget } from '@/contexts/ChatWidgetContext'
 import UnreadBadge from '@/components/UnreadBadge'
 import { formatDesignation as formatDesignationLib, formatDepartments, getLevelNameFromNumber } from '@/lib/formatters'
 
@@ -14,6 +15,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
   const router = useRouter()
   const pathname = usePathname()
   const { unreadCount } = useUnreadMessages()
+  const { openWidget } = useChatWidget()
 
   // Fallback theme colors if theme is not loaded yet
   const primaryColor = theme?.primary?.[600] || '#2563EB'
@@ -279,6 +281,13 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
     setShowSearchResults(false)
     setShowMobileSearch(false)
     setSearchQuery('')
+    
+    // On desktop, open chat popup instead of navigating to chat page
+    if (link === '/dashboard/chat' && isDesktop) {
+      openWidget('button')
+      return
+    }
+    
     router.push(link)
   }
 
@@ -287,23 +296,6 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
     setSearchQuery('')
     setSearchResults(null)
     setShowSearchResults(false)
-  }
-
-  const getResultIcon = (type) => {
-    const icons = {
-      page: '🔍',
-      employee: '👤',
-      task: '📋',
-      leave: '🏖️',
-      attendance: '⏰',
-      department: '🏢',
-      designation: '💼',
-      document: '📄',
-      asset: '💻',
-      announcement: '📢',
-      policy: '📜'
-    }
-    return icons[type] || '📌'
   }
 
   const getCategoryLabel = (category) => {
@@ -366,77 +358,74 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
 
           {/* Search bar - Desktop */}
           <div ref={searchRef} className="hidden md:block relative w-64 lg:w-96">
-            <div className="relative flex items-center">
-              <FaSearch className="absolute left-3 text-gray-400 w-4 h-4 pointer-events-none" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search everything..."
-                className="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-100 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-1 focus:border-transparent transition-all"
-                style={{ '--tw-ring-color': primaryMedium }}
+            {/* Backdrop overlay when search is active */}
+            {(showSearchResults || searchQuery.length >= 2) && (
+              <div 
+                className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[100]"
+                onClick={() => {
+                  setSearchQuery('')
+                  setShowSearchResults(false)
+                }}
               />
-              {searching && (
-                <FaSpinner className="absolute right-3 animate-spin w-4 h-4" style={{ color: primaryColor }} />
-              )}
-              {searchQuery && !searching && (
-                <button
-                  onClick={() => {
-                    setSearchQuery('')
-                    setShowSearchResults(false)
-                  }}
-                  className="absolute right-3 text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                  <FaTimes className="w-4 h-4" />
-                </button>
-              )}
-            </div>
+            )}
+            
+            {/* Unified Search Container */}
+            <div className={`z-[101] ${(showSearchResults || searchQuery.length >= 2) ? 'fixed left-1/2 -translate-x-1/2 top-4 w-[90%] max-w-xl bg-white/95 backdrop-blur-xl rounded-xl shadow-2xl border border-gray-200 overflow-hidden' : 'relative'}`}>
+              <div className="relative flex items-center">
+                <FaSearch className="absolute left-3 text-gray-400 w-4 h-4 pointer-events-none z-10" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search everything..."
+                  className={`w-full pl-10 pr-10 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none transition-all ${(showSearchResults || searchQuery.length >= 2) ? 'bg-transparent border-b border-gray-200' : 'bg-gray-50 border border-gray-100 rounded-lg focus:ring-1 focus:border-transparent'}`}
+                  style={{ '--tw-ring-color': primaryMedium }}
+                />
+                {searching && (
+                  <FaSpinner className="absolute right-3 animate-spin w-4 h-4 z-10" style={{ color: primaryColor }} />
+                )}
+                {searchQuery && !searching && (
+                  <button
+                    onClick={() => {
+                      setSearchQuery('')
+                      setShowSearchResults(false)
+                    }}
+                    className="absolute right-3 text-gray-400 hover:text-gray-600 transition-colors z-10"
+                  >
+                    <FaTimes className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
 
-            {/* Search Results Dropdown */}
-            {showSearchResults && searchResults && (
-              <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl border border-gray-200 max-h-[70vh] overflow-hidden z-50">
-                <div className="overflow-y-auto max-h-[70vh] scrollbar-hide">
+              {/* Search Results - Integrated */}
+              {showSearchResults && searchResults && (
+                <div className="max-h-[60vh] overflow-y-auto scrollbar-hide">
                   {Object.entries(searchResults).map(([category, items]) => {
                     if (items.length === 0) return null
                     return (
                       <div key={category} className="border-b border-gray-100 last:border-b-0">
-                        <div className="px-4 py-2.5 bg-gradient-to-r from-gray-50 to-gray-100 font-semibold text-xs text-gray-700 uppercase sticky top-0 z-10 border-b border-gray-200">
-                          {getCategoryLabel(category)} <span className="text-gray-500">({items.length})</span>
+                        <div className="px-4 py-2 bg-gray-50/80 font-semibold text-xs text-gray-600 uppercase sticky top-0 backdrop-blur-sm">
+                          {getCategoryLabel(category)} <span className="text-gray-400">({items.length})</span>
                         </div>
                         {items.map((item, index) => (
                           <div
                             key={item._id || index}
                             onClick={() => handleSearchResultClick(item.link)}
-                            className="px-4 py-3 cursor-pointer border-b border-gray-50 last:border-b-0 transition-colors"
-                            style={{
-                              backgroundColor: 'transparent',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = primaryLight
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = 'transparent'
-                            }}
+                            className="px-4 py-3 cursor-pointer transition-colors hover:bg-gray-50"
                           >
-                            <div className="flex items-start gap-3">
-                              <div className="text-xl flex-shrink-0 mt-0.5">{getResultIcon(item.type)}</div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <h4 className="font-semibold text-sm text-gray-900 truncate">{item.title}</h4>
-                                  {item.meta && item.type === 'page' && (
-                                    <span className="text-lg">{item.meta}</span>
-                                  )}
-                                  {item.meta && item.type !== 'page' && (
-                                    <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{item.meta}</span>
-                                  )}
-                                </div>
-                                {item.subtitle && (
-                                  <p className="text-xs mb-1" style={{ color: primaryColor }}>{item.subtitle}</p>
-                                )}
-                                {item.description && (
-                                  <p className="text-xs text-gray-500 line-clamp-1">{item.description}</p>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-0.5">
+                                <h4 className="font-medium text-sm text-gray-900 truncate">{item.title}</h4>
+                                {item.meta && item.type !== 'page' && (
+                                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{item.meta}</span>
                                 )}
                               </div>
+                              {item.subtitle && (
+                                <p className="text-xs text-gray-500">{item.subtitle}</p>
+                              )}
+                              {item.description && (
+                                <p className="text-xs text-gray-400 line-clamp-1 mt-0.5">{item.description}</p>
+                              )}
                             </div>
                           </div>
                         ))}
@@ -444,15 +433,14 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                     )
                   })}
                   {Object.values(searchResults).every(arr => arr.length === 0) && (
-                    <div className="px-4 py-12 text-center text-gray-500">
-                      <FaSearch className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                    <div className="px-4 py-8 text-center text-gray-500">
                       <p className="text-sm font-medium">No results found for "{searchQuery}"</p>
-                      <p className="text-xs text-gray-400 mt-1">Try different keywords or check spelling</p>
+                      <p className="text-xs text-gray-400 mt-1">Try different keywords</p>
                     </div>
                   )}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
 
@@ -714,15 +702,10 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                               e.currentTarget.style.backgroundColor = 'transparent'
                             }}
                           >
-                            <div className="flex items-start gap-3">
-                              <div className="text-2xl flex-shrink-0 mt-1">{getResultIcon(item.type)}</div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <h4 className="font-semibold text-base text-gray-900">{item.title}</h4>
-                                  {item.meta && item.type === 'page' && (
-                                    <span className="text-xl">{item.meta}</span>
-                                  )}
-                                </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="font-semibold text-base text-gray-900">{item.title}</h4>
+                              </div>
                                 {item.subtitle && (
                                   <p className="text-sm mb-1" style={{ color: primaryColor }}>{item.subtitle}</p>
                                 )}
@@ -734,7 +717,6 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                                     {item.meta}
                                   </span>
                                 )}
-                              </div>
                             </div>
                           </div>
                         ))}

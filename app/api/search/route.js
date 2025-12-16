@@ -72,7 +72,7 @@ function buildSearchablePagesFromMenu(menuItems) {
         title: item.name,
         description: `View ${item.name.toLowerCase()}`,
         link: item.path,
-        icon: '📄',
+        type: 'page',
         keywords: [item.name.toLowerCase(), ...item.name.toLowerCase().split(' ')]
       })
     }
@@ -84,7 +84,7 @@ function buildSearchablePagesFromMenu(menuItems) {
           title: subItem.name,
           description: `${subItem.name} - ${item.name}`,
           link: subItem.path,
-          icon: '📄',
+          type: 'page',
           keywords: [
             subItem.name.toLowerCase(),
             ...subItem.name.toLowerCase().split(' '),
@@ -173,7 +173,6 @@ export async function GET(request) {
       title: result.item.title,
       subtitle: 'Navigate to',
       description: result.item.description,
-      meta: result.item.icon,
       link: result.item.link,
       score: result.score
     }))
