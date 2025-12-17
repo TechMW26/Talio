@@ -8,11 +8,15 @@ import Holiday from '@/models/Holiday'
 import CompanySettings from '@/models/CompanySettings'
 import GeofenceLocation from '@/models/GeofenceLocation'
 import OvertimeRequest from '@/models/OvertimeRequest'
+import Company from '@/models/Company'
 import queryCache from '@/lib/queryCache'
 import { logActivity } from '@/lib/activityLogger'
 import { sendEmail } from '@/lib/mailer'
 import { sendPushToUser } from '@/lib/pushNotification'
 import { calculateEffectiveWorkHours, determineAttendanceStatus } from '@/lib/attendanceShrinkage'
+
+// Ensure models are registered for populate
+const _ensureModels = { Company };
 
 // Calculate distance between two coordinates (Haversine formula)
 function calculateDistance(lat1, lon1, lat2, lon2) {

@@ -4,8 +4,12 @@ import Employee from '@/models/Employee'
 import User from '@/models/User'
 import Department from '@/models/Department'
 import Designation from '@/models/Designation'
+import Company from '@/models/Company'
 import queryCache from '@/lib/queryCache'
 import { logActivity } from '@/lib/activityLogger'
+
+// Ensure models are registered for populate
+const _ensureModels = { Department, Designation, Company };
 
 // GET - Get single employee
 export async function GET(request, { params }) {

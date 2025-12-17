@@ -40,6 +40,7 @@ export async function POST(request) {
       password,
       role: role || 'employee',
       employeeId,
+      forcePasswordChange: true, // Force password change on first login
     })
 
     return NextResponse.json({

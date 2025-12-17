@@ -209,6 +209,7 @@ export async function POST(request) {
       password: password, // Let the pre-save hook handle hashing
       role: data.role || 'employee', // Default role is employee
       employeeId: employee._id,
+      forcePasswordChange: true, // Force password change on first login
     }
 
     // Add company to user if provided (same company as employee)

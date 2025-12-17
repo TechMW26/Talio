@@ -32,6 +32,11 @@ const UserSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  // Force password change on first login
+  forcePasswordChange: {
+    type: Boolean,
+    default: true, // New users must change their password on first login
+  },
   lastLogin: {
     type: Date,
   },

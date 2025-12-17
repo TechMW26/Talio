@@ -31,7 +31,7 @@ export async function GET(request) {
 
     // Check if user still exists and is active
     await connectDB()
-    const user = await User.findById(payload.userId).select('isActive email')
+    const user = await User.findById(payload.userId).select('isActive email forcePasswordChange')
 
     if (!user) {
       return NextResponse.json(
@@ -49,7 +49,8 @@ export async function GET(request) {
 
     return NextResponse.json({
       valid: true,
-      userId: payload.userId
+      userId: payload.userId,
+      forcePasswordChange: user.forcePasswordChange === true
     })
 
   } catch (error) {

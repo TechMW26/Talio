@@ -146,14 +146,14 @@ export async function GET(request) {
       }
     }
 
-    // Update last login
+    // Update last login and clear forcePasswordChange (Google OAuth users don't need to change password)
     try {
       await User.updateOne(
         { _id: user._id },
-        { $set: { lastLogin: new Date() } },
+        { $set: { lastLogin: new Date(), forcePasswordChange: false } },
         { timestamps: false }
       )
-      console.log('✅ Last login updated')
+      console.log('✅ Last login updated, forcePasswordChange cleared')
     } catch (error) {
       console.error('⚠️ Failed to update lastLogin:', error)
     }
@@ -181,6 +181,7 @@ export async function GET(request) {
       email: user.email,
       role: user.role,
       isActive: user.isActive,
+      forcePasswordChange: false, // Google OAuth users don't need to change password
       // Store employeeId as both string and object for compatibility
       employeeId: employeeData ? {
         _id: user.employeeId.toString(),

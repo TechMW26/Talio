@@ -26,7 +26,7 @@ export async function POST(request) {
       )
     }
 
-    // Find user and include password field (without populate to avoid schema error)
+    // Find user and include password field (forcePasswordChange and isActive are included by default)
     const user = await User.findOne({ email }).select('+password')
 
     if (!user) {
@@ -204,6 +204,8 @@ export async function POST(request) {
       email: user.email,
       role: user.role,
       isActive: user.isActive,
+      // Force password change flag - true for first login
+      forcePasswordChange: user.forcePasswordChange === true,
       // Store employeeId as both string and object for compatibility
       employeeId: employeeData ? {
         _id: user.employeeId.toString(),

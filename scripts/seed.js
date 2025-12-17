@@ -173,6 +173,7 @@ async function seedDatabase() {
       role: 'admin',
       employeeId: adminEmployee._id,
       isActive: true,
+      forcePasswordChange: true, // Force password change on first login
     });
 
     await User.create({
@@ -181,6 +182,7 @@ async function seedDatabase() {
       role: 'hr',
       employeeId: hrEmployee._id,
       isActive: true,
+      forcePasswordChange: true, // Force password change on first login
     });
 
     await User.create({
@@ -189,6 +191,7 @@ async function seedDatabase() {
       role: 'manager',
       employeeId: managerEmployee._id,
       isActive: true,
+      forcePasswordChange: true, // Force password change on first login
     });
 
     await User.create({
@@ -197,6 +200,7 @@ async function seedDatabase() {
       role: 'employee',
       employeeId: employeeUser._id,
       isActive: true,
+      forcePasswordChange: true, // Force password change on first login
     });
 
     console.log('✅ Users created successfully!');
@@ -206,6 +210,7 @@ async function seedDatabase() {
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('⚠️  All users have the same password set via SEED_PASSWORD env var');
     console.log('⚠️  Default password: ChangeMe123! (CHANGE IMMEDIATELY!)');
+    console.log('⚠️  Users will be forced to change password on first login!');
     console.log('');
     console.log('👤 Admin: admin@hrms.com');
     console.log('👤 HR Manager: hr@hrms.com');
@@ -213,7 +218,7 @@ async function seedDatabase() {
     console.log('👤 Employee: employee@hrms.com');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('\n🚀 You can now login at: http://localhost:3000\n');
-    console.log('⚠️  IMPORTANT: Change all passwords after first login!\n');
+    console.log('⚠️  IMPORTANT: All users must change their password on first login!\n');
 
   } catch (error) {
     console.error('❌ Error seeding database:', error);

@@ -65,6 +65,15 @@ export default function LoginPage() {
           })
           
           if (response.ok) {
+            const data = await response.json()
+            
+            // Check if user needs to change password
+            if (data.forcePasswordChange) {
+              console.log('[Login Page] User needs to change password, redirecting...')
+              window.location.href = '/auth/change-password'
+              return
+            }
+            
             // Token is valid, redirect to dashboard
             console.log('[Login Page] Token valid, redirecting to dashboard...')
             window.location.href = '/dashboard'
@@ -180,6 +189,14 @@ export default function LoginPage() {
         if (window.checkPendingFCMToken) {
           console.log('[Login] Checking for pending FCM token...')
           window.checkPendingFCMToken()
+        }
+
+        // Check if user needs to change password on first login
+        if (data.user?.forcePasswordChange) {
+          console.log('[Login] First login detected - redirecting to change password...')
+          toast.loading('Please change your password to continue')
+          window.location.href = '/auth/change-password'
+          return
         }
 
         console.log('[Login] Redirecting to dashboard...')

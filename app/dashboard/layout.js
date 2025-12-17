@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import BottomNav from '@/components/BottomNav'
@@ -32,10 +32,71 @@ export default function DashboardLayout({ children }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true) // Desktop sidebar starts collapsed
   const [userId, setUserId] = useState(null)
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const pathname = usePathname()
+  const router = useRouter()
+
+  // Check if user needs to change password on first login
+  useEffect(() => {
+    const checkPasswordChangeRequired = async () => {
+      const token = getToken()
+      const user = getCurrentUser()
+      
+      if (!token || !user) {
+        // No auth, redirect to login
+        window.location.href = '/login'
+        return
+      }
+      
+      // Check if localStorage user data indicates password change needed
+      if (user.forcePasswordChange) {
+        console.log('[Dashboard] Password change required (from localStorage), redirecting...')
+        window.location.href = '/auth/change-password'
+        return
+      }
+      
+      // Verify with server
+      try {
+        const response = await fetch('/api/auth/validate', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+        
+        if (!response.ok) {
+          // Token invalid, redirect to login
+          localStorage.removeItem('token')
+          localStorage.removeItem('user')
+          localStorage.removeItem('userId')
+          document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+          window.location.href = '/login'
+          return
+        }
+        
+        const data = await response.json()
+        
+        if (data.forcePasswordChange) {
+          console.log('[Dashboard] Password change required (from server), redirecting...')
+          // Update localStorage to reflect this
+          const updatedUser = { ...user, forcePasswordChange: true }
+          localStorage.setItem('user', JSON.stringify(updatedUser))
+          window.location.href = '/auth/change-password'
+          return
+        }
+        
+        setIsCheckingAuth(false)
+      } catch (error) {
+        console.error('[Dashboard] Auth check error:', error)
+        // On network error, allow access but show warning
+        setIsCheckingAuth(false)
+      }
+    }
+    
+    checkPasswordChangeRequired()
+  }, [])
 
   // Sync user data on mount to ensure employee info is complete
   useEffect(() => {
+    if (isCheckingAuth) return // Don't sync while checking auth
+    
     const syncEmployeeData = async () => {
       const user = getCurrentUser()
       const token = getToken()
@@ -121,6 +182,18 @@ export default function DashboardLayout({ children }) {
   
   // Only show fade on bottom nav pages (not chat)
   const shouldShowFade = isBottomNavPage && !isChatPage
+
+  // Show loading state while checking auth
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--color-bg-main)' }}>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-300">Loading...</p>
+        </div>
+      </div>
+    )
+  }
 
   // For meeting room pages, render children directly without any layout chrome
   if (isMeetingRoomPage) {
