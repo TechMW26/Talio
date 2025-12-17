@@ -107,6 +107,9 @@ export async function POST(request) {
     user.forcePasswordChange = false
     await user.save()
 
+    // Refresh user data to get profileCompletion
+    const updatedUser = await User.findById(user._id).select('profileCompletion')
+
     // Fetch employee data for response
     let employeeData = null
     if (user.employeeId) {
@@ -129,6 +132,25 @@ export async function POST(request) {
       role: user.role,
       isActive: user.isActive,
       forcePasswordChange: false,
+      // Profile completion status for modal display
+      profileCompletion: updatedUser?.profileCompletion ? {
+        status: updatedUser.profileCompletion.status || 'incomplete',
+        firstLoginAt: updatedUser.profileCompletion.firstLoginAt,
+        profileCompletionDeadline: updatedUser.profileCompletion.profileCompletionDeadline,
+        completedAt: updatedUser.profileCompletion.completedAt,
+        completedFields: updatedUser.profileCompletion.completedFields || {
+          personalInfo: false,
+          aadhaarUploaded: false,
+          ocrVerified: false
+        }
+      } : {
+        status: 'incomplete',
+        completedFields: {
+          personalInfo: false,
+          aadhaarUploaded: false,
+          ocrVerified: false
+        }
+      },
       employeeId: employeeData ? {
         _id: user.employeeId.toString(),
         id: user.employeeId.toString(),

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import {
   FaUser,
   FaEnvelope,
@@ -18,12 +19,14 @@ import {
   FaRedo,
   FaSun,
   FaAdjust,
+  FaExclamationTriangle,
 } from 'react-icons/fa'
 import toast from 'react-hot-toast'
 import ModalPortal from '@/components/ModalPortal'
 import { formatDesignation, formatDepartments, getLevelNameFromNumber } from '@/lib/formatters'
 import TiltWrapper from "@/components/TiltWrapper";
 import dynamic from 'next/dynamic'
+import AadhaarVerificationSection from '@/components/AadhaarVerificationSection'
 
 // Dynamically import Lanyard with no SSR and error boundary
 const Lanyard = dynamic(() => import('@/src/component/Lanyard').catch((error) => {
@@ -43,6 +46,7 @@ const Lanyard = dynamic(() => import('@/src/component/Lanyard').catch((error) =>
 
 
 export default function ProfilePage() {
+  const searchParams = useSearchParams()
   const [user, setUser] = useState(null)
   const [employee, setEmployee] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -51,6 +55,10 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
   const fileInputRef = useRef(null)
+  
+  // Profile completion state
+  const [profileCompletionStatus, setProfileCompletionStatus] = useState(null)
+  const [isCompleteProfileMode, setIsCompleteProfileMode] = useState(false)
 
   // Use imported getLevelNameFromNumber for level name lookup
   const getLevelName = getLevelNameFromNumber
@@ -69,9 +77,40 @@ export default function ProfilePage() {
   const canvasRef = useRef(null)
   const imageRef = useRef(null)
 
+  // Check for edit mode from URL params (from profile completion modal)
+  useEffect(() => {
+    const editMode = searchParams.get('edit')
+    const completeProfile = searchParams.get('completeProfile')
+    
+    if (editMode === 'true') {
+      setIsEditing(true)
+    }
+    if (completeProfile === 'true') {
+      setIsCompleteProfileMode(true)
+    }
+  }, [searchParams])
+
   useEffect(() => {
     fetchProfile()
+    fetchProfileCompletionStatus()
   }, [])
+
+  const fetchProfileCompletionStatus = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/profile/completion-status', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      const result = await response.json()
+      if (result.success) {
+        setProfileCompletionStatus(result.data)
+      }
+    } catch (error) {
+      console.error('Error fetching profile completion status:', error)
+    }
+  }
 
   const fetchProfile = async () => {
     try {
@@ -480,26 +519,270 @@ export default function ProfilePage() {
     </div>
   );
 
+  // Handler for Aadhaar verification status changes
+  const handleAadhaarStatusChange = (status) => {
+    fetchProfileCompletionStatus()
+  }
+
+  // Render the Complete Profile Status Section
+  const renderCompleteProfileSection = () => {
+    if (!profileCompletionStatus) return null
+    
+    const { steps, completionPercentage, daysRemaining, isComplete, warning } = profileCompletionStatus
+
+    // Check if there's a mismatch issue
+    const hasMismatch = steps?.ocrVerification?.status === 'mismatch'
+    
+    // Show if: not complete OR has mismatch OR in complete profile mode
+    // Mismatch always shows because it requires user action
+    if (isComplete && !hasMismatch && !isCompleteProfileMode) return null
+    
+    return (
+      <section className={`rounded-3xl border shadow-sm p-4 sm:p-6 ${
+        hasMismatch 
+          ? 'bg-red-50 border-red-200 shadow-red-900/5' 
+          : 'bg-white border-slate-100 shadow-slate-900/5'
+      }`}>
+        {/* Section Header */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+              isComplete ? 'bg-emerald-100' : hasMismatch ? 'bg-red-100' : 'bg-amber-100'
+            }`}>
+              {isComplete ? (
+                <FaCheck className="w-5 h-5 text-emerald-600" />
+              ) : hasMismatch ? (
+                <FaExclamationTriangle className="w-5 h-5 text-red-600" />
+              ) : (
+                <FaExclamationTriangle className="w-5 h-5 text-amber-600" />
+              )}
+            </div>
+            <div>
+              <h3 className="text-base sm:text-lg font-semibold text-slate-900">
+                {hasMismatch ? 'Profile Verification Issue' : 'Complete Your Profile'}
+              </h3>
+              <p className={`text-xs mt-0.5 ${hasMismatch ? 'text-red-600' : 'text-slate-500'}`}>
+                {hasMismatch 
+                  ? 'Aadhaar data doesn\'t match your profile - please update'
+                  : isComplete 
+                    ? 'All required information has been completed'
+                    : daysRemaining !== null 
+                      ? `${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining to complete`
+                      : 'Complete all required fields'
+                }
+              </p>
+            </div>
+          </div>
+          <span className={`text-sm font-bold px-3 py-1.5 rounded-full ${
+            isComplete ? 'bg-emerald-100 text-emerald-700' :
+            hasMismatch ? 'bg-red-100 text-red-700' :
+            completionPercentage >= 70 ? 'bg-emerald-100 text-emerald-700' :
+            completionPercentage >= 40 ? 'bg-amber-100 text-amber-700' :
+            'bg-slate-100 text-slate-700'
+          }`}>
+            {completionPercentage}%
+          </span>
+        </div>
+
+        {/* Progress Bar - Always show */}
+        <div className="mb-5">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-xs text-slate-500">Progress</span>
+            <span className="text-xs font-medium text-slate-700">{completionPercentage}/100</span>
+          </div>
+          <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+            <div 
+              className={`h-full rounded-full transition-all duration-500 ${
+                completionPercentage === 100 
+                  ? 'bg-emerald-500' 
+                  : hasMismatch
+                    ? 'bg-red-500'
+                    : completionPercentage >= 70 
+                      ? 'bg-blue-500' 
+                      : completionPercentage >= 40 
+                        ? 'bg-amber-500' 
+                        : 'bg-slate-400'
+              }`}
+              style={{ width: `${completionPercentage}%` }}
+            />
+          </div>
+          <div className="flex justify-between mt-2 text-xs text-slate-400">
+            <span>Personal Info (40%)</span>
+            <span>Aadhaar (30%)</span>
+            <span>Verification (30%)</span>
+          </div>
+        </div>
+
+        {/* Steps Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Personal Info */}
+          <div className={`p-4 rounded-2xl border ${
+            steps?.personalInfo?.complete 
+              ? 'bg-emerald-50 border-emerald-200' 
+              : 'bg-slate-50 border-slate-200'
+          }`}>
+            <div className="flex items-center gap-3 mb-2">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                steps?.personalInfo?.complete ? 'bg-emerald-500' : 'bg-slate-300'
+              }`}>
+                {steps?.personalInfo?.complete ? (
+                  <FaCheck className="w-4 h-4 text-white" />
+                ) : (
+                  <FaUser className="w-4 h-4 text-white" />
+                )}
+              </div>
+              <div>
+                <p className={`text-sm font-semibold ${
+                  steps?.personalInfo?.complete ? 'text-emerald-700' : 'text-slate-700'
+                }`}>
+                  Personal Info
+                </p>
+                <p className="text-xs text-slate-500">
+                  {steps?.personalInfo?.completedCount || 0}/{steps?.personalInfo?.totalFields || 7} fields
+                </p>
+              </div>
+            </div>
+            {!steps?.personalInfo?.complete && steps?.personalInfo?.missingFields?.length > 0 && (
+              <p className="text-xs text-amber-600 mt-2 line-clamp-2">
+                Missing: {steps.personalInfo.missingFields.slice(0, 3).join(', ')}
+                {steps.personalInfo.missingFields.length > 3 && ` +${steps.personalInfo.missingFields.length - 3} more`}
+              </p>
+            )}
+          </div>
+
+          {/* Aadhaar Upload */}
+          <div className={`p-4 rounded-2xl border ${
+            steps?.aadhaarUpload?.complete 
+              ? 'bg-emerald-50 border-emerald-200' 
+              : 'bg-slate-50 border-slate-200'
+          }`}>
+            <div className="flex items-center gap-3 mb-2">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                steps?.aadhaarUpload?.complete ? 'bg-emerald-500' : 'bg-slate-300'
+              }`}>
+                {steps?.aadhaarUpload?.complete ? (
+                  <FaCheck className="w-4 h-4 text-white" />
+                ) : (
+                  <FaUser className="w-4 h-4 text-white" />
+                )}
+              </div>
+              <div>
+                <p className={`text-sm font-semibold ${
+                  steps?.aadhaarUpload?.complete ? 'text-emerald-700' : 'text-slate-700'
+                }`}>
+                  Aadhaar Upload
+                </p>
+                <p className="text-xs text-slate-500">
+                  {steps?.aadhaarUpload?.frontUploaded && steps?.aadhaarUpload?.backUploaded 
+                    ? '2/2 uploaded'
+                    : steps?.aadhaarUpload?.frontUploaded || steps?.aadhaarUpload?.backUploaded
+                      ? '1/2 uploaded'
+                      : '0/2 uploaded'
+                  }
+                </p>
+              </div>
+            </div>
+            {!steps?.aadhaarUpload?.complete && (
+              <p className="text-xs text-amber-600 mt-2">
+                {!steps?.aadhaarUpload?.frontUploaded && !steps?.aadhaarUpload?.backUploaded
+                  ? 'Upload front & back'
+                  : !steps?.aadhaarUpload?.frontUploaded
+                    ? 'Upload front side'
+                    : 'Upload back side'
+                }
+              </p>
+            )}
+          </div>
+
+          {/* OCR Verification */}
+          <div className={`p-4 rounded-2xl border ${
+            steps?.ocrVerification?.complete 
+              ? 'bg-emerald-50 border-emerald-200' 
+              : steps?.ocrVerification?.status === 'mismatch'
+                ? 'bg-red-50 border-red-200'
+                : 'bg-slate-50 border-slate-200'
+          }`}>
+            <div className="flex items-center gap-3 mb-2">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                steps?.ocrVerification?.complete 
+                  ? 'bg-emerald-500' 
+                  : steps?.ocrVerification?.status === 'mismatch'
+                    ? 'bg-red-500'
+                    : 'bg-slate-300'
+              }`}>
+                {steps?.ocrVerification?.complete ? (
+                  <FaCheck className="w-4 h-4 text-white" />
+                ) : (
+                  <FaUser className="w-4 h-4 text-white" />
+                )}
+              </div>
+              <div>
+                <p className={`text-sm font-semibold ${
+                  steps?.ocrVerification?.complete 
+                    ? 'text-emerald-700' 
+                    : steps?.ocrVerification?.status === 'mismatch'
+                      ? 'text-red-700'
+                      : 'text-slate-700'
+                }`}>
+                  Verification
+                </p>
+                <p className={`text-xs ${
+                  steps?.ocrVerification?.status === 'mismatch' ? 'text-red-500' : 'text-slate-500'
+                }`}>
+                  {steps?.ocrVerification?.complete 
+                    ? 'Verified'
+                    : steps?.ocrVerification?.status === 'mismatch'
+                      ? 'Needs review'
+                      : 'Pending'
+                  }
+                </p>
+              </div>
+            </div>
+            {steps?.ocrVerification?.status === 'mismatch' && (
+              <div className="mt-2">
+                <p className="text-xs text-red-600 font-medium">
+                  ⚠️ {steps.ocrVerification.mismatches?.length || 0} field(s) don't match
+                </p>
+                {steps.ocrVerification.mismatches?.slice(0, 2).map((m, i) => (
+                  <p key={i} className="text-xs text-red-500 mt-1">
+                    {m.field}: Profile "{m.profileValue}" ≠ Aadhaar "{m.aadhaarValue}"
+                  </p>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Mismatch Action Banner */}
+        {hasMismatch && (
+          <div className="mt-4 p-3 bg-red-100 rounded-xl border border-red-200">
+            <p className="text-sm text-red-700 font-medium">
+              🔴 Action Required: Update your profile to match your Aadhaar details, or contact HR if there's an error.
+            </p>
+          </div>
+        )}
+      </section>
+    )
+  }
+
   return (
     <div className="page-container pb-24 md:pb-6 px-2 sm:px-4 lg:px-8">
       <div className="max-w-[1400px] mx-auto w-full">
         {/* Status and Edit buttons - Desktop only (hidden on mobile) */}
-        <div className="mb-2 hidden lg:flex items-center justify-end gap-3">
+        <div className="mb-4 hidden lg:flex items-center justify-end gap-3">
           <StatusEditButtons />
         </div>
 
-        {/* Content */}
+        {/* Content - Two Column Layout */}
         <div className="flex flex-col lg:grid lg:grid-cols-3 gap-6 lg:gap-8 overflow-visible">
-          {/* ID Card Lanyard - positioned to hang from under the header */}
+          {/* Left Column: ID Card */}
           <div className="lg:col-span-1 relative lg:sticky lg:top-4 lg:self-start order-1" style={{ overflow: 'visible' }}>
             {/* Hidden file input for profile picture */}
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
             
-            {/* Lanyard Model - hanging from top, string goes under header */}
+            {/* Lanyard Model - hanging from top */}
             {typeof window !== 'undefined' && (
-              <div
-                className="relative w-full overflow-visible z-10 h-[560px] sm:h-[620px] md:h-[680px] lg:h-[750px] mt-[-60px] lg:mt-[-140px]"
-              >
+              <div className="relative w-full overflow-visible z-10 h-[560px] sm:h-[620px] md:h-[680px] lg:h-[750px] mt-[-60px] lg:mt-[-140px]">
                 <Lanyard
                   employee={{
                     name: employee ? `${employee.firstName} ${employee.lastName}` : undefined,
@@ -518,11 +801,30 @@ export default function ProfilePage() {
                 />
               </div>
             )}
-            
           </div>
 
-          {/* Right Side: Details */}
+          {/* Right Column: All Sections */}
           <div className="lg:col-span-2 space-y-5 sm:space-y-6 order-2 mt-6 lg:mt-0">
+            {/* Complete Your Profile Section - Always at top */}
+            {renderCompleteProfileSection()}
+
+            {/* Aadhaar Verification Section - shown when in complete profile mode or when profile is incomplete */}
+            {(isCompleteProfileMode || (profileCompletionStatus && !profileCompletionStatus.isComplete)) && (
+              <AadhaarVerificationSection 
+                initialStatus={profileCompletionStatus?.steps ? {
+                  aadhaarFront: profileCompletionStatus.steps.aadhaarUpload?.frontUploaded ? { url: true } : null,
+                  aadhaarBack: profileCompletionStatus.steps.aadhaarUpload?.backUploaded ? { url: true } : null,
+                  ocrVerification: {
+                    status: profileCompletionStatus.steps.ocrVerification?.status || 'pending',
+                    extractedData: null,
+                    mismatches: profileCompletionStatus.steps.ocrVerification?.mismatches || []
+                  }
+                } : null}
+                onStatusChange={handleAadhaarStatusChange}
+                showUrgentWarning={profileCompletionStatus?.warning?.urgent}
+              />
+            )}
+
             {/* Personal Information */}
             <section className="bg-white rounded-3xl border border-slate-100 shadow-sm shadow-slate-900/5 p-4 sm:p-6">
               <div className="flex items-center justify-between mb-4 sm:mb-5">
@@ -658,17 +960,63 @@ export default function ProfilePage() {
                       Address
                     </p>
                     {isEditing ? (
-                      <textarea
-                        value={editedEmployee.address || ''}
-                        onChange={(e) => handleFieldChange('address', e.target.value)}
-                        className="w-full px-3 py-2 border border-rose-300 rounded-lg text-sm font-semibold text-slate-900 bg-white focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all resize-none"
-                        placeholder="Enter complete address"
-                        rows="2"
-                      />
+                      <>
+                        <textarea
+                          value={editedEmployee.address || ''}
+                          onChange={(e) => handleFieldChange('address', e.target.value)}
+                          className="w-full px-3 py-2 border border-rose-300 rounded-lg text-sm font-semibold text-slate-900 bg-white focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all resize-none"
+                          placeholder="Enter complete address"
+                          rows="2"
+                        />
+                        {/* Show extracted address from Aadhaar if available and different */}
+                        {profileCompletionStatus?.steps?.ocrVerification?.extractedData?.address && 
+                         profileCompletionStatus.steps.ocrVerification.extractedData.address !== editedEmployee.address && (
+                          <div className="mt-2 p-2 bg-emerald-50 border border-emerald-200 rounded-lg">
+                            <p className="text-[10px] font-medium text-emerald-700 uppercase mb-1 flex items-center gap-1">
+                              <FaCheck className="text-emerald-500" />
+                              Address from Aadhaar
+                            </p>
+                            <p className="text-xs text-emerald-800 mb-2">
+                              {profileCompletionStatus.steps.ocrVerification.extractedData.address}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => handleFieldChange('address', profileCompletionStatus.steps.ocrVerification.extractedData.address)}
+                              className="text-xs px-2 py-1 bg-emerald-500 text-white rounded hover:bg-emerald-600 transition-colors"
+                            >
+                              Use this address
+                            </button>
+                          </div>
+                        )}
+                      </>
                     ) : (
-                      <p className="font-semibold text-slate-900 text-sm sm:text-base whitespace-pre-line">
-                        {employee.address || 'N/A'}
-                      </p>
+                      <>
+                        <p className="font-semibold text-slate-900 text-sm sm:text-base whitespace-pre-line">
+                          {employee.address || 'N/A'}
+                        </p>
+                        {/* Show extracted address badge when address matches Aadhaar */}
+                        {profileCompletionStatus?.steps?.ocrVerification?.extractedData?.address && 
+                         employee.address === profileCompletionStatus.steps.ocrVerification.extractedData.address && (
+                          <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-medium rounded-full">
+                            <FaCheck className="text-[8px]" />
+                            Verified from Aadhaar
+                          </span>
+                        )}
+                        {/* Show suggestion if no address but Aadhaar has one */}
+                        {!employee.address && profileCompletionStatus?.steps?.ocrVerification?.extractedData?.address && (
+                          <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                            <p className="text-[10px] font-medium text-blue-700 uppercase mb-1">
+                              📍 Address found in Aadhaar
+                            </p>
+                            <p className="text-xs text-blue-800">
+                              {profileCompletionStatus.steps.ocrVerification.extractedData.address}
+                            </p>
+                            <p className="text-[10px] text-blue-600 mt-1">
+                              Click Edit to use this address
+                            </p>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -869,6 +1217,23 @@ export default function ProfilePage() {
                 </div>
               </div>
             </section>
+
+            {/* Aadhaar Verification Section - always visible in right column */}
+            {!isCompleteProfileMode && (
+              <AadhaarVerificationSection 
+                initialStatus={profileCompletionStatus?.steps ? {
+                  aadhaarFront: profileCompletionStatus.steps.aadhaarUpload?.frontUploaded ? { url: true } : null,
+                  aadhaarBack: profileCompletionStatus.steps.aadhaarUpload?.backUploaded ? { url: true } : null,
+                  ocrVerification: {
+                    status: profileCompletionStatus.steps.ocrVerification?.status || 'pending',
+                    extractedData: null,
+                    mismatches: profileCompletionStatus.steps.ocrVerification?.mismatches || []
+                  }
+                } : null}
+                onStatusChange={handleAadhaarStatusChange}
+                showUrgentWarning={profileCompletionStatus?.warning?.urgent}
+              />
+            )}
             
             {/* Mobile only: Status and Edit buttons at bottom */}
             <div className="lg:hidden mt-8 mb-4">

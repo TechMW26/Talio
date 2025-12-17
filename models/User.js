@@ -37,6 +37,59 @@ const UserSchema = new mongoose.Schema({
     type: Boolean,
     default: true, // New users must change their password on first login
   },
+  // Profile completion tracking
+  profileCompletion: {
+    status: {
+      type: String,
+      enum: ['incomplete', 'partially_complete', 'complete'],
+      default: 'incomplete',
+    },
+    // Aadhaar document uploads
+    aadhaarFront: {
+      url: String,
+      uploadedAt: Date,
+    },
+    aadhaarBack: {
+      url: String,
+      uploadedAt: Date,
+    },
+    // OCR verification
+    ocrVerification: {
+      status: {
+        type: String,
+        enum: ['pending', 'verified', 'failed', 'mismatch'],
+        default: 'pending',
+      },
+      extractedData: {
+        name: String,
+        dateOfBirth: String,
+        aadhaarNumber: String, // Last 4 digits only for security
+        address: String,
+      },
+      mismatches: [{
+        field: String,
+        profileValue: String,
+        aadhaarValue: String,
+      }],
+      verifiedAt: Date,
+    },
+    // Timestamps
+    firstLoginAt: Date,
+    profileCompletionDeadline: Date,
+    completedAt: Date,
+    // Track what was completed
+    completedFields: {
+      personalInfo: { type: Boolean, default: false },
+      aadhaarUploaded: { type: Boolean, default: false },
+      ocrVerified: { type: Boolean, default: false },
+    },
+  },
+  // Account suspension for non-compliance
+  suspensionReason: {
+    type: String,
+    enum: ['profile_incomplete', 'admin_action', 'policy_violation', null],
+  },
+  suspendedAt: Date,
   lastLogin: {
     type: Date,
   },

@@ -93,3 +93,7 @@ public/releases/
 *.blockmap
 CREDENTIALS.md
 scripts/create-admin.js
+
+# Sensitive uploads (Aadhaar documents, etc.)
+uploads/aadhaar/
+!uploads/aadhaar/.gitkeep

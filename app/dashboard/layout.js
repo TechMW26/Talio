@@ -9,6 +9,7 @@ import PWAInstaller, { OfflineIndicator } from '@/components/PWAInstaller'
 import OutOfPremisesPopup from '@/components/OutOfPremisesPopup'
 import OfflineDetector from '@/components/OfflineDetector'
 import ChatWidgetContainer from '@/components/chat/ChatWidgetContainer'
+import ProfileCompletionModal from '@/components/ProfileCompletionModal'
 
 import useGeofencing from '@/hooks/useGeofencing'
 import { SocketProvider } from '@/contexts/SocketContext'
@@ -33,6 +34,8 @@ export default function DashboardLayout({ children }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true) // Desktop sidebar starts collapsed
   const [userId, setUserId] = useState(null)
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
+  const [showProfileCompletionModal, setShowProfileCompletionModal] = useState(false)
+  const [profileCompletionStatus, setProfileCompletionStatus] = useState(null)
   const pathname = usePathname()
   const router = useRouter()
 
@@ -83,6 +86,12 @@ export default function DashboardLayout({ children }) {
         }
         
         setIsCheckingAuth(false)
+        
+        // Check profile completion status after auth is verified
+        // Small delay to ensure layout is mounted
+        setTimeout(() => {
+          checkProfileCompletionStatus(token)
+        }, 500)
       } catch (error) {
         console.error('[Dashboard] Auth check error:', error)
         // On network error, allow access but show warning
@@ -92,6 +101,63 @@ export default function DashboardLayout({ children }) {
     
     checkPasswordChangeRequired()
   }, [])
+
+  // Check profile completion status
+  const checkProfileCompletionStatus = async (token) => {
+    try {
+      console.log('[Dashboard] Checking profile completion status...')
+      const response = await fetch('/api/profile/completion-status', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        console.log('[Dashboard] Profile completion data:', data)
+        if (data.success && data.data) {
+          setProfileCompletionStatus(data.data)
+          
+          // Show modal if profile is not complete and not on profile page
+          const shouldShowModal = data.data.showModal
+          const isOnProfilePage = pathname?.includes('/profile')
+          
+          console.log('[Dashboard] Modal check - showModal:', shouldShowModal, 'isOnProfilePage:', isOnProfilePage)
+          
+          if (shouldShowModal && !isOnProfilePage) {
+            // Check if user has dismissed the modal in this session
+            // Use a more specific key that includes user ID to avoid cross-session issues
+            const userId = data.data.firstLoginAt ? 'user' : 'unknown'
+            const dismissedKey = `profileModal_dismissed_${new Date().toDateString()}`
+            const dismissed = sessionStorage.getItem(dismissedKey)
+            
+            console.log('[Dashboard] Modal dismissed today:', dismissed)
+            
+            if (!dismissed) {
+              console.log('[Dashboard] *** SHOWING PROFILE COMPLETION MODAL ***')
+              setShowProfileCompletionModal(true)
+            }
+          }
+          
+          // If account is suspended, show suspension message
+          if (data.data.status === 'suspended') {
+            console.log('[Dashboard] Account suspended due to incomplete profile')
+            // Could redirect to a suspension page or show a blocking modal
+          }
+        }
+      } else {
+        console.log('[Dashboard] Profile completion API returned non-ok status:', response.status)
+      }
+    } catch (error) {
+      console.error('[Dashboard] Profile completion check error:', error)
+    }
+  }
+
+  // Handle modal close
+  const handleProfileModalClose = () => {
+    setShowProfileCompletionModal(false)
+    // Remember that user dismissed modal today (resets daily)
+    const dismissedKey = `profileModal_dismissed_${new Date().toDateString()}`
+    sessionStorage.setItem(dismissedKey, 'true')
+  }
 
   // Sync user data on mount to ensure employee info is complete
   useEffect(() => {
@@ -276,6 +342,13 @@ export default function DashboardLayout({ children }) {
 
               {/* Floating Chat Widget for Desktop */}
               <ChatWidgetContainer />
+
+              {/* Profile Completion Modal */}
+              <ProfileCompletionModal
+                isOpen={showProfileCompletionModal}
+                onClose={handleProfileModalClose}
+                profileStatus={profileCompletionStatus}
+              />
             </div>
           </ChatWidgetProvider>
         </InAppNotificationProvider>
@@ -283,4 +356,3 @@ export default function DashboardLayout({ children }) {
     </SocketProvider>
   )
 }
-

@@ -67,12 +67,25 @@ export async function POST(request) {
       )
     }
 
-    // Update last login without triggering full validation (handles legacy data)
+    // Update last login and set firstLoginAt if not set (for profile completion tracking)
     const lastLogin = new Date()
     try {
+      const updateData = { lastLogin }
+      
+      // Set firstLoginAt and profileCompletionDeadline on first login (after password change)
+      if (!user.forcePasswordChange && !user.profileCompletion?.firstLoginAt) {
+        const deadline = new Date()
+        deadline.setDate(deadline.getDate() + 7) // 7 days from now
+        
+        updateData['profileCompletion.firstLoginAt'] = lastLogin
+        updateData['profileCompletion.profileCompletionDeadline'] = deadline
+        
+        console.log('[Login] Setting first login and profile completion deadline:', deadline)
+      }
+      
       await User.updateOne(
         { _id: user._id },
-        { $set: { lastLogin } },
+        { $set: updateData },
         { timestamps: false }
       )
       user.lastLogin = lastLogin
@@ -206,6 +219,25 @@ export async function POST(request) {
       isActive: user.isActive,
       // Force password change flag - true for first login
       forcePasswordChange: user.forcePasswordChange === true,
+      // Profile completion status for modal display
+      profileCompletion: user.profileCompletion ? {
+        status: user.profileCompletion.status || 'incomplete',
+        firstLoginAt: user.profileCompletion.firstLoginAt,
+        profileCompletionDeadline: user.profileCompletion.profileCompletionDeadline,
+        completedAt: user.profileCompletion.completedAt,
+        completedFields: user.profileCompletion.completedFields || {
+          personalInfo: false,
+          aadhaarUploaded: false,
+          ocrVerified: false
+        }
+      } : {
+        status: 'incomplete',
+        completedFields: {
+          personalInfo: false,
+          aadhaarUploaded: false,
+          ocrVerified: false
+        }
+      },
       // Store employeeId as both string and object for compatibility
       employeeId: employeeData ? {
         _id: user.employeeId.toString(),
