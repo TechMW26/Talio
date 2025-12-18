@@ -3,10 +3,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { FaSave, FaTimes, FaChevronDown, FaCheck, FaTimes as FaX } from 'react-icons/fa'
+import { FaSave, FaTimes, FaChevronDown, FaCheck, FaTimes as FaX, FaUserPlus, FaFileUpload } from 'react-icons/fa'
+import BulkImportEmployees from '@/components/employees/BulkImportEmployees'
 
 export default function AddEmployeePage() {
   const router = useRouter()
+  const [activeTab, setActiveTab] = useState('single') // 'single' or 'bulk'
   const [loading, setLoading] = useState(false)
   const [departments, setDepartments] = useState([])
   const [designations, setDesignations] = useState([])
@@ -287,10 +289,48 @@ export default function AddEmployeePage() {
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Add New Employee</h1>
-        <p className="text-gray-600 mt-1">Fill in the employee details</p>
+        <p className="text-gray-600 mt-1">Create a single employee or bulk import from Excel</p>
       </div>
 
-      {/* Form */}
+      {/* Tabs */}
+      <div className="mb-6">
+        <div className="flex border-b border-gray-200">
+          <button
+            type="button"
+            onClick={() => setActiveTab('single')}
+            className={`px-6 py-3 text-sm font-medium flex items-center gap-2 border-b-2 transition-colors ${
+              activeTab === 'single'
+                ? 'border-primary-500 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <FaUserPlus />
+            <span>Single Employee</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('bulk')}
+            className={`px-6 py-3 text-sm font-medium flex items-center gap-2 border-b-2 transition-colors ${
+              activeTab === 'bulk'
+                ? 'border-primary-500 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <FaFileUpload />
+            <span>Bulk Import</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Bulk Import Tab Content */}
+      {activeTab === 'bulk' && (
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <BulkImportEmployees />
+        </div>
+      )}
+
+      {/* Single Employee Form */}
+      {activeTab === 'single' && (
       <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-md p-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Employee Code */}
@@ -1051,6 +1091,7 @@ export default function AddEmployeePage() {
           </button>
         </div>
       </form>
+      )}
     </div>
   )
 }
