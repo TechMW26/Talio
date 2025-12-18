@@ -80,6 +80,13 @@ export default function AttendancePage() {
     }
   }, [hasPendingRequest, pendingRequest])
 
+  // Auto-switch to list view on mobile
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setViewMode('list')
+    }
+  }, [])
+
   // Helper function to safely get employeeId
   const getEmployeeId = (userObj) => {
     if (!userObj) return null
@@ -563,14 +570,14 @@ export default function AttendancePage() {
 
   const getStatusBadgeColor = (status) => {
     switch (status) {
-      case 'present': return 'bg-green-100 text-green-800'
-      case 'in-progress': return 'bg-orange-100 text-orange-800'
-      case 'half-day': return 'bg-yellow-100 text-yellow-800'
-      case 'late': return 'bg-amber-100 text-amber-800'
-      case 'absent': return 'bg-red-100 text-red-800'
-      case 'on-leave': case 'leave': return 'bg-blue-100 text-blue-800'
-      case 'holiday': return 'bg-purple-100 text-purple-800'
-      default: return 'bg-gray-100 text-gray-800'
+      case 'present': return 'bg-green-100 text-green-800 border-green-200'
+      case 'in-progress': return 'bg-orange-100 text-orange-800 border-orange-200'
+      case 'half-day': return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+      case 'late': return 'bg-amber-100 text-amber-800 border-amber-200'
+      case 'absent': return 'bg-red-100 text-red-800 border-red-200'
+      case 'on-leave': case 'leave': return 'bg-blue-100 text-blue-800 border-blue-200'
+      case 'holiday': return 'bg-purple-100 text-purple-800 border-purple-200'
+      default: return 'bg-gray-100 text-gray-800 border-gray-200'
     }
   }
 
@@ -755,33 +762,36 @@ export default function AttendancePage() {
   return (
     <div className="page-container">
       {/* Header */}
-      <div className="mb-6 flex justify-between items-start">
+      <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-0">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Attendance</h1>
-          <p className="text-gray-600 mt-1">Track your attendance and work hours</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Attendance</h1>
+          <p className="text-sm sm:text-base text-gray-600 mt-1">Track your attendance and work hours</p>
         </div>
-        <div className="flex space-x-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <button
             onClick={() => setShowMissingEntryModal(true)}
-            className="flex items-center space-x-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+            className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors text-sm sm:text-base"
           >
-            <FaPlus />
-            <span>Report Missing Entry</span>
+            <FaPlus className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">Report Missing Entry</span>
+            <span className="sm:hidden">Missing Entry</span>
           </button>
           <button
             onClick={() => setShowMyCorrections(!showMyCorrections)}
-            className="flex items-center space-x-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+            className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm sm:text-base"
           >
-            <FaEdit />
-            <span>My Requests ({myCorrections.length})</span>
+            <FaEdit className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">My Requests ({myCorrections.length})</span>
+            <span className="sm:hidden">Requests ({myCorrections.length})</span>
           </button>
           {canApprove && pendingCorrections.length > 0 && (
             <button
               onClick={() => setShowPendingApprovals(!showPendingApprovals)}
-              className="flex items-center space-x-2 px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors"
+              className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm sm:text-base"
             >
-              <FaExclamationCircle />
-              <span>Pending Approvals ({pendingCorrections.length})</span>
+              <FaExclamationCircle className="w-3 h-3 sm:w-4 sm:h-4" />
+              <span className="hidden sm:inline">Pending Approvals ({pendingCorrections.length})</span>
+              <span className="sm:hidden">Approvals ({pendingCorrections.length})</span>
             </button>
           )}
         </div>
@@ -789,44 +799,44 @@ export default function AttendancePage() {
 
       {/* Pending Approvals Section (for admins/HRs/dept heads) */}
       {showPendingApprovals && pendingCorrections.length > 0 && (
-        <div className="bg-purple-50 rounded-lg shadow-md p-6 mb-6 border border-purple-200">
-          <h2 className="text-xl font-semibold text-purple-800 mb-4">Pending Correction Approvals</h2>
+        <div className="bg-purple-50 rounded-lg shadow-md p-4 sm:p-6 mb-4 sm:mb-6 border border-purple-200">
+          <h2 className="text-lg sm:text-xl font-semibold text-purple-800 mb-4">Pending Correction Approvals</h2>
           <div className="space-y-4">
             {pendingCorrections.map((correction) => (
-              <div key={correction._id} className="bg-white rounded-lg p-4 border border-purple-100">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="font-semibold text-gray-800">
+              <div key={correction._id} className="bg-white rounded-lg p-3 sm:p-4 border border-purple-100">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
+                  <div className="flex-1">
+                    <p className="font-semibold text-sm sm:text-base text-gray-800">
                       {correction.employee?.firstName} {correction.employee?.lastName}
                     </p>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-xs sm:text-sm text-gray-600 mt-1">
                       Date: {formatDate(correction.date)} | Type: {correction.correctionType}
                     </p>
-                    <p className="text-sm text-gray-500 mt-1">
+                    <p className="text-xs sm:text-sm text-gray-500 mt-1">
                       <strong>Current:</strong> {formatTime(correction.currentCheckIn)} - {formatTime(correction.currentCheckOut)} ({correction.currentStatus})
                     </p>
-                    <p className="text-sm text-blue-600">
+                    <p className="text-xs sm:text-sm text-blue-600 mt-1">
                       <strong>Requested:</strong> {correction.requestedCheckIn ? formatTime(correction.requestedCheckIn) : 'N/A'} - {correction.requestedCheckOut ? formatTime(correction.requestedCheckOut) : 'N/A'} {correction.requestedStatus ? `(${correction.requestedStatus})` : ''}
                     </p>
-                    <p className="text-sm text-gray-600 mt-2 italic">&quot;{correction.reason}&quot;</p>
+                    <p className="text-xs sm:text-sm text-gray-600 mt-2 italic line-clamp-2">&quot;{correction.reason}&quot;</p>
                   </div>
-                  <div className="flex space-x-2">
+                  <div className="flex gap-2 flex-shrink-0">
                     <button
                       onClick={() => handleApproveReject(correction._id, 'approve')}
-                      className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+                      className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
                       title="Approve"
                     >
-                      <FaCheck />
+                      <FaCheck className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => {
                         const comment = prompt('Reason for rejection (optional):')
                         handleApproveReject(correction._id, 'reject', comment || '')
                       }}
-                      className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                      className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
                       title="Reject"
                     >
-                      <FaTimes />
+                      <FaTimes className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -838,21 +848,21 @@ export default function AttendancePage() {
 
       {/* My Correction Requests */}
       {showMyCorrections && (
-        <div className="bg-blue-50 rounded-lg shadow-md p-6 mb-6 border border-blue-200">
-          <h2 className="text-xl font-semibold text-blue-800 mb-4">My Correction Requests</h2>
+        <div className="bg-blue-50 rounded-lg shadow-md p-4 sm:p-6 mb-4 sm:mb-6 border border-blue-200">
+          <h2 className="text-lg sm:text-xl font-semibold text-blue-800 mb-4">My Correction Requests</h2>
           {myCorrections.length === 0 ? (
-            <p className="text-gray-500">No correction requests submitted yet.</p>
+            <p className="text-sm sm:text-base text-gray-500">No correction requests submitted yet.</p>
           ) : (
             <div className="space-y-3">
               {myCorrections.map((correction) => (
-                <div key={correction._id} className="bg-white rounded-lg p-4 border border-blue-100">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="font-medium text-gray-800">{formatDate(correction.date)}</p>
-                      <p className="text-sm text-gray-600">Type: {correction.correctionType}</p>
-                      <p className="text-sm text-gray-500 italic">&quot;{correction.reason}&quot;</p>
+                <div key={correction._id} className="bg-white rounded-lg p-3 sm:p-4 border border-blue-100">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-0">
+                    <div className="flex-1">
+                      <p className="font-medium text-sm sm:text-base text-gray-800">{formatDate(correction.date)}</p>
+                      <p className="text-xs sm:text-sm text-gray-600">Type: {correction.correctionType}</p>
+                      <p className="text-xs sm:text-sm text-gray-500 italic line-clamp-2">&quot;{correction.reason}&quot;</p>
                     </div>
-                    <span className={`px-3 py-1 text-sm rounded-full ${
+                    <span className={`px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-full whitespace-nowrap self-start ${
                       correction.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                       correction.status === 'approved' ? 'bg-green-100 text-green-800' :
                       'bg-red-100 text-red-800'
@@ -861,7 +871,7 @@ export default function AttendancePage() {
                     </span>
                   </div>
                   {correction.reviewerComments && (
-                    <p className="text-sm text-gray-500 mt-2">
+                    <p className="text-xs sm:text-sm text-gray-500 mt-2">
                       <strong>Reviewer:</strong> {correction.reviewerComments}
                     </p>
                   )}
@@ -873,22 +883,22 @@ export default function AttendancePage() {
       )}
 
       {/* Clock In/Out Card */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <div className="flex flex-col md:flex-row items-center justify-between">
-          <div className="mb-4 md:mb-0">
-            <h2 className="text-xl font-semibold text-gray-800 mb-2">Today&apos;s Attendance</h2>
-            <div className="flex items-center space-x-4 text-gray-600">
-              <div className="flex items-center space-x-2">
-                <FaClock className="text-primary-500" />
+      <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-4 sm:mb-6">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+          <div className="w-full lg:w-auto">
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3">Today&apos;s Attendance</h2>
+            <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-4 text-sm sm:text-base text-gray-600">
+              <div className="flex items-center gap-2">
+                <FaClock className="text-primary-500 w-4 h-4" />
                 <span>Check In: {formatTime(todayAttendance?.checkIn)}</span>
               </div>
-              <div className="flex items-center space-x-2">
-                <FaClock className="text-primary-500" />
+              <div className="flex items-center gap-2">
+                <FaClock className="text-primary-500 w-4 h-4" />
                 <span>Check Out: {formatTime(todayAttendance?.checkOut)}</span>
               </div>
               {todayAttendance?.workHours && (
-                <div className="flex items-center space-x-2">
-                  <FaClock className="text-green-500" />
+                <div className="flex items-center gap-2">
+                  <FaClock className="text-green-500 w-4 h-4" />
                   <span className="font-semibold">
                     Work Hours: {todayAttendance.workHours}h
                   </span>
@@ -896,21 +906,21 @@ export default function AttendancePage() {
               )}
             </div>
           </div>
-          <div className="flex space-x-4">
+          <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
             <button
               onClick={handleClockIn}
               disabled={loading || (todayAttendance && todayAttendance.checkIn)}
-              className="btn-theme-primary flex items-center p-8 space-x-2 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold shadow-md hover:shadow-lg transition-all duration-200"
+              className="btn-theme-primary flex items-center justify-center gap-2 px-6 py-3 sm:p-8 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold shadow-md hover:shadow-lg transition-all duration-200 text-sm sm:text-base"
             >
-              <FaSignInAlt />
+              <FaSignInAlt className="w-4 h-4 sm:w-5 sm:h-5" />
               <span>Clock In</span>
             </button>
             <button
               onClick={handleClockOut}
               disabled={loading || !todayAttendance || !todayAttendance.checkIn || todayAttendance.checkOut}
-              className="btn-theme-secondary flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed p-8 rounded-lg font-semibold shadow-md hover:shadow-lg transition-all duration-200"
+              className="btn-theme-secondary flex items-center justify-center gap-2 px-6 py-3 sm:p-8 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold shadow-md hover:shadow-lg transition-all duration-200 text-sm sm:text-base"
             >
-              <FaSignOutAlt />
+              <FaSignOutAlt className="w-4 h-4 sm:w-5 sm:h-5" />
               <span>Clock Out</span>
             </button>
           </div>
@@ -918,106 +928,107 @@ export default function AttendancePage() {
       </div>
 
       {/* Attendance History - Calendar & List View */}
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+      <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-4 sm:mb-6 gap-3 sm:gap-4">
           <div>
-            <h2 className="text-xl font-semibold text-gray-800">My Attendance - {user?.firstName} {user?.lastName}</h2>
-            <p className="text-sm text-gray-500 mt-1">Click on any day to edit or report missing entry</p>
+            <h2 className="text-lg sm:text-xl font-semibold text-gray-800">My Attendance - {user?.firstName} {user?.lastName}</h2>
+            <p className="text-xs sm:text-sm text-gray-500 mt-1">Click on any day to edit or report missing entry</p>
           </div>
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full lg:w-auto">
             {/* View Toggle */}
-            <div className="flex bg-gray-100 rounded-lg p-1">
+            <div className="flex bg-gray-100 rounded-lg p-1 w-full sm:w-auto">
               <button
                 onClick={() => setViewMode('calendar')}
-                className={`flex items-center space-x-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                className={`flex items-center justify-center gap-1 px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors flex-1 sm:flex-initial ${
                   viewMode === 'calendar' ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                <FaTh className="w-4 h-4" />
+                <FaTh className="w-3 h-3 sm:w-4 sm:h-4" />
                 <span>Calendar</span>
               </button>
               <button
                 onClick={() => setViewMode('list')}
-                className={`flex items-center space-x-1 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                className={`flex items-center justify-center gap-1 px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors flex-1 sm:flex-initial ${
                   viewMode === 'list' ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                <FaList className="w-4 h-4" />
+                <FaList className="w-3 h-3 sm:w-4 sm:h-4" />
                 <span>List</span>
               </button>
             </div>
             
             {/* Month Navigation */}
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
               <button
                 onClick={goToPreviousMonth}
                 className="p-2 rounded-lg hover:bg-gray-100 text-gray-600"
               >
-                <FaChevronLeft />
+                <FaChevronLeft className="w-3 h-3 sm:w-4 sm:h-4" />
               </button>
-              <span className="text-lg font-medium text-gray-800 min-w-[140px] text-center">
+              <span className="text-sm sm:text-lg font-medium text-gray-800 min-w-[120px] sm:min-w-[140px] text-center">
                 {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
               </span>
               <button
                 onClick={goToNextMonth}
                 className="p-2 rounded-lg hover:bg-gray-100 text-gray-600"
               >
-                <FaChevronRight />
+                <FaChevronRight className="w-3 h-3 sm:w-4 sm:h-4" />
               </button>
             </div>
           </div>
         </div>
 
         {/* Status Legend */}
-        <div className="flex flex-wrap gap-3 mb-6 p-3 bg-gray-50 rounded-lg">
-          <div className="flex items-center space-x-2">
-            <div className="w-4 h-4 rounded bg-green-100 border border-green-400"></div>
-            <span className="text-xs text-gray-600">Present</span>
+        <div className="flex flex-wrap gap-2 sm:gap-3 mb-4 sm:mb-6 p-2 sm:p-3 bg-gray-50 rounded-lg">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-green-100 border border-green-400"></div>
+            <span className="text-[10px] sm:text-xs text-gray-600">Present</span>
           </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-4 h-4 rounded bg-orange-100 border border-orange-400"></div>
-            <span className="text-xs text-gray-600">In Progress</span>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-orange-100 border border-orange-400"></div>
+            <span className="text-[10px] sm:text-xs text-gray-600">In Progress</span>
           </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-4 h-4 rounded bg-yellow-100 border border-yellow-400"></div>
-            <span className="text-xs text-gray-600">Half Day</span>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-yellow-100 border border-yellow-400"></div>
+            <span className="text-[10px] sm:text-xs text-gray-600">Half Day</span>
           </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-4 h-4 rounded bg-amber-100 border border-amber-400"></div>
-            <span className="text-xs text-gray-600">Late</span>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-amber-100 border border-amber-400"></div>
+            <span className="text-[10px] sm:text-xs text-gray-600">Late</span>
           </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-4 h-4 rounded bg-red-100 border border-red-400"></div>
-            <span className="text-xs text-gray-600">Absent</span>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-red-100 border border-red-400"></div>
+            <span className="text-[10px] sm:text-xs text-gray-600">Absent</span>
           </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-4 h-4 rounded bg-blue-100 border border-blue-400"></div>
-            <span className="text-xs text-gray-600">On Leave</span>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-blue-100 border border-blue-400"></div>
+            <span className="text-[10px] sm:text-xs text-gray-600">On Leave</span>
           </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-4 h-4 rounded bg-purple-100 border border-purple-400"></div>
-            <span className="text-xs text-gray-600">Holiday</span>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-purple-100 border border-purple-400"></div>
+            <span className="text-[10px] sm:text-xs text-gray-600">Holiday</span>
           </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-4 h-4 rounded bg-gray-100 border border-gray-300"></div>
-            <span className="text-xs text-gray-600">No Record</span>
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-gray-100 border border-gray-300"></div>
+            <span className="text-[10px] sm:text-xs text-gray-600">No Record</span>
           </div>
         </div>
 
         {viewMode === 'calendar' ? (
           /* Calendar View */
-          <div className="overflow-x-auto overflow-y-visible p-2 -m-2">
-            {/* Day Headers */}
-            <div className="grid grid-cols-7 gap-1 mb-2">
-              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                <div key={day} className="text-center text-sm font-semibold text-gray-500 py-2">
-                  {day}
-                </div>
-              ))}
-            </div>
-            
-            {/* Calendar Grid */}
-            <div className="grid grid-cols-7 gap-1">
+          <div className="overflow-x-auto overflow-y-visible">
+            <div className="min-w-[700px] p-2">
+              {/* Day Headers */}
+              <div className="grid grid-cols-7 gap-1 mb-2">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                  <div key={day} className="text-center text-xs sm:text-sm font-semibold text-gray-500 py-2">
+                    {day}
+                  </div>
+                ))}
+              </div>
+              
+              {/* Calendar Grid */}
+              <div className="grid grid-cols-7 gap-1">
               {calendarData.map((dayData, index) => {
                 const pendingCorrection = dayData.day ? getPendingCorrectionForDay(dayData) : null
                 const hasPending = !!pendingCorrection
@@ -1058,28 +1069,31 @@ export default function AttendancePage() {
                       }
                     }}
                     className={`
-                      min-h-[80px] p-2 border rounded-lg transition-all cursor-pointer relative group
+                      min-h-[80px] sm:min-h-[120px] p-1.5 sm:p-2 border rounded transition-all cursor-pointer relative group
                       ${statusColor}
-                      ${dayData.isToday ? 'ring-2 ring-blue-500 ring-offset-1' : ''}
-                      ${!dayData.isCurrentMonth ? 'opacity-40 bg-gray-50' : 'hover:shadow-md'}
+                      ${dayData.isToday ? 'ring-2 ring-blue-500' : ''}
+                      ${!dayData.isCurrentMonth ? 'opacity-40 bg-gray-50 border-transparent' : 'bg-white hover:shadow'}
                     `}
                   >
-                    <div className="flex justify-between items-start">
-                      <span className={`
-                        text-sm font-medium w-6 h-6 flex items-center justify-center rounded-full
-                        ${dayData.isToday ? 'bg-blue-500 text-white' : 'text-gray-700'}
-                      `}>
+                    {/* Day number */}
+                    <div className="font-bold text-xs sm:text-sm mb-1">
+                      <span className={dayData.isToday ? 'text-blue-600' : 'text-gray-700'}>
                         {dayData.day}
                       </span>
-                      {dayData.record?.status && (
+                    </div>
+
+                    {/* Status badge */}
+                    {dayData.record?.status && (
+                      <div className="mb-1">
                         <span className={`
-                          text-[10px] px-1.5 py-0.5 rounded-full font-medium uppercase tracking-wider
+                          inline-block text-[9px] sm:text-[10px] px-1 py-0.5 rounded border font-medium uppercase tracking-tight leading-tight
                           ${getStatusBadgeColor(dayData.record.status)}
-                        `}>
+                          break-words max-w-full
+                        `} style={{ wordBreak: 'break-word', hyphens: 'auto' }}>
                           {dayData.record.status}
                         </span>
-                      )}
-                    </div>
+                      </div>
+                    )}
 
                     {/* Edit button for regularisation - show on hover */}
                     {dayData.isCurrentMonth && dayData.record && !isHoliday && (
@@ -1088,17 +1102,17 @@ export default function AttendancePage() {
                           e.stopPropagation()
                           openCorrectionModal(dayData.record)
                         }}
-                        className="absolute top-1 right-1 p-1 rounded-full bg-white shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-50 z-10"
+                        className="absolute top-0.5 sm:top-1 right-0.5 sm:right-1 p-0.5 sm:p-1 rounded-full bg-white shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-50 z-10"
                         title="Request Regularisation"
                       >
-                        <FaEdit className="w-3 h-3 text-blue-600" />
+                        <FaEdit className="w-2 h-2 sm:w-3 sm:h-3 text-blue-600" />
                       </button>
                     )}
 
                     {/* Pending correction indicator */}
                     {hasPending && (
-                      <div className="absolute bottom-1 right-1">
-                        <span className="text-[8px] px-1 py-0.5 bg-yellow-400 text-yellow-900 rounded font-medium">
+                      <div className="absolute bottom-0.5 sm:bottom-1 right-0.5 sm:right-1">
+                        <span className="text-[7px] sm:text-[8px] px-0.5 sm:px-1 py-0.5 bg-yellow-400 text-yellow-900 rounded font-medium">
                           Pending
                         </span>
                       </div>
@@ -1115,37 +1129,38 @@ export default function AttendancePage() {
                           }))
                           setShowMissingEntryModal(true)
                         }}
-                        className="absolute top-1 right-1 p-1 rounded-full bg-white shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-green-50 z-10"
+                        className="absolute top-0.5 sm:top-1 right-0.5 sm:right-1 p-0.5 sm:p-1 rounded-full bg-white shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-green-50 z-10"
                         title="Add Missing Entry"
                       >
-                        <FaPlus className="w-3 h-3 text-green-600" />
+                        <FaPlus className="w-2 h-2 sm:w-3 sm:h-3 text-green-600" />
                       </button>
                     )}
 
                     {/* Holiday Name */}
                     {isHoliday && (
-                      <div className="text-[10px] leading-tight text-purple-700 truncate mt-1 font-medium bg-purple-100/50 px-1 py-0.5 rounded">
+                      <div className="text-[9px] sm:text-[10px] leading-tight text-purple-700 mt-1 font-medium bg-purple-100/50 px-1 py-0.5 rounded break-words" style={{ wordBreak: 'break-word', hyphens: 'auto' }}>
                         {holidayName}
                       </div>
                     )}
 
                     {/* Time details for present/late/half-day */}
                     {dayData.record && ['present', 'late', 'half-day'].includes(dayData.record.status) && (
-                      <div className="text-[10px] text-gray-600 mt-1">
+                      <div className="text-[9px] sm:text-[10px] text-gray-600 mt-1 space-y-0.5 max-h-[50px] sm:max-h-[70px] overflow-y-auto overflow-x-hidden">
                         {dayData.record.checkIn && (
-                          <div>In: {formatTime(dayData.record.checkIn)}</div>
+                          <div className="truncate" title={`In: ${formatTime(dayData.record.checkIn)}`}>In: {formatTime(dayData.record.checkIn)}</div>
                         )}
                         {dayData.record.checkOut && (
-                          <div>Out: {formatTime(dayData.record.checkOut)}</div>
+                          <div className="truncate" title={`Out: ${formatTime(dayData.record.checkOut)}`}>Out: {formatTime(dayData.record.checkOut)}</div>
                         )}
                         {dayData.record.workHours && (
-                          <div className="font-medium">{dayData.record.workHours}h</div>
+                          <div className="font-medium truncate">{dayData.record.workHours}h</div>
                         )}
                       </div>
                     )}
                   </div>
                 )
               })}
+              </div>
             </div>
           </div>
         ) : (

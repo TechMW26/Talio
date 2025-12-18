@@ -49,6 +49,13 @@ export default function HolidaysPage() {
     fetchHolidays()
   }, [])
 
+  // Auto-switch to list view on mobile
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setViewMode('list')
+    }
+  }, [])
+
   const fetchHolidays = async () => {
     try {
       const token = localStorage.getItem('token')
@@ -247,87 +254,85 @@ export default function HolidaysPage() {
 
     const weekDays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-    // Render Days Header
-    const header = (
-      <div className="grid grid-cols-7 mb-2">
-        {weekDays.map((d, i) => (
-          <div key={i} className="text-center text-sm font-semibold text-gray-500 py-2">
-            {d}
-          </div>
-        ))}
-      </div>
-    )
-
     // Render Cells
     const daysInMonth = eachDayOfInterval({ start: startDate, end: endDate })
 
     return (
-      <div className="bg-white rounded-lg shadow p-4">
-        {/* Calendar Controls */}
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-gray-800">
-            {format(currentMonth, 'MMMM yyyy')}
-          </h2>
-          <div className="flex space-x-2">
-            <button onClick={prevMonth} className="p-2 hover:bg-gray-100 rounded-full">
-              <FaChevronLeft />
-            </button>
-            <button onClick={goToToday} className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded-md">
-              Today
-            </button>
-            <button onClick={nextMonth} className="p-2 hover:bg-gray-100 rounded-full">
-              <FaChevronRight />
-            </button>
+      <div className="bg-white rounded-lg shadow-md p-2 sm:p-4 overflow-x-auto">
+        <div className="min-w-[700px]">
+          {/* Calendar Controls */}
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg sm:text-xl font-bold text-gray-800">
+              {format(currentMonth, 'MMMM yyyy')}
+            </h2>
+            <div className="flex space-x-2">
+              <button onClick={prevMonth} className="p-2 hover:bg-gray-100 rounded-full">
+                <FaChevronLeft />
+              </button>
+              <button onClick={goToToday} className="px-2 sm:px-3 py-1 text-xs sm:text-sm bg-gray-100 hover:bg-gray-200 rounded-md">
+                Today
+              </button>
+              <button onClick={nextMonth} className="p-2 hover:bg-gray-100 rounded-full">
+                <FaChevronRight />
+              </button>
+            </div>
           </div>
-        </div>
 
-        {header}
+          {/* Days Header */}
+          <div className="grid grid-cols-7 gap-1 text-xs sm:text-sm border-b pb-2 mb-2">
+            {weekDays.map((d, i) => (
+              <div key={i} className="text-center font-semibold text-gray-500">
+                {d}
+              </div>
+            ))}
+          </div>
 
-        <div className="grid grid-cols-7 gap-1 auto-rows-fr">
-          {daysInMonth.map((dayItem, idx) => {
-            const holiday = getHolidayForDate(dayItem)
-            const isCurrentMonth = isSameMonth(dayItem, monthStart)
-            const isTodayDate = isToday(dayItem)
+          <div className="grid grid-cols-7 gap-1">
+            {daysInMonth.map((dayItem, idx) => {
+              const holiday = getHolidayForDate(dayItem)
+              const isCurrentMonth = isSameMonth(dayItem, monthStart)
+              const isTodayDate = isToday(dayItem)
 
-            return (
-              <div
-                key={idx}
-                className={`min-h-[100px] p-2 border rounded-lg relative transition-colors
-                  ${!isCurrentMonth ? 'bg-gray-50 text-gray-400' : 'bg-white'}
-                  ${isTodayDate ? 'ring-2 ring-primary-500' : ''}
-                  ${holiday ? getHolidayColor(holiday.type).split(' ')[0] : ''}
-                `}
-                onClick={() => holiday && handleEdit(holiday)}
-              >
-                <div className="flex justify-between items-start">
-                  <span className={`text-sm font-medium ${!isCurrentMonth ? 'text-gray-400' : 'text-gray-700'}`}>
-                    {format(dayItem, 'd')}
-                  </span>
+              return (
+                <div
+                  key={idx}
+                  className={`min-h-[80px] sm:min-h-[100px] p-1.5 sm:p-2 border rounded relative transition-colors
+                    ${!isCurrentMonth ? 'bg-gray-50 text-gray-400 border-transparent' : 'bg-white hover:shadow'}
+                    ${isTodayDate ? 'ring-2 ring-primary-500' : ''}
+                    ${holiday ? getHolidayColor(holiday.type).split(' ')[0] : ''}
+                  `}
+                  onClick={() => holiday && handleEdit(holiday)}
+                >
+                  <div className="flex justify-between items-start">
+                    <span className={`text-xs sm:text-sm font-medium ${!isCurrentMonth ? 'text-gray-400' : 'text-gray-700'}`}>
+                      {format(dayItem, 'd')}
+                    </span>
+                    {holiday && (
+                      <div className="flex space-x-1">
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleEdit(holiday); }}
+                          className="text-blue-600 hover:text-blue-800"
+                        >
+                          <FaEdit size={10} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  
                   {holiday && (
-                    <div className="flex space-x-1">
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); handleEdit(holiday); }}
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        <FaEdit size={10} />
-                      </button>
+                    <div className={`mt-1 p-1 rounded text-[10px] sm:text-xs border ${getHolidayColor(holiday.type)}`}>
+                      <div className="font-semibold truncate" title={holiday.name}>
+                        {holiday.name}
+                      </div>
+                      <div className="text-[9px] sm:text-[10px] opacity-75 capitalize">
+                        {holiday.type}
+                      </div>
                     </div>
                   )}
                 </div>
-                
-                {holiday && (
-                  <div className={`mt-1 p-1 rounded text-xs border ${getHolidayColor(holiday.type)}`}>
-                    <div className="font-semibold truncate" title={holiday.name}>
-                      {holiday.name}
-                    </div>
-                    <div className="text-[10px] opacity-75 capitalize">
-                      {holiday.type}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )
-          })}
+              )
+            })}
+          </div>
         </div>
       </div>
     )
@@ -349,43 +354,47 @@ export default function HolidaysPage() {
   const groupedHolidays = groupHolidaysByMonth()
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
+      <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Holidays</h1>
-          <p className="text-gray-600 mt-1">Manage company holidays and observances</p>
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800">Holidays</h1>
+          <p className="text-gray-600 text-sm mt-1">Manage company holidays and observances</p>
         </div>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-wrap">
           {/* View Toggle */}
           <div className="flex bg-gray-100 rounded-lg p-1">
             <button
               onClick={() => setViewMode('calendar')}
-              className={`p-2 rounded-md transition-all ${viewMode === 'calendar' ? 'bg-white shadow text-primary-600' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-3 py-1.5 text-sm rounded-md flex items-center gap-1 ${viewMode === 'calendar' ? 'bg-white shadow text-primary-600' : 'text-gray-500 hover:text-gray-700'}`}
               title="Calendar View"
             >
-              <FaCalendarAlt />
+              <FaTh />
+              <span className="hidden sm:inline">calendar</span>
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className={`p-2 rounded-md transition-all ${viewMode === 'list' ? 'bg-white shadow text-primary-600' : 'text-gray-500 hover:text-gray-700'}`}
+              className={`px-3 py-1.5 text-sm rounded-md flex items-center gap-1 ${viewMode === 'list' ? 'bg-white shadow text-primary-600' : 'text-gray-500 hover:text-gray-700'}`}
               title="List View"
             >
               <FaList />
+              <span className="hidden sm:inline">list</span>
             </button>
           </div>
 
           <button
             onClick={() => setShowAiModal(true)}
-            className="btn-secondary flex items-center space-x-2 bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
+            className="btn-secondary flex items-center space-x-2 bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 text-sm"
           >
-            <span>Fetch with AI</span>
+            <FaRobot />
+            <span className="hidden sm:inline">Fetch with AI</span>
+            <span className="sm:hidden">AI</span>
           </button>
 
           <button
             onClick={handleSync}
             disabled={syncing}
-            className="btn-secondary flex items-center space-x-2"
+            className="btn-secondary flex items-center space-x-2 text-sm"
           >
             <FaSync className={syncing ? 'animate-spin' : ''} />
             <span>Sync</span>
@@ -393,7 +402,7 @@ export default function HolidaysPage() {
           
           <button
             onClick={() => setShowModal(true)}
-            className="btn-primary flex items-center space-x-2"
+            className="btn-primary flex items-center space-x-2 text-sm"
           >
             <FaPlus />
             <span>Add Holiday</span>
@@ -402,31 +411,31 @@ export default function HolidaysPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-primary-500">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 border-l-4 border-primary-500">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-600">Total Holidays</h3>
-            <FaCalendarAlt className="text-primary-500" />
+            <h3 className="text-xs sm:text-sm font-medium text-gray-600">Total Holidays</h3>
+            <FaCalendarAlt className="text-primary-500 text-sm sm:text-base" />
           </div>
-          <div className="text-3xl font-bold text-gray-800">{holidays.length}</div>
+          <div className="text-2xl sm:text-3xl font-bold text-gray-800">{holidays.length}</div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-green-500">
+        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 border-l-4 border-green-500">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-600">Public Holidays</h3>
-            <FaCalendarAlt className="text-green-500" />
+            <h3 className="text-xs sm:text-sm font-medium text-gray-600">Public Holidays</h3>
+            <FaCalendarAlt className="text-green-500 text-sm sm:text-base" />
           </div>
-          <div className="text-3xl font-bold text-gray-800">
+          <div className="text-2xl sm:text-3xl font-bold text-gray-800">
             {holidays.filter(h => h.type === 'public').length}
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow-md p-6 border-l-4 border-blue-500">
+        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 border-l-4 border-blue-500">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-sm font-medium text-gray-600">Optional Holidays</h3>
-            <FaCalendarAlt className="text-blue-500" />
+            <h3 className="text-xs sm:text-sm font-medium text-gray-600">Optional Holidays</h3>
+            <FaCalendarAlt className="text-blue-500 text-sm sm:text-base" />
           </div>
-          <div className="text-3xl font-bold text-gray-800">
+          <div className="text-2xl sm:text-3xl font-bold text-gray-800">
             {holidays.filter(h => h.type === 'optional').length}
           </div>
         </div>

@@ -165,40 +165,43 @@ export default function TrainingsPage() {
       </div>
 
       {/* Filter Tabs */}
-      <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setFilter('all')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              filter === 'all'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            All Trainings ({stats.total})
-          </button>
-          <button
-            onClick={() => setFilter('in-progress')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              filter === 'in-progress'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            In Progress ({stats.inProgress})
-          </button>
-          <button
-            onClick={() => setFilter('completed')}
-            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-              filter === 'completed'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Completed ({stats.completed})
-          </button>
-        </div>
-      </div>
+      <div className="bg-white rounded-lg shadow-md p-3 sm:p-4 mb-6">
+  <div className="flex gap-2 overflow-x-auto scrollbar-hide sm:flex-wrap">
+    <button
+      onClick={() => setFilter('all')}
+      className={`flex-shrink-0 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${
+        filter === 'all'
+          ? 'bg-blue-600 text-white'
+          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+      }`}
+    >
+      All ({stats.total})
+    </button>
+
+    <button
+      onClick={() => setFilter('in-progress')}
+      className={`flex-shrink-0 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${
+        filter === 'in-progress'
+          ? 'bg-blue-600 text-white'
+          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+      }`}
+    >
+      In Progress ({stats.inProgress})
+    </button>
+
+    <button
+      onClick={() => setFilter('completed')}
+      className={`flex-shrink-0 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${
+        filter === 'completed'
+          ? 'bg-blue-600 text-white'
+          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+      }`}
+    >
+      Completed ({stats.completed})
+    </button>
+  </div>
+</div>
+
 
       {/* Trainings List */}
       {loading ? (

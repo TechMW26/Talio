@@ -39,6 +39,7 @@
   <androidx.compose.material/>
   <androidx.compose.material3/>
   <androidx.compose.material3.adaptive/>
+  <androidx.compose.remote/>
   <androidx.compose.runtime/>
   <androidx.compose.ui/>
   <androidx.concurrent/>
@@ -147,6 +148,7 @@
   <androidx.wear.tiles/>
   <androidx.wear.watchface/>
   <androidx.wear.watchfacepush/>
+  <androidx.webgpu/>
   <androidx.webkit/>
   <androidx.window/>
   <androidx.window.extensions.core/>

@@ -655,14 +655,14 @@ export default function PayrollPage() {
   }))
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 sm:mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
             {isAdmin ? 'Process Payroll' : 'My Payroll'}
           </h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-sm sm:text-base text-gray-600 mt-1">
             {isAdmin 
               ? 'Manage and process employee payrolls' 
               : 'View your salary slips and payment history'}
@@ -671,7 +671,7 @@ export default function PayrollPage() {
         {isAdmin && (
           <button
             onClick={() => router.push('/dashboard/payroll/generate')}
-            className="mt-4 md:mt-0 btn-primary flex items-center space-x-2"
+            className="btn-primary flex items-center justify-center space-x-2 w-full sm:w-auto"
           >
             <FaPlus />
             <span>Generate Payroll</span>
@@ -680,14 +680,14 @@ export default function PayrollPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center space-x-2">
-            <FaCalendarAlt className="text-gray-400" />
+      <div className="bg-white rounded-lg shadow-md p-3 sm:p-4 mb-4 sm:mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+          <div className="flex items-center gap-2 flex-wrap">
+            <FaCalendarAlt className="text-gray-400 flex-shrink-0" />
             <select
               value={selectedMonth}
               onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-              className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="border border-gray-300 rounded-md px-2 sm:px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 flex-1 min-w-[100px]"
             >
               {months.map(m => (
                 <option key={m.value} value={m.value}>{m.label}</option>
@@ -696,7 +696,7 @@ export default function PayrollPage() {
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-              className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="border border-gray-300 rounded-md px-2 sm:px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 flex-1 min-w-[100px]"
             >
               {years.map(y => (
                 <option key={y.value} value={y.value}>{y.label}</option>
@@ -705,12 +705,12 @@ export default function PayrollPage() {
           </div>
 
           {isAdmin && (
-            <div className="flex items-center space-x-2">
-              <FaFilter className="text-gray-400" />
+            <div className="flex items-center gap-2">
+              <FaFilter className="text-gray-400 flex-shrink-0" />
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="border border-gray-300 rounded-md px-2 sm:px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 w-full sm:w-auto"
               >
                 <option value="all">All Status</option>
                 <option value="draft">Draft</option>
@@ -723,7 +723,7 @@ export default function PayrollPage() {
 
           <button
             onClick={() => isAdmin ? fetchAllPayrolls() : fetchPayrolls(getEmployeeId(user))}
-            className="ml-auto btn-secondary text-sm"
+            className="btn-secondary text-xs sm:text-sm w-full sm:w-auto sm:ml-auto"
           >
             Refresh
           </button>
@@ -732,86 +732,86 @@ export default function PayrollPage() {
 
       {/* Admin Stats Cards */}
       {isAdmin && (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow-md p-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-4 sm:mb-6">
+          <div className="bg-white rounded-lg shadow-md p-3 sm:p-4">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-xs font-medium text-gray-500 uppercase">Employees</h3>
-              <FaUsers className="text-blue-500" />
+              <FaUsers className="text-blue-500 w-4 h-4" />
             </div>
-            <div className="text-2xl font-bold text-gray-800">{stats.total}</div>
+            <div className="text-xl sm:text-2xl font-bold text-gray-800">{stats.total}</div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-md p-4">
+          <div className="bg-white rounded-lg shadow-md p-3 sm:p-4">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-xs font-medium text-gray-500 uppercase">Total Gross</h3>
-              <FaChartLine className="text-blue-500" />
+              <FaChartLine className="text-blue-500 w-4 h-4" />
             </div>
-            <div className="text-xl font-bold text-gray-800">{formatCurrency(stats.totalGross)}</div>
+            <div className="text-base sm:text-xl font-bold text-gray-800">{formatCurrency(stats.totalGross)}</div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-md p-4">
+          <div className="bg-white rounded-lg shadow-md p-3 sm:p-4">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-xs font-medium text-gray-500 uppercase">Deductions</h3>
-              <FaMoneyBillWave className="text-red-500" />
+              <FaMoneyBillWave className="text-red-500 w-4 h-4" />
             </div>
-            <div className="text-xl font-bold text-red-600">{formatCurrency(stats.totalDeductions)}</div>
+            <div className="text-base sm:text-xl font-bold text-red-600">{formatCurrency(stats.totalDeductions)}</div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-md p-4">
+          <div className="bg-white rounded-lg shadow-md p-3 sm:p-4">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-xs font-medium text-gray-500 uppercase">Net Payable</h3>
-              <FaFileInvoiceDollar className="text-green-500" />
+              <FaFileInvoiceDollar className="text-green-500 w-4 h-4" />
             </div>
-            <div className="text-xl font-bold text-green-600">{formatCurrency(stats.totalNet)}</div>
+            <div className="text-base sm:text-xl font-bold text-green-600">{formatCurrency(stats.totalNet)}</div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-md p-4">
+          <div className="bg-white rounded-lg shadow-md p-3 sm:p-4">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-xs font-medium text-gray-500 uppercase">Draft</h3>
-              <FaClock className="text-gray-500" />
+              <FaClock className="text-gray-500 w-4 h-4" />
             </div>
-            <div className="text-2xl font-bold text-gray-600">{stats.draft}</div>
+            <div className="text-xl sm:text-2xl font-bold text-gray-600">{stats.draft}</div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-md p-4">
+          <div className="bg-white rounded-lg shadow-md p-3 sm:p-4">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-xs font-medium text-gray-500 uppercase">Paid</h3>
-              <FaCheckCircle className="text-green-500" />
+              <FaCheckCircle className="text-green-500 w-4 h-4" />
             </div>
-            <div className="text-2xl font-bold text-green-600">{stats.paid}</div>
+            <div className="text-xl sm:text-2xl font-bold text-green-600">{stats.paid}</div>
           </div>
         </div>
       )}
 
       {/* Employee Summary Cards */}
       {!isAdmin && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow-md p-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
+          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-gray-600">Latest Net Salary</h3>
-              <FaMoneyBillWave className="text-green-500" />
+              <h3 className="text-xs sm:text-sm font-medium text-gray-600">Latest Net Salary</h3>
+              <FaMoneyBillWave className="text-green-500 w-5 h-5" />
             </div>
-            <div className="text-3xl font-bold text-gray-800">
+            <div className="text-2xl sm:text-3xl font-bold text-gray-800">
               {payrolls.length > 0 ? formatCurrency(payrolls[0]?.netSalary) : '₹0'}
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-gray-600">Total Earnings</h3>
-              <FaMoneyBillWave className="text-blue-500" />
+              <h3 className="text-xs sm:text-sm font-medium text-gray-600">Total Earnings</h3>
+              <FaMoneyBillWave className="text-blue-500 w-5 h-5" />
             </div>
-            <div className="text-3xl font-bold text-gray-800">
+            <div className="text-2xl sm:text-3xl font-bold text-gray-800">
               {payrolls.length > 0 ? formatCurrency(payrolls[0]?.grossSalary) : '₹0'}
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 sm:col-span-2 lg:col-span-1">
             <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-gray-600">Total Deductions</h3>
-              <FaMoneyBillWave className="text-red-500" />
+              <h3 className="text-xs sm:text-sm font-medium text-gray-600">Total Deductions</h3>
+              <FaMoneyBillWave className="text-red-500 w-5 h-5" />
             </div>
-            <div className="text-3xl font-bold text-gray-800">
+            <div className="text-2xl sm:text-3xl font-bold text-gray-800">
               {payrolls.length > 0 ? formatCurrency(payrolls[0]?.totalDeductions) : '₹0'}
             </div>
           </div>
@@ -820,62 +820,67 @@ export default function PayrollPage() {
 
       {/* Bulk Action Bar - Admin Only */}
       {isAdmin && (
-        <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center space-x-4">
-              <span className="text-sm font-medium text-gray-700">
+        <div className="bg-white rounded-lg shadow-md p-3 sm:p-4 mb-4 sm:mb-6">
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <span className="text-xs sm:text-sm font-medium text-gray-700">
                 {selectedPayrolls.length} of {filteredPayrolls.length} selected
               </span>
-              <label className="flex items-center space-x-2 text-sm text-gray-600">
+              <label className="flex items-center gap-2 text-xs sm:text-sm text-gray-600">
                 <input
                   type="checkbox"
                   checked={sendEmailsOnProcess}
                   onChange={(e) => setSendEmailsOnProcess(e.target.checked)}
                   className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                 />
-                <span>Send email payslips on process</span>
+                <span className="whitespace-nowrap">Send email payslips</span>
               </label>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:flex lg:flex-wrap gap-2">
               <button
                 onClick={() => handleBulkProcess('processed')}
                 disabled={selectedPayrolls.length === 0 || bulkProcessing}
-                className="btn-primary text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+                className="btn-primary text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1 px-2 sm:px-4 py-2"
               >
-                <FaCheckCircle />
-                <span>{bulkProcessing ? 'Processing...' : 'Process Selected'}</span>
+                <FaCheckCircle className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">{bulkProcessing ? 'Processing...' : 'Process Selected'}</span>
+                <span className="sm:hidden">Process</span>
               </button>
               <button
                 onClick={() => handleBulkProcess('paid')}
                 disabled={selectedPayrolls.length === 0 || bulkProcessing}
-                className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+                className="bg-green-600 hover:bg-green-700 text-white px-2 sm:px-4 py-2 rounded-md text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
               >
-                <FaMoneyBillWave />
-                <span>Mark Paid</span>
+                <FaMoneyBillWave className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">Mark Paid</span>
+                <span className="sm:hidden">Paid</span>
               </button>
               <button
                 onClick={handleBulkDelete}
                 disabled={selectedPayrolls.length === 0 || bulkProcessing}
-                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+                className="bg-red-600 hover:bg-red-700 text-white px-2 sm:px-4 py-2 rounded-md text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
               >
-                <FaTrash />
-                <span>Delete Selected</span>
+                <FaTrash className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">Delete Selected</span>
+                <span className="sm:hidden">Delete</span>
               </button>
               <button
                 onClick={() => setShowBankSheetModal(true)}
                 disabled={filteredPayrolls.length === 0}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+                className="bg-purple-600 hover:bg-purple-700 text-white px-2 sm:px-4 py-2 rounded-md text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
               >
-                <FaUniversity />
-                <span>Bank Sheet</span>
+                <FaUniversity className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">Bank Sheet</span>
+                <span className="sm:hidden">Bank</span>
               </button>
               <button
                 onClick={exportToExcel}
                 disabled={filteredPayrolls.length === 0}
-                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-1"
+                className="bg-gray-600 hover:bg-gray-700 text-white px-2 sm:px-4 py-2 rounded-md text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1 col-span-2 sm:col-span-1"
               >
-                <FaDownload />
-                <span>Export Excel</span>
+                <FaDownload className="w-3 h-3 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">Export Excel</span>
+                <span className="sm:hidden">Export</span>
               </button>
             </div>
           </div>
@@ -884,8 +889,8 @@ export default function PayrollPage() {
 
       {/* Payroll Table */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="p-4 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-800">
+        <div className="p-3 sm:p-4 border-b border-gray-200">
+          <h2 className="text-base sm:text-xl font-semibold text-gray-800">
             {isAdmin ? `Payroll Records - ${getMonthName(selectedMonth)} ${selectedYear}` : 'Salary Slips'}
           </h2>
         </div>
@@ -893,15 +898,15 @@ export default function PayrollPage() {
         {loading ? (
           <div className="p-8 text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading payroll records...</p>
+            <p className="mt-4 text-sm sm:text-base text-gray-600">Loading payroll records...</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[800px]">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   {isAdmin && (
-                    <th className="px-4 py-3 text-center">
+                    <th className="px-2 sm:px-4 py-3 text-center">
                       <input
                         type="checkbox"
                         checked={selectedPayrolls.length === filteredPayrolls.length && filteredPayrolls.length > 0}
@@ -917,26 +922,26 @@ export default function PayrollPage() {
                     </th>
                   )}
                   {isAdmin && (
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Employee
                     </th>
                   )}
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                     Month/Year
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Gross Salary
+                  <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
+                    Gross
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                     Deductions
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
                     Net Salary
                   </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-2 sm:px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-2 sm:px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
@@ -966,7 +971,7 @@ export default function PayrollPage() {
                   filteredPayrolls.map((payroll) => (
                     <tr key={payroll._id} className="hover:bg-gray-50">
                       {isAdmin && (
-                        <td className="px-4 py-4 text-center">
+                        <td className="px-2 sm:px-4 py-3 sm:py-4 text-center">
                           <input
                             type="checkbox"
                             checked={selectedPayrolls.includes(payroll._id)}
@@ -982,8 +987,8 @@ export default function PayrollPage() {
                         </td>
                       )}
                       {isAdmin && (
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="font-medium text-gray-900">
+                        <td className="px-2 sm:px-4 py-3 sm:py-4 whitespace-nowrap">
+                          <div className="font-medium text-gray-900 text-xs sm:text-sm">
                             {payroll.employee?.firstName} {payroll.employee?.lastName}
                           </div>
                           <div className="text-xs text-gray-500">
@@ -991,52 +996,52 @@ export default function PayrollPage() {
                           </div>
                         </td>
                       )}
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-2 sm:px-4 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">
                         {getMonthName(payroll.month)} {payroll.year}
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-right text-gray-900">
+                      <td className="px-2 sm:px-4 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-right text-gray-900">
                         {formatCurrency(payroll.grossSalary)}
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-right text-red-600">
+                      <td className="px-2 sm:px-4 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-right text-red-600">
                         {formatCurrency(payroll.totalDeductions)}
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-right font-semibold text-green-600">
+                      <td className="px-2 sm:px-4 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-right font-semibold text-green-600">
                         {formatCurrency(payroll.netSalary)}
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-center">
+                      <td className="px-2 sm:px-4 py-3 sm:py-4 whitespace-nowrap text-center">
                         {getStatusBadge(payroll.status)}
                       </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-center">
-                        <div className="flex items-center justify-center space-x-2">
+                      <td className="px-2 sm:px-4 py-3 sm:py-4 whitespace-nowrap text-center">
+                        <div className="flex items-center justify-center gap-1 sm:gap-2">
                           <button
                             onClick={() => router.push(`/dashboard/payroll/payslips/${payroll._id}`)}
-                            className="text-blue-600 hover:text-blue-900 p-1"
+                            className="text-blue-600 hover:text-blue-900 p-1 hover:bg-blue-50 rounded"
                             title="View Payslip"
                           >
-                            <FaEye />
+                            <FaEye className="w-3 h-3 sm:w-4 sm:h-4" />
                           </button>
                           <button
-                            className="text-green-600 hover:text-green-900 p-1"
+                            className="text-green-600 hover:text-green-900 p-1 hover:bg-green-50 rounded"
                             title="Download Payslip"
                           >
-                            <FaDownload />
+                            <FaDownload className="w-3 h-3 sm:w-4 sm:h-4" />
                           </button>
                           {isAdmin && (
                             <>
                               <button
                                 onClick={() => openEditModal(payroll)}
-                                className="text-yellow-600 hover:text-yellow-900 p-1"
+                                className="text-yellow-600 hover:text-yellow-900 p-1 hover:bg-yellow-50 rounded"
                                 title="Edit Payroll"
                               >
-                                <FaEdit />
+                                <FaEdit className="w-3 h-3 sm:w-4 sm:h-4" />
                               </button>
                               <button
                                 onClick={() => handleDeletePayroll(payroll._id)}
                                 disabled={deleting}
-                                className="text-red-600 hover:text-red-900 p-1 disabled:opacity-50"
+                                className="text-red-600 hover:text-red-900 p-1 disabled:opacity-50 hover:bg-red-50 rounded"
                                 title="Delete Payroll"
                               >
-                                <FaTrash />
+                                <FaTrash className="w-3 h-3 sm:w-4 sm:h-4" />
                               </button>
                             </>
                           )}
@@ -1404,4 +1409,3 @@ export default function PayrollPage() {
     </div>
   )
 }
-
