@@ -6,12 +6,13 @@ export async function middleware(request) {
                 request.cookies.get('token')?.value
 
   // Public routes that don't require authentication
-  const publicRoutes = ['/', '/login', '/register', '/forgot-password']
+  const publicRoutes = ['/', '/login', '/register', '/forgot-password', '/auth/forgot-password', '/auth/reset-password']
   const publicApiRoutes = [
     '/api/auth/login',
     '/api/auth/register',
     '/api/auth/session',
     '/api/auth/forgot-password',
+    '/api/auth/reset-password',
     '/api/auth/google/callback',
     '/api/assetlinks'
   ]

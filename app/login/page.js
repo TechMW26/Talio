@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { FaEnvelope, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa'
 
@@ -422,9 +423,9 @@ export default function LoginPage() {
                     />
                     <span className="text-gray-600">Remember me</span>
                   </label>
-                  <a href="#" className="text-purple-600 hover:text-purple-700 font-medium transition-colors">
+                  <Link href="/auth/forgot-password" className="text-purple-600 hover:text-purple-700 font-medium transition-colors">
                     Forgot password?
-                  </a>
+                  </Link>
                 </div>
 
                 {/* Sign In Button */}

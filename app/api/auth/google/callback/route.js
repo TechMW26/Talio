@@ -3,7 +3,9 @@ import connectDB from '@/lib/mongodb'
 import User from '@/models/User'
 import Employee from '@/models/Employee'
 import EmailAccount from '@/models/EmailAccount'
+import UserSession from '@/models/UserSession'
 import { SignJWT } from 'jose'
+import crypto from 'crypto'
 
 // Mark this route as dynamic
 export const dynamic = 'force-dynamic'
@@ -160,10 +162,15 @@ export async function GET(request) {
 
     // Create JWT token
     const secret = new TextEncoder().encode(process.env.JWT_SECRET)
+    
+    // Generate unique token ID for session tracking
+    const tokenId = crypto.randomBytes(16).toString('hex')
+    
     const token = await new SignJWT({
       userId: user._id.toString(),
       email: user.email,
-      role: user.role
+      role: user.role,
+      tokenId, // Include tokenId for session management
     })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
@@ -171,6 +178,33 @@ export async function GET(request) {
       .sign(secret)
 
     console.log('✅ JWT token created')
+
+    // Get request info for session tracking
+    const userAgent = request.headers.get('user-agent') || 'Unknown'
+    const forwarded = request.headers.get('x-forwarded-for')
+    const ipAddress = forwarded ? forwarded.split(',')[0].trim() : request.headers.get('x-real-ip') || 'Unknown'
+
+    // Create UserSession record (fire and forget)
+    ;(async () => {
+      try {
+        const deviceInfo = UserSession.parseUserAgent(userAgent)
+        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+
+        await UserSession.create({
+          user: user._id,
+          tokenId,
+          deviceInfo,
+          userAgent,
+          ipAddress,
+          expiresAt,
+          lastActivityAt: new Date(),
+        })
+
+        console.log(`[Google OAuth] Session created for user ${user._id} with tokenId ${tokenId}`)
+      } catch (sessionError) {
+        console.error('Failed to create user session:', sessionError)
+      }
+    })()
 
     // Prepare user data for response (similar to login API)
     // IMPORTANT: employeeId is stored as an object with _id for frontend compatibility

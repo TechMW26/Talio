@@ -27,6 +27,7 @@ import { formatDesignation, formatDepartments, getLevelNameFromNumber } from '@/
 import TiltWrapper from "@/components/TiltWrapper";
 import dynamic from 'next/dynamic'
 import AadhaarVerificationSection from '@/components/AadhaarVerificationSection'
+import ActiveSessionsSection from '@/components/ActiveSessionsSection'
 
 // Dynamically import Lanyard with no SSR and error boundary
 const Lanyard = dynamic(() => import('@/src/component/Lanyard').catch((error) => {
@@ -1234,6 +1235,9 @@ export default function ProfilePage() {
                 showUrgentWarning={profileCompletionStatus?.warning?.urgent}
               />
             )}
+
+            {/* Active Sessions Section - always visible */}
+            <ActiveSessionsSection />
             
             {/* Mobile only: Status and Edit buttons at bottom */}
             <div className="lg:hidden mt-8 mb-4">

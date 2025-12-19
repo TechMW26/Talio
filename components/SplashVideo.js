@@ -55,6 +55,13 @@ export default function SplashVideo({ children }) {
       const data = await response.json();
       setAnimationData(data);
       setIsAnimating(true);
+      
+      // Set 2x speed after animation loads
+      setTimeout(() => {
+        if (lottieRef.current) {
+          lottieRef.current.setSpeed(2);
+        }
+      }, 50);
     } catch (error) {
       console.log('[SplashVideo] Error loading animation:', error.message);
       // On error, skip splash
@@ -152,6 +159,11 @@ export default function SplashVideo({ children }) {
                 animationData={animationData}
                 loop={false}
                 autoplay={true}
+                onDOMLoaded={() => {
+                  if (lottieRef.current) {
+                    lottieRef.current.setSpeed(1.5);
+                  }
+                }}
                 onComplete={handleAnimationEnd}
                 style={{
                   width: '100%',

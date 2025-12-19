@@ -5,9 +5,11 @@ import Employee from '@/models/Employee'
 import Department from '@/models/Department'
 import Designation from '@/models/Designation'
 import CompanySettings from '@/models/CompanySettings'
+import UserSession from '@/models/UserSession'
 import { SignJWT } from 'jose'
 import { sendLoginAlertEmail } from '@/lib/mailer'
 import { sendPushToUser } from '@/lib/pushNotification'
+import crypto from 'crypto'
 
 // Ensure models are registered for populate
 const _ensureModels = { Department, Designation };
@@ -102,16 +104,48 @@ export async function POST(request) {
         { status: 500 }
       )
     }
+
+    // Generate unique token ID for session tracking
+    const tokenId = crypto.randomBytes(16).toString('hex')
+
     const secret = new TextEncoder().encode(secretValue)
     const token = await new SignJWT({
       userId: user._id.toString(),
       email: user.email,
-      role: user.role
+      role: user.role,
+      tokenId, // Include tokenId for session management
     })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
       .setExpirationTime('7d')
       .sign(secret)
+
+    // Get request info for session tracking
+    const userAgent = request.headers.get('user-agent') || 'Unknown'
+    const forwarded = request.headers.get('x-forwarded-for')
+    const ipAddress = forwarded ? forwarded.split(',')[0].trim() : request.headers.get('x-real-ip') || 'Unknown'
+
+    // Create UserSession record (fire and forget)
+    ;(async () => {
+      try {
+        const deviceInfo = UserSession.parseUserAgent(userAgent)
+        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+
+        await UserSession.create({
+          user: user._id,
+          tokenId,
+          deviceInfo,
+          userAgent,
+          ipAddress,
+          expiresAt,
+          lastActivityAt: new Date(),
+        })
+
+        console.log(`[Login] Session created for user ${user._id} with tokenId ${tokenId}`)
+      } catch (sessionError) {
+        console.error('Failed to create user session:', sessionError)
+      }
+    })()
 
     // Fetch full employee data if employeeId exists
     let employeeData = null

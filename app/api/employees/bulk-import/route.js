@@ -7,6 +7,7 @@ import Designation from '@/models/Designation'
 import Company from '@/models/Company'
 import queryCache from '@/lib/queryCache'
 import * as XLSX from 'xlsx'
+import { sendAndLogOnboardingEmail } from '@/lib/mailer'
 
 // Ensure models are registered
 const _ensureModels = { Department, Designation, Company }
@@ -121,6 +122,38 @@ async function createEmployeeAndUser(data, departmentMap, designationMap, compan
 
   // Update employee with userId reference
   await Employee.findByIdAndUpdate(employee._id, { userId: user._id })
+
+  // Get department name for email
+  let departmentName = null
+  if (employeeData.department) {
+    const dept = await Department.findById(employeeData.department).select('name').lean()
+    departmentName = dept?.name
+  }
+
+  // Get designation name for email
+  let designationName = null
+  if (employeeData.designation) {
+    const desig = await Designation.findById(employeeData.designation).select('title').lean()
+    designationName = desig?.title
+  }
+
+  // Send onboarding email and log to database (async, don't block)
+  sendAndLogOnboardingEmail({
+    employeeId: employee._id,
+    userId: user._id,
+    to: data.email,
+    firstName: data.firstName,
+    lastName: data.lastName,
+    email: data.email.toLowerCase().trim(),
+    password: password,
+    employeeCode: data.employeeCode,
+    designation: designationName || employeeData.designationLevelName,
+    department: departmentName,
+    dateOfJoining: data.dateOfJoining,
+    triggeredBy: 'bulk_import',
+  }).catch(err => {
+    console.error(`[Bulk Import] Failed to send onboarding email to ${data.email}:`, err)
+  })
 
   return {
     success: true,

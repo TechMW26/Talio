@@ -55,6 +55,7 @@ export const roleBasedMenus = {
       submenu: [
         { name: 'All Employees', path: '/dashboard/employees' },
         { name: 'Add Employee', path: '/dashboard/employees/add' },
+        { name: 'Onboarding Emails', path: '/dashboard/employees/onboarding-emails' },
         { name: 'Departments', path: '/dashboard/departments' },
         { name: 'Designations', path: '/dashboard/designations' },
       ]
@@ -171,6 +172,7 @@ export const roleBasedMenus = {
       submenu: [
         { name: 'All Employees', path: '/dashboard/employees' },
         { name: 'Add Employee', path: '/dashboard/employees/add' },
+        { name: 'Onboarding Emails', path: '/dashboard/employees/onboarding-emails' },
         { name: 'Departments', path: '/dashboard/departments' },
         { name: 'Designations', path: '/dashboard/designations' },
       ]

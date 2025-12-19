@@ -6,6 +6,7 @@ import Department from '@/models/Department'
 import Designation from '@/models/Designation'
 import queryCache from '@/lib/queryCache'
 import bcrypt from 'bcryptjs'
+import { sendAndLogOnboardingEmail } from '@/lib/mailer'
 
 // GET - List all employees with filters
 export async function GET(request) {
@@ -248,6 +249,25 @@ export async function POST(request) {
 
     // Clear employee list cache
     queryCache.clearPattern('employees')
+
+    // Send onboarding email and log to database (async, don't block response)
+    const actualPassword = data.password || 'employee123'
+    sendAndLogOnboardingEmail({
+      employeeId: employee._id,
+      userId: user._id,
+      to: data.email,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      email: data.email,
+      password: actualPassword,
+      employeeCode: data.employeeCode,
+      designation: populatedEmployee?.designation?.title || data.designationLevelName,
+      department: populatedEmployee?.department?.name,
+      dateOfJoining: data.dateOfJoining,
+      triggeredBy: 'manual_creation',
+    }).catch(err => {
+      console.error('[Employee Create] Failed to send onboarding email:', err)
+    })
 
     return NextResponse.json({
       success: true,
