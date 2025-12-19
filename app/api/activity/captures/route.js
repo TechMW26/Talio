@@ -7,6 +7,7 @@ import User from '@/models/User';
 import Employee from '@/models/Employee';
 import Department from '@/models/Department';
 import ProductivitySession from '@/models/ProductivitySession';
+import Screenshot from '@/models/Screenshot';
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
@@ -166,18 +167,46 @@ export async function GET(request) {
     // Read captures from filesystem
     const activityDir = path.join(process.cwd(), 'public', 'activity', targetUserId, dateParam);
     let captures = [];
+    const seenPaths = new Set();
     
+    // First, get captures from Screenshot model (v3.0.0 desktop app)
+    const dbScreenshots = await Screenshot.find({
+      user: targetUserId,
+      dateString: dateParam
+    }).sort({ capturedAt: 1 }).lean();
+    
+    for (const ss of dbScreenshots) {
+      if (ss.path) {
+        captures.push({
+          path: ss.path,
+          filename: ss.filename,
+          timestamp: ss.capturedAt.toISOString(),
+          size: ss.metadata?.fileSize || 0,
+          date: dateParam,
+          activity: ss.activity,
+          screenshotId: ss._id.toString()
+        });
+        seenPaths.add(ss.path);
+      }
+    }
+    
+    // Then, also read from filesystem for backward compatibility
     try {
       const files = await readdir(activityDir);
       const imageFiles = files.filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f));
       
       for (const file of imageFiles) {
+        const publicPath = `/activity/${targetUserId}/${dateParam}/${file}`;
+        
+        // Skip if already in DB results
+        if (seenPaths.has(publicPath)) continue;
+        
         const filePath = path.join(activityDir, file);
         const fileStat = await stat(filePath);
         const timestamp = parseTimestamp(file);
         
         captures.push({
-          path: `/activity/${targetUserId}/${dateParam}/${file}`,
+          path: publicPath,
           filename: file,
           timestamp: timestamp.toISOString(),
           size: fileStat.size,
@@ -187,7 +216,7 @@ export async function GET(request) {
       
       captures.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     } catch {
-      // Directory doesn't exist
+      // Directory doesn't exist, that's ok if we have DB results
     }
 
     // Get sessions from database

@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('talioDesktop', {
   getAuthToken: () => ipcRenderer.invoke('get-auth-token'),
   setAuthToken: (token) => ipcRenderer.invoke('set-auth-token', token),
   clearAuthToken: () => ipcRenderer.invoke('clear-auth-token'),
+  checkAuthToken: () => ipcRenderer.invoke('check-auth-token'),
   
   // App version
   getVersion: () => ipcRenderer.invoke('get-app-version'),
@@ -29,6 +30,16 @@ contextBridge.exposeInMainWorld('talioDesktop', {
   getPermissionStatus: () => ipcRenderer.invoke('get-permission-status'),
   retryPermissions: () => ipcRenderer.invoke('retry-permissions'),
   openSystemPreferences: () => ipcRenderer.invoke('open-system-preferences'),
+  
+  // Location services
+  requestLocationPermission: () => ipcRenderer.invoke('request-location-permission'),
+  getCurrentLocation: () => ipcRenderer.invoke('get-current-location'),
+  
+  // Google OAuth via system browser
+  openGoogleOAuth: () => ipcRenderer.invoke('open-google-oauth'),
+  
+  // Open external URL in system browser (for OAuth)
+  openExternal: (url) => ipcRenderer.invoke('open-external-url', url),
   
   // Storage info
   getStoragePaths: () => ipcRenderer.invoke('get-storage-paths'),
@@ -47,6 +58,12 @@ contextBridge.exposeInMainWorld('talioDesktop', {
   onPermissionBlocked: (callback) => {
     ipcRenderer.on('permission-blocked', (event, data) => callback(data));
     return () => ipcRenderer.removeAllListeners('permission-blocked');
+  },
+  
+  // Listen for auth token from deep link
+  onAuthReceived: (callback) => {
+    ipcRenderer.on('auth-token-received', (event, data) => callback(data));
+    return () => ipcRenderer.removeAllListeners('auth-token-received');
   }
 });
 

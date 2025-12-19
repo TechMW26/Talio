@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
+import { mkdir, writeFile, access, constants } from 'fs/promises';
+import path from 'path';
 import connectDB from '@/lib/mongodb';
-import { uploadScreenshot } from '@/lib/gridfs';
+import { uploadScreenshot, getScreenshot } from '@/lib/gridfs';
 import Screenshot from '@/models/Screenshot';
 import User from '@/models/User';
 import Employee from '@/models/Employee';
@@ -9,8 +11,22 @@ import Employee from '@/models/Employee';
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
 /**
+ * Ensure directory exists
+ */
+async function ensureDirectory(dirPath) {
+  try {
+    await access(dirPath, constants.W_OK);
+  } catch {
+    await mkdir(dirPath, { recursive: true, mode: 0o755 });
+    console.log(`[Screenshot] Created directory: ${dirPath}`);
+  }
+}
+
+/**
  * POST /api/activity/screenshot
- * Upload a screenshot to GridFS and create metadata record
+ * Upload a screenshot - saves to BOTH filesystem and GridFS
+ * Filesystem: For dashboard display (existing flow)
+ * GridFS: For long-term storage and AI analysis
  */
 export async function POST(request) {
   try {
@@ -91,8 +107,21 @@ export async function POST(request) {
     
     const now = new Date();
     const dateString = now.toISOString().split('T')[0];
+    const timestamp = now.getTime();
+    const filename = `screenshot_${timestamp}.${format}`;
 
-    // Upload to GridFS
+    // === FILESYSTEM STORAGE (for dashboard display) ===
+    const activityDir = path.join(process.cwd(), 'public', 'activity', userId, dateString);
+    await ensureDirectory(activityDir);
+    
+    const filePath = path.join(activityDir, filename);
+    await writeFile(filePath, buffer);
+    
+    // Public URL path for dashboard
+    const publicPath = `/activity/${userId}/${dateString}/${filename}`;
+    console.log(`[Screenshot] Saved to filesystem: ${publicPath}`);
+
+    // === GRIDFS STORAGE (for long-term storage & AI analysis) ===
     const gridfsResult = await uploadScreenshot(buffer, {
       userId,
       employeeId: employeeId?.toString(),
@@ -100,18 +129,21 @@ export async function POST(request) {
       sessionId,
       mimeType,
       format,
-      width: 1920, // Expected 1080p
+      width: 1920,
       height: 1080,
       activity
     });
 
-    // Create screenshot metadata record
+    // === DATABASE RECORD ===
     const screenshot = new Screenshot({
       user: userId,
       employee: employeeId,
       gridfsFileId: gridfsResult._id,
       capturedAt: now,
       dateString,
+      // Add filesystem path for dashboard compatibility
+      path: publicPath,
+      filename,
       metadata: {
         mimeType,
         width: 1920,
@@ -138,6 +170,7 @@ export async function POST(request) {
       success: true,
       screenshotId: screenshot._id.toString(),
       gridfsId: gridfsResult._id.toString(),
+      path: publicPath,
       timestamp: now.toISOString(),
       fileSize: buffer.length
     });
@@ -153,7 +186,7 @@ export async function POST(request) {
 
 /**
  * GET /api/activity/screenshot?id=xxx
- * Retrieve a screenshot image by ID
+ * Retrieve a screenshot image by ID (from GridFS)
  */
 export async function GET(request) {
   try {
@@ -201,30 +234,23 @@ export async function GET(request) {
     const userId = decoded.payload.userId;
     const userRole = decoded.payload.role;
 
-    // Access control: user can only view their own screenshots unless admin/manager
+    // Access control
     if (!['admin', 'god_admin', 'hr', 'manager'].includes(userRole)) {
       if (screenshot.user.toString() !== userId) {
-        // Check if viewer is department head of screenshot owner
-        const { isDepartmentHead } = await import('@/app/api/activity/captures/route.js');
-        const isHead = await isDepartmentHead(userId, screenshot.user.toString());
-        
-        if (!isHead) {
-          return NextResponse.json({ 
-            success: false, 
-            error: 'Access denied' 
-          }, { status: 403 });
-        }
+        return NextResponse.json({ 
+          success: false, 
+          error: 'Access denied' 
+        }, { status: 403 });
       }
     }
 
     // Get image from GridFS
-    const { getScreenshot } = await import('@/lib/gridfs');
     const imageBuffer = await getScreenshot(screenshot.gridfsFileId);
 
-    // Return image with proper content type
+    // Return image
     return new NextResponse(imageBuffer, {
       headers: {
-        'Content-Type': screenshot.metadata.mimeType || 'image/png',
+        'Content-Type': screenshot.metadata?.mimeType || 'image/png',
         'Content-Length': imageBuffer.length.toString(),
         'Cache-Control': 'private, max-age=3600'
       }

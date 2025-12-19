@@ -2,7 +2,9 @@ import mongoose from 'mongoose';
 
 /**
  * Screenshot Model
- * Stores screenshot metadata - actual image data is in GridFS
+ * Stores screenshot metadata - actual image data is in GridFS AND filesystem
+ * Filesystem path is for dashboard display compatibility
+ * GridFS is for long-term storage and AI analysis
  * Screenshots are auto-deleted after 7 days, but analytics are preserved
  */
 const ScreenshotSchema = new mongoose.Schema({
@@ -26,6 +28,17 @@ const ScreenshotSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     required: true,
     index: true
+  },
+  
+  // Filesystem path for dashboard display (e.g., /activity/{userId}/{date}/{filename})
+  path: {
+    type: String,
+    index: true
+  },
+  
+  // Filename
+  filename: {
+    type: String
   },
   
   // Capture timestamp

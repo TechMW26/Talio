@@ -1,11 +1,16 @@
 /**
- * Talio Desktop App v3.0.0
+ * Talio Desktop App v3.1.0
  * 
  * Main process - handles window, tray, and screenshot capture
  * Screenshots are uploaded directly to MongoDB GridFS
+ * 
+ * Features:
+ * - Deep link protocol (talio://) for OAuth callback
+ * - Location permission for geofencing
+ * - External browser Google OAuth
  */
 
-const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, session, shell, Notification, systemPreferences } = require('electron');
+const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, session, shell, Notification, systemPreferences, dialog } = require('electron');
 const path = require('path');
 const Store = require('electron-store');
 const screenshotService = require('./screenshotService');
@@ -13,6 +18,7 @@ const debugLogger = require('./debugLogger');
 
 // Constants
 const APP_URL = 'https://app.talio.in';
+const PROTOCOL_NAME = 'talio';
 const store = new Store();
 
 // Global references
@@ -41,13 +47,93 @@ if (!gotTheLock) {
   app.quit();
 }
 
-app.on('second-instance', () => {
+// Register deep link protocol (talio://)
+if (process.defaultApp) {
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient(PROTOCOL_NAME, process.execPath, [path.resolve(process.argv[1])]);
+  }
+} else {
+  app.setAsDefaultProtocolClient(PROTOCOL_NAME);
+}
+
+// Handle deep link on macOS
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  debugLogger.log('info', 'DeepLink', `Received: ${url}`);
+  handleDeepLink(url);
+});
+
+app.on('second-instance', (event, commandLine) => {
+  // Handle deep link on Windows (passed as command line argument)
+  const url = commandLine.find(arg => arg.startsWith(`${PROTOCOL_NAME}://`));
+  if (url) {
+    debugLogger.log('info', 'DeepLink', `Received from second instance: ${url}`);
+    handleDeepLink(url);
+  }
+  
   if (mainWindow) {
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.show();
     mainWindow.focus();
   }
 });
+
+/**
+ * Handle deep link URLs (talio://auth?token=xxx)
+ */
+function handleDeepLink(url) {
+  try {
+    const parsedUrl = new URL(url);
+    const action = parsedUrl.hostname || parsedUrl.pathname.replace(/^\/+/, '');
+    
+    debugLogger.log('info', 'DeepLink', `Action: ${action}`);
+    
+    if (action === 'auth' || action === 'callback') {
+      // OAuth callback
+      const token = parsedUrl.searchParams.get('token');
+      const error = parsedUrl.searchParams.get('error');
+      
+      if (error) {
+        debugLogger.log('error', 'DeepLink', `OAuth error: ${error}`);
+        if (mainWindow) {
+          mainWindow.webContents.executeJavaScript(`
+            window.dispatchEvent(new CustomEvent('talio-oauth-error', { detail: { error: '${error}' } }));
+          `);
+        }
+        return;
+      }
+      
+      if (token) {
+        debugLogger.log('info', 'DeepLink', 'OAuth token received, storing...');
+        store.set('authToken', token);
+        
+        // Inject token into the web app
+        if (mainWindow) {
+          mainWindow.show();
+          mainWindow.focus();
+          
+          // Store token and reload to authenticated state
+          mainWindow.webContents.executeJavaScript(`
+            localStorage.setItem('token', '${token}');
+            window.dispatchEvent(new CustomEvent('talio-oauth-success', { detail: { token: '${token}' } }));
+            // Redirect to dashboard
+            if (window.location.pathname === '/login' || window.location.pathname === '/') {
+              window.location.href = '/dashboard';
+            }
+          `);
+        }
+      }
+    } else if (action === 'open') {
+      // Just open the app
+      if (mainWindow) {
+        mainWindow.show();
+        mainWindow.focus();
+      }
+    }
+  } catch (error) {
+    debugLogger.log('error', 'DeepLink', `Parse error: ${error.message}`);
+  }
+}
 
 /**
  * Get color for tray state
@@ -156,6 +242,109 @@ async function checkScreenPermission() {
   }
 
   return false;
+}
+
+/**
+ * Request location permission
+ * On macOS: Uses native permission dialog
+ * On Windows: Uses Geolocation API (permission handled by OS)
+ */
+async function requestLocationPermission() {
+  debugLogger.log('info', 'Permission', 'Requesting location permission...');
+  
+  if (process.platform === 'darwin') {
+    // macOS: Check and request location permission
+    const status = systemPreferences.getMediaAccessStatus('location');
+    debugLogger.log('info', 'Permission', `Location permission status: ${status}`);
+    
+    if (status === 'granted') {
+      return { granted: true };
+    }
+    
+    if (status === 'denied') {
+      // Show dialog to open settings
+      const result = await dialog.showMessageBox({
+        type: 'info',
+        title: 'Location Permission Required',
+        message: 'Talio needs location access for attendance geofencing.',
+        detail: 'Please enable location access for Talio in System Settings > Privacy & Security > Location Services.',
+        buttons: ['Open System Settings', 'Cancel'],
+        defaultId: 0
+      });
+      
+      if (result.response === 0) {
+        shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_LocationServices');
+      }
+      
+      return { granted: false, reason: 'denied' };
+    }
+    
+    // Status is 'not-determined' - need to trigger the native prompt
+    // On macOS, we trigger location request via the renderer process
+    return { granted: false, reason: 'not-determined', needsPrompt: true };
+  }
+  
+  // Windows: Location permission is handled by the OS when geolocation is requested
+  // We'll let the renderer handle it via navigator.geolocation
+  return { granted: true, platform: 'windows' };
+}
+
+/**
+ * Get current location
+ * Returns location coordinates for geofencing
+ */
+async function getCurrentLocation() {
+  return new Promise((resolve) => {
+    if (!mainWindow) {
+      resolve({ error: 'No window available' });
+      return;
+    }
+    
+    // Use renderer process to get location (has access to navigator.geolocation)
+    mainWindow.webContents.executeJavaScript(`
+      new Promise((resolve) => {
+        if (!navigator.geolocation) {
+          resolve({ error: 'Geolocation not supported' });
+          return;
+        }
+        
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            resolve({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy,
+              timestamp: position.timestamp
+            });
+          },
+          (error) => {
+            resolve({ error: error.message, code: error.code });
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 60000
+          }
+        );
+      });
+    `).then(resolve).catch(err => resolve({ error: err.message }));
+  });
+}
+
+/**
+ * Open Google OAuth in system browser
+ */
+function openGoogleOAuth() {
+  // Build OAuth URL that will redirect back to our deep link
+  const callbackUrl = encodeURIComponent(`${APP_URL}/api/auth/desktop-callback`);
+  const oauthUrl = `${APP_URL}/api/auth/google?desktop=true&callback=${callbackUrl}`;
+  
+  debugLogger.log('info', 'OAuth', `Opening Google OAuth in browser: ${oauthUrl}`);
+  
+  // Open in system default browser
+  shell.openExternal(oauthUrl);
+  
+  return { opened: true };
 }
 
 /**
@@ -720,4 +909,41 @@ ipcMain.handle('get-health', async () => {
 
 ipcMain.handle('force-capture', async () => {
   return screenshotService.captureAndUpload();
+});
+
+// Location permission handlers
+ipcMain.handle('request-location-permission', async () => {
+  return requestLocationPermission();
+});
+
+ipcMain.handle('get-current-location', async () => {
+  return getCurrentLocation();
+});
+
+// OAuth handlers
+ipcMain.handle('open-google-oauth', () => {
+  return openGoogleOAuth();
+});
+
+// Open external URL in system browser
+ipcMain.handle('open-external-url', async (event, url) => {
+  if (!url || typeof url !== 'string') {
+    return { opened: false, error: 'Invalid URL' };
+  }
+  
+  debugLogger.log('info', 'External', `Opening URL: ${url}`);
+  await shell.openExternal(url);
+  return { opened: true };
+});
+
+// Check if user is logged in via deep link
+ipcMain.handle('check-auth-token', () => {
+  const token = store.get('authToken');
+  return { hasToken: !!token, token };
+});
+
+// Clear stored auth token
+ipcMain.handle('clear-auth-token', () => {
+  store.delete('authToken');
+  return { cleared: true };
 });

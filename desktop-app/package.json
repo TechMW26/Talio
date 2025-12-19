@@ -1,7 +1,7 @@
 {
   "name": "talio-desktop",
-  "version": "3.0.0",
-  "description": "Talio Desktop Application - Productivity Monitoring & Screen Capture",
+  "version": "3.1.0",
+  "description": "Talio Desktop Application - Productivity Monitoring, Screen Capture, Location & OAuth",
   "main": "src/main.js",
   "author": "Talio",
   "license": "MIT",
@@ -23,6 +23,12 @@
     "copyright": "Copyright © 2024 Talio",
     "asar": true,
     "compression": "maximum",
+    "protocols": [
+      {
+        "name": "Talio URL Protocol",
+        "schemes": ["talio"]
+      }
+    ],
     "directories": {
       "output": "dist",
       "buildResources": "build"
