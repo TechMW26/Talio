@@ -1,265 +1,169 @@
 import { NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
-import { writeFile, mkdir, access, constants } from 'fs/promises';
-import path from 'path';
 import connectDB from '@/lib/mongodb';
+import { uploadScreenshot } from '@/lib/gridfs';
+import Screenshot from '@/models/Screenshot';
 import User from '@/models/User';
-import ProductivitySession from '@/models/ProductivitySession';
+import Employee from '@/models/Employee';
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
-// Roles that are restricted from having their screens captured
-const RESTRICTED_ROLES = ['admin', 'god_admin'];
-
-/**
- * Ensure directory exists recursively
- */
-async function ensureDirectory(dirPath) {
-  try {
-    await access(dirPath, constants.W_OK);
-    return true;
-  } catch {
-    try {
-      await mkdir(dirPath, { recursive: true, mode: 0o755 });
-      console.log(`[Screenshot] Created directory: ${dirPath}`);
-      return true;
-    } catch (mkdirError) {
-      console.error(`[Screenshot] Failed to create directory:`, mkdirError.message);
-      return false;
-    }
-  }
-}
-
-/**
- * Create activity folder structure for a user
- * Creates: public/activity/{userId}/
- */
-async function createUserActivityFolder(userId) {
-  const publicDir = path.join(process.cwd(), 'public');
-  const activityBaseDir = path.join(publicDir, 'activity');
-  const userDir = path.join(activityBaseDir, userId);
-  
-  await ensureDirectory(activityBaseDir);
-  await ensureDirectory(userDir);
-  
-  return userDir;
-}
-
 /**
  * POST /api/activity/screenshot
- * Receive and save screenshots from desktop app
- * 
- * Storage: public/activity/{userId}/{YYYY-MM-DD}/{timestamp}.jpg
- * 
- * Accepts JPEG images (no WebP compression)
- * Auto-creates folder structure
- * Links to ProductivitySession in DB
+ * Upload a screenshot to GridFS and create metadata record
  */
 export async function POST(request) {
-  const startTime = Date.now();
-  
   try {
-    // Verify JWT token
+    // Verify JWT
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Unauthorized' 
+      }, { status: 401 });
     }
 
     const token = authHeader.substring(7);
-    
     let decoded;
     try {
       decoded = await jwtVerify(token, JWT_SECRET);
     } catch {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Invalid token' 
+      }, { status: 401 });
     }
-    
+
     const userId = decoded.payload.userId;
     const userRole = decoded.payload.role;
 
-    if (!userId) {
-      return NextResponse.json({ error: 'User not found' }, { status: 401 });
+    // Skip for admin roles
+    if (['admin', 'god_admin'].includes(userRole)) {
+      return NextResponse.json({
+        success: false,
+        error: 'Screenshot capture not enabled for admin roles'
+      }, { status: 400 });
     }
 
-    // CRITICAL: Block restricted roles from capture
-    if (RESTRICTED_ROLES.includes(userRole)) {
-      console.log(`[Screenshot] BLOCKED - Role '${userRole}' is restricted`);
-      return NextResponse.json(
-        { error: 'Screen capture disabled for admin accounts', restricted: true },
-        { status: 403 }
-      );
-    }
+    await connectDB();
 
-    // Parse request body
-    let screenshot, timestamp, sessionId, sessionNumber, captureType, isOfflineCapture, originalFilename;
-    const contentType = request.headers.get('content-type') || '';
-
-    if (contentType.includes('multipart/form-data')) {
-      const formData = await request.formData();
-      screenshot = formData.get('screenshot');
-      timestamp = formData.get('timestamp') || Date.now().toString();
-      sessionId = formData.get('sessionId');
-      sessionNumber = formData.get('sessionNumber');
-      captureType = formData.get('captureType') || 'automatic';
-      isOfflineCapture = formData.get('isOfflineCapture') === 'true';
-      originalFilename = formData.get('originalFilename');
-    } else {
-      const body = await request.json();
-      screenshot = body.screenshot;
-      timestamp = body.timestamp || Date.now().toString();
-      sessionId = body.sessionId;
-      sessionNumber = body.sessionNumber;
-      captureType = body.captureType || 'automatic';
-      isOfflineCapture = body.isOfflineCapture || false;
-      originalFilename = body.originalFilename;
-    }
-
-    if (!screenshot) {
-      return NextResponse.json({ error: 'Screenshot data required' }, { status: 400 });
-    }
-
-    // Parse timestamp
-    const captureTime = new Date(parseInt(timestamp));
-    if (isNaN(captureTime.getTime())) {
-      return NextResponse.json({ error: 'Invalid timestamp' }, { status: 400 });
-    }
+    // Get form data
+    const formData = await request.formData();
+    const file = formData.get('screenshot');
+    const activityData = formData.get('activity');
+    const sessionId = formData.get('sessionId');
     
-    const dateFolder = captureTime.toISOString().split('T')[0]; // YYYY-MM-DD
-    const timeString = captureTime.toISOString().replace(/[:.]/g, '-');
+    if (!file) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'No screenshot file provided' 
+      }, { status: 400 });
+    }
 
-    // Create directory structure: public/activity/{userId}/{date}/
-    const publicDir = path.join(process.cwd(), 'public');
-    const activityDir = path.join(publicDir, 'activity', userId, dateFolder);
+    // Get file buffer
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Parse activity data
+    let activity = {};
+    if (activityData) {
+      try {
+        activity = JSON.parse(activityData);
+      } catch (e) {
+        console.warn('[Screenshot] Failed to parse activity data:', e.message);
+      }
+    }
+
+    // Get employee info
+    const user = await User.findById(userId).select('employeeId name email');
+    let employeeId = user?.employeeId;
     
-    const dirCreated = await ensureDirectory(activityDir);
-    if (!dirCreated) {
-      return NextResponse.json({ error: 'Failed to create directory' }, { status: 500 });
+    if (!employeeId && user?.email) {
+      const employee = await Employee.findOne({ email: user.email.toLowerCase() });
+      if (employee) {
+        employeeId = employee._id;
+      }
     }
 
-    // Convert screenshot to buffer
-    let buffer;
-    let fileExt = 'jpg';
+    // Determine file format from content type
+    const mimeType = file.type || 'image/png';
+    const format = mimeType.split('/')[1] || 'png';
     
-    if (screenshot instanceof File) {
-      buffer = Buffer.from(await screenshot.arrayBuffer());
-      // Check MIME type
-      if (screenshot.type === 'image/png') fileExt = 'png';
-    } else if (typeof screenshot === 'string') {
-      // Handle base64 data URL
-      const matches = screenshot.match(/^data:image\/(\w+);base64,(.+)$/);
-      if (matches) {
-        fileExt = matches[1] === 'jpeg' ? 'jpg' : matches[1];
-        buffer = Buffer.from(matches[2], 'base64');
-      } else {
-        // Raw base64
-        buffer = Buffer.from(screenshot, 'base64');
-      }
-    } else {
-      return NextResponse.json({ error: 'Invalid screenshot format' }, { status: 400 });
-    }
+    const now = new Date();
+    const dateString = now.toISOString().split('T')[0];
 
-    // File name and path
-    const fileName = `${timeString}.${fileExt}`;
-    const filePath = path.join(activityDir, fileName);
+    // Upload to GridFS
+    const gridfsResult = await uploadScreenshot(buffer, {
+      userId,
+      employeeId: employeeId?.toString(),
+      capturedAt: now,
+      sessionId,
+      mimeType,
+      format,
+      width: 1920, // Expected 1080p
+      height: 1080,
+      activity
+    });
 
-    // Write file (no compression - save as-is)
-    try {
-      await writeFile(filePath, buffer);
-    } catch (writeError) {
-      console.error('[Screenshot] Write failed:', writeError.message);
-      return NextResponse.json({ error: 'Failed to save file' }, { status: 500 });
-    }
+    // Create screenshot metadata record
+    const screenshot = new Screenshot({
+      user: userId,
+      employee: employeeId,
+      gridfsFileId: gridfsResult._id,
+      capturedAt: now,
+      dateString,
+      metadata: {
+        mimeType,
+        width: 1920,
+        height: 1080,
+        fileSize: buffer.length,
+        format
+      },
+      activity: {
+        activeWindow: activity.activeWindow || '',
+        activeApp: activity.activeApp || '',
+        keystrokes: activity.keystrokes || 0,
+        mouseClicks: activity.mouseClicks || 0,
+        mouseMovements: activity.mouseMovements || 0,
+        isIdle: activity.isIdle || false
+      },
+      sessionId
+    });
 
-    const relativePath = `/activity/${userId}/${dateFolder}/${fileName}`;
-    const elapsed = Date.now() - startTime;
+    await screenshot.save();
 
-    console.log(`[Screenshot] ✓ Saved: ${relativePath} (${(buffer.length / 1024).toFixed(1)}KB, ${elapsed}ms)`);
-
-    // Update database
-    try {
-      await connectDB();
-      
-      const user = await User.findById(userId).select('employeeId');
-      
-      const dateStart = new Date(captureTime);
-      dateStart.setHours(0, 0, 0, 0);
-      const dateEnd = new Date(captureTime);
-      dateEnd.setHours(23, 59, 59, 999);
-      
-      // Find or create session
-      let session = await ProductivitySession.findOne({
-        user: userId,
-        date: { $gte: dateStart, $lte: dateEnd },
-        sessionNumber: sessionNumber ? parseInt(sessionNumber) : 1
-      });
-      
-      if (!session) {
-        session = new ProductivitySession({
-          user: userId,
-          employee: user?.employeeId,
-          date: dateStart,
-          sessionNumber: sessionNumber ? parseInt(sessionNumber) : 1,
-          screenshots: [],
-          startTime: captureTime,
-          endTime: captureTime
-        });
-      }
-      
-      // Add screenshot record
-      session.screenshots.push({
-        path: relativePath,
-        timestamp: captureTime,
-        filename: fileName,
-        size: buffer.length,
-        captureType: captureType || 'automatic',
-        isOfflineCapture: isOfflineCapture || false
-      });
-      
-      session.screenshotCount = session.screenshots.length;
-      session.endTime = captureTime;
-      
-      // Mark complete if 30 captures
-      if (session.screenshotCount >= 30) {
-        session.isComplete = true;
-      }
-      
-      await session.save();
-      
-      console.log(`[Screenshot] DB updated: session #${session.sessionNumber}, capture #${session.screenshotCount}`);
-      
-    } catch (dbError) {
-      console.error('[Screenshot] DB error:', dbError.message);
-      // Don't fail - file was saved
-    }
+    console.log(`[Screenshot] Saved for user ${userId}: ${screenshot._id} (GridFS: ${gridfsResult._id})`);
 
     return NextResponse.json({
       success: true,
-      path: relativePath,
-      timestamp: captureTime.toISOString(),
-      userId,
-      size: buffer.length,
-      sessionNumber,
-      captureType
+      screenshotId: screenshot._id.toString(),
+      gridfsId: gridfsResult._id.toString(),
+      timestamp: now.toISOString(),
+      fileSize: buffer.length
     });
 
   } catch (error) {
-    console.error('[Screenshot] Error:', error);
-    return NextResponse.json(
-      { error: 'Failed to save screenshot', details: error.message },
-      { status: 500 }
-    );
+    console.error('[Screenshot] Upload error:', error);
+    return NextResponse.json({
+      success: false,
+      error: error.message
+    }, { status: 500 });
   }
 }
 
 /**
- * GET /api/activity/screenshot
- * Get screenshot service status
+ * GET /api/activity/screenshot?id=xxx
+ * Retrieve a screenshot image by ID
  */
 export async function GET(request) {
   try {
+    // Verify JWT
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Unauthorized' 
+      }, { status: 401 });
     }
 
     const token = authHeader.substring(7);
@@ -267,38 +171,70 @@ export async function GET(request) {
     try {
       decoded = await jwtVerify(token, JWT_SECRET);
     } catch {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Invalid token' 
+      }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const screenshotId = searchParams.get('id');
+    
+    if (!screenshotId) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Screenshot ID required' 
+      }, { status: 400 });
+    }
+
+    await connectDB();
+
+    // Get screenshot metadata
+    const screenshot = await Screenshot.findById(screenshotId);
+    if (!screenshot) {
+      return NextResponse.json({ 
+        success: false, 
+        error: 'Screenshot not found' 
+      }, { status: 404 });
     }
 
     const userId = decoded.payload.userId;
     const userRole = decoded.payload.role;
-    
-    // Check if role is restricted
-    const isRestricted = RESTRICTED_ROLES.includes(userRole);
-    
-    // Check if user directory exists
-    const userDir = path.join(process.cwd(), 'public', 'activity', userId);
-    let dirExists = false;
-    try {
-      await access(userDir, constants.R_OK);
-      dirExists = true;
-    } catch {
-      dirExists = false;
+
+    // Access control: user can only view their own screenshots unless admin/manager
+    if (!['admin', 'god_admin', 'hr', 'manager'].includes(userRole)) {
+      if (screenshot.user.toString() !== userId) {
+        // Check if viewer is department head of screenshot owner
+        const { isDepartmentHead } = await import('@/app/api/activity/captures/route.js');
+        const isHead = await isDepartmentHead(userId, screenshot.user.toString());
+        
+        if (!isHead) {
+          return NextResponse.json({ 
+            success: false, 
+            error: 'Access denied' 
+          }, { status: 403 });
+        }
+      }
     }
 
-    return NextResponse.json({
-      success: true,
-      enabled: !isRestricted,
-      restricted: isRestricted,
-      userId,
-      activityDir: `/activity/${userId}`,
-      dirExists
+    // Get image from GridFS
+    const { getScreenshot } = await import('@/lib/gridfs');
+    const imageBuffer = await getScreenshot(screenshot.gridfsFileId);
+
+    // Return image with proper content type
+    return new NextResponse(imageBuffer, {
+      headers: {
+        'Content-Type': screenshot.metadata.mimeType || 'image/png',
+        'Content-Length': imageBuffer.length.toString(),
+        'Cache-Control': 'private, max-age=3600'
+      }
     });
 
   } catch (error) {
-    return NextResponse.json(
-      { error: 'Failed to get status', details: error.message },
-      { status: 500 }
-    );
+    console.error('[Screenshot] Retrieval error:', error);
+    return NextResponse.json({
+      success: false,
+      error: error.message
+    }, { status: 500 });
   }
 }

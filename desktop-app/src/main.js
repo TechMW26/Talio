@@ -1,24 +1,23 @@
-const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, session, shell, Notification } = require('electron');
+/**
+ * Talio Desktop App v3.0.0
+ * 
+ * Main process - handles window, tray, and screenshot capture
+ * Screenshots are uploaded directly to MongoDB GridFS
+ */
+
+const { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, session, shell, Notification, systemPreferences } = require('electron');
 const path = require('path');
 const Store = require('electron-store');
-const { ScreenshotService } = require('./screenshotService');
-const { PermissionHandler } = require('./permissionHandler');
-const { SessionManager } = require('./sessionManager');
-const { LocalStorageManager } = require('./localStorageManager');
-const { getLogger } = require('./debugLogger');
+const screenshotService = require('./screenshotService');
+const debugLogger = require('./debugLogger');
 
 // Constants
 const APP_URL = 'https://app.talio.in';
 const store = new Store();
-const logger = getLogger();
 
 // Global references
 let mainWindow = null;
 let tray = null;
-let screenshotService = null;
-let permissionHandler = null;
-let sessionManager = null;
-let localStorageManager = null;
 let isQuitting = false;
 let hasDetectedLogin = false;
 let loginCheckInterval = null;
@@ -27,23 +26,12 @@ let healthCheckInterval = null;
 let currentUserRole = null;
 let currentUserId = null;
 
-// Health status
-let healthStatus = {
-  server: 'unknown',      // 'healthy', 'unhealthy', 'unknown'
-  lastCheck: null,
-  lastCapture: null,
-  lastUpload: null,
-  captureCount: 0,
-  uploadCount: 0,
-  failedCount: 0
-};
-
-// Tray icon states
+// Tray states
 const TRAY_STATES = {
   IDLE: 'idle',           // Gray - not capturing
-  CAPTURING: 'capturing', // Green - actively capturing
-  ERROR: 'error',         // Red - health check failed
-  UPLOADING: 'uploading'  // Blue - uploading
+  HEALTHY: 'healthy',     // Green - capturing normally
+  WARNING: 'warning',     // Yellow - offline or issues
+  ERROR: 'error'          // Red - failed
 };
 let currentTrayState = TRAY_STATES.IDLE;
 
@@ -62,20 +50,22 @@ app.on('second-instance', () => {
 });
 
 /**
- * Create tray icon with specific color/state
+ * Get color for tray state
+ */
+function getStateColor(state) {
+  switch (state) {
+    case TRAY_STATES.HEALTHY: return '#22c55e';  // Green
+    case TRAY_STATES.WARNING: return '#eab308';  // Yellow
+    case TRAY_STATES.ERROR: return '#ef4444';    // Red
+    default: return '#9ca3af';                    // Gray
+  }
+}
+
+/**
+ * Create simple colored tray icon using native image
  */
 function createTrayIcon(state) {
-  const size = 16;
-  const canvas = `
-    <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="8" cy="8" r="7" fill="${getStateColor(state)}" stroke="#333" stroke-width="1"/>
-      ${state === TRAY_STATES.CAPTURING ? '<circle cx="8" cy="8" r="3" fill="white"/>' : ''}
-      ${state === TRAY_STATES.UPLOADING ? '<path d="M8 4 L8 12 M5 7 L8 4 L11 7" stroke="white" stroke-width="1.5" fill="none"/>' : ''}
-      ${state === TRAY_STATES.ERROR ? '<path d="M6 6 L10 10 M10 6 L6 10" stroke="white" stroke-width="1.5"/>' : ''}
-    </svg>
-  `;
-  
-  // For production, use pre-built icons
+  // Try to use pre-built icon first
   const iconPath = path.join(__dirname, '..', 'build', `tray-${state}.png`);
   try {
     const icon = nativeImage.createFromPath(iconPath);
@@ -83,65 +73,89 @@ function createTrayIcon(state) {
       return icon.resize({ width: 16, height: 16 });
     }
   } catch {}
-  
-  // Fallback to basic icon
-  const fallbackPath = path.join(__dirname, '..', 'build', 'tray-icon.png');
+
+  // Fallback to default icon
+  const defaultPath = path.join(__dirname, '..', 'build', 'tray-icon.png');
   try {
-    const icon = nativeImage.createFromPath(fallbackPath);
+    const icon = nativeImage.createFromPath(defaultPath);
     if (!icon.isEmpty()) {
       return icon.resize({ width: 16, height: 16 });
     }
   } catch {}
-  
+
   return nativeImage.createEmpty();
 }
 
-function getStateColor(state) {
-  switch (state) {
-    case TRAY_STATES.CAPTURING: return '#22c55e'; // Green
-    case TRAY_STATES.ERROR: return '#ef4444';     // Red
-    case TRAY_STATES.UPLOADING: return '#3b82f6'; // Blue
-    default: return '#6b7280';                     // Gray
-  }
-}
-
 /**
- * Update tray icon state
+ * Update tray icon and tooltip
  */
 function setTrayState(state) {
   if (currentTrayState === state) return;
   currentTrayState = state;
-  
+
   if (tray) {
     const icon = createTrayIcon(state);
     tray.setImage(icon);
-    
+
     const tooltips = {
       [TRAY_STATES.IDLE]: 'Talio - Idle',
-      [TRAY_STATES.CAPTURING]: 'Talio - Capturing',
-      [TRAY_STATES.ERROR]: 'Talio - Connection Error',
-      [TRAY_STATES.UPLOADING]: 'Talio - Uploading'
+      [TRAY_STATES.HEALTHY]: 'Talio - Active',
+      [TRAY_STATES.WARNING]: 'Talio - Offline',
+      [TRAY_STATES.ERROR]: 'Talio - Error'
     };
     tray.setToolTip(tooltips[state] || 'Talio');
   }
-  
-  logger.info(`Tray state changed to: ${state}`);
+
+  debugLogger.log('info', 'Tray', `State changed to: ${state}`);
 }
 
 /**
- * Flash tray icon briefly (for capture indication)
+ * Flash tray icon briefly on capture
  */
-function flashTrayIcon() {
+function flashTrayCapture() {
+  if (!tray) return;
+  
+  // Quick visual feedback - no text notification
   const originalState = currentTrayState;
-  setTrayState(TRAY_STATES.CAPTURING);
+  setTrayState(TRAY_STATES.HEALTHY);
   
   setTimeout(() => {
-    if (healthStatus.server === 'unhealthy') {
-      setTrayState(TRAY_STATES.ERROR);
-    } else {
-      setTrayState(originalState === TRAY_STATES.CAPTURING ? TRAY_STATES.IDLE : originalState);
-    }
-  }, 2000);
+    // Return to original or appropriate state
+    setTrayState(originalState);
+  }, 500);
+}
+
+/**
+ * Check screen recording permission (macOS)
+ */
+async function checkScreenPermission() {
+  if (process.platform !== 'darwin') {
+    return true;
+  }
+
+  const status = systemPreferences.getMediaAccessStatus('screen');
+  debugLogger.log('info', 'Permission', `Screen permission status: ${status}`);
+
+  if (status === 'granted') {
+    return true;
+  }
+
+  // Show permission dialog
+  const { dialog } = require('electron');
+  const result = await dialog.showMessageBox({
+    type: 'info',
+    title: 'Screen Recording Permission Required',
+    message: 'Talio needs screen recording permission to capture screenshots for productivity monitoring.',
+    detail: 'Please click "Open System Settings" and enable screen recording for Talio in Privacy & Security settings.',
+    buttons: ['Open System Settings', 'Later'],
+    defaultId: 0
+  });
+
+  if (result.response === 0) {
+    shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
+  }
+
+  return false;
 }
 
 /**
@@ -156,7 +170,10 @@ function createLoadingWindow() {
     resizable: false,
     center: true,
     alwaysOnTop: true,
-    webPreferences: { nodeIntegration: false, contextIsolation: true }
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true
+    }
   });
 
   const loadingHTML = `
@@ -211,13 +228,13 @@ function createLoadingWindow() {
 }
 
 /**
- * Show offline window
+ * Show offline page
  */
-function showOfflineWindow() {
+function showOfflinePage() {
   if (!mainWindow || mainWindow.isDestroyed()) return;
-  
-  setTrayState(TRAY_STATES.ERROR);
-  
+
+  setTrayState(TRAY_STATES.WARNING);
+
   const offlineHTML = `
     <!DOCTYPE html>
     <html>
@@ -236,7 +253,7 @@ function showOfflineWindow() {
         }
         .icon { width: 80px; height: 80px; margin-bottom: 24px; opacity: 0.5; }
         h1 { font-size: 24px; margin-bottom: 12px; }
-        p { font-size: 16px; color: #666; margin-bottom: 24px; text-align: center; max-width: 400px; }
+        p { font-size: 16px; color: #666; margin-bottom: 24px; text-align: center; }
         button {
           padding: 12px 32px;
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -259,15 +276,37 @@ function showOfflineWindow() {
     </body>
     </html>
   `;
-  
+
   mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(offlineHTML)}`);
 }
 
 /**
- * Create main window
+ * Start network retry when offline
+ */
+function startNetworkRetry() {
+  if (networkRetryInterval) return;
+
+  networkRetryInterval = setInterval(async () => {
+    try {
+      const response = await fetch(`${APP_URL}/api/health`, { method: 'HEAD' });
+      if (response.ok) {
+        clearInterval(networkRetryInterval);
+        networkRetryInterval = null;
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.loadURL(APP_URL);
+          setTrayState(TRAY_STATES.IDLE);
+        }
+      }
+    } catch {}
+  }, 5000);
+}
+
+/**
+ * Create main browser window
  */
 function createWindow() {
-  logger.info('Creating main window...');
+  debugLogger.log('info', 'App', 'Creating main window...');
+  
   const loadingWindow = createLoadingWindow();
 
   mainWindow = new BrowserWindow({
@@ -293,475 +332,392 @@ function createWindow() {
 
   mainWindow.setMenu(null);
 
+  // Handle load failures
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
-    logger.error(`Load failed: ${errorCode} - ${errorDescription}`);
+    debugLogger.log('error', 'Window', `Load failed: ${errorCode} - ${errorDescription}`);
     if ([-106, -105, -102, -118].includes(errorCode)) {
-      showOfflineWindow();
+      showOfflinePage();
       startNetworkRetry();
     }
   });
 
-  mainWindow.loadURL(APP_URL);
-
-  mainWindow.once('ready-to-show', () => {
+  // When page loads, close loading window
+  mainWindow.webContents.on('did-finish-load', () => {
+    debugLogger.log('info', 'Window', 'Page finished loading');
+    
     if (loadingWindow && !loadingWindow.isDestroyed()) {
       loadingWindow.close();
     }
-    mainWindow.show();
-    logger.info('Main window ready');
-    startLoginCheck();
-  });
 
-  mainWindow.webContents.on('did-finish-load', () => {
-    const url = mainWindow.webContents.getURL();
-    logger.info(`Page loaded: ${url}`);
-    if (!url.startsWith('data:')) {
-      checkForLoginSuccess(url);
-      stopNetworkRetry();
+    if (!mainWindow.isVisible()) {
+      mainWindow.show();
     }
+
+    // Start login detection
+    startLoginDetection();
   });
 
-  mainWindow.webContents.on('did-navigate', (e, url) => checkForLoginSuccess(url));
-  mainWindow.webContents.on('did-navigate-in-page', (e, url) => checkForLoginSuccess(url));
-
-  mainWindow.on('close', (event) => {
-    if (!isQuitting) {
-      event.preventDefault();
-      mainWindow.hide();
-      if (!store.get('hasShownTrayNotification')) {
-        tray?.displayBalloon?.({
-          title: 'Talio',
-          content: 'Running in background. Click tray icon to open.',
-          iconType: 'info'
-        });
-        store.set('hasShownTrayNotification', true);
-      }
-    }
-  });
-
+  // Handle new window requests (open in browser)
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (url.includes('accounts.google.com') || url.includes('talio.in')) {
-      return { action: 'allow' };
-    }
     shell.openExternal(url);
     return { action: 'deny' };
   });
 
-  session.defaultSession.setPermissionRequestHandler((wc, perm, cb) => {
-    cb(['media', 'mediaKeySystem', 'geolocation', 'notifications', 'fullscreen', 'display-capture', 'pointerLock'].includes(perm));
-  });
-
-  mainWindow.webContents.session.setDisplayMediaRequestHandler((req, cb) => {
-    require('electron').desktopCapturer.getSources({ types: ['screen', 'window'] }).then(sources => {
-      cb(sources.length > 0 ? { video: sources[0], audio: 'loopback' } : {});
-    });
-  });
-
-  return mainWindow;
-}
-
-/**
- * Network retry
- */
-function startNetworkRetry() {
-  if (networkRetryInterval) return;
-  logger.info('Starting network retry...');
-  
-  networkRetryInterval = setInterval(async () => {
-    try {
-      const response = await fetch(APP_URL, { method: 'HEAD' });
-      if (response.ok) {
-        logger.info('Network restored!');
-        stopNetworkRetry();
-        mainWindow?.loadURL(APP_URL);
-        setTrayState(TRAY_STATES.IDLE);
-      }
-    } catch {}
-  }, 5000);
-}
-
-function stopNetworkRetry() {
-  if (networkRetryInterval) {
-    clearInterval(networkRetryInterval);
-    networkRetryInterval = null;
-  }
-}
-
-/**
- * Health check - verify server connectivity
- */
-async function performHealthCheck() {
-  const token = store.get('authToken');
-  if (!token) {
-    healthStatus.server = 'unknown';
-    return;
-  }
-
-  try {
-    const response = await fetch(`${APP_URL}/api/activity/health`, {
-      method: 'GET',
-      headers: { 'Authorization': `Bearer ${token}` },
-      timeout: 10000
-    });
-
-    if (response.ok) {
-      healthStatus.server = 'healthy';
-      healthStatus.lastCheck = Date.now();
-      if (currentTrayState === TRAY_STATES.ERROR) {
-        setTrayState(screenshotService?.isRunning ? TRAY_STATES.IDLE : TRAY_STATES.IDLE);
-      }
-      logger.health('healthy', { status: response.status });
-    } else {
-      healthStatus.server = 'unhealthy';
-      setTrayState(TRAY_STATES.ERROR);
-      logger.health('unhealthy', { status: response.status });
+  // Window close behavior
+  mainWindow.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      mainWindow.hide();
     }
-  } catch (error) {
-    healthStatus.server = 'unhealthy';
-    setTrayState(TRAY_STATES.ERROR);
-    logger.health('error', { error: error.message });
-  }
-}
+  });
 
-function startHealthCheck() {
-  performHealthCheck();
-  healthCheckInterval = setInterval(performHealthCheck, 60000); // Every 1 minute
-}
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
 
-function stopHealthCheck() {
-  if (healthCheckInterval) {
-    clearInterval(healthCheckInterval);
-    healthCheckInterval = null;
-  }
+  // Load the app
+  mainWindow.loadURL(APP_URL);
 }
 
 /**
- * Create tray
+ * Create system tray
  */
 function createTray() {
-  logger.info('Creating system tray...');
   const icon = createTrayIcon(TRAY_STATES.IDLE);
   tray = new Tray(icon);
-  tray.setToolTip('Talio');
-  updateTrayMenu();
-
-  tray.on('click', () => {
-    mainWindow?.isVisible() ? mainWindow.focus() : mainWindow?.show();
-  });
-
-  tray.on('double-click', () => {
-    mainWindow?.show();
-    mainWindow?.focus();
-  });
-}
-
-/**
- * Update tray menu
- */
-function updateTrayMenu() {
-  const stats = localStorageManager?.getStats() || {};
-  const sessionInfo = sessionManager?.getCurrentSessionInfo() || {};
-  
-  const statusText = healthStatus.server === 'healthy' ? '● Connected' : 
-                     healthStatus.server === 'unhealthy' ? '○ Disconnected' : '◐ Unknown';
 
   const contextMenu = Menu.buildFromTemplate([
-    { label: 'Open Talio', click: () => { mainWindow?.show(); mainWindow?.focus(); } },
+    {
+      label: 'Show Talio',
+      click: () => {
+        if (mainWindow) {
+          mainWindow.show();
+          mainWindow.focus();
+        }
+      }
+    },
     { type: 'separator' },
-    { label: `Status: ${statusText}`, enabled: false },
-    { label: `Captures: ${healthStatus.captureCount}`, enabled: false },
-    { label: `Pending Uploads: ${stats.pendingCount || 0}`, enabled: false },
-    { label: `Session: ${sessionInfo.sessionNumber || '-'}`, enabled: false },
+    {
+      label: 'Capture Status',
+      enabled: false,
+      id: 'status'
+    },
     { type: 'separator' },
-    { label: 'View Logs', click: () => {
-      const logPath = logger.getLogPath();
-      shell.showItemInFolder(logPath);
-    }},
+    {
+      label: 'View Logs',
+      click: () => {
+        const logPath = debugLogger.getLogPath();
+        shell.openPath(logPath);
+      }
+    },
     { type: 'separator' },
-    { label: 'Quit', click: () => { isQuitting = true; app.quit(); } }
-  ]);
-
-  tray?.setContextMenu(contextMenu);
-}
-
-/**
- * Initialize application
- */
-async function initialize() {
-  logger.info('Initializing Talio Desktop...');
-  
-  createWindow();
-  createTray();
-
-  permissionHandler = new PermissionHandler(mainWindow);
-
-  localStorageManager = new LocalStorageManager({
-    retentionDays: 7,
-    uploadRetryInterval: 30000
-  });
-
-  sessionManager = new SessionManager({
-    sessionDuration: 30,
-    capturesPerSession: 30
-  });
-
-  // Initialize screenshot service WITHOUT clock-in requirement
-  screenshotService = new ScreenshotService({
-    apiUrl: `${APP_URL}/api/activity/screenshot`,
-    healthUrl: `${APP_URL}/api/activity/health`,
-    getAuthToken: () => store.get('authToken'),
-    getUserRole: () => currentUserRole,
-    getUserId: () => currentUserId,
-    interval: 60000, // 1 minute
-    requireClockIn: false, // DISABLED - capture always after login
-    localStorageManager,
-    sessionManager,
-    logger,
-    onCaptureStart: () => {
-      flashTrayIcon();
-    },
-    onCaptureComplete: (data) => {
-      healthStatus.captureCount++;
-      healthStatus.lastCapture = Date.now();
-      updateTrayMenu();
-      mainWindow?.webContents?.send('capture-complete', data);
-      logger.capture(true, { size: data.size, path: data.localPath });
-    },
-    onCaptureFailed: (error) => {
-      healthStatus.failedCount++;
-      logger.capture(false, { error });
-    },
-    onUploadComplete: (data) => {
-      healthStatus.uploadCount++;
-      healthStatus.lastUpload = Date.now();
-      setTrayState(TRAY_STATES.IDLE);
-      updateTrayMenu();
-      logger.upload(true, { path: data.serverPath });
-    },
-    onUploadFailed: (error) => {
-      logger.upload(false, { error });
-    },
-    onUploadStart: () => {
-      setTrayState(TRAY_STATES.UPLOADING);
-    }
-  });
-
-  setupAutoLaunch();
-  startHealthCheck();
-  
-  logger.info('Initialization complete');
-}
-
-/**
- * Auto-launch setup
- */
-function setupAutoLaunch() {
-  const settings = { openAtLogin: true, openAsHidden: true };
-  if (process.platform === 'darwin') {
-    app.setLoginItemSettings(settings);
-  } else if (process.platform === 'win32') {
-    app.setLoginItemSettings({ ...settings, path: app.getPath('exe') });
-  }
-}
-
-/**
- * Check for login
- */
-function checkForLoginSuccess(url) {
-  if (hasDetectedLogin) return;
-  
-  const dashboardPatterns = ['/dashboard', '/employee', '/admin', '/manager', '/team'];
-  const isOnDashboard = dashboardPatterns.some(p => url.includes(p));
-  const isNotLoginPage = !url.includes('/login') && !url.includes('/auth');
-  
-  if (isOnDashboard && isNotLoginPage) {
-    logger.info(`Login detected: ${url}`);
-    onLoginSuccess('url_navigation');
-  }
-}
-
-/**
- * Handle login success
- */
-async function onLoginSuccess(source) {
-  if (hasDetectedLogin) return;
-  
-  hasDetectedLogin = true;
-  logger.info(`Login success via: ${source}`);
-  
-  if (loginCheckInterval) {
-    clearInterval(loginCheckInterval);
-    loginCheckInterval = null;
-  }
-  
-  await fetchUserInfo();
-  
-  setTimeout(async () => {
-    logger.info('Requesting permissions...');
-    const granted = await permissionHandler.requestAllPermissions();
-    
-    if (granted) {
-      setTimeout(() => startCaptureIfAllowed(), 2000);
-    }
-  }, 1500);
-}
-
-/**
- * Fetch user info
- */
-async function fetchUserInfo() {
-  const token = store.get('authToken');
-  if (!token) return;
-
-  try {
-    const response = await fetch(`${APP_URL}/api/auth/me`, {
-      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
-    });
-
-    if (response.ok) {
-      const data = await response.json();
-      if (data.success && data.user) {
-        currentUserRole = data.user.role;
-        currentUserId = data.user._id;
-        store.set('userRole', currentUserRole);
-        store.set('userId', currentUserId);
-        logger.info(`User info: role=${currentUserRole}, id=${currentUserId}`);
+    {
+      label: 'Quit Talio',
+      click: () => {
+        isQuitting = true;
+        app.quit();
       }
     }
-  } catch (error) {
-    logger.error(`Failed to fetch user info: ${error.message}`);
-    currentUserRole = store.get('userRole');
-    currentUserId = store.get('userId');
+  ]);
+
+  tray.setContextMenu(contextMenu);
+  tray.setToolTip('Talio');
+
+  tray.on('click', () => {
+    if (mainWindow) {
+      mainWindow.isVisible() ? mainWindow.hide() : mainWindow.show();
+    }
+  });
+}
+
+/**
+ * Update tray menu status text
+ */
+function updateTrayStatus(text) {
+  if (!tray) return;
+
+  const menu = tray.getContextMenu();
+  if (menu) {
+    const statusItem = menu.items.find(item => item.id === 'status');
+    if (statusItem) {
+      statusItem.label = text;
+    }
   }
 }
 
 /**
- * Start capture
+ * Extract auth data from cookies/localStorage
  */
-function startCaptureIfAllowed() {
-  const restrictedRoles = ['admin', 'god_admin'];
-  
-  if (restrictedRoles.includes(currentUserRole)) {
-    logger.info(`Role '${currentUserRole}' is restricted - capture disabled`);
+async function extractAuthData() {
+  if (!mainWindow) return null;
+
+  try {
+    // Try to get JWT from cookies first
+    const cookies = await session.fromPartition('persist:talio').cookies.get({ url: APP_URL });
+    const tokenCookie = cookies.find(c => c.name === 'token' || c.name === 'auth-token');
+
+    if (tokenCookie?.value) {
+      debugLogger.log('info', 'Auth', 'Found auth token in cookies');
+      return tokenCookie.value;
+    }
+
+    // Try localStorage
+    const localStorageData = await mainWindow.webContents.executeJavaScript(`
+      (function() {
+        try {
+          return localStorage.getItem('token') || localStorage.getItem('auth-token') || null;
+        } catch { return null; }
+      })()
+    `);
+
+    if (localStorageData) {
+      debugLogger.log('info', 'Auth', 'Found auth token in localStorage');
+      return localStorageData;
+    }
+
+    return null;
+  } catch (error) {
+    debugLogger.log('error', 'Auth', `Failed to extract auth data: ${error.message}`);
+    return null;
+  }
+}
+
+/**
+ * Check if user is logged in
+ */
+async function checkLoginStatus() {
+  if (!mainWindow) return { loggedIn: false };
+
+  try {
+    const result = await mainWindow.webContents.executeJavaScript(`
+      (function() {
+        try {
+          const url = window.location.href;
+          const pathname = window.location.pathname;
+          
+          // Check URL patterns
+          const isLoginPage = pathname.includes('/login') || pathname === '/';
+          const isDashboard = pathname.includes('/dashboard');
+          
+          // Try to get user data
+          let userData = null;
+          try {
+            const stored = localStorage.getItem('user') || sessionStorage.getItem('user');
+            if (stored) userData = JSON.parse(stored);
+          } catch {}
+          
+          return {
+            url,
+            pathname,
+            isLoginPage,
+            isDashboard,
+            hasUserData: !!userData,
+            userId: userData?.id || userData?._id || null,
+            userRole: userData?.role || null,
+            userName: userData?.name || null
+          };
+        } catch (e) {
+          return { error: e.message };
+        }
+      })()
+    `);
+
+    const loggedIn = result.isDashboard || result.hasUserData;
+
+    return {
+      loggedIn,
+      ...result
+    };
+  } catch (error) {
+    debugLogger.log('error', 'Auth', `Login check failed: ${error.message}`);
+    return { loggedIn: false, error: error.message };
+  }
+}
+
+/**
+ * Start screenshot capture service
+ */
+async function startCaptureService(authToken, userId, userRole) {
+  // Don't capture for admin roles
+  if (['admin', 'god_admin'].includes(userRole)) {
+    debugLogger.log('info', 'Capture', 'Skipping capture for admin role');
+    setTrayState(TRAY_STATES.IDLE);
+    updateTrayStatus('Capture: Disabled (Admin)');
     return;
   }
 
-  logger.info(`Starting capture for role '${currentUserRole}'`);
-  
-  screenshotService?.start();
-  sessionManager?.startNewSession(currentUserId);
+  // Check screen permission
+  const hasPermission = await checkScreenPermission();
+  if (!hasPermission) {
+    debugLogger.log('warn', 'Capture', 'Screen recording permission not granted');
+    setTrayState(TRAY_STATES.WARNING);
+    updateTrayStatus('Capture: Permission Required');
+    return;
+  }
 
-  // Initial capture after 3 seconds
-  setTimeout(() => {
-    logger.info('Triggering initial capture...');
-    screenshotService?.forceCapture();
-  }, 3000);
+  // Initialize screenshot service
+  screenshotService.initialize(APP_URL, authToken);
+
+  // Set up callbacks
+  screenshotService.onCapture((data) => {
+    debugLogger.log('info', 'Capture', `Screenshot captured: ${data.screenshotId} (Total: ${data.captureCount})`);
+    flashTrayCapture();
+    setTrayState(TRAY_STATES.HEALTHY);
+    updateTrayStatus(`Capture: Active (${data.captureCount} today)`);
+  });
+
+  screenshotService.onError((error) => {
+    debugLogger.log('error', 'Capture', `Error: ${error.message}`);
+    
+    if (error.type === 'offline') {
+      setTrayState(TRAY_STATES.WARNING);
+      updateTrayStatus('Capture: Offline');
+    } else {
+      setTrayState(TRAY_STATES.ERROR);
+      updateTrayStatus(`Capture: Error`);
+    }
+  });
+
+  // Start capturing
+  screenshotService.start();
+  setTrayState(TRAY_STATES.HEALTHY);
+  updateTrayStatus('Capture: Active');
+
+  debugLogger.log('info', 'Capture', 'Screenshot service started');
 }
 
 /**
- * Login check fallback
+ * Handle detected login
  */
-function startLoginCheck() {
-  loginCheckInterval = setInterval(() => {
-    if (hasDetectedLogin) {
-      clearInterval(loginCheckInterval);
-      return;
-    }
-    
-    if (mainWindow?.webContents) {
-      checkForLoginSuccess(mainWindow.webContents.getURL());
-    }
-    
-    const authToken = store.get('authToken');
-    if (authToken && !hasDetectedLogin) {
-      logger.info('Auth token found in store');
-      onLoginSuccess('stored_token');
-    }
-  }, 10000);
-  
-  setTimeout(() => {
-    if (!hasDetectedLogin) {
-      logger.info('Fallback: Requesting permissions');
-      permissionHandler?.requestAllPermissions();
-    }
-  }, 30000);
+async function handleLogin(loginData) {
+  if (hasDetectedLogin) return;
+  hasDetectedLogin = true;
+
+  debugLogger.log('info', 'Auth', `Login detected: ${loginData.userName || 'Unknown'} (${loginData.userRole || 'Unknown'})`);
+
+  currentUserId = loginData.userId;
+  currentUserRole = loginData.userRole;
+
+  // Save to store
+  store.set('lastUserId', currentUserId);
+  store.set('lastUserRole', currentUserRole);
+
+  // Get auth token
+  const authToken = await extractAuthData();
+  if (!authToken) {
+    debugLogger.log('error', 'Auth', 'Could not extract auth token');
+    return;
+  }
+
+  // Start capture service
+  await startCaptureService(authToken, currentUserId, currentUserRole);
 }
 
-// IPC Handlers
-ipcMain.handle('get-auth-token', () => store.get('authToken'));
+/**
+ * Handle logout
+ */
+function handleLogout() {
+  debugLogger.log('info', 'Auth', 'Logout detected');
 
-ipcMain.handle('set-auth-token', (event, token) => {
-  store.set('authToken', token);
-  if (token && !hasDetectedLogin) {
-    logger.info('Auth token set via IPC');
-    onLoginSuccess('ipc_token');
-  }
-  return true;
-});
-
-ipcMain.handle('clear-auth-token', () => {
-  store.delete('authToken');
-  store.delete('userRole');
-  store.delete('userId');
   hasDetectedLogin = false;
-  currentUserRole = null;
   currentUserId = null;
-  screenshotService?.stop();
+  currentUserRole = null;
+
+  // Stop capture service
+  screenshotService.stop();
+
+  // Clear stored data
+  store.delete('lastUserId');
+  store.delete('lastUserRole');
+
   setTrayState(TRAY_STATES.IDLE);
-  return true;
-});
+  updateTrayStatus('Capture: Idle');
+}
 
-ipcMain.handle('get-capture-status', () => ({
-  isCapturing: screenshotService?.isRunning || false,
-  role: currentUserRole,
-  isRoleRestricted: ['admin', 'god_admin'].includes(currentUserRole),
-  health: healthStatus,
-  stats: screenshotService?.getStatus() || {},
-  session: sessionManager?.getCurrentSessionInfo() || {},
-  storage: localStorageManager?.getStats() || {}
-}));
-
-ipcMain.handle('force-capture', async () => {
-  logger.info('Force capture requested');
-  return await screenshotService?.forceCapture();
-});
-
-ipcMain.handle('get-permission-status', () => permissionHandler?.getStatus());
-ipcMain.handle('retry-permissions', async () => permissionHandler?.retryPermissions());
-ipcMain.handle('open-system-preferences', () => { permissionHandler?.openSystemPreferences(); return true; });
-ipcMain.handle('get-storage-paths', () => localStorageManager?.getPaths());
-ipcMain.handle('get-app-version', () => app.getVersion());
-ipcMain.handle('get-log-path', () => logger.getLogPath());
-ipcMain.handle('get-recent-logs', (event, lines) => logger.getRecentLogs(lines));
-ipcMain.handle('get-health-status', () => healthStatus);
-
-// App lifecycle
-app.whenReady().then(initialize);
-
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit();
-});
-
-app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
-  } else {
-    mainWindow?.show();
+/**
+ * Start login detection polling
+ */
+function startLoginDetection() {
+  if (loginCheckInterval) {
+    clearInterval(loginCheckInterval);
   }
+
+  // Check immediately
+  checkAndHandleLogin();
+
+  // Then check every 3 seconds
+  loginCheckInterval = setInterval(checkAndHandleLogin, 3000);
+}
+
+/**
+ * Check login status and handle accordingly
+ */
+async function checkAndHandleLogin() {
+  const status = await checkLoginStatus();
+
+  if (status.loggedIn && !hasDetectedLogin) {
+    await handleLogin(status);
+  } else if (!status.loggedIn && hasDetectedLogin) {
+    handleLogout();
+  }
+}
+
+/**
+ * App ready handler
+ */
+app.whenReady().then(async () => {
+  debugLogger.log('info', 'App', 'Talio Desktop v3.0.0 starting...');
+
+  createTray();
+  createWindow();
+
+  // macOS: Re-create window when dock icon is clicked
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
+    } else if (mainWindow) {
+      mainWindow.show();
+    }
+  });
 });
 
+/**
+ * Before quit handler
+ */
 app.on('before-quit', () => {
   isQuitting = true;
-  screenshotService?.stop();
-  localStorageManager?.stop();
-  stopHealthCheck();
-  logger.info('App quitting...');
+
+  // Stop services
+  screenshotService.stop();
+
+  // Clear intervals
+  if (loginCheckInterval) clearInterval(loginCheckInterval);
+  if (networkRetryInterval) clearInterval(networkRetryInterval);
+  if (healthCheckInterval) clearInterval(healthCheckInterval);
+
+  debugLogger.log('info', 'App', 'Shutting down...');
 });
 
-process.on('uncaughtException', (error) => {
-  logger.error(`Uncaught exception: ${error.message}`);
+/**
+ * All windows closed handler
+ */
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
 });
 
-process.on('unhandledRejection', (reason) => {
-  logger.error(`Unhandled rejection: ${reason}`);
+/**
+ * IPC Handlers
+ */
+ipcMain.handle('get-capture-status', () => {
+  return screenshotService.getStatus();
+});
+
+ipcMain.handle('get-health', async () => {
+  return screenshotService.healthCheck();
+});
+
+ipcMain.handle('force-capture', async () => {
+  return screenshotService.captureAndUpload();
 });

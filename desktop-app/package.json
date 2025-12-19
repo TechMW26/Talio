@@ -1,6 +1,6 @@
 {
   "name": "talio-desktop",
-  "version": "2.2.0",
+  "version": "3.0.0",
   "description": "Talio Desktop Application - Productivity Monitoring & Screen Capture",
   "main": "src/main.js",
   "author": "Talio",

@@ -1,176 +1,113 @@
-const { app } = require('electron');
+/**
+ * Debug Logger v3.0.0
+ * Simple file-based logging for debugging
+ */
+
 const fs = require('fs');
 const path = require('path');
 
+// Get app data path
+function getAppDataPath() {
+  const { app } = require('electron');
+  return app.getPath('userData');
+}
+
+// Log directory and file
+let logDir = null;
+let logFile = null;
+let initialized = false;
+
 /**
- * Debug Logger
- * Writes logs to file for debugging screenshot capture issues
+ * Initialize logger
  */
-class DebugLogger {
-  constructor() {
-    // Log file location
-    this.logDir = path.join(app.getPath('userData'), 'logs');
-    this.logFile = path.join(this.logDir, 'talio-debug.log');
-    this.maxLogSize = 5 * 1024 * 1024; // 5MB max
-    this.maxLogFiles = 5;
+function init() {
+  if (initialized) return;
+  
+  try {
+    logDir = path.join(getAppDataPath(), 'logs');
     
-    this.ensureLogDir();
-    this.rotateLogsIfNeeded();
-    
-    this.log('='.repeat(60));
-    this.log(`Talio Desktop Started - v${app.getVersion()}`);
-    this.log(`Platform: ${process.platform}, Arch: ${process.arch}`);
-    this.log(`User Data: ${app.getPath('userData')}`);
-    this.log('='.repeat(60));
-  }
-
-  /**
-   * Ensure log directory exists
-   */
-  ensureLogDir() {
-    try {
-      if (!fs.existsSync(this.logDir)) {
-        fs.mkdirSync(this.logDir, { recursive: true });
-      }
-    } catch (error) {
-      console.error('Failed to create log directory:', error);
-    }
-  }
-
-  /**
-   * Rotate logs if file is too large
-   */
-  rotateLogsIfNeeded() {
-    try {
-      if (fs.existsSync(this.logFile)) {
-        const stats = fs.statSync(this.logFile);
-        if (stats.size > this.maxLogSize) {
-          // Rotate existing log files
-          for (let i = this.maxLogFiles - 1; i >= 1; i--) {
-            const oldFile = `${this.logFile}.${i}`;
-            const newFile = `${this.logFile}.${i + 1}`;
-            if (fs.existsSync(oldFile)) {
-              if (i === this.maxLogFiles - 1) {
-                fs.unlinkSync(oldFile);
-              } else {
-                fs.renameSync(oldFile, newFile);
-              }
-            }
-          }
-          fs.renameSync(this.logFile, `${this.logFile}.1`);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to rotate logs:', error);
-    }
-  }
-
-  /**
-   * Format timestamp
-   */
-  getTimestamp() {
-    return new Date().toISOString();
-  }
-
-  /**
-   * Write log entry
-   */
-  log(message, level = 'INFO') {
-    const timestamp = this.getTimestamp();
-    const logEntry = `[${timestamp}] [${level}] ${message}\n`;
-    
-    // Console output
-    if (level === 'ERROR') {
-      console.error(message);
-    } else {
-      console.log(message);
+    // Create logs directory
+    if (!fs.existsSync(logDir)) {
+      fs.mkdirSync(logDir, { recursive: true });
     }
     
-    // File output
-    try {
-      fs.appendFileSync(this.logFile, logEntry);
-    } catch (error) {
-      console.error('Failed to write log:', error);
-    }
-  }
-
-  info(message) {
-    this.log(message, 'INFO');
-  }
-
-  error(message) {
-    this.log(message, 'ERROR');
-  }
-
-  warn(message) {
-    this.log(message, 'WARN');
-  }
-
-  debug(message) {
-    this.log(message, 'DEBUG');
-  }
-
-  /**
-   * Log capture event
-   */
-  capture(success, details = {}) {
-    if (success) {
-      this.log(`CAPTURE SUCCESS: ${JSON.stringify(details)}`, 'CAPTURE');
-    } else {
-      this.log(`CAPTURE FAILED: ${JSON.stringify(details)}`, 'ERROR');
-    }
-  }
-
-  /**
-   * Log upload event
-   */
-  upload(success, details = {}) {
-    if (success) {
-      this.log(`UPLOAD SUCCESS: ${JSON.stringify(details)}`, 'UPLOAD');
-    } else {
-      this.log(`UPLOAD FAILED: ${JSON.stringify(details)}`, 'ERROR');
-    }
-  }
-
-  /**
-   * Log health check
-   */
-  health(status, details = {}) {
-    this.log(`HEALTH CHECK: ${status} - ${JSON.stringify(details)}`, 'HEALTH');
-  }
-
-  /**
-   * Get log file path
-   */
-  getLogPath() {
-    return this.logFile;
-  }
-
-  /**
-   * Get recent logs
-   */
-  getRecentLogs(lines = 100) {
-    try {
-      if (!fs.existsSync(this.logFile)) {
-        return 'No logs yet';
-      }
-      const content = fs.readFileSync(this.logFile, 'utf8');
-      const allLines = content.split('\n');
-      return allLines.slice(-lines).join('\n');
-    } catch (error) {
-      return `Error reading logs: ${error.message}`;
-    }
+    // Create log file with date
+    const date = new Date().toISOString().split('T')[0];
+    logFile = path.join(logDir, `talio-${date}.log`);
+    
+    initialized = true;
+    
+    // Log startup
+    log('info', 'Logger', '='.repeat(50));
+    log('info', 'Logger', `Talio Desktop v3.0.0 started`);
+    log('info', 'Logger', `Platform: ${process.platform}`);
+    log('info', 'Logger', `Log file: ${logFile}`);
+    log('info', 'Logger', '='.repeat(50));
+    
+  } catch (error) {
+    console.error('Failed to initialize logger:', error);
   }
 }
 
-// Singleton instance
-let loggerInstance = null;
-
-function getLogger() {
-  if (!loggerInstance) {
-    loggerInstance = new DebugLogger();
+/**
+ * Write log entry
+ */
+function log(level, category, message) {
+  if (!initialized) {
+    try {
+      init();
+    } catch {
+      // Fall back to console only
+      console.log(`[${level.toUpperCase()}] [${category}] ${message}`);
+      return;
+    }
   }
-  return loggerInstance;
+  
+  const timestamp = new Date().toISOString();
+  const logEntry = `[${timestamp}] [${level.toUpperCase()}] [${category}] ${message}`;
+  
+  // Console output
+  console.log(logEntry);
+  
+  // File output
+  try {
+    fs.appendFileSync(logFile, logEntry + '\n');
+  } catch (error) {
+    console.error('Failed to write log:', error);
+  }
 }
 
-module.exports = { DebugLogger, getLogger };
+/**
+ * Get log file path
+ */
+function getLogPath() {
+  if (!initialized) {
+    init();
+  }
+  return logDir || '';
+}
+
+/**
+ * Get recent logs
+ */
+function getRecentLogs(lines = 100) {
+  if (!logFile || !fs.existsSync(logFile)) {
+    return 'No logs available';
+  }
+  
+  try {
+    const content = fs.readFileSync(logFile, 'utf8');
+    const allLines = content.split('\n');
+    return allLines.slice(-lines).join('\n');
+  } catch (error) {
+    return `Error reading logs: ${error.message}`;
+  }
+}
+
+// Export simple API
+module.exports = {
+  log,
+  getLogPath,
+  getRecentLogs,
+  init
+};
