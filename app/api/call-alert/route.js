@@ -124,23 +124,8 @@ export async function POST(request) {
       );
     }
 
-    // Department head permission check: can only send to own department
-    if (!isAdmin && isDepartmentHead && senderDepartmentHead) {
-      const invalidTargets = targetUsers.filter(u => {
-        const empDeptId = u.employeeId?.department?._id || u.employeeId?.department;
-        return empDeptId?.toString() !== senderDepartmentHead._id.toString();
-      });
-
-      if (invalidTargets.length > 0) {
-        return NextResponse.json(
-          { 
-            success: false, 
-            message: 'Department heads can only send alerts to employees in their own department' 
-          },
-          { status: 403 }
-        );
-      }
-    }
+    // NOTE: Department heads have full access to send alerts to ALL employees
+    // (previously restricted to own department only, now removed per requirement)
 
     // Build sender name
     const senderName = `${senderEmployee.firstName} ${senderEmployee.lastName}`;

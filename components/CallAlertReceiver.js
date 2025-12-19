@@ -50,6 +50,7 @@ export default function CallAlertReceiver() {
   const alertAudioRef = useRef(null);
   const voiceAudioRef = useRef(null);
   const alertQueue = useRef([]);
+  const activeAlertRef = useRef(null);  // Ref to track active alert for stale closure handling
 
   // Initialize audio elements
   useEffect(() => {
@@ -204,18 +205,58 @@ export default function CallAlertReceiver() {
     }
   }, [stopAudio]);
 
+  // Keep ref in sync with state
+  useEffect(() => {
+    activeAlertRef.current = activeAlert;
+  }, [activeAlert]);
+
+  // Play incoming alert audio (for queued alerts that should still be heard)
+  const playIncomingAlertAudio = useCallback(async (alert) => {
+    try {
+      // Create a new audio instance for the queued alert
+      const tempAudio = new Audio(ALERT_SOUND_URL);
+      tempAudio.volume = 0.7;
+      await tempAudio.play();
+      
+      // If voice is enabled, play voice after alert sound
+      if (alert?.voiceEnabled && alert?.audioDataUrl) {
+        tempAudio.onended = async () => {
+          try {
+            const voiceAudio = new Audio(alert.audioDataUrl);
+            await voiceAudio.play();
+          } catch (err) {
+            console.error('[CallAlert] Error playing queued voice:', err);
+          }
+        };
+      }
+    } catch (err) {
+      console.error('[CallAlert] Error playing queued alert audio:', err);
+    }
+  }, []);
+
   // Handle incoming alert
   const handleIncomingAlert = useCallback((alert) => {
     console.log('📢 [CallAlert] Received alert:', alert);
 
-    if (activeAlert) {
-      // Queue the alert if one is already active
-      alertQueue.current.push(alert);
-      toast('New alert queued', { icon: '📢' });
-    } else {
+    // If no active alert, set as active and play
+    // Use ref to avoid stale closure issue
+    if (!activeAlertRef.current) {
       setActiveAlert(alert);
+    } else {
+      // Queue the alert for display after current one is dismissed
+      alertQueue.current.push(alert);
+      
+      // IMPORTANT: Still play the audio immediately for queued alerts
+      // User requested that alerts should always be played even if previous not acknowledged
+      playIncomingAlertAudio(alert);
+      
+      // Show notification with queue count
+      toast(`New alert received! (${alertQueue.current.length} queued)`, { 
+        icon: '📢',
+        duration: 4000
+      });
     }
-  }, [activeAlert]);
+  }, [playIncomingAlertAudio]);  // Only depends on the audio play function
 
   // Auto-play when alert becomes active
   useEffect(() => {
