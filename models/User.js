@@ -139,7 +139,17 @@ const UserSchema = new mongoose.Schema({
   settings: {
     screenshotInterval: { type: Number, default: 5 }, // minutes
     screenshotIntervalUpdatedAt: { type: Date }
-  }
+  },
+  // Department Head meta - synced from Department model when user is assigned as head
+  isDepartmentHead: {
+    type: Boolean,
+    default: false
+  },
+  // Array of department IDs this user is head of
+  headOfDepartments: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Department'
+  }]
 }, {
   timestamps: true,
 });

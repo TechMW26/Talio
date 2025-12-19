@@ -244,6 +244,37 @@ export async function POST(request) {
 
     // Return user data without password, including employee details
     // IMPORTANT: employeeId is stored as an object with _id for frontend compatibility
+    
+    // Get department head info from user meta (or check departments if not synced)
+    let isDepartmentHead = user.isDepartmentHead || false;
+    let headOfDepartments = user.headOfDepartments || [];
+    
+    // If not in user meta, check Department model (fallback for existing data)
+    if (!isDepartmentHead && user.employeeId) {
+      try {
+        const deptHeadCheck = await Department.find({
+          isActive: true,
+          $or: [
+            { head: user.employeeId },
+            { heads: user.employeeId }
+          ]
+        }).select('_id name').lean();
+        
+        if (deptHeadCheck.length > 0) {
+          isDepartmentHead = true;
+          headOfDepartments = deptHeadCheck.map(d => d._id);
+          
+          // Sync to user meta (fire and forget)
+          User.updateOne(
+            { _id: user._id },
+            { $set: { isDepartmentHead: true, headOfDepartments } }
+          ).catch(err => console.error('Failed to sync department head status:', err));
+        }
+      } catch (error) {
+        console.error('Error checking department head status:', error);
+      }
+    }
+    
     const userData = {
       id: user._id.toString(),
       _id: user._id.toString(),
@@ -251,6 +282,9 @@ export async function POST(request) {
       email: user.email,
       role: user.role,
       isActive: user.isActive,
+      // Department head meta - allows department heads to use special features regardless of role
+      isDepartmentHead,
+      headOfDepartments: headOfDepartments.map(d => d.toString()),
       // Force password change flag - true for first login
       forcePasswordChange: user.forcePasswordChange === true,
       // Profile completion status for modal display

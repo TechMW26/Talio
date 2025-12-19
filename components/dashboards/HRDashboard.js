@@ -11,6 +11,7 @@ import toast from 'react-hot-toast'
 import { formatDesignation } from '@/lib/formatters'
 import { getEmployeeId } from '@/utils/userHelper'
 import { CustomizableDashboard } from '@/components/dashboard'
+import CallAlertButton from '@/components/CallAlertButton'
 import {
   CheckInOutWidget,
   QuickGlanceWidget,
@@ -564,6 +565,11 @@ export default function HRDashboard({ user }) {
 
   return (
     <div className="page-container">
+      {/* Call Alert Button - Fixed position for easy access */}
+      <div className="fixed bottom-6 right-6 z-40">
+        <CallAlertButton user={user} />
+      </div>
+
       <CustomizableDashboard
         userId={user?._id || 'hr'}
         userRole={user?.role || 'hr'}

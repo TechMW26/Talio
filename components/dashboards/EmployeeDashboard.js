@@ -11,6 +11,7 @@ import { formatDesignation } from '@/lib/formatters'
 import { useTheme } from '@/contexts/ThemeContext'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
 import { CustomizableDashboard } from '@/components/dashboard'
+import CallAlertButton from '@/components/CallAlertButton'
 import {
   CheckInOutWidget,
   QuickGlanceWidget,
@@ -549,6 +550,11 @@ export default function EmployeeDashboard({ user: userProp }) {
 
   return (
     <div className="page-container">
+      {/* Call Alert Button - Fixed position for easy access (only shows for department heads) */}
+      <div className="fixed bottom-6 right-6 z-40">
+        <CallAlertButton user={user} />
+      </div>
+
       <CustomizableDashboard
         userId={user?._id || 'employee'}
         userRole={user?.role || 'employee'}

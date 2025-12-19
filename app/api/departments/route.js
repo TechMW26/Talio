@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import connectDB from '@/lib/mongodb'
 import Department from '@/models/Department'
 import Employee from '@/models/Employee'
+import { updateDepartmentHeadsForDepartment } from '@/lib/departmentHeadSync'
 
 // GET - List all departments
 export async function GET(request) {
@@ -62,6 +63,12 @@ export async function POST(request) {
     }
 
     const department = await Department.create(data)
+
+    // Sync department head status to User meta (fire and forget)
+    if (data.heads && data.heads.length > 0) {
+      updateDepartmentHeadsForDepartment(department._id.toString(), [], data.heads)
+        .catch(err => console.error('Error syncing department heads:', err));
+    }
 
     return NextResponse.json({
       success: true,

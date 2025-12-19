@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import connectDB from '@/lib/mongodb'
 import Department from '@/models/Department'
+import { updateDepartmentHeadsForDepartment } from '@/lib/departmentHeadSync'
 
 // GET - Get single department
 export async function GET(request, { params }) {
@@ -38,6 +39,29 @@ export async function PUT(request, { params }) {
 
     const data = await request.json()
     
+    // Get current department to compare heads
+    const currentDepartment = await Department.findById(params.id).lean()
+    if (!currentDepartment) {
+      return NextResponse.json(
+        { success: false, message: 'Department not found' },
+        { status: 404 }
+      )
+    }
+    
+    // Collect previous heads
+    const previousHeads = []
+    if (currentDepartment.head) {
+      previousHeads.push(currentDepartment.head.toString())
+    }
+    if (currentDepartment.heads && currentDepartment.heads.length > 0) {
+      currentDepartment.heads.forEach(h => {
+        const hStr = h.toString()
+        if (!previousHeads.includes(hStr)) {
+          previousHeads.push(hStr)
+        }
+      })
+    }
+    
     // Handle multiple heads - ensure backwards compatibility
     if (data.heads && data.heads.length > 0) {
       // Set the first head as the legacy 'head' field for backwards compatibility
@@ -55,12 +79,23 @@ export async function PUT(request, { params }) {
       .populate('head', 'firstName lastName employeeCode designation')
       .populate('heads', 'firstName lastName employeeCode designation')
 
-    if (!department) {
-      return NextResponse.json(
-        { success: false, message: 'Department not found' },
-        { status: 404 }
-      )
+    // Collect new heads
+    const newHeads = []
+    if (data.head) {
+      newHeads.push(data.head.toString())
     }
+    if (data.heads && data.heads.length > 0) {
+      data.heads.forEach(h => {
+        const hStr = h.toString()
+        if (!newHeads.includes(hStr)) {
+          newHeads.push(hStr)
+        }
+      })
+    }
+    
+    // Sync department head status to User meta (fire and forget)
+    updateDepartmentHeadsForDepartment(params.id, previousHeads, newHeads)
+      .catch(err => console.error('Error syncing department heads:', err))
 
     return NextResponse.json({
       success: true,
@@ -80,14 +115,36 @@ export async function PUT(request, { params }) {
 export async function DELETE(request, { params }) {
   try {
     await connectDB()
-
-    const department = await Department.findByIdAndDelete(params.id)
-
+    
+    // Get department to remove heads
+    const department = await Department.findById(params.id).lean()
     if (!department) {
       return NextResponse.json(
         { success: false, message: 'Department not found' },
         { status: 404 }
       )
+    }
+    
+    // Collect all heads to update their status
+    const previousHeads = []
+    if (department.head) {
+      previousHeads.push(department.head.toString())
+    }
+    if (department.heads && department.heads.length > 0) {
+      department.heads.forEach(h => {
+        const hStr = h.toString()
+        if (!previousHeads.includes(hStr)) {
+          previousHeads.push(hStr)
+        }
+      })
+    }
+
+    await Department.findByIdAndDelete(params.id)
+    
+    // Sync department head status - remove this department from heads (fire and forget)
+    if (previousHeads.length > 0) {
+      updateDepartmentHeadsForDepartment(params.id, previousHeads, [])
+        .catch(err => console.error('Error syncing department heads:', err))
     }
 
     return NextResponse.json({
