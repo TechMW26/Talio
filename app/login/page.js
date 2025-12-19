@@ -46,10 +46,26 @@ export default function LoginPage() {
     }
   }, [])
 
-  // Check if user is already logged in
+  // Check if user is already logged in or if setup is needed
   useEffect(() => {
     const checkSession = async () => {
       console.log('[Login Page] Checking session...')
+      
+      // First, check if initial setup is needed
+      try {
+        const setupResponse = await fetch('/api/setup/check')
+        const setupData = await setupResponse.json()
+        
+        if (setupData.success && setupData.needsSetup) {
+          console.log('[Login Page] Initial setup needed, redirecting to setup...')
+          window.location.href = '/setup'
+          return
+        }
+      } catch (setupError) {
+        console.error('[Login Page] Setup check error:', setupError)
+        // Continue with normal login flow if setup check fails
+      }
+      
       const token = localStorage.getItem('token')
       const user = localStorage.getItem('user')
 

@@ -6,7 +6,7 @@ export async function middleware(request) {
                 request.cookies.get('token')?.value
 
   // Public routes that don't require authentication
-  const publicRoutes = ['/', '/login', '/register', '/forgot-password', '/auth/forgot-password', '/auth/reset-password']
+  const publicRoutes = ['/', '/login', '/register', '/forgot-password', '/auth/forgot-password', '/auth/reset-password', '/setup']
   const publicApiRoutes = [
     '/api/auth/login',
     '/api/auth/register',
@@ -14,7 +14,9 @@ export async function middleware(request) {
     '/api/auth/forgot-password',
     '/api/auth/reset-password',
     '/api/auth/google/callback',
-    '/api/assetlinks'
+    '/api/assetlinks',
+    '/api/setup/check',
+    '/api/setup/create-admin'
   ]
 
   // Routes allowed during forced password change
