@@ -6,24 +6,46 @@ const store = new Store();
 /**
  * Screenshot Service
  * Captures full screen every minute and uploads when user is clocked in
+ * Enforces role-based capture restrictions
  */
 class ScreenshotService {
   constructor(options = {}) {
     this.apiUrl = options.apiUrl;
     this.clockStatusUrl = options.clockStatusUrl;
+    this.userInfoUrl = options.userInfoUrl;
     this.getAuthToken = options.getAuthToken || (() => store.get('authToken'));
+    this.getUserRole = options.getUserRole || (() => store.get('userRole'));
+    this.getUserId = options.getUserId || (() => store.get('userId'));
     this.interval = options.interval || 60000; // Default 1 minute
+    this.sessionManager = options.sessionManager;
+    this.offlineManager = options.offlineManager;
+    this.onCaptureComplete = options.onCaptureComplete;
+    
     this.intervalId = null;
     this.isRunning = false;
     this.isClockedIn = false;
-    this.wasClockedIn = false; // Track previous clock status for immediate capture
     this.lastClockCheck = 0;
     this.clockCheckInterval = 30000; // Check clock status every 30 seconds
-    this.retryQueue = []; // Queue for failed uploads
-    this.maxRetries = 3;
-    this.retryDelay = 5000; // 5 seconds between retries
     this.lastCaptureTime = 0;
     this.captureInProgress = false;
+    this.totalCaptures = 0;
+
+    // Role-based restrictions - CRITICAL
+    this.restrictedRoles = ['admin', 'god_admin'];
+  }
+
+  /**
+   * Check if current user's role allows capture
+   */
+  isRoleAllowed() {
+    const role = this.getUserRole();
+    const isRestricted = this.restrictedRoles.includes(role);
+    
+    if (isRestricted) {
+      console.log(`[ScreenshotService] Role '${role}' is restricted - capture disabled`);
+    }
+    
+    return !isRestricted;
   }
 
   /**
@@ -32,10 +54,16 @@ class ScreenshotService {
   start() {
     if (this.isRunning) return;
     
+    // CRITICAL: Check role restriction before starting
+    if (!this.isRoleAllowed()) {
+      console.log('[ScreenshotService] Cannot start - user role is restricted');
+      return;
+    }
+    
     this.isRunning = true;
     console.log('[ScreenshotService] Starting...');
     
-    // Initial clock status check - triggers immediate capture if clocked in
+    // Initial clock status check
     this.checkClockStatus().then(() => {
       if (this.isClockedIn) {
         console.log('[ScreenshotService] Already clocked in, taking immediate screenshot');
@@ -43,7 +71,7 @@ class ScreenshotService {
       }
     });
     
-    // Start interval for screenshots
+    // Start interval for screenshots (every 1 minute)
     this.intervalId = setInterval(() => {
       this.captureAndUpload();
     }, this.interval);
@@ -52,11 +80,6 @@ class ScreenshotService {
     this.clockCheckIntervalId = setInterval(() => {
       this.checkClockStatus();
     }, this.clockCheckInterval);
-
-    // Start retry processing
-    this.retryIntervalId = setInterval(() => {
-      this.processRetryQueue();
-    }, this.retryDelay);
   }
 
   /**
@@ -76,11 +99,6 @@ class ScreenshotService {
     if (this.clockCheckIntervalId) {
       clearInterval(this.clockCheckIntervalId);
       this.clockCheckIntervalId = null;
-    }
-
-    if (this.retryIntervalId) {
-      clearInterval(this.retryIntervalId);
-      this.retryIntervalId = null;
     }
   }
 
@@ -148,6 +166,12 @@ class ScreenshotService {
    * Capture screenshot and upload if clocked in
    */
   async captureAndUpload() {
+    // CRITICAL: Re-check role restriction on every capture
+    if (!this.isRoleAllowed()) {
+      console.log('[ScreenshotService] Capture blocked - role is restricted');
+      return;
+    }
+
     // Prevent concurrent captures
     if (this.captureInProgress) {
       console.log('[ScreenshotService] Capture already in progress, skipping');
@@ -181,11 +205,12 @@ class ScreenshotService {
     }
 
     this.captureInProgress = true;
+    const captureStartTime = Date.now();
 
     try {
       console.log('[ScreenshotService] Capturing screenshot...');
       
-      // Get all displays
+      // Get all displays for multi-monitor support
       const displays = screen.getAllDisplays();
       const primaryDisplay = screen.getPrimaryDisplay();
       
@@ -204,7 +229,7 @@ class ScreenshotService {
         return;
       }
 
-      // Capture primary screen
+      // Capture primary screen (or first available)
       const primarySource = sources.find(s => s.display_id === primaryDisplay.id.toString()) || sources[0];
       const thumbnail = primarySource.thumbnail;
       
@@ -214,17 +239,16 @@ class ScreenshotService {
         return;
       }
       
-      // Convert to WebP with compression using sharp (if available) or PNG
+      // Convert to WebP with compression
       let imageBuffer;
       let mimeType = 'image/webp';
       
       try {
-        // Try to use sharp for WebP compression
         const sharp = require('sharp');
         const pngBuffer = thumbnail.toPNG();
         
         imageBuffer = await sharp(pngBuffer)
-          .webp({ quality: 70, effort: 4 }) // Good balance of quality and compression
+          .webp({ quality: 70, effort: 4 })
           .toBuffer();
         
         console.log(`[ScreenshotService] Compressed to WebP: ${(imageBuffer.length / 1024).toFixed(1)}KB`);
@@ -236,12 +260,57 @@ class ScreenshotService {
         console.log(`[ScreenshotService] Using PNG: ${(imageBuffer.length / 1024).toFixed(1)}KB`);
       }
 
+      // Get session info
+      const userId = this.getUserId();
+      const sessionInfo = this.sessionManager?.getCurrentSessionInfo() || {};
+
       // Upload to server
-      await this.uploadScreenshot(imageBuffer, mimeType, token);
+      const uploadResult = await this.uploadScreenshot(imageBuffer, mimeType, token, userId, sessionInfo);
+      
+      // Record in session manager
+      if (uploadResult.success && this.sessionManager) {
+        const sessionResult = this.sessionManager.recordCapture({
+          path: uploadResult.path,
+          size: imageBuffer.length,
+          userId
+        });
+        console.log(`[ScreenshotService] Session #${sessionResult.sessionNumber}, Capture #${sessionResult.captureNumber}`);
+      }
+
       this.lastCaptureTime = Date.now();
+      this.totalCaptures++;
+      
+      // Notify callback
+      if (this.onCaptureComplete) {
+        this.onCaptureComplete({
+          success: true,
+          path: uploadResult.path,
+          timestamp: new Date().toISOString(),
+          captureTime: Date.now() - captureStartTime,
+          size: imageBuffer.length,
+          totalCaptures: this.totalCaptures
+        });
+      }
       
     } catch (error) {
       console.error('[ScreenshotService] Capture failed:', error.message);
+      
+      // If upload failed due to network, queue for later
+      if (this.offlineManager && error.message.includes('fetch')) {
+        try {
+          const userId = this.getUserId();
+          const sessionInfo = this.sessionManager?.getCurrentSessionInfo() || {};
+          
+          await this.offlineManager.addToQueue({
+            imageBuffer,
+            timestamp: Date.now().toString(),
+            userId,
+            sessionId: sessionInfo.sessionId
+          });
+        } catch (queueError) {
+          console.error('[ScreenshotService] Failed to queue capture:', queueError.message);
+        }
+      }
     } finally {
       this.captureInProgress = false;
     }
@@ -250,7 +319,7 @@ class ScreenshotService {
   /**
    * Upload screenshot to server
    */
-  async uploadScreenshot(imageBuffer, mimeType, token, retryCount = 0) {
+  async uploadScreenshot(imageBuffer, mimeType, token, userId, sessionInfo) {
     try {
       const timestamp = Date.now();
       
@@ -267,7 +336,10 @@ class ScreenshotService {
         },
         body: JSON.stringify({
           screenshot: base64Data,
-          timestamp: timestamp.toString()
+          timestamp: timestamp.toString(),
+          sessionId: sessionInfo.sessionId,
+          sessionNumber: sessionInfo.sessionNumber,
+          captureType: 'automatic'
         })
       });
 
@@ -279,57 +351,10 @@ class ScreenshotService {
       const data = await response.json();
       console.log(`[ScreenshotService] ✓ Uploaded successfully: ${data.path}`);
       
-      return data;
+      return { success: true, ...data };
     } catch (error) {
-      console.error(`[ScreenshotService] Upload failed (attempt ${retryCount + 1}):`, error.message);
-      
-      // Add to retry queue if not exceeded max retries
-      if (retryCount < this.maxRetries) {
-        this.retryQueue.push({
-          imageBuffer,
-          mimeType,
-          token,
-          retryCount: retryCount + 1,
-          timestamp: Date.now()
-        });
-        console.log(`[ScreenshotService] Added to retry queue (${this.retryQueue.length} pending)`);
-      } else {
-        console.error('[ScreenshotService] Max retries exceeded, discarding screenshot');
-        // Store failed uploads info for debugging
-        const failedUploads = store.get('failedUploads', []);
-        failedUploads.push({
-          timestamp: Date.now(),
-          error: error.message
-        });
-        // Keep only last 10 failed uploads
-        store.set('failedUploads', failedUploads.slice(-10));
-      }
-      
+      console.error(`[ScreenshotService] Upload failed:`, error.message);
       throw error;
-    }
-  }
-
-  /**
-   * Process retry queue for failed uploads
-   */
-  async processRetryQueue() {
-    if (this.retryQueue.length === 0) return;
-
-    const item = this.retryQueue.shift();
-    if (!item) return;
-
-    // Check if item is too old (more than 5 minutes)
-    if (Date.now() - item.timestamp > 5 * 60 * 1000) {
-      console.log('[ScreenshotService] Retry item too old, discarding');
-      return;
-    }
-
-    console.log(`[ScreenshotService] Processing retry queue (${this.retryQueue.length + 1} items)`);
-
-    try {
-      await this.uploadScreenshot(item.imageBuffer, item.mimeType, item.token, item.retryCount);
-    } catch (error) {
-      // Error already logged in uploadScreenshot
     }
   }
 
@@ -337,6 +362,12 @@ class ScreenshotService {
    * Force capture now (for debugging/testing)
    */
   async forceCapture() {
+    // CRITICAL: Check role restriction
+    if (!this.isRoleAllowed()) {
+      console.log('[ScreenshotService] Force capture blocked - role is restricted');
+      return { success: false, error: 'Role is restricted from screen capture' };
+    }
+
     console.log('[ScreenshotService] Force capture requested');
     const token = this.getAuthToken();
     if (!token) {
@@ -359,18 +390,60 @@ class ScreenshotService {
   }
 
   /**
+   * Capture for multi-monitor support
+   */
+  async captureAllDisplays() {
+    // CRITICAL: Check role restriction
+    if (!this.isRoleAllowed()) {
+      return { success: false, error: 'Role is restricted' };
+    }
+
+    const displays = screen.getAllDisplays();
+    const captures = [];
+
+    for (const display of displays) {
+      try {
+        const sources = await desktopCapturer.getSources({
+          types: ['screen'],
+          thumbnailSize: {
+            width: Math.floor(display.size.width * display.scaleFactor),
+            height: Math.floor(display.size.height * display.scaleFactor)
+          }
+        });
+
+        const source = sources.find(s => s.display_id === display.id.toString());
+        if (source && source.thumbnail && !source.thumbnail.isEmpty()) {
+          captures.push({
+            displayId: display.id,
+            thumbnail: source.thumbnail,
+            bounds: display.bounds,
+            scaleFactor: display.scaleFactor
+          });
+        }
+      } catch (error) {
+        console.error(`[ScreenshotService] Failed to capture display ${display.id}:`, error.message);
+      }
+    }
+
+    return captures;
+  }
+
+  /**
    * Get service status
    */
   getStatus() {
     return {
       isRunning: this.isRunning,
       isClockedIn: this.isClockedIn,
+      isRoleAllowed: this.isRoleAllowed(),
+      currentRole: this.getUserRole(),
+      restrictedRoles: this.restrictedRoles,
       lastClockCheck: this.lastClockCheck,
       lastCaptureTime: this.lastCaptureTime,
       captureInProgress: this.captureInProgress,
-      retryQueueLength: this.retryQueue.length,
       interval: this.interval,
-      failedUploads: store.get('failedUploads', [])
+      totalCaptures: this.totalCaptures,
+      offlineQueueLength: this.offlineManager?.getStatus()?.queueLength || 0
     };
   }
 }

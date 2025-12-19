@@ -1,7 +1,7 @@
 {
   "name": "talio-desktop",
-  "version": "1.0.0",
-  "description": "Talio Desktop Application",
+  "version": "2.0.0",
+  "description": "Talio Desktop Application - Productivity Monitoring & Screen Capture",
   "main": "src/main.js",
   "author": "Talio",
   "license": "MIT",
@@ -102,7 +102,8 @@
   },
   "dependencies": {
     "electron-store": "^8.1.0",
-    "sharp": "^0.33.2"
+    "sharp": "^0.33.2",
+    "uuid": "^9.0.0"
   },
   "devDependencies": {
     "cross-env": "^7.0.3",

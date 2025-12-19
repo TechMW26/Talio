@@ -44,7 +44,21 @@ const ProductivitySessionSchema = new mongoose.Schema({
       type: Date,
       required: true
     },
-    filename: String
+    filename: String,
+    captureType: {
+      type: String,
+      enum: ['automatic', 'manual'],
+      default: 'automatic'
+    },
+    isOfflineCapture: {
+      type: Boolean,
+      default: false
+    },
+    capturedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    capturedByRole: String
   }],
   
   // Time range

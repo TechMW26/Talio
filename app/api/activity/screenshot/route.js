@@ -3,8 +3,14 @@ import { jwtVerify } from 'jose';
 import { writeFile, mkdir, access, constants } from 'fs/promises';
 import path from 'path';
 import { optimizeScreenshot } from '@/lib/imageOptimization';
+import connectDB from '@/lib/mongodb';
+import User from '@/models/User';
+import ProductivitySession from '@/models/ProductivitySession';
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
+
+// Roles that are restricted from having their screens captured
+const RESTRICTED_ROLES = ['admin', 'god_admin'];
 
 /**
  * Ensure directory exists with proper permissions
@@ -29,6 +35,7 @@ async function ensureDirectory(dirPath) {
  * POST /api/activity/screenshot
  * Receive and save screenshots from desktop app
  * Saves to: public/activity/{userId}/{date}/{timestamp}.webp
+ * Enforces role-based restrictions
  */
 export async function POST(request) {
   const startTime = Date.now();
@@ -58,6 +65,7 @@ export async function POST(request) {
     }
     
     const userId = decoded.payload.userId;
+    const userRole = decoded.payload.role;
 
     if (!userId) {
       console.log('[Screenshot] No userId in token');
@@ -67,7 +75,16 @@ export async function POST(request) {
       );
     }
 
-    let screenshot, timestamp;
+    // CRITICAL: Check if user's role is restricted from capture
+    if (RESTRICTED_ROLES.includes(userRole)) {
+      console.log(`[Screenshot] BLOCKED - User role '${userRole}' is restricted from capture`);
+      return NextResponse.json(
+        { error: 'Screen capture is disabled for admin accounts', restricted: true },
+        { status: 403 }
+      );
+    }
+
+    let screenshot, timestamp, sessionId, sessionNumber, captureType, isOfflineCapture;
     const contentType = request.headers.get('content-type') || '';
 
     // Handle both FormData and JSON body
@@ -75,10 +92,18 @@ export async function POST(request) {
       const formData = await request.formData();
       screenshot = formData.get('screenshot');
       timestamp = formData.get('timestamp') || Date.now().toString();
+      sessionId = formData.get('sessionId');
+      sessionNumber = formData.get('sessionNumber');
+      captureType = formData.get('captureType') || 'automatic';
+      isOfflineCapture = formData.get('isOfflineCapture') === 'true';
     } else {
       const body = await request.json();
       screenshot = body.screenshot;
       timestamp = body.timestamp || Date.now().toString();
+      sessionId = body.sessionId;
+      sessionNumber = body.sessionNumber;
+      captureType = body.captureType || 'automatic';
+      isOfflineCapture = body.isOfflineCapture || false;
     }
 
     if (!screenshot) {
@@ -157,13 +182,63 @@ export async function POST(request) {
 
     console.log(`[Screenshot] ✓ Saved: ${relativePath} (${(buffer.length / 1024).toFixed(1)}KB, ${elapsed}ms)`);
 
+    // Update or create session in database
+    try {
+      await connectDB();
+      
+      const user = await User.findById(userId).select('employeeId');
+      const dateObj = new Date(parseInt(timestamp));
+      const dateStart = new Date(dateObj);
+      dateStart.setHours(0, 0, 0, 0);
+      const dateEnd = new Date(dateObj);
+      dateEnd.setHours(23, 59, 59, 999);
+      
+      // Find or create session
+      let session = await ProductivitySession.findOne({
+        user: userId,
+        date: { $gte: dateStart, $lte: dateEnd },
+        sessionNumber: sessionNumber ? parseInt(sessionNumber) : 1
+      });
+      
+      if (!session) {
+        // Create new session
+        session = new ProductivitySession({
+          user: userId,
+          employee: user?.employeeId,
+          date: dateStart,
+          sessionNumber: sessionNumber ? parseInt(sessionNumber) : 1,
+          screenshots: [],
+          startTime: dateObj,
+          endTime: dateObj
+        });
+      }
+      
+      // Add screenshot to session
+      session.screenshots.push({
+        path: relativePath,
+        timestamp: dateObj,
+        filename: fileName,
+        captureType: captureType || 'automatic',
+        isOfflineCapture: isOfflineCapture || false
+      });
+      
+      session.endTime = dateObj;
+      await session.save();
+      
+    } catch (dbError) {
+      console.error('[Screenshot] Database update error:', dbError.message);
+      // Don't fail the request - file was saved successfully
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Screenshot saved successfully',
       path: relativePath,
       timestamp: date.toISOString(),
       userId,
-      size: buffer.length
+      size: buffer.length,
+      sessionId,
+      captureType
     });
 
   } catch (error) {

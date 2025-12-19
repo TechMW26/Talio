@@ -4,7 +4,9 @@ const { contextBridge, ipcRenderer } = require('electron');
  * Preload script
  * Exposes safe APIs to the renderer process for:
  * - Authentication token management
- * - Screen sharing for meetings
+ * - Screen capture control
+ * - Session management
+ * - Role-based restrictions
  * - Platform detection
  */
 
@@ -24,6 +26,10 @@ contextBridge.exposeInMainWorld('talioDesktop', {
   getUserId: () => ipcRenderer.invoke('get-user-id'),
   setUserId: (userId) => ipcRenderer.invoke('set-user-id', userId),
   
+  // User role management
+  getUserRole: () => ipcRenderer.invoke('get-user-role'),
+  setUserRole: (role) => ipcRenderer.invoke('set-user-role', role),
+  
   // Request screen capture permission (triggers native dialog on macOS)
   requestScreenCapturePermission: () => ipcRenderer.invoke('request-screen-capture-permission'),
   
@@ -40,13 +46,29 @@ contextBridge.exposeInMainWorld('talioDesktop', {
   
   // Permission management
   requestAllPermissions: () => ipcRenderer.invoke('request-all-permissions'),
-  getPermissionStatus: () => ipcRenderer.invoke('get-permission-status')
+  getPermissionStatus: () => ipcRenderer.invoke('get-permission-status'),
+  
+  // Session management
+  getSessionInfo: () => ipcRenderer.invoke('get-session-info'),
+  
+  // Role-based capture restrictions
+  getCaptureRestrictions: () => ipcRenderer.invoke('get-capture-restrictions'),
+  
+  // Manual capture request (for Admin/Dept Head to capture others)
+  requestManualCapture: (targetUserId) => ipcRenderer.invoke('request-manual-capture', targetUserId),
+  
+  // Event listeners for capture notifications
+  onCaptureComplete: (callback) => {
+    ipcRenderer.on('capture-complete', (event, data) => callback(data));
+  },
+  
+  // Remove capture listener
+  removeCaptureListener: () => {
+    ipcRenderer.removeAllListeners('capture-complete');
+  }
 });
 
 // Intercept localStorage to sync auth tokens with main process
-const originalSetItem = window.localStorage?.setItem;
-const originalGetItem = window.localStorage?.getItem;
-
 if (typeof window !== 'undefined') {
   // Wait for DOM to be ready
   window.addEventListener('DOMContentLoaded', () => {
@@ -69,10 +91,15 @@ if (typeof window !== 'undefined') {
           const userData = JSON.parse(value);
           if (userData._id) {
             ipcRenderer.invoke('set-user-id', userData._id);
-            // User data also indicates login
-            console.log('[Talio Desktop] User data set in localStorage');
-            ipcRenderer.invoke('notify-login-success');
+            console.log('[Talio Desktop] User ID set:', userData._id);
           }
+          if (userData.role) {
+            ipcRenderer.invoke('set-user-role', userData.role);
+            console.log('[Talio Desktop] User role set:', userData.role);
+          }
+          // User data also indicates login
+          console.log('[Talio Desktop] User data set in localStorage');
+          ipcRenderer.invoke('notify-login-success');
         } catch {
           // Ignore parse errors
         }
@@ -97,6 +124,9 @@ if (typeof window !== 'undefined') {
         if (userData._id) {
           ipcRenderer.invoke('set-user-id', userData._id);
         }
+        if (userData.role) {
+          ipcRenderer.invoke('set-user-role', userData.role);
+        }
       } catch {
         // Ignore parse errors
       }
@@ -111,6 +141,9 @@ if (typeof window !== 'undefined') {
       /* Hide elements that are browser-specific */
       .browser-only { display: none !important; }
       
+      /* Show desktop-only elements */
+      .desktop-only { display: block !important; }
+      
       /* Optimize for desktop app */
       body.talio-desktop-app {
         overflow-x: hidden;
@@ -123,11 +156,88 @@ if (typeof window !== 'undefined') {
         -webkit-user-select: none;
         user-select: none;
       }
+      
+      /* Capture status indicator */
+      .capture-status-indicator {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-size: 12px;
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      
+      .capture-status-indicator .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #22c55e;
+        animation: pulse 2s ease-in-out infinite;
+      }
+      
+      .capture-status-indicator.restricted .dot {
+        background: #6b7280;
+        animation: none;
+      }
+      
+      @keyframes pulse {
+        0%, 100% { opacity: 1; transform: scale(1); }
+        50% { opacity: 0.5; transform: scale(0.9); }
+      }
     `;
     document.head.appendChild(style);
 
+    // Create capture status indicator
+    createCaptureStatusIndicator();
+
     console.log('[Talio Desktop] Preload script initialized');
   });
+}
+
+/**
+ * Create a visual indicator for capture status
+ */
+function createCaptureStatusIndicator() {
+  // Wait a bit for the app to fully load
+  setTimeout(async () => {
+    const indicator = document.createElement('div');
+    indicator.className = 'capture-status-indicator';
+    indicator.id = 'talio-capture-indicator';
+    indicator.innerHTML = `
+      <span class="dot"></span>
+      <span class="text">Screen Capture Active</span>
+    `;
+    
+    // Check if capture is restricted
+    try {
+      const restrictions = await ipcRenderer.invoke('get-capture-restrictions');
+      if (restrictions.isRestricted) {
+        indicator.classList.add('restricted');
+        indicator.querySelector('.text').textContent = 'Capture Disabled (Admin)';
+      }
+    } catch (e) {
+      console.log('[Talio Desktop] Could not check capture restrictions');
+    }
+    
+    document.body.appendChild(indicator);
+    
+    // Update indicator on capture events
+    ipcRenderer.on('capture-complete', (event, data) => {
+      const textEl = indicator.querySelector('.text');
+      if (textEl) {
+        textEl.textContent = `Last capture: ${new Date().toLocaleTimeString()}`;
+        setTimeout(() => {
+          textEl.textContent = 'Screen Capture Active';
+        }, 3000);
+      }
+    });
+  }, 5000);
 }
 
 // Handle screen sharing for meetings

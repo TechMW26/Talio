@@ -12,8 +12,12 @@ import {
   HiOutlinePhoto,
   HiOutlineClock,
   HiOutlineXMark,
-  HiOutlineArrowPath
+  HiOutlineArrowPath,
+  HiOutlineCamera,
+  HiOutlineSquares2X2
 } from 'react-icons/hi2'
+import RawCaptureViewer from '@/components/productivity/RawCaptureViewer'
+import ManualCapturePanel from '@/components/productivity/ManualCapturePanel'
 
 export default function ProductivityPage() {
   const [user, setUser] = useState(null)
@@ -26,6 +30,7 @@ export default function ProductivityPage() {
   const [analyzing, setAnalyzing] = useState(false)
   const [canViewTeam, setCanViewTeam] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [viewMode, setViewMode] = useState('sessions') // 'sessions', 'raw', 'manual'
 
   // Get user from localStorage
   useEffect(() => {
@@ -215,6 +220,61 @@ export default function ProductivityPage() {
         </div>
       )}
 
+      {/* View Mode Tabs */}
+      <div className="flex flex-wrap gap-2 mb-4 sm:mb-6 bg-gray-100 p-1 rounded-xl">
+        <button
+          onClick={() => setViewMode('sessions')}
+          className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition flex-1 sm:flex-initial ${
+            viewMode === 'sessions'
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <HiOutlineSquares2X2 className="w-4 h-4" />
+          <span className="hidden sm:inline">Sessions</span>
+        </button>
+        <button
+          onClick={() => setViewMode('raw')}
+          className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition flex-1 sm:flex-initial ${
+            viewMode === 'raw'
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <HiOutlinePhoto className="w-4 h-4" />
+          <span className="hidden sm:inline">Raw Captures</span>
+          <span className="sm:hidden">Raw</span>
+        </button>
+        {canViewTeam && (
+          <button
+            onClick={() => setViewMode('manual')}
+            className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition flex-1 sm:flex-initial ${
+              viewMode === 'manual'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <HiOutlineCamera className="w-4 h-4" />
+            <span className="hidden sm:inline">Manual Capture</span>
+            <span className="sm:hidden">Manual</span>
+          </button>
+        )}
+      </div>
+
+      {/* Raw Capture View */}
+      {viewMode === 'raw' && (
+        <RawCaptureViewer date={selectedDate} showFilters={true} />
+      )}
+
+      {/* Manual Capture View */}
+      {viewMode === 'manual' && canViewTeam && (
+        <ManualCapturePanel />
+      )}
+
+      {/* Sessions View */}
+      {viewMode === 'sessions' && (
+        <>
+
       {/* My Activity Tab */}
       {activeTab === 'my' && (
         <>
@@ -371,6 +431,8 @@ export default function ProductivityPage() {
             ))
           )}
         </div>
+      )}
+      </>
       )}
 
       {/* Session Detail Modal */}
