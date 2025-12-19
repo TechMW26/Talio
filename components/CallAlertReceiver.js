@@ -1,38 +1,42 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { FaPhoneAlt, FaTimes, FaVolumeUp, FaVolumeMute, FaCheck, FaUser } from 'react-icons/fa';
+import { FaPhoneAlt, FaTimes, FaVolumeUp, FaVolumeMute, FaCheck, FaUser, FaExclamationTriangle } from 'react-icons/fa';
 import { useSocket } from '@/contexts/SocketContext';
 import toast from 'react-hot-toast';
 
-// Alert sound URL - using existing notification sound, played in loop for urgency
+// Alert sound URL - using existing notification sound
 const ALERT_SOUND_URL = '/sounds/notification.mp3';
 
-// Priority-based styling
-const priorityStyles = {
+// Priority-based styling matching project theme
+const priorityConfig = {
   low: {
-    bg: 'bg-gray-100',
-    border: 'border-gray-400',
-    text: 'text-gray-800',
-    pulse: ''
+    headerBg: 'bg-gray-500',
+    iconBg: 'bg-gray-100',
+    iconColor: 'text-gray-600',
+    buttonBg: 'modal-btn-secondary',
+    badgeBg: 'bg-gray-100 text-gray-700',
   },
   medium: {
-    bg: 'bg-blue-100',
-    border: 'border-blue-500',
-    text: 'text-blue-800',
-    pulse: ''
+    headerBg: 'bg-blue-500',
+    iconBg: 'bg-blue-100',
+    iconColor: 'text-blue-600',
+    buttonBg: 'modal-btn-primary',
+    badgeBg: 'bg-blue-100 text-blue-700',
   },
   high: {
-    bg: 'bg-orange-100',
-    border: 'border-orange-500',
-    text: 'text-orange-800',
-    pulse: 'animate-pulse'
+    headerBg: 'bg-orange-500',
+    iconBg: 'bg-orange-100',
+    iconColor: 'text-orange-600',
+    buttonBg: 'modal-btn-primary',
+    badgeBg: 'bg-orange-100 text-orange-700',
   },
   urgent: {
-    bg: 'bg-red-100',
-    border: 'border-red-500',
-    text: 'text-red-800',
-    pulse: 'animate-pulse'
+    headerBg: 'bg-red-500',
+    iconBg: 'bg-red-100',
+    iconColor: 'text-red-600',
+    buttonBg: 'modal-btn-danger',
+    badgeBg: 'bg-red-100 text-red-700',
   }
 };
 
@@ -41,6 +45,7 @@ export default function CallAlertReceiver() {
   const [activeAlert, setActiveAlert] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioError, setAudioError] = useState(false);
+  const [acknowledging, setAcknowledging] = useState(false);
   
   const alertAudioRef = useRef(null);
   const voiceAudioRef = useRef(null);
@@ -159,6 +164,7 @@ export default function CallAlertReceiver() {
     if (!activeAlert?.alertId) return;
 
     try {
+      setAcknowledging(true);
       const token = localStorage.getItem('token');
       const response = await fetch(`/api/call-alert/${activeAlert.alertId}/acknowledge`, {
         method: 'POST',
@@ -181,6 +187,8 @@ export default function CallAlertReceiver() {
     } catch (error) {
       console.error('[CallAlert] Error acknowledging alert:', error);
       toast.error('Failed to acknowledge alert');
+    } finally {
+      setAcknowledging(false);
     }
   }, [activeAlert]);
 
@@ -235,83 +243,85 @@ export default function CallAlertReceiver() {
   // Don't render if no active alert
   if (!activeAlert) return null;
 
-  const styles = priorityStyles[activeAlert.priority] || priorityStyles.medium;
+  const config = priorityConfig[activeAlert.priority] || priorityConfig.medium;
 
   return (
     <>
-      {/* Full-screen overlay for urgent alerts */}
+      {/* Urgent alert overlay effect */}
       {activeAlert.priority === 'urgent' && (
-        <div className="fixed inset-0 bg-red-900/20 z-40 animate-pulse pointer-events-none" />
+        <div className="fixed inset-0 bg-red-500/10 z-[99997] animate-pulse pointer-events-none" />
       )}
 
-      {/* Alert Modal */}
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={acknowledgeAlert} />
+      {/* Modal using project's unified modal system */}
+      <div className="modal-overlay" style={{ zIndex: 99999 }}>
+        <div className="modal-backdrop" />
         
-        <div className={`relative w-full max-w-md ${styles.bg} ${styles.border} border-2 rounded-2xl shadow-2xl overflow-hidden ${styles.pulse}`}>
-          {/* Animated Header */}
-          <div className={`relative px-6 py-4 ${
-            activeAlert.priority === 'urgent' ? 'bg-red-500' :
-            activeAlert.priority === 'high' ? 'bg-orange-500' :
-            activeAlert.priority === 'medium' ? 'bg-blue-500' : 'bg-gray-500'
-          } text-white`}>
-            <div className="absolute inset-0 overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 animate-shimmer" />
+        <div className="modal-container modal-md" style={{ overflow: 'visible' }}>
+          {/* Header with priority color */}
+          <div className={`modal-header ${config.headerBg}`} style={{ borderBottom: 'none' }}>
+            <div className="flex items-center gap-3 text-white">
+              <div className="p-2.5 bg-white/20 rounded-lg animate-pulse">
+                <FaPhoneAlt className="text-xl" />
+              </div>
+              <div>
+                <h3 className="modal-title text-white">Incoming Alert</h3>
+                <span className={`inline-block mt-1 px-2 py-0.5 text-xs rounded-full font-medium bg-white/20 text-white capitalize`}>
+                  {activeAlert.priority} Priority
+                </span>
+              </div>
             </div>
             
-            <div className="relative flex items-center gap-3">
-              <div className="p-3 bg-white/20 rounded-full animate-bounce">
-                <FaPhoneAlt className="text-2xl" />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold">Incoming Alert</h2>
-                <p className="text-sm opacity-90 capitalize">{activeAlert.priority} Priority</p>
-              </div>
-            </div>
+            {/* Queue indicator */}
+            {alertQueue.current.length > 0 && (
+              <span className="px-2 py-1 bg-white/20 text-white text-xs rounded-full font-medium">
+                +{alertQueue.current.length} queued
+              </span>
+            )}
           </div>
 
-          {/* Content */}
-          <div className="p-6 space-y-4">
-            {/* Sender Info */}
-            <div className="flex items-center gap-3 p-3 bg-white/50 dark:bg-gray-800/50 rounded-lg">
-              <div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                <FaUser className="text-xl text-gray-500" />
+          {/* Body */}
+          <div className="modal-body space-y-4">
+            {/* Sender Info Card */}
+            <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg border border-gray-100">
+              <div className={`w-14 h-14 rounded-full ${config.iconBg} flex items-center justify-center`}>
+                <FaUser className={`text-2xl ${config.iconColor}`} />
               </div>
-              <div>
-                <p className="font-semibold text-gray-900 dark:text-white">
-                  {activeAlert.sender?.name || 'Unknown'}
+              <div className="flex-1">
+                <p className="font-semibold text-gray-900 text-lg">
+                  {activeAlert.sender?.name || 'Unknown Sender'}
                 </p>
-                <p className="text-sm text-gray-600 dark:text-gray-400 capitalize">
+                <p className="text-sm text-gray-500 capitalize">
                   {activeAlert.sender?.role?.replace('_', ' ') || 'Team Member'}
                 </p>
               </div>
             </div>
 
-            {/* Message */}
-            <div className="p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-              <p className="text-gray-800 dark:text-gray-200 leading-relaxed">
+            {/* Message Card */}
+            <div className="p-4 bg-white rounded-lg border border-gray-200">
+              <p className="text-sm font-medium text-gray-500 mb-2">Message:</p>
+              <p className="text-gray-800 leading-relaxed text-base">
                 {activeAlert.message}
               </p>
             </div>
 
             {/* Audio Controls */}
             {activeAlert.voiceEnabled && (
-              <div className="flex items-center justify-center gap-4">
+              <div className="flex items-center justify-center gap-3 py-2">
                 {isPlaying ? (
                   <button
                     onClick={stopAudio}
-                    className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+                    className="modal-btn flex items-center gap-2 bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
                   >
                     <FaVolumeMute />
-                    Stop Audio
+                    <span>Stop Audio</span>
                   </button>
                 ) : (
                   <button
                     onClick={replayAudio}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors"
+                    className="modal-btn flex items-center gap-2 bg-green-50 text-green-700 border border-green-200 hover:bg-green-100"
                   >
                     <FaVolumeUp />
-                    {audioError ? 'Retry Audio' : 'Replay Audio'}
+                    <span>{audioError ? 'Retry Audio' : 'Replay Audio'}</span>
                   </button>
                 )}
               </div>
@@ -319,53 +329,47 @@ export default function CallAlertReceiver() {
 
             {/* Audio Error Message */}
             {audioError && (
-              <p className="text-center text-sm text-red-600 dark:text-red-400">
-                Voice playback failed. Please read the message above.
-              </p>
+              <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-100 rounded-lg text-sm text-red-600">
+                <FaExclamationTriangle />
+                <span>Voice playback failed. Please read the message above.</span>
+              </div>
             )}
 
             {/* Timestamp */}
-            <p className="text-center text-xs text-gray-500 dark:text-gray-400">
-              Received at {new Date(activeAlert.timestamp).toLocaleTimeString()}
+            <p className="text-center text-xs text-gray-400">
+              Received at {new Date(activeAlert.timestamp).toLocaleTimeString([], { 
+                hour: '2-digit', 
+                minute: '2-digit',
+                hour12: true 
+              })}
             </p>
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700">
+          <div className="modal-footer">
             <button
               onClick={acknowledgeAlert}
-              className={`w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-semibold text-white transition-all ${
-                activeAlert.priority === 'urgent' 
-                  ? 'bg-red-500 hover:bg-red-600' 
-                  : activeAlert.priority === 'high'
-                  ? 'bg-orange-500 hover:bg-orange-600'
-                  : 'bg-blue-500 hover:bg-blue-600'
-              }`}
+              disabled={acknowledging}
+              className={`modal-btn ${config.buttonBg} w-full flex items-center justify-center gap-2`}
+              style={activeAlert.priority !== 'low' && activeAlert.priority !== 'urgent' ? {
+                background: 'linear-gradient(135deg, var(--color-primary-500) 0%, var(--color-primary-600) 100%)'
+              } : {}}
             >
-              <FaCheck />
-              Acknowledge Alert
+              {acknowledging ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white"></div>
+                  <span>Acknowledging...</span>
+                </>
+              ) : (
+                <>
+                  <FaCheck />
+                  <span>Acknowledge Alert</span>
+                </>
+              )}
             </button>
           </div>
-
-          {/* Queue indicator */}
-          {alertQueue.current.length > 0 && (
-            <div className="absolute top-2 right-2 px-2 py-1 bg-black/50 text-white text-xs rounded-full">
-              +{alertQueue.current.length} queued
-            </div>
-          )}
         </div>
       </div>
-
-      {/* Add shimmer animation */}
-      <style jsx>{`
-        @keyframes shimmer {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-        .animate-shimmer {
-          animation: shimmer 2s infinite;
-        }
-      `}</style>
     </>
   );
 }
