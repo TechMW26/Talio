@@ -1,7 +1,14 @@
 const Store = require('electron-store');
-const { v4: uuidv4 } = require('uuid');
+const { randomBytes } = require('crypto');
 
 const store = new Store();
+
+/**
+ * Generate a simple unique ID
+ */
+function generateId() {
+  return `${Date.now()}-${randomBytes(4).toString('hex')}`;
+}
 
 /**
  * Session Manager
@@ -17,36 +24,36 @@ class SessionManager {
   }
 
   /**
-   * Start a new session for the user
+   * Start a new session
    */
   startNewSession(userId) {
     this.userId = userId;
     
-    // Check if there's an existing active session
+    // Check for existing active session
     if (this.currentSession && !this.currentSession.isComplete) {
       const elapsed = Date.now() - new Date(this.currentSession.startTime).getTime();
       const minutesElapsed = elapsed / (1000 * 60);
       
-      // If less than 30 minutes have passed and not complete, continue it
       if (minutesElapsed < this.sessionDuration) {
-        console.log(`[SessionManager] Resuming existing session ${this.currentSession.sessionId}`);
+        console.log(`[Session] Resuming session #${this.currentSession.sessionNumber}`);
         return this.currentSession;
       }
     }
 
-    // End previous session if exists
+    // End previous session
     if (this.currentSession) {
       this.endSession();
     }
 
-    // Create new session
+    // Count today's sessions
     const today = new Date().toISOString().split('T')[0];
     const todaySessions = this.sessions.filter(s => 
       s.date === today && s.userId === userId
     );
     
+    // Create new session
     this.currentSession = {
-      sessionId: uuidv4(),
+      sessionId: generateId(),
       userId,
       date: today,
       sessionNumber: todaySessions.length + 1,
@@ -54,111 +61,73 @@ class SessionManager {
       endTime: null,
       captures: [],
       captureCount: 0,
-      isComplete: false,
-      metadata: {
-        platform: process.platform,
-        appVersion: require('electron').app?.getVersion() || '1.0.0'
-      }
+      isComplete: false
     };
 
-    console.log(`[SessionManager] Started new session #${this.currentSession.sessionNumber} (${this.currentSession.sessionId})`);
+    console.log(`[Session] Started session #${this.currentSession.sessionNumber}`);
     
-    // Save to store
     this.sessions.push(this.currentSession);
-    store.set('sessions', this.sessions);
+    this.saveSessions();
     
     return this.currentSession;
   }
 
   /**
-   * Record a capture in the current session
+   * Record a capture
    */
   recordCapture(captureData) {
     if (!this.currentSession) {
-      console.log('[SessionManager] No active session, starting new one');
       this.startNewSession(this.userId || captureData.userId);
     }
 
-    // Check if session is complete (30 captures)
+    // Check if session needs rotation
     if (this.currentSession.captureCount >= this.capturesPerSession) {
-      console.log('[SessionManager] Session complete, starting new session');
+      console.log('[Session] 30 captures reached, rotating session');
       this.startNewSession(this.userId);
     }
 
-    // Check if session has exceeded 30 minutes
+    // Check session time limit
     const elapsed = Date.now() - new Date(this.currentSession.startTime).getTime();
-    const minutesElapsed = elapsed / (1000 * 60);
-    if (minutesElapsed >= this.sessionDuration) {
-      console.log('[SessionManager] Session time exceeded, starting new session');
+    if (elapsed >= this.sessionDuration * 60 * 1000) {
+      console.log('[Session] 30 minutes elapsed, rotating session');
       this.startNewSession(this.userId);
     }
 
-    // Add capture to session
-    const capture = {
+    // Record capture
+    this.currentSession.captures.push({
       timestamp: new Date().toISOString(),
-      path: captureData.path,
-      size: captureData.size,
-      captureNumber: this.currentSession.captureCount + 1
-    };
-
-    this.currentSession.captures.push(capture);
+      localPath: captureData.localPath,
+      size: captureData.size
+    });
+    
     this.currentSession.captureCount++;
-    this.currentSession.lastCaptureTime = capture.timestamp;
+    this.currentSession.endTime = new Date().toISOString();
 
-    // Check if session is now complete
+    // Mark complete if 30 captures
     if (this.currentSession.captureCount >= this.capturesPerSession) {
       this.currentSession.isComplete = true;
-      this.currentSession.endTime = new Date().toISOString();
-      console.log(`[SessionManager] Session #${this.currentSession.sessionNumber} completed with ${this.currentSession.captureCount} captures`);
     }
 
-    // Update in store
-    const sessionIndex = this.sessions.findIndex(s => s.sessionId === this.currentSession.sessionId);
-    if (sessionIndex !== -1) {
-      this.sessions[sessionIndex] = this.currentSession;
-    }
-    store.set('sessions', this.sessions);
+    this.saveSessions();
 
     return {
       sessionId: this.currentSession.sessionId,
       sessionNumber: this.currentSession.sessionNumber,
-      captureNumber: capture.captureNumber,
-      isComplete: this.currentSession.isComplete
+      captureNumber: this.currentSession.captureCount
     };
   }
 
   /**
-   * End the current session
+   * End current session
    */
   endSession() {
-    if (!this.currentSession) return;
-
-    this.currentSession.endTime = new Date().toISOString();
-    this.currentSession.isComplete = true;
-
-    // Update in store
-    const sessionIndex = this.sessions.findIndex(s => s.sessionId === this.currentSession.sessionId);
-    if (sessionIndex !== -1) {
-      this.sessions[sessionIndex] = this.currentSession;
+    if (this.currentSession) {
+      this.currentSession.endTime = new Date().toISOString();
+      this.currentSession.isComplete = true;
+      this.saveSessions();
+      console.log(`[Session] Ended session #${this.currentSession.sessionNumber} with ${this.currentSession.captureCount} captures`);
     }
-    store.set('sessions', this.sessions);
-
-    console.log(`[SessionManager] Session #${this.currentSession.sessionNumber} ended with ${this.currentSession.captureCount} captures`);
-    
     this.currentSession = null;
-  }
-
-  /**
-   * Check if there's an active session
-   */
-  isSessionActive() {
-    if (!this.currentSession) return false;
-    
-    // Check if session time has exceeded
-    const elapsed = Date.now() - new Date(this.currentSession.startTime).getTime();
-    const minutesElapsed = elapsed / (1000 * 60);
-    
-    return !this.currentSession.isComplete && minutesElapsed < this.sessionDuration;
   }
 
   /**
@@ -167,64 +136,67 @@ class SessionManager {
   getCurrentSessionInfo() {
     if (!this.currentSession) {
       return {
-        active: false,
-        sessionNumber: null,
+        sessionId: null,
+        sessionNumber: 0,
         captureCount: 0,
-        remainingCaptures: 30,
-        timeElapsed: 0,
-        timeRemaining: 30
+        isActive: false
       };
     }
 
-    const elapsed = Date.now() - new Date(this.currentSession.startTime).getTime();
-    const minutesElapsed = Math.floor(elapsed / (1000 * 60));
-    const minutesRemaining = Math.max(0, this.sessionDuration - minutesElapsed);
-
     return {
-      active: this.isSessionActive(),
       sessionId: this.currentSession.sessionId,
       sessionNumber: this.currentSession.sessionNumber,
       captureCount: this.currentSession.captureCount,
-      remainingCaptures: this.capturesPerSession - this.currentSession.captureCount,
-      timeElapsed: minutesElapsed,
-      timeRemaining: minutesRemaining,
       startTime: this.currentSession.startTime,
       isComplete: this.currentSession.isComplete,
-      date: this.currentSession.date
+      isActive: !this.currentSession.isComplete
     };
   }
 
   /**
-   * Get sessions for a specific date
+   * Check if session is active
    */
-  getSessionsForDate(date, userId) {
-    const dateStr = typeof date === 'string' ? date : date.toISOString().split('T')[0];
-    return this.sessions.filter(s => s.date === dateStr && s.userId === userId);
+  isSessionActive() {
+    return this.currentSession && !this.currentSession.isComplete;
   }
 
   /**
-   * Get all sessions for a user
+   * Save sessions to store
    */
-  getUserSessions(userId) {
-    return this.sessions.filter(s => s.userId === userId);
-  }
-
-  /**
-   * Clean up old sessions (older than 7 days)
-   */
-  cleanupOldSessions() {
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - 7);
-    const cutoffStr = cutoffDate.toISOString().split('T')[0];
-
-    const originalCount = this.sessions.length;
-    this.sessions = this.sessions.filter(s => s.date >= cutoffStr);
+  saveSessions() {
+    // Only keep last 7 days of sessions
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    const cutoffDate = sevenDaysAgo.toISOString().split('T')[0];
+    
+    this.sessions = this.sessions.filter(s => s.date >= cutoffDate);
     store.set('sessions', this.sessions);
+  }
 
-    const removedCount = originalCount - this.sessions.length;
-    if (removedCount > 0) {
-      console.log(`[SessionManager] Cleaned up ${removedCount} old sessions`);
-    }
+  /**
+   * Get sessions for a date
+   */
+  getSessionsForDate(date) {
+    const dateStr = typeof date === 'string' ? date : date.toISOString().split('T')[0];
+    return this.sessions.filter(s => 
+      s.date === dateStr && s.userId === this.userId
+    );
+  }
+
+  /**
+   * Get today's stats
+   */
+  getTodayStats() {
+    const today = new Date().toISOString().split('T')[0];
+    const todaySessions = this.getSessionsForDate(today);
+    
+    return {
+      date: today,
+      totalSessions: todaySessions.length,
+      totalCaptures: todaySessions.reduce((sum, s) => sum + s.captureCount, 0),
+      completedSessions: todaySessions.filter(s => s.isComplete).length,
+      currentSession: this.getCurrentSessionInfo()
+    };
   }
 }
 

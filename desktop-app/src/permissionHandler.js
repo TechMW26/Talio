@@ -1,111 +1,105 @@
-const { systemPreferences, dialog, desktopCapturer, Notification, shell } = require('electron');
+const { systemPreferences, dialog, desktopCapturer, Notification, shell, BrowserWindow } = require('electron');
 const Store = require('electron-store');
 
 const store = new Store();
 
 /**
- * Permission Handler
- * Requests all required permissions through native popups after user login
+ * Permission Handler - Enhanced Version
+ * 
+ * Requests all required permissions at login:
+ * - Screen Recording (REQUIRED - blocks app if denied)
+ * - Camera
+ * - Microphone
+ * - Notifications
+ * - Location (via web content)
+ * 
+ * Blocks app usage until required permissions are granted
  */
 class PermissionHandler {
   constructor(mainWindow) {
     this.mainWindow = mainWindow;
     this.permissions = {
+      screen: false,
       camera: false,
       microphone: false,
-      screen: false,
       notifications: false,
       location: false
     };
+    
+    // Required permissions - app will be blocked if these are not granted
+    this.requiredPermissions = ['screen'];
+    
+    // Blocking state
+    this.isBlocked = false;
     this.permissionCheckInterval = null;
-    this.hasRequestedPermissions = false;
-    this.lastPermissionCheck = 0;
+    this.blockingOverlay = null;
   }
 
   /**
-   * Called when user successfully logs in - request all permissions
+   * Request all permissions at login
+   * Returns true if all required permissions are granted
    */
-  async onUserLogin() {
-    console.log('[PermissionHandler] User logged in - requesting all permissions...');
-    
-    // Mark that we've requested permissions this session
-    this.hasRequestedPermissions = true;
-    store.set('lastPermissionRequest', Date.now());
+  async requestAllPermissions() {
+    console.log('[PermissionHandler] Requesting all permissions at login...');
     
     const platform = process.platform;
 
     if (platform === 'darwin') {
-      await this.requestMacPermissionsSequentially();
+      return await this.requestMacPermissions();
     } else if (platform === 'win32') {
-      await this.requestWindowsPermissions();
+      return await this.requestWindowsPermissions();
     }
-
-    // Start monitoring for permission changes
-    this.startPermissionMonitoring();
     
-    return this.permissions;
+    return true;
   }
 
   /**
-   * Fallback: Request permissions if not already granted (even without login detection)
+   * Request macOS permissions with native dialogs
    */
-  async requestPermissionsIfNeeded() {
-    await this.checkAllPermissions();
-    
-    // If screen permission is not granted and we haven't asked recently
-    const lastRequest = store.get('lastPermissionRequest', 0);
-    const hoursSinceLastRequest = (Date.now() - lastRequest) / (1000 * 60 * 60);
-    
-    if (!this.permissions.screen && hoursSinceLastRequest > 1) {
-      console.log('[PermissionHandler] Screen permission not granted, requesting...');
-      await this.onUserLogin();
-    } else if (!this.permissions.screen) {
-      // Just show notification without full dialog flow
-      this.showPermissionNotification();
-    }
-  }
-
-  /**
-   * Request macOS permissions one by one with native dialogs
-   */
-  async requestMacPermissionsSequentially() {
-    console.log('[PermissionHandler] Requesting macOS permissions sequentially...');
-
+  async requestMacPermissions() {
     // Check current status first
     await this.checkAllPermissions();
     
-    // If all permissions are already granted, skip
-    if (this.permissions.screen && this.permissions.camera && this.permissions.microphone) {
-      console.log('[PermissionHandler] All permissions already granted');
-      return;
-    }
-
-    // Show initial dialog explaining what's about to happen
-    await dialog.showMessageBox(this.mainWindow, {
+    // Show welcome dialog explaining permissions
+    const shouldContinue = await dialog.showMessageBox(this.mainWindow, {
       type: 'info',
-      title: 'Welcome to Talio',
-      message: 'Talio needs a few permissions to work properly',
-      detail: `We'll now ask for the following permissions:
+      title: 'Talio - Permissions Required',
+      message: 'Talio needs permissions to work properly',
+      detail: `The following permissions are required:
 
-• Screen Recording - For productivity monitoring
-• Camera - For video calls and meetings  
-• Microphone - For audio calls and meetings
+✓ Screen Recording (Required) - For productivity monitoring
+  Screenshots are captured every minute while you work.
 
-Please grant these permissions when prompted.`,
-      buttons: ['Continue'],
-      defaultId: 0
+• Camera - For video calls and meetings
+• Microphone - For audio calls
+• Notifications - For alerts and updates
+
+You will be prompted to grant each permission.
+Screen Recording is REQUIRED for the app to function.`,
+      buttons: ['Grant Permissions', 'Cancel'],
+      defaultId: 0,
+      cancelId: 1
     });
 
-    // 1. Screen Recording (MOST IMPORTANT - do first)
+    if (shouldContinue.response === 1) {
+      // User cancelled - show blocked screen
+      this.showBlockedScreen('Permissions are required to use Talio.');
+      return false;
+    }
+
+    // 1. Screen Recording (REQUIRED - do first)
     if (!this.permissions.screen) {
-      await this.requestScreenRecordingPermission();
-      await this.delay(500);
+      const screenGranted = await this.requestScreenPermission();
+      if (!screenGranted) {
+        this.showBlockedScreen('Screen Recording permission is required.\nPlease grant it in System Preferences.');
+        this.startPermissionMonitoring();
+        return false;
+      }
     }
 
     // 2. Camera
     if (!this.permissions.camera) {
       await this.requestCameraPermission();
-      await this.delay(500);
     }
 
     // 3. Microphone
@@ -113,63 +107,204 @@ Please grant these permissions when prompted.`,
       await this.requestMicrophonePermission();
     }
 
-    // 4. Check final status and show summary
-    await this.checkAllPermissions();
+    // 4. Notifications - just check status
+    this.permissions.notifications = Notification.isSupported();
+
+    // Show summary
     await this.showPermissionSummary();
+    
+    // Check if all required permissions are granted
+    const allRequired = this.requiredPermissions.every(p => this.permissions[p]);
+    
+    if (!allRequired) {
+      this.showBlockedScreen('Required permissions not granted.');
+      this.startPermissionMonitoring();
+      return false;
+    }
+    
+    this.hideBlockedScreen();
+    return true;
   }
 
   /**
-   * Request Windows permissions - show informational dialog
+   * Request Windows permissions
    */
   async requestWindowsPermissions() {
-    console.log('[PermissionHandler] Requesting Windows permissions...');
-
+    // Show info dialog
     await dialog.showMessageBox(this.mainWindow, {
       type: 'info',
-      title: 'Welcome to Talio',
-      message: 'Talio needs the following permissions to work properly:',
-      detail: `• Screen Recording - For productivity monitoring
-  Screenshots are captured every minute while you're clocked in.
+      title: 'Talio - Permissions',
+      message: 'Talio needs permissions to work properly',
+      detail: `The following features require permissions:
 
-• Camera & Microphone - For video calls and meetings
+• Screen Recording - For productivity monitoring
+  Screenshots are captured every minute while you work.
 
-• Notifications - For alerts and updates
+• Camera & Microphone - For video calls
 
-• Location - For attendance geofencing
-
-Windows will automatically grant screen recording access.
-Please allow other permissions when prompted by the system.`,
+Windows will automatically grant screen capture access.
+Please allow other permissions when prompted.`,
       buttons: ['Got it!'],
       defaultId: 0
     });
 
-    // Trigger a screen capture to verify it works
-    const captureWorks = await this.triggerScreenCapture();
+    // Test screen capture works
+    const screenWorks = await this.testScreenCapture();
+    this.permissions.screen = screenWorks;
     
-    if (!captureWorks) {
-      await dialog.showMessageBox(this.mainWindow, {
+    if (!screenWorks) {
+      const retry = await dialog.showMessageBox(this.mainWindow, {
         type: 'warning',
         title: 'Screen Capture Issue',
         message: 'Screen capture test failed',
-        detail: 'Please make sure no other applications are blocking screen capture. You may need to restart the app.',
-        buttons: ['OK']
+        detail: 'This may be because another application is blocking screen capture, or an antivirus is interfering.\n\nTry restarting the app or check your security settings.',
+        buttons: ['Retry', 'Continue Anyway'],
+        defaultId: 0
       });
+      
+      if (retry.response === 0) {
+        this.permissions.screen = await this.testScreenCapture();
+      }
     }
     
-    // Set permissions status for Windows
-    this.permissions.screen = captureWorks;
+    // On Windows, set other permissions as granted (system handles them)
     this.permissions.camera = true;
     this.permissions.microphone = true;
     this.permissions.notifications = Notification.isSupported();
-
-    console.log('[PermissionHandler] Windows permissions set:', this.permissions);
+    
+    if (!this.permissions.screen) {
+      this.showBlockedScreen('Screen capture is not working.\nPlease restart the app or check security settings.');
+      return false;
+    }
+    
+    return true;
   }
 
   /**
-   * Request camera permission (macOS)
+   * Request Screen Recording permission (macOS)
+   */
+  async requestScreenPermission() {
+    if (process.platform !== 'darwin') return true;
+
+    const status = systemPreferences.getMediaAccessStatus('screen');
+    console.log(`[PermissionHandler] Screen permission status: ${status}`);
+
+    if (status === 'granted') {
+      this.permissions.screen = true;
+      return true;
+    }
+
+    // Screen permission requires user action in System Preferences
+    // Trigger the permission prompt by attempting capture
+    const granted = await this.triggerScreenPermissionPrompt();
+    
+    if (!granted) {
+      // Show dialog to open System Preferences
+      const result = await dialog.showMessageBox(this.mainWindow, {
+        type: 'warning',
+        title: 'Screen Recording Permission Required',
+        message: 'Talio needs Screen Recording permission',
+        detail: `To grant permission:
+
+1. Click "Open System Preferences"
+2. Find "Talio" in the list
+3. Check the box to enable access
+4. You may need to restart Talio
+
+Screen Recording is required for productivity monitoring.`,
+        buttons: ['Open System Preferences', 'Check Again', 'Cancel'],
+        defaultId: 0
+      });
+
+      if (result.response === 0) {
+        // Open System Preferences to Screen Recording
+        shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
+        
+        // Wait for user to grant permission
+        await this.delay(2000);
+        
+        // Check again
+        const newStatus = systemPreferences.getMediaAccessStatus('screen');
+        this.permissions.screen = newStatus === 'granted';
+        return this.permissions.screen;
+      } else if (result.response === 1) {
+        // Check again
+        const newStatus = systemPreferences.getMediaAccessStatus('screen');
+        this.permissions.screen = newStatus === 'granted';
+        return this.permissions.screen;
+      }
+      
+      return false;
+    }
+    
+    this.permissions.screen = true;
+    return true;
+  }
+
+  /**
+   * Trigger screen permission prompt by attempting capture
+   */
+  async triggerScreenPermissionPrompt() {
+    try {
+      const sources = await desktopCapturer.getSources({ 
+        types: ['screen'],
+        thumbnailSize: { width: 1, height: 1 }
+      });
+      
+      // Check if we got actual content (not black image)
+      if (sources.length > 0 && sources[0].thumbnail && !sources[0].thumbnail.isEmpty()) {
+        // Try to get actual pixel data to verify
+        const size = sources[0].thumbnail.getSize();
+        if (size.width > 0 && size.height > 0) {
+          // Double check by getting bitmap
+          const bitmap = sources[0].thumbnail.toBitmap();
+          // If first few pixels aren't all black, permission is granted
+          const hasContent = bitmap.some((v, i) => i < 100 && v !== 0);
+          if (hasContent || bitmap.length > 0) {
+            console.log('[PermissionHandler] Screen capture successful');
+            return true;
+          }
+        }
+      }
+      
+      console.log('[PermissionHandler] Screen capture returned empty - permission likely denied');
+      return false;
+    } catch (error) {
+      console.error('[PermissionHandler] Screen capture test failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Test screen capture on Windows
+   */
+  async testScreenCapture() {
+    try {
+      const sources = await desktopCapturer.getSources({
+        types: ['screen'],
+        thumbnailSize: { width: 100, height: 100 }
+      });
+      
+      if (sources.length > 0 && sources[0].thumbnail && !sources[0].thumbnail.isEmpty()) {
+        const size = sources[0].thumbnail.getSize();
+        console.log(`[PermissionHandler] Screen capture test: ${size.width}x${size.height}`);
+        return size.width > 0 && size.height > 0;
+      }
+      return false;
+    } catch (error) {
+      console.error('[PermissionHandler] Screen capture test failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Request Camera permission (macOS)
    */
   async requestCameraPermission() {
-    if (process.platform !== 'darwin') return true;
+    if (process.platform !== 'darwin') {
+      this.permissions.camera = true;
+      return true;
+    }
 
     const status = systemPreferences.getMediaAccessStatus('camera');
     console.log(`[PermissionHandler] Camera status: ${status}`);
@@ -178,7 +313,6 @@ Please allow other permissions when prompted by the system.`,
       try {
         const granted = await systemPreferences.askForMediaAccess('camera');
         this.permissions.camera = granted;
-        console.log(`[PermissionHandler] Camera access ${granted ? 'granted' : 'denied'}`);
         return granted;
       } catch (error) {
         console.error('[PermissionHandler] Camera permission error:', error);
@@ -194,10 +328,13 @@ Please allow other permissions when prompted by the system.`,
   }
 
   /**
-   * Request microphone permission (macOS)
+   * Request Microphone permission (macOS)
    */
   async requestMicrophonePermission() {
-    if (process.platform !== 'darwin') return true;
+    if (process.platform !== 'darwin') {
+      this.permissions.microphone = true;
+      return true;
+    }
 
     const status = systemPreferences.getMediaAccessStatus('microphone');
     console.log(`[PermissionHandler] Microphone status: ${status}`);
@@ -206,7 +343,6 @@ Please allow other permissions when prompted by the system.`,
       try {
         const granted = await systemPreferences.askForMediaAccess('microphone');
         this.permissions.microphone = granted;
-        console.log(`[PermissionHandler] Microphone access ${granted ? 'granted' : 'denied'}`);
         return granted;
       } catch (error) {
         console.error('[PermissionHandler] Microphone permission error:', error);
@@ -222,230 +358,188 @@ Please allow other permissions when prompted by the system.`,
   }
 
   /**
-   * Request screen recording permission (macOS) - Critical for screenshots
-   */
-  async requestScreenRecordingPermission() {
-    if (process.platform !== 'darwin') return true;
-
-    let status = systemPreferences.getMediaAccessStatus('screen');
-    console.log(`[PermissionHandler] Screen recording status: ${status}`);
-
-    if (status !== 'granted') {
-      // Show dialog explaining why this is critical
-      const result = await dialog.showMessageBox(this.mainWindow, {
-        type: 'warning',
-        title: 'Screen Recording Permission Required',
-        message: 'Talio requires Screen Recording access',
-        detail: `This permission is essential for:
-• Automatic screenshot capture for productivity monitoring
-• Screen sharing in meetings
-
-Without this permission, Talio cannot function properly.
-
-Click "Open System Settings" to grant permission, then:
-1. Find "Talio" in the list
-2. Toggle it ON
-3. You may need to restart the app`,
-        buttons: ['Open System Settings', 'I\'ll do it later'],
-        defaultId: 0,
-        cancelId: 1
-      });
-
-      if (result.response === 0) {
-        // Open System Preferences to Screen Recording
-        shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
-        
-        // Wait for user to potentially grant permission
-        await this.delay(3000);
-        
-        // Show reminder
-        await dialog.showMessageBox(this.mainWindow, {
-          type: 'info',
-          title: 'Enable Screen Recording',
-          message: 'Please enable Screen Recording for Talio',
-          detail: 'After enabling the permission in System Settings, click OK to continue.\n\nNote: You may need to restart Talio for the change to take effect.',
-          buttons: ['OK']
-        });
-      }
-
-      // Trigger a capture attempt to prompt the system dialog
-      await this.triggerScreenCapture();
-      
-      // Check status again
-      status = systemPreferences.getMediaAccessStatus('screen');
-    }
-
-    this.permissions.screen = status === 'granted';
-    console.log(`[PermissionHandler] Final screen recording status: ${this.permissions.screen}`);
-    
-    return this.permissions.screen;
-  }
-
-  /**
-   * Trigger a screen capture to prompt for permission and verify it works
-   */
-  async triggerScreenCapture() {
-    try {
-      console.log('[PermissionHandler] Triggering screen capture test...');
-      const sources = await desktopCapturer.getSources({ 
-        types: ['screen'],
-        thumbnailSize: { width: 100, height: 100 }
-      });
-      
-      // Check if we got valid sources with non-empty thumbnails
-      let hasValidSources = false;
-      for (const source of sources) {
-        if (source.thumbnail && !source.thumbnail.isEmpty()) {
-          hasValidSources = true;
-          break;
-        }
-      }
-      
-      this.permissions.screen = hasValidSources;
-      console.log(`[PermissionHandler] Screen capture test: ${sources.length} sources, valid: ${hasValidSources}`);
-      return hasValidSources;
-    } catch (error) {
-      console.error('[PermissionHandler] Screen capture test failed:', error.message);
-      this.permissions.screen = false;
-      return false;
-    }
-  }
-
-  /**
-   * Show permission summary after requesting all permissions
-   */
-  async showPermissionSummary() {
-    const denied = [];
-    
-    if (!this.permissions.screen) denied.push('Screen Recording');
-    if (!this.permissions.camera) denied.push('Camera');
-    if (!this.permissions.microphone) denied.push('Microphone');
-
-    if (denied.length > 0) {
-      await dialog.showMessageBox(this.mainWindow, {
-        type: 'warning',
-        title: 'Some Permissions Missing',
-        message: 'The following permissions were not granted:',
-        detail: `${denied.join('\n')}\n\nTalio may not work correctly without these permissions.\n\nYou can grant them later in System Settings > Privacy & Security.`,
-        buttons: ['OK']
-      });
-    } else {
-      console.log('[PermissionHandler] All permissions granted!');
-    }
-  }
-
-  /**
-   * Start monitoring permissions and show persistent notification if denied
-   */
-  startPermissionMonitoring() {
-    // Clear any existing interval
-    if (this.permissionCheckInterval) {
-      clearInterval(this.permissionCheckInterval);
-    }
-    
-    // Check every 60 seconds
-    this.permissionCheckInterval = setInterval(async () => {
-      await this.checkAllPermissions();
-      
-      // If screen recording is not granted, show notification
-      if (!this.permissions.screen) {
-        this.showPermissionNotification();
-      }
-    }, 60000);
-  }
-
-  /**
-   * Show persistent notification for missing permissions
-   */
-  showPermissionNotification() {
-    if (!Notification.isSupported()) return;
-    
-    // Don't spam notifications - only show once per 5 minutes
-    const now = Date.now();
-    if (now - this.lastPermissionCheck < 5 * 60 * 1000) {
-      return;
-    }
-    this.lastPermissionCheck = now;
-
-    const notification = new Notification({
-      title: 'Talio - Permission Required',
-      body: 'Screen Recording permission is required for productivity monitoring. Click to open settings.',
-      silent: false
-    });
-
-    notification.on('click', () => {
-      if (process.platform === 'darwin') {
-        shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
-      }
-      this.mainWindow?.show();
-      this.mainWindow?.focus();
-    });
-
-    notification.show();
-  }
-
-  /**
-   * Check all permission statuses
+   * Check all permissions status
    */
   async checkAllPermissions() {
     if (process.platform === 'darwin') {
+      this.permissions.screen = systemPreferences.getMediaAccessStatus('screen') === 'granted';
       this.permissions.camera = systemPreferences.getMediaAccessStatus('camera') === 'granted';
       this.permissions.microphone = systemPreferences.getMediaAccessStatus('microphone') === 'granted';
-      this.permissions.screen = systemPreferences.getMediaAccessStatus('screen') === 'granted';
     } else {
-      // On Windows, verify screen capture actually works
-      const captureWorks = await this.triggerScreenCapture();
-      this.permissions.screen = captureWorks;
+      // On Windows, test screen capture
+      this.permissions.screen = await this.testScreenCapture();
       this.permissions.camera = true;
       this.permissions.microphone = true;
     }
-
+    
     this.permissions.notifications = Notification.isSupported();
-
-    console.log('[PermissionHandler] Current permissions:', this.permissions);
+    
+    console.log('[PermissionHandler] Permission status:', this.permissions);
     return this.permissions;
   }
 
   /**
-   * Get current permission statuses
+   * Show permission summary dialog
    */
-  getPermissions() {
-    return this.permissions;
+  async showPermissionSummary() {
+    const status = Object.entries(this.permissions)
+      .map(([key, granted]) => `${granted ? '✓' : '✗'} ${key.charAt(0).toUpperCase() + key.slice(1)}: ${granted ? 'Granted' : 'Not granted'}`)
+      .join('\n');
+
+    await dialog.showMessageBox(this.mainWindow, {
+      type: this.permissions.screen ? 'info' : 'warning',
+      title: 'Permission Status',
+      message: 'Permission Summary',
+      detail: status + '\n\nYou can change these settings later in System Preferences.',
+      buttons: ['OK']
+    });
   }
 
   /**
-   * Alias for getPermissions - used by IPC handler
+   * Show blocking overlay when required permissions are not granted
    */
-  getStatus() {
-    return {
-      permissions: this.permissions,
-      hasRequestedPermissions: this.hasRequestedPermissions,
-      lastRequest: store.get('lastPermissionRequest', 0),
-      platform: process.platform
-    };
-  }
-
-  /**
-   * Public method to request all permissions - alias for onUserLogin
-   */
-  async requestAllPermissions() {
-    return await this.onUserLogin();
-  }
-
-  /**
-   * Check if screen recording permission is granted
-   */
-  hasScreenPermission() {
-    if (process.platform === 'darwin') {
-      return systemPreferences.getMediaAccessStatus('screen') === 'granted';
+  showBlockedScreen(message) {
+    this.isBlocked = true;
+    
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      const blockedHTML = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+              background: linear-gradient(135deg, #ff6b6b 0%, #ff8e53 100%);
+              height: 100vh;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              color: white;
+              text-align: center;
+              padding: 40px;
+            }
+            .icon {
+              width: 100px;
+              height: 100px;
+              margin-bottom: 30px;
+              opacity: 0.9;
+            }
+            h1 {
+              font-size: 28px;
+              font-weight: 600;
+              margin-bottom: 16px;
+            }
+            p {
+              font-size: 18px;
+              opacity: 0.95;
+              margin-bottom: 30px;
+              white-space: pre-line;
+              line-height: 1.6;
+              max-width: 500px;
+            }
+            .buttons {
+              display: flex;
+              gap: 16px;
+            }
+            button {
+              padding: 14px 32px;
+              background: rgba(255,255,255,0.2);
+              color: white;
+              border: 2px solid rgba(255,255,255,0.5);
+              border-radius: 8px;
+              font-size: 16px;
+              font-weight: 500;
+              cursor: pointer;
+              transition: all 0.2s;
+            }
+            button:hover {
+              background: rgba(255,255,255,0.3);
+              border-color: white;
+              transform: translateY(-2px);
+            }
+            button.primary {
+              background: white;
+              color: #ff6b6b;
+              border-color: white;
+            }
+            button.primary:hover {
+              background: #f5f5f5;
+            }
+            .status {
+              margin-top: 40px;
+              padding: 16px 24px;
+              background: rgba(0,0,0,0.2);
+              border-radius: 8px;
+              font-size: 14px;
+            }
+          </style>
+        </head>
+        <body>
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 8v4M12 16h.01"/>
+          </svg>
+          <h1>Permission Required</h1>
+          <p>${message}</p>
+          <div class="buttons">
+            <button class="primary" onclick="window.talioAPI?.openSystemPreferences?.()">
+              Open Settings
+            </button>
+            <button onclick="window.talioAPI?.retryPermissions?.()">
+              Check Again
+            </button>
+          </div>
+          <div class="status">
+            Waiting for permissions to be granted...
+          </div>
+        </body>
+        </html>
+      `;
+      
+      this.mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(blockedHTML)}`);
     }
-    return this.permissions.screen;
   }
 
   /**
-   * Cleanup
+   * Hide blocked screen and reload app
    */
-  destroy() {
+  hideBlockedScreen() {
+    this.isBlocked = false;
+    this.stopPermissionMonitoring();
+    
+    // Reload the main app
+    if (this.mainWindow && !this.mainWindow.isDestroyed()) {
+      this.mainWindow.loadURL('https://app.talio.in');
+    }
+  }
+
+  /**
+   * Start monitoring for permission changes
+   */
+  startPermissionMonitoring() {
+    if (this.permissionCheckInterval) return;
+    
+    console.log('[PermissionHandler] Starting permission monitoring...');
+    
+    this.permissionCheckInterval = setInterval(async () => {
+      await this.checkAllPermissions();
+      
+      // Check if all required permissions are now granted
+      const allRequired = this.requiredPermissions.every(p => this.permissions[p]);
+      
+      if (allRequired && this.isBlocked) {
+        console.log('[PermissionHandler] Required permissions granted! Unblocking...');
+        this.hideBlockedScreen();
+      }
+    }, 3000); // Check every 3 seconds
+  }
+
+  /**
+   * Stop permission monitoring
+   */
+  stopPermissionMonitoring() {
     if (this.permissionCheckInterval) {
       clearInterval(this.permissionCheckInterval);
       this.permissionCheckInterval = null;
@@ -453,7 +547,38 @@ Click "Open System Settings" to grant permission, then:
   }
 
   /**
-   * Helper delay function
+   * Open system preferences to grant permissions
+   */
+  openSystemPreferences() {
+    if (process.platform === 'darwin') {
+      shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
+    } else if (process.platform === 'win32') {
+      shell.openExternal('ms-settings:privacy-webcam');
+    }
+  }
+
+  /**
+   * Retry permission check
+   */
+  async retryPermissions() {
+    const result = await this.requestAllPermissions();
+    return result;
+  }
+
+  /**
+   * Get current permission status
+   */
+  getStatus() {
+    return {
+      permissions: this.permissions,
+      isBlocked: this.isBlocked,
+      requiredPermissions: this.requiredPermissions,
+      allRequiredGranted: this.requiredPermissions.every(p => this.permissions[p])
+    };
+  }
+
+  /**
+   * Utility: delay helper
    */
   delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));

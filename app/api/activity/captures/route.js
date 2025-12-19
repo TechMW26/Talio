@@ -14,30 +14,74 @@ const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 const ADMIN_ROLES = ['admin', 'god_admin', 'hr'];
 
 /**
+ * Check if a user is a department head
+ * Returns the department IDs they are head of
+ */
+async function getDepartmentsWhereUserIsHead(employeeId) {
+  if (!employeeId) return [];
+  
+  const departments = await Department.find({
+    $or: [
+      { head: employeeId },
+      { heads: employeeId }
+    ],
+    isActive: true
+  }).select('_id name');
+  
+  return departments;
+}
+
+/**
+ * Get all employees in a department (including sub-departments)
+ */
+async function getEmployeesInDepartments(departmentIds) {
+  if (!departmentIds || departmentIds.length === 0) return [];
+  
+  // Get sub-departments recursively
+  const allDeptIds = [...departmentIds];
+  const subDepts = await Department.find({
+    parentDepartment: { $in: departmentIds },
+    isActive: true
+  }).select('_id');
+  
+  subDepts.forEach(d => {
+    if (!allDeptIds.some(id => id.toString() === d._id.toString())) {
+      allDeptIds.push(d._id);
+    }
+  });
+  
+  // Get employees in these departments
+  const employees = await Employee.find({
+    $or: [
+      { department: { $in: allDeptIds } },
+      { departments: { $in: allDeptIds } }
+    ]
+  }).select('_id');
+  
+  return employees.map(e => e._id);
+}
+
+/**
  * GET /api/activity/captures
- * Get raw captures for a user, with role-based access control
+ * Get captures with proper role-based access control
+ * 
+ * Department heads can view captures of their team members
+ * (identified by being in Department.head or Department.heads array)
  */
 export async function GET(request) {
   try {
-    // Verify JWT token
+    // Verify JWT
     const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const token = authHeader.substring(7);
-    
     let decoded;
     try {
       decoded = await jwtVerify(token, JWT_SECRET);
     } catch {
-      return NextResponse.json(
-        { success: false, error: 'Invalid token' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
     }
 
     const currentUserId = decoded.payload.userId;
@@ -48,63 +92,89 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const targetUserId = searchParams.get('userId') || currentUserId;
     const dateParam = searchParams.get('date') || new Date().toISOString().split('T')[0];
-    const captureType = searchParams.get('type'); // 'automatic', 'manual', or null for all
+    const captureType = searchParams.get('type'); // 'automatic', 'manual', or null
+    const departmentId = searchParams.get('departmentId'); // Filter by department
     
-    // Permission check: Can only view others' captures if admin/hr or department head
+    // Permission check
     if (targetUserId !== currentUserId) {
       const isAdmin = ADMIN_ROLES.includes(currentUserRole);
       
-      // Check if current user is department head of target user's department
-      let isDeptHead = false;
-      if (!isAdmin && currentUserRole === 'department_head') {
+      if (!isAdmin) {
+        // Check if current user is department head of target user's department
         const currentUser = await User.findById(currentUserId).populate('employeeId');
         const targetUser = await User.findById(targetUserId).populate('employeeId');
         
-        if (targetUser?.employeeId?.department) {
-          const dept = await Department.findById(targetUser.employeeId.department);
-          if (dept) {
-            const allHeads = dept.allHeads || [];
-            isDeptHead = allHeads.some(
-              headId => headId.toString() === currentUser?.employeeId?._id?.toString()
+        if (!currentUser?.employeeId || !targetUser?.employeeId) {
+          return NextResponse.json(
+            { error: 'Permission denied - Employee records not found' },
+            { status: 403 }
+          );
+        }
+        
+        // Get departments where current user is head
+        const headOfDepartments = await getDepartmentsWhereUserIsHead(currentUser.employeeId._id);
+        
+        if (headOfDepartments.length === 0) {
+          return NextResponse.json(
+            { error: 'Permission denied - You can only view your own captures' },
+            { status: 403 }
+          );
+        }
+        
+        // Get target user's departments
+        const targetDeptIds = [];
+        if (targetUser.employeeId.department) {
+          targetDeptIds.push(targetUser.employeeId.department.toString());
+        }
+        if (targetUser.employeeId.departments) {
+          targetUser.employeeId.departments.forEach(d => targetDeptIds.push(d.toString()));
+        }
+        
+        // Check if any of target's departments are headed by current user
+        const headDeptIds = headOfDepartments.map(d => d._id.toString());
+        const hasAccess = targetDeptIds.some(id => headDeptIds.includes(id));
+        
+        // Also check sub-departments
+        if (!hasAccess) {
+          const subDepts = await Department.find({
+            parentDepartment: { $in: headOfDepartments.map(d => d._id) }
+          }).select('_id');
+          const subDeptIds = subDepts.map(d => d._id.toString());
+          const hasSubAccess = targetDeptIds.some(id => subDeptIds.includes(id));
+          
+          if (!hasSubAccess) {
+            return NextResponse.json(
+              { error: 'Permission denied - User is not in your department' },
+              { status: 403 }
             );
           }
         }
       }
-      
-      if (!isAdmin && !isDeptHead) {
-        return NextResponse.json(
-          { success: false, error: 'Permission denied - You can only view your own captures' },
-          { status: 403 }
-        );
-      }
     }
 
-    // Check if target user is admin (their captures don't exist)
+    // Check if target user is admin (no captures)
     const targetUser = await User.findById(targetUserId);
     if (['admin', 'god_admin'].includes(targetUser?.role)) {
       return NextResponse.json({
         success: true,
         message: 'Admin screens are not captured',
-        captures: [],
-        sessions: [],
+        data: { captures: [], sessions: [] },
         totalCaptures: 0
       });
     }
 
-    // Build the directory path
-    const activityDir = path.join(process.cwd(), 'public', 'activity', targetUserId);
-    const datePath = path.join(activityDir, dateParam);
-    
+    // Read captures from filesystem
+    const activityDir = path.join(process.cwd(), 'public', 'activity', targetUserId, dateParam);
     let captures = [];
     
     try {
-      const files = await readdir(datePath);
-      const imageFiles = files.filter(f => /\.(webp|png|jpg|jpeg)$/i.test(f));
+      const files = await readdir(activityDir);
+      const imageFiles = files.filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f));
       
       for (const file of imageFiles) {
-        const filePath = path.join(datePath, file);
+        const filePath = path.join(activityDir, file);
         const fileStat = await stat(filePath);
-        const timestamp = parseScreenshotTimestamp(file);
+        const timestamp = parseTimestamp(file);
         
         captures.push({
           path: `/activity/${targetUserId}/${dateParam}/${file}`,
@@ -115,12 +185,9 @@ export async function GET(request) {
         });
       }
       
-      // Sort by timestamp
       captures.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-      
-    } catch (error) {
-      // Directory doesn't exist or is empty
-      console.log(`[Captures] No captures found for user ${targetUserId} on ${dateParam}`);
+    } catch {
+      // Directory doesn't exist
     }
 
     // Get sessions from database
@@ -134,24 +201,20 @@ export async function GET(request) {
       date: { $gte: dateStart, $lte: dateEnd }
     }).sort({ sessionNumber: 1 });
 
-    // Apply capture type filter if specified
-    if (captureType) {
+    // Filter by capture type if specified
+    if (captureType && sessions.length > 0) {
       captures = captures.filter(c => {
-        // Check in sessions for capture type
         for (const session of sessions) {
-          const sessionCapture = session.screenshots.find(s => s.path === c.path);
-          if (sessionCapture) {
-            return sessionCapture.captureType === captureType;
-          }
+          const sc = session.screenshots.find(s => s.path === c.path);
+          if (sc) return sc.captureType === captureType;
         }
-        // Default to automatic if not found in session
         return captureType === 'automatic';
       });
     }
 
     // Get user info
     const userInfo = await User.findById(targetUserId)
-      .populate('employeeId', 'name employeeId department')
+      .populate('employeeId', 'firstName lastName employeeCode department')
       .select('email role');
 
     return NextResponse.json({
@@ -160,22 +223,22 @@ export async function GET(request) {
         captures,
         sessions: sessions.map(s => ({
           _id: s._id,
-          sessionId: s._id,
           sessionNumber: s.sessionNumber,
           date: s.date,
           startTime: s.startTime,
           endTime: s.endTime,
           screenshotCount: s.screenshotCount,
-          isComplete: s.isComplete,
-          estimatedDuration: s.estimatedDuration,
-          analysis: s.analysis
+          isComplete: s.isComplete
         })),
         user: userInfo ? {
           _id: userInfo._id,
           email: userInfo.email,
-          name: userInfo.employeeId?.name,
-          employeeCode: userInfo.employeeId?.employeeId,
-          role: userInfo.role
+          name: userInfo.employeeId ? 
+            `${userInfo.employeeId.firstName} ${userInfo.employeeId.lastName}` : 
+            userInfo.email,
+          employeeCode: userInfo.employeeId?.employeeCode,
+          role: userInfo.role,
+          departmentId: userInfo.employeeId?.department
         } : null
       },
       date: dateParam,
@@ -187,23 +250,27 @@ export async function GET(request) {
   } catch (error) {
     console.error('[Captures] Error:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to get captures', details: error.message },
+      { error: 'Failed to get captures', details: error.message },
       { status: 500 }
     );
   }
 }
 
 /**
- * Parse screenshot filename to get timestamp
- * Format: 2024-12-13T10-30-45-123Z.webp
+ * Parse timestamp from filename
+ * Format: 2024-12-13T10-30-45-123Z.jpg
  */
-function parseScreenshotTimestamp(filename) {
+function parseTimestamp(filename) {
   try {
-    // Remove extension and convert back to ISO format
-    const nameWithoutExt = filename.replace(/\.(webp|png|jpg|jpeg)$/i, '');
-    // Replace dashes back to colons/dots for ISO format
-    const isoString = nameWithoutExt
-      .replace(/T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z/, 'T$1:$2:$3.$4Z');
+    const name = filename.replace(/\.(jpg|jpeg|png|webp)$/i, '');
+    const isoString = name.replace(/-/g, (match, offset) => {
+      // Convert back to ISO format: - to : for time parts
+      if (offset === 4 || offset === 7) return '-'; // Date separators stay
+      if (offset === 10) return 'T'; // T separator
+      if (offset === 13 || offset === 16) return ':'; // Time separators
+      if (offset === 19) return '.'; // Millisecond separator
+      return match;
+    });
     return new Date(isoString);
   } catch {
     return new Date();
