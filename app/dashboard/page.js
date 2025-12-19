@@ -9,7 +9,9 @@ import EmployeeDashboard from '@/components/dashboards/EmployeeDashboard'
 // Helper function to render role-based dashboard
 const renderDashboardByRole = (user) => {
   switch (user?.role) {
+    case 'god_admin':
     case 'admin':
+    case 'department_head':
       return <AdminDashboard user={user} />
     case 'hr':
       return <HRDashboard user={user} />

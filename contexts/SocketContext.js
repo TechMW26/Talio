@@ -395,6 +395,22 @@ export function SocketProvider({ children }) {
     }
   }, [socket])
 
+  // Subscribe to call alert events
+  const onCallAlert = useCallback((callback) => {
+    if (socket) {
+      socket.on('call-alert', callback)
+      return () => socket.off('call-alert', callback)
+    }
+  }, [socket])
+
+  // Subscribe to call alert acknowledged events
+  const onCallAlertAcknowledged = useCallback((callback) => {
+    if (socket) {
+      socket.on('call-alert-acknowledged', callback)
+      return () => socket.off('call-alert-acknowledged', callback)
+    }
+  }, [socket])
+
   const value = {
     socket,
     isConnected,
@@ -428,7 +444,9 @@ export function SocketProvider({ children }) {
     onDocumentUpdate,
     onAssetUpdate,
     onPayrollUpdate,
-    onNewNotification
+    onNewNotification,
+    onCallAlert,
+    onCallAlertAcknowledged
   }
 
   return (

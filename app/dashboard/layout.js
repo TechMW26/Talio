@@ -17,6 +17,7 @@ import { UnreadMessagesProvider } from '@/contexts/UnreadMessagesContext'
 import { InAppNotificationProvider } from '@/contexts/InAppNotificationContext'
 import { ChatWidgetProvider, useChatWidget } from '@/contexts/ChatWidgetContext'
 import { getCurrentUser, getEmployeeId, syncUserData, getToken } from '@/utils/userHelper'
+import CallAlertReceiver from '@/components/CallAlertReceiver'
 
 // Component to sync sidebar state with chat widget context
 function SidebarStateSync({ sidebarCollapsed }) {
@@ -269,6 +270,7 @@ export default function DashboardLayout({ children }) {
           <InAppNotificationProvider>
             <ChatWidgetProvider>
               {children}
+              <CallAlertReceiver />
             </ChatWidgetProvider>
           </InAppNotificationProvider>
         </UnreadMessagesProvider>
@@ -349,6 +351,9 @@ export default function DashboardLayout({ children }) {
                 onClose={handleProfileModalClose}
                 profileStatus={profileCompletionStatus}
               />
+
+              {/* Call Alert Receiver - Global alert listener */}
+              <CallAlertReceiver />
             </div>
           </ChatWidgetProvider>
         </InAppNotificationProvider>
