@@ -28,6 +28,9 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Ensure directories exist even if pruned by ignore rules
+RUN mkdir -p /app/models /app/lib /app/public
+
 # Build args for Next.js public envs
 ARG NEXT_PUBLIC_APP_URL=https://app.talio.in
 ARG NEXT_PUBLIC_APP_NAME=Talio HRMS
