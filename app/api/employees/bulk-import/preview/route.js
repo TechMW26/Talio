@@ -170,7 +170,8 @@ function transformRow(row, mapping) {
   })
   
   for (const [colIdx, fieldMapping] of Object.entries(mapping)) {
-    if (fieldMapping === 'null') continue
+    // Skip null, undefined, or 'null' string mappings
+    if (!fieldMapping || fieldMapping === 'null') continue
     
     const idx = parseInt(colIdx)
     const value = row[idx]
@@ -178,7 +179,7 @@ function transformRow(row, mapping) {
     if (value === undefined || value === null || value === '') continue
     
     // Handle split fields (like fullName -> firstName, lastName)
-    if (fieldMapping.startsWith('split:')) {
+    if (typeof fieldMapping === 'string' && fieldMapping.startsWith('split:')) {
       const fields = fieldMapping.replace('split:', '').split(',')
       const nameParts = String(value).trim().split(/\s+/)
       if (fields.length >= 2 && nameParts.length >= 1) {
@@ -207,7 +208,23 @@ function transformRow(row, mapping) {
       continue
     }
     
+    // Handle role normalization
+    if (fieldMapping === 'role') {
+      const v = String(value).toLowerCase().trim()
+      if (['admin', 'hr', 'manager', 'employee'].includes(v)) {
+        result[fieldMapping] = v.charAt(0).toUpperCase() + v.slice(1) // Capitalize first letter
+      } else {
+        result[fieldMapping] = 'Employee' // Default to Employee for invalid/empty values
+      }
+      continue
+    }
+    
     result[fieldMapping] = String(value).trim()
+  }
+  
+  // Set default role if not mapped or empty
+  if (!result.role || result.role === '') {
+    result.role = 'Employee'
   }
   
   return result

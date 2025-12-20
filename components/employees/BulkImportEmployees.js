@@ -298,7 +298,7 @@ export default function BulkImportEmployees() {
       {previewLoading && (
         <div className="bg-purple-50 border border-purple-200 rounded-lg p-6 text-center">
           <FaSpinner className="animate-spin text-3xl text-purple-600 mx-auto mb-3" />
-          <p className="text-purple-800 font-medium">🤖 AI is analyzing your Excel file...</p>
+          <p className="text-purple-800 font-medium">MAYA is analyzing your Excel file.</p>
           <p className="text-purple-600 text-sm mt-1">Detecting columns, extracting data, and mapping to our template</p>
         </div>
       )}

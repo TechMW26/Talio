@@ -316,7 +316,8 @@ function parseRowWithMapping(row, mapping) {
   const data = {}
   
   for (const [colIdx, fieldName] of Object.entries(mapping)) {
-    if (fieldName === 'ignore' || fieldName === 'null') continue
+    // Skip null, undefined, 'ignore', or 'null' string mappings
+    if (!fieldName || fieldName === 'ignore' || fieldName === 'null') continue
     
     const idx = parseInt(colIdx)
     let value = row[idx]
@@ -329,7 +330,7 @@ function parseRowWithMapping(row, mapping) {
     }
     
     // Handle split fields (like "split:firstName,lastName")
-    if (fieldName.startsWith('split:')) {
+    if (typeof fieldName === 'string' && fieldName.startsWith('split:')) {
       const fields = fieldName.replace('split:', '').split(',')
       const nameParts = String(value).trim().split(/\s+/)
       if (fields.length >= 2 && nameParts.length >= 1) {
@@ -990,9 +991,14 @@ function parseExcelRow(row, headers) {
 
     // Normalize status
     if (fieldName === 'status' && typeof value === 'string') {
-      const normalized = value.toLowerCase()
+      const normalized = value.toLowerCase().trim()
       if (normalized === 'active' || normalized === '1' || normalized === 'yes') {
         value = 'active'
+      } else if (normalized === 'terminated' || normalized === 'resigned' || normalized === 'left' || 
+                 normalized === 'exit' || normalized === 'exited' || normalized === 'quit' ||
+                 normalized === 'dismissed' || normalized === 'fired' || normalized === 'relieved' ||
+                 normalized === 'separated' || normalized === 'no' || normalized === '0') {
+        value = 'inactive-skip' // Mark for skipping during import
       } else {
         value = 'inactive'
       }
@@ -1122,6 +1128,7 @@ export async function POST(request) {
       created: [],
       updated: [],
       failed: [],
+      skipped: 0,
       departmentsCreated: 0,
       designationsCreated: 0,
       warnings: [],
@@ -1141,6 +1148,13 @@ export async function POST(request) {
         
         // Skip completely empty rows
         if (!employeeData.email && !employeeData.employeeCode && !employeeData.firstName) {
+          continue
+        }
+
+        // Skip employees with non-active status (terminated, resigned, etc.)
+        if (employeeData.status === 'inactive-skip') {
+          results.skipped++
+          results.warnings.push(`Row ${rowNumber}: Skipped - Employee status is terminated/resigned/inactive`)
           continue
         }
 
