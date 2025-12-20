@@ -30,109 +30,176 @@
   <!-- Hero Section -->
   <main class="hero">
     <div class="hero-content">
-      <span class="badge">✦ DESKTOP APPLICATION</span>
+      <!-- Dynamic Badge - changes based on detected device -->
+      <span class="badge" id="platformBadge">✦ DESKTOP APPLICATION</span>
       <h1>Download Talio</h1>
       <p class="subtitle">
-        Get the native desktop experience for attendance tracking, 
+        Get the native experience for attendance tracking, 
         productivity monitoring, and seamless HR management.
       </p>
 
-      <!-- OS Selection -->
-      <div class="os-selector">
-        <button class="os-btn active" data-os="mac" id="macBtn">
-          <svg class="os-icon" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M18.71 19.5C17.88 20.74 17 21.95 15.66 21.97C14.32 22 13.89 21.18 12.37 21.18C10.84 21.18 10.37 21.95 9.1 22C7.79 22.05 6.8 20.68 5.96 19.47C4.25 17 2.94 12.45 4.7 9.39C5.57 7.87 7.13 6.91 8.82 6.88C10.1 6.86 11.32 7.75 12.11 7.75C12.89 7.75 14.37 6.68 15.92 6.84C16.57 6.87 18.39 7.1 19.56 8.82C19.47 8.88 17.39 10.1 17.41 12.63C17.44 15.65 20.06 16.66 20.09 16.67C20.06 16.74 19.67 18.11 18.71 19.5ZM13 3.5C13.73 2.67 14.94 2.04 15.94 2C16.07 3.17 15.6 4.35 14.9 5.19C14.21 6.04 13.07 6.7 11.95 6.61C11.8 5.46 12.36 4.26 13 3.5Z"/>
+      <!-- Recommended Download (Auto-detected) -->
+      <div class="recommended-download" id="recommendedDownload">
+        <div class="recommended-badge">
+          <svg class="sparkle-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2L14.2 8.4L21 9.2L16 14L17.5 21L12 17.5L6.5 21L8 14L3 9.2L9.8 8.4L12 2Z"/>
           </svg>
-          <span>macOS</span>
-        </button>
-        <button class="os-btn" data-os="windows" id="windowsBtn">
-          <svg class="os-icon" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M3 12V6.75L9 5.43V11.91L3 12ZM20 3V11.75L10 11.9V5.21L20 3ZM3 13L9 13.09V19.9L3 18.75V13ZM10 13.25L20 13.5V22L10 20.09V13.25Z"/>
+          Recommended for your device
+        </div>
+        <a href="#" class="download-btn-large" id="recommendedBtn">
+          <div class="btn-content">
+            <div class="btn-icon" id="recommendedIcon">
+              <!-- Icon inserted by JS -->
+            </div>
+            <div class="btn-text">
+              <span class="btn-title" id="recommendedTitle">Download for macOS</span>
+              <span class="btn-subtitle" id="recommendedSubtitle">Apple Silicon • v3.1.0 • ~83 MB</span>
+            </div>
+          </div>
+          <svg class="download-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15"/>
+            <polyline points="7 10 12 15 17 10"/>
+            <line x1="12" y1="15" x2="12" y2="3"/>
           </svg>
-          <span>Windows</span>
-        </button>
+        </a>
       </div>
 
-      <!-- Download Cards -->
-      <div class="download-section">
-        <!-- macOS Download -->
-        <div class="download-card" id="macDownload">
-          <div class="card-header">
-            <div class="platform-info">
-              <span class="platform-name">macOS</span>
-              <span class="version" id="macVersion">Version 1.0.6</span>
+      <!-- All Platforms Section -->
+      <div class="all-platforms">
+        <h3 class="section-title">All Platforms</h3>
+        
+        <div class="platform-grid">
+          <!-- macOS Card -->
+          <div class="platform-card" id="macCard">
+            <div class="platform-header">
+              <div class="platform-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M18.71 19.5C17.88 20.74 17 21.95 15.66 21.97C14.32 22 13.89 21.18 12.37 21.18C10.84 21.18 10.37 21.95 9.1 22C7.79 22.05 6.8 20.68 5.96 19.47C4.25 17 2.94 12.45 4.7 9.39C5.57 7.87 7.13 6.91 8.82 6.88C10.1 6.86 11.32 7.75 12.11 7.75C12.89 7.75 14.37 6.68 15.92 6.84C16.57 6.87 18.39 7.1 19.56 8.82C19.47 8.88 17.39 10.1 17.41 12.63C17.44 15.65 20.06 16.66 20.09 16.67C20.06 16.74 19.67 18.11 18.71 19.5ZM13 3.5C13.73 2.67 14.94 2.04 15.94 2C16.07 3.17 15.6 4.35 14.9 5.19C14.21 6.04 13.07 6.7 11.95 6.61C11.8 5.46 12.36 4.26 13 3.5Z"/>
+                </svg>
+              </div>
+              <div class="platform-info">
+                <span class="platform-name">macOS</span>
+                <span class="platform-version">v3.1.0</span>
+              </div>
             </div>
-            <span class="arch-badge" id="macArchBadge">Apple Silicon</span>
-          </div>
-          <a href="#" class="download-btn" id="macDownloadBtn">
-            <svg class="download-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15"/>
-              <polyline points="7 10 12 15 17 10"/>
-              <line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            <span id="macDownloadText">Download for macOS</span>
-          </a>
-          <p class="file-info" id="macFileInfo">DMG installer • ~100 MB</p>
-
-          <!-- Mac Architecture Options -->
-          <div class="arch-options" id="macArchOptions">
-            <span class="arch-label">Other versions:</span>
-            <a href="#" class="arch-link" id="macAltLink">Intel (x64)</a>
-          </div>
-
-          <!-- Mac Installation Notice -->
-          <div class="install-notice">
-            <svg class="notice-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"/>
-              <line x1="12" y1="8" x2="12" y2="12"/>
-              <line x1="12" y1="16" x2="12.01" y2="16"/>
-            </svg>
-            <div class="notice-text">
-              <strong>Apple Silicon users:</strong> If you see "damaged" error,
-              <a href="https://github.com/avirajsharma-ops/Tailo/blob/main/MAC_INSTALLATION_GUIDE.md" target="_blank" class="notice-link">follow this guide</a>
+            <div class="platform-downloads">
+              <a href="https://github.com/avirajsharma-ops/Talio/releases/download/v3.1.0/Talio-3.1.0-arm64.dmg" class="platform-link" download>
+                <span>Apple Silicon (M1/M2/M3/M4)</span>
+                <span class="size">~83 MB</span>
+              </a>
+              <a href="https://github.com/avirajsharma-ops/Talio/releases/download/v3.1.0/Talio-3.1.0.dmg" class="platform-link" download>
+                <span>Intel (x64)</span>
+                <span class="size">~87 MB</span>
+              </a>
+            </div>
+            <div class="install-notice">
+              <svg class="notice-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              <span>If you see "damaged" error, <a href="https://github.com/avirajsharma-ops/Talio/blob/main/MAC_INSTALLATION_GUIDE.md" target="_blank">follow this guide</a></span>
             </div>
           </div>
-        </div>
 
-        <!-- Windows Download -->
-        <div class="download-card hidden" id="windowsDownload">
-          <div class="card-header">
-            <div class="platform-info">
-              <span class="platform-name">Windows</span>
-              <span class="version" id="winVersion">Version 1.0.6</span>
+          <!-- Windows Card -->
+          <div class="platform-card" id="windowsCard">
+            <div class="platform-header">
+              <div class="platform-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M3 12V6.75L9 5.43V11.91L3 12ZM20 3V11.75L10 11.9V5.21L20 3ZM3 13L9 13.09V19.9L3 18.75V13ZM10 13.25L20 13.5V22L10 20.09V13.25Z"/>
+                </svg>
+              </div>
+              <div class="platform-info">
+                <span class="platform-name">Windows</span>
+                <span class="platform-version">v3.1.0</span>
+              </div>
             </div>
-            <span class="arch-badge" id="winArchBadge">Universal</span>
+            <div class="platform-downloads">
+              <a href="https://github.com/avirajsharma-ops/Talio/releases/download/v3.1.0/Talio.Setup.3.1.0.exe" class="platform-link" download>
+                <span>Windows 10/11 (64-bit)</span>
+                <span class="size">~147 MB</span>
+              </a>
+            </div>
           </div>
-          <a href="#" class="download-btn" id="winDownloadBtn">
-            <svg class="download-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V15"/>
-              <polyline points="7 10 12 15 17 10"/>
-              <line x1="12" y1="15" x2="12" y2="3"/>
-            </svg>
-            <span id="winDownloadText">Download for Windows</span>
-          </a>
-          <p class="file-info" id="winFileInfo">Universal Installer • ~138 MB • Works on all Windows</p>
+
+          <!-- Android Card -->
+          <div class="platform-card" id="androidCard">
+            <div class="platform-header">
+              <div class="platform-icon android-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M17.6 9.48L19.44 6.3C19.54 6.12 19.48 5.88 19.3 5.78C19.12 5.68 18.88 5.74 18.78 5.92L16.92 9.14C15.42 8.44 13.76 8.06 12 8.06C10.24 8.06 8.58 8.44 7.08 9.14L5.22 5.92C5.12 5.74 4.88 5.68 4.7 5.78C4.52 5.88 4.46 6.12 4.56 6.3L6.4 9.48C3.06 11.38 0.84 14.84 0.5 18.78H23.5C23.16 14.84 20.94 11.38 17.6 9.48ZM7 15.25C6.31 15.25 5.75 14.69 5.75 14C5.75 13.31 6.31 12.75 7 12.75C7.69 12.75 8.25 13.31 8.25 14C8.25 14.69 7.69 15.25 7 15.25ZM17 15.25C16.31 15.25 15.75 14.69 15.75 14C15.75 13.31 16.31 12.75 17 12.75C17.69 12.75 18.25 13.31 18.25 14C18.25 14.69 17.69 15.25 17 15.25Z"/>
+                </svg>
+              </div>
+              <div class="platform-info">
+                <span class="platform-name">Android</span>
+                <span class="platform-version">v3.1.0</span>
+              </div>
+            </div>
+            <div class="platform-downloads">
+              <a href="https://github.com/avirajsharma-ops/Talio/releases/download/v3.1.0/talio-hrms.apk" class="platform-link" download>
+                <span>Android APK</span>
+                <span class="size">~7 MB</span>
+              </a>
+            </div>
+            <div class="install-notice android-notice">
+              <svg class="notice-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+              <span>Enable "Install from unknown sources" in Settings</span>
+            </div>
+          </div>
+
+          <!-- iOS Card (Coming Soon) -->
+          <div class="platform-card disabled" id="iosCard">
+            <div class="platform-header">
+              <div class="platform-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M18.71 19.5C17.88 20.74 17 21.95 15.66 21.97C14.32 22 13.89 21.18 12.37 21.18C10.84 21.18 10.37 21.95 9.1 22C7.79 22.05 6.8 20.68 5.96 19.47C4.25 17 2.94 12.45 4.7 9.39C5.57 7.87 7.13 6.91 8.82 6.88C10.1 6.86 11.32 7.75 12.11 7.75C12.89 7.75 14.37 6.68 15.92 6.84C16.57 6.87 18.39 7.1 19.56 8.82C19.47 8.88 17.39 10.1 17.41 12.63C17.44 15.65 20.06 16.66 20.09 16.67C20.06 16.74 19.67 18.11 18.71 19.5ZM13 3.5C13.73 2.67 14.94 2.04 15.94 2C16.07 3.17 15.6 4.35 14.9 5.19C14.21 6.04 13.07 6.7 11.95 6.61C11.8 5.46 12.36 4.26 13 3.5Z"/>
+                </svg>
+              </div>
+              <div class="platform-info">
+                <span class="platform-name">iOS</span>
+                <span class="platform-version">Coming Soon</span>
+              </div>
+            </div>
+            <div class="coming-soon-badge">
+              <span>🚀 Coming Q1 2025</span>
+            </div>
+          </div>
         </div>
       </div>
 
       <!-- System Requirements -->
-      <div class="requirements" id="requirements">
+      <div class="requirements">
         <h3>System Requirements</h3>
-        <div class="req-content" id="macReq">
-          <ul>
-            <li>macOS 10.15 (Catalina) or later</li>
-            <li>Apple Silicon (M1/M2/M3) or Intel processor</li>
-            <li>200 MB available disk space</li>
-            <li>Internet connection for sync features</li>
-          </ul>
-        </div>
-        <div class="req-content hidden" id="windowsReq">
-          <ul>
-            <li>Windows 10 or Windows 11</li>
-            <li>64-bit or 32-bit processor</li>
-            <li>200 MB available disk space</li>
-            <li>Internet connection for sync features</li>
-          </ul>
+        <div class="req-grid">
+          <div class="req-item">
+            <h4>macOS</h4>
+            <ul>
+              <li>macOS 10.15 (Catalina) or later</li>
+              <li>Apple Silicon or Intel processor</li>
+              <li>200 MB available disk space</li>
+            </ul>
+          </div>
+          <div class="req-item">
+            <h4>Windows</h4>
+            <ul>
+              <li>Windows 10 or Windows 11</li>
+              <li>64-bit processor</li>
+              <li>200 MB available disk space</li>
+            </ul>
+          </div>
+          <div class="req-item">
+            <h4>Android</h4>
+            <ul>
+              <li>Android 8.0 (Oreo) or later</li>
+              <li>50 MB available storage</li>
+              <li>Location services enabled</li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>

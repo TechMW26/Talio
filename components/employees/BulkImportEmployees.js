@@ -12,85 +12,21 @@ import {
   FaExclamationTriangle,
   FaInfoCircle,
   FaEye,
-  FaTrash
+  FaTrash,
+  FaRobot,
+  FaArrowRight
 } from 'react-icons/fa'
 
 export default function BulkImportEmployees() {
   const [file, setFile] = useState(null)
   const [preview, setPreview] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [previewLoading, setPreviewLoading] = useState(false)
   const [downloadingTemplate, setDownloadingTemplate] = useState(false)
   const [importResult, setImportResult] = useState(null)
-  const [validationErrors, setValidationErrors] = useState([])
   const fileInputRef = useRef(null)
 
-  // Convert column index to Excel column letter (0 = A, 1 = B, etc.)
-  const getExcelColumnLetter = (index) => {
-    let letter = ''
-    let temp = index
-    while (temp >= 0) {
-      letter = String.fromCharCode((temp % 26) + 65) + letter
-      temp = Math.floor(temp / 26) - 1
-    }
-    return letter
-  }
-
-  // Get cell reference like "A2", "B3"
-  const getCellReference = (rowIndex, colIndex) => {
-    return `${getExcelColumnLetter(colIndex)}${rowIndex + 2}` // +2 for header row and 1-based indexing
-  }
-
-  // Validate row data
-  const validateRow = (row, headers, rowIndex) => {
-    const errors = []
-    const requiredFields = [
-      { header: 'Employee Code', colIndex: 0 },
-      { header: 'First Name', colIndex: 1 },
-      { header: 'Last Name', colIndex: 2 },
-      { header: 'Email', colIndex: 3 },
-      { header: 'Phone', colIndex: 4 },
-      { header: 'Date of Joining', colIndex: 6 }
-    ]
-
-    // Find column indices from headers (case-insensitive)
-    const columnMap = new Map()
-    headers.forEach((header, index) => {
-      if (header) {
-        columnMap.set(header.toString().toLowerCase().trim(), index)
-      }
-    })
-
-    requiredFields.forEach(field => {
-      const colIndex = columnMap.get(field.header.toLowerCase()) ?? field.colIndex
-      const cellValue = row[colIndex]
-      
-      if (!cellValue || cellValue.toString().trim() === '') {
-        errors.push({
-          cell: getCellReference(rowIndex, colIndex),
-          field: field.header,
-          message: `${field.header} is required`
-        })
-      }
-    })
-
-    // Validate email format
-    const emailColIndex = columnMap.get('email') ?? 3
-    const emailValue = row[emailColIndex]
-    if (emailValue && emailValue.toString().trim() !== '') {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      if (!emailRegex.test(emailValue.toString().trim())) {
-        errors.push({
-          cell: getCellReference(rowIndex, emailColIndex),
-          field: 'Email',
-          message: 'Invalid email format'
-        })
-      }
-    }
-
-    return errors
-  }
-
-  // Handle file selection
+  // Handle file selection - use AI preview API
   const handleFileSelect = async (e) => {
     const selectedFile = e.target.files?.[0]
     if (!selectedFile) return
@@ -101,98 +37,51 @@ export default function BulkImportEmployees() {
       return
     }
 
-    // Validate file size (max 5MB)
-    if (selectedFile.size > 5 * 1024 * 1024) {
-      toast.error('File size must be less than 5MB')
+    // Validate file size (max 10MB)
+    if (selectedFile.size > 10 * 1024 * 1024) {
+      toast.error('File size must be less than 10MB')
       return
     }
 
     setFile(selectedFile)
     setImportResult(null)
-    setValidationErrors([])
+    setPreviewLoading(true)
 
-    // Preview and validate the file
+    // Call preview API to get AI-mapped data
     try {
-      const arrayBuffer = await selectedFile.arrayBuffer()
-      const XLSX = await import('xlsx')
-      const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: false })
-      const sheetName = workbook.SheetNames[0]
-      const worksheet = workbook.Sheets[sheetName]
-      
-      // Get the range of the worksheet
-      const range = XLSX.utils.decode_range(worksheet['!ref'])
-      const headers = []
-      const rows = []
-      
-      // Extract headers from first row
-      for (let col = range.s.c; col <= range.e.c; col++) {
-        const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col })
-        const cell = worksheet[cellAddress]
-        headers.push(cell ? cell.v : '')
-      }
+      const formData = new FormData()
+      formData.append('file', selectedFile)
 
-      // Extract data rows, preserving empty cells
-      for (let row = 1; row <= range.e.r; row++) {
-        const rowData = []
-        let hasData = false
-        
-        for (let col = range.s.c; col <= range.e.c; col++) {
-          const cellAddress = XLSX.utils.encode_cell({ r: row, c: col })
-          const cell = worksheet[cellAddress]
-          const value = cell ? cell.v : ''
-          rowData.push(value)
-          if (value !== '' && value !== null && value !== undefined) {
-            hasData = true
-          }
-        }
-        
-        // Only include rows that have at least one non-empty cell
-        if (hasData) {
-          rows.push(rowData)
-        }
-      }
-
-      if (rows.length === 0) {
-        toast.error('Excel file appears to be empty')
-        setFile(null)
-        return
-      }
-
-      // Validate all rows
-      const allErrors = []
-      rows.forEach((row, index) => {
-        const rowErrors = validateRow(row, headers, index)
-        if (rowErrors.length > 0) {
-          allErrors.push({
-            rowNumber: index + 2, // +2 for header and 1-based indexing
-            errors: rowErrors
-          })
-        }
+      const response = await fetch('/api/employees/bulk-import/preview', {
+        method: 'POST',
+        body: formData,
       })
 
-      setValidationErrors(allErrors)
+      const data = await response.json()
 
-      setPreview({
-        headers,
-        rows: rows.slice(0, 5), // Show first 5 rows
-        totalRows: rows.length,
-        allRows: rows // Store all rows for validation display
-      })
-
-      if (allErrors.length > 0) {
-        toast.error(`Validation failed: ${allErrors.length} row(s) have errors. Please fix them before importing.`, {
-          duration: 4000,
-          icon: '❌'
-        })
+      if (data.success) {
+        setPreview(data.data)
+        
+        if (data.data.warnings?.length > 0) {
+          data.data.warnings.forEach(w => toast.error(w, { duration: 5000 }))
+        } else {
+          toast.success(
+            `🤖 AI analyzed ${data.data.totalRows} employees. Detected ${data.data.detectedMappings?.length || 0} field mappings.`,
+            { duration: 4000, icon: '✅' }
+          )
+        }
       } else {
-        toast.success(`File loaded: ${rows.length} employee(s) found and validated successfully`, {
-          icon: '✅'
-        })
+        toast.error(data.message || 'Failed to analyze file')
+        setFile(null)
+        setPreview(null)
       }
     } catch (error) {
-      console.error('Error reading file:', error)
-      toast.error('Failed to read Excel file')
+      console.error('Preview error:', error)
+      toast.error('Failed to analyze Excel file')
       setFile(null)
+      setPreview(null)
+    } finally {
+      setPreviewLoading(false)
     }
   }
 
@@ -277,6 +166,11 @@ export default function BulkImportEmployees() {
         } else {
           toast.error('All imports failed. Please check the errors below.')
         }
+
+        // Show column mapping info if available
+        if (data.data.detectedColumns && data.data.detectedColumns.length > 0) {
+          console.log('AI detected columns:', data.data.detectedColumns)
+        }
       } else {
         toast.error(data.message || 'Import failed')
       }
@@ -293,7 +187,7 @@ export default function BulkImportEmployees() {
     setFile(null)
     setPreview(null)
     setImportResult(null)
-    setValidationErrors([])
+    setPreviewLoading(false)
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
@@ -306,14 +200,15 @@ export default function BulkImportEmployees() {
         <div className="flex items-start gap-3">
           <FaInfoCircle className="text-blue-600 text-xl flex-shrink-0 mt-0.5" />
           <div>
-            <h3 className="font-semibold text-blue-800 mb-2">Bulk Import Instructions</h3>
+            <h3 className="font-semibold text-blue-800 mb-2">Smart Bulk Import</h3>
             <ul className="text-sm text-blue-700 space-y-1">
-              <li>• Upload an Excel file (.xlsx or .xls) with employee data</li>
-              <li>• Download the template below to see the required columns</li>
-              <li>• <strong>Required fields:</strong> Employee Code, First Name, Last Name, Email, Phone, Date of Joining</li>
-              <li>• Duplicate emails or employee codes will be skipped</li>
-              <li>• Default password is "employee123" if not specified</li>
-              <li>• All employees will be required to change password on first login</li>
+              <li>• Upload <strong>any Excel file</strong> with employee data - AI will auto-detect columns</li>
+              <li>• No need to match exact column names - we&apos;ll figure out what each column contains</li>
+              <li>• <strong>Required:</strong> Email column (used to identify employees)</li>
+              <li>• <strong>Auto-detected:</strong> Name, Phone, DOB, DOJ, Department, Designation, etc.</li>
+              <li>• <strong>Smart matching:</strong> Departments &amp; Designations fuzzy-matched or auto-created</li>
+              <li>• <strong>Upsert:</strong> Re-importing with same email updates existing records</li>
+              <li>• Excel date serial numbers (like 45628) are automatically converted</li>
             </ul>
           </div>
         </div>
@@ -393,106 +288,127 @@ export default function BulkImportEmployees() {
               or <span className="text-primary-600 hover:underline">browse to upload</span>
             </p>
             <p className="text-xs text-gray-400 mt-2">
-              Supported formats: .xlsx, .xls (max 5MB)
+              Supported formats: .xlsx, .xls (max 10MB)
             </p>
           </div>
         )}
       </div>
 
-      {/* Validation Errors Section */}
-      {validationErrors.length > 0 && !importResult && (
-        <div className="bg-red-50 border border-red-200 rounded-lg overflow-hidden">
-          <div className="bg-red-100 px-4 py-3 border-b border-red-200">
-            <div className="flex items-center gap-2">
-              <FaExclamationTriangle className="text-red-600" />
-              <span className="font-semibold text-red-800">
-                Validation Errors ({validationErrors.length} row(s))
+      {/* Loading State */}
+      {previewLoading && (
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-6 text-center">
+          <FaSpinner className="animate-spin text-3xl text-purple-600 mx-auto mb-3" />
+          <p className="text-purple-800 font-medium">🤖 AI is analyzing your Excel file...</p>
+          <p className="text-purple-600 text-sm mt-1">Detecting columns, extracting data, and mapping to our template</p>
+        </div>
+      )}
+
+      {/* AI Mapping Info */}
+      {preview && !importResult && preview.detectedMappings?.length > 0 && (
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+          <h4 className="font-medium text-purple-800 mb-3 flex items-center gap-2">
+            <FaRobot className="text-purple-600" />
+            AI Column Detection ({preview.mappingMethod === 'ai' ? 'AI Analysis' : 'Pattern Matching'})
+          </h4>
+          <div className="flex flex-wrap gap-2">
+            {preview.detectedMappings.map((mapping, idx) => (
+              <span key={idx} className="inline-flex items-center gap-1 px-3 py-1.5 bg-purple-100 text-purple-700 rounded-full text-sm">
+                <span className="font-medium">{mapping.sourceColumn}</span>
+                <FaArrowRight className="text-xs text-purple-400" />
+                <span className="text-purple-800">{mapping.targetField}</span>
               </span>
-            </div>
-            <p className="text-sm text-red-700 mt-1">
-              Please fix the following errors before importing. Cell references show the exact location in Excel format.
-            </p>
-          </div>
-          <div className="overflow-x-auto max-h-80 overflow-y-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-red-50 sticky top-0">
-                <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-red-700 uppercase">Row</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-red-700 uppercase">Cell</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-red-700 uppercase">Field</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-red-700 uppercase">Error</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-red-100">
-                {validationErrors.map((rowError, idx) => (
-                  rowError.errors.map((error, errorIdx) => (
-                    <tr key={`${idx}-${errorIdx}`} className="hover:bg-red-50">
-                      {errorIdx === 0 && (
-                        <td className="px-4 py-2 text-red-700 font-medium" rowSpan={rowError.errors.length}>
-                          {rowError.rowNumber}
-                        </td>
-                      )}
-                      <td className="px-4 py-2 text-red-600 font-mono font-semibold">{error.cell}</td>
-                      <td className="px-4 py-2 text-gray-700">{error.field}</td>
-                      <td className="px-4 py-2 text-red-600">{error.message}</td>
-                    </tr>
-                  ))
-                ))}
-              </tbody>
-            </table>
+            ))}
           </div>
         </div>
       )}
 
-      {/* Preview Section */}
-      {preview && !importResult && (
-        <div className="bg-white border rounded-lg overflow-hidden">
-          <div className="bg-gray-50 px-4 py-3 border-b flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <FaEye className="text-gray-500" />
-              <span className="font-medium text-gray-700">Preview</span>
-              <span className="text-sm text-gray-500">
-                (showing {Math.min(5, preview.rows.length)} of {preview.totalRows} rows)
-              </span>
-            </div>
-            {validationErrors.length === 0 && (
-              <span className="flex items-center gap-1 text-sm text-green-600 font-medium">
-                <FaCheck className="text-green-600" />
-                All rows validated
-              </span>
+      {/* Row Warnings */}
+      {preview && !importResult && preview.rowWarnings?.length > 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <FaExclamationTriangle className="text-yellow-600" />
+            <span className="font-medium text-yellow-800">
+              Warnings ({preview.rowWarnings.length} row(s))
+            </span>
+          </div>
+          <p className="text-sm text-yellow-700 mb-3">
+            These rows have issues but will still be imported. Missing data can be added later.
+          </p>
+          <div className="max-h-40 overflow-y-auto">
+            {preview.rowWarnings.slice(0, 10).map((warning, idx) => (
+              <div key={idx} className="text-sm text-yellow-700 py-1">
+                <span className="font-medium">Row {warning.rowNumber}:</span> {warning.issues.join(', ')}
+              </div>
+            ))}
+            {preview.rowWarnings.length > 10 && (
+              <div className="text-sm text-yellow-600 italic">
+                ...and {preview.rowWarnings.length - 10} more warnings
+              </div>
             )}
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-100">
+        </div>
+      )}
+
+      {/* Preview Section - Our Template */}
+      {preview && !importResult && preview.templateFields && (
+        <div className="bg-white border rounded-lg overflow-hidden">
+          <div className="bg-gradient-to-r from-green-50 to-blue-50 px-4 py-3 border-b flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FaEye className="text-green-600" />
+              <span className="font-medium text-gray-700">Extracted Data Preview</span>
+              <span className="text-sm text-gray-500">
+                ({preview.totalRows} employees detected)
+              </span>
+            </div>
+            <span className="flex items-center gap-1 text-sm text-green-600 font-medium">
+              <FaCheck className="text-green-600" />
+              Data mapped to Talio template
+            </span>
+          </div>
+          <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+            <table className="w-full text-sm min-w-[1200px]">
+              <thead className="bg-gray-100 sticky top-0 z-10">
                 <tr>
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
-                  {preview.headers.slice(0, 8).map((header, i) => (
-                    <th key={i} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
-                      {header || `Column ${getExcelColumnLetter(i)}`}
+                  {preview.templateFields.map((field, i) => (
+                    <th 
+                      key={i} 
+                      className={`px-3 py-2 text-left text-xs font-medium uppercase whitespace-nowrap ${
+                        field.required ? 'text-red-600' : 'text-gray-500'
+                      }`}
+                      title={field.description}
+                    >
+                      {field.label}
+                      {field.required && <span className="text-red-500 ml-1">*</span>}
                     </th>
                   ))}
-                  {preview.headers.length > 8 && (
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500">...</th>
-                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {preview.rows.map((row, rowIdx) => {
-                  const hasError = validationErrors.some(err => err.rowNumber === rowIdx + 2)
+                {preview.transformedRows.map((row, rowIdx) => {
+                  const hasWarning = preview.rowWarnings?.some(w => w.rowNumber === rowIdx + 2)
                   return (
-                    <tr key={rowIdx} className={hasError ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-gray-50'}>
-                      <td className={`px-3 py-2 ${hasError ? 'text-red-600 font-semibold' : 'text-gray-500'}`}>
-                        {rowIdx + 2}
+                    <tr key={rowIdx} className={hasWarning ? 'bg-yellow-50 hover:bg-yellow-100' : 'hover:bg-gray-50'}>
+                      <td className="px-3 py-2 text-gray-400 font-mono text-xs">
+                        {rowIdx + 1}
                       </td>
-                      {row.slice(0, 8).map((cell, cellIdx) => (
-                        <td key={cellIdx} className="px-3 py-2 text-gray-700 whitespace-nowrap max-w-[150px] truncate">
-                          {cell !== '' && cell !== null && cell !== undefined ? cell : '-'}
-                        </td>
-                      ))}
-                      {row.length > 8 && (
-                        <td className="px-3 py-2 text-gray-400">...</td>
-                      )}
+                      {preview.templateFields.map((field, cellIdx) => {
+                        const value = row[field.key] || ''
+                        const isEmpty = !value
+                        const isMissingRequired = field.required && isEmpty
+                        return (
+                          <td 
+                            key={cellIdx} 
+                            className={`px-3 py-2 whitespace-nowrap max-w-[180px] truncate ${
+                              isMissingRequired ? 'bg-red-100 text-red-600' :
+                              isEmpty ? 'text-gray-300' : 'text-gray-700'
+                            }`}
+                            title={value || 'Empty'}
+                          >
+                            {value || '-'}
+                          </td>
+                        )
+                      })}
                     </tr>
                   )
                 })}
@@ -503,7 +419,7 @@ export default function BulkImportEmployees() {
       )}
 
       {/* Import Button */}
-      {file && !importResult && (
+      {file && !importResult && preview && !previewLoading && (
         <div className="flex justify-end gap-3">
           <button
             onClick={handleClear}
@@ -514,9 +430,8 @@ export default function BulkImportEmployees() {
           </button>
           <button
             onClick={handleSubmit}
-            disabled={loading || validationErrors.length > 0}
+            disabled={loading}
             className="btn-primary flex items-center gap-2"
-            title={validationErrors.length > 0 ? 'Please fix validation errors before importing' : ''}
           >
             {loading ? (
               <>
@@ -536,17 +451,34 @@ export default function BulkImportEmployees() {
       {/* Results Section */}
       {importResult && (
         <div className="space-y-4">
+          {/* AI Column Detection Info */}
+          {importResult.detectedColumns?.length > 0 && (
+            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+              <h4 className="font-medium text-purple-800 mb-2 flex items-center gap-2">
+                <span className="text-lg">🤖</span>
+                AI Detected Columns ({importResult.mappingMethod === 'ai' ? 'AI Analysis' : 'Pattern Matching'})
+              </h4>
+              <div className="flex flex-wrap gap-2">
+                {importResult.detectedColumns.map((col, idx) => (
+                  <span key={idx} className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs">
+                    <strong>{col.column}</strong> → {col.field}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Summary */}
           <div className={`rounded-lg p-4 ${
-            importResult.failed.length === 0 
+            importResult.failed?.length === 0 
               ? 'bg-green-50 border border-green-200' 
-              : importResult.successful.length > 0 
+              : (importResult.created?.length > 0 || importResult.updated?.length > 0)
                 ? 'bg-yellow-50 border border-yellow-200'
                 : 'bg-red-50 border border-red-200'
           }`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                {importResult.failed.length === 0 ? (
+                {importResult.failed?.length === 0 ? (
                   <FaCheck className="text-2xl text-green-600" />
                 ) : (
                   <FaExclamationTriangle className="text-2xl text-yellow-600" />
@@ -554,8 +486,15 @@ export default function BulkImportEmployees() {
                 <div>
                   <h3 className="font-semibold text-gray-800">Import Complete</h3>
                   <p className="text-sm text-gray-600">
-                    {importResult.successful.length} succeeded • {importResult.failed.length} failed
+                    {importResult.created?.length || 0} created • {importResult.updated?.length || 0} updated • {importResult.failed?.length || 0} failed
                   </p>
+                  {(importResult.departmentsCreated > 0 || importResult.designationsCreated > 0) && (
+                    <p className="text-xs text-blue-600 mt-1">
+                      {importResult.departmentsCreated > 0 && `${importResult.departmentsCreated} new department(s) created`}
+                      {importResult.departmentsCreated > 0 && importResult.designationsCreated > 0 && ' • '}
+                      {importResult.designationsCreated > 0 && `${importResult.designationsCreated} new designation(s) created`}
+                    </p>
+                  )}
                 </div>
               </div>
               <button
@@ -567,13 +506,13 @@ export default function BulkImportEmployees() {
             </div>
           </div>
 
-          {/* Success List */}
-          {importResult.successful.length > 0 && (
+          {/* Created List */}
+          {importResult.created?.length > 0 && (
             <div className="bg-white border rounded-lg overflow-hidden">
               <div className="bg-green-50 px-4 py-3 border-b">
                 <h4 className="font-medium text-green-800 flex items-center gap-2">
                   <FaCheck className="text-green-600" />
-                  Successfully Created ({importResult.successful.length})
+                  New Employees Created ({importResult.created.length})
                 </h4>
               </div>
               <div className="overflow-x-auto max-h-60 overflow-y-auto">
@@ -588,13 +527,59 @@ export default function BulkImportEmployees() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {importResult.successful.map((item, idx) => (
+                    {importResult.created.map((item, idx) => (
                       <tr key={idx} className="hover:bg-gray-50">
                         <td className="px-4 py-2 text-gray-500">{item.rowNumber}</td>
                         <td className="px-4 py-2 font-medium text-gray-800">{item.employeeCode}</td>
                         <td className="px-4 py-2 text-gray-700">{item.name}</td>
                         <td className="px-4 py-2 text-gray-600">{item.email}</td>
-                        <td className="px-4 py-2 text-gray-600 font-mono text-xs">{item.credentials?.password}</td>
+                        <td className="px-4 py-2 text-gray-600 font-mono text-xs">{item.credentials?.password || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Updated List */}
+          {importResult.updated?.length > 0 && (
+            <div className="bg-white border border-blue-200 rounded-lg overflow-hidden">
+              <div className="bg-blue-50 px-4 py-3 border-b border-blue-200">
+                <h4 className="font-medium text-blue-800 flex items-center gap-2">
+                  <FaInfoCircle className="text-blue-600" />
+                  Existing Employees Updated ({importResult.updated.length})
+                </h4>
+              </div>
+              <div className="overflow-x-auto max-h-60 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Row</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Employee Code</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Name</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Email</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Warnings</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {importResult.updated.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-blue-50">
+                        <td className="px-4 py-2 text-gray-500">{item.rowNumber}</td>
+                        <td className="px-4 py-2 font-medium text-gray-800">{item.employeeCode}</td>
+                        <td className="px-4 py-2 text-gray-700">{item.name}</td>
+                        <td className="px-4 py-2 text-gray-600">{item.email}</td>
+                        <td className="px-4 py-2">
+                          {item.warnings?.length > 0 ? (
+                            <ul className="text-yellow-600 text-xs list-disc list-inside">
+                              {item.warnings.map((warn, warnIdx) => (
+                                <li key={warnIdx}>{warn}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <span className="text-gray-400 text-xs">No warnings</span>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -604,7 +589,7 @@ export default function BulkImportEmployees() {
           )}
 
           {/* Failure List */}
-          {importResult.failed.length > 0 && (
+          {importResult.failed?.length > 0 && (
             <div className="bg-white border border-red-200 rounded-lg overflow-hidden">
               <div className="bg-red-50 px-4 py-3 border-b border-red-200">
                 <h4 className="font-medium text-red-800 flex items-center gap-2">

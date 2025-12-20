@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { FaUserShield, FaEnvelope, FaLock, FaUser, FaEye, FaEyeSlash, FaBuilding, FaRocket } from 'react-icons/fa';
+import Image from 'next/image';
+import { FaUserShield, FaEnvelope, FaLock, FaUser, FaEye, FaEyeSlash, FaBuilding, FaArrowRight } from 'react-icons/fa';
 import toast from 'react-hot-toast';
 
 export default function SetupPage() {
@@ -44,6 +45,38 @@ export default function SetupPage() {
 
     checkSetup();
   }, [router]);
+
+  // Fix scroll issue - override global CSS that locks body
+  useEffect(() => {
+    const originalStyle = {
+      overflow: document.body.style.overflow,
+      position: document.body.style.position,
+      height: document.body.style.height,
+      width: document.body.style.width,
+    };
+    const originalHtmlStyle = {
+      overflow: document.documentElement.style.overflow,
+      position: document.documentElement.style.position,
+    };
+
+    // Override to allow scrolling
+    document.body.style.overflow = 'auto';
+    document.body.style.position = 'static';
+    document.body.style.height = 'auto';
+    document.body.style.width = 'auto';
+    document.documentElement.style.overflow = 'auto';
+    document.documentElement.style.position = 'static';
+
+    return () => {
+      // Restore original styles on unmount
+      document.body.style.overflow = originalStyle.overflow;
+      document.body.style.position = originalStyle.position;
+      document.body.style.height = originalStyle.height;
+      document.body.style.width = originalStyle.width;
+      document.documentElement.style.overflow = originalHtmlStyle.overflow;
+      document.documentElement.style.position = originalHtmlStyle.position;
+    };
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -174,8 +207,14 @@ export default function SetupPage() {
       <div className="w-full max-w-lg">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl shadow-lg mb-4">
-            <FaRocket className="text-4xl text-white" />
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-white rounded-2xl shadow-lg mb-4 border border-gray-100">
+            <Image
+              src="/fox-icon.png"
+              alt="Talio"
+              width={56}
+              height={56}
+              className="object-contain"
+            />
           </div>
           <h1 className="text-3xl font-bold text-gray-900">Welcome to Talio</h1>
           <p className="text-gray-600 mt-2">
@@ -337,7 +376,7 @@ export default function SetupPage() {
                 </span>
               ) : (
                 <span className="flex items-center justify-center gap-2">
-                  <FaRocket />
+                  <FaArrowRight />
                   Create Admin & Get Started
                 </span>
               )}

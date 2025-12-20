@@ -22,7 +22,7 @@ const EmployeeSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    required: true,
+    required: false, // Not required for bulk import flexibility
   },
   dateOfBirth: {
     type: Date,
@@ -88,7 +88,7 @@ const EmployeeSchema = new mongoose.Schema({
   },
   dateOfJoining: {
     type: Date,
-    required: true,
+    required: false, // Not required for bulk import flexibility
   },
   dateOfLeaving: {
     type: Date,
