@@ -416,22 +416,8 @@ deploy_docker() {
         docker_compose up -d
     fi
     
-    # Wait and check
-    log_info "Waiting for application to start (health check)..."
-    
-    # Health check loop (extended timeout for slow starts)
-    for i in {1..60}; do
-        if curl -sf http://localhost:3000/api/health > /dev/null 2>&1; then
-            log_success "Application is healthy and responding!"
-            break
-        fi
-        if [ $i -eq 60 ]; then
-            log_warning "Health check timed out after 60 seconds"
-            log_info "Application may still be starting. Check logs with: docker compose logs -f"
-            break
-        fi
-        sleep 1
-    done
+    # Quick container status check (no health check endpoint)
+    sleep 3
     
     if docker_compose ps | grep -q "Up\|running"; then
         log_success "Docker containers are running"
@@ -460,25 +446,6 @@ setup_vector_search() {
     docker_compose exec -T app node scripts/setup-vector-db.js 2>/dev/null || true
     docker_compose exec -T app node scripts/generate-embeddings-free.js 2>/dev/null || true
     log_success "Vector search setup complete"
-}
-
-# Health check
-health_check() {
-    log_info "Performing health check..."
-    
-    for i in 1 2 3 4 5; do
-        HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/ 2>/dev/null || echo "000")
-        
-        if [ "$HTTP_STATUS" = "200" ] || [ "$HTTP_STATUS" = "302" ]; then
-            log_success "Application is running (HTTP $HTTP_STATUS)"
-            return
-        fi
-        
-        log_info "Waiting... (attempt $i/5)"
-        sleep 5
-    done
-    
-    log_warning "App may still be starting - check: docker compose logs -f"
 }
 
 # Show status
@@ -546,7 +513,6 @@ main() {
         setup_vector_search
     fi
     
-    health_check
     show_status
 }
 

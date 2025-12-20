@@ -3,16 +3,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      # Enable BuildKit for faster builds with caching
-      args:
-        - BUILDKIT_INLINE_CACHE=1
-        - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL:-https://app.talio.in}
-        - NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME:-Talio HRMS}
-        - NEXT_PUBLIC_GOOGLE_CLIENT_ID=${NEXT_PUBLIC_GOOGLE_CLIENT_ID}
-        - NEXT_PUBLIC_ELEVENLABS_API_KEY=${NEXT_PUBLIC_ELEVENLABS_API_KEY}
-        - NEXT_PUBLIC_ELEVENLABS_VOICE_ID=${NEXT_PUBLIC_ELEVENLABS_VOICE_ID}
-        - NEXT_PUBLIC_ELEVENLABS_API_URL=${NEXT_PUBLIC_ELEVENLABS_API_URL}
-        - NEXT_PUBLIC_GEMINI_API_KEY=${NEXT_PUBLIC_GEMINI_API_KEY}
     image: talio-app:latest
     container_name: talio-app
     env_file:
@@ -44,15 +34,12 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      # Persist uploads across container restarts
       - ./public/uploads:/app/public/uploads
     restart: unless-stopped
-    # Resource limits for production
     deploy:
       resources:
         limits:
           memory: 2G
         reservations:
           memory: 512M
-    # Graceful shutdown
     stop_grace_period: 30s
