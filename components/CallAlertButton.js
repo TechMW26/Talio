@@ -351,8 +351,8 @@ export default function CallAlertButton({ user }) {
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-white/20 rounded-xl">
-                    <HiOutlinePhone className="w-6 h-6 text-white" />
+                  <div className="p-2.5 bg-white rounded-xl">
+                    <HiOutlinePhone className="w-6 h-6 text-blue-900" />
                   </div>
                   <div>
                     <h2 className="text-xl font-semibold text-white">
@@ -367,14 +367,14 @@ export default function CallAlertButton({ user }) {
                   onClick={handleClose}
                   className="p-2 rounded-xl hover:bg-white/20 transition-colors"
                 >
-                  <HiOutlineXMark className="w-6 h-6 text-white" />
+                  <HiOutlineXMark className="w-6 h-6 text-blue" />
                 </button>
               </div>
 
               {/* Step Progress Bar */}
               <div className="mt-4 flex items-center gap-2">
-                <div className={`h-1.5 flex-1 rounded-full transition-all ${step >= 1 ? 'bg-white' : 'bg-white/30'}`} />
-                <div className={`h-1.5 flex-1 rounded-full transition-all ${step >= 2 ? 'bg-white' : 'bg-white/30'}`} />
+                <div className={`h-1.5 flex-1 rounded-full transition-all ${step >= 1 ? 'bg-white' : 'bg-blue-900'}`} />
+                <div className={`h-1.5 flex-1 rounded-full transition-all ${step >= 2 ? 'bg-white' : 'bg-blue-900'}`} />
               </div>
             </div>
 
