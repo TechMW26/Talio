@@ -9,6 +9,7 @@ import queryCache from '@/lib/queryCache'
 import { logActivity } from '@/lib/activityLogger'
 import { uploadImageToImageKit, deleteFromImageKit, getImageKitFolder, generateEmployeeFolderName } from '@/lib/imagekit'
 import { optimizeImage, isValidImage } from '@/lib/imageOptimization'
+import { deleteUserFromBackup } from '@/lib/backupDb'
 
 // Check if ImageKit is configured
 const isImageKitConfigured = () => {
@@ -343,8 +344,18 @@ export async function DELETE(request, { params }) {
       )
     }
 
+    // Find the associated user to delete from backup
+    const user = await User.findOne({ employeeId: id }).select('_id').lean()
+    
     // Soft delete - change status to terminated
     await Employee.findByIdAndUpdate(id, { status: 'terminated' })
+
+    // Delete user from backup database (fire-and-forget)
+    if (user) {
+      deleteUserFromBackup(user._id).catch(err => 
+        console.error('[Employee Delete] Backup delete failed:', err)
+      )
+    }
 
     return NextResponse.json({
       success: true,

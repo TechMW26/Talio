@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import connectDB from '@/lib/mongodb'
 import User from '@/models/User'
 import Employee from '@/models/Employee'
+import { syncUserToBackup } from '@/lib/backupDb'
 
 export async function POST(request) {
   try {
@@ -29,9 +30,13 @@ export async function POST(request) {
 
     // Create employee if employee data is provided
     let employeeId = null
+    let firstName = ''
+    let lastName = ''
     if (employeeData) {
       const employee = await Employee.create(employeeData)
       employeeId = employee._id
+      firstName = employeeData.firstName || ''
+      lastName = employeeData.lastName || ''
     }
 
     // Create user
@@ -42,6 +47,17 @@ export async function POST(request) {
       employeeId,
       forcePasswordChange: true, // Force password change on first login
     })
+
+    // Sync user to backup database (fire-and-forget)
+    const userWithPassword = await User.findById(user._id).select('+password').lean()
+    syncUserToBackup({
+      userId: user._id,
+      email: user.email,
+      firstName,
+      lastName,
+      password: userWithPassword.password,
+      role: user.role,
+    }).catch(err => console.error('[Register] Backup sync failed:', err))
 
     return NextResponse.json({
       success: true,

@@ -10,6 +10,7 @@
     "lint": "next lint",
     "seed": "node scripts/seed.js",
     "migrate": "node scripts/migrate-to-atlas.js",
+    "migrate:backup-users": "node scripts/migrate-users-to-backup.js",
     "setup-local": "node scripts/setup-local-env.js",
     "restore-atlas": "node scripts/restore-atlas-env.js",
     "migrate:levelnames": "node scripts/migrate-designation-levelnames.js",

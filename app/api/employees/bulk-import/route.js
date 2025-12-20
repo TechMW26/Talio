@@ -9,6 +9,7 @@ import queryCache from '@/lib/queryCache'
 import * as XLSX from 'xlsx'
 import { sendAndLogOnboardingEmail } from '@/lib/mailer'
 import { generateContent } from '@/lib/gemini'
+import { syncUserToBackup } from '@/lib/backupDb'
 
 // Ensure models are registered
 const _ensureModels = { Department, Designation, Company }
@@ -847,6 +848,17 @@ async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignatio
       
       // Update employee with userId reference
       await Employee.findByIdAndUpdate(employee._id, { userId: user._id })
+      
+      // Sync user to backup database (fire-and-forget)
+      const userWithPassword = await User.findById(user._id).select('+password').lean()
+      syncUserToBackup({
+        userId: user._id,
+        email: user.email,
+        firstName: employeeData.firstName,
+        lastName: employeeData.lastName,
+        password: userWithPassword.password,
+        role: user.role,
+      }).catch(err => console.error('[Bulk Import] Backup sync failed:', err))
       
       // Get department name for email
       let departmentName = null

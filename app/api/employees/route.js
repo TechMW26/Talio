@@ -7,6 +7,7 @@ import Designation from '@/models/Designation'
 import queryCache from '@/lib/queryCache'
 import bcrypt from 'bcryptjs'
 import { sendAndLogOnboardingEmail } from '@/lib/mailer'
+import { syncUserToBackup } from '@/lib/backupDb'
 
 // GET - List all employees with filters
 export async function GET(request) {
@@ -222,6 +223,18 @@ export async function POST(request) {
 
     // Update employee with userId reference
     await Employee.findByIdAndUpdate(employee._id, { userId: user._id })
+
+    // Sync user to backup database (fire-and-forget)
+    // Get the hashed password from the created user for backup
+    const userWithPassword = await User.findById(user._id).select('+password').lean()
+    syncUserToBackup({
+      userId: user._id,
+      email: user.email,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      password: userWithPassword.password, // Hashed password
+      role: user.role,
+    }).catch(err => console.error('[Employee Create] Backup sync failed:', err))
 
     const populatedEmployee = await Employee.findById(employee._id)
       .select('employeeCode firstName lastName email phone department departments designation designationLevel designationLevelName reportingManager dateOfJoining status salary pfEnrollment esiEnrollment professionalTax healthInsurance basicSalary')
