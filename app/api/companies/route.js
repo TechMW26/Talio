@@ -2,6 +2,16 @@ import { NextResponse } from 'next/server'
 import connectDB from '@/lib/mongodb'
 import Company from '@/models/Company'
 import { verifyToken } from '@/lib/auth'
+import { uploadImageToImageKit, getImageKitFolder } from '@/lib/imagekit'
+
+// Check if ImageKit is configured
+const isImageKitConfigured = () => {
+  return !!(
+    process.env.IMAGEKIT_PUBLIC_KEY &&
+    process.env.IMAGEKIT_PRIVATE_KEY &&
+    process.env.IMAGEKIT_URL_ENDPOINT
+  )
+}
 
 // GET - List all companies
 export async function GET(request) {
@@ -40,7 +50,7 @@ export async function POST(request) {
 
     const token = authHeader.split(' ')[1]
     const decoded = await verifyToken(token)
-    
+
     if (!decoded) {
       return NextResponse.json(
         { success: false, message: 'Invalid token' },
@@ -60,7 +70,7 @@ export async function POST(request) {
     await connectDB()
 
     const data = await request.json()
-    
+
     // Validate required fields
     if (!data.name || !data.code) {
       return NextResponse.json(
@@ -84,11 +94,39 @@ export async function POST(request) {
       )
     }
 
+    // Handle logo upload to ImageKit if it's base64
+    let logoUrl = data.logo || '';
+    let logoFileId = '';
+
+    // Get folder path with company code
+    const companyCode = data.code.trim().toUpperCase();
+    const imagekitFolder = getImageKitFolder('company', { companyCode });
+
+    if (logoUrl && logoUrl.startsWith('data:image/') && isImageKitConfigured()) {
+      try {
+        const imagekitResult = await uploadImageToImageKit(logoUrl, {
+          fileName: `company_${companyCode}_logo_${Date.now()}.webp`,
+          folder: imagekitFolder,
+          tags: ['company', 'logo', companyCode],
+          customMetadata: {
+            companyCode: companyCode,
+          },
+        });
+        logoUrl = imagekitResult.url;
+        logoFileId = imagekitResult.fileId;
+        console.log(`[Company] Logo uploaded to ImageKit: ${imagekitFolder}`);
+      } catch (imgError) {
+        console.error('[Company] ImageKit logo upload failed:', imgError.message);
+        // Keep the base64 as fallback (not recommended)
+      }
+    }
+
     const company = await Company.create({
       name: data.name.trim(),
       code: data.code.trim().toUpperCase(),
       description: data.description?.trim() || '',
-      logo: data.logo || '',
+      logo: logoUrl,
+      logoFileId: logoFileId,
       email: data.email?.trim() || '',
       phone: data.phone?.trim() || '',
       website: data.website?.trim() || '',

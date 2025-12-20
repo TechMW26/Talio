@@ -2,8 +2,18 @@ import { NextResponse } from 'next/server'
 import connectDB from '@/lib/mongodb'
 import SystemPreferences from '@/models/SystemPreferences'
 import { verifyToken } from '@/lib/auth'
+import { uploadImageToImageKit, deleteFromImageKit, getImageKitFolder } from '@/lib/imagekit'
 
 export const dynamic = 'force-dynamic'
+
+// Check if ImageKit is configured
+const isImageKitConfigured = () => {
+  return !!(
+    process.env.IMAGEKIT_PUBLIC_KEY &&
+    process.env.IMAGEKIT_PRIVATE_KEY &&
+    process.env.IMAGEKIT_URL_ENDPOINT
+  )
+}
 
 
 // GET - Get system preferences
@@ -23,7 +33,7 @@ export async function GET(request) {
 
     // Get system preferences (there should be only one document)
     let preferences = await SystemPreferences.findOne()
-    
+
     if (!preferences) {
       // Create default preferences if none exist
       preferences = new SystemPreferences({
@@ -89,7 +99,32 @@ export async function PUT(request) {
 
     // Find existing preferences or create new one
     let preferences = await SystemPreferences.findOne()
-    
+
+    // Handle companyLogo upload to ImageKit if it's base64
+    if (body.companyLogo && body.companyLogo.startsWith('data:image/') && isImageKitConfigured()) {
+      try {
+        // Delete old logo from ImageKit if exists
+        if (preferences?.companyLogoFileId) {
+          await deleteFromImageKit(preferences.companyLogoFileId).catch(() => { });
+        }
+
+        // Get settings folder path
+        const imagekitFolder = getImageKitFolder('settings');
+
+        const imagekitResult = await uploadImageToImageKit(body.companyLogo, {
+          fileName: `company_logo_${Date.now()}.webp`,
+          folder: imagekitFolder,
+          tags: ['company', 'logo', 'system'],
+        });
+        body.companyLogo = imagekitResult.url;
+        body.companyLogoFileId = imagekitResult.fileId;
+        console.log(`[SystemPreferences] Company logo uploaded to ImageKit: ${imagekitFolder}`);
+      } catch (imgError) {
+        console.error('[SystemPreferences] ImageKit logo upload failed:', imgError.message);
+        // Keep original base64 as fallback
+      }
+    }
+
     if (preferences) {
       // Update existing preferences
       Object.keys(body).forEach(key => {

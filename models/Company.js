@@ -28,6 +28,10 @@ const CompanySchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  logoFileId: {
+    type: String, // ImageKit file ID for deletion
+    default: ''
+  },
   // Contact Information
   email: {
     type: String,

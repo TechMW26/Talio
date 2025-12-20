@@ -1,14 +1,24 @@
 import { NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
-import { mkdir, writeFile, access, constants } from 'fs/promises';
+import { mkdir, writeFile, access, constants, unlink } from 'fs/promises';
 import path from 'path';
 import connectDB from '@/lib/mongodb';
 import { uploadScreenshot, getScreenshot } from '@/lib/gridfs';
+import { uploadWithTempStorage, getImageKitFolder, generateEmployeeFolderName } from '@/lib/imagekit';
 import Screenshot from '@/models/Screenshot';
 import User from '@/models/User';
 import Employee from '@/models/Employee';
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
+
+// Check if ImageKit is configured
+const isImageKitConfigured = () => {
+  return !!(
+    process.env.IMAGEKIT_PUBLIC_KEY &&
+    process.env.IMAGEKIT_PRIVATE_KEY &&
+    process.env.IMAGEKIT_URL_ENDPOINT
+  )
+}
 
 /**
  * Ensure directory exists
@@ -33,9 +43,9 @@ export async function POST(request) {
     // Verify JWT
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Unauthorized' 
+      return NextResponse.json({
+        success: false,
+        error: 'Unauthorized'
       }, { status: 401 });
     }
 
@@ -44,9 +54,9 @@ export async function POST(request) {
     try {
       decoded = await jwtVerify(token, JWT_SECRET);
     } catch {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Invalid token' 
+      return NextResponse.json({
+        success: false,
+        error: 'Invalid token'
       }, { status: 401 });
     }
 
@@ -68,11 +78,11 @@ export async function POST(request) {
     const file = formData.get('screenshot');
     const activityData = formData.get('activity');
     const sessionId = formData.get('sessionId');
-    
+
     if (!file) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'No screenshot file provided' 
+      return NextResponse.json({
+        success: false,
+        error: 'No screenshot file provided'
       }, { status: 400 });
     }
 
@@ -90,12 +100,17 @@ export async function POST(request) {
       }
     }
 
-    // Get employee info
+    // Get employee info with full details for folder structure
     const user = await User.findById(userId).select('employeeId name email');
+    let employee = null;
     let employeeId = user?.employeeId;
-    
-    if (!employeeId && user?.email) {
-      const employee = await Employee.findOne({ email: user.email.toLowerCase() });
+
+    if (employeeId) {
+      employee = await Employee.findById(employeeId).select('firstName lastName employeeCode');
+    }
+
+    if (!employee && user?.email) {
+      employee = await Employee.findOne({ email: user.email.toLowerCase() }).select('firstName lastName employeeCode');
       if (employee) {
         employeeId = employee._id;
       }
@@ -104,41 +119,83 @@ export async function POST(request) {
     // Determine file format from content type
     const mimeType = file.type || 'image/png';
     const format = mimeType.split('/')[1] || 'png';
-    
+
     const now = new Date();
     const dateString = now.toISOString().split('T')[0];
     const timestamp = now.getTime();
-    const filename = `screenshot_${timestamp}.${format}`;
+    const employeeCode = employee?.employeeCode || 'UNKNOWN';
+    const filename = `screenshot_${employeeCode}_${timestamp}.webp`;
 
-    // === FILESYSTEM STORAGE (for dashboard display) ===
-    const activityDir = path.join(process.cwd(), 'public', 'activity', userId, dateString);
-    await ensureDirectory(activityDir);
-    
-    const filePath = path.join(activityDir, filename);
-    await writeFile(filePath, buffer);
-    
-    // Public URL path for dashboard
-    const publicPath = `/activity/${userId}/${dateString}/${filename}`;
-    console.log(`[Screenshot] Saved to filesystem: ${publicPath}`);
+    // Get the appropriate ImageKit folder with employee subfolder
+    const imagekitFolder = getImageKitFolder('screenshot', { employee, dateString });
+    const employeeFolderName = generateEmployeeFolderName(employee);
 
-    // === GRIDFS STORAGE (for long-term storage & AI analysis) ===
-    const gridfsResult = await uploadScreenshot(buffer, {
-      userId,
-      employeeId: employeeId?.toString(),
-      capturedAt: now,
-      sessionId,
-      mimeType,
-      format,
-      width: 1920,
-      height: 1080,
-      activity
-    });
+    let publicPath = '';
+    let imagekitFileId = null;
+    let imagekitUrl = null;
+    let gridfsResult = null;
+
+    // === IMAGEKIT STORAGE (primary - CDN delivery) ===
+    if (isImageKitConfigured()) {
+      try {
+        const imagekitResult = await uploadWithTempStorage(buffer, {
+          fileName: filename,
+          folder: imagekitFolder,
+          tags: ['screenshot', 'productivity', dateString, employeeCode],
+          customMetadata: {
+            userId,
+            employeeId: employeeId?.toString(),
+            employeeName: employee ? `${employee.firstName} ${employee.lastName}` : 'Unknown',
+            employeeCode: employeeCode,
+            capturedAt: now.toISOString(),
+            sessionId,
+          },
+        });
+
+        imagekitUrl = imagekitResult.url;
+        imagekitFileId = imagekitResult.fileId;
+        publicPath = imagekitUrl;
+        console.log(`[Screenshot] Uploaded to ImageKit: ${imagekitFolder}/${filename}`);
+      } catch (imagekitError) {
+        console.error('[Screenshot] ImageKit upload failed, falling back:', imagekitError.message);
+      }
+    }
+
+    // === FALLBACK: FILESYSTEM STORAGE (for dashboard display) ===
+    if (!publicPath) {
+      const activityDir = path.join(process.cwd(), 'public', 'activity', employeeFolderName, dateString);
+      await ensureDirectory(activityDir);
+
+      const filePath = path.join(activityDir, filename);
+      await writeFile(filePath, buffer);
+
+      publicPath = `/activity/${employeeFolderName}/${dateString}/${filename}`;
+      console.log(`[Screenshot] Saved to filesystem: ${publicPath}`);
+    }
+
+    // === GRIDFS STORAGE (for long-term storage & AI analysis - fallback) ===
+    // Only use GridFS if ImageKit is not configured
+    if (!isImageKitConfigured()) {
+      gridfsResult = await uploadScreenshot(buffer, {
+        userId,
+        employeeId: employeeId?.toString(),
+        capturedAt: now,
+        sessionId,
+        mimeType,
+        format,
+        width: 1920,
+        height: 1080,
+        activity
+      });
+    }
 
     // === DATABASE RECORD ===
     const screenshot = new Screenshot({
       user: userId,
       employee: employeeId,
-      gridfsFileId: gridfsResult._id,
+      gridfsFileId: gridfsResult?._id || null,
+      imagekitFileId: imagekitFileId,
+      imagekitUrl: imagekitUrl,
       capturedAt: now,
       dateString,
       // Add filesystem path for dashboard compatibility
@@ -149,7 +206,8 @@ export async function POST(request) {
         width: 1920,
         height: 1080,
         fileSize: buffer.length,
-        format
+        format,
+        storage: imagekitUrl ? 'imagekit' : (gridfsResult ? 'gridfs' : 'filesystem')
       },
       activity: {
         activeWindow: activity.activeWindow || '',
@@ -164,15 +222,18 @@ export async function POST(request) {
 
     await screenshot.save();
 
-    console.log(`[Screenshot] Saved for user ${userId}: ${screenshot._id} (GridFS: ${gridfsResult._id})`);
+    console.log(`[Screenshot] Saved for user ${userId}: ${screenshot._id}${imagekitUrl ? ` (ImageKit: ${imagekitFileId})` : (gridfsResult ? ` (GridFS: ${gridfsResult._id})` : '')}`);
 
     return NextResponse.json({
       success: true,
       screenshotId: screenshot._id.toString(),
-      gridfsId: gridfsResult._id.toString(),
+      gridfsId: gridfsResult?._id?.toString() || null,
+      imagekitFileId: imagekitFileId,
+      imagekitUrl: imagekitUrl,
       path: publicPath,
       timestamp: now.toISOString(),
-      fileSize: buffer.length
+      fileSize: buffer.length,
+      storage: imagekitUrl ? 'imagekit' : (gridfsResult ? 'gridfs' : 'filesystem')
     });
 
   } catch (error) {
@@ -193,9 +254,9 @@ export async function GET(request) {
     // Verify JWT
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Unauthorized' 
+      return NextResponse.json({
+        success: false,
+        error: 'Unauthorized'
       }, { status: 401 });
     }
 
@@ -204,19 +265,19 @@ export async function GET(request) {
     try {
       decoded = await jwtVerify(token, JWT_SECRET);
     } catch {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Invalid token' 
+      return NextResponse.json({
+        success: false,
+        error: 'Invalid token'
       }, { status: 401 });
     }
 
     const { searchParams } = new URL(request.url);
     const screenshotId = searchParams.get('id');
-    
+
     if (!screenshotId) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Screenshot ID required' 
+      return NextResponse.json({
+        success: false,
+        error: 'Screenshot ID required'
       }, { status: 400 });
     }
 
@@ -225,9 +286,9 @@ export async function GET(request) {
     // Get screenshot metadata
     const screenshot = await Screenshot.findById(screenshotId);
     if (!screenshot) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Screenshot not found' 
+      return NextResponse.json({
+        success: false,
+        error: 'Screenshot not found'
       }, { status: 404 });
     }
 
@@ -237,9 +298,9 @@ export async function GET(request) {
     // Access control
     if (!['admin', 'god_admin', 'hr', 'manager'].includes(userRole)) {
       if (screenshot.user.toString() !== userId) {
-        return NextResponse.json({ 
-          success: false, 
-          error: 'Access denied' 
+        return NextResponse.json({
+          success: false,
+          error: 'Access denied'
         }, { status: 403 });
       }
     }

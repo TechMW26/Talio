@@ -3,7 +3,7 @@ import { jwtVerify } from 'jose'
 
 export async function middleware(request) {
   const token = request.headers.get('authorization')?.split(' ')[1] ||
-                request.cookies.get('token')?.value
+    request.cookies.get('token')?.value
 
   // Public routes that don't require authentication
   const publicRoutes = ['/', '/login', '/register', '/forgot-password', '/auth/forgot-password', '/auth/reset-password', '/setup']
@@ -16,7 +16,8 @@ export async function middleware(request) {
     '/api/auth/google/callback',
     '/api/assetlinks',
     '/api/setup/check',
-    '/api/setup/create-admin'
+    '/api/setup/create-admin',
+    '/api/test-imagekit' // Test route for ImageKit debugging
   ]
 
   // Routes allowed during forced password change

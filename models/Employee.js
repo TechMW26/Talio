@@ -149,9 +149,14 @@ const EmployeeSchema = new mongoose.Schema({
     name: String,
     type: String,
     url: String,
+    fileId: String, // ImageKit file ID for deletion
     uploadedAt: Date,
   }],
   profilePicture: {
+    type: String,
+  },
+  // ImageKit file ID for profile picture (used for deletion/updates)
+  profilePictureFileId: {
     type: String,
   },
   status: {

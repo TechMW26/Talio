@@ -73,6 +73,9 @@ const CourseSchema = new mongoose.Schema({
   thumbnail: {
     type: String,
   },
+  thumbnailFileId: {
+    type: String, // ImageKit file ID for deletion
+  },
   status: {
     type: String,
     enum: ['draft', 'published', 'archived'],

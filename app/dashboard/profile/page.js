@@ -56,7 +56,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
   const fileInputRef = useRef(null)
-  
+
   // Profile completion state
   const [profileCompletionStatus, setProfileCompletionStatus] = useState(null)
   const [isCompleteProfileMode, setIsCompleteProfileMode] = useState(false)
@@ -82,7 +82,7 @@ export default function ProfilePage() {
   useEffect(() => {
     const editMode = searchParams.get('edit')
     const completeProfile = searchParams.get('completeProfile')
-    
+
     if (editMode === 'true') {
       setIsEditing(true)
     }
@@ -382,8 +382,11 @@ export default function ProfilePage() {
 
       const result = await response.json()
       if (result.success) {
-        setEmployee((prev) => ({ ...prev, profilePicture: croppedImage }))
-        setEditedEmployee((prev) => ({ ...prev, profilePicture: croppedImage }))
+        // Use the URL returned from the API (could be ImageKit URL or base64 fallback)
+        const profilePictureUrl = result.data?.profilePicture || croppedImage
+
+        setEmployee((prev) => ({ ...prev, profilePicture: profilePictureUrl }))
+        setEditedEmployee((prev) => ({ ...prev, profilePicture: profilePictureUrl }))
         toast.success('Profile picture updated successfully!')
 
         // Update localStorage user data if it has employeeId
@@ -391,7 +394,7 @@ export default function ProfilePage() {
         if (userData) {
           const parsedUser = JSON.parse(userData)
           if (parsedUser.employeeId) {
-            parsedUser.employeeId.profilePicture = croppedImage
+            parsedUser.employeeId.profilePicture = profilePictureUrl
             localStorage.setItem('user', JSON.stringify(parsedUser))
           }
         }
@@ -528,28 +531,26 @@ export default function ProfilePage() {
   // Render the Complete Profile Status Section
   const renderCompleteProfileSection = () => {
     if (!profileCompletionStatus) return null
-    
+
     const { steps, completionPercentage, daysRemaining, isComplete, warning } = profileCompletionStatus
 
     // Check if there's a mismatch issue
     const hasMismatch = steps?.ocrVerification?.status === 'mismatch'
-    
+
     // Show if: not complete OR has mismatch OR in complete profile mode
     // Mismatch always shows because it requires user action
     if (isComplete && !hasMismatch && !isCompleteProfileMode) return null
-    
+
     return (
-      <section className={`rounded-3xl border shadow-sm p-4 sm:p-6 ${
-        hasMismatch 
-          ? 'bg-red-50 border-red-200 shadow-red-900/5' 
+      <section className={`rounded-3xl border shadow-sm p-4 sm:p-6 ${hasMismatch
+          ? 'bg-red-50 border-red-200 shadow-red-900/5'
           : 'bg-white border-slate-100 shadow-slate-900/5'
-      }`}>
+        }`}>
         {/* Section Header */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-              isComplete ? 'bg-emerald-100' : hasMismatch ? 'bg-red-100' : 'bg-amber-100'
-            }`}>
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isComplete ? 'bg-emerald-100' : hasMismatch ? 'bg-red-100' : 'bg-amber-100'
+              }`}>
               {isComplete ? (
                 <FaCheck className="w-5 h-5 text-emerald-600" />
               ) : hasMismatch ? (
@@ -563,24 +564,23 @@ export default function ProfilePage() {
                 {hasMismatch ? 'Profile Verification Issue' : 'Complete Your Profile'}
               </h3>
               <p className={`text-xs mt-0.5 ${hasMismatch ? 'text-red-600' : 'text-slate-500'}`}>
-                {hasMismatch 
+                {hasMismatch
                   ? 'Aadhaar data doesn\'t match your profile - please update'
-                  : isComplete 
+                  : isComplete
                     ? 'All required information has been completed'
-                    : daysRemaining !== null 
+                    : daysRemaining !== null
                       ? `${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} remaining to complete`
                       : 'Complete all required fields'
                 }
               </p>
             </div>
           </div>
-          <span className={`text-sm font-bold px-3 py-1.5 rounded-full ${
-            isComplete ? 'bg-emerald-100 text-emerald-700' :
-            hasMismatch ? 'bg-red-100 text-red-700' :
-            completionPercentage >= 70 ? 'bg-emerald-100 text-emerald-700' :
-            completionPercentage >= 40 ? 'bg-amber-100 text-amber-700' :
-            'bg-slate-100 text-slate-700'
-          }`}>
+          <span className={`text-sm font-bold px-3 py-1.5 rounded-full ${isComplete ? 'bg-emerald-100 text-emerald-700' :
+              hasMismatch ? 'bg-red-100 text-red-700' :
+                completionPercentage >= 70 ? 'bg-emerald-100 text-emerald-700' :
+                  completionPercentage >= 40 ? 'bg-amber-100 text-amber-700' :
+                    'bg-slate-100 text-slate-700'
+            }`}>
             {completionPercentage}%
           </span>
         </div>
@@ -592,18 +592,17 @@ export default function ProfilePage() {
             <span className="text-xs font-medium text-slate-700">{completionPercentage}/100</span>
           </div>
           <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
-            <div 
-              className={`h-full rounded-full transition-all duration-500 ${
-                completionPercentage === 100 
-                  ? 'bg-emerald-500' 
+            <div
+              className={`h-full rounded-full transition-all duration-500 ${completionPercentage === 100
+                  ? 'bg-emerald-500'
                   : hasMismatch
                     ? 'bg-red-500'
-                    : completionPercentage >= 70 
-                      ? 'bg-blue-500' 
-                      : completionPercentage >= 40 
-                        ? 'bg-amber-500' 
+                    : completionPercentage >= 70
+                      ? 'bg-blue-500'
+                      : completionPercentage >= 40
+                        ? 'bg-amber-500'
                         : 'bg-slate-400'
-              }`}
+                }`}
               style={{ width: `${completionPercentage}%` }}
             />
           </div>
@@ -617,15 +616,13 @@ export default function ProfilePage() {
         {/* Steps Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {/* Personal Info */}
-          <div className={`p-4 rounded-2xl border ${
-            steps?.personalInfo?.complete 
-              ? 'bg-emerald-50 border-emerald-200' 
+          <div className={`p-4 rounded-2xl border ${steps?.personalInfo?.complete
+              ? 'bg-emerald-50 border-emerald-200'
               : 'bg-slate-50 border-slate-200'
-          }`}>
+            }`}>
             <div className="flex items-center gap-3 mb-2">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                steps?.personalInfo?.complete ? 'bg-emerald-500' : 'bg-slate-300'
-              }`}>
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${steps?.personalInfo?.complete ? 'bg-emerald-500' : 'bg-slate-300'
+                }`}>
                 {steps?.personalInfo?.complete ? (
                   <FaCheck className="w-4 h-4 text-white" />
                 ) : (
@@ -633,9 +630,8 @@ export default function ProfilePage() {
                 )}
               </div>
               <div>
-                <p className={`text-sm font-semibold ${
-                  steps?.personalInfo?.complete ? 'text-emerald-700' : 'text-slate-700'
-                }`}>
+                <p className={`text-sm font-semibold ${steps?.personalInfo?.complete ? 'text-emerald-700' : 'text-slate-700'
+                  }`}>
                   Personal Info
                 </p>
                 <p className="text-xs text-slate-500">
@@ -652,15 +648,13 @@ export default function ProfilePage() {
           </div>
 
           {/* Aadhaar Upload */}
-          <div className={`p-4 rounded-2xl border ${
-            steps?.aadhaarUpload?.complete 
-              ? 'bg-emerald-50 border-emerald-200' 
+          <div className={`p-4 rounded-2xl border ${steps?.aadhaarUpload?.complete
+              ? 'bg-emerald-50 border-emerald-200'
               : 'bg-slate-50 border-slate-200'
-          }`}>
+            }`}>
             <div className="flex items-center gap-3 mb-2">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                steps?.aadhaarUpload?.complete ? 'bg-emerald-500' : 'bg-slate-300'
-              }`}>
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${steps?.aadhaarUpload?.complete ? 'bg-emerald-500' : 'bg-slate-300'
+                }`}>
                 {steps?.aadhaarUpload?.complete ? (
                   <FaCheck className="w-4 h-4 text-white" />
                 ) : (
@@ -668,13 +662,12 @@ export default function ProfilePage() {
                 )}
               </div>
               <div>
-                <p className={`text-sm font-semibold ${
-                  steps?.aadhaarUpload?.complete ? 'text-emerald-700' : 'text-slate-700'
-                }`}>
+                <p className={`text-sm font-semibold ${steps?.aadhaarUpload?.complete ? 'text-emerald-700' : 'text-slate-700'
+                  }`}>
                   Aadhaar Upload
                 </p>
                 <p className="text-xs text-slate-500">
-                  {steps?.aadhaarUpload?.frontUploaded && steps?.aadhaarUpload?.backUploaded 
+                  {steps?.aadhaarUpload?.frontUploaded && steps?.aadhaarUpload?.backUploaded
                     ? '2/2 uploaded'
                     : steps?.aadhaarUpload?.frontUploaded || steps?.aadhaarUpload?.backUploaded
                       ? '1/2 uploaded'
@@ -696,21 +689,19 @@ export default function ProfilePage() {
           </div>
 
           {/* OCR Verification */}
-          <div className={`p-4 rounded-2xl border ${
-            steps?.ocrVerification?.complete 
-              ? 'bg-emerald-50 border-emerald-200' 
+          <div className={`p-4 rounded-2xl border ${steps?.ocrVerification?.complete
+              ? 'bg-emerald-50 border-emerald-200'
               : steps?.ocrVerification?.status === 'mismatch'
                 ? 'bg-red-50 border-red-200'
                 : 'bg-slate-50 border-slate-200'
-          }`}>
+            }`}>
             <div className="flex items-center gap-3 mb-2">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                steps?.ocrVerification?.complete 
-                  ? 'bg-emerald-500' 
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${steps?.ocrVerification?.complete
+                  ? 'bg-emerald-500'
                   : steps?.ocrVerification?.status === 'mismatch'
                     ? 'bg-red-500'
                     : 'bg-slate-300'
-              }`}>
+                }`}>
                 {steps?.ocrVerification?.complete ? (
                   <FaCheck className="w-4 h-4 text-white" />
                 ) : (
@@ -718,19 +709,17 @@ export default function ProfilePage() {
                 )}
               </div>
               <div>
-                <p className={`text-sm font-semibold ${
-                  steps?.ocrVerification?.complete 
-                    ? 'text-emerald-700' 
+                <p className={`text-sm font-semibold ${steps?.ocrVerification?.complete
+                    ? 'text-emerald-700'
                     : steps?.ocrVerification?.status === 'mismatch'
                       ? 'text-red-700'
                       : 'text-slate-700'
-                }`}>
+                  }`}>
                   Verification
                 </p>
-                <p className={`text-xs ${
-                  steps?.ocrVerification?.status === 'mismatch' ? 'text-red-500' : 'text-slate-500'
-                }`}>
-                  {steps?.ocrVerification?.complete 
+                <p className={`text-xs ${steps?.ocrVerification?.status === 'mismatch' ? 'text-red-500' : 'text-slate-500'
+                  }`}>
+                  {steps?.ocrVerification?.complete
                     ? 'Verified'
                     : steps?.ocrVerification?.status === 'mismatch'
                       ? 'Needs review'
@@ -780,7 +769,7 @@ export default function ProfilePage() {
           <div className="lg:col-span-1 relative lg:sticky lg:top-4 lg:self-start order-1" style={{ overflow: 'visible' }}>
             {/* Hidden file input for profile picture */}
             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageSelect} className="hidden" />
-            
+
             {/* Lanyard Model - hanging from top */}
             {typeof window !== 'undefined' && (
               <div className="relative w-full overflow-visible z-10 h-[560px] sm:h-[620px] md:h-[680px] lg:h-[750px] mt-[-60px] lg:mt-[-140px]">
@@ -811,7 +800,7 @@ export default function ProfilePage() {
 
             {/* Aadhaar Verification Section - shown when in complete profile mode or when profile is incomplete */}
             {(isCompleteProfileMode || (profileCompletionStatus && !profileCompletionStatus.isComplete)) && (
-              <AadhaarVerificationSection 
+              <AadhaarVerificationSection
                 initialStatus={profileCompletionStatus?.steps ? {
                   aadhaarFront: profileCompletionStatus.steps.aadhaarUpload?.frontUploaded ? { url: true } : null,
                   aadhaarBack: profileCompletionStatus.steps.aadhaarUpload?.backUploaded ? { url: true } : null,
@@ -970,25 +959,25 @@ export default function ProfilePage() {
                           rows="2"
                         />
                         {/* Show extracted address from Aadhaar if available and different */}
-                        {profileCompletionStatus?.steps?.ocrVerification?.extractedData?.address && 
-                         profileCompletionStatus.steps.ocrVerification.extractedData.address !== editedEmployee.address && (
-                          <div className="mt-2 p-2 bg-emerald-50 border border-emerald-200 rounded-lg">
-                            <p className="text-[10px] font-medium text-emerald-700 uppercase mb-1 flex items-center gap-1">
-                              <FaCheck className="text-emerald-500" />
-                              Address from Aadhaar
-                            </p>
-                            <p className="text-xs text-emerald-800 mb-2">
-                              {profileCompletionStatus.steps.ocrVerification.extractedData.address}
-                            </p>
-                            <button
-                              type="button"
-                              onClick={() => handleFieldChange('address', profileCompletionStatus.steps.ocrVerification.extractedData.address)}
-                              className="text-xs px-2 py-1 bg-emerald-500 text-white rounded hover:bg-emerald-600 transition-colors"
-                            >
-                              Use this address
-                            </button>
-                          </div>
-                        )}
+                        {profileCompletionStatus?.steps?.ocrVerification?.extractedData?.address &&
+                          profileCompletionStatus.steps.ocrVerification.extractedData.address !== editedEmployee.address && (
+                            <div className="mt-2 p-2 bg-emerald-50 border border-emerald-200 rounded-lg">
+                              <p className="text-[10px] font-medium text-emerald-700 uppercase mb-1 flex items-center gap-1">
+                                <FaCheck className="text-emerald-500" />
+                                Address from Aadhaar
+                              </p>
+                              <p className="text-xs text-emerald-800 mb-2">
+                                {profileCompletionStatus.steps.ocrVerification.extractedData.address}
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => handleFieldChange('address', profileCompletionStatus.steps.ocrVerification.extractedData.address)}
+                                className="text-xs px-2 py-1 bg-emerald-500 text-white rounded hover:bg-emerald-600 transition-colors"
+                              >
+                                Use this address
+                              </button>
+                            </div>
+                          )}
                       </>
                     ) : (
                       <>
@@ -996,13 +985,13 @@ export default function ProfilePage() {
                           {employee.address || 'N/A'}
                         </p>
                         {/* Show extracted address badge when address matches Aadhaar */}
-                        {profileCompletionStatus?.steps?.ocrVerification?.extractedData?.address && 
-                         employee.address === profileCompletionStatus.steps.ocrVerification.extractedData.address && (
-                          <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-medium rounded-full">
-                            <FaCheck className="text-[8px]" />
-                            Verified from Aadhaar
-                          </span>
-                        )}
+                        {profileCompletionStatus?.steps?.ocrVerification?.extractedData?.address &&
+                          employee.address === profileCompletionStatus.steps.ocrVerification.extractedData.address && (
+                            <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-medium rounded-full">
+                              <FaCheck className="text-[8px]" />
+                              Verified from Aadhaar
+                            </span>
+                          )}
                         {/* Show suggestion if no address but Aadhaar has one */}
                         {!employee.address && profileCompletionStatus?.steps?.ocrVerification?.extractedData?.address && (
                           <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
@@ -1221,7 +1210,7 @@ export default function ProfilePage() {
 
             {/* Aadhaar Verification Section - always visible in right column */}
             {!isCompleteProfileMode && (
-              <AadhaarVerificationSection 
+              <AadhaarVerificationSection
                 initialStatus={profileCompletionStatus?.steps ? {
                   aadhaarFront: profileCompletionStatus.steps.aadhaarUpload?.frontUploaded ? { url: true } : null,
                   aadhaarBack: profileCompletionStatus.steps.aadhaarUpload?.backUploaded ? { url: true } : null,
@@ -1238,7 +1227,7 @@ export default function ProfilePage() {
 
             {/* Active Sessions Section - always visible */}
             <ActiveSessionsSection />
-            
+
             {/* Mobile only: Status and Edit buttons at bottom */}
             <div className="lg:hidden mt-8 mb-4">
               <StatusEditButtons />

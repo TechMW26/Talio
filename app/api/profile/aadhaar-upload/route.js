@@ -2,13 +2,24 @@ import { NextResponse } from 'next/server'
 import { verifyToken } from '@/lib/auth'
 import connectDB from '@/lib/mongodb'
 import User from '@/models/User'
+import Employee from '@/models/Employee'
 import path from 'path'
 import fs from 'fs/promises'
+import { uploadWithTempStorage, deleteFromImageKit, getImageKitFolder, generateEmployeeFolderName } from '@/lib/imagekit'
 
 export const dynamic = 'force-dynamic'
 
 // Maximum file size: 5MB
 const MAX_FILE_SIZE = 5 * 1024 * 1024
+
+// Check if ImageKit is configured
+const isImageKitConfigured = () => {
+  return !!(
+    process.env.IMAGEKIT_PUBLIC_KEY &&
+    process.env.IMAGEKIT_PRIVATE_KEY &&
+    process.env.IMAGEKIT_URL_ENDPOINT
+  )
+}
 
 /**
  * POST /api/profile/aadhaar-upload
@@ -74,7 +85,7 @@ export async function POST(request) {
     // Extract base64 data and check size
     const base64Data = imageData.replace(base64Regex, '')
     const imageBuffer = Buffer.from(base64Data, 'base64')
-    
+
     if (imageBuffer.length > MAX_FILE_SIZE) {
       return NextResponse.json({
         success: false,
@@ -82,28 +93,66 @@ export async function POST(request) {
       }, { status: 400 })
     }
 
-    // Create secure upload directory
-    const uploadDir = path.join(process.cwd(), 'uploads', 'aadhaar', decoded.userId)
-    await fs.mkdir(uploadDir, { recursive: true })
+    // Get employee info for folder structure
+    let employee = null
+    if (user.employeeId) {
+      employee = await Employee.findById(user.employeeId).select('firstName lastName employeeCode')
+    }
+    if (!employee) {
+      employee = await Employee.findOne({ userId: decoded.userId }).select('firstName lastName employeeCode')
+    }
 
-    // Generate secure filename
+    // Generate secure filename with employee code
     const timestamp = Date.now()
     const extension = imageData.match(/data:image\/(\w+);/)?.[1] || 'jpg'
-    const filename = `aadhaar_${side}_${timestamp}.${extension}`
-    const filePath = path.join(uploadDir, filename)
+    const employeeCode = employee?.employeeCode || 'UNKNOWN'
+    const filename = `aadhaar_${side}_${employeeCode}_${timestamp}.${extension}`
 
-    // Save the file
-    await fs.writeFile(filePath, imageBuffer)
+    // Get the appropriate ImageKit folder
+    const imagekitFolder = getImageKitFolder('aadhaar', { employee })
+    const employeeFolderName = generateEmployeeFolderName(employee)
 
-    // Generate URL for the file
-    const fileUrl = `/uploads/aadhaar/${decoded.userId}/${filename}`
+    let fileUrl = ''
+    let fileId = null
+
+    // Try ImageKit upload if configured
+    if (isImageKitConfigured()) {
+      try {
+        // Build safe tags (no undefined values)
+        const safeTags = ['aadhaar', side, 'document', employeeCode].filter(Boolean)
+
+        const imagekitResult = await uploadWithTempStorage(imageBuffer, {
+          fileName: filename,
+          folder: imagekitFolder,
+          tags: safeTags,
+        })
+
+        fileUrl = imagekitResult.url
+        fileId = imagekitResult.fileId
+        console.log(`[Aadhaar Upload] Uploaded to ImageKit: ${imagekitFolder}/${filename}`)
+      } catch (imagekitError) {
+        console.error('[Aadhaar Upload] ImageKit failed, falling back to local:', imagekitError.message)
+        // Fall through to local storage
+      }
+    }
+
+    // Fallback: Local file storage with employee folder structure
+    if (!fileUrl) {
+      const uploadDir = path.join(process.cwd(), 'uploads', 'aadhaar', employeeFolderName)
+      await fs.mkdir(uploadDir, { recursive: true })
+
+      const filePath = path.join(uploadDir, filename)
+      await fs.writeFile(filePath, imageBuffer)
+      fileUrl = `/uploads/aadhaar/${employeeFolderName}/${filename}`
+    }
 
     // Update user's Aadhaar document status
     const updateField = side === 'front' ? 'profileCompletion.aadhaarFront' : 'profileCompletion.aadhaarBack'
-    
+
     const updateData = {
       [`${updateField}.url`]: fileUrl,
       [`${updateField}.uploadedAt`]: new Date(),
+      ...(fileId && { [`${updateField}.fileId`]: fileId }),
     }
 
     // Check if both sides will be uploaded after this update
@@ -123,14 +172,24 @@ export async function POST(request) {
     })
 
     // Delete old file if exists
-    const oldUrl = user.profileCompletion?.[side === 'front' ? 'aadhaarFront' : 'aadhaarBack']?.url
-    if (oldUrl) {
-      const oldPath = path.join(process.cwd(), oldUrl)
-      try {
-        await fs.unlink(oldPath)
-      } catch (err) {
-        // Ignore if file doesn't exist
-        console.log('Old file cleanup:', err.message)
+    const oldSideData = user.profileCompletion?.[side === 'front' ? 'aadhaarFront' : 'aadhaarBack']
+    if (oldSideData?.url) {
+      // If old file was on ImageKit, delete from ImageKit
+      if (oldSideData.fileId) {
+        try {
+          await deleteFromImageKit(oldSideData.fileId)
+          console.log(`[Aadhaar Upload] Deleted old ImageKit file: ${oldSideData.fileId}`)
+        } catch (err) {
+          console.log('Old ImageKit file cleanup:', err.message)
+        }
+      } else if (oldSideData.url.startsWith('/uploads/')) {
+        // Local file - delete from filesystem
+        const oldPath = path.join(process.cwd(), oldSideData.url)
+        try {
+          await fs.unlink(oldPath)
+        } catch (err) {
+          console.log('Old file cleanup:', err.message)
+        }
       }
     }
 

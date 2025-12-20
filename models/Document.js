@@ -21,6 +21,9 @@ const DocumentSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  fileId: {
+    type: String, // ImageKit file ID for deletion
+  },
   fileSize: {
     type: Number,
   },

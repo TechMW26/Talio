@@ -7,6 +7,17 @@ import Designation from '@/models/Designation'
 import Company from '@/models/Company'
 import queryCache from '@/lib/queryCache'
 import { logActivity } from '@/lib/activityLogger'
+import { uploadImageToImageKit, deleteFromImageKit, getImageKitFolder, generateEmployeeFolderName } from '@/lib/imagekit'
+import { optimizeImage, isValidImage } from '@/lib/imageOptimization'
+
+// Check if ImageKit is configured
+const isImageKitConfigured = () => {
+  return !!(
+    process.env.IMAGEKIT_PUBLIC_KEY &&
+    process.env.IMAGEKIT_PRIVATE_KEY &&
+    process.env.IMAGEKIT_URL_ENDPOINT
+  )
+}
 
 // Ensure models are registered for populate
 const _ensureModels = { Department, Designation, Company };
@@ -123,12 +134,15 @@ export async function GET(request, { params }) {
 // PUT - Update employee
 export async function PUT(request, { params }) {
   try {
+    // Await params in Next.js 15
+    const { id } = await params;
+
     await connectDB()
 
     const data = await request.json()
 
     // Check if employee exists
-    const employee = await Employee.findById(params.id).lean()
+    const employee = await Employee.findById(id).lean()
     if (!employee) {
       return NextResponse.json(
         { success: false, message: 'Employee not found' },
@@ -196,8 +210,70 @@ export async function PUT(request, { params }) {
       data.designationLevel = parseInt(data.designationLevel) || 1
     }
 
+    // Handle profile picture upload to ImageKit if base64 is provided
+    if (data.profilePicture && data.profilePicture.startsWith('data:image/')) {
+      console.log('[Employee Update] Processing profile picture upload...')
+
+      try {
+        // Extract base64 data
+        const base64Data = data.profilePicture.replace(/^data:image\/\w+;base64,/, '')
+        const imageBuffer = Buffer.from(base64Data, 'base64')
+
+        // Validate image
+        if (await isValidImage(imageBuffer)) {
+          // Optimize image
+          const { buffer: optimizedBuffer } = await optimizeImage(imageBuffer, {
+            type: 'avatar',
+            format: 'webp',
+            quality: 85
+          })
+
+          // Generate filename
+          const timestamp = Date.now()
+          const employeeCode = employee.employeeCode || 'UNKNOWN'
+          const filename = `profile_${employeeCode}_${timestamp}.webp`
+
+          // Get the appropriate ImageKit folder
+          const imagekitFolder = getImageKitFolder('profile', { employee })
+
+          if (isImageKitConfigured()) {
+            console.log('[Employee Update] Uploading to ImageKit...')
+
+            // Build safe tags (no undefined values)
+            const safeTags = ['profile', 'avatar', employeeCode].filter(Boolean)
+
+            const imagekitResult = await uploadImageToImageKit(optimizedBuffer, {
+              fileName: filename,
+              folder: imagekitFolder,
+              tags: safeTags,
+            })
+
+            // Delete old profile picture from ImageKit if exists
+            if (employee.profilePictureFileId) {
+              try {
+                await deleteFromImageKit(employee.profilePictureFileId)
+                console.log(`[Employee Update] Deleted old ImageKit file: ${employee.profilePictureFileId}`)
+              } catch (err) {
+                console.log('[Employee Update] Old file cleanup:', err.message)
+              }
+            }
+
+            // Update data with ImageKit URL
+            data.profilePicture = imagekitResult.url
+            data.profilePictureFileId = imagekitResult.fileId
+            console.log(`[Employee Update] Profile picture uploaded to ImageKit: ${imagekitResult.url}`)
+          } else {
+            console.log('[Employee Update] ImageKit not configured, keeping base64')
+          }
+        }
+      } catch (uploadError) {
+        console.error('[Employee Update] Profile picture upload failed:', uploadError.message)
+        // Keep the base64 if upload fails (fallback behavior)
+      }
+    }
+
     const updatedEmployee = await Employee.findByIdAndUpdate(
-      params.id,
+      id,
       data,
       { new: true, runValidators: true }
     )
@@ -224,17 +300,17 @@ export async function PUT(request, { params }) {
       .lean()
 
     // Clear cache for this employee and list
-    queryCache.delete(queryCache.generateKey('employee', params.id))
+    queryCache.delete(queryCache.generateKey('employee', id))
     queryCache.clearPattern('employees')
 
     // Log activity for profile update
     await logActivity({
-      employeeId: params.id,
+      employeeId: id,
       type: 'profile_update',
       action: 'Updated profile',
       details: 'Profile information updated',
       relatedModel: 'Employee',
-      relatedId: params.id
+      relatedId: id
     })
 
     return NextResponse.json({
@@ -254,9 +330,12 @@ export async function PUT(request, { params }) {
 // DELETE - Delete employee
 export async function DELETE(request, { params }) {
   try {
+    // Await params in Next.js 15
+    const { id } = await params;
+
     await connectDB()
 
-    const employee = await Employee.findById(params.id)
+    const employee = await Employee.findById(id)
     if (!employee) {
       return NextResponse.json(
         { success: false, message: 'Employee not found' },
@@ -265,7 +344,7 @@ export async function DELETE(request, { params }) {
     }
 
     // Soft delete - change status to terminated
-    await Employee.findByIdAndUpdate(params.id, { status: 'terminated' })
+    await Employee.findByIdAndUpdate(id, { status: 'terminated' })
 
     return NextResponse.json({
       success: true,

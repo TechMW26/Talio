@@ -2,6 +2,16 @@ import { NextResponse } from 'next/server'
 import connectDB from '@/lib/mongodb'
 import Company from '@/models/Company'
 import { verifyToken } from '@/lib/auth'
+import { uploadImageToImageKit, deleteFromImageKit, getImageKitFolder } from '@/lib/imagekit'
+
+// Check if ImageKit is configured
+const isImageKitConfigured = () => {
+  return !!(
+    process.env.IMAGEKIT_PUBLIC_KEY &&
+    process.env.IMAGEKIT_PRIVATE_KEY &&
+    process.env.IMAGEKIT_URL_ENDPOINT
+  )
+}
 
 // GET - Get single company
 export async function GET(request, { params }) {
@@ -48,7 +58,7 @@ export async function PUT(request, { params }) {
 
     const token = authHeader.split(' ')[1]
     const decoded = await verifyToken(token)
-    
+
     if (!decoded) {
       return NextResponse.json(
         { success: false, message: 'Invalid token' },
@@ -68,7 +78,7 @@ export async function PUT(request, { params }) {
     await connectDB()
 
     const data = await request.json()
-    
+
     // Check if company exists
     const existingCompany = await Company.findById(id)
     if (!existingCompany) {
@@ -102,7 +112,41 @@ export async function PUT(request, { params }) {
     if (data.code) updateData.code = data.code.trim().toUpperCase()
     if (data.description !== undefined) updateData.description = data.description.trim()
     if (data.isActive !== undefined) updateData.isActive = data.isActive
-    if (data.logo !== undefined) updateData.logo = data.logo
+
+    // Handle logo upload to ImageKit if it's base64
+    if (data.logo !== undefined) {
+      if (data.logo && data.logo.startsWith('data:image/') && isImageKitConfigured()) {
+        try {
+          // Delete old logo from ImageKit if exists
+          if (company.logoFileId) {
+            await deleteFromImageKit(company.logoFileId).catch(() => { });
+          }
+
+          // Get folder path with company code
+          const companyCode = data.code?.trim().toUpperCase() || company.code;
+          const imagekitFolder = getImageKitFolder('company', { companyCode });
+
+          const imagekitResult = await uploadImageToImageKit(data.logo, {
+            fileName: `company_${companyCode}_logo_${Date.now()}.webp`,
+            folder: imagekitFolder,
+            tags: ['company', 'logo', companyCode],
+            customMetadata: {
+              companyId: id,
+              companyCode: companyCode,
+            },
+          });
+          updateData.logo = imagekitResult.url;
+          updateData.logoFileId = imagekitResult.fileId;
+          console.log(`[Company] Logo uploaded to ImageKit: ${imagekitFolder}`);
+        } catch (imgError) {
+          console.error('[Company] ImageKit logo upload failed:', imgError.message);
+          updateData.logo = data.logo; // Fallback to base64
+        }
+      } else {
+        updateData.logo = data.logo;
+      }
+    }
+
     if (data.email !== undefined) updateData.email = data.email?.trim() || ''
     if (data.phone !== undefined) updateData.phone = data.phone?.trim() || ''
     if (data.website !== undefined) updateData.website = data.website?.trim() || ''
@@ -152,7 +196,7 @@ export async function DELETE(request, { params }) {
 
     const token = authHeader.split(' ')[1]
     const decoded = await verifyToken(token)
-    
+
     if (!decoded) {
       return NextResponse.json(
         { success: false, message: 'Invalid token' },

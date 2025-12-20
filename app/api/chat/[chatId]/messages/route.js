@@ -95,7 +95,7 @@ export async function POST(request, context) {
     const params = await context.params
     const { chatId } = params
     const body = await request.json()
-    const { content, fileUrl, fileName, fileType, fileSize, replyTo } = body
+    const { content, fileUrl, fileId, fileName, fileType, fileSize, replyTo } = body
 
     // Get user to find employee ID
     const userDoc = await User.findById(decoded.userId).select('employeeId')
@@ -136,6 +136,7 @@ export async function POST(request, context) {
     // Add file info if present
     if (fileUrl) {
       message.fileUrl = fileUrl
+      message.fileId = fileId // ImageKit file ID for deletion
       message.fileName = fileName
       message.fileType = fileType
       message.fileSize = fileSize

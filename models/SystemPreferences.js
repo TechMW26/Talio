@@ -11,7 +11,7 @@ const systemPreferencesSchema = new mongoose.Schema({
     type: String,
     default: '₹',
   },
-  
+
   // Time Settings
   timeFormat: {
     type: String,
@@ -27,7 +27,7 @@ const systemPreferencesSchema = new mongoose.Schema({
     enum: ['DD/MM/YYYY', 'MM/DD/YYYY', 'YYYY-MM-DD'],
     default: 'DD/MM/YYYY',
   },
-  
+
   // Work Settings
   workingDaysPerWeek: {
     type: Number,
@@ -46,7 +46,7 @@ const systemPreferencesSchema = new mongoose.Schema({
     enum: ['monday', 'sunday'],
     default: 'monday',
   },
-  
+
   // Leave Settings
   defaultLeaveYear: {
     type: Number,
@@ -60,7 +60,7 @@ const systemPreferencesSchema = new mongoose.Schema({
     type: Number,
     default: 10,
   },
-  
+
   // Attendance Settings
   lateThresholdMinutes: {
     type: Number,
@@ -74,7 +74,7 @@ const systemPreferencesSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
-  
+
   // Notification Settings
   emailNotifications: {
     type: Boolean,
@@ -88,7 +88,7 @@ const systemPreferencesSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
-  
+
   // Company Information
   companyName: {
     type: String,
@@ -110,7 +110,11 @@ const systemPreferencesSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
-  
+  companyLogoFileId: {
+    type: String, // ImageKit file ID for deletion
+    default: '',
+  },
+
   // System Settings
   maintenanceMode: {
     type: Boolean,
@@ -133,7 +137,7 @@ const systemPreferencesSchema = new mongoose.Schema({
 })
 
 // Ensure only one preferences document exists
-systemPreferencesSchema.statics.getSingleton = async function() {
+systemPreferencesSchema.statics.getSingleton = async function () {
   let preferences = await this.findOne()
   if (!preferences) {
     preferences = new this()
@@ -143,20 +147,20 @@ systemPreferencesSchema.statics.getSingleton = async function() {
 }
 
 // Method to get formatted currency
-systemPreferencesSchema.methods.formatCurrency = function(amount) {
+systemPreferencesSchema.methods.formatCurrency = function (amount) {
   return `${this.currencySymbol}${amount.toLocaleString()}`
 }
 
 // Method to get working days array
-systemPreferencesSchema.methods.getWorkingDays = function() {
+systemPreferencesSchema.methods.getWorkingDays = function () {
   const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
   const startIndex = this.weekStartsOn === 'sunday' ? 6 : 0
   const workingDays = []
-  
+
   for (let i = 0; i < this.workingDaysPerWeek; i++) {
     workingDays.push(days[(startIndex + i) % 7])
   }
-  
+
   return workingDays
 }
 

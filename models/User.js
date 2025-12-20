@@ -28,6 +28,13 @@ const UserSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Company',
   },
+  // User avatar/profile picture
+  avatar: {
+    type: String,
+  },
+  avatarFileId: {
+    type: String, // ImageKit file ID for deletion
+  },
   isActive: {
     type: Boolean,
     default: true,
@@ -47,10 +54,12 @@ const UserSchema = new mongoose.Schema({
     // Aadhaar document uploads
     aadhaarFront: {
       url: String,
+      fileId: String, // ImageKit file ID for deletion
       uploadedAt: Date,
     },
     aadhaarBack: {
       url: String,
+      fileId: String, // ImageKit file ID for deletion
       uploadedAt: Date,
     },
     // OCR verification

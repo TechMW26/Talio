@@ -2,10 +2,10 @@ import mongoose from 'mongoose';
 
 const WhiteboardObjectSchema = new mongoose.Schema({
   id: { type: String, required: true },
-  type: { 
-    type: String, 
+  type: {
+    type: String,
     enum: ['pencil', 'highlighter', 'line', 'arrow', 'curvedArrow', 'dottedArrow', 'pigtailArrow', 'rect', 'ellipse', 'diamond', 'triangle', 'star', 'hexagon', 'pentagon', 'polygon', 'sticky', 'text', 'image'],
-    required: true 
+    required: true
   },
   // Common properties
   x: { type: Number, default: 0 },
@@ -19,16 +19,16 @@ const WhiteboardObjectSchema = new mongoose.Schema({
   opacity: { type: Number, default: 1 },
   cornerRadius: { type: Number, default: 0 },
   borderRadius: { type: Number, default: 0 },
-  
+
   // Path-based objects (pencil, line, arrows)
   points: [{ x: Number, y: Number }],
-  
+
   // Arrow-specific properties
   arrowType: { type: String, enum: ['straight', 'curved', 'elbow'], default: 'straight' },
   lineStyle: { type: String, enum: ['solid', 'dashed', 'dotted'], default: 'solid' },
   controlPoint: { type: mongoose.Schema.Types.Mixed }, // {x: Number, y: Number} for curved arrows
   pathPoints: [{ x: Number, y: Number }], // Temporary drawing path (cleared after save)
-  
+
   // Text properties
   text: { type: String },
   fontSize: { type: Number, default: 16 },
@@ -38,24 +38,24 @@ const WhiteboardObjectSchema = new mongoose.Schema({
   bold: { type: Boolean, default: false },
   italic: { type: Boolean, default: false },
   underline: { type: Boolean, default: false },
-  
+
   // Image properties
   imageData: { type: String }, // base64 or URL
   originalWidth: { type: Number },
   originalHeight: { type: Number },
-  
+
   // Polygon-specific
   sides: { type: Number, default: 6 },
-  
+
   // Eraser strokes attached to this object
   eraserStrokes: [{
     points: [{ x: Number, y: Number }],
     width: { type: Number, default: 20 }
   }],
-  
+
   // Locking
   locked: { type: Boolean, default: false },
-  
+
   // Layer order
   zIndex: { type: Number, default: 0 }
 }, { _id: false });
@@ -85,8 +85,8 @@ const AIAnalysisSchema = new mongoose.Schema({
 
 const WhiteboardShareSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  permission: { 
-    type: String, 
+  permission: {
+    type: String,
     enum: ['view_only', 'editor', 'owner'],
     default: 'view_only'
   },
@@ -97,43 +97,44 @@ const WhiteboardShareSchema = new mongoose.Schema({
 const WhiteboardSchema = new mongoose.Schema({
   title: { type: String, required: true, default: 'Untitled Board' },
   description: { type: String, default: '' },
-  
+
   // Owner
   owner: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  
+
   // Pages
   pages: { type: [WhiteboardPageSchema], default: () => [{ id: 'page-1', objects: [] }] },
   currentPageIndex: { type: Number, default: 0 },
-  
+
   // Theme settings
-  theme: { 
-    type: String, 
+  theme: {
+    type: String,
     enum: ['white', 'black', 'chalk'],
     default: 'white'
   },
   chalkTextureUrl: { type: String, default: '' },
   showGrid: { type: Boolean, default: false },
-  
+
   // View state (saved per user, but we can store default)
   defaultZoom: { type: Number, default: 1 },
   defaultPanX: { type: Number, default: 0 },
   defaultPanY: { type: Number, default: 0 },
-  
+
   // Sharing
   sharing: [WhiteboardShareSchema],
   isPublic: { type: Boolean, default: false },
   publicLink: { type: String, unique: true, sparse: true },
-  
+
   // Metadata
-  thumbnail: { type: String }, // Main board thumbnail (first page)
+  thumbnail: { type: String }, // Main board thumbnail (first page) - URL or base64
+  thumbnailFileId: { type: String }, // ImageKit file ID for deletion
   tags: [{ type: String }],
-  
+
   // Folder/Organization
   folderId: { type: mongoose.Schema.Types.ObjectId, ref: 'WhiteboardFolder' },
-  
+
   // AI Analysis
   aiAnalysis: { type: AIAnalysisSchema, default: () => ({ summary: '', messages: [], notes: [], keyPoints: [] }) },
-  
+
   // Timestamps
   lastModified: { type: Date, default: Date.now },
   lastModifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
@@ -147,13 +148,13 @@ WhiteboardSchema.index({ 'sharing.userId': 1 });
 WhiteboardSchema.index({ title: 'text', description: 'text', tags: 'text' });
 
 // Update lastModified on save
-WhiteboardSchema.pre('save', function(next) {
+WhiteboardSchema.pre('save', function (next) {
   this.lastModified = new Date();
   next();
 });
 
 // Virtual for full board data export
-WhiteboardSchema.virtual('exportData').get(function() {
+WhiteboardSchema.virtual('exportData').get(function () {
   return {
     version: '1.0',
     title: this.title,
@@ -165,7 +166,7 @@ WhiteboardSchema.virtual('exportData').get(function() {
 });
 
 // Static method to generate unique public link
-WhiteboardSchema.statics.generatePublicLink = function() {
+WhiteboardSchema.statics.generatePublicLink = function () {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let result = '';
   for (let i = 0; i < 12; i++) {
@@ -175,41 +176,41 @@ WhiteboardSchema.statics.generatePublicLink = function() {
 };
 
 // Check if user has permission
-WhiteboardSchema.methods.hasPermission = function(userId, requiredPermission = 'view_only') {
+WhiteboardSchema.methods.hasPermission = function (userId, requiredPermission = 'view_only') {
   const userIdStr = userId.toString();
-  
+
   // Owner has all permissions
   if (this.owner.toString() === userIdStr) {
     return true;
   }
-  
+
   // Check sharing
   const share = this.sharing.find(s => s.userId.toString() === userIdStr);
   if (!share) {
     return this.isPublic && requiredPermission === 'view_only';
   }
-  
+
   const permissionLevels = { 'view_only': 1, 'editor': 2, 'owner': 3 };
   return permissionLevels[share.permission] >= permissionLevels[requiredPermission];
 };
 
 // Get user's permission level
-WhiteboardSchema.methods.getUserPermission = function(userId) {
+WhiteboardSchema.methods.getUserPermission = function (userId) {
   const userIdStr = userId.toString();
-  
+
   if (this.owner.toString() === userIdStr) {
     return 'owner';
   }
-  
+
   const share = this.sharing.find(s => s.userId.toString() === userIdStr);
   if (share) {
     return share.permission;
   }
-  
+
   if (this.isPublic) {
     return 'view_only';
   }
-  
+
   return null;
 };
 

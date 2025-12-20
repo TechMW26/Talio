@@ -8,12 +8,15 @@ const MessageSchema = new mongoose.Schema({
   },
   content: {
     type: String,
-    required: function() {
+    required: function () {
       return !this.fileUrl
     }
   },
   fileUrl: {
     type: String
+  },
+  fileId: {
+    type: String // ImageKit file ID for deletion
   },
   fileName: {
     type: String
@@ -61,7 +64,7 @@ const MessageSchema = new mongoose.Schema({
 const ChatSchema = new mongoose.Schema({
   name: {
     type: String,
-    required: function() {
+    required: function () {
       return this.isGroup
     }
   },

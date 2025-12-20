@@ -2,14 +2,24 @@ import { NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
 import connectDB from '@/lib/mongodb';
 import Whiteboard from '@/models/Whiteboard';
+import { uploadImageToImageKit, deleteFromImageKit, getImageKitFolder } from '@/lib/imagekit';
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key');
 
+// Check if ImageKit is configured
+const isImageKitConfigured = () => {
+  return !!(
+    process.env.IMAGEKIT_PUBLIC_KEY &&
+    process.env.IMAGEKIT_PRIVATE_KEY &&
+    process.env.IMAGEKIT_URL_ENDPOINT
+  )
+}
+
 async function verifyAuth(request) {
   try {
-    const token = request.cookies.get('token')?.value || 
-                  request.headers.get('authorization')?.replace('Bearer ', '');
-    
+    const token = request.cookies.get('token')?.value ||
+      request.headers.get('authorization')?.replace('Bearer ', '');
+
     if (!token) {
       return null;
     }
@@ -32,7 +42,7 @@ export async function GET(request, { params }) {
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    
+
     const { id } = await params;
 
     await connectDB();
@@ -49,16 +59,16 @@ export async function GET(request, { params }) {
     // Get owner ID (handle both populated and non-populated cases)
     const ownerId = whiteboard.owner?._id?.toString() || whiteboard.owner?.toString();
     const userId = user.id?.toString();
-    
+
     // Check if user is owner
     const isOwner = ownerId === userId;
-    
+
     // Check if user has sharing access
     const shareEntry = whiteboard.sharing?.find(s => {
       const shareUserId = s.userId?._id?.toString() || s.userId?.toString();
       return shareUserId === userId;
     });
-    
+
     // For now, allow all authenticated users to view boards (for team collaboration)
     // Determine permission level
     let permission = 'view_only';
@@ -98,7 +108,7 @@ export async function PUT(request, { params }) {
     // Get owner ID (handle both populated and non-populated cases)
     const ownerId = whiteboard.owner?._id?.toString() || whiteboard.owner?.toString();
     const userId = user.id?.toString();
-    
+
     // Check if user is owner or has editor permission
     const isOwner = ownerId === userId;
     const shareEntry = whiteboard.sharing?.find(s => {
@@ -106,7 +116,7 @@ export async function PUT(request, { params }) {
       return shareUserId === userId;
     });
     const isEditor = shareEntry?.permission === 'editor';
-    
+
     // Allow owner and editors to update
     if (!isOwner && !isEditor) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
@@ -122,10 +132,45 @@ export async function PUT(request, { params }) {
     if (theme !== undefined) whiteboard.theme = theme;
     if (showGrid !== undefined) whiteboard.showGrid = showGrid;
     if (currentPageIndex !== undefined) whiteboard.currentPageIndex = currentPageIndex;
-    if (thumbnail !== undefined) whiteboard.thumbnail = thumbnail;
     if (tags !== undefined) whiteboard.tags = tags;
     if (aiAnalysis !== undefined) whiteboard.aiAnalysis = aiAnalysis;
-    
+
+    // Handle thumbnail - upload to ImageKit if it's base64
+    if (thumbnail !== undefined) {
+      if (thumbnail && thumbnail.startsWith('data:image/') && isImageKitConfigured()) {
+        try {
+          // Delete old thumbnail from ImageKit if exists
+          if (whiteboard.thumbnailFileId) {
+            await deleteFromImageKit(whiteboard.thumbnailFileId).catch(() => { });
+          }
+
+          // Get folder path with whiteboard ID
+          const imagekitFolder = getImageKitFolder('whiteboard', { whiteboardId: id });
+
+          // Upload new thumbnail to ImageKit
+          const imagekitResult = await uploadImageToImageKit(thumbnail, {
+            fileName: `whiteboard_${id}_thumb_${Date.now()}.webp`,
+            folder: imagekitFolder,
+            tags: ['whiteboard', 'thumbnail'],
+            customMetadata: {
+              whiteboardId: id,
+              userId: user.id,
+            },
+          });
+
+          whiteboard.thumbnail = imagekitResult.url;
+          whiteboard.thumbnailFileId = imagekitResult.fileId;
+          console.log(`[Whiteboard] Thumbnail uploaded to ImageKit: ${imagekitFolder}`);
+        } catch (imgError) {
+          console.error('[Whiteboard] ImageKit thumbnail upload failed:', imgError.message);
+          // Fallback to storing base64 (not recommended but backwards compatible)
+          whiteboard.thumbnail = thumbnail;
+        }
+      } else {
+        whiteboard.thumbnail = thumbnail;
+      }
+    }
+
     whiteboard.lastModifiedBy = user.id;
     whiteboard.lastModified = new Date();
 
