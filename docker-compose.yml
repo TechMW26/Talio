@@ -13,8 +13,6 @@ services:
         - NEXT_PUBLIC_ELEVENLABS_VOICE_ID=${NEXT_PUBLIC_ELEVENLABS_VOICE_ID}
         - NEXT_PUBLIC_ELEVENLABS_API_URL=${NEXT_PUBLIC_ELEVENLABS_API_URL}
         - NEXT_PUBLIC_GEMINI_API_KEY=${NEXT_PUBLIC_GEMINI_API_KEY}
-      cache_from:
-        - talio-app:latest
     image: talio-app:latest
     container_name: talio-app
     env_file:
