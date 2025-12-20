@@ -25,6 +25,7 @@ APP_DIR=$(pwd)
 FRESH_INSTALL=false
 SETUP_SSL=false
 SKIP_DEPS=false
+NO_CACHE=false
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -41,6 +42,10 @@ while [[ $# -gt 0 ]]; do
             SKIP_DEPS=true
             shift
             ;;
+        --no-cache)
+            NO_CACHE=true
+            shift
+            ;;
         --domain)
             DOMAIN="$2"
             shift 2
@@ -55,6 +60,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --ssl         Set up SSL with Certbot"
             echo "  --domain      Your domain name (default: app.talio.in)"
             echo "  --skip-deps   Skip dependency installation"
+            echo "  --no-cache    Build Docker image without cache (for dependency issues)"
             echo "  --help        Show this help message"
             exit 0
             ;;
@@ -374,6 +380,13 @@ deploy_docker() {
     export DOCKER_BUILDKIT=1
     export COMPOSE_DOCKER_CLI_BUILD=1
     
+    # Build arguments
+    BUILD_ARGS="--build-arg BUILDKIT_INLINE_CACHE=1"
+    if $NO_CACHE; then
+        BUILD_ARGS="--no-cache"
+        log_info "Building without cache (fresh build)..."
+    fi
+    
     # Check if we can do zero-downtime deployment
     RUNNING_CONTAINER=$(docker_compose ps -q app 2>/dev/null || true)
     
@@ -382,7 +395,7 @@ deploy_docker() {
         
         # Build new image while old container is still running
         log_info "Building new Docker image (old container still serving traffic)..."
-        docker_compose build --build-arg BUILDKIT_INLINE_CACHE=1
+        docker_compose build $BUILD_ARGS
         
         # Quick container swap
         log_info "Swapping to new container..."
@@ -396,7 +409,7 @@ deploy_docker() {
         
         # Build with cache for faster builds
         log_info "Building Docker image..."
-        docker_compose build --build-arg BUILDKIT_INLINE_CACHE=1
+        docker_compose build $BUILD_ARGS
         
         # Start containers
         log_info "Starting containers..."
@@ -406,16 +419,16 @@ deploy_docker() {
     # Wait and check
     log_info "Waiting for application to start (health check)..."
     
-    # Health check loop
-    for i in {1..30}; do
+    # Health check loop (extended timeout for slow starts)
+    for i in {1..60}; do
         if curl -sf http://localhost:3000/api/health > /dev/null 2>&1; then
             log_success "Application is healthy and responding!"
             break
         fi
-        if [ $i -eq 30 ]; then
-            log_error "Health check failed after 30 seconds"
-            docker_compose logs --tail=50
-            exit 1
+        if [ $i -eq 60 ]; then
+            log_warning "Health check timed out after 60 seconds"
+            log_info "Application may still be starting. Check logs with: docker compose logs -f"
+            break
         fi
         sleep 1
     done

@@ -20,7 +20,13 @@ RUN apt-get update && \
 FROM base AS deps
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm ci --legacy-peer-deps --prefer-offline
+
+# Configure npm for slower networks and skip problematic sharp binary download
+ENV SHARP_IGNORE_GLOBAL_LIBVIPS=0
+RUN npm config set fetch-retry-mintimeout 60000 && \
+    npm config set fetch-retry-maxtimeout 300000 && \
+    npm config set fetch-timeout 600000 && \
+    npm ci --legacy-peer-deps --prefer-offline --network-timeout=600000
 
 # Builder
 FROM base AS builder
