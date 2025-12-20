@@ -164,7 +164,6 @@ HealthScoreSchema.methods.saveToHistory = function(notes = '') {
 }
 
 // Indexes for performance
-HealthScoreSchema.index({ employee: 1 })
 HealthScoreSchema.index({ overallScore: -1 })
 HealthScoreSchema.index({ riskLevel: 1 })
 HealthScoreSchema.index({ salaryDeductionRisk: 1 })
