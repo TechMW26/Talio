@@ -144,7 +144,6 @@ const WhiteboardSchema = new mongoose.Schema({
 // Indexes
 WhiteboardSchema.index({ owner: 1, createdAt: -1 });
 WhiteboardSchema.index({ 'sharing.userId': 1 });
-WhiteboardSchema.index({ publicLink: 1 });
 WhiteboardSchema.index({ title: 'text', description: 'text', tags: 'text' });
 
 // Update lastModified on save

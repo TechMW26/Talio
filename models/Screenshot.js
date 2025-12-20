@@ -19,8 +19,7 @@ const ScreenshotSchema = new mongoose.Schema({
   // Employee reference for team queries
   employee: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Employee',
-    index: true
+    ref: 'Employee'
   },
   
   // GridFS file ID for the actual image
@@ -45,8 +44,7 @@ const ScreenshotSchema = new mongoose.Schema({
   capturedAt: {
     type: Date,
     required: true,
-    default: Date.now,
-    index: true
+    default: Date.now
   },
   
   // Date string for easy querying (YYYY-MM-DD)
@@ -109,8 +107,6 @@ const ScreenshotSchema = new mongoose.Schema({
 ScreenshotSchema.index({ user: 1, capturedAt: -1 });
 ScreenshotSchema.index({ user: 1, dateString: 1 });
 ScreenshotSchema.index({ employee: 1, dateString: 1 });
-ScreenshotSchema.index({ capturedAt: 1 }); // For cleanup queries
-
 // TTL index - auto-delete after 7 days (backup to manual cleanup)
 // Note: This only deletes the metadata document, GridFS files are cleaned separately
 ScreenshotSchema.index({ capturedAt: 1 }, { expireAfterSeconds: 604800 }); // 7 days

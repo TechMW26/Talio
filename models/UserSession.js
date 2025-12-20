@@ -64,7 +64,6 @@ const userSessionSchema = new mongoose.Schema({
 // Indexes for efficient queries
 userSessionSchema.index({ user: 1, isActive: 1 })
 userSessionSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 })
-userSessionSchema.index({ tokenId: 1 })
 
 // Static method to parse user agent
 userSessionSchema.statics.parseUserAgent = function(userAgentString) {
