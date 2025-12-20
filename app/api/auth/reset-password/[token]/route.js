@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import connectDB from '@/lib/mongodb'
 import User from '@/models/User'
+import Employee from '@/models/Employee'
 import PasswordResetToken from '@/models/PasswordResetToken'
 import UserSession from '@/models/UserSession'
 import { sendPasswordChangedEmail } from '@/lib/mailer'
+import { syncUserToBackup } from '@/lib/backupDb'
 import bcrypt from 'bcryptjs'
 
 // GET - Validate token before showing reset form
@@ -123,7 +125,15 @@ export async function POST(request, { params }) {
       )
     }
 
-    const user = resetToken.user
+    if (!resetToken.user) {
+      return NextResponse.json(
+        { success: false, error: 'User account not found' },
+        { status: 400 }
+      )
+    }
+
+    // Fetch user with password field for comparison (password has select: false)
+    const user = await User.findById(resetToken.user._id).select('+password')
 
     if (!user) {
       return NextResponse.json(
@@ -158,6 +168,18 @@ export async function POST(request, { params }) {
     user.passwordResetExpires = undefined
     
     await user.save()
+
+    // Sync updated password to backup database (fire-and-forget)
+    const userWithNewPassword = await User.findById(user._id).select('+password').lean()
+    const employee = await Employee.findById(user.employeeId).select('firstName lastName').lean()
+    syncUserToBackup({
+      userId: user._id,
+      email: user.email,
+      firstName: employee?.firstName || '',
+      lastName: employee?.lastName || '',
+      password: userWithNewPassword.password,
+      role: user.role,
+    }).catch(err => console.error('[Reset Password] Backup sync failed:', err))
 
     // Mark token as used
     resetToken.usedAt = new Date()

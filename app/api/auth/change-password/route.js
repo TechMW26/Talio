@@ -3,6 +3,7 @@ import { jwtVerify } from 'jose'
 import connectDB from '@/lib/mongodb'
 import User from '@/models/User'
 import Employee from '@/models/Employee'
+import { syncUserToBackup } from '@/lib/backupDb'
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key')
 
@@ -106,6 +107,20 @@ export async function POST(request) {
     user.password = newPassword // Will be hashed by pre-save hook
     user.forcePasswordChange = false
     await user.save()
+
+    // Sync updated password to backup database (fire-and-forget)
+    const userWithNewPassword = await User.findById(user._id).select('+password').lean()
+    const empData = user.employeeId 
+      ? await Employee.findById(user.employeeId).select('firstName lastName').lean() 
+      : null
+    syncUserToBackup({
+      userId: user._id,
+      email: user.email,
+      firstName: empData?.firstName || '',
+      lastName: empData?.lastName || '',
+      password: userWithNewPassword.password,
+      role: user.role,
+    }).catch(err => console.error('[Change Password] Backup sync failed:', err))
 
     // Refresh user data to get profileCompletion
     const updatedUser = await User.findById(user._id).select('profileCompletion')
