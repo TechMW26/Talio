@@ -22,9 +22,8 @@ RUN apk add --no-cache \
 # Copy only package files first (better layer caching)
 COPY package.json package-lock.json* ./
 
-# Install dependencies with cache mount for faster rebuilds
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci --legacy-peer-deps --prefer-offline
+# Install dependencies
+RUN npm ci --legacy-peer-deps --prefer-offline
 
 # Stage 3: Builder - Build the application
 FROM base AS builder
@@ -68,10 +67,11 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Install only runtime dependencies for sharp (image processing)
+# Install runtime deps and wget for healthcheck
 RUN apk add --no-cache \
     vips \
     vips-cpp \
+    wget \
     && rm -rf /var/cache/apk/*
 
 # Create non-root user for security (run in single layer)
