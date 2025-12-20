@@ -524,8 +524,94 @@ export default function ProfilePage() {
   );
 
   // Handler for Aadhaar verification status changes
-  const handleAadhaarStatusChange = (status) => {
-    fetchProfileCompletionStatus()
+  const handleAadhaarStatusChange = async (status) => {
+    // Refresh completion status first
+    await fetchProfileCompletionStatus()
+
+    // If verification completed with extracted data, enable edit mode so user can see suggestions
+    if (status?.extractedData) {
+      const extractedData = status.extractedData
+
+      // Check if there's useful data to suggest (DOB or address that differs from current)
+      const hasDobSuggestion = extractedData.dateOfBirth && (!employee?.dateOfBirth || (() => {
+        const aadhaarDateMatch = extractedData.dateOfBirth.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/)
+        if (!aadhaarDateMatch) return false
+        const aadhaarDateFormatted = `${aadhaarDateMatch[3]}-${aadhaarDateMatch[2].padStart(2, '0')}-${aadhaarDateMatch[1].padStart(2, '0')}`
+        const currentDob = employee?.dateOfBirth ? new Date(employee.dateOfBirth).toISOString().split('T')[0] : ''
+        return aadhaarDateFormatted !== currentDob
+      })())
+
+      const hasAddressSuggestion = extractedData.address && extractedData.address !== employee?.address
+
+      // If there are suggestions available, enable edit mode
+      if (hasDobSuggestion || hasAddressSuggestion) {
+        setIsEditing(true)
+        setEditedEmployee({ ...employee })
+        toast.success('Aadhaar verified! You can now use the extracted data to update your profile.', {
+          duration: 4000,
+          icon: '📋'
+        })
+      }
+    }
+  }
+
+  // Handler for using Aadhaar data in profile
+  const handleUseAadhaarData = async (field, value) => {
+    if (!value) return
+
+    // Map field names to employee fields
+    const fieldMapping = {
+      'name': null, // Name changes require HR approval
+      'dateofbirth': 'dateOfBirth',
+      'address': 'address',
+    }
+
+    const employeeField = fieldMapping[field]
+
+    if (field === 'name') {
+      toast.error('Name changes require HR approval. Please contact HR to update your name.')
+      return
+    }
+
+    if (!employeeField) {
+      toast.error('Cannot update this field automatically.')
+      return
+    }
+
+    try {
+      // Parse date if it's DOB field
+      let processedValue = value
+      if (field === 'dateofbirth') {
+        // Convert DD/MM/YYYY to YYYY-MM-DD for the API
+        const dateMatch = value.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/)
+        if (dateMatch) {
+          processedValue = `${dateMatch[3]}-${dateMatch[2].padStart(2, '0')}-${dateMatch[1].padStart(2, '0')}`
+        }
+      }
+
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/profile', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ [employeeField]: processedValue }),
+      })
+
+      const result = await response.json()
+      if (result.success) {
+        toast.success(`${field === 'dateofbirth' ? 'Date of Birth' : 'Address'} updated from Aadhaar!`)
+        // Refresh profile data
+        fetchProfile()
+        fetchProfileCompletionStatus()
+      } else {
+        toast.error(result.message || 'Failed to update profile')
+      }
+    } catch (error) {
+      console.error('Error updating profile with Aadhaar data:', error)
+      toast.error('Failed to update profile')
+    }
   }
 
   // Render the Complete Profile Status Section
@@ -543,8 +629,8 @@ export default function ProfilePage() {
 
     return (
       <section className={`rounded-3xl border shadow-sm p-4 sm:p-6 ${hasMismatch
-          ? 'bg-red-50 border-red-200 shadow-red-900/5'
-          : 'bg-white border-slate-100 shadow-slate-900/5'
+        ? 'bg-red-50 border-red-200 shadow-red-900/5'
+        : 'bg-white border-slate-100 shadow-slate-900/5'
         }`}>
         {/* Section Header */}
         <div className="flex items-center justify-between mb-4">
@@ -576,10 +662,10 @@ export default function ProfilePage() {
             </div>
           </div>
           <span className={`text-sm font-bold px-3 py-1.5 rounded-full ${isComplete ? 'bg-emerald-100 text-emerald-700' :
-              hasMismatch ? 'bg-red-100 text-red-700' :
-                completionPercentage >= 70 ? 'bg-emerald-100 text-emerald-700' :
-                  completionPercentage >= 40 ? 'bg-amber-100 text-amber-700' :
-                    'bg-slate-100 text-slate-700'
+            hasMismatch ? 'bg-red-100 text-red-700' :
+              completionPercentage >= 70 ? 'bg-emerald-100 text-emerald-700' :
+                completionPercentage >= 40 ? 'bg-amber-100 text-amber-700' :
+                  'bg-slate-100 text-slate-700'
             }`}>
             {completionPercentage}%
           </span>
@@ -594,14 +680,14 @@ export default function ProfilePage() {
           <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-500 ${completionPercentage === 100
-                  ? 'bg-emerald-500'
-                  : hasMismatch
-                    ? 'bg-red-500'
-                    : completionPercentage >= 70
-                      ? 'bg-blue-500'
-                      : completionPercentage >= 40
-                        ? 'bg-amber-500'
-                        : 'bg-slate-400'
+                ? 'bg-emerald-500'
+                : hasMismatch
+                  ? 'bg-red-500'
+                  : completionPercentage >= 70
+                    ? 'bg-blue-500'
+                    : completionPercentage >= 40
+                      ? 'bg-amber-500'
+                      : 'bg-slate-400'
                 }`}
               style={{ width: `${completionPercentage}%` }}
             />
@@ -617,8 +703,8 @@ export default function ProfilePage() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {/* Personal Info */}
           <div className={`p-4 rounded-2xl border ${steps?.personalInfo?.complete
-              ? 'bg-emerald-50 border-emerald-200'
-              : 'bg-slate-50 border-slate-200'
+            ? 'bg-emerald-50 border-emerald-200'
+            : 'bg-slate-50 border-slate-200'
             }`}>
             <div className="flex items-center gap-3 mb-2">
               <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${steps?.personalInfo?.complete ? 'bg-emerald-500' : 'bg-slate-300'
@@ -649,8 +735,8 @@ export default function ProfilePage() {
 
           {/* Aadhaar Upload */}
           <div className={`p-4 rounded-2xl border ${steps?.aadhaarUpload?.complete
-              ? 'bg-emerald-50 border-emerald-200'
-              : 'bg-slate-50 border-slate-200'
+            ? 'bg-emerald-50 border-emerald-200'
+            : 'bg-slate-50 border-slate-200'
             }`}>
             <div className="flex items-center gap-3 mb-2">
               <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${steps?.aadhaarUpload?.complete ? 'bg-emerald-500' : 'bg-slate-300'
@@ -690,17 +776,17 @@ export default function ProfilePage() {
 
           {/* OCR Verification */}
           <div className={`p-4 rounded-2xl border ${steps?.ocrVerification?.complete
-              ? 'bg-emerald-50 border-emerald-200'
-              : steps?.ocrVerification?.status === 'mismatch'
-                ? 'bg-red-50 border-red-200'
-                : 'bg-slate-50 border-slate-200'
+            ? 'bg-emerald-50 border-emerald-200'
+            : steps?.ocrVerification?.status === 'mismatch'
+              ? 'bg-red-50 border-red-200'
+              : 'bg-slate-50 border-slate-200'
             }`}>
             <div className="flex items-center gap-3 mb-2">
               <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${steps?.ocrVerification?.complete
-                  ? 'bg-emerald-500'
-                  : steps?.ocrVerification?.status === 'mismatch'
-                    ? 'bg-red-500'
-                    : 'bg-slate-300'
+                ? 'bg-emerald-500'
+                : steps?.ocrVerification?.status === 'mismatch'
+                  ? 'bg-red-500'
+                  : 'bg-slate-300'
                 }`}>
                 {steps?.ocrVerification?.complete ? (
                   <FaCheck className="w-4 h-4 text-white" />
@@ -710,10 +796,10 @@ export default function ProfilePage() {
               </div>
               <div>
                 <p className={`text-sm font-semibold ${steps?.ocrVerification?.complete
-                    ? 'text-emerald-700'
-                    : steps?.ocrVerification?.status === 'mismatch'
-                      ? 'text-red-700'
-                      : 'text-slate-700'
+                  ? 'text-emerald-700'
+                  : steps?.ocrVerification?.status === 'mismatch'
+                    ? 'text-red-700'
+                    : 'text-slate-700'
                   }`}>
                   Verification
                 </p>
@@ -811,6 +897,7 @@ export default function ProfilePage() {
                   }
                 } : null}
                 onStatusChange={handleAadhaarStatusChange}
+                onUseAadhaarData={handleUseAadhaarData}
                 showUrgentWarning={profileCompletionStatus?.warning?.urgent}
               />
             )}
@@ -886,28 +973,99 @@ export default function ProfilePage() {
                       Date of Birth
                     </p>
                     {isEditing ? (
-                      <input
-                        type="date"
-                        value={
-                          editedEmployee.dateOfBirth
-                            ? new Date(editedEmployee.dateOfBirth)
-                              .toISOString()
-                              .split('T')[0]
+                      <>
+                        <input
+                          type="date"
+                          value={
+                            editedEmployee.dateOfBirth
+                              ? new Date(editedEmployee.dateOfBirth)
+                                .toISOString()
+                                .split('T')[0]
+                              : ''
+                          }
+                          onChange={(e) => handleFieldChange('dateOfBirth', e.target.value)}
+                          className="w-full px-3 py-2 border border-purple-300 rounded-lg text-sm font-semibold text-slate-900 bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+                        />
+                        {/* Show extracted DOB from Aadhaar if available and different */}
+                        {profileCompletionStatus?.steps?.ocrVerification?.extractedData?.dateOfBirth && (() => {
+                          const aadhaarDob = profileCompletionStatus.steps.ocrVerification.extractedData.dateOfBirth
+                          // Parse Aadhaar DOB (DD/MM/YYYY) to compare
+                          const aadhaarDateMatch = aadhaarDob.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/)
+                          const aadhaarDateFormatted = aadhaarDateMatch
+                            ? `${aadhaarDateMatch[3]}-${aadhaarDateMatch[2].padStart(2, '0')}-${aadhaarDateMatch[1].padStart(2, '0')}`
+                            : null
+                          const currentDob = editedEmployee.dateOfBirth
+                            ? new Date(editedEmployee.dateOfBirth).toISOString().split('T')[0]
                             : ''
-                        }
-                        onChange={(e) => handleFieldChange('dateOfBirth', e.target.value)}
-                        className="w-full px-3 py-2 border border-purple-300 rounded-lg text-sm font-semibold text-slate-900 bg-white focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-                      />
+
+                          if (aadhaarDateFormatted && aadhaarDateFormatted !== currentDob) {
+                            return (
+                              <div className="mt-2 p-2 bg-emerald-50 border border-emerald-200 rounded-lg">
+                                <p className="text-[10px] font-medium text-emerald-700 uppercase mb-1 flex items-center gap-1">
+                                  <FaCheck className="text-emerald-500" />
+                                  Date of Birth from Aadhaar
+                                </p>
+                                <p className="text-xs text-emerald-800 mb-2">
+                                  {aadhaarDob}
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => handleFieldChange('dateOfBirth', aadhaarDateFormatted)}
+                                  className="text-xs px-2 py-1 bg-emerald-500 text-white rounded hover:bg-emerald-600 transition-colors"
+                                >
+                                  Use this date
+                                </button>
+                              </div>
+                            )
+                          }
+                          return null
+                        })()}
+                      </>
                     ) : (
-                      <p className="font-semibold text-slate-900 text-sm sm:text-base">
-                        {employee.dateOfBirth
-                          ? new Date(employee.dateOfBirth).toLocaleDateString('en-GB', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                          })
-                          : 'N/A'}
-                      </p>
+                      <>
+                        <p className="font-semibold text-slate-900 text-sm sm:text-base">
+                          {employee.dateOfBirth
+                            ? new Date(employee.dateOfBirth).toLocaleDateString('en-GB', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                            })
+                            : 'N/A'}
+                        </p>
+                        {/* Show verified badge when DOB matches Aadhaar */}
+                        {profileCompletionStatus?.steps?.ocrVerification?.extractedData?.dateOfBirth && employee.dateOfBirth && (() => {
+                          const aadhaarDob = profileCompletionStatus.steps.ocrVerification.extractedData.dateOfBirth
+                          const aadhaarDateMatch = aadhaarDob.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/)
+                          const aadhaarDateFormatted = aadhaarDateMatch
+                            ? `${aadhaarDateMatch[3]}-${aadhaarDateMatch[2].padStart(2, '0')}-${aadhaarDateMatch[1].padStart(2, '0')}`
+                            : null
+                          const currentDob = new Date(employee.dateOfBirth).toISOString().split('T')[0]
+
+                          if (aadhaarDateFormatted === currentDob) {
+                            return (
+                              <span className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-[10px] font-medium rounded-full">
+                                <FaCheck className="text-[8px]" />
+                                Verified from Aadhaar
+                              </span>
+                            )
+                          }
+                          return null
+                        })()}
+                        {/* Show suggestion if no DOB but Aadhaar has one */}
+                        {!employee.dateOfBirth && profileCompletionStatus?.steps?.ocrVerification?.extractedData?.dateOfBirth && (
+                          <div className="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                            <p className="text-[10px] font-medium text-blue-700 uppercase mb-1">
+                              📅 DOB found in Aadhaar
+                            </p>
+                            <p className="text-xs text-blue-800">
+                              {profileCompletionStatus.steps.ocrVerification.extractedData.dateOfBirth}
+                            </p>
+                            <p className="text-[10px] text-blue-600 mt-1">
+                              Click Edit to use this date
+                            </p>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -1208,8 +1366,8 @@ export default function ProfilePage() {
               </div>
             </section>
 
-            {/* Aadhaar Verification Section - always visible in right column */}
-            {!isCompleteProfileMode && (
+            {/* Aadhaar Verification Section - only show here when profile is complete and not in complete profile mode */}
+            {!isCompleteProfileMode && profileCompletionStatus?.isComplete && (
               <AadhaarVerificationSection
                 initialStatus={profileCompletionStatus?.steps ? {
                   aadhaarFront: profileCompletionStatus.steps.aadhaarUpload?.frontUploaded ? { url: true } : null,
@@ -1221,7 +1379,8 @@ export default function ProfilePage() {
                   }
                 } : null}
                 onStatusChange={handleAadhaarStatusChange}
-                showUrgentWarning={profileCompletionStatus?.warning?.urgent}
+                onUseAadhaarData={handleUseAadhaarData}
+                showUrgentWarning={false}
               />
             )}
 

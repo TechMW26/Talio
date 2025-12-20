@@ -10,6 +10,45 @@ import path from 'path'
 export const dynamic = 'force-dynamic'
 
 /**
+ * Helper function to determine if a URL is remote (ImageKit/external) or local
+ */
+function isRemoteUrl(url) {
+  return url && (url.startsWith('http://') || url.startsWith('https://'))
+}
+
+/**
+ * Helper function to fetch image as base64 from URL or local path
+ */
+async function fetchImageAsBase64(url) {
+  if (isRemoteUrl(url)) {
+    // Fetch from remote URL (ImageKit, etc.)
+    const response = await fetch(url)
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image: ${response.status} ${response.statusText}`)
+    }
+    const arrayBuffer = await response.arrayBuffer()
+    const buffer = Buffer.from(arrayBuffer)
+    return buffer.toString('base64')
+  } else {
+    // Read from local file path
+    const filePath = path.join(process.cwd(), url)
+    const buffer = await fs.readFile(filePath)
+    return buffer.toString('base64')
+  }
+}
+
+/**
+ * Helper function to determine mime type from URL
+ */
+function getMimeType(url) {
+  const lowerUrl = url.toLowerCase()
+  if (lowerUrl.includes('.png')) return 'image/png'
+  if (lowerUrl.includes('.webp')) return 'image/webp'
+  if (lowerUrl.includes('.gif')) return 'image/gif'
+  return 'image/jpeg' // Default to JPEG
+}
+
+/**
  * POST /api/profile/verify-aadhaar
  * Verify Aadhaar documents using OCR (Gemini Vision)
  */
@@ -40,7 +79,9 @@ export async function POST(request) {
     if (!frontUrl || !backUrl) {
       return NextResponse.json({
         success: false,
-        message: 'Both Aadhaar front and back images must be uploaded before verification'
+        message: 'Both Aadhaar front and back images must be uploaded before verification',
+        failureReason: 'MISSING_IMAGES',
+        suggestion: 'Please upload both front and back images of your Aadhaar card.'
       }, { status: 400 })
     }
 
@@ -52,37 +93,45 @@ export async function POST(request) {
     if (!employee) {
       return NextResponse.json({
         success: false,
-        message: 'Employee profile not found. Please complete your profile first.'
+        message: 'Employee profile not found. Please complete your profile first.',
+        failureReason: 'PROFILE_NOT_FOUND',
+        suggestion: 'Please complete your personal information in the profile section before verifying Aadhaar.'
       }, { status: 400 })
     }
 
-    // Read image files
+    // Fetch image data (works for both remote URLs and local paths)
     let frontImageData, backImageData
 
     try {
-      const frontPath = path.join(process.cwd(), frontUrl)
-      const backPath = path.join(process.cwd(), backUrl)
+      console.log('[OCR] Fetching Aadhaar images...')
+      console.log('[OCR] Front URL:', frontUrl)
+      console.log('[OCR] Back URL:', backUrl)
 
-      const frontBuffer = await fs.readFile(frontPath)
-      const backBuffer = await fs.readFile(backPath)
+      // Fetch images in parallel
+      const [frontData, backData] = await Promise.all([
+        fetchImageAsBase64(frontUrl),
+        fetchImageAsBase64(backUrl)
+      ])
 
-      frontImageData = frontBuffer.toString('base64')
-      backImageData = backBuffer.toString('base64')
+      frontImageData = frontData
+      backImageData = backData
+      console.log('[OCR] Successfully fetched both images')
     } catch (error) {
-      console.error('[OCR] Error reading images:', error)
+      console.error('[OCR] Error fetching images:', error)
       return NextResponse.json({
         success: false,
-        message: 'Failed to read Aadhaar images. Please re-upload them.'
+        message: 'Failed to fetch Aadhaar images. Please re-upload them.',
+        failureReason: 'IMAGE_FETCH_FAILED',
+        suggestion: 'The uploaded images could not be accessed. Please try uploading clearer images of your Aadhaar card.',
+        error: error.message
       }, { status: 400 })
     }
 
-    // Determine mime types from file extensions
-    const frontMime = frontUrl.endsWith('.png') ? 'image/png' : 
-                      frontUrl.endsWith('.webp') ? 'image/webp' : 'image/jpeg'
-    const backMime = backUrl.endsWith('.png') ? 'image/png' : 
-                     backUrl.endsWith('.webp') ? 'image/webp' : 'image/jpeg'
+    // Determine mime types from URLs
+    const frontMime = getMimeType(frontUrl)
+    const backMime = getMimeType(backUrl)
 
-    // OCR extraction prompt
+    // OCR extraction prompt with detailed field extraction
     const ocrPrompt = `You are analyzing Indian Aadhaar card images (front and back).
 Extract the following information and return it as JSON only, with no additional text:
 
@@ -93,15 +142,17 @@ Extract the following information and return it as JSON only, with no additional
   "gender": "Male/Female/Other",
   "address": "Complete address as printed on the card",
   "isValid": true/false (whether this appears to be a valid Aadhaar card),
-  "confidence": 0-100 (confidence score of extraction accuracy)
+  "confidence": 0-100 (confidence score of extraction accuracy),
+  "validationIssues": ["List of any issues found with the document, e.g., 'Image blurry', 'Text not readable', 'Not an Aadhaar card'"]
 }
 
 Important:
 - Extract name exactly as printed (in English)
 - For security, only extract last 4 digits of Aadhaar number
 - Return ONLY the JSON object, no explanations
-- If you cannot read certain fields clearly, set them to null
-- Set isValid to false if the images don't appear to be valid Aadhaar cards`
+- If you cannot read certain fields clearly, set them to null and add the issue to validationIssues
+- Set isValid to false if the images don't appear to be valid Aadhaar cards
+- Include specific reasons in validationIssues if document appears invalid`
 
     // Call Gemini Vision API with both images
     let ocrResult
@@ -120,50 +171,63 @@ Important:
       }
     } catch (error) {
       console.error('[OCR] Gemini Vision error:', error)
-      
+
       // Update verification status to failed
       await User.findByIdAndUpdate(decoded.userId, {
         $set: {
           'profileCompletion.ocrVerification.status': 'failed',
-          'profileCompletion.ocrVerification.verifiedAt': new Date()
+          'profileCompletion.ocrVerification.verifiedAt': new Date(),
+          'profileCompletion.ocrVerification.failureReason': 'OCR_PROCESSING_FAILED'
         }
       })
 
       return NextResponse.json({
         success: false,
         message: 'OCR verification failed. Please ensure the images are clear and try again.',
+        failureReason: 'OCR_PROCESSING_FAILED',
+        suggestion: 'Please upload high-quality, well-lit images of your Aadhaar card. Make sure the text is clearly visible and the document is not blurry.',
         error: error.message
       }, { status: 400 })
     }
 
     // Check if the document appears valid
     if (!ocrResult.isValid) {
+      const validationIssues = ocrResult.validationIssues || ['Document does not appear to be a valid Aadhaar card']
+
       await User.findByIdAndUpdate(decoded.userId, {
         $set: {
           'profileCompletion.ocrVerification.status': 'failed',
-          'profileCompletion.ocrVerification.verifiedAt': new Date()
+          'profileCompletion.ocrVerification.verifiedAt': new Date(),
+          'profileCompletion.ocrVerification.failureReason': 'INVALID_DOCUMENT',
+          'profileCompletion.ocrVerification.validationIssues': validationIssues
         }
       })
 
       return NextResponse.json({
         success: false,
-        message: 'The uploaded images do not appear to be valid Aadhaar cards. Please upload clear images of your Aadhaar card.'
+        message: 'The uploaded images do not appear to be valid Aadhaar cards.',
+        failureReason: 'INVALID_DOCUMENT',
+        validationIssues: validationIssues,
+        suggestion: 'Please upload clear photos of your original Aadhaar card. Ensure both front and back sides are clearly visible and the document is not expired or damaged.',
+        confidence: ocrResult.confidence
       }, { status: 400 })
     }
 
     // Compare extracted data with profile
     const mismatches = []
-    
+    const suggestions = []
+
     // Compare name
     const profileName = `${employee.firstName} ${employee.lastName}`.toLowerCase().trim()
     const aadhaarName = (ocrResult.name || '').toLowerCase().trim()
-    
+
     if (aadhaarName && !compareNames(profileName, aadhaarName)) {
       mismatches.push({
         field: 'Name',
         profileValue: `${employee.firstName} ${employee.lastName}`,
         aadhaarValue: ocrResult.name
       })
+      suggestions.push(`Update your profile name to match your Aadhaar: "${ocrResult.name}"`)
     }
 
     // Compare date of birth
@@ -177,7 +241,16 @@ Important:
           profileValue: profileDob,
           aadhaarValue: aadhaarDob
         })
+        suggestions.push(`Update your profile date of birth to match your Aadhaar: "${ocrResult.dateOfBirth}"`)
       }
+    } else if (!employee.dateOfBirth && ocrResult.dateOfBirth) {
+      // Date of birth missing in profile but available in Aadhaar
+      suggestions.push(`Add your date of birth from Aadhaar to your profile: "${ocrResult.dateOfBirth}"`)
+    }
+
+    // Check for address
+    if (ocrResult.address && (!employee.address || employee.address.trim() === '')) {
+      suggestions.push(`Your address from Aadhaar can be added to your profile: "${ocrResult.address}"`)
     }
 
     // Determine verification status
@@ -194,13 +267,15 @@ Important:
         address: ocrResult.address
       },
       'profileCompletion.ocrVerification.mismatches': mismatches,
+      'profileCompletion.ocrVerification.suggestions': suggestions,
       'profileCompletion.ocrVerification.verifiedAt': new Date(),
+      'profileCompletion.ocrVerification.confidence': ocrResult.confidence,
       'profileCompletion.completedFields.ocrVerified': isComplete
     }
 
     // Update overall profile completion status if verified
-    if (isComplete && user.profileCompletion?.completedFields?.personalInfo && 
-        user.profileCompletion?.completedFields?.aadhaarUploaded) {
+    if (isComplete && user.profileCompletion?.completedFields?.personalInfo &&
+      user.profileCompletion?.completedFields?.aadhaarUploaded) {
       updateData['profileCompletion.status'] = 'complete'
       updateData['profileCompletion.completedAt'] = new Date()
     } else if (user.profileCompletion?.completedFields?.aadhaarUploaded) {
@@ -230,24 +305,30 @@ Important:
         success: true,
         verified: false,
         message: 'Aadhaar verification found mismatches with your profile data',
+        failureReason: 'DATA_MISMATCH',
         data: {
           status: 'mismatch',
           extractedData: {
             name: ocrResult.name,
             dateOfBirth: ocrResult.dateOfBirth,
-            aadhaarNumber: ocrResult.aadhaarNumber ? `XXXX-XXXX-${ocrResult.aadhaarNumber}` : null
+            aadhaarNumber: ocrResult.aadhaarNumber ? `XXXX-XXXX-${ocrResult.aadhaarNumber}` : null,
+            address: ocrResult.address
           },
           mismatches,
+          suggestions,
           confidence: ocrResult.confidence,
           addressAutoFilled
-        }
+        },
+        suggestion: suggestions.length > 0
+          ? `To fix: ${suggestions.join('. ')}`
+          : 'Please update your profile information to match your Aadhaar details (Name, DOB, Address).'
       })
     }
 
     return NextResponse.json({
       success: true,
       verified: true,
-      message: addressAutoFilled 
+      message: addressAutoFilled
         ? 'Aadhaar verification successful. Address has been auto-filled from your Aadhaar card.'
         : 'Aadhaar verification successful',
       data: {
@@ -295,10 +376,10 @@ function compareNames(name1, name2) {
   const words1 = n1.split(' ')
   const words2 = n2.split(' ')
 
-  const allWords1InWords2 = words1.every(w => 
+  const allWords1InWords2 = words1.every(w =>
     words2.some(w2 => w2.includes(w) || w.includes(w2))
   )
-  const allWords2InWords1 = words2.every(w => 
+  const allWords2InWords1 = words2.every(w =>
     words1.some(w1 => w1.includes(w) || w.includes(w1))
   )
 
@@ -312,19 +393,19 @@ function compareDates(date1, date2) {
   // Parse dates in various formats
   const parseDate = (dateStr) => {
     if (!dateStr) return null
-    
+
     // Try DD/MM/YYYY format
     const ddmmyyyy = dateStr.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/)
     if (ddmmyyyy) {
       return new Date(ddmmyyyy[3], ddmmyyyy[2] - 1, ddmmyyyy[1])
     }
-    
+
     // Try YYYY-MM-DD format
     const yyyymmdd = dateStr.match(/(\d{4})-(\d{2})-(\d{2})/)
     if (yyyymmdd) {
       return new Date(yyyymmdd[1], yyyymmdd[2] - 1, yyyymmdd[3])
     }
-    
+
     return new Date(dateStr)
   }
 
@@ -345,11 +426,11 @@ function formatDateForComparison(date) {
   if (!date) return null
   const d = new Date(date)
   if (isNaN(d.getTime())) return null
-  
+
   const day = d.getDate().toString().padStart(2, '0')
   const month = (d.getMonth() + 1).toString().padStart(2, '0')
   const year = d.getFullYear()
-  
+
   return `${day}/${month}/${year}`
 }
 

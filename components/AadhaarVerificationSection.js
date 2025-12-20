@@ -1,11 +1,11 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { 
-  FaIdCard, 
-  FaUpload, 
-  FaCheckCircle, 
-  FaTimesCircle, 
+import {
+  FaIdCard,
+  FaUpload,
+  FaCheckCircle,
+  FaTimesCircle,
   FaExclamationTriangle,
   FaSpinner,
   FaShieldAlt,
@@ -21,9 +21,10 @@ import ModalPortal from '@/components/ModalPortal'
  * AadhaarVerificationSection
  * Component for uploading and verifying Aadhaar documents
  */
-export default function AadhaarVerificationSection({ 
+export default function AadhaarVerificationSection({
   initialStatus,
   onStatusChange,
+  onUseAadhaarData,
   showUrgentWarning = false
 }) {
   const [frontImage, setFrontImage] = useState(null)
@@ -36,8 +37,9 @@ export default function AadhaarVerificationSection({
   const [verificationStatus, setVerificationStatus] = useState(initialStatus?.ocrVerification?.status || 'pending')
   const [extractedData, setExtractedData] = useState(initialStatus?.ocrVerification?.extractedData || null)
   const [mismatches, setMismatches] = useState(initialStatus?.ocrVerification?.mismatches || [])
+  const [suggestions, setSuggestions] = useState(initialStatus?.ocrVerification?.suggestions || [])
   const [showPreviewModal, setShowPreviewModal] = useState(null)
-  
+
   const frontInputRef = useRef(null)
   const backInputRef = useRef(null)
 
@@ -53,7 +55,7 @@ export default function AadhaarVerificationSection({
           headers: { 'Authorization': `Bearer ${token}` }
         })
         const result = await response.json()
-        
+
         if (result.success && result.data) {
           if (result.data.aadhaarFront?.url) {
             // Load the actual image through the secured endpoint
@@ -78,7 +80,7 @@ export default function AadhaarVerificationSection({
       const response = await fetch(apiUrl, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
-      
+
       if (response.ok) {
         const blob = await response.blob()
         const objectUrl = URL.createObjectURL(blob)
@@ -108,7 +110,7 @@ export default function AadhaarVerificationSection({
     const reader = new FileReader()
     reader.onloadend = async () => {
       const imageData = reader.result
-      
+
       if (side === 'front') {
         setFrontImage(imageData)
         setFrontPreview(imageData)
@@ -141,14 +143,14 @@ export default function AadhaarVerificationSection({
 
       if (result.success) {
         toast.success(`Aadhaar ${side} uploaded successfully`)
-        
+
         // Reset verification status when new images are uploaded
         setVerificationStatus('pending')
         setExtractedData(null)
         setMismatches([])
-        
+
         if (onStatusChange) {
-          onStatusChange({ 
+          onStatusChange({
             aadhaarUploaded: result.data.bothUploaded,
             verificationStatus: 'pending'
           })
@@ -194,6 +196,7 @@ export default function AadhaarVerificationSection({
         setVerificationStatus(result.data.status)
         setExtractedData(result.data.extractedData)
         setMismatches(result.data.mismatches || [])
+        setSuggestions(result.data.suggestions || [])
 
         if (result.verified) {
           toast.success('Aadhaar verification successful!')
@@ -204,12 +207,17 @@ export default function AadhaarVerificationSection({
         if (onStatusChange) {
           onStatusChange({
             verificationStatus: result.data.status,
-            verified: result.verified
+            verified: result.verified,
+            extractedData: result.data.extractedData
           })
         }
       } else {
         toast.error(result.message || 'Verification failed')
         setVerificationStatus('failed')
+        // Store failure reason and suggestions from failed response
+        if (result.suggestion) {
+          setSuggestions([result.suggestion])
+        }
       }
     } catch (error) {
       console.error('Verification error:', error)
@@ -254,11 +262,10 @@ export default function AadhaarVerificationSection({
   }
 
   return (
-    <section className={`bg-white rounded-3xl border shadow-sm p-4 sm:p-6 ${
-      showUrgentWarning 
-        ? 'border-red-200 ring-2 ring-red-100' 
+    <section className={`bg-white rounded-3xl border shadow-sm p-4 sm:p-6 ${showUrgentWarning
+        ? 'border-red-200 ring-2 ring-red-100'
         : 'border-slate-100 shadow-slate-900/5'
-    }`}>
+      }`}>
       {/* Header */}
       <div className="flex items-center justify-between mb-4 sm:mb-5">
         <div className="flex items-center gap-3">
@@ -303,47 +310,61 @@ export default function AadhaarVerificationSection({
             onChange={(e) => handleImageSelect('front', e.target.files?.[0])}
             className="hidden"
           />
-          
-          <div 
+
+          <div
             onClick={() => !uploadingFront && frontInputRef.current?.click()}
-            className={`relative border-2 border-dashed rounded-2xl p-4 transition-all cursor-pointer ${
-              frontPreview 
-                ? 'border-green-300 bg-green-50/50' 
+            className={`relative border-2 border-dashed rounded-2xl p-4 transition-all cursor-pointer ${frontPreview
+                ? 'border-green-300 bg-green-50/50'
                 : 'border-slate-300 hover:border-blue-400 hover:bg-blue-50/50'
-            }`}
+              }`}
           >
             {frontPreview ? (
               <div className="relative">
-                <img 
-                  src={frontPreview} 
-                  alt="Aadhaar Front" 
-                  className="w-full h-32 object-cover rounded-xl"
+                <img
+                  src={frontPreview}
+                  alt="Aadhaar Front"
+                  className={`w-full h-32 object-cover rounded-xl ${uploadingFront ? 'opacity-50' : ''}`}
                 />
-                <div className="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                  <div className="flex gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setShowPreviewModal('front')
-                      }}
-                      className="p-2 bg-white rounded-full text-slate-700 hover:bg-slate-100"
-                    >
-                      <FaEye className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        frontInputRef.current?.click()
-                      }}
-                      className="p-2 bg-white rounded-full text-slate-700 hover:bg-slate-100"
-                    >
-                      <FaCamera className="w-4 h-4" />
-                    </button>
+                {/* Loading Overlay */}
+                {uploadingFront && (
+                  <div className="absolute inset-0 bg-white/70 rounded-xl flex items-center justify-center">
+                    <div className="flex flex-col items-center">
+                      <FaSpinner className="w-8 h-8 text-blue-500 animate-spin" />
+                      <p className="text-xs text-blue-600 mt-2 font-medium">Uploading...</p>
+                    </div>
                   </div>
-                </div>
-                <div className="absolute top-2 right-2">
-                  <FaCheckCircle className="w-5 h-5 text-green-500" />
-                </div>
+                )}
+                {/* Hover Overlay - only show when not uploading */}
+                {!uploadingFront && (
+                  <div className="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setShowPreviewModal('front')
+                        }}
+                        className="p-2 bg-white rounded-full text-slate-700 hover:bg-slate-100"
+                      >
+                        <FaEye className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          frontInputRef.current?.click()
+                        }}
+                        className="p-2 bg-white rounded-full text-slate-700 hover:bg-slate-100"
+                      >
+                        <FaCamera className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {/* Success checkmark - only show when not uploading */}
+                {!uploadingFront && (
+                  <div className="absolute top-2 right-2">
+                    <FaCheckCircle className="w-5 h-5 text-green-500" />
+                  </div>
+                )}
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-6">
@@ -373,47 +394,61 @@ export default function AadhaarVerificationSection({
             onChange={(e) => handleImageSelect('back', e.target.files?.[0])}
             className="hidden"
           />
-          
-          <div 
+
+          <div
             onClick={() => !uploadingBack && backInputRef.current?.click()}
-            className={`relative border-2 border-dashed rounded-2xl p-4 transition-all cursor-pointer ${
-              backPreview 
-                ? 'border-green-300 bg-green-50/50' 
+            className={`relative border-2 border-dashed rounded-2xl p-4 transition-all cursor-pointer ${backPreview
+                ? 'border-green-300 bg-green-50/50'
                 : 'border-slate-300 hover:border-blue-400 hover:bg-blue-50/50'
-            }`}
+              }`}
           >
             {backPreview ? (
               <div className="relative">
-                <img 
-                  src={backPreview} 
-                  alt="Aadhaar Back" 
-                  className="w-full h-32 object-cover rounded-xl"
+                <img
+                  src={backPreview}
+                  alt="Aadhaar Back"
+                  className={`w-full h-32 object-cover rounded-xl ${uploadingBack ? 'opacity-50' : ''}`}
                 />
-                <div className="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                  <div className="flex gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setShowPreviewModal('back')
-                      }}
-                      className="p-2 bg-white rounded-full text-slate-700 hover:bg-slate-100"
-                    >
-                      <FaEye className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        backInputRef.current?.click()
-                      }}
-                      className="p-2 bg-white rounded-full text-slate-700 hover:bg-slate-100"
-                    >
-                      <FaCamera className="w-4 h-4" />
-                    </button>
+                {/* Loading Overlay */}
+                {uploadingBack && (
+                  <div className="absolute inset-0 bg-white/70 rounded-xl flex items-center justify-center">
+                    <div className="flex flex-col items-center">
+                      <FaSpinner className="w-8 h-8 text-blue-500 animate-spin" />
+                      <p className="text-xs text-blue-600 mt-2 font-medium">Uploading...</p>
+                    </div>
                   </div>
-                </div>
-                <div className="absolute top-2 right-2">
-                  <FaCheckCircle className="w-5 h-5 text-green-500" />
-                </div>
+                )}
+                {/* Hover Overlay - only show when not uploading */}
+                {!uploadingBack && (
+                  <div className="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setShowPreviewModal('back')
+                        }}
+                        className="p-2 bg-white rounded-full text-slate-700 hover:bg-slate-100"
+                      >
+                        <FaEye className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          backInputRef.current?.click()
+                        }}
+                        className="p-2 bg-white rounded-full text-slate-700 hover:bg-slate-100"
+                      >
+                        <FaCamera className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+                {/* Success checkmark - only show when not uploading */}
+                {!uploadingBack && (
+                  <div className="absolute top-2 right-2">
+                    <FaCheckCircle className="w-5 h-5 text-green-500" />
+                  </div>
+                )}
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-6">
@@ -436,23 +471,36 @@ export default function AadhaarVerificationSection({
       </div>
 
       {/* Verification Button */}
-      {frontPreview && backPreview && verificationStatus !== 'verified' && (
+      {verificationStatus !== 'verified' && (
         <div className="mb-5">
           <button
             onClick={handleVerify}
-            disabled={verifying}
-            className="w-full py-3 px-4 bg-blue-600 text-white rounded-xl font-medium text-sm hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+            disabled={verifying || uploadingFront || uploadingBack || !frontPreview || !backPreview}
+            className={`w-full py-3 px-4 rounded-xl font-medium text-sm transition-colors flex items-center justify-center gap-2 ${!frontPreview || !backPreview || uploadingFront || uploadingBack
+                ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                : 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed'
+              }`}
           >
             {verifying ? (
               <>
                 <FaSpinner className="w-4 h-4 animate-spin" />
                 Verifying with OCR...
               </>
+            ) : uploadingFront || uploadingBack ? (
+              <>
+                <FaSpinner className="w-4 h-4 animate-spin" />
+                Waiting for upload...
+              </>
+            ) : !frontPreview || !backPreview ? (
+              <>
+                <FaUpload className="w-4 h-4" />
+                Upload both images to verify
+              </>
             ) : (
               <>
                 <FaShieldAlt className="w-4 h-4" />
-                {verificationStatus === 'failed' || verificationStatus === 'mismatch' 
-                  ? 'Retry Verification' 
+                {verificationStatus === 'failed' || verificationStatus === 'mismatch'
+                  ? 'Retry Verification'
                   : 'Verify Aadhaar'}
               </>
             )}
@@ -473,7 +521,17 @@ export default function AadhaarVerificationSection({
               <div className="space-y-2">
                 {mismatches.map((mismatch, index) => (
                   <div key={index} className="bg-white rounded-lg p-3 border border-red-200">
-                    <p className="text-xs font-medium text-red-700 mb-1">{mismatch.field}</p>
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-xs font-medium text-red-700">{mismatch.field}</p>
+                      {onUseAadhaarData && mismatch.aadhaarValue && (
+                        <button
+                          onClick={() => onUseAadhaarData(mismatch.field.toLowerCase().replace(' ', ''), mismatch.aadhaarValue)}
+                          className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors font-medium"
+                        >
+                          Use Aadhaar Value
+                        </button>
+                      )}
+                    </div>
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <div>
                         <span className="text-slate-500">Profile:</span>
@@ -487,6 +545,27 @@ export default function AadhaarVerificationSection({
                   </div>
                 ))}
               </div>
+
+              {/* Suggestion for Address if extracted */}
+              {extractedData?.address && (
+                <div className="mt-3 bg-blue-50 rounded-lg p-3 border border-blue-200">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1">
+                      <p className="text-xs font-medium text-blue-700 mb-1">Address from Aadhaar</p>
+                      <p className="text-xs text-slate-600">{extractedData.address}</p>
+                    </div>
+                    {onUseAadhaarData && (
+                      <button
+                        onClick={() => onUseAadhaarData('address', extractedData.address)}
+                        className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium whitespace-nowrap"
+                      >
+                        Use Address
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
               <p className="text-xs text-red-600 mt-3">
                 Please update your profile to match your Aadhaar details, or contact HR if there's an error.
               </p>
@@ -525,6 +604,24 @@ export default function AadhaarVerificationSection({
                   </div>
                 )}
               </div>
+
+              {/* Address suggestion */}
+              {extractedData.address && onUseAadhaarData && (
+                <div className="mt-3 bg-blue-50 rounded-lg p-3 border border-blue-200">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1">
+                      <p className="text-xs font-medium text-blue-700 mb-1">Address from Aadhaar</p>
+                      <p className="text-xs text-slate-600">{extractedData.address}</p>
+                    </div>
+                    <button
+                      onClick={() => onUseAadhaarData('address', extractedData.address)}
+                      className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium whitespace-nowrap"
+                    >
+                      Use Address
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -533,7 +630,7 @@ export default function AadhaarVerificationSection({
       {/* Security Note */}
       <div className="mt-4 p-3 rounded-xl bg-slate-50 border border-slate-200">
         <p className="text-xs text-slate-600">
-          <strong className="text-slate-700">Security Note:</strong> Your Aadhaar documents are stored securely and encrypted. 
+          <strong className="text-slate-700">Security Note:</strong> Your Aadhaar documents are stored securely and encrypted.
           Only the last 4 digits of your Aadhaar number are stored for verification purposes.
         </p>
       </div>
@@ -541,7 +638,7 @@ export default function AadhaarVerificationSection({
       {/* Image Preview Modal */}
       {showPreviewModal && (
         <ModalPortal show={true}>
-          <div 
+          <div
             className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-[99999]"
             onClick={() => setShowPreviewModal(null)}
           >
