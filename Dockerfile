@@ -6,7 +6,7 @@
 # Use slim base for smaller image and faster pulls
 FROM node:20-slim AS base
 
-# Install only essential OS deps in a single layer
+# Install runtime deps (libvips) in a single layer
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libvips42 \
     ca-certificates \
@@ -18,16 +18,23 @@ WORKDIR /app
 FROM base AS deps
 WORKDIR /app
 
+# Install build tools only for this stage (sharp fallback compile)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    python3 \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
 # Copy only package files first (better cache)
 COPY package.json package-lock.json* ./
 
-# Install with optimized settings
+# Install with optimized settings (include devDeps for build)
 ENV SHARP_IGNORE_GLOBAL_LIBVIPS=0 \
     npm_config_update_notifier=false \
     npm_config_fund=false \
     npm_config_audit=false
 
-RUN npm ci --legacy-peer-deps --omit=dev --ignore-scripts && \
+RUN npm ci --legacy-peer-deps --prefer-offline && \
     npm cache clean --force
 
 # Builder stage
@@ -59,7 +66,7 @@ ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1
 
 # Build Next.js
-RUN npm run build
+RUN npm run build && npm prune --production
 
 # Production runner - minimal image
 FROM node:20-slim AS runner
