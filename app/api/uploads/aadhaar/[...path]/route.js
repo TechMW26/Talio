@@ -47,7 +47,7 @@ export async function GET(request, context) {
     // 1. User is requesting their own documents
     // 2. User is admin/HR
     const isOwnDocument = decoded.userId === requestedUserId
-    const isAuthorized = ['admin', 'hr', 'god_admin'].includes(requestingUser.role)
+    const isAuthorized = ['admin', 'hr'].includes(requestingUser.role)
 
     if (!isOwnDocument && !isAuthorized) {
       return NextResponse.json({

@@ -48,7 +48,7 @@ global.io.to(`chat:${chatId}`).emit('new-message', message);
   const payload = await verifyToken(token)
   ```
 - **Middleware**: `middleware.js` protects routes. Public routes defined in `publicRoutes` and `publicApiRoutes` arrays.
-- **User Model**: Located in `models/User.js`. Contains `role` field (admin/hr/manager/employee/department_head/god_admin) for RBAC.
+- **User Model**: Located in `models/User.js`. Contains `role` field (admin/hr/manager/employee/department_head) for RBAC.
 
 ### AI Integration (Gemini/OpenAI)
 - **Location**: `lib/gemini.js` contains AI helpers
@@ -117,8 +117,7 @@ export async function POST(request) { }
 ## 🔐 Security & RBAC
 
 ### Role Hierarchy
-- `god_admin`: Super admin (full access)
-- `admin`: Company admin (manage all users/data)
+- `admin`: Company admin (full access, manage all users/data)
 - `department_head`: Manage department employees only
 - `hr`: Employee management, payroll access
 - `manager`: Team view, approvals

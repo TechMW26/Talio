@@ -7,7 +7,7 @@ const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
 /**
  * DELETE /api/admin/clear-chats
- * Clear all chat data (admin/god_admin only)
+ * Clear all chat data (admin only)
  */
 export async function DELETE(request) {
   try {
@@ -25,8 +25,8 @@ export async function DELETE(request) {
     const token = authHeader.substring(7);
     const decoded = await jwtVerify(token, JWT_SECRET);
     
-    // Only god_admin and admin can clear all chats
-    if (!['god_admin', 'admin'].includes(decoded.payload.role)) {
+    // Only admin can clear all chats
+    if (!['admin'].includes(decoded.payload.role)) {
       return NextResponse.json(
         { error: 'Forbidden - Admin access required' },
         { status: 403 }

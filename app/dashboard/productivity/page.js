@@ -42,9 +42,9 @@ export default function ProductivityPage() {
 
   const userRole = user?.role
 
-  // Check if user can view team (admin, hr, manager, dept_head, god_admin)
+  // Check if user can view team (admin, hr, manager, dept_head, admin)
   useEffect(() => {
-    const teamRoles = ['admin', 'hr', 'manager', 'department_head', 'god_admin']
+    const teamRoles = ['admin', 'hr', 'manager', 'department_head']
     setCanViewTeam(teamRoles.includes(userRole))
   }, [userRole])
 

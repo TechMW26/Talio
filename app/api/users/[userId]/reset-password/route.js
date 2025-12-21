@@ -6,7 +6,16 @@ import Employee from '@/models/Employee'
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key')
 
-// POST - Admin/HR reset user password
+/**
+ * POST - Admin/HR directly reset user password
+ * 
+ * This IMMEDIATELY changes the user's password to the new password provided.
+ * The user will NOT be able to login with their old password after this.
+ * User will be required to change password on next login (forcePasswordChange: true).
+ * 
+ * For sending a reset LINK instead (without changing password), use:
+ * POST /api/users/[userId]/send-reset-link
+ */
 export async function POST(request, { params }) {
   try {
     // Get token from Authorization header
@@ -38,7 +47,7 @@ export async function POST(request, { params }) {
     // Verify requesting user is admin or HR
     const requestingUser = await User.findById(payload.userId).select('role')
     
-    if (!requestingUser || !['admin', 'hr', 'god_admin'].includes(requestingUser.role)) {
+    if (!requestingUser || !['admin', 'hr'].includes(requestingUser.role)) {
       return NextResponse.json(
         { success: false, message: 'Only Admin or HR can reset passwords' },
         { status: 403 }
@@ -63,14 +72,6 @@ export async function POST(request, { params }) {
       return NextResponse.json(
         { success: false, message: 'User not found' },
         { status: 404 }
-      )
-    }
-
-    // Prevent resetting god_admin password unless you are also god_admin
-    if (targetUser.role === 'god_admin' && requestingUser.role !== 'god_admin') {
-      return NextResponse.json(
-        { success: false, message: 'Cannot reset God Admin password' },
-        { status: 403 }
       )
     }
 

@@ -51,7 +51,7 @@ export async function GET(request, { params }) {
     }
 
     // Check access (allow admins to view any project)
-    const isAdmin = ['admin', 'god_admin', 'hr'].includes(user.role)
+    const isAdmin = ['admin', 'hr'].includes(user.role)
     if (!isAdmin) {
       const { hasAccess } = await checkProjectAccess(projectId, user.employeeId, 'view')
       if (!hasAccess) {
@@ -141,7 +141,7 @@ export async function PUT(request, { params }) {
     }
 
     // Only project head can update project (except admins)
-    const isAdmin = ['admin', 'god_admin'].includes(user.role)
+    const isAdmin = ['admin'].includes(user.role)
     const isHead = project.projectHead.toString() === user.employeeId.toString()
 
     if (!isAdmin && !isHead) {
@@ -253,7 +253,7 @@ export async function DELETE(request, { params }) {
     }
 
     // Only admin or project head can archive
-    const isAdmin = ['admin', 'god_admin'].includes(user.role)
+    const isAdmin = ['admin'].includes(user.role)
     const isHead = project.projectHead.toString() === user.employeeId.toString()
 
     if (!isAdmin && !isHead) {

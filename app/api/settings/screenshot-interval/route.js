@@ -31,8 +31,8 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 });
     }
 
-    // Only admin, god_admin, and department_head can set screenshot interval
-    if (!['admin', 'god_admin', 'department_head'].includes(user.role)) {
+    // Only admin, admin, and department_head can set screenshot interval
+    if (!['admin', 'department_head'].includes(user.role)) {
       return NextResponse.json({ 
         success: false, 
         error: 'Insufficient permissions' 

@@ -153,7 +153,7 @@ export async function GET(request) {
       const currentUser = await User.findById(currentUserId).populate('employeeId');
       const targetUser = await User.findById(targetUserId).populate('employeeId');
       
-      const isAdminOrHR = ['admin', 'hr', 'god_admin'].includes(currentUserRole);
+      const isAdminOrHR = ['admin', 'hr'].includes(currentUserRole);
       
       // Check if current user is department head of target user's department
       let isDeptHead = false;

@@ -32,7 +32,7 @@ export default function AttendanceReportPage() {
       const parsedUser = JSON.parse(userData)
       setUser(parsedUser)
       
-      if (!['god_admin', 'admin', 'hr'].includes(parsedUser.role)) {
+      if (!['admin', 'hr'].includes(parsedUser.role)) {
         toast.error('Access denied. This page is for admins and HR only.')
         setLoading(false)
         return
@@ -44,7 +44,7 @@ export default function AttendanceReportPage() {
   }, [])
 
   useEffect(() => {
-    if (user && ['god_admin', 'admin', 'hr'].includes(user.role)) {
+    if (user && ['admin', 'hr'].includes(user.role)) {
       fetchReportData()
     }
   }, [dateRange, customStartDate, customEndDate, selectedDepartment])
@@ -462,7 +462,7 @@ export default function AttendanceReportPage() {
     )
   }
 
-  if (!user || !['god_admin', 'admin', 'hr'].includes(user.role)) {
+  if (!user || !['admin', 'hr'].includes(user.role)) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">

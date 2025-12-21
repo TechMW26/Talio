@@ -96,7 +96,7 @@ export async function POST(request, { params }) {
       }
     }
     const isProjectHead = projectHeadIds.includes(user.employeeId.toString())
-    const isAdmin = ['admin', 'god_admin'].includes(user.role)
+    const isAdmin = ['admin'].includes(user.role)
 
     if (!isAssignee && !isCreator && !isAssigner && !isProjectHead && !isAdmin) {
       return NextResponse.json({ 
@@ -241,7 +241,7 @@ export async function PUT(request, { params }) {
       }
     }
     const isProjectHead = projectHeadIds.includes(user.employeeId.toString())
-    const isAdmin = ['admin', 'god_admin'].includes(user.role)
+    const isAdmin = ['admin'].includes(user.role)
 
     if (!isAssignee && !isCreator && !isAssigner && !isProjectHead && !isAdmin) {
       return NextResponse.json({ 
@@ -559,7 +559,7 @@ export async function DELETE(request, { params }) {
       }
     }
     const isProjectHead = projectHeadIds.includes(user.employeeId.toString())
-    const isAdmin = ['admin', 'god_admin'].includes(user.role)
+    const isAdmin = ['admin'].includes(user.role)
 
     if (!isCreator && !isAssigner && !isAssignee && !isProjectHead && !isAdmin) {
       return NextResponse.json({ 

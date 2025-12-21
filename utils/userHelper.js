@@ -104,7 +104,7 @@ export function getUserRole(user) {
  * @returns {boolean}
  */
 export function isAdmin(user) {
-  const adminRoles = ['admin', 'god_admin', 'hr']
+  const adminRoles = ['admin', 'hr']
   return adminRoles.includes(getUserRole(user))
 }
 
@@ -114,7 +114,7 @@ export function isAdmin(user) {
  * @returns {boolean}
  */
 export function isManager(user) {
-  const managerRoles = ['admin', 'god_admin', 'hr', 'manager', 'department_head']
+  const managerRoles = ['admin', 'hr', 'manager', 'department_head']
   return managerRoles.includes(getUserRole(user))
 }
 

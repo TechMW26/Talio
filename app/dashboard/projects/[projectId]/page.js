@@ -1021,7 +1021,7 @@ export default function ProjectDetailPage() {
 
   const isProjectHead = project.isProjectHead
   const isCreator = project.isCreator
-  const canManage = isProjectHead || isCreator || (user && ['admin', 'god_admin'].includes(user.role))
+  const canManage = isProjectHead || isCreator || (user && ['admin'].includes(user.role))
   const isAcceptedMember = project.currentUserInvitationStatus === 'accepted'
   const isPendingInvitation = project.currentUserInvitationStatus === 'invited'
   const isOverdue = new Date(project.endDate) < new Date() && !['completed', 'approved', 'archived'].includes(project.status)
@@ -2628,7 +2628,7 @@ export default function ProjectDetailPage() {
                   const isAssignedAndAccepted = selectedTask.assignees?.some(
                     a => a.user._id === currentEmployeeId && a.assignmentStatus === 'accepted'
                   )
-                  const canEdit = isProjectHead || (user && ['admin', 'god_admin'].includes(user.role)) || isAssignedAndAccepted || selectedTask.createdBy?._id === currentEmployeeId
+                  const canEdit = isProjectHead || (user && ['admin'].includes(user.role)) || isAssignedAndAccepted || selectedTask.createdBy?._id === currentEmployeeId
                   
                   return canEdit && (
                     <button
@@ -2762,7 +2762,7 @@ export default function ProjectDetailPage() {
                   <div className="space-y-2">
                     {selectedTask.assignees.map(a => {
                       const canReassign = a.assignmentStatus === 'rejected' && 
-                        (selectedTask.createdBy?._id === currentEmployeeId || isProjectHead || (user && ['admin', 'god_admin'].includes(user.role)))
+                        (selectedTask.createdBy?._id === currentEmployeeId || isProjectHead || (user && ['admin'].includes(user.role)))
                       const isCurrentUserPending = a.user._id === currentEmployeeId && a.assignmentStatus === 'pending'
                       const isUpdating = updatingTaskId === selectedTask._id
                       
@@ -2886,7 +2886,7 @@ export default function ProjectDetailPage() {
                       const isAssignedAndAccepted = selectedTask.assignees?.some(
                         a => a.user._id === currentEmployeeId && a.assignmentStatus === 'accepted'
                       )
-                      const canToggle = isAssignedAndAccepted || isProjectHead || (user && ['admin', 'god_admin'].includes(user.role))
+                      const canToggle = isAssignedAndAccepted || isProjectHead || (user && ['admin'].includes(user.role))
                       const canComment = canToggle // Same permissions for commenting
                       
                       // Color coding for comment author roles
@@ -2997,8 +2997,8 @@ export default function ProjectDetailPage() {
                 const isAssignedAndAccepted = selectedTask.assignees?.some(
                   a => a.user._id === currentEmployeeId && a.assignmentStatus === 'accepted'
                 )
-                const canControlTask = isAssignedAndAccepted || isProjectHead || (user && ['admin', 'god_admin'].includes(user.role))
-                const canDelete = selectedTask.createdBy?._id === currentEmployeeId || isProjectHead || (user && ['admin', 'god_admin'].includes(user.role))
+                const canControlTask = isAssignedAndAccepted || isProjectHead || (user && ['admin'].includes(user.role))
+                const canDelete = selectedTask.createdBy?._id === currentEmployeeId || isProjectHead || (user && ['admin'].includes(user.role))
                 const isUpdating = updatingTaskId === selectedTask._id
                 const hasSubtasks = selectedTask.subtasks && selectedTask.subtasks.length > 0
 

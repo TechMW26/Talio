@@ -47,7 +47,7 @@ export async function GET(request) {
     // Get current user
     const currentUser = await User.findById(currentUserId).populate('employeeId');
     
-    const isAdminOrHR = ['admin', 'hr', 'god_admin'].includes(currentUserRole);
+    const isAdminOrHR = ['admin', 'hr'].includes(currentUserRole);
     
     let teamMembers = [];
     let departmentName = null;

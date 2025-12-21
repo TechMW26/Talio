@@ -42,7 +42,7 @@ export async function POST(request, { params }) {
     }
 
     // Check permissions - only task creator, project head, or admin can reassign
-    const isAdmin = ['admin', 'god_admin'].includes(user.role)
+    const isAdmin = ['admin'].includes(user.role)
     const isProjectHead = project.projectHead.toString() === user.employeeId.toString()
     const isCreator = task.createdBy.toString() === user.employeeId.toString()
 

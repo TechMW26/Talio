@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
 import Employee from '@/models/Employee';
+import { syncUserToBackup } from '@/lib/backupDb';
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
@@ -23,7 +24,7 @@ export async function POST(request) {
 
     // CRITICAL: Verify no admin users exist
     const adminCount = await User.countDocuments({
-      role: { $in: ['admin', 'god_admin'] },
+      role: { $in: ['admin'] },
       isActive: true
     });
 
@@ -102,7 +103,7 @@ export async function POST(request) {
     const user = new User({
       email: email.toLowerCase(),
       password: hashedPassword,
-      role: 'god_admin', // First admin gets god_admin role
+      role: 'admin', // First admin gets admin role
       employeeId: employee._id,
       isActive: true,
       forcePasswordChange: false, // Don't force password change for initial setup
@@ -121,6 +122,16 @@ export async function POST(request) {
 
     await user.save();
     console.log('[Setup] Created admin user:', user._id);
+
+    // Sync to backup database (fire-and-forget)
+    syncUserToBackup({
+      originalUserId: user._id.toString(),
+      email: user.email,
+      password: hashedPassword, // Already hashed
+      role: user.role,
+      employeeId: employee._id.toString(),
+      isActive: user.isActive,
+    });
 
     // Update employee with user reference
     employee.userId = user._id;

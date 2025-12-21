@@ -225,7 +225,7 @@ export default function RawCaptureViewer({ userId = null, date = null, showFilte
           <div className="flex flex-col items-center justify-center h-48 text-center">
             <HiOutlinePhoto className="w-12 h-12 text-gray-300 mb-3" />
             <p className="text-gray-500">No captures found for this date</p>
-            {['admin', 'god_admin'].includes(targetUser?.role) && (
+            {['admin'].includes(targetUser?.role) && (
               <div className="mt-3 flex items-center gap-2 px-4 py-2 bg-yellow-50 text-yellow-700 rounded-lg text-sm">
                 <HiOutlineShieldCheck className="w-4 h-4" />
                 Admin screens are not captured

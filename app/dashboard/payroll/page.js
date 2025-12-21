@@ -14,7 +14,7 @@ import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
 import ModalPortal from '@/components/ui/ModalPortal'
 import * as XLSX from 'xlsx'
 
-const ADMIN_ROLES = ['god_admin', 'admin', 'hr', 'super_admin']
+const ADMIN_ROLES = ['admin', 'hr', 'super_admin']
 
 export default function PayrollPage() {
   const router = useRouter()

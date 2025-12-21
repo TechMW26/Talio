@@ -79,7 +79,7 @@ export async function POST(request, { params }) {
     }
 
     // Check if user can assign tasks
-    const isAdmin = ['admin', 'god_admin'].includes(user.role)
+    const isAdmin = ['admin'].includes(user.role)
     const membership = await ProjectMember.findOne({
       project: projectId,
       user: user.employeeId,
@@ -227,7 +227,7 @@ export async function DELETE(request, { params }) {
     }
 
     // Check permission
-    const isAdmin = ['admin', 'god_admin'].includes(user.role)
+    const isAdmin = ['admin'].includes(user.role)
     const isCreator = task.createdBy.toString() === user.employeeId.toString()
     const isProjectHead = project.projectHead.toString() === user.employeeId.toString()
     const isAssigner = assignment.assignedBy.toString() === user.employeeId.toString()

@@ -60,8 +60,8 @@ export async function POST(request) {
       });
     }
 
-    // Permission check: Only admin, god_admin, or department_head can send alerts
-    const isAdmin = ['admin', 'god_admin'].includes(senderUser.role);
+    // Permission check: Only admin, admin, or department_head can send alerts
+    const isAdmin = ['admin'].includes(senderUser.role);
     const isDepartmentHead = senderUser.role === 'department_head' || !!senderDepartmentHead;
 
     if (!isAdmin && !isDepartmentHead) {
@@ -331,7 +331,7 @@ export async function GET(request) {
     const limit = parseInt(searchParams.get('limit') || '20');
     const skip = parseInt(searchParams.get('skip') || '0');
 
-    const isAdmin = ['admin', 'god_admin'].includes(decoded.role);
+    const isAdmin = ['admin'].includes(decoded.role);
 
     let alerts;
 

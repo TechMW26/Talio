@@ -37,7 +37,7 @@ export async function GET(request) {
     const isDeptHead = decoded.role === 'department_head' || currentEmployee?.isDepartmentHead
 
     // Check if user has permission
-    if (!['admin', 'hr', 'god_admin'].includes(decoded.role) && !isDeptHead) {
+    if (!['admin', 'hr'].includes(decoded.role) && !isDeptHead) {
       return NextResponse.json(
         { success: false, message: 'You do not have permission to view scheduled notifications' },
         { status: 403 }
@@ -52,7 +52,7 @@ export async function GET(request) {
       query.status = status
     }
 
-    if (isDeptHead && !['admin', 'hr', 'god_admin'].includes(decoded.role) && currentEmployee) {
+    if (isDeptHead && !['admin', 'hr'].includes(decoded.role) && currentEmployee) {
       // Department heads can only see their own scheduled notifications
       query.createdBy = currentEmployee._id
     } else if (decoded.role === 'hr' && currentEmployee) {
@@ -109,7 +109,7 @@ export async function POST(request) {
     const isDeptHead = decoded.role === 'department_head' || currentEmployee?.isDepartmentHead
 
     // Check if user has permission
-    if (!['admin', 'hr', 'god_admin'].includes(decoded.role) && !isDeptHead) {
+    if (!['admin', 'hr'].includes(decoded.role) && !isDeptHead) {
       return NextResponse.json(
         { success: false, message: 'You do not have permission to create scheduled notifications' },
         { status: 403 }

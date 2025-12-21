@@ -15,7 +15,7 @@ export async function POST(request) {
     }
 
     // Allow access for admins, HR, managers, and check if user is a department head
-    const allowedRoles = ['god_admin', 'admin', 'hr', 'department_head', 'manager']
+    const allowedRoles = ['admin', 'hr', 'department_head', 'manager']
     
     // Always allow if user has an allowed role
     if (!allowedRoles.includes(decoded.role)) {

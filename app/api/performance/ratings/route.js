@@ -93,7 +93,7 @@ export async function DELETE(request) {
     const token = request.headers.get('authorization')?.replace('Bearer ', '')
     const decoded = await verifyToken(token)
     
-    if (!decoded || !['admin', 'hr', 'manager', 'god_admin'].includes(decoded.role)) {
+    if (!decoded || !['admin', 'hr', 'manager'].includes(decoded.role)) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
     }
 

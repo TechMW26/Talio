@@ -23,7 +23,7 @@ export async function POST(request, { params }) {
     }
     
     // Only admin and HR can retry emails
-    if (!['admin', 'hr', 'god_admin'].includes(payload.role)) {
+    if (!['admin', 'hr'].includes(payload.role)) {
       return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
     }
     
@@ -83,7 +83,7 @@ export async function GET(request, { params }) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
     
-    if (!['admin', 'hr', 'god_admin'].includes(payload.role)) {
+    if (!['admin', 'hr'].includes(payload.role)) {
       return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
     }
     

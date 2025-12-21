@@ -8,7 +8,7 @@ import Department from '@/models/Department';
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
 // Roles that can view all team members
-const ADMIN_ROLES = ['admin', 'god_admin', 'hr'];
+const ADMIN_ROLES = ['admin', 'hr'];
 
 /**
  * GET /api/activity/team
@@ -92,7 +92,7 @@ export async function GET(request) {
           employeeCode: e.employeeCode,
           department: e.department,
           role: userIdMap[e._id.toString()]?.role,
-          canCapture: !['admin', 'god_admin'].includes(userIdMap[e._id.toString()]?.role)
+          canCapture: !['admin'].includes(userIdMap[e._id.toString()]?.role)
         })).filter(e => e.userId) // Only include users with accounts
       });
     }
@@ -112,7 +112,7 @@ export async function GET(request) {
           employeeCode: null,
           department: null,
           role: currentUserRole,
-          canCapture: !['admin', 'god_admin'].includes(currentUserRole)
+          canCapture: !['admin'].includes(currentUserRole)
         }]
       });
     }
@@ -212,7 +212,7 @@ export async function GET(request) {
         employeeCode: e.employeeCode,
         department: e.department,
         role: userIdMap[e._id.toString()]?.role,
-        canCapture: !['admin', 'god_admin'].includes(userIdMap[e._id.toString()]?.role)
+        canCapture: !['admin'].includes(userIdMap[e._id.toString()]?.role)
       })).filter(e => e.userId)
     });
 

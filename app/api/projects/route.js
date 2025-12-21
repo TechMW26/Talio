@@ -49,7 +49,7 @@ export async function GET(request) {
     let projects
 
     // Admin can see all projects
-    if (all === 'true' && ['admin', 'god_admin', 'hr'].includes(user.role)) {
+    if (all === 'true' && ['admin', 'hr'].includes(user.role)) {
       const query = {}
       if (status) {
         query.status = status === 'active' 

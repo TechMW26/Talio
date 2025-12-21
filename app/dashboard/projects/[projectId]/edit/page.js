@@ -304,7 +304,7 @@ export default function EditProjectPage() {
     employeesByDept[deptName].push(emp)
   })
 
-  const canManage = project.isCreator || project.isProjectHead || (user && ['admin', 'god_admin'].includes(user.role))
+  const canManage = project.isCreator || project.isProjectHead || (user && ['admin'].includes(user.role))
 
   return (
     <div className="page-container">

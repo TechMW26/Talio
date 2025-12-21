@@ -20,7 +20,7 @@ export async function GET(request) {
         const { payload: decoded } = await jwtVerify(token, secret)
 
         // Only admins can view scheduler status
-        if (!['admin', 'hr', 'god_admin'].includes(decoded.role)) {
+        if (!['admin', 'hr'].includes(decoded.role)) {
             return NextResponse.json(
                 { success: false, message: 'Access denied' },
                 { status: 403 }

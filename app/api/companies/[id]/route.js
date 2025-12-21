@@ -66,8 +66,8 @@ export async function PUT(request, { params }) {
       )
     }
 
-    // Check role - only admin, hr, or god_admin can update companies
-    const allowedRoles = ['god_admin', 'admin', 'hr']
+    // Check role - only admin or hr can update companies
+    const allowedRoles = ['admin', 'hr']
     if (!allowedRoles.includes(decoded.role)) {
       return NextResponse.json(
         { success: false, message: 'You do not have permission to update companies' },
@@ -204,8 +204,8 @@ export async function DELETE(request, { params }) {
       )
     }
 
-    // Check role - only admin, hr, or god_admin can delete companies
-    const allowedRoles = ['god_admin', 'admin', 'hr']
+    // Check role - only admin or hr can delete companies
+    const allowedRoles = ['admin', 'hr']
     if (!allowedRoles.includes(decoded.role)) {
       return NextResponse.json(
         { success: false, message: 'You do not have permission to delete companies' },

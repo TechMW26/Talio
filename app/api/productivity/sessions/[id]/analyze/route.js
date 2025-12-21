@@ -54,7 +54,7 @@ export async function POST(request, { params }) {
     
     // Permission check
     const isOwner = session.user.toString() === currentUserId;
-    const isAdminOrHR = ['admin', 'hr', 'god_admin'].includes(currentUserRole);
+    const isAdminOrHR = ['admin', 'hr'].includes(currentUserRole);
     
     if (!isOwner && !isAdminOrHR) {
       // TODO: Add department head check if needed

@@ -19,7 +19,7 @@ async function canApproveCorrections(userId, targetEmployeeId) {
   const role = user.role
   
   // God admin, admin, and HR can approve all corrections
-  if (['god_admin', 'admin', 'hr'].includes(role)) {
+  if (['admin', 'hr'].includes(role)) {
     return { canApprove: true, role }
   }
 
@@ -80,7 +80,7 @@ export async function GET(request) {
       // Get pending requests for approval (for admins/HRs/dept heads)
       const canApprove = await canApproveCorrections(decoded.userId, null)
       
-      if (['god_admin', 'admin', 'hr'].includes(user?.role)) {
+      if (['admin', 'hr'].includes(user?.role)) {
         // Can see all pending
         query.status = 'pending'
       } else if (user?.employeeId) {

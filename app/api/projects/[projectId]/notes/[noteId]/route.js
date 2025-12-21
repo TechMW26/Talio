@@ -36,7 +36,7 @@ export async function PUT(request, { params }) {
     const project = await Project.findById(projectId)
     const isCreator = note.createdBy.toString() === user.employeeId.toString()
     const isProjectHead = project?.projectHead?.toString() === user.employeeId.toString()
-    const isAdmin = ['admin', 'god_admin'].includes(user.role)
+    const isAdmin = ['admin'].includes(user.role)
 
     if (!isCreator && !isProjectHead && !isAdmin) {
       return NextResponse.json({ 
@@ -104,7 +104,7 @@ export async function DELETE(request, { params }) {
     const project = await Project.findById(projectId)
     const isCreator = note.createdBy.toString() === user.employeeId.toString()
     const isProjectHead = project?.projectHead?.toString() === user.employeeId.toString()
-    const isAdmin = ['admin', 'god_admin'].includes(user.role)
+    const isAdmin = ['admin'].includes(user.role)
 
     if (!isCreator && !isProjectHead && !isAdmin) {
       return NextResponse.json({ 

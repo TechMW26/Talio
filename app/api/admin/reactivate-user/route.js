@@ -25,7 +25,7 @@ export async function POST(request) {
 
     // Verify admin/HR role
     const adminUser = await User.findById(decoded.userId).select('role')
-    if (!adminUser || !['admin', 'hr', 'god_admin'].includes(adminUser.role)) {
+    if (!adminUser || !['admin', 'hr'].includes(adminUser.role)) {
       return NextResponse.json({
         success: false,
         message: 'Admin or HR access required'
@@ -117,7 +117,7 @@ export async function GET(request) {
 
     // Verify admin/HR role
     const adminUser = await User.findById(decoded.userId).select('role')
-    if (!adminUser || !['admin', 'hr', 'god_admin'].includes(adminUser.role)) {
+    if (!adminUser || !['admin', 'hr'].includes(adminUser.role)) {
       return NextResponse.json({
         success: false,
         message: 'Admin or HR access required'

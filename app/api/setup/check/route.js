@@ -13,7 +13,7 @@ export async function GET() {
 
     // Check if any admin users exist
     const adminCount = await User.countDocuments({
-      role: { $in: ['admin', 'god_admin'] },
+      role: { $in: ['admin'] },
       isActive: true
     });
 

@@ -90,7 +90,7 @@ export default function EmployeesPage() {
   }
 
   const canManageEmployees = () => {
-    return user && ['god_admin', 'admin', 'hr'].includes(user.role)
+    return user && ['admin', 'hr'].includes(user.role)
   }
 
   const canViewEmployeeDetails = () => {

@@ -115,7 +115,7 @@ export default function TicketDetailPage() {
     }
   }
 
-  const canManageTicket = user && ['admin', 'hr', 'manager', 'department_head', 'god_admin'].includes(user.role)
+  const canManageTicket = user && ['admin', 'hr', 'manager', 'department_head'].includes(user.role)
 
   if (loading) {
     return (

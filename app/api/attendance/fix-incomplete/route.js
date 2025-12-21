@@ -30,7 +30,7 @@ export async function POST(request) {
 
     // Check if user has admin/hr role
     const user = await User.findById(payload.userId).lean()
-    if (!user || !['admin', 'hr', 'god_admin'].includes(user.role)) {
+    if (!user || !['admin', 'hr'].includes(user.role)) {
       return NextResponse.json(
         { success: false, message: 'Access denied. Admin or HR role required.' },
         { status: 403 }

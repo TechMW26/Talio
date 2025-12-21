@@ -90,7 +90,7 @@ export async function GET(request) {
     console.log('[CallAlert Recipients] Final isDepartmentHead:', isDepartmentHead);
 
     // Admin, God Admin, and HR have full access
-    const isAdmin = ['admin', 'god_admin', 'hr'].includes(currentUser.role);
+    const isAdmin = ['admin', 'hr'].includes(currentUser.role);
     
     // IMPORTANT: Department heads get FULL ACCESS (same as admin)
     // They can see ALL departments and ALL employees

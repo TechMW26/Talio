@@ -81,7 +81,7 @@ export default function CallAlertButton({ user }) {
       
       // Check role directly from user object (Admin, God Admin, HR, or department_head role)
       // Note: Manager role does NOT get access unless they are a department head
-      const allowedRoles = ['admin', 'god_admin', 'department_head', 'hr'];
+      const allowedRoles = ['admin', 'department_head', 'hr'];
       if (allowedRoles.includes(currentUser?.role)) {
         console.log('[CallAlertButton] User has allowed role:', currentUser?.role);
         setCanSendAlerts(true);

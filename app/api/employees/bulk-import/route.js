@@ -32,13 +32,41 @@ const TARGET_FIELDS = [
   { name: 'employmentType', description: 'Employment type (full-time, part-time, contract)', required: false },
   { name: 'company', description: 'Company name', required: false },
   { name: 'role', description: 'System role (admin, hr, manager, employee)', required: false },
-  { name: 'salary', description: 'Salary, CTC, compensation', required: false },
+  { name: 'grossSalary', description: 'Monthly gross salary, total salary, CTC per month, compensation', required: false },
   { name: 'address', description: 'Address, location', required: false },
 ]
 
 /**
+ * Calculate salary breakdown from gross salary
+ * Standard breakdown: Basic 40%, HRA 40% of Basic (16% of gross), Conveyance ₹800 fixed, Medical 5%, Special = remainder
+ */
+function calculateSalaryBreakdown(grossSalary) {
+  const gross = parseFloat(grossSalary) || 0
+  if (gross <= 0) {
+    return null
+  }
+  const basic = Math.round(gross * 0.40)           // 40% of gross
+  const hra = Math.round(basic * 0.40)             // 40% of basic (16% of gross)
+  const conveyance = 800                            // Fixed ₹800
+  const medical = Math.round(gross * 0.05)         // 5% of gross
+  const special = gross - basic - hra - conveyance - medical  // Remainder
+  
+  return {
+    basic,
+    hra,
+    conveyance,
+    medical,
+    special: Math.max(0, special),
+    grossSalary: gross,
+    ctc: gross * 12, // Annual CTC
+  }
+}
+
+/**
  * Convert Excel serial date number to JavaScript Date
  * Excel uses days since Jan 1, 1900 (with a bug treating 1900 as leap year)
+ * 
+ * IMPORTANT: Returns local date to preserve exact date from Excel (no timezone offset)
  */
 function excelSerialToDate(serial) {
   if (typeof serial !== 'number' || isNaN(serial) || serial < 1) {
@@ -47,26 +75,31 @@ function excelSerialToDate(serial) {
   
   // Excel's epoch is January 1, 1900
   // But Excel incorrectly treats 1900 as a leap year, so we need to adjust for dates after Feb 28, 1900
-  const excelEpoch = new Date(Date.UTC(1899, 11, 30)) // Dec 30, 1899
+  const excelEpoch = new Date(1899, 11, 30) // Dec 30, 1899 (LOCAL, not UTC)
   const millisecondsPerDay = 24 * 60 * 60 * 1000
   
   // For serial numbers > 60 (after Feb 28, 1900), subtract 1 to account for Excel's leap year bug
   const adjustedSerial = serial > 60 ? serial - 1 : serial
   
   const date = new Date(excelEpoch.getTime() + adjustedSerial * millisecondsPerDay)
-  return date
+  // Return as local date at midnight to preserve exact date
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
 }
 
 /**
  * Parse various date formats from Excel
  * Handles: Excel serial numbers, ISO strings, DD/MM/YYYY, MM/DD/YYYY, etc.
+ * 
+ * IMPORTANT: All dates are returned as local dates at midnight to preserve
+ * the exact date entered in Excel (no timezone offset applied)
  */
 function parseExcelDate(value) {
   if (!value && value !== 0) return null
   
-  // If it's already a Date object
+  // If it's already a Date object - convert to local date at midnight
   if (value instanceof Date) {
-    return isNaN(value.getTime()) ? null : value
+    if (isNaN(value.getTime())) return null
+    return new Date(value.getFullYear(), value.getMonth(), value.getDate())
   }
   
   // If it's a number (Excel serial date)
@@ -78,11 +111,13 @@ function parseExcelDate(value) {
     }
     // Could be a timestamp in milliseconds
     if (value > 1000000000000) {
-      return new Date(value)
+      const d = new Date(value)
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate())
     }
     // Could be a timestamp in seconds
     if (value > 1000000000) {
-      return new Date(value * 1000)
+      const d = new Date(value * 1000)
+      return new Date(d.getFullYear(), d.getMonth(), d.getDate())
     }
     return null
   }
@@ -99,47 +134,125 @@ function parseExcelDate(value) {
       }
     }
     
-    // Try ISO format first
-    let parsed = new Date(trimmed)
-    if (!isNaN(parsed.getTime())) {
-      return parsed
-    }
-    
-    // Try DD/MM/YYYY or DD-MM-YYYY format
+    // Try DD/MM/YYYY or DD-MM-YYYY format FIRST (most common in India)
     const ddmmyyyyMatch = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/)
     if (ddmmyyyyMatch) {
       const [, day, month, year] = ddmmyyyyMatch
-      parsed = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+      // Create local date at midnight
+      const parsed = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
       if (!isNaN(parsed.getTime())) {
         return parsed
       }
     }
     
-    // Try YYYY/MM/DD or YYYY-MM-DD format
+    // Try YYYY/MM/DD or YYYY-MM-DD format (ISO-like but treat as local)
     const yyyymmddMatch = trimmed.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/)
     if (yyyymmddMatch) {
       const [, year, month, day] = yyyymmddMatch
-      parsed = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+      // Create local date at midnight
+      const parsed = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
       if (!isNaN(parsed.getTime())) {
         return parsed
       }
     }
     
-    // Try MM/DD/YYYY format (US format)
-    const mmddyyyyMatch = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/)
-    if (mmddyyyyMatch) {
-      const [, month, day, year] = mmddyyyyMatch
-      // Only use this if month is valid (1-12)
-      if (parseInt(month) <= 12) {
-        parsed = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
-        if (!isNaN(parsed.getTime())) {
-          return parsed
-        }
-      }
+    // Try standard Date parsing as fallback (but convert to local date)
+    const parsed = new Date(trimmed)
+    if (!isNaN(parsed.getTime())) {
+      return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate())
     }
   }
   
   return null
+}
+
+/**
+ * Correct spelling of specific fields using AI
+ * Only corrects: departments, designations, roles, companies
+ * Does NOT touch: names, addresses, emails, employee codes, phone numbers
+ * Matches against existing records in the database for better accuracy
+ */
+async function correctSpellingWithAI(data, existingDepartments, existingDesignations, existingCompanies) {
+  // Only process if we have values to correct
+  const fieldsToCorrect = {}
+  if (data.department && typeof data.department === 'string') fieldsToCorrect.department = data.department
+  if (data.designation && typeof data.designation === 'string') fieldsToCorrect.designation = data.designation
+  if (data.role && typeof data.role === 'string') fieldsToCorrect.role = data.role
+  if (data.company && typeof data.company === 'string') fieldsToCorrect.company = data.company
+  
+  // Skip if nothing to correct
+  if (Object.keys(fieldsToCorrect).length === 0) {
+    return data
+  }
+  
+  try {
+    // Build context about existing values
+    const existingDeptNames = existingDepartments.map(d => d.name).join(', ')
+    const existingDesigNames = existingDesignations.map(d => d.title).join(', ')
+    const existingCompanyNames = existingCompanies.map(c => c.name).join(', ')
+    const validRoles = 'admin, hr, manager, employee, department_head'
+    
+    const prompt = `Correct any spelling mistakes in these field values. Match to existing values when possible.
+
+Input values to correct:
+${JSON.stringify(fieldsToCorrect, null, 2)}
+
+Existing departments in database: ${existingDeptNames || 'none'}
+Existing designations in database: ${existingDesigNames || 'none'}
+Existing companies in database: ${existingCompanyNames || 'none'}
+Valid roles: ${validRoles}
+
+Rules:
+1. Fix obvious typos (e.g., "Engenering" -> "Engineering", "Sofware" -> "Software")
+2. If a value closely matches an existing record, use the existing record's spelling
+3. For 'role', only use valid role values (admin, hr, manager, employee, department_head)
+4. Keep the original if it looks correct or uncertain
+5. Preserve proper case (capitalize first letters of words)
+
+Respond with ONLY a JSON object containing the corrected values:
+{"department": "corrected", "designation": "corrected", "role": "corrected", "company": "corrected"}`
+
+    const response = await generateContent(prompt, 'You are a spell-check assistant. Respond only with valid JSON containing corrected values.')
+    
+    // Parse the JSON response
+    const jsonMatch = response.match(/\{[\s\S]*\}/)
+    if (jsonMatch) {
+      const corrections = JSON.parse(jsonMatch[0])
+      
+      // Apply corrections back to data
+      const correctedData = { ...data }
+      if (corrections.department) correctedData.department = corrections.department
+      if (corrections.designation) correctedData.designation = corrections.designation
+      if (corrections.role) correctedData.role = corrections.role.toLowerCase()
+      if (corrections.company) correctedData.company = corrections.company
+      
+      // Log corrections for debugging
+      const changesMade = []
+      if (fieldsToCorrect.department !== corrections.department) {
+        changesMade.push(`department: "${fieldsToCorrect.department}" → "${corrections.department}"`)
+      }
+      if (fieldsToCorrect.designation !== corrections.designation) {
+        changesMade.push(`designation: "${fieldsToCorrect.designation}" → "${corrections.designation}"`)
+      }
+      if (fieldsToCorrect.role !== corrections.role) {
+        changesMade.push(`role: "${fieldsToCorrect.role}" → "${corrections.role}"`)
+      }
+      if (fieldsToCorrect.company !== corrections.company) {
+        changesMade.push(`company: "${fieldsToCorrect.company}" → "${corrections.company}"`)
+      }
+      
+      if (changesMade.length > 0) {
+        console.log(`[Bulk Import] AI spell-check corrections: ${changesMade.join(', ')}`)
+      }
+      
+      return correctedData
+    }
+  } catch (error) {
+    console.error('[Bulk Import] AI spell-check failed:', error.message)
+    // Fall through to return original data
+  }
+  
+  return data
 }
 
 /**
@@ -661,10 +774,143 @@ async function getOrCreateDesignation(title, allDesignations) {
 }
 
 /**
+ * Find best matching company with fuzzy matching
+ * Returns { company, isExact, similarity } or null
+ */
+function findBestMatchingCompany(searchName, companies, threshold = 0.75) {
+  if (!searchName) return null
+  
+  const normalizedSearch = normalizeForComparison(searchName)
+  let bestMatch = null
+  let bestSimilarity = 0
+  
+  for (const comp of companies) {
+    // Check exact match first
+    const normalizedComp = normalizeForComparison(comp.name)
+    if (normalizedComp === normalizedSearch) {
+      return { company: comp, isExact: true, similarity: 1 }
+    }
+    
+    // Check code match
+    if (comp.code && comp.code.toLowerCase() === searchName.toLowerCase().trim()) {
+      return { company: comp, isExact: true, similarity: 1 }
+    }
+    
+    // Calculate similarity
+    const similarity = calculateSimilarity(normalizedSearch, normalizedComp)
+    if (similarity > bestSimilarity && similarity >= threshold) {
+      bestSimilarity = similarity
+      bestMatch = { company: comp, isExact: false, similarity }
+    }
+  }
+  
+  return bestMatch
+}
+
+/**
+ * Generate company code and description using AI
+ */
+async function generateCompanyCodeAndDescription(companyName) {
+  try {
+    const prompt = `Given the company name "${companyName}", generate:
+1. A short unique code (2-6 uppercase letters/numbers, like stock ticker)
+2. A brief professional description (1 sentence, max 100 chars)
+
+Respond in JSON format only:
+{"code": "ABC", "description": "Brief description here"}`
+
+    const response = await generateContent(prompt, 'You are a helpful assistant that generates company codes and descriptions. Respond only with valid JSON.')
+    
+    // Parse the JSON response
+    const jsonMatch = response.match(/\{[\s\S]*\}/)
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0])
+      return {
+        code: (parsed.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 6),
+        description: (parsed.description || '').substring(0, 200)
+      }
+    }
+  } catch (error) {
+    console.error('[Bulk Import] AI company generation failed:', error.message)
+  }
+  
+  // Fallback: generate code from name
+  const words = companyName.trim().split(/\s+/)
+  let code
+  if (words.length === 1) {
+    code = words[0].substring(0, 4).toUpperCase()
+  } else {
+    code = words.map(w => w[0]).join('').toUpperCase().substring(0, 6)
+  }
+  
+  return {
+    code,
+    description: `${companyName.trim()} - Imported via bulk import`
+  }
+}
+
+/**
+ * Create or find company with fuzzy matching
+ * Similar to department/designation handling, but uses AI for code/description
+ */
+async function getOrCreateCompany(name, allCompanies, companyMap) {
+  if (!name) return { companyId: null, created: false, matched: null }
+  
+  const match = findBestMatchingCompany(name, allCompanies)
+  
+  if (match) {
+    return { 
+      companyId: match.company._id, 
+      created: false, 
+      matched: match.company.name,
+      similarity: match.similarity,
+      isExact: match.isExact
+    }
+  }
+  
+  // Generate code and description using AI
+  const { code: generatedCode, description } = await generateCompanyCodeAndDescription(name)
+  
+  let uniqueCode = generatedCode
+  let counter = 1
+  
+  // Ensure unique code
+  while (allCompanies.some(c => c.code === uniqueCode)) {
+    uniqueCode = `${generatedCode}${counter}`
+    counter++
+  }
+  
+  // Create new company with defaults (similar to admin dashboard creation)
+  const newCompany = await Company.create({
+    name: name.trim(),
+    code: uniqueCode,
+    description: description,
+    timezone: 'Asia/Kolkata',
+    workingHours: {
+      checkInTime: '09:00',
+      checkOutTime: '18:00',
+      lateThresholdMinutes: 15,
+      absentThresholdMinutes: 60,
+      halfDayHours: 4,
+      fullDayHours: 8,
+      workingDays: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+    },
+    isActive: true
+  })
+  
+  // Add to cache arrays
+  allCompanies.push({ _id: newCompany._id, name: newCompany.name, code: newCompany.code })
+  companyMap.set(newCompany.name.toLowerCase(), newCompany._id)
+  companyMap.set(newCompany.code.toLowerCase(), newCompany._id)
+  
+  return { companyId: newCompany._id, created: true, matched: name.trim(), code: uniqueCode }
+}
+
+/**
  * Helper function to create or update a single employee and user account
  * Now supports upsert by email
  */
-async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignations, companyMap) {
+async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignations, allCompanies, companyMap) {
   const warnings = []
   
   // Email is required for deduplication
@@ -700,11 +946,17 @@ async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignatio
     }
   }
   
-  // Map company name to ID if provided as string
-  let companyId = null
+  // Handle company with fuzzy matching and auto-creation
+  let companyResult = { companyId: null, created: false }
   if (data.company && typeof data.company === 'string') {
-    companyId = companyMap.get(data.company.toLowerCase().trim())
+    companyResult = await getOrCreateCompany(data.company, allCompanies, companyMap)
+    if (companyResult.created) {
+      warnings.push(`Created new company: "${companyResult.matched}" (code: ${companyResult.code})`)
+    } else if (!companyResult.isExact && companyResult.similarity < 1) {
+      warnings.push(`Matched company "${data.company}" to existing "${companyResult.matched}" (${Math.round(companyResult.similarity * 100)}% match)`)
+    }
   }
+  const companyId = companyResult.companyId
 
   // Prepare employee data - only include non-empty fields
   const employeeData = {}
@@ -731,13 +983,21 @@ async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignatio
   if (data.designationLevel) employeeData.designationLevel = parseInt(data.designationLevel) || 1
   if (data.designationLevelName) employeeData.designationLevelName = data.designationLevelName
   
-  // Handle salary fields
-  if (data.salary || data.basicSalary || data.grossSalary || data.ctc) {
+  // Handle salary fields - auto-distribute from gross salary
+  const grossSalaryValue = parseFloat(data.grossSalary) || parseFloat(data.salary) || parseFloat(data.ctc ? data.ctc / 12 : 0)
+  if (grossSalaryValue > 0) {
+    const salaryBreakdown = calculateSalaryBreakdown(grossSalaryValue)
+    if (salaryBreakdown) {
+      employeeData.salary = {
+        ...(existingEmployee?.salary || {}),
+        ...salaryBreakdown,
+      }
+    }
+  } else if (data.basicSalary) {
+    // Fallback: if only basic salary provided, store it directly
     employeeData.salary = {
       ...(existingEmployee?.salary || {}),
-      basic: data.basicSalary || data.salary || existingEmployee?.salary?.basic,
-      grossSalary: data.grossSalary || existingEmployee?.salary?.grossSalary,
-      ctc: data.ctc || existingEmployee?.salary?.ctc,
+      basic: parseFloat(data.basicSalary),
     }
   }
 
@@ -915,6 +1175,7 @@ async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignatio
     } : null,
     departmentCreated: departmentResult.created,
     designationCreated: designationResult.created,
+    companyCreated: companyResult.created,
   }
 }
 
@@ -967,6 +1228,14 @@ function parseExcelRow(row, headers) {
     'level': 'designationLevel',
     'designation level': 'designationLevel',
     'designationlevel': 'designationLevel',
+    'gross salary': 'grossSalary',
+    'grosssalary': 'grossSalary',
+    'gross_salary': 'grossSalary',
+    'salary': 'grossSalary',
+    'ctc': 'grossSalary',
+    'monthly salary': 'grossSalary',
+    'monthlysalary': 'grossSalary',
+    'compensation': 'grossSalary',
   }
 
   headers.forEach((header, index) => {
@@ -1124,6 +1393,7 @@ export async function POST(request) {
     // Create mutable arrays for dynamic creation
     const allDepartments = [...departments]
     const allDesignations = [...designations]
+    const allCompanies = [...companies]
 
     // Create company lookup map (case-insensitive)
     const companyMap = new Map()
@@ -1143,6 +1413,7 @@ export async function POST(request) {
       skipped: 0,
       departmentsCreated: 0,
       designationsCreated: 0,
+      companiesCreated: 0,
       warnings: [],
       mappingMethod,
       detectedColumns: Object.entries(columnMapping)
@@ -1156,7 +1427,7 @@ export async function POST(request) {
       
       try {
         // Use AI-detected mapping to parse row
-        const employeeData = parseRowWithMapping(row, columnMapping)
+        let employeeData = parseRowWithMapping(row, columnMapping)
         
         // Skip completely empty rows
         if (!employeeData.email && !employeeData.employeeCode && !employeeData.firstName) {
@@ -1170,10 +1441,14 @@ export async function POST(request) {
           continue
         }
 
+        // Apply AI spell-check for departments, designations, roles, companies
+        employeeData = await correctSpellingWithAI(employeeData, allDepartments, allDesignations, allCompanies)
+
         const result = await createOrUpdateEmployeeAndUser(
           employeeData,
           allDepartments,
           allDesignations,
+          allCompanies,
           companyMap
         )
 
@@ -1195,6 +1470,7 @@ export async function POST(request) {
           
           if (result.departmentCreated) results.departmentsCreated++
           if (result.designationCreated) results.designationsCreated++
+          if (result.companyCreated) results.companiesCreated++
           
         } else {
           results.failed.push({
@@ -1228,6 +1504,7 @@ export async function POST(request) {
     if (results.failed.length > 0) summaryParts.push(`${results.failed.length} failed`)
     if (results.departmentsCreated > 0) summaryParts.push(`${results.departmentsCreated} new departments`)
     if (results.designationsCreated > 0) summaryParts.push(`${results.designationsCreated} new designations`)
+    if (results.companiesCreated > 0) summaryParts.push(`${results.companiesCreated} new companies`)
 
     return NextResponse.json({
       success: true,
@@ -1265,6 +1542,7 @@ export async function GET(request) {
         'Role',
         'Employment Type',
         'Status',
+        'Gross Salary',
         'Company',
         'Password',
       ],
@@ -1282,6 +1560,7 @@ export async function GET(request) {
         'employee',
         'full-time',
         'active',
+        '50000',
         'Acme Corp',
         'password123',
       ],
@@ -1299,8 +1578,27 @@ export async function GET(request) {
         'hr',
         'full-time',
         'active',
+        '75000',
         'Acme Corp',
         'password456',
+      ],
+      [
+        'EMP003',
+        'Rahul',
+        'Kumar',
+        'rahul.kumar@example.com',
+        '+919876543210',
+        'Male',
+        '1988-08-10',
+        '2023-06-01',
+        'Sales',
+        'Sales Executive',
+        'employee',
+        'full-time',
+        'active',
+        '35000',
+        'Tech Solutions',
+        'password789',
       ],
     ]
 
@@ -1313,7 +1611,7 @@ export async function GET(request) {
       { wch: 15 }, // Employee Code
       { wch: 15 }, // First Name
       { wch: 15 }, // Last Name
-      { wch: 25 }, // Email
+      { wch: 28 }, // Email
       { wch: 15 }, // Phone
       { wch: 10 }, // Gender
       { wch: 15 }, // Date of Birth
@@ -1323,7 +1621,8 @@ export async function GET(request) {
       { wch: 12 }, // Role
       { wch: 15 }, // Employment Type
       { wch: 10 }, // Status
-      { wch: 15 }, // Company
+      { wch: 15 }, // Gross Salary
+      { wch: 18 }, // Company
       { wch: 15 }, // Password
     ]
 

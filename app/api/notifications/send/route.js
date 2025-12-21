@@ -55,8 +55,8 @@ export async function POST(request) {
       })
     }
 
-    // Check if user has permission (admin, hr, god_admin, department_head role, or is a department head)
-    const hasPermission = ['admin', 'hr', 'god_admin', 'department_head'].includes(decoded.role) ||
+    // Check if user has permission (admin, hr, admin, department_head role, or is a department head)
+    const hasPermission = ['admin', 'hr', 'department_head'].includes(decoded.role) ||
                          !!userDepartment
 
     console.log('[Notifications] Permission check:', {
@@ -117,15 +117,15 @@ export async function POST(request) {
     const isDeptHead = decoded.role === 'department_head' || !!userDepartment
 
     // Department heads need an employee record to send notifications
-    if (isDeptHead && !['admin', 'hr', 'god_admin'].includes(decoded.role) && !currentEmployee) {
+    if (isDeptHead && !['admin', 'hr'].includes(decoded.role) && !currentEmployee) {
       return NextResponse.json(
         { success: false, message: 'Employee record not found. Please contact administrator.' },
         { status: 403 }
       )
     }
 
-    // Department heads (non-admin/hr/god_admin) cannot use 'department' or 'role' target types
-    if (isDeptHead && !['admin', 'hr', 'god_admin'].includes(decoded.role)) {
+    // Department heads (non-admin/hr/admin) cannot use 'department' or 'role' target types
+    if (isDeptHead && !['admin', 'hr'].includes(decoded.role)) {
       if (targetType === 'department') {
         return NextResponse.json(
           { success: false, message: 'Department heads can only send to their own department members' },
@@ -145,7 +145,7 @@ export async function POST(request) {
 
     if (targetType === 'all') {
       // Department heads can only send to their department
-      if (isDeptHead && !['admin', 'hr', 'god_admin'].includes(decoded.role)) {
+      if (isDeptHead && !['admin', 'hr'].includes(decoded.role)) {
         const deptEmployees = await Employee.find({
           department: userDepartment._id,
           status: 'active'
@@ -162,7 +162,7 @@ export async function POST(request) {
     } else if (targetType === 'department') {
       // Department heads can only send to their own department
       let deptId = targetDepartment
-      if (isDeptHead && !['admin', 'hr', 'god_admin'].includes(decoded.role)) {
+      if (isDeptHead && !['admin', 'hr'].includes(decoded.role)) {
         deptId = userDepartment._id
       }
 
@@ -183,7 +183,7 @@ export async function POST(request) {
       }
 
       // Department heads can only send to users in their department
-      if (isDeptHead && !['admin', 'hr', 'god_admin'].includes(decoded.role)) {
+      if (isDeptHead && !['admin', 'hr'].includes(decoded.role)) {
         const deptEmployees = await Employee.find({
           department: userDepartment._id,
           status: 'active'
@@ -212,7 +212,7 @@ export async function POST(request) {
       }
 
       // Department heads can only send to users in their department
-      if (isDeptHead && !['admin', 'hr', 'god_admin'].includes(decoded.role)) {
+      if (isDeptHead && !['admin', 'hr'].includes(decoded.role)) {
         const deptEmployees = await Employee.find({
           department: userDepartment._id,
           status: 'active'
@@ -259,7 +259,7 @@ export async function POST(request) {
         message,
         url: url || '/dashboard',
         targetType,
-        targetDepartment: targetType === 'department' ? (isDeptHead && !['admin', 'hr', 'god_admin'].includes(decoded.role) && userDepartment ? userDepartment._id : targetDepartment) : null,
+        targetDepartment: targetType === 'department' ? (isDeptHead && !['admin', 'hr'].includes(decoded.role) && userDepartment ? userDepartment._id : targetDepartment) : null,
         targetUsers: targetType === 'specific' ? userIds : [],
         targetRoles: targetType === 'role' ? targetRoles : [],
         scheduledFor: new Date(scheduledFor),
@@ -376,7 +376,7 @@ export async function POST(request) {
         message,
         url: url || '/dashboard',
         targetType,
-        targetDepartment: targetType === 'department' ? (isDeptHead && !['admin', 'hr', 'god_admin'].includes(decoded.role) && userDepartment ? userDepartment._id : targetDepartment) : null,
+        targetDepartment: targetType === 'department' ? (isDeptHead && !['admin', 'hr'].includes(decoded.role) && userDepartment ? userDepartment._id : targetDepartment) : null,
         targetUsers: targetType === 'specific' ? userIds : [],
         targetRoles: targetType === 'role' ? targetRoles : [],
         scheduledFor: now,

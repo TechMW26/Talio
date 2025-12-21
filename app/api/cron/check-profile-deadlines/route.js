@@ -144,7 +144,7 @@ export async function POST(request) {
     await connectDB()
     
     const user = await User.findById(payload.userId).select('role')
-    if (!user || !['admin', 'hr', 'god_admin'].includes(user.role)) {
+    if (!user || !['admin', 'hr'].includes(user.role)) {
       return NextResponse.json({ success: false, message: 'Admin access required' }, { status: 403 })
     }
 

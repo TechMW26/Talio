@@ -58,8 +58,8 @@ export async function POST(request) {
       )
     }
 
-    // Check role - only admin, hr, or god_admin can create companies
-    const allowedRoles = ['god_admin', 'admin', 'hr']
+    // Check role - only admin or hr can create companies
+    const allowedRoles = ['admin', 'hr']
     if (!allowedRoles.includes(decoded.role)) {
       return NextResponse.json(
         { success: false, message: 'You do not have permission to create companies' },

@@ -13,7 +13,7 @@ const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
  * Check if viewer can access target user's analysis
  */
 async function canViewAnalysis(viewerId, targetUserId, viewerRole) {
-  if (['admin', 'god_admin', 'hr'].includes(viewerRole)) {
+  if (['admin', 'hr'].includes(viewerRole)) {
     return true;
   }
 
@@ -210,7 +210,7 @@ export async function POST(request) {
     const viewerRole = decoded.payload.role;
 
     // Only admins can trigger analysis manually
-    if (!['admin', 'god_admin', 'hr'].includes(viewerRole)) {
+    if (!['admin', 'hr'].includes(viewerRole)) {
       return NextResponse.json({ 
         success: false, 
         error: 'Admin access required' 

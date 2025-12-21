@@ -135,7 +135,7 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
-    if (!['admin', 'hr', 'manager', 'department_head', 'god_admin'].includes(decoded.role)) {
+    if (!['admin', 'hr', 'manager', 'department_head'].includes(decoded.role)) {
       return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
     }
 
@@ -252,7 +252,7 @@ export async function PUT(request) {
       )
     }
 
-    const canUpdateAll = ['admin', 'hr', 'manager', 'department_head', 'god_admin'].includes(decoded.role)
+    const canUpdateAll = ['admin', 'hr', 'manager', 'department_head'].includes(decoded.role)
     const employee = await Employee.findOne({ userId: decoded.userId }).select('_id')
 
     if (!canUpdateAll) {
@@ -314,7 +314,7 @@ export async function DELETE(request) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
-    if (!['admin', 'hr', 'manager', 'department_head', 'god_admin'].includes(decoded.role)) {
+    if (!['admin', 'hr', 'manager', 'department_head'].includes(decoded.role)) {
       return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
     }
 

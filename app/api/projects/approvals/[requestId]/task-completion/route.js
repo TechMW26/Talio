@@ -54,7 +54,7 @@ export async function POST(request, { params }) {
         : []
 
     const isProjectHead = projectHeadIds.includes(user.employeeId.toString())
-    const isAdmin = ['admin', 'god_admin'].includes(user.role)
+    const isAdmin = ['admin'].includes(user.role)
 
     if (!isProjectHead && !isAdmin) {
       return NextResponse.json({ success: false, message: 'Only project heads can approve this request' }, { status: 403 })

@@ -34,7 +34,7 @@ export async function GET(request) {
     const isDeptHead = decoded.role === 'department_head' || currentEmployee?.isDepartmentHead
 
     // Check if user has permission
-    if (!['admin', 'hr', 'god_admin'].includes(decoded.role) && !isDeptHead) {
+    if (!['admin', 'hr'].includes(decoded.role) && !isDeptHead) {
       return NextResponse.json(
         { success: false, message: 'You do not have permission to view recurring notifications' },
         { status: 403 }
@@ -44,7 +44,7 @@ export async function GET(request) {
     // Build query based on role
     let query = {}
 
-    if (isDeptHead && !['admin', 'hr', 'god_admin'].includes(decoded.role) && currentEmployee) {
+    if (isDeptHead && !['admin', 'hr'].includes(decoded.role) && currentEmployee) {
       // Department heads can only see their own recurring notifications
       query.createdBy = currentEmployee._id
     } else if (decoded.role === 'hr' && currentEmployee) {
@@ -104,7 +104,7 @@ export async function POST(request) {
     const isDeptHead = decoded.role === 'department_head' || currentEmployee?.isDepartmentHead
 
     // Check if user has permission
-    if (!['admin', 'hr', 'god_admin'].includes(decoded.role) && !isDeptHead) {
+    if (!['admin', 'hr'].includes(decoded.role) && !isDeptHead) {
       return NextResponse.json(
         { success: false, message: 'You do not have permission to create recurring notifications' },
         { status: 403 }
@@ -112,7 +112,7 @@ export async function POST(request) {
     }
 
     // Department heads (non-admin/hr) cannot use 'department' or 'role' target types
-    if (isDeptHead && !['admin', 'hr', 'god_admin'].includes(decoded.role)) {
+    if (isDeptHead && !['admin', 'hr'].includes(decoded.role)) {
       if (data.targetType === 'department') {
         return NextResponse.json(
           { success: false, message: 'Department heads can only send to their own department members' },
@@ -340,7 +340,7 @@ export async function PATCH(request) {
 
     const isDeptHead = decoded.role === 'department_head' || currentEmployee?.isDepartmentHead
 
-    if (isDeptHead && !['admin', 'hr', 'god_admin'].includes(decoded.role) && currentEmployee && notification.createdBy.toString() !== currentEmployee._id.toString()) {
+    if (isDeptHead && !['admin', 'hr'].includes(decoded.role) && currentEmployee && notification.createdBy.toString() !== currentEmployee._id.toString()) {
       return NextResponse.json(
         { success: false, message: 'You can only update your own recurring notifications' },
         { status: 403 }

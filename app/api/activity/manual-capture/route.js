@@ -8,10 +8,10 @@ import Department from '@/models/Department';
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
 // Roles that can initiate manual captures
-const ALLOWED_INITIATOR_ROLES = ['admin', 'god_admin', 'department_head'];
+const ALLOWED_INITIATOR_ROLES = ['admin', 'department_head'];
 
 // Roles that cannot be captured (even manually)
-const PROTECTED_ROLES = ['admin', 'god_admin'];
+const PROTECTED_ROLES = ['admin'];
 
 /**
  * POST /api/activity/manual-capture
@@ -222,7 +222,7 @@ export async function GET(request) {
     if (canInitiateCapture) {
       await connectDB();
       
-      if (['admin', 'god_admin'].includes(userRole)) {
+      if (['admin'].includes(userRole)) {
         captureScope = 'all'; // Can capture any non-admin user
         
         // Get all non-admin users

@@ -46,7 +46,7 @@ export default function TeamAttendancePage() {
         // Department head - show employees directly
         await fetchDepartmentEmployees(checkHeadData.departmentId)
         setView('employees')
-      } else if (['god_admin', 'admin', 'hr'].includes(parsedUser.role)) {
+      } else if (['admin', 'hr'].includes(parsedUser.role)) {
         // Admin/HR - show departments first
         await fetchDepartments()
         setView('departments')

@@ -86,7 +86,7 @@ export default function NotificationManagement() {
   }
 
   // Check if user has access
-  const hasAccess = ['admin', 'hr', 'department_head', 'god_admin'].includes(userRole) || isDepartmentHead
+  const hasAccess = ['admin', 'hr', 'department_head'].includes(userRole) || isDepartmentHead
 
   if (loading) {
     return (
@@ -126,7 +126,7 @@ export default function NotificationManagement() {
       {/* Firebase Status Banner */}
 
       {/* Firebase Configured Success Banner - Admin only */}
-      {!checkingApiKey && apiKeyConfigured && ['admin', 'god_admin'].includes(userRole) && (
+      {!checkingApiKey && apiKeyConfigured && ['admin'].includes(userRole) && (
         <div className="mb-6 bg-green-50 border-l-4 border-green-400 p-4 rounded-lg">
           <div className="flex items-start gap-3">
             <div className="flex-shrink-0">
@@ -203,8 +203,8 @@ function SendNotificationTab({ userRole, userDepartment, isDepartmentHead, apiKe
   const [employeeHasMore, setEmployeeHasMore] = useState(true)
   const [employeeLoading, setEmployeeLoading] = useState(false)
 
-  // Check if user is admin/hr/god_admin
-  const isAdminOrHR = ['admin', 'hr', 'god_admin'].includes(userRole)
+  // Check if user is admin/hr
+  const isAdminOrHR = ['admin', 'hr'].includes(userRole)
   const isDeptHead = isDepartmentHead || userRole === 'department_head'
 
   useEffect(() => {
@@ -245,7 +245,7 @@ function SendNotificationTab({ userRole, userDepartment, isDepartmentHead, apiKe
         return
       }
 
-      // Build URL with department filter if department head (not admin/hr/god_admin)
+      // Build URL with department filter if department head (not admin/hr)
       let url = `/api/employees?limit=50&page=${page}&status=active`
       if (isDeptHead && !isAdminOrHR && userDepartment) {
         url += `&department=${userDepartment}`

@@ -64,7 +64,7 @@ export async function POST(request) {
     const userRole = decoded.payload.role;
 
     // Skip for admin roles
-    if (['admin', 'god_admin'].includes(userRole)) {
+    if (['admin'].includes(userRole)) {
       return NextResponse.json({
         success: false,
         error: 'Screenshot capture not enabled for admin roles'
@@ -296,7 +296,7 @@ export async function GET(request) {
     const userRole = decoded.payload.role;
 
     // Access control
-    if (!['admin', 'god_admin', 'hr', 'manager'].includes(userRole)) {
+    if (!['admin', 'hr', 'manager'].includes(userRole)) {
       if (screenshot.user.toString() !== userId) {
         return NextResponse.json({
           success: false,

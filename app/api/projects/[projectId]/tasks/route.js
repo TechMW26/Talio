@@ -41,7 +41,7 @@ export async function GET(request, { params }) {
     }
 
     // Check access
-    const isAdmin = ['admin', 'god_admin', 'hr'].includes(user.role)
+    const isAdmin = ['admin', 'hr'].includes(user.role)
     if (!isAdmin) {
       const { hasAccess } = await checkProjectAccess(projectId, user.employeeId, 'view')
       if (!hasAccess) {
@@ -122,7 +122,7 @@ export async function POST(request, { params }) {
     }
 
     // Check if user can create tasks (must be accepted member)
-    const isAdmin = ['admin', 'god_admin'].includes(user.role)
+    const isAdmin = ['admin'].includes(user.role)
     if (!isAdmin) {
       const { hasAccess } = await checkProjectAccess(projectId, user.employeeId, 'participate')
       if (!hasAccess) {

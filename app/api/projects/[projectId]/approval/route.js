@@ -90,7 +90,7 @@ export async function POST(request, { params }) {
     }
 
     // Check if user can request completion (must be accepted member)
-    const isAdmin = ['admin', 'god_admin'].includes(user.role)
+    const isAdmin = ['admin'].includes(user.role)
     const membership = await ProjectMember.findOne({
       project: projectId,
       user: user.employeeId,
@@ -158,7 +158,7 @@ export async function PUT(request, { params }) {
 
     // Only project head can respond
     const isProjectHead = project.projectHead.toString() === user.employeeId.toString()
-    const isAdmin = ['admin', 'god_admin'].includes(user.role)
+    const isAdmin = ['admin'].includes(user.role)
 
     if (!isProjectHead && !isAdmin) {
       return NextResponse.json({ 

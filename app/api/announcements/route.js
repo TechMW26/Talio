@@ -61,7 +61,7 @@ export async function GET(request) {
     // Filter announcements based on user's department and role
     const filteredAnnouncements = announcements.filter(announcement => {
       // Admins and HR can see all announcements
-      if (userRole === 'admin' || userRole === 'hr' || userRole === 'god_admin') {
+      if (userRole === 'admin' || userRole === 'hr' || userRole === 'admin') {
         return true
       }
 

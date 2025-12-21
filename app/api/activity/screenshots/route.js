@@ -13,7 +13,7 @@ const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
  */
 async function canViewUserScreenshots(viewerId, targetUserId, viewerRole) {
   // Admins and HR can view all
-  if (['admin', 'god_admin', 'hr'].includes(viewerRole)) {
+  if (['admin', 'hr'].includes(viewerRole)) {
     return true;
   }
 

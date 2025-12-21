@@ -12,7 +12,7 @@ import Screenshot from '@/models/Screenshot';
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
 // Roles that can view all captures
-const ADMIN_ROLES = ['admin', 'god_admin', 'hr'];
+const ADMIN_ROLES = ['admin', 'hr'];
 
 /**
  * Check if a user is a department head
@@ -155,7 +155,7 @@ export async function GET(request) {
 
     // Check if target user is admin (no captures)
     const targetUser = await User.findById(targetUserId);
-    if (['admin', 'god_admin'].includes(targetUser?.role)) {
+    if (['admin'].includes(targetUser?.role)) {
       return NextResponse.json({
         success: true,
         message: 'Admin screens are not captured',

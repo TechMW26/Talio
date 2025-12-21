@@ -53,7 +53,7 @@ export async function PUT(request, { params }) {
     }
 
     // Only project head(s) or admin can approve
-    const isAdmin = ['admin', 'god_admin'].includes(user.role)
+    const isAdmin = ['admin'].includes(user.role)
     const projectHeadIds = project.projectHeads && project.projectHeads.length > 0 
       ? project.projectHeads.map(h => h.toString())
       : project.projectHead 
@@ -414,7 +414,7 @@ export async function DELETE(request, { params }) {
 
     // Only requester, project head, or admin can cancel
     const isRequester = approvalRequest.requestedBy.toString() === user.employeeId.toString()
-    const isAdmin = ['admin', 'god_admin'].includes(user.role)
+    const isAdmin = ['admin'].includes(user.role)
     
     const project = await Project.findById(approvalRequest.project)
     const isProjectHead = project && project.projectHead.toString() === user.employeeId.toString()

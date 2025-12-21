@@ -16,7 +16,7 @@ export default function ExpenseApprovalsPage() {
     const parsedUser = getCurrentUser()
     if (parsedUser) {
       setUser(parsedUser)
-      if (['admin', 'hr', 'manager', 'department_head', 'god_admin'].includes(parsedUser.role)) {
+      if (['admin', 'hr', 'manager', 'department_head'].includes(parsedUser.role)) {
         fetchPendingExpenses()
       } else {
         toast.error('Unauthorized access')

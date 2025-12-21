@@ -56,7 +56,7 @@ export async function POST(request, { params }) {
     }
 
     // Check permissions - only project head, admins, or assignees can respond
-    const isAdmin = ['admin', 'god_admin'].includes(user.role)
+    const isAdmin = ['admin'].includes(user.role)
     
     // Build list of project head IDs (handle both array and single field)
     const projectHeadIds = []

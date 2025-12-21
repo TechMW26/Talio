@@ -15,7 +15,7 @@ const CallAlertSchema = new mongoose.Schema({
   },
   senderRole: {
     type: String,
-    enum: ['admin', 'hr', 'manager', 'employee', 'department_head', 'god_admin'],
+    enum: ['admin', 'hr', 'manager', 'employee', 'department_head'],
     required: true
   },
   senderName: {

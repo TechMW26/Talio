@@ -22,7 +22,7 @@ export async function GET(request) {
     }
     
     // Only admin and HR can access this
-    if (!['admin', 'hr', 'god_admin'].includes(payload.role)) {
+    if (!['admin', 'hr'].includes(payload.role)) {
       return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
     }
     

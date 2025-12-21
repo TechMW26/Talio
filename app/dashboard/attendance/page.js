@@ -124,7 +124,7 @@ export default function AttendancePage() {
       
       // Check if user can approve corrections
       const role = parsedUser.role
-      if (['god_admin', 'admin', 'hr', 'department_head', 'manager'].includes(role)) {
+      if (['admin', 'hr', 'department_head', 'manager'].includes(role)) {
         setCanApprove(true)
         fetchPendingCorrections()
       }

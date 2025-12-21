@@ -85,7 +85,7 @@ export async function POST(request, { params }) {
     }
 
     // Check if user can invite members
-    const isAdmin = ['admin', 'god_admin'].includes(user.role)
+    const isAdmin = ['admin'].includes(user.role)
     const isHead = project.projectHead.toString() === user.employeeId.toString()
     const isCreator = project.createdBy.toString() === user.employeeId.toString()
     
@@ -248,7 +248,7 @@ export async function DELETE(request, { params }) {
     }
 
     // Check permission to remove
-    const isAdmin = ['admin', 'god_admin'].includes(user.role)
+    const isAdmin = ['admin'].includes(user.role)
     const isHead = project.projectHead.toString() === user.employeeId.toString()
     const isSelf = membership.user._id.toString() === user.employeeId.toString()
 

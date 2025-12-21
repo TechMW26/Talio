@@ -115,7 +115,7 @@ export async function PUT(request, { params }) {
     }
 
     // Check permissions
-    const isAdmin = ['admin', 'god_admin'].includes(user.role)
+    const isAdmin = ['admin'].includes(user.role)
     const isCreator = task.createdBy.toString() === user.employeeId.toString()
     const isProjectHead = project.projectHead.toString() === user.employeeId.toString()
     
@@ -441,7 +441,7 @@ export async function DELETE(request, { params }) {
     }
 
     // Check permissions
-    const isAdmin = ['admin', 'god_admin'].includes(user.role)
+    const isAdmin = ['admin'].includes(user.role)
     const projectHeadIds = project.projectHeads && project.projectHeads.length > 0 
       ? project.projectHeads.map(h => h.toString())
       : project.projectHead 

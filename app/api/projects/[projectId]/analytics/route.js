@@ -46,7 +46,7 @@ export async function GET(request, { params }) {
     }
 
     // Check access
-    const isAdmin = ['admin', 'god_admin', 'hr'].includes(user.role)
+    const isAdmin = ['admin', 'hr'].includes(user.role)
     if (!isAdmin) {
       const { hasAccess } = await checkProjectAccess(projectId, user.employeeId, 'view')
       if (!hasAccess) {

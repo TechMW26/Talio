@@ -10,7 +10,7 @@ import { syncDepartmentHeadStatus, getAllDepartmentHeads } from '@/lib/departmen
  * 
  * POST /api/admin/sync-department-heads
  * Manually trigger sync of department head status for all users
- * Only accessible by admin or god_admin
+ * Only accessible by admin
  */
 
 export async function GET(request) {
@@ -39,8 +39,8 @@ export async function GET(request) {
       );
     }
 
-    // Only admin or god_admin can access
-    if (!['admin', 'god_admin'].includes(currentUser.role)) {
+    // Only admin can access
+    if (!['admin'].includes(currentUser.role)) {
       return NextResponse.json(
         { success: false, message: 'Access denied' },
         { status: 403 }
@@ -85,8 +85,8 @@ export async function POST(request) {
       );
     }
 
-    // Only admin or god_admin can trigger sync
-    if (!['admin', 'god_admin'].includes(currentUser.role)) {
+    // Only admin can trigger sync
+    if (!['admin'].includes(currentUser.role)) {
       return NextResponse.json(
         { success: false, message: 'Access denied' },
         { status: 403 }

@@ -70,7 +70,7 @@ export default function EmployeeRatingsPage() {
   }
 
   const canManageRatings = () => {
-    return user && ['admin', 'hr', 'manager', 'department_head', 'god_admin'].includes(user.role)
+    return user && ['admin', 'hr', 'manager', 'department_head'].includes(user.role)
   }
 
   const getRatingStars = (rating) => {

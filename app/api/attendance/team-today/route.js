@@ -29,7 +29,7 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
     }
 
-    const isAdmin = ['admin', 'god_admin', 'hr'].includes(requestingUser.role)
+    const isAdmin = ['admin', 'hr'].includes(requestingUser.role)
 
     // Get company settings for threshold calculation
     const settings = await CompanySettings.findOne().lean()

@@ -77,7 +77,7 @@ export async function GET(request) {
       timestamp: new Date().toISOString(),
       userId,
       role: userRole,
-      captureEnabled: !['admin', 'god_admin'].includes(userRole),
+      captureEnabled: !['admin'].includes(userRole),
       database: dbConnected ? 'connected' : 'error',
       activityFolder: folderResult,
       server: {

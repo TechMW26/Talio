@@ -728,7 +728,7 @@ async function checkLoginStatus() {
  */
 async function startCaptureService(authToken, userId, userRole) {
   // Don't capture for admin roles
-  if (['admin', 'god_admin'].includes(userRole)) {
+  if (['admin'].includes(userRole)) {
     debugLogger.log('info', 'Capture', 'Skipping capture for admin role');
     setTrayState(TRAY_STATES.IDLE);
     updateTrayStatus('Capture: Disabled (Admin)');

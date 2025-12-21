@@ -139,7 +139,7 @@ export default function GoalDetailsPage() {
   }
 
   const canManageGoals = () => {
-    return user && ['admin', 'hr', 'manager', 'god_admin', 'department_head'].includes(user.role)
+    return user && ['admin', 'hr', 'manager', 'department_head'].includes(user.role)
   }
 
   const canUpdateProgress = () => {
