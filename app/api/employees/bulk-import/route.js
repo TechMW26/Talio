@@ -15,6 +15,69 @@ import { syncUserToBackup } from '@/lib/backupDb'
 const _ensureModels = { Department, Designation, Company }
 
 /**
+ * Smart level detection based on designation/job title
+ * Levels: 1=Entry, 2=Junior, 3=Mid, 4=Senior, 5=Lead, 6=Manager, 7=Director, 8=Executive
+ */
+function detectLevelFromTitle(title) {
+  if (!title) return 1
+  
+  const normalizedTitle = title.toLowerCase().trim()
+  
+  // Level 8: Executive/C-Suite
+  if (/\b(ceo|cto|cfo|coo|cmo|cio|cpo|chief|president|founder|co-founder|owner|chairman|chairwoman|chairperson)\b/i.test(normalizedTitle)) {
+    return 8
+  }
+  
+  // Level 7: Director
+  if (/\b(director|vp|vice\s*president|head\s+of|global\s+head|regional\s+head|country\s+head|avp|associate\s+vice\s+president)\b/i.test(normalizedTitle)) {
+    return 7
+  }
+  
+  // Level 6: Manager
+  if (/\b(manager|mgr|gm|general\s+manager|agm|assistant\s+manager|deputy\s+manager|project\s+manager|product\s+manager|program\s+manager|account\s+manager|team\s+manager|operations\s+manager|branch\s+manager|area\s+manager|zonal\s+manager|regional\s+manager|supervisor|superintendent|controller|coordinator)\b/i.test(normalizedTitle)) {
+    return 6
+  }
+  
+  // Level 5: Lead/Principal
+  if (/\b(lead|principal|team\s+lead|tech\s+lead|technical\s+lead|group\s+lead|squad\s+lead|architect|staff\s+engineer|staff\s+developer|specialist|expert|consultant|advisor|strategist)\b/i.test(normalizedTitle)) {
+    return 5
+  }
+  
+  // Level 4: Senior
+  if (/\b(senior|sr\.?|snr|experienced|advanced|level\s*[3-4]|grade\s*[3-4]|band\s*[3-4])\b/i.test(normalizedTitle)) {
+    return 4
+  }
+  
+  // Level 3: Mid-Level
+  if (/\b(mid|mid-level|mid\s+level|intermediate|level\s*2|grade\s*2|band\s*2|associate(?!\s+(vice|director|manager)))\b/i.test(normalizedTitle)) {
+    return 3
+  }
+  
+  // Level 2: Junior
+  if (/\b(junior|jr\.?|jnr|fresher|graduate|trainee(?!\s+manager)|apprentice|probation|entry(?!\s+level)|beginner)\b/i.test(normalizedTitle)) {
+    return 2
+  }
+  
+  // Level 1: Entry Level (default) - Also catch explicit entry level terms
+  if (/\b(entry\s*level|intern|internship|trainee|fresher|newcomer|starter)\b/i.test(normalizedTitle)) {
+    return 1
+  }
+  
+  // Default heuristics based on common title patterns
+  // If title contains specific senior-ish terms without explicit level indicators
+  if (/\b(analyst|engineer|developer|designer|executive|officer|representative|administrator|accountant|auditor|scientist|researcher)\b/i.test(normalizedTitle)) {
+    // Check if it has any seniority modifiers we might have missed
+    if (/\b(chief|head|principal|lead|senior|sr)\b/i.test(normalizedTitle)) {
+      return 4 // Default to senior for these
+    }
+    return 3 // Default to mid-level for professional roles without modifiers
+  }
+  
+  // Default to Entry Level for unknown titles
+  return 1
+}
+
+/**
  * Target fields we want to map from any Excel sheet
  */
 const TARGET_FIELDS = [
@@ -779,7 +842,7 @@ async function getOrCreateDesignation(title, allDesignations) {
     }
   }
   
-  // Create new designation
+  // Create new designation with smart level detection
   const code = generateDesignationCode(title)
   let uniqueCode = code
   let counter = 1
@@ -790,18 +853,21 @@ async function getOrCreateDesignation(title, allDesignations) {
     counter++
   }
   
+  // Detect appropriate level based on title
+  const detectedLevel = detectLevelFromTitle(title)
+  
   const newDesig = await Designation.create({
     title: title.trim(),
     code: uniqueCode,
     description: `${title.trim()} position`,
-    level: 1,
+    level: detectedLevel,
     isActive: true
   })
   
   // Add to cache
-  allDesignations.push({ _id: newDesig._id, title: newDesig.title, code: newDesig.code })
+  allDesignations.push({ _id: newDesig._id, title: newDesig.title, code: newDesig.code, level: detectedLevel })
   
-  return { designationId: newDesig._id, created: true, matched: title.trim() }
+  return { designationId: newDesig._id, created: true, matched: title.trim(), level: detectedLevel }
 }
 
 /**
