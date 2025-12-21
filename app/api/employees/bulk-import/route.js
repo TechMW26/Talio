@@ -1035,6 +1035,7 @@ async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignatio
   let employee
   let user
   let action
+  let password = null // Password is only set for new employees
   
   if (existingEmployee) {
     // UPDATE existing employee - merge new data with existing (preserve existing if not provided in new data)
@@ -1122,7 +1123,7 @@ async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignatio
     }
 
     // Create user account for new employee - generate random temporary password
-    const password = data.password || generateRandomPassword()
+    password = data.password || generateRandomPassword()
 
     const userData = {
       email: email,
