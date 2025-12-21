@@ -15,6 +15,7 @@ import {
   HiOutlineUser,
   HiOutlineCalendar,
   HiOutlineExclamationTriangle,
+  HiOutlineBolt,
 } from 'react-icons/hi2'
 import toast from 'react-hot-toast'
 
@@ -37,6 +38,19 @@ export default function OnboardingEmailsPage() {
   // Retry state
   const [retrying, setRetrying] = useState({})
   const [bulkRetrying, setBulkRetrying] = useState(false)
+  
+  // Auto-send toggle state
+  const [autoSendEnabled, setAutoSendEnabled] = useState(true)
+  const [togglingAutoSend, setTogglingAutoSend] = useState(false)
+  const [user, setUser] = useState(null)
+  
+  // Get user info
+  useEffect(() => {
+    const userData = localStorage.getItem('user')
+    if (userData) {
+      setUser(JSON.parse(userData))
+    }
+  }, [])
 
   // Debounce search
   useEffect(() => {
@@ -69,6 +83,10 @@ export default function OnboardingEmailsPage() {
         setEmails(data.data)
         setPagination(prev => ({ ...prev, ...data.pagination }))
         setStats(data.stats)
+        // Set auto-send toggle state from API response
+        if (typeof data.onboardingEmailsEnabled === 'boolean') {
+          setAutoSendEnabled(data.onboardingEmailsEnabled)
+        }
       } else {
         toast.error(data.message || 'Failed to fetch emails')
       }
@@ -83,6 +101,41 @@ export default function OnboardingEmailsPage() {
   useEffect(() => {
     fetchEmails()
   }, [fetchEmails])
+
+  // Toggle auto-send
+  const handleToggleAutoSend = async () => {
+    if (user?.role !== 'admin') {
+      toast.error('Only admin can change this setting')
+      return
+    }
+    
+    setTogglingAutoSend(true)
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch('/api/employees/onboarding-emails', {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ enabled: !autoSendEnabled }),
+      })
+      
+      const data = await res.json()
+      
+      if (data.success) {
+        setAutoSendEnabled(data.onboardingEmailsEnabled)
+        toast.success(data.message)
+      } else {
+        toast.error(data.message || 'Failed to update setting')
+      }
+    } catch (error) {
+      console.error('Toggle error:', error)
+      toast.error('Failed to update setting')
+    } finally {
+      setTogglingAutoSend(false)
+    }
+  }
 
   // Reset page when filters change
   useEffect(() => {
@@ -220,15 +273,65 @@ export default function OnboardingEmailsPage() {
   return (
     <div className="p-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-theme-text-primary flex items-center gap-3">
-          <HiOutlineEnvelope className="w-7 h-7 text-purple-500" />
-          Onboarding Emails
-        </h1>
-        <p className="text-theme-text-secondary mt-1">
-          Track and manage welcome emails sent to new employees
-        </p>
+      <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-theme-text-primary flex items-center gap-3">
+            <HiOutlineEnvelope className="w-7 h-7 text-purple-500" />
+            Onboarding Emails
+          </h1>
+          <p className="text-theme-text-secondary mt-1">
+            Track and manage welcome emails sent to new employees
+          </p>
+        </div>
+        
+        {/* Auto-send Toggle */}
+        <div className={`flex items-center gap-3 p-3 rounded-xl border ${
+          autoSendEnabled 
+            ? 'bg-green-500/10 border-green-500/30' 
+            : 'bg-gray-500/10 border-gray-500/30'
+        }`}>
+          <div className="flex items-center gap-2">
+            <HiOutlineBolt className={`w-5 h-5 ${autoSendEnabled ? 'text-green-500' : 'text-gray-400'}`} />
+            <div>
+              <p className={`text-sm font-medium ${autoSendEnabled ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                Auto-send Emails
+              </p>
+              <p className="text-xs text-theme-text-secondary">
+                {autoSendEnabled ? 'Emails sent automatically' : 'Emails disabled'}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleToggleAutoSend}
+            disabled={togglingAutoSend || user?.role !== 'admin'}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
+              autoSendEnabled ? 'bg-green-500' : 'bg-gray-300 dark:bg-gray-600'
+            } ${togglingAutoSend ? 'opacity-50 cursor-wait' : ''} ${user?.role !== 'admin' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+            title={user?.role !== 'admin' ? 'Only admin can change this setting' : (autoSendEnabled ? 'Click to disable' : 'Click to enable')}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                autoSendEnabled ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
+        </div>
       </div>
+
+      {/* Warning when disabled */}
+      {!autoSendEnabled && (
+        <div className="mb-6 p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/30 flex items-start gap-3">
+          <HiOutlineExclamationTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">
+              Automatic onboarding emails are disabled
+            </p>
+            <p className="text-xs text-theme-text-secondary mt-1">
+              New employees will not receive welcome emails automatically. You can still manually retry failed emails from this page.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">

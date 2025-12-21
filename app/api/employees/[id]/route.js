@@ -328,7 +328,7 @@ export async function PUT(request, { params }) {
   }
 }
 
-// DELETE - Delete employee
+// DELETE - Hard delete employee (removes from both Employee and User collections)
 export async function DELETE(request, { params }) {
   try {
     // Await params in Next.js 15
@@ -344,27 +344,124 @@ export async function DELETE(request, { params }) {
       )
     }
 
-    // Find the associated user to delete from backup
-    const user = await User.findOne({ employeeId: id }).select('_id').lean()
+    // Find and delete the associated user
+    const user = await User.findOne({ employeeId: id })
     
-    // Soft delete - change status to terminated
-    await Employee.findByIdAndUpdate(id, { status: 'terminated' })
-
-    // Delete user from backup database (fire-and-forget)
     if (user) {
+      // Delete user from backup database (fire-and-forget)
       deleteUserFromBackup(user._id).catch(err => 
         console.error('[Employee Delete] Backup delete failed:', err)
       )
+      
+      // Hard delete the user from main database
+      await User.findByIdAndDelete(user._id)
+      console.log(`[Employee Delete] Deleted user: ${user._id} (${user.email})`)
     }
+
+    // Delete profile picture from ImageKit if exists
+    if (employee.profilePictureFileId && isImageKitConfigured()) {
+      try {
+        await deleteFromImageKit(employee.profilePictureFileId)
+        console.log(`[Employee Delete] Deleted profile picture: ${employee.profilePictureFileId}`)
+      } catch (imgErr) {
+        console.error('[Employee Delete] Failed to delete profile picture:', imgErr)
+      }
+    }
+
+    // Hard delete the employee from main database
+    await Employee.findByIdAndDelete(id)
+    console.log(`[Employee Delete] Deleted employee: ${id} (${employee.email})`)
+
+    // Clear cache
+    queryCache.delete(queryCache.generateKey('employee', id))
 
     return NextResponse.json({
       success: true,
-      message: 'Employee deleted successfully',
+      message: 'Employee permanently deleted',
+      deletedEmployee: {
+        _id: employee._id,
+        email: employee.email,
+        firstName: employee.firstName,
+        lastName: employee.lastName,
+      },
+      userDeleted: !!user,
     })
   } catch (error) {
     console.error('Delete employee error:', error)
     return NextResponse.json(
       { success: false, message: 'Failed to delete employee' },
+      { status: 500 }
+    )
+  }
+}
+
+// PATCH - Update employee status only
+export async function PATCH(request, { params }) {
+  try {
+    const { id } = await params;
+    const body = await request.json()
+    const { status } = body
+
+    if (!status) {
+      return NextResponse.json(
+        { success: false, message: 'Status is required' },
+        { status: 400 }
+      )
+    }
+
+    const validStatuses = ['active', 'inactive', 'terminated', 'resigned', 'on_leave', 'probation']
+    if (!validStatuses.includes(status)) {
+      return NextResponse.json(
+        { success: false, message: `Invalid status. Must be one of: ${validStatuses.join(', ')}` },
+        { status: 400 }
+      )
+    }
+
+    await connectDB()
+
+    const employee = await Employee.findById(id)
+    if (!employee) {
+      return NextResponse.json(
+        { success: false, message: 'Employee not found' },
+        { status: 404 }
+      )
+    }
+
+    const oldStatus = employee.status
+    
+    // Update employee status
+    employee.status = status
+    await employee.save()
+
+    // If status is terminated or resigned, also deactivate the user account
+    if (['terminated', 'resigned'].includes(status)) {
+      await User.findOneAndUpdate(
+        { employeeId: id },
+        { isActive: false }
+      )
+    } else if (status === 'active') {
+      // Reactivate user if status is set back to active
+      await User.findOneAndUpdate(
+        { employeeId: id },
+        { isActive: true }
+      )
+    }
+
+    // Clear cache
+    queryCache.delete(queryCache.generateKey('employee', id))
+
+    return NextResponse.json({
+      success: true,
+      message: `Employee status changed from ${oldStatus} to ${status}`,
+      employee: {
+        _id: employee._id,
+        status: employee.status,
+      },
+    })
+  } catch (error) {
+    console.error('Update employee status error:', error)
+    return NextResponse.json(
+      { success: false, message: 'Failed to update employee status' },
       { status: 500 }
     )
   }

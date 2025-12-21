@@ -3,8 +3,18 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
-import { FaPlus, FaSearch, FaEdit, FaTrash, FaEye, FaFilter, FaSortAmountDown, FaSortAmountUp } from 'react-icons/fa'
+import { FaPlus, FaSearch, FaEdit, FaTrash, FaEye, FaFilter, FaSortAmountDown, FaSortAmountUp, FaExclamationTriangle } from 'react-icons/fa'
 import { formatDesignation, formatDepartments, getLevelNameFromNumber } from '@/lib/formatters'
+
+// Status options with colors
+const STATUS_OPTIONS = [
+  { value: 'active', label: 'Active', color: 'bg-green-100 text-green-800' },
+  { value: 'inactive', label: 'Inactive', color: 'bg-gray-100 text-gray-800' },
+  { value: 'probation', label: 'Probation', color: 'bg-blue-100 text-blue-800' },
+  { value: 'on_leave', label: 'On Leave', color: 'bg-yellow-100 text-yellow-800' },
+  { value: 'resigned', label: 'Resigned', color: 'bg-orange-100 text-orange-800' },
+  { value: 'terminated', label: 'Terminated', color: 'bg-red-100 text-red-800' },
+]
 
 export default function EmployeesPage() {
   const router = useRouter()
@@ -17,6 +27,8 @@ export default function EmployeesPage() {
   const [sortBy, setSortBy] = useState('createdAt')
   const [sortOrder, setSortOrder] = useState('desc')
   const [showFilters, setShowFilters] = useState(false)
+  const [deleteModal, setDeleteModal] = useState({ show: false, employee: null })
+  const [statusUpdating, setStatusUpdating] = useState(null) // Track which employee's status is being updated
 
   // Use imported getLevelNameFromNumber for level name lookup
   const getLevelName = getLevelNameFromNumber
@@ -58,17 +70,23 @@ export default function EmployeesPage() {
     }
   }
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (employee) => {
     if (!canManageEmployees()) {
       toast.error('You do not have permission to delete employees')
       return
     }
 
-    if (!confirm('Are you sure you want to delete this employee?')) return
+    // Show confirmation modal
+    setDeleteModal({ show: true, employee })
+  }
+
+  const confirmDelete = async () => {
+    const employee = deleteModal.employee
+    if (!employee) return
 
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch(`/api/employees/${id}`, {
+      const response = await fetch(`/api/employees/${employee._id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -78,7 +96,7 @@ export default function EmployeesPage() {
       const data = await response.json()
 
       if (data.success) {
-        toast.success('Employee deleted successfully')
+        toast.success(`${employee.firstName} ${employee.lastName} has been permanently deleted`)
         fetchEmployees()
       } else {
         toast.error(data.message || 'Failed to delete employee')
@@ -86,6 +104,46 @@ export default function EmployeesPage() {
     } catch (error) {
       console.error('Delete employee error:', error)
       toast.error('An error occurred while deleting employee')
+    } finally {
+      setDeleteModal({ show: false, employee: null })
+    }
+  }
+
+  const handleStatusChange = async (employeeId, newStatus) => {
+    if (!canManageEmployees()) {
+      toast.error('You do not have permission to change employee status')
+      return
+    }
+
+    setStatusUpdating(employeeId)
+
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/employees/${employeeId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ status: newStatus }),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        toast.success(data.message || 'Status updated successfully')
+        // Update local state
+        setEmployees(prev => prev.map(emp => 
+          emp._id === employeeId ? { ...emp, status: newStatus } : emp
+        ))
+      } else {
+        toast.error(data.message || 'Failed to update status')
+      }
+    } catch (error) {
+      console.error('Update status error:', error)
+      toast.error('An error occurred while updating status')
+    } finally {
+      setStatusUpdating(null)
     }
   }
 
@@ -247,12 +305,30 @@ export default function EmployeesPage() {
                         {formatDesignation(employee.designation, employee)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${employee.status === 'active' ? 'bg-green-100 text-green-800' :
-                          employee.status === 'inactive' ? 'bg-gray-100 text-gray-800' :
-                            'bg-red-100 text-red-800'
+                        {canManageEmployees() ? (
+                          <select
+                            value={employee.status || 'active'}
+                            onChange={(e) => handleStatusChange(employee._id, e.target.value)}
+                            disabled={statusUpdating === employee._id}
+                            className={`px-2 py-1 text-xs font-semibold rounded-full border-0 cursor-pointer focus:ring-2 focus:ring-primary-500 ${
+                              statusUpdating === employee._id ? 'opacity-50' : ''
+                            } ${
+                              STATUS_OPTIONS.find(s => s.value === employee.status)?.color || 'bg-gray-100 text-gray-800'
+                            }`}
+                          >
+                            {STATUS_OPTIONS.map(option => (
+                              <option key={option.value} value={option.value}>
+                                {option.label}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            STATUS_OPTIONS.find(s => s.value === employee.status)?.color || 'bg-gray-100 text-gray-800'
                           }`}>
-                          {employee.status}
-                        </span>
+                            {STATUS_OPTIONS.find(s => s.value === employee.status)?.label || employee.status}
+                          </span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex space-x-2">
@@ -275,9 +351,9 @@ export default function EmployeesPage() {
                                 <FaEdit />
                               </button>
                               <button
-                                onClick={() => handleDelete(employee._id)}
+                                onClick={() => handleDelete(employee)}
                                 className="text-red-600 hover:text-red-900 p-2 rounded-lg hover:bg-red-50 transition-colors"
-                                title="Delete Employee"
+                                title="Permanently Delete Employee"
                               >
                                 <FaTrash />
                               </button>
@@ -339,6 +415,69 @@ export default function EmployeesPage() {
           </>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deleteModal.show && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 overflow-hidden">
+            <div className="bg-red-50 px-6 py-4 border-b border-red-100">
+              <div className="flex items-center gap-3">
+                <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                  <FaExclamationTriangle className="text-red-600 text-lg" />
+                </div>
+                <h3 className="text-lg font-semibold text-red-800">Permanently Delete Employee</h3>
+              </div>
+            </div>
+            <div className="px-6 py-4">
+              <p className="text-gray-700 mb-4">
+                Are you sure you want to <span className="font-semibold text-red-600">permanently delete</span> this employee?
+              </p>
+              {deleteModal.employee && (
+                <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full bg-primary-500 flex items-center justify-center text-white font-semibold overflow-hidden">
+                      {deleteModal.employee.profilePicture ? (
+                        <img
+                          src={deleteModal.employee.profilePicture}
+                          alt={`${deleteModal.employee.firstName} ${deleteModal.employee.lastName}`}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <span>{deleteModal.employee.firstName?.[0]}{deleteModal.employee.lastName?.[0]}</span>
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">
+                        {deleteModal.employee.firstName} {deleteModal.employee.lastName}
+                      </p>
+                      <p className="text-sm text-gray-500">{deleteModal.employee.email}</p>
+                      <p className="text-xs text-gray-400">{deleteModal.employee.employeeCode}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm text-yellow-800">
+                <strong>Warning:</strong> This action cannot be undone. The employee and their user account will be permanently removed from the system.
+              </div>
+            </div>
+            <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3">
+              <button
+                onClick={() => setDeleteModal({ show: false, employee: null })}
+                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                className="px-4 py-2 text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+              >
+                <FaTrash className="text-sm" />
+                Delete Permanently
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -281,6 +281,11 @@ const CompanySettingsSchema = new mongoose.Schema({
       type: Boolean,
       default: false,
     },
+    // Onboarding emails auto-send toggle
+    onboardingEmailsEnabled: {
+      type: Boolean,
+      default: true, // Enabled by default
+    },
     emailEvents: {
       login: {
         type: Boolean,

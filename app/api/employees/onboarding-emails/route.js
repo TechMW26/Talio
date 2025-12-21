@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import connectDB from '@/lib/mongodb'
 import OnboardingEmail from '@/models/OnboardingEmail'
+import CompanySettings from '@/models/CompanySettings'
 import { verifyToken } from '@/lib/auth'
 
 /**
@@ -54,7 +55,7 @@ export async function GET(request) {
     const skip = (page - 1) * limit
     const sortObj = { [sortBy]: sortOrder === 'asc' ? 1 : -1 }
     
-    const [emails, total] = await Promise.all([
+    const [emails, total, settings] = await Promise.all([
       OnboardingEmail.find(query)
         .populate('employee', 'firstName lastName employeeCode profilePicture')
         .populate('retriedBy', 'email')
@@ -62,7 +63,8 @@ export async function GET(request) {
         .skip(skip)
         .limit(limit)
         .lean(),
-      OnboardingEmail.countDocuments(query)
+      OnboardingEmail.countDocuments(query),
+      CompanySettings.findOne().select('notifications.onboardingEmailsEnabled').lean(),
     ])
     
     // Get stats
@@ -71,6 +73,9 @@ export async function GET(request) {
       OnboardingEmail.countDocuments({ status: 'failed' }),
       OnboardingEmail.countDocuments({ status: 'pending' }),
     ])
+    
+    // Get onboarding emails enabled status (default to true if not set)
+    const onboardingEmailsEnabled = settings?.notifications?.onboardingEmailsEnabled !== false
     
     return NextResponse.json({
       success: true,
@@ -86,12 +91,71 @@ export async function GET(request) {
         failed: failedCount,
         pending: pendingCount,
         total: sentCount + failedCount + pendingCount,
-      }
+      },
+      onboardingEmailsEnabled,
     })
   } catch (error) {
     console.error('Get onboarding emails error:', error)
     return NextResponse.json(
       { success: false, message: error.message || 'Failed to fetch onboarding emails' },
+      { status: 500 }
+    )
+  }
+}
+
+/**
+ * PATCH - Toggle onboarding emails enabled/disabled
+ */
+export async function PATCH(request) {
+  try {
+    // Verify authentication
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    }
+    
+    const token = authHeader.split(' ')[1]
+    const payload = await verifyToken(token)
+    
+    if (!payload) {
+      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
+    }
+    
+    // Only admin can toggle this setting
+    if (payload.role !== 'admin') {
+      return NextResponse.json({ success: false, message: 'Only admin can change this setting' }, { status: 403 })
+    }
+    
+    await connectDB()
+    
+    const body = await request.json()
+    const { enabled } = body
+    
+    if (typeof enabled !== 'boolean') {
+      return NextResponse.json(
+        { success: false, message: 'enabled must be a boolean' },
+        { status: 400 }
+      )
+    }
+    
+    // Update or create company settings
+    const settings = await CompanySettings.findOneAndUpdate(
+      {},
+      { $set: { 'notifications.onboardingEmailsEnabled': enabled } },
+      { new: true, upsert: true }
+    )
+    
+    console.log(`[Onboarding Emails] Auto-send ${enabled ? 'enabled' : 'disabled'} by ${payload.email}`)
+    
+    return NextResponse.json({
+      success: true,
+      message: `Onboarding emails ${enabled ? 'enabled' : 'disabled'} successfully`,
+      onboardingEmailsEnabled: enabled,
+    })
+  } catch (error) {
+    console.error('Toggle onboarding emails error:', error)
+    return NextResponse.json(
+      { success: false, message: error.message || 'Failed to update setting' },
       { status: 500 }
     )
   }
