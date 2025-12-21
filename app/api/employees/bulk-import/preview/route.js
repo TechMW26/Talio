@@ -17,6 +17,7 @@ const TEMPLATE_FIELDS = [
   { key: 'department', label: 'Department', description: 'Department name' },
   { key: 'designation', label: 'Designation', description: 'Job title, position' },
   { key: 'employmentType', label: 'Employment Type', description: 'Full-time, part-time, contract' },
+  { key: 'grossSalary', label: 'Gross Salary', description: 'Monthly salary, CTC, compensation' },
   { key: 'role', label: 'System Role', description: 'admin, hr, manager, employee' },
 ]
 
@@ -87,6 +88,7 @@ RULES:
 7. Department names like "HR", "IT", "Sales", "Engineering"
 8. Designations like "Manager", "Developer", "Executive", "Analyst"
 9. Serial/S.No/# columns should be ignored
+10. Large numbers like 15000, 50000, 100000 with headers like "Salary", "CTC", "Compensation", "Gross" → grossSalary
 
 Return JSON mapping column index to field (or "split:firstName,lastName" for name columns):
 Example: {"0": "null", "1": "split:firstName,lastName", "2": "email", "3": "department", "4": "dateOfJoining"}
@@ -150,6 +152,8 @@ function patternBasedMapping(headers, sampleRows) {
       mapping[idx] = 'employeeCode'
     } else if (/type|employment/i.test(h)) {
       mapping[idx] = 'employmentType'
+    } else if (/salary|ctc|compensation|pay|gross|wage/i.test(h)) {
+      mapping[idx] = 'grossSalary'
     } else {
       mapping[idx] = 'null'
     }
@@ -215,6 +219,17 @@ function transformRow(row, mapping) {
         result[fieldMapping] = v.charAt(0).toUpperCase() + v.slice(1) // Capitalize first letter
       } else {
         result[fieldMapping] = 'Employee' // Default to Employee for invalid/empty values
+      }
+      continue
+    }
+    
+    // Handle grossSalary - format as number
+    if (fieldMapping === 'grossSalary') {
+      const num = parseFloat(value)
+      if (!isNaN(num) && num > 0) {
+        result[fieldMapping] = `₹${num.toLocaleString('en-IN')}`
+      } else {
+        result[fieldMapping] = String(value).trim()
       }
       continue
     }

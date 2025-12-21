@@ -37,6 +37,37 @@ const TARGET_FIELDS = [
 ]
 
 /**
+ * Generate a random temporary password for bulk imported employees
+ * Format: 3 uppercase + 3 lowercase + 2 digits + 1 special = 9 chars
+ * Example: ABCdef12@
+ */
+function generateRandomPassword() {
+  const uppercase = 'ABCDEFGHJKLMNPQRSTUVWXYZ' // Removed I, O for clarity
+  const lowercase = 'abcdefghjkmnpqrstuvwxyz'  // Removed i, l, o for clarity
+  const digits = '23456789'                     // Removed 0, 1 for clarity
+  const special = '@#$%&*!'
+  
+  let password = ''
+  
+  // 3 uppercase
+  for (let i = 0; i < 3; i++) {
+    password += uppercase.charAt(Math.floor(Math.random() * uppercase.length))
+  }
+  // 3 lowercase
+  for (let i = 0; i < 3; i++) {
+    password += lowercase.charAt(Math.floor(Math.random() * lowercase.length))
+  }
+  // 2 digits
+  for (let i = 0; i < 2; i++) {
+    password += digits.charAt(Math.floor(Math.random() * digits.length))
+  }
+  // 1 special character
+  password += special.charAt(Math.floor(Math.random() * special.length))
+  
+  return password
+}
+
+/**
  * Calculate salary breakdown from gross salary
  * Standard breakdown: Basic 40%, HRA 40% of Basic (16% of gross), Conveyance ₹800 fixed, Medical 5%, Special = remainder
  */
@@ -1090,8 +1121,8 @@ async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignatio
       throw error
     }
 
-    // Create user account for new employee
-    const password = data.password || 'employee123'
+    // Create user account for new employee - generate random temporary password
+    const password = data.password || generateRandomPassword()
 
     const userData = {
       email: email,
@@ -1171,7 +1202,7 @@ async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignatio
     warnings,
     credentials: action === 'created' ? {
       email: email,
-      password: data.password || 'employee123',
+      password: password, // Use the generated random password
     } : null,
     departmentCreated: departmentResult.created,
     designationCreated: designationResult.created,
