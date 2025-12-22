@@ -13,7 +13,7 @@ const priorityConfig = {
   low: {
     headerBg: 'bg-gray-500',
     iconBg: 'bg-gray-100',
-    iconColor: 'text-gray-600',
+    iconColor: 'text-black-600',
     buttonBg: 'modal-btn-secondary',
     badgeBg: 'bg-gray-100 text-gray-700',
   },
@@ -314,13 +314,13 @@ export default function CallAlertReceiver() {
         <div className="modal-container modal-md" style={{ overflow: 'visible' }}>
           {/* Header with priority color */}
           <div className={`modal-header ${config.headerBg}`} style={{ borderBottom: 'none' }}>
-            <div className="flex items-center gap-3 text-white">
-              <div className="p-2.5 bg-white/20 rounded-lg animate-pulse">
-                <FaPhoneAlt className="text-xl" />
+            <div className="flex items-center gap-3 text-gray-900">
+              <div className="p-2.5 bg-black/10 rounded-lg animate-pulse">
+                <FaPhoneAlt className="text-xl text-gray-900" />
               </div>
               <div>
-                <h3 className="modal-title text-white">Incoming Alert</h3>
-                <span className="inline-block mt-1 px-2 py-0.5 text-xs rounded-full font-medium bg-white/20 text-white capitalize">
+                <h3 className="modal-title text-gray-900">Incoming Alert</h3>
+                <span className="inline-block mt-1 px-2 py-0.5 text-xs rounded-full font-medium bg-black/10 text-gray-900 capitalize">
                   {activeAlert.priority} Priority
                 </span>
               </div>
@@ -328,7 +328,7 @@ export default function CallAlertReceiver() {
             
             {/* Queue indicator */}
             {alertQueue.current.length > 0 && (
-              <span className="px-2 py-1 bg-white/20 text-white text-xs rounded-full font-medium">
+              <span className="px-2 py-1 bg-black/10 text-gray-900 text-xs rounded-full font-medium">
                 +{alertQueue.current.length} queued
               </span>
             )}
