@@ -311,9 +311,9 @@ export default function CallAlertReceiver() {
       <div className="modal-overlay" style={{ zIndex: 99999 }}>
         <div className="modal-backdrop" />
         
-        <div className="modal-container modal-md" style={{ overflow: 'visible' }}>
+        <div className="modal-container modal-md" style={{ overflow: 'visible', borderRadius: '30px' }}>
           {/* Header with priority color */}
-          <div className={`modal-header ${config.headerBg}`} style={{ borderBottom: 'none' }}>
+          <div className={`modal-header ${config.headerBg}`} style={{ borderBottom: 'none', borderRadius: '30px 30px 0 0' }}>
             <div className="flex items-center gap-3 text-gray-900">
               <div className="p-2.5 bg-black/10 rounded-lg animate-pulse">
                 <FaPhoneAlt className="text-xl text-gray-900" />
@@ -400,14 +400,15 @@ export default function CallAlertReceiver() {
           </div>
 
           {/* Footer */}
-          <div className="modal-footer">
+          <div className="modal-footer" style={{ borderRadius: '0 0 30px 30px' }}>
             <button
               onClick={acknowledgeAlert}
               disabled={acknowledging}
               className={`modal-btn ${config.buttonBg} w-full flex items-center justify-center gap-2`}
               style={activeAlert.priority !== 'low' && activeAlert.priority !== 'urgent' ? {
-                background: 'linear-gradient(135deg, var(--color-primary-500) 0%, var(--color-primary-600) 100%)'
-              } : {}}
+                background: 'linear-gradient(135deg, var(--color-primary-500) 0%, var(--color-primary-600) 100%)',
+                borderRadius: '15px'
+              } : { borderRadius: '15px' }}
             >
               {acknowledging ? (
                 <>
