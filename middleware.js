@@ -2,6 +2,12 @@ import { NextResponse } from 'next/server'
 import { jwtVerify } from 'jose'
 
 export async function middleware(request) {
+  // Permanent redirect: app.talio.in/resources -> talio.in/resources
+  if (request.nextUrl.pathname.startsWith('/resources')) {
+    const redirectUrl = new URL(request.nextUrl.pathname + request.nextUrl.search, 'https://talio.in')
+    return NextResponse.redirect(redirectUrl, { status: 301 })
+  }
+
   const token = request.headers.get('authorization')?.split(' ')[1] ||
     request.cookies.get('token')?.value
 
@@ -99,6 +105,6 @@ export async function middleware(request) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/api/:path*', '/auth/:path*'],
+  matcher: ['/dashboard/:path*', '/api/:path*', '/auth/:path*', '/resources/:path*'],
 }
 
