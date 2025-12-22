@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { FaPhoneAlt, FaTimes, FaVolumeUp, FaVolumeMute, FaCheck, FaUser, FaExclamationTriangle } from 'react-icons/fa';
+import { FaPhoneAlt, FaVolumeUp, FaVolumeMute, FaCheck, FaUser, FaExclamationTriangle } from 'react-icons/fa';
 import { useSocket } from '@/contexts/SocketContext';
 import toast from 'react-hot-toast';
 
@@ -40,6 +40,89 @@ const priorityConfig = {
   }
 };
 
+/**
+ * Simple audio player function - creates new Audio instance each time
+ * This avoids issues with reusing audio elements
+ */
+async function playAudioSimple(src) {
+  return new Promise((resolve, reject) => {
+    try {
+      console.log('[Audio] Creating new Audio for:', src.substring(0, 60));
+      const audio = new Audio(src);
+      
+      audio.onended = () => {
+        console.log('[Audio] Playback ended');
+        resolve({ success: true });
+      };
+      
+      audio.onerror = (e) => {
+        console.error('[Audio] Error event:', e);
+        reject(new Error('Audio playback failed'));
+      };
+      
+      // Attempt to play
+      const playPromise = audio.play();
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log('[Audio] Play started successfully');
+          })
+          .catch((err) => {
+            console.error('[Audio] Play promise rejected:', err);
+            reject(err);
+          });
+      }
+    } catch (err) {
+      console.error('[Audio] Exception:', err);
+      reject(err);
+    }
+  });
+}
+
+/**
+ * Play the full alert sequence: notification ding + voice message
+ */
+async function playFullAlertSequence(alert) {
+  console.log('[CallAlert] ========== PLAYING ALERT SEQUENCE ==========');
+  console.log('[CallAlert] Voice enabled:', alert?.voiceEnabled);
+  console.log('[CallAlert] Audio URL present:', !!alert?.audioDataUrl);
+  console.log('[CallAlert] Audio URL length:', alert?.audioDataUrl?.length || 0);
+  
+  let notificationPlayed = false;
+  let voicePlayed = false;
+  
+  // Step 1: Play notification sound
+  try {
+    console.log('[CallAlert] Step 1: Playing notification sound...');
+    await playAudioSimple(ALERT_SOUND_URL);
+    notificationPlayed = true;
+    console.log('[CallAlert] ✅ Notification sound completed');
+  } catch (err) {
+    console.error('[CallAlert] ❌ Notification sound failed:', err.message);
+  }
+  
+  // Step 2: Play voice message if available
+  if (alert?.voiceEnabled && alert?.audioDataUrl) {
+    try {
+      console.log('[CallAlert] Step 2: Playing voice message...');
+      console.log('[CallAlert] Audio URL starts with:', alert.audioDataUrl.substring(0, 30));
+      await playAudioSimple(alert.audioDataUrl);
+      voicePlayed = true;
+      console.log('[CallAlert] ✅ Voice message completed');
+    } catch (err) {
+      console.error('[CallAlert] ❌ Voice message failed:', err.message);
+    }
+  } else {
+    console.log('[CallAlert] Step 2: Skipped (voice not enabled or no audio URL)');
+  }
+  
+  console.log('[CallAlert] ========== SEQUENCE COMPLETE ==========');
+  console.log('[CallAlert] Notification played:', notificationPlayed);
+  console.log('[CallAlert] Voice played:', voicePlayed);
+  
+  return { notificationPlayed, voicePlayed };
+}
+
 export default function CallAlertReceiver() {
   const { socket, isConnected } = useSocket();
   const [activeAlert, setActiveAlert] = useState(null);
@@ -47,153 +130,53 @@ export default function CallAlertReceiver() {
   const [audioError, setAudioError] = useState(false);
   const [acknowledging, setAcknowledging] = useState(false);
   
-  const alertAudioRef = useRef(null);
-  const voiceAudioRef = useRef(null);
   const alertQueue = useRef([]);
-  const activeAlertRef = useRef(null);  // Ref to track active alert for stale closure handling
+  const activeAlertRef = useRef(null);
 
-  // Initialize audio elements ONCE on mount (not on every activeAlert change)
-  useEffect(() => {
-    alertAudioRef.current = new Audio(ALERT_SOUND_URL);
-    alertAudioRef.current.loop = false;
-    
-    voiceAudioRef.current = new Audio();
-    voiceAudioRef.current.loop = false;
-
-    // Add error handler for alert sound
-    alertAudioRef.current.onerror = (e) => {
-      console.error('[CallAlert] Alert sound load error:', e);
-      // If alert sound fails to load, try to play voice directly using ref
-      const currentAlert = activeAlertRef.current;
-      if (currentAlert?.voiceEnabled && currentAlert?.audioDataUrl) {
-        console.log('[CallAlert] Alert sound failed, playing voice directly');
-        voiceAudioRef.current.src = currentAlert.audioDataUrl;
-        voiceAudioRef.current.play().catch(err => {
-          console.error('[CallAlert] Voice play error:', err);
-        });
-      }
-    };
-
-    // Handle audio end events - use refs to avoid stale closures
-    alertAudioRef.current.onended = () => {
-      const currentAlert = activeAlertRef.current;
-      console.log('[CallAlert] Alert sound ended, checking for voice:', currentAlert?.voiceEnabled, currentAlert?.audioDataUrl ? 'has audio' : 'no audio');
-      // After alert sound, play voice if available
-      if (currentAlert?.voiceEnabled && currentAlert?.audioDataUrl) {
-        console.log('[CallAlert] Playing voice message...');
-        voiceAudioRef.current.src = currentAlert.audioDataUrl;
-        voiceAudioRef.current.play().catch(err => {
-          console.error('[CallAlert] Voice play error after alert:', err);
-        });
-      } else {
-        console.log('[CallAlert] No voice to play');
-      }
-    };
-
-    voiceAudioRef.current.onended = () => {
-      console.log('[CallAlert] Voice playback ended');
-    };
-
-    voiceAudioRef.current.onerror = (e) => {
-      console.error('[CallAlert] Voice audio error:', e);
-    };
-
-    return () => {
-      alertAudioRef.current?.pause();
-      voiceAudioRef.current?.pause();
-    };
-  }, []); // Empty dependency - only run once on mount
-
-  // Play alert sound (and then voice will auto-play via onended handler)
-  const playAlertSound = useCallback(async () => {
-    const currentAlert = activeAlertRef.current;
-    console.log('[CallAlert] playAlertSound called, voiceEnabled:', currentAlert?.voiceEnabled, 'audioDataUrl:', currentAlert?.audioDataUrl ? 'present' : 'missing');
-    
-    try {
-      setIsPlaying(true);
-      setAudioError(false);
-      
-      // Try to play alert sound first
-      if (alertAudioRef.current) {
-        alertAudioRef.current.currentTime = 0;
-        await alertAudioRef.current.play();
-        console.log('[CallAlert] Alert sound playing...');
-      }
-    } catch (error) {
-      console.error('[CallAlert] Error playing alert sound:', error);
-      // If alert sound fails, try to play voice directly
-      if (currentAlert?.voiceEnabled && currentAlert?.audioDataUrl) {
-        console.log('[CallAlert] Falling back to voice directly...');
-        try {
-          voiceAudioRef.current.src = currentAlert.audioDataUrl;
-          await voiceAudioRef.current.play();
-          console.log('[CallAlert] Voice playing directly');
-        } catch (voiceError) {
-          console.error('[CallAlert] Voice also failed:', voiceError);
-          setAudioError(true);
-          setIsPlaying(false);
-        }
-      } else {
-        setIsPlaying(false);
-      }
-    }
-  }, []); // No dependencies - uses refs
-
-  // Play voice message directly
-  const playVoiceMessage = useCallback(async () => {
-    const currentAlert = activeAlertRef.current;
-    if (!currentAlert?.audioDataUrl) {
-      console.log('[CallAlert] playVoiceMessage: No audioDataUrl available');
-      setIsPlaying(false);
+  // Play the current alert's audio
+  const playCurrentAlert = useCallback(async () => {
+    const alert = activeAlertRef.current;
+    if (!alert) {
+      console.log('[CallAlert] No active alert to play');
       return;
     }
-
+    
+    setIsPlaying(true);
+    setAudioError(false);
+    
     try {
-      console.log('[CallAlert] Playing voice message directly, audioDataUrl length:', currentAlert.audioDataUrl.length);
-      voiceAudioRef.current.src = currentAlert.audioDataUrl;
-      await voiceAudioRef.current.play();
-      console.log('[CallAlert] Voice message playing');
-    } catch (error) {
-      console.error('[CallAlert] Error playing voice:', error);
+      const result = await playFullAlertSequence(alert);
+      if (alert?.voiceEnabled && !result.voicePlayed) {
+        setAudioError(true);
+      }
+    } catch (err) {
+      console.error('[CallAlert] Play sequence error:', err);
       setAudioError(true);
-      setIsPlaying(false);
     }
-  }, []); // No dependencies - uses refs
-
-  // Stop audio
-  const stopAudio = useCallback(() => {
-    alertAudioRef.current?.pause();
-    voiceAudioRef.current?.pause();
+    
     setIsPlaying(false);
   }, []);
 
   // Replay audio
   const replayAudio = useCallback(() => {
-    playAlertSound();
-  }, [playAlertSound]);
+    playCurrentAlert();
+  }, [playCurrentAlert]);
 
-  // Mark audio as played
-  const markAudioPlayed = useCallback(async () => {
-    const currentAlert = activeAlertRef.current;
-    if (!currentAlert?.alertId) return;
-
-    try {
-      const token = localStorage.getItem('token');
-      await fetch(`/api/call-alert/${currentAlert.alertId}/acknowledge`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          platform: 'web',
-          audioPlayed: true
-        })
-      });
-    } catch (error) {
-      console.error('[CallAlert] Error marking audio played:', error);
+  // Dismiss current alert and process queue
+  const dismissAlert = useCallback(() => {
+    activeAlertRef.current = null;
+    setActiveAlert(null);
+    setIsPlaying(false);
+    setAudioError(false);
+    
+    // Process next alert in queue
+    if (alertQueue.current.length > 0) {
+      const nextAlert = alertQueue.current.shift();
+      console.log('[CallAlert] Processing next queued alert');
+      activeAlertRef.current = nextAlert;
+      setActiveAlert(nextAlert);
     }
-  }, []); // No dependencies - uses refs
+  }, []);
 
   // Acknowledge alert
   const acknowledgeAlert = useCallback(async () => {
@@ -227,118 +210,87 @@ export default function CallAlertReceiver() {
     } finally {
       setAcknowledging(false);
     }
-  }, []); // Will need dismissAlert - but we'll fix this after
+  }, [dismissAlert]);
 
-  // Dismiss alert
-  const dismissAlert = useCallback(() => {
-    stopAudio();
-    activeAlertRef.current = null; // Clear ref
-    setActiveAlert(null);
-    
-    // Process next alert in queue
-    if (alertQueue.current.length > 0) {
-      const nextAlert = alertQueue.current.shift();
-      activeAlertRef.current = nextAlert;
-      setActiveAlert(nextAlert);
-    }
-  }, [stopAudio]);
-
-  // Keep ref in sync with state
-  useEffect(() => {
-    activeAlertRef.current = activeAlert;
-  }, [activeAlert]);
-
-  // Play incoming alert audio (for queued alerts that should still be heard)
-  const playIncomingAlertAudio = useCallback(async (alert) => {
-    try {
-      // Create a new audio instance for the queued alert
-      const tempAudio = new Audio(ALERT_SOUND_URL);
-      tempAudio.volume = 0.7;
-      await tempAudio.play();
-      
-      // If voice is enabled, play voice after alert sound
-      if (alert?.voiceEnabled && alert?.audioDataUrl) {
-        tempAudio.onended = async () => {
-          try {
-            const voiceAudio = new Audio(alert.audioDataUrl);
-            await voiceAudio.play();
-          } catch (err) {
-            console.error('[CallAlert] Error playing queued voice:', err);
-          }
-        };
-      }
-    } catch (err) {
-      console.error('[CallAlert] Error playing queued alert audio:', err);
-    }
-  }, []);
-
-  // Handle incoming alert
+  // Handle incoming alert from socket
   const handleIncomingAlert = useCallback((alert) => {
-    console.log('📢 [CallAlert] Received alert:', JSON.stringify({
-      alertId: alert.alertId,
-      voiceEnabled: alert.voiceEnabled,
-      audioDataUrl: alert.audioDataUrl ? `${alert.audioDataUrl.substring(0, 50)}... (length: ${alert.audioDataUrl.length})` : 'null',
-      priority: alert.priority,
-      message: alert.message?.substring(0, 50)
-    }, null, 2));
-
+    console.log('');
+    console.log('📢📢📢 [CallAlert] ========== RECEIVED ALERT ========== 📢📢📢');
+    console.log('[CallAlert] Alert ID:', alert.alertId);
+    console.log('[CallAlert] Sender:', alert.sender?.name);
+    console.log('[CallAlert] Priority:', alert.priority);
+    console.log('[CallAlert] Voice Enabled:', alert.voiceEnabled);
+    console.log('[CallAlert] Audio URL Present:', !!alert.audioDataUrl);
+    console.log('[CallAlert] Audio URL Length:', alert.audioDataUrl?.length || 0);
+    if (alert.audioDataUrl) {
+      console.log('[CallAlert] Audio URL Preview:', alert.audioDataUrl.substring(0, 50) + '...');
+    }
+    console.log('[CallAlert] Message:', alert.message?.substring(0, 100));
+    console.log('');
+    
     // Validate audioDataUrl if voice is enabled
     if (alert.voiceEnabled && alert.audioDataUrl) {
       if (!alert.audioDataUrl.startsWith('data:audio/')) {
-        console.error('[CallAlert] Invalid audioDataUrl format - does not start with data:audio/');
+        console.error('[CallAlert] ❌ INVALID AUDIO FORMAT');
+        console.error('[CallAlert] Expected: data:audio/...');
+        console.error('[CallAlert] Got:', alert.audioDataUrl.substring(0, 50));
         alert.voiceEnabled = false;
       } else if (alert.audioDataUrl.length < 1000) {
-        console.error('[CallAlert] audioDataUrl too short, likely truncated:', alert.audioDataUrl.length);
+        console.error('[CallAlert] ❌ AUDIO DATA TOO SHORT (likely truncated)');
+        console.error('[CallAlert] Length:', alert.audioDataUrl.length);
         alert.voiceEnabled = false;
       } else {
-        console.log('[CallAlert] audioDataUrl validated successfully');
+        console.log('[CallAlert] ✅ Audio data validated successfully');
       }
     }
 
-    // If no active alert, set as active and play
-    // Use ref to avoid stale closure issue
+    // If no active alert, set as active
     if (!activeAlertRef.current) {
-      // Update ref BEFORE setting state to ensure it's available for audio handlers
+      console.log('[CallAlert] Setting as active alert (no current alert)');
       activeAlertRef.current = alert;
       setActiveAlert(alert);
     } else {
-      // Queue the alert for display after current one is dismissed
+      // Queue the alert
+      console.log('[CallAlert] Current alert exists, queueing. Queue size:', alertQueue.current.length + 1);
       alertQueue.current.push(alert);
       
-      // IMPORTANT: Still play the audio immediately for queued alerts
-      // User requested that alerts should always be played even if previous not acknowledged
-      playIncomingAlertAudio(alert);
+      // Still play audio for queued alerts immediately
+      console.log('[CallAlert] Playing queued alert audio immediately');
+      playFullAlertSequence(alert);
       
-      // Show notification with queue count
       toast(`New alert received! (${alertQueue.current.length} queued)`, { 
         icon: '📢',
         duration: 4000
       });
     }
-  }, [playIncomingAlertAudio]);  // Only depends on the audio play function
+  }, []);
 
   // Auto-play when alert becomes active
   useEffect(() => {
     if (activeAlert) {
-      // Update ref when activeAlert changes
       activeAlertRef.current = activeAlert;
-      console.log('[CallAlert] Active alert set, will play in 100ms');
-      // Small delay to ensure component is mounted
+      console.log('[CallAlert] Active alert set, scheduling playback in 100ms');
+      
       const timer = setTimeout(() => {
-        playAlertSound();
+        playCurrentAlert();
       }, 100);
 
       return () => clearTimeout(timer);
     }
-  }, [activeAlert, playAlertSound]);
+  }, [activeAlert, playCurrentAlert]);
 
   // Subscribe to socket events
   useEffect(() => {
-    if (!socket || !isConnected) return;
+    if (!socket || !isConnected) {
+      console.log('[CallAlert] Socket not ready. socket:', !!socket, 'connected:', isConnected);
+      return;
+    }
 
+    console.log('[CallAlert] ✅ Subscribing to call-alert socket events');
     socket.on('call-alert', handleIncomingAlert);
 
     return () => {
+      console.log('[CallAlert] Unsubscribing from call-alert events');
       socket.off('call-alert', handleIncomingAlert);
     };
   }, [socket, isConnected, handleIncomingAlert]);
@@ -368,7 +320,7 @@ export default function CallAlertReceiver() {
               </div>
               <div>
                 <h3 className="modal-title text-white">Incoming Alert</h3>
-                <span className={`inline-block mt-1 px-2 py-0.5 text-xs rounded-full font-medium bg-white/20 text-white capitalize`}>
+                <span className="inline-block mt-1 px-2 py-0.5 text-xs rounded-full font-medium bg-white/20 text-white capitalize">
                   {activeAlert.priority} Priority
                 </span>
               </div>
@@ -411,13 +363,12 @@ export default function CallAlertReceiver() {
             {activeAlert.voiceEnabled && (
               <div className="flex items-center justify-center gap-3 py-2">
                 {isPlaying ? (
-                  <button
-                    onClick={stopAudio}
-                    className="modal-btn flex items-center gap-2 bg-red-50 text-red-700 border border-red-200 hover:bg-red-100"
-                  >
-                    <FaVolumeMute />
-                    <span>Stop Audio</span>
-                  </button>
+                  <div className="flex items-center gap-2 text-green-600">
+                    <div className="animate-pulse">
+                      <FaVolumeUp />
+                    </div>
+                    <span className="text-sm">Playing audio...</span>
+                  </div>
                 ) : (
                   <button
                     onClick={replayAudio}

@@ -115,8 +115,8 @@ export default function CustomizableDashboard({
 
   return (
     <div className="relative">
-      {/* Dashboard Controls */}
-      <div className="flex items-center justify-between mb-4">
+      {/* Dashboard Controls - Hidden on mobile */}
+      <div className="hidden md:flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           {isEditMode && (
             <span className="text-xs text-primary-600 bg-primary-50 px-2 py-1 rounded-full font-medium">
