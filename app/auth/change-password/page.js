@@ -1,13 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { FaLock, FaEye, FaEyeSlash, FaShieldAlt } from 'react-icons/fa'
-
-// Spline animation URL - cached in localStorage for faster perceived loading
-const SPLINE_URL = 'https://my.spline.design/100followersfocus-GCaB9DZhMZTNOxJCBwYFlptI/'
-const ANIMATION_CACHE_KEY = 'talio_login_animation_loaded'
 
 export default function ChangePasswordPage() {
   const router = useRouter()
@@ -22,8 +18,6 @@ export default function ChangePasswordPage() {
   const [loading, setLoading] = useState(false)
   const [checking, setChecking] = useState(true)
   const [user, setUser] = useState(null)
-  const [animationLoaded, setAnimationLoaded] = useState(false)
-  const [showAnimation, setShowAnimation] = useState(false)
 
   // Password strength indicators
   const [passwordStrength, setPasswordStrength] = useState({
@@ -33,27 +27,6 @@ export default function ChangePasswordPage() {
     number: false,
     special: false,
   })
-
-  // Handle iframe load event
-  const handleAnimationLoad = useCallback(() => {
-    setAnimationLoaded(true)
-    try {
-      localStorage.setItem(ANIMATION_CACHE_KEY, 'true')
-    } catch (e) {
-      // Ignore localStorage errors
-    }
-  }, [])
-
-  // Check if animation was previously loaded
-  useEffect(() => {
-    const wasLoaded = localStorage.getItem(ANIMATION_CACHE_KEY)
-    if (wasLoaded) {
-      setShowAnimation(true)
-    } else {
-      const timer = setTimeout(() => setShowAnimation(true), 100)
-      return () => clearTimeout(timer)
-    }
-  }, [])
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -230,35 +203,16 @@ export default function ChangePasswordPage() {
 
   return (
     <div className="min-h-screen bg-[#1a0a2e] relative overflow-hidden">
-      {/* Background gradient overlay */}
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#1a0a2e]/30 to-[#1a0a2e]/80 pointer-events-none z-10" />
-      
-      {/* Fallback gradient background */}
-      <div className={`absolute inset-0 bg-gradient-to-br from-[#1a0a2e] via-[#2d1b4e] to-[#1a0a2e] transition-opacity duration-500 ${animationLoaded ? 'opacity-0' : 'opacity-100'}`}>
+      {/* Background gradient */}
+      <div className="absolute inset-0 bg-gradient-to-br from-[#1a0a2e] via-[#2d1b4e] to-[#1a0a2e]">
+        {/* Animated gradient orbs */}
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl animate-pulse" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
       </div>
-      
-      {/* Spline 3D Animation */}
-      {showAnimation && (
-        <div className={`absolute inset-0 w-full h-full z-0 transition-opacity duration-500 ${animationLoaded ? 'opacity-100' : 'opacity-0'}`}>
-          <iframe 
-            src={SPLINE_URL}
-            frameBorder='0' 
-            width='100%' 
-            height='100%'
-            className="absolute inset-0 scale-110"
-            style={{ pointerEvents: 'auto' }}
-            loading="lazy"
-            onLoad={handleAnimationLoad}
-            title="Background Animation"
-          />
-        </div>
-      )}
 
       {/* Form Container */}
-      <div className="relative z-20 min-h-screen flex items-center justify-center px-4 py-8 pointer-events-none">
-        <div className="w-full max-w-md pointer-events-auto">
+      <div className="relative z-20 min-h-screen flex items-center justify-center px-4 py-8">
+        <div className="w-full max-w-md">
           {/* Glass morphism card */}
           <div 
             className="rounded-3xl shadow-2xl overflow-hidden"
