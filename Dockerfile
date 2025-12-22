@@ -94,8 +94,15 @@ COPY --from=builder --chown=nextjs:nodejs /app/next.config.js ./next.config.js
 COPY --from=builder --chown=nextjs:nodejs /app/lib ./lib
 COPY --from=builder --chown=nextjs:nodejs /app/models ./models
 
-# Create uploads directory
-RUN mkdir -p /app/public/uploads && chown -R nextjs:nodejs /app/public/uploads
+# Create uploads directory with all subdirectories
+RUN mkdir -p /app/public/uploads/chat \
+    /app/public/uploads/captures \
+    /app/public/uploads/profile \
+    /app/public/uploads/documents \
+    /app/public/uploads/meetings \
+    /app/public/uploads/temp \
+    && chown -R nextjs:nodejs /app/public/uploads \
+    && chmod -R 755 /app/public/uploads
 
 USER nextjs
 EXPOSE 3000

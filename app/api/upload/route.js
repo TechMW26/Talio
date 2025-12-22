@@ -153,12 +153,36 @@ export async function POST(request) {
 
     // Fallback: Local file storage
     const uploadsDir = path.join(process.cwd(), 'public', 'uploads', folder)
-    if (!existsSync(uploadsDir)) {
-      await mkdir(uploadsDir, { recursive: true })
+    
+    try {
+      if (!existsSync(uploadsDir)) {
+        await mkdir(uploadsDir, { recursive: true, mode: 0o755 })
+      }
+    } catch (mkdirError) {
+      console.error('[Upload] Failed to create directory:', mkdirError.message)
+      // Try creating with different approach
+      const { execSync } = require('child_process')
+      try {
+        execSync(`mkdir -p "${uploadsDir}"`, { stdio: 'ignore' })
+      } catch (e) {
+        return NextResponse.json({ 
+          success: false, 
+          message: `Upload directory creation failed. Please ensure the server has write permissions to: ${uploadsDir}` 
+        }, { status: 500 })
+      }
     }
 
     const filepath = path.join(uploadsDir, finalFilename)
-    await writeFile(filepath, buffer)
+    
+    try {
+      await writeFile(filepath, buffer)
+    } catch (writeError) {
+      console.error('[Upload] Failed to write file:', writeError.message)
+      return NextResponse.json({ 
+        success: false, 
+        message: `Failed to save file. Permission denied on: ${uploadsDir}. Please check server write permissions.` 
+      }, { status: 500 })
+    }
 
     // Return the URL
     const fileUrl = `/uploads/${folder}/${finalFilename}`
