@@ -90,7 +90,10 @@
           "arch": ["x64", "ia32"]
         }
       ],
-      "requestedExecutionLevel": "asInvoker"
+      "requestedExecutionLevel": "asInvoker",
+      "publisherName": "Talio",
+      "legalTrademarks": "Talio - Workforce Management Platform",
+      "verifyUpdateCodeSignature": false
     },
     "nsis": {
       "oneClick": false,
@@ -101,7 +104,9 @@
       "installerHeaderIcon": "build/icon.ico",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Talio"
+      "shortcutName": "Talio",
+      "artifactName": "Talio Setup ${version}.exe",
+      "uninstallDisplayName": "Talio"
     },
     "linux": {
       "icon": "build/icons",

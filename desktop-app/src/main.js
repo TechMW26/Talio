@@ -544,7 +544,14 @@ function createWindow() {
       mainWindow.show();
     }
 
-    // Initialize permission handler and check permissions
+    // Windows and Linux: Skip permission screen entirely, permissions are handled by OS
+    if (process.platform === 'win32' || process.platform === 'linux') {
+      debugLogger.log('info', 'Permissions', 'Windows/Linux - skipping permission screen, OS handles permissions');
+      startLoginDetection();
+      return;
+    }
+    
+    // macOS: Initialize permission handler and check permissions
     if (!permissionHandler) {
       permissionHandler = new PermissionHandler(mainWindow);
       
