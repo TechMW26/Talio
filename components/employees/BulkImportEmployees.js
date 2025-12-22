@@ -14,7 +14,8 @@ import {
   FaEye,
   FaTrash,
   FaRobot,
-  FaArrowRight
+  FaArrowRight,
+  FaEdit
 } from 'react-icons/fa'
 
 export default function BulkImportEmployees() {
@@ -25,6 +26,109 @@ export default function BulkImportEmployees() {
   const [downloadingTemplate, setDownloadingTemplate] = useState(false)
   const [importResult, setImportResult] = useState(null)
   const fileInputRef = useRef(null)
+  
+  // Bulk selection state
+  const [selectedRows, setSelectedRows] = useState(new Set())
+  
+  // Inline editing state
+  const [editingCell, setEditingCell] = useState(null) // { rowIdx, fieldKey }
+  const [editValue, setEditValue] = useState('')
+
+  // Handle row selection toggle
+  const toggleRowSelection = (rowIdx) => {
+    setSelectedRows(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(rowIdx)) {
+        newSet.delete(rowIdx)
+      } else {
+        newSet.add(rowIdx)
+      }
+      return newSet
+    })
+  }
+
+  // Handle select all toggle
+  const toggleSelectAll = () => {
+    if (!preview?.transformedRows) return
+    if (selectedRows.size === preview.transformedRows.length) {
+      setSelectedRows(new Set())
+    } else {
+      setSelectedRows(new Set(preview.transformedRows.map((_, idx) => idx)))
+    }
+  }
+
+  // Delete selected rows
+  const deleteSelectedRows = () => {
+    if (selectedRows.size === 0 || !preview) return
+    
+    const newRows = preview.transformedRows.filter((_, idx) => !selectedRows.has(idx))
+    const newWarnings = preview.rowWarnings?.filter(w => !selectedRows.has(w.rowNumber - 2)) || []
+    
+    setPreview({
+      ...preview,
+      transformedRows: newRows,
+      totalRows: newRows.length,
+      rowWarnings: newWarnings.map((w, i) => ({ ...w, rowNumber: i + 2 }))
+    })
+    setSelectedRows(new Set())
+    toast.success(`Removed ${selectedRows.size} row(s) from preview`)
+  }
+
+  // Delete a single row by index
+  const deleteSingleRow = (rowIdx) => {
+    if (!preview) return
+    
+    const newRows = preview.transformedRows.filter((_, idx) => idx !== rowIdx)
+    const newWarnings = preview.rowWarnings?.filter(w => w.rowNumber - 2 !== rowIdx) || []
+    
+    setPreview({
+      ...preview,
+      transformedRows: newRows,
+      totalRows: newRows.length,
+      rowWarnings: newWarnings.map((w, i) => ({ ...w, rowNumber: i + 2 }))
+    })
+    // Also remove from selected if it was selected
+    if (selectedRows.has(rowIdx)) {
+      const newSelected = new Set(selectedRows)
+      newSelected.delete(rowIdx)
+      setSelectedRows(newSelected)
+    }
+    toast.success('Removed 1 row from preview')
+  }
+
+  // Start editing a cell
+  const startEditing = (rowIdx, fieldKey, currentValue) => {
+    setEditingCell({ rowIdx, fieldKey })
+    setEditValue(currentValue || '')
+  }
+
+  // Save cell edit
+  const saveEdit = () => {
+    if (!editingCell || !preview) return
+    
+    const { rowIdx, fieldKey } = editingCell
+    const newRows = [...preview.transformedRows]
+    newRows[rowIdx] = { ...newRows[rowIdx], [fieldKey]: editValue }
+    
+    setPreview({ ...preview, transformedRows: newRows })
+    setEditingCell(null)
+    setEditValue('')
+  }
+
+  // Cancel cell edit
+  const cancelEdit = () => {
+    setEditingCell(null)
+    setEditValue('')
+  }
+
+  // Handle key press in edit input
+  const handleEditKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      saveEdit()
+    } else if (e.key === 'Escape') {
+      cancelEdit()
+    }
+  }
 
   // Handle file selection - use AI preview API
   const handleFileSelect = async (e) => {
@@ -188,6 +292,9 @@ export default function BulkImportEmployees() {
     setPreview(null)
     setImportResult(null)
     setPreviewLoading(false)
+    setSelectedRows(new Set())
+    setEditingCell(null)
+    setEditValue('')
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
     }
@@ -360,15 +467,52 @@ export default function BulkImportEmployees() {
                 ({preview.totalRows} employees detected)
               </span>
             </div>
-            <span className="flex items-center gap-1 text-sm text-green-600 font-medium">
-              <FaCheck className="text-green-600" />
-              Data mapped to Talio template
-            </span>
+            <div className="flex items-center gap-3">
+              {selectedRows.size > 0 && (
+                <button
+                  onClick={deleteSelectedRows}
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
+                >
+                  <FaTrash className="text-xs" />
+                  Remove {selectedRows.size} selected
+                </button>
+              )}
+              <span className="flex items-center gap-1 text-sm text-green-600 font-medium">
+                <FaCheck className="text-green-600" />
+                Data mapped to Talio template
+              </span>
+            </div>
           </div>
+          
+          {/* Bulk actions bar */}
+          {selectedRows.size > 0 && (
+            <div className="bg-blue-50 px-4 py-2 border-b flex items-center gap-4">
+              <span className="text-sm text-blue-700">
+                {selectedRows.size} of {preview.transformedRows.length} row(s) selected
+              </span>
+              <button
+                onClick={() => setSelectedRows(new Set())}
+                className="text-sm text-blue-600 hover:text-blue-800 underline"
+              >
+                Clear selection
+              </button>
+            </div>
+          )}
+          
           <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
             <table className="w-full text-sm min-w-[1200px]">
               <thead className="bg-gray-100 sticky top-0 z-10">
                 <tr>
+                  {/* Select All Checkbox */}
+                  <th className="px-2 py-2 text-center w-10">
+                    <input
+                      type="checkbox"
+                      checked={preview.transformedRows.length > 0 && selectedRows.size === preview.transformedRows.length}
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                      title="Select all rows"
+                    />
+                  </th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
                   {preview.templateFields.map((field, i) => (
                     <th 
@@ -382,13 +526,30 @@ export default function BulkImportEmployees() {
                       {field.required && <span className="text-red-500 ml-1">*</span>}
                     </th>
                   ))}
+                  <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase w-16">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {preview.transformedRows.map((row, rowIdx) => {
                   const hasWarning = preview.rowWarnings?.some(w => w.rowNumber === rowIdx + 2)
+                  const isSelected = selectedRows.has(rowIdx)
                   return (
-                    <tr key={rowIdx} className={hasWarning ? 'bg-yellow-50 hover:bg-yellow-100' : 'hover:bg-gray-50'}>
+                    <tr 
+                      key={rowIdx} 
+                      className={`
+                        ${isSelected ? 'bg-blue-50' : hasWarning ? 'bg-yellow-50' : ''}
+                        ${isSelected ? 'hover:bg-blue-100' : hasWarning ? 'hover:bg-yellow-100' : 'hover:bg-gray-50'}
+                      `}
+                    >
+                      {/* Row Selection Checkbox */}
+                      <td className="px-2 py-2 text-center">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleRowSelection(rowIdx)}
+                          className="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                        />
+                      </td>
                       <td className="px-3 py-2 text-gray-400 font-mono text-xs">
                         {rowIdx + 1}
                       </td>
@@ -396,24 +557,59 @@ export default function BulkImportEmployees() {
                         const value = row[field.key] || ''
                         const isEmpty = !value
                         const isMissingRequired = field.required && isEmpty
+                        const isEditing = editingCell?.rowIdx === rowIdx && editingCell?.fieldKey === field.key
+                        
                         return (
                           <td 
                             key={cellIdx} 
-                            className={`px-3 py-2 whitespace-nowrap max-w-[180px] truncate ${
+                            className={`px-3 py-2 whitespace-nowrap max-w-[180px] ${
                               isMissingRequired ? 'bg-red-100 text-red-600' :
                               isEmpty ? 'text-gray-300' : 'text-gray-700'
                             }`}
-                            title={value || 'Empty'}
+                            title={isEditing ? '' : (value || 'Empty - Double click to edit')}
+                            onDoubleClick={() => !isEditing && startEditing(rowIdx, field.key, value)}
                           >
-                            {value || '-'}
+                            {isEditing ? (
+                              <input
+                                type="text"
+                                value={editValue}
+                                onChange={(e) => setEditValue(e.target.value)}
+                                onKeyDown={handleEditKeyPress}
+                                onBlur={saveEdit}
+                                className="w-full px-1 py-0.5 text-sm border border-primary-400 rounded focus:outline-none focus:ring-1 focus:ring-primary-500"
+                                autoFocus
+                              />
+                            ) : (
+                              <span className="truncate block">{value || '-'}</span>
+                            )}
                           </td>
                         )
                       })}
+                      {/* Row Actions */}
+                      <td className="px-3 py-2 text-center">
+                        <button
+                          onClick={() => deleteSingleRow(rowIdx)}
+                          className="p-1 text-gray-400 hover:text-red-600 rounded transition-colors"
+                          title="Remove this row"
+                        >
+                          <FaTrash className="text-xs" />
+                        </button>
+                      </td>
                     </tr>
                   )
                 })}
               </tbody>
             </table>
+          </div>
+          
+          {/* Help text */}
+          <div className="bg-gray-50 px-4 py-2 border-t text-xs text-gray-500 flex items-center gap-4">
+            <span className="flex items-center gap-1">
+              <FaEdit className="text-gray-400" />
+              Double-click a cell to edit
+            </span>
+            <span>•</span>
+            <span>Use checkboxes to select multiple rows for bulk removal</span>
           </div>
         </div>
       )}

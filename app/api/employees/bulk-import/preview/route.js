@@ -16,9 +16,10 @@ const TEMPLATE_FIELDS = [
   { key: 'dateOfJoining', label: 'Date of Joining', description: 'Hire date, start date' },
   { key: 'department', label: 'Department', description: 'Department name' },
   { key: 'designation', label: 'Designation', description: 'Job title, position' },
+  { key: 'company', label: 'Company', description: 'Company name' },
   { key: 'employmentType', label: 'Employment Type', description: 'Full-time, part-time, contract' },
   { key: 'grossSalary', label: 'Gross Salary', description: 'Monthly salary, CTC, compensation' },
-  { key: 'role', label: 'System Role', description: 'admin, hr, manager, employee' },
+  { key: 'role', label: 'System Role', description: 'admin, hr, manager, department_head, employee' },
 ]
 
 /**
@@ -146,8 +147,12 @@ function patternBasedMapping(headers, sampleRows) {
       mapping[idx] = 'gender'
     } else if (/dept|department/i.test(h)) {
       mapping[idx] = 'department'
-    } else if (/design|title|position|role|post/i.test(h)) {
+    } else if (/company|org|organization|firm|employer/i.test(h)) {
+      mapping[idx] = 'company'
+    } else if (/design|title|position|post/i.test(h)) {
       mapping[idx] = 'designation'
+    } else if (/^role$|system.*role|user.*role|access.*role/i.test(h)) {
+      mapping[idx] = 'role'
     } else if (/emp.*code|emp.*id|staff.*id|employee.*id|code|id/i.test(h)) {
       mapping[idx] = 'employeeCode'
     } else if (/type|employment/i.test(h)) {
