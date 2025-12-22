@@ -56,6 +56,8 @@ export default function EditEmployeePage() {
       deductions: '',
       currency: 'INR',
     },
+    // System Role (User account role)
+    systemRole: 'employee',
     // Statutory fields
     statutory: {
       pfEnrolled: false,
@@ -134,6 +136,8 @@ export default function EditEmployeePage() {
           employmentType: emp.employmentType || '',
           workLocation: emp.workLocation || '',
           status: emp.status || 'active',
+          // System Role from linked user account
+          systemRole: emp.userId?.role || 'employee',
           // Salary fields
           salary: {
             ctc: emp.salary?.ctc || '',
@@ -572,6 +576,27 @@ export default function EditEmployeePage() {
                   <option value="inactive">Inactive</option>
                   <option value="terminated">Terminated</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  System Role
+                  <span className="text-xs text-gray-400 ml-2">(Access level)</span>
+                </label>
+                <select
+                  value={formData.systemRole}
+                  onChange={(e) => setFormData({ ...formData, systemRole: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                >
+                  <option value="employee">Employee</option>
+                  <option value="manager">Manager</option>
+                  <option value="department_head">Department Head</option>
+                  <option value="hr">HR</option>
+                  <option value="admin">Admin</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Controls what features this user can access in the system
+                </p>
               </div>
             </div>
           </div>

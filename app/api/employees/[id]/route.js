@@ -300,6 +300,15 @@ export async function PUT(request, { params }) {
       })
       .lean()
 
+    // Handle system role update if provided
+    if (data.systemRole && ['admin', 'hr', 'manager', 'employee', 'department_head'].includes(data.systemRole)) {
+      const user = await User.findOne({ employeeId: id })
+      if (user && user.role !== data.systemRole) {
+        await User.findByIdAndUpdate(user._id, { role: data.systemRole })
+        console.log(`[Employee Update] Updated user role from ${user.role} to ${data.systemRole} for employee ${id}`)
+      }
+    }
+
     // Clear cache for this employee and list
     queryCache.delete(queryCache.generateKey('employee', id))
     queryCache.clearPattern('employees')

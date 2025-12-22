@@ -87,44 +87,37 @@ function detectUserRoleFromDesignation(designation, department) {
   const title = designation.toLowerCase().trim()
   const dept = (department || '').toLowerCase().trim()
   
-  // HR roles - people working in HR department or with HR-related titles
-  if (/\b(hr|human\s*resource|people\s*ops|people\s*operations|talent|recruitment|recruiter|hrbp|hr\s*business\s*partner)\b/i.test(title) ||
-      /\b(hr|human\s*resource|people\s*ops|people\s*operations|talent\s*acquisition)\b/i.test(dept)) {
-    // Check if they are HR managers/heads - they get 'hr' role
-    if (/\b(head|director|vp|vice\s*president|chief|manager|lead|senior|sr)\b/i.test(title)) {
-      return 'hr'
-    }
-    // HR executives/associates also get 'hr' role
-    if (/\b(executive|associate|specialist|coordinator|officer|analyst|generalist|admin|administrator)\b/i.test(title)) {
-      return 'hr'
-    }
-    // Default HR department employees to 'hr' role
-    if (/\b(hr|human\s*resource)\b/i.test(dept)) {
-      return 'hr'
-    }
-  }
-  
-  // Admin roles - IT Admin, System Admin, Office Admin (but not regular admins)
-  if (/\b(system\s*admin|it\s*admin|network\s*admin|database\s*admin|infra\s*admin)\b/i.test(title)) {
-    return 'employee' // These are technical roles, not system admin
-  }
-  
   // Check for explicit admin role (rare, should be manually set)
   if (/^admin$|^administrator$/i.test(title)) {
     return 'admin'
   }
   
-  // Manager role - people managers
-  if (/\b(manager|mgr|team\s*lead|tech\s*lead|engineering\s*lead)\b/i.test(title) && 
-      !/\b(hr|human\s*resource)\b/i.test(title)) {
+  // HR roles - people working in HR department or with HR-related titles
+  const isHRTitle = /\b(hr|human\s*resource|people\s*ops|people\s*operations|talent|recruitment|recruiter|hrbp|hr\s*business\s*partner|personnel)\b/i.test(title)
+  const isHRDept = /\b(hr|human\s*resource|people\s*ops|people\s*operations|talent\s*acquisition|personnel)\b/i.test(dept)
+  
+  if (isHRTitle || isHRDept) {
+    // All HR-related roles get 'hr' system role
+    return 'hr'
+  }
+  
+  // Department head role - check before manager since heads are higher
+  if (/\b(head|director|vp|vice\s*president|chief|cto|cfo|coo|cmo|cpo|evp|svp|president)\b/i.test(title)) {
+    return 'department_head'
+  }
+  
+  // Manager role - people managers and leads
+  if (/\b(manager|mgr|team\s*lead|tech\s*lead|engineering\s*lead|lead|supervisor|superintendent)\b/i.test(title)) {
     return 'manager'
   }
   
-  // Department head role
-  if (/\b(head|director|vp|vice\s*president|chief|cto|cfo|coo|cmo|cpo)\b/i.test(title) &&
-      !/\b(hr|human\s*resource)\b/i.test(title)) {
-    return 'department_head'
+  // Senior roles - still employees but could be leads
+  if (/\b(senior|sr|principal|staff)\b/i.test(title) && /\b(lead|manager)\b/i.test(title)) {
+    return 'manager'
   }
+  
+  // Admin roles - IT Admin, System Admin are technical roles = employee
+  // Only exact "Admin" or "Administrator" as title = admin role (already handled above)
   
   // Default to employee
   return 'employee'
@@ -1246,6 +1239,7 @@ async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignatio
 
     // Detect role from designation if not explicitly provided
     const detectedRole = data.role || detectUserRoleFromDesignation(data.designation, data.department)
+    console.log(`[Bulk Import] Role detection for "${data.designation}" (dept: "${data.department}") => ${detectedRole}`)
 
     const userData = {
       email: email,
