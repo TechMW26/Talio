@@ -3,6 +3,40 @@ import * as XLSX from 'xlsx'
 import { generateContent } from '@/lib/gemini'
 
 /**
+ * Detect user role from designation/job title
+ * Only maps: employee, hr, manager (NOT admin - admin must be set manually)
+ * Returns display name for preview, will be converted to lowercase for DB
+ */
+function detectUserRoleFromDesignation(designation, department) {
+  if (!designation) return 'employee'
+  
+  const title = designation.toLowerCase().trim()
+  const dept = (department || '').toLowerCase().trim()
+  
+  // HR roles - only if designation explicitly contains HR-related terms
+  // Matches: HR, Human Resource, HR Executive, Associate-HR, AM-HR, HRBP, etc.
+  if (/\b(hr|human\s*resource|hrbp|hr\s*business\s*partner)\b/i.test(title) ||
+      /[-_](hr|human\s*resource)$/i.test(title) ||
+      /^(hr|human\s*resource)[-_]/i.test(title)) {
+    return 'hr'
+  }
+  
+  // Also check if department is HR
+  if (/\b(hr|human\s*resource)\b/i.test(dept)) {
+    return 'hr'
+  }
+  
+  // Manager role - only if designation explicitly contains Manager/Lead terms
+  // Matches: Manager, Team Lead, Tech Lead, Project Manager, etc.
+  if (/\b(manager|mgr|team\s*lead|tech\s*lead|project\s*lead|engineering\s*lead)\b/i.test(title)) {
+    return 'manager'
+  }
+  
+  // Default to employee for all other designations
+  return 'employee'
+}
+
+/**
  * Target fields we want to extract - our template
  */
 const TEMPLATE_FIELDS = [
@@ -217,13 +251,14 @@ function transformRow(row, mapping) {
       continue
     }
     
-    // Handle role normalization
+    // Handle role normalization - only allow hr, manager, employee (not admin)
     if (fieldMapping === 'role') {
       const v = String(value).toLowerCase().trim()
-      if (['admin', 'hr', 'manager', 'employee'].includes(v)) {
-        result[fieldMapping] = v.charAt(0).toUpperCase() + v.slice(1) // Capitalize first letter
+      if (['hr', 'manager', 'employee'].includes(v)) {
+        result[fieldMapping] = v // Store lowercase to match DB schema
       } else {
-        result[fieldMapping] = 'Employee' // Default to Employee for invalid/empty values
+        // Will be detected from designation later
+        result[fieldMapping] = ''
       }
       continue
     }
@@ -242,9 +277,9 @@ function transformRow(row, mapping) {
     result[fieldMapping] = String(value).trim()
   }
   
-  // Set default role if not mapped or empty
+  // Detect role from designation if not explicitly set
   if (!result.role || result.role === '') {
-    result.role = 'Employee'
+    result.role = detectUserRoleFromDesignation(result.designation, result.department)
   }
   
   return result

@@ -79,7 +79,8 @@ function detectLevelFromTitle(title) {
 
 /**
  * Detect user role from designation/job title
- * Valid roles: admin, hr, manager, department_head, employee
+ * Only maps: employee, hr, manager (NOT admin - admin must be set manually)
+ * Uses lowercase values matching User schema enum
  */
 function detectUserRoleFromDesignation(designation, department) {
   if (!designation) return 'employee'
@@ -87,39 +88,26 @@ function detectUserRoleFromDesignation(designation, department) {
   const title = designation.toLowerCase().trim()
   const dept = (department || '').toLowerCase().trim()
   
-  // Check for explicit admin role (rare, should be manually set)
-  if (/^admin$|^administrator$/i.test(title)) {
-    return 'admin'
-  }
-  
-  // HR roles - people working in HR department or with HR-related titles
-  const isHRTitle = /\b(hr|human\s*resource|people\s*ops|people\s*operations|talent|recruitment|recruiter|hrbp|hr\s*business\s*partner|personnel)\b/i.test(title)
-  const isHRDept = /\b(hr|human\s*resource|people\s*ops|people\s*operations|talent\s*acquisition|personnel)\b/i.test(dept)
-  
-  if (isHRTitle || isHRDept) {
-    // All HR-related roles get 'hr' system role
+  // HR roles - only if designation explicitly contains HR-related terms
+  // Matches: HR, Human Resource, HR Executive, Associate-HR, AM-HR, HRBP, etc.
+  if (/\b(hr|human\s*resource|hrbp|hr\s*business\s*partner)\b/i.test(title) ||
+      /[-_](hr|human\s*resource)$/i.test(title) ||
+      /^(hr|human\s*resource)[-_]/i.test(title)) {
     return 'hr'
   }
   
-  // Department head role - check before manager since heads are higher
-  if (/\b(head|director|vp|vice\s*president|chief|cto|cfo|coo|cmo|cpo|evp|svp|president)\b/i.test(title)) {
-    return 'department_head'
+  // Also check if department is HR
+  if (/\b(hr|human\s*resource)\b/i.test(dept)) {
+    return 'hr'
   }
   
-  // Manager role - people managers and leads
-  if (/\b(manager|mgr|team\s*lead|tech\s*lead|engineering\s*lead|lead|supervisor|superintendent)\b/i.test(title)) {
+  // Manager role - only if designation explicitly contains Manager/Lead terms
+  // Matches: Manager, Team Lead, Tech Lead, Project Manager, etc.
+  if (/\b(manager|mgr|team\s*lead|tech\s*lead|project\s*lead|engineering\s*lead)\b/i.test(title)) {
     return 'manager'
   }
   
-  // Senior roles - still employees but could be leads
-  if (/\b(senior|sr|principal|staff)\b/i.test(title) && /\b(lead|manager)\b/i.test(title)) {
-    return 'manager'
-  }
-  
-  // Admin roles - IT Admin, System Admin are technical roles = employee
-  // Only exact "Admin" or "Administrator" as title = admin role (already handled above)
-  
-  // Default to employee
+  // Default to employee for all other designations
   return 'employee'
 }
 
