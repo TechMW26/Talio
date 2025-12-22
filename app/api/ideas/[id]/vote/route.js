@@ -1,0 +1,84 @@
+import { NextResponse } from 'next/server';
+import connectDB from '@/lib/mongodb';
+import Suggestion from '@/models/Suggestion';
+import { verifyToken } from '@/lib/auth';
+
+/**
+ * POST /api/ideas/[id]/vote
+ * Vote on an idea (like/dislike)
+ */
+export async function POST(request, { params }) {
+  try {
+    await connectDB();
+
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+    }
+
+    const token = authHeader.substring(7);
+    const decoded = await verifyToken(token);
+    if (!decoded) {
+      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 });
+    }
+
+    const { id } = params;
+    const body = await request.json();
+    const { type } = body; // 'upvote' or 'downvote' or 'remove'
+
+    const idea = await Suggestion.findById(id);
+    if (!idea) {
+      return NextResponse.json({ success: false, message: 'Idea not found' }, { status: 404 });
+    }
+
+    // Initialize votes array if not exists
+    if (!idea.votes) {
+      idea.votes = [];
+    }
+
+    // Find existing vote
+    const existingVoteIndex = idea.votes.findIndex(
+      v => v.voter?.toString() === decoded.employeeId
+    );
+
+    if (type === 'remove') {
+      // Remove vote
+      if (existingVoteIndex > -1) {
+        idea.votes.splice(existingVoteIndex, 1);
+      }
+    } else if (existingVoteIndex > -1) {
+      // Update existing vote
+      idea.votes[existingVoteIndex].type = type;
+      idea.votes[existingVoteIndex].votedAt = new Date();
+    } else {
+      // Add new vote
+      idea.votes.push({
+        voter: decoded.employeeId,
+        type,
+        votedAt: new Date()
+      });
+    }
+
+    await idea.save();
+
+    const likes = idea.votes.filter(v => v.type === 'upvote').length;
+    const dislikes = idea.votes.filter(v => v.type === 'downvote').length;
+    const userVote = idea.votes.find(v => v.voter?.toString() === decoded.employeeId)?.type || null;
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        likes,
+        dislikes,
+        userVote
+      }
+    });
+
+  } catch (error) {
+    console.error('[Ideas] Vote error:', error);
+    return NextResponse.json(
+      { success: false, message: 'Failed to vote', error: error.message },
+      { status: 500 }
+    );
+  }
+}

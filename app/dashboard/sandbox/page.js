@@ -1,202 +1,405 @@
 'use client'
 
-import { useState } from 'react'
-import { FaLightbulb, FaPlus, FaThumbsUp, FaComment, FaUser } from 'react-icons/fa'
+import { useState, useEffect, useCallback } from 'react'
+import { 
+  HiOutlineLightBulb,
+  HiOutlinePlus,
+  HiOutlineMagnifyingGlass,
+  HiOutlineFunnel,
+  HiOutlineChevronLeft,
+  HiOutlineChevronRight,
+  HiOutlineUserCircle,
+  HiOutlineChatBubbleLeft,
+  HiOutlineHandThumbUp,
+  HiOutlineHandThumbDown,
+  HiOutlineSparkles,
+  HiOutlineEyeSlash,
+  HiOutlineTrash,
+  HiOutlineMapPin,
+  HiOutlineBuildingOffice2,
+  HiOutlineCheck
+} from 'react-icons/hi2'
+import { FaSpinner, FaThumbtack, FaUserSecret, FaPaperPlane } from 'react-icons/fa'
+import toast from 'react-hot-toast'
+import CreateIdeaModal from './components/CreateIdeaModal'
+import IdeaCard from './components/IdeaCard'
 
 export default function SandboxPage() {
-  const [showAddIdea, setShowAddIdea] = useState(false)
-  const [newIdea, setNewIdea] = useState({ title: '', description: '' })
+  const [ideas, setIdeas] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [filter, setFilter] = useState({
+    tab: 'all',
+    department: '',
+    pinned: false
+  })
+  const [searchQuery, setSearchQuery] = useState('')
+  const [departments, setDepartments] = useState([])
+  const [pagination, setPagination] = useState({
+    page: 1,
+    limit: 20,
+    total: 0,
+    pages: 1
+  })
+  const [user, setUser] = useState(null)
 
-  const dummyIdeas = [
-    {
-      id: 1,
-      title: 'Implement AI-powered Task Prioritization',
-      description: 'Use machine learning to automatically prioritize tasks based on deadlines, importance, and team capacity.',
-      author: 'John Doe',
-      date: '2 days ago',
-      likes: 15,
-      comments: 8,
-      status: 'Under Review'
-    },
-    {
-      id: 2,
-      title: 'Mobile App for Quick Attendance',
-      description: 'Develop a mobile app that allows employees to mark attendance with face recognition.',
-      author: 'Sarah Smith',
-      date: '5 days ago',
-      likes: 23,
-      comments: 12,
-      status: 'In Progress'
-    },
-    {
-      id: 3,
-      title: 'Team Collaboration Spaces',
-      description: 'Create virtual collaboration spaces where teams can brainstorm and share ideas in real-time.',
-      author: 'Mike Johnson',
-      date: '1 week ago',
-      likes: 18,
-      comments: 6,
-      status: 'New'
-    },
-    {
-      id: 4,
-      title: 'Automated Leave Balance Alerts',
-      description: 'Send automated notifications to employees when their leave balance is running low.',
-      author: 'Emily Davis',
-      date: '2 weeks ago',
-      likes: 31,
-      comments: 15,
-      status: 'Implemented'
+  // Load user
+  useEffect(() => {
+    const userData = localStorage.getItem('user')
+    if (userData) {
+      setUser(JSON.parse(userData))
     }
-  ]
+  }, [])
 
-  const handleSubmitIdea = (e) => {
-    e.preventDefault()
-    // Handle idea submission
-    console.log('New idea:', newIdea)
-    setNewIdea({ title: '', description: '' })
-    setShowAddIdea(false)
+  const fetchIdeas = useCallback(async () => {
+    try {
+      setLoading(true)
+      const token = localStorage.getItem('token')
+      
+      const params = new URLSearchParams({
+        page: pagination.page.toString(),
+        limit: pagination.limit.toString()
+      })
+
+      if (filter.tab !== 'all') params.append('tab', filter.tab)
+      if (filter.department) params.append('department', filter.department)
+      if (filter.pinned) params.append('pinned', 'true')
+      if (searchQuery) params.append('search', searchQuery)
+
+      const response = await fetch(`/api/ideas?${params}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        setIdeas(Array.isArray(data.data) ? data.data : [])
+        if (data.departments) {
+          setDepartments(data.departments)
+        }
+        if (data.pagination) {
+          setPagination(prev => ({
+            ...prev,
+            total: data.pagination.total,
+            pages: data.pagination.pages
+          }))
+        }
+      } else {
+        toast.error(data.message || 'Failed to fetch ideas')
+        setIdeas([])
+      }
+    } catch (error) {
+      console.error('Error fetching ideas:', error)
+      toast.error('Failed to load ideas')
+      setIdeas([])
+    } finally {
+      setLoading(false)
+    }
+  }, [filter, pagination.page, pagination.limit, searchQuery])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchIdeas()
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [fetchIdeas])
+
+  const handleIdeaCreated = (newIdea) => {
+    setShowCreateModal(false)
+    toast.success('Idea submitted successfully!')
+    fetchIdeas()
   }
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'New':
-        return 'bg-blue-100 text-blue-800'
-      case 'Under Review':
-        return 'bg-yellow-100 text-yellow-800'
-      case 'In Progress':
-        return 'bg-purple-100 text-purple-800'
-      case 'Implemented':
-        return 'bg-green-100 text-green-800'
-      default:
-        return 'bg-gray-100 text-gray-800'
+  const handleVote = async (ideaId, type) => {
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch(`/api/ideas/${ideaId}/vote`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ type })
+      })
+
+      const data = await res.json()
+      if (data.success) {
+        setIdeas(prev => prev.map(idea => 
+          idea._id === ideaId 
+            ? { ...idea, likes: data.data.likes, dislikes: data.data.dislikes, userVote: data.data.userVote }
+            : idea
+        ))
+      } else {
+        toast.error(data.message || 'Failed to vote')
+      }
+    } catch (error) {
+      console.error('Error voting:', error)
+      toast.error('Failed to vote')
     }
   }
+
+  const handlePin = async (ideaId) => {
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch(`/api/ideas/${ideaId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ action: 'pin' })
+      })
+
+      const data = await res.json()
+      if (data.success) {
+        toast.success(data.data.isPinned ? 'Idea pinned!' : 'Idea unpinned')
+        fetchIdeas()
+      }
+    } catch (error) {
+      console.error('Error pinning:', error)
+      toast.error('Failed to pin idea')
+    }
+  }
+
+  const handleDelete = async (ideaId) => {
+    if (!confirm('Are you sure you want to delete this idea?')) return
+    
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch(`/api/ideas/${ideaId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      })
+
+      const data = await res.json()
+      if (data.success) {
+        toast.success('Idea deleted')
+        fetchIdeas()
+      } else {
+        toast.error(data.message || 'Failed to delete')
+      }
+    } catch (error) {
+      console.error('Error deleting:', error)
+      toast.error('Failed to delete idea')
+    }
+  }
+
+  // Stats
+  const myIdeas = ideas.filter(i => i.isOwner)
+  const pinnedIdeas = ideas.filter(i => i.isPinned)
+  const totalVotes = ideas.reduce((sum, i) => sum + (i.likes || 0), 0)
+
+  const isAdmin = user?.role === 'admin' || user?.role === 'hr' || user?.role === 'department_head'
 
   return (
-    <div className="page-container pb-14 md:pb-6">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4 sm:mb-6">
+    <div className="page-container">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Ideas Sandbox</h1>
-          <p className="text-sm sm:text-base text-gray-600 mt-1">Share your innovative ideas with the team</p>
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+            <HiOutlineLightBulb className="w-7 h-7 text-yellow-500" />
+            Ideas Sandbox
+          </h1>
+          <p className="text-gray-600 mt-1">
+            Share your innovative ideas with the team
+          </p>
         </div>
+
         <button
-          onClick={() => setShowAddIdea(!showAddIdea)}
-          className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+          onClick={() => setShowCreateModal(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-white text-black border border-gray-300 rounded-lg font-medium hover:bg-blue-600 hover:text-black hover:border-blue-600 transition-colors"
         >
-          <FaPlus />
-          <span className="hidden sm:inline">New Idea</span>
+          <HiOutlinePlus className="w-5 h-5" />
+          New Idea
         </button>
       </div>
 
-      {/* Add Idea Form */}
-      {showAddIdea && (
-        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-6">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">Share Your Idea</h2>
-          <form onSubmit={handleSubmitIdea}>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Title
-                </label>
-                <input
-                  type="text"
-                  value={newIdea.title}
-                  onChange={(e) => setNewIdea({ ...newIdea, title: e.target.value })}
-                  placeholder="Enter a catchy title for your idea"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Description
-                </label>
-                <textarea
-                  value={newIdea.description}
-                  onChange={(e) => setNewIdea({ ...newIdea, description: e.target.value })}
-                  placeholder="Describe your idea in detail..."
-                  rows="4"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                />
-              </div>
-              <div className="flex gap-3">
-                <button
-                  type="submit"
-                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  Submit Idea
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowAddIdea(false)}
-                  className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300 transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-yellow-100 rounded-lg">
+              <HiOutlineLightBulb className="w-5 h-5 text-yellow-600" />
             </div>
-          </form>
-        </div>
-      )}
-
-      {/* Ideas Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-        {dummyIdeas.map((idea) => (
-          <div key={idea.id} className="bg-white rounded-lg shadow-md p-4 sm:p-6 hover:shadow-lg transition-shadow">
-            <div className="flex items-start gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-400 to-yellow-600 flex items-center justify-center flex-shrink-0">
-                <FaLightbulb className="text-white" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="text-lg font-bold text-gray-800 mb-1">{idea.title}</h3>
-                <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(idea.status)}`}>
-                  {idea.status}
-                </span>
-              </div>
-            </div>
-
-            <p className="text-gray-600 mb-4 line-clamp-3">{idea.description}</p>
-
-            <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-              <div className="flex items-center gap-2 text-sm text-gray-500">
-                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center">
-                  <FaUser className="text-white text-xs" />
-                </div>
-                <span>{idea.author}</span>
-                <span>•</span>
-                <span>{idea.date}</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-4 mt-4">
-              <button className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors">
-                <FaThumbsUp />
-                <span className="text-sm">{idea.likes}</span>
-              </button>
-              <button className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors">
-                <FaComment />
-                <span className="text-sm">{idea.comments}</span>
-              </button>
+            <div>
+              <p className="text-2xl font-bold text-gray-800">{ideas.length}</p>
+              <p className="text-sm text-gray-500">Total Ideas</p>
             </div>
           </div>
-        ))}
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <HiOutlineUserCircle className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-800">{myIdeas.length}</p>
+              <p className="text-sm text-gray-500">My Ideas</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-100 rounded-lg">
+              <FaThumbtack className="w-5 h-5 text-amber-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-800">{pinnedIdeas.length}</p>
+              <p className="text-sm text-gray-500">Pinned</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-green-100 rounded-lg">
+              <HiOutlineHandThumbUp className="w-5 h-5 text-green-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-800">{totalVotes}</p>
+              <p className="text-sm text-gray-500">Total Votes</p>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Empty State */}
-      {dummyIdeas.length === 0 && (
-        <div className="bg-white rounded-lg shadow-md p-12 text-center">
-          <FaLightbulb className="text-6xl text-gray-300 mx-auto mb-4" />
-          <h3 className="text-xl font-bold text-gray-800 mb-2">No Ideas Yet</h3>
-          <p className="text-gray-600 mb-6">Be the first to share an innovative idea!</p>
-          <button
-            onClick={() => setShowAddIdea(true)}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Share Your First Idea
-          </button>
+      {/* Filters and Search */}
+      <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+        <div className="flex flex-col md:flex-row gap-4">
+          {/* Search */}
+          <div className="relative flex-1">
+            <HiOutlineMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search ideas..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          {/* Filters */}
+          <div className="flex flex-wrap gap-2">
+            <div className="flex bg-white border border-gray-300 rounded-lg overflow-hidden">
+              <button
+                onClick={() => setFilter(prev => ({ ...prev, tab: 'all' }))}
+                className={`px-4 py-2.5 text-sm font-medium transition-colors ${
+                  filter.tab === 'all'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                All Ideas
+              </button>
+              <button
+                onClick={() => setFilter(prev => ({ ...prev, tab: 'my' }))}
+                className={`px-4 py-2.5 text-sm font-medium transition-colors ${
+                  filter.tab === 'my'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                My Ideas
+              </button>
+            </div>
+
+            <button
+              onClick={() => setFilter(prev => ({ ...prev, pinned: !prev.pinned }))}
+              className={`px-4 py-2.5 border rounded-lg flex items-center gap-2 transition-colors ${
+                filter.pinned 
+                  ? 'bg-blue-600 border-blue-600 text-white' 
+                  : 'border-gray-300 bg-white text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              <HiOutlineFunnel className="w-4 h-4" />
+              Filters
+            </button>
+          </div>
         </div>
+      </div>
+
+      {/* Ideas List */}
+      <div>
+        <h2 className="text-lg font-semibold text-gray-800 mb-3">
+          {filter.tab === 'my' ? 'My Ideas' : 'All Ideas'}
+        </h2>
+        
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="bg-white rounded-xl p-4 animate-pulse shadow-sm border border-gray-100">
+                <div className="h-4 bg-gray-200 rounded w-3/4 mb-3"></div>
+                <div className="h-3 bg-gray-200 rounded w-1/2 mb-2"></div>
+                <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+              </div>
+            ))}
+          </div>
+        ) : ideas.length === 0 ? (
+          <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
+            <HiOutlineLightBulb className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+            <h3 className="text-lg font-medium text-gray-800 mb-2">
+              No ideas found
+            </h3>
+            <p className="text-gray-500 mb-4">
+              {searchQuery ? 'Try adjusting your search' : 'Be the first to share an innovative idea!'}
+            </p>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="btn-primary inline-flex items-center gap-2"
+            >
+              <HiOutlinePlus className="w-5 h-5" />
+              Share an Idea
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {ideas.map(idea => (
+              <IdeaCard 
+                key={idea._id} 
+                idea={idea}
+                onVote={handleVote}
+                onPin={handlePin}
+                onDelete={handleDelete}
+                isAdmin={isAdmin}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {pagination.pages > 1 && (
+          <div className="flex justify-center items-center gap-2 mt-6">
+            <button
+              onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
+              disabled={pagination.page === 1}
+              className="p-2 rounded-lg border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+            >
+              <HiOutlineChevronLeft className="w-5 h-5 text-gray-600" />
+            </button>
+            <span className="text-sm text-gray-600">
+              Page {pagination.page} of {pagination.pages}
+            </span>
+            <button
+              onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
+              disabled={pagination.page === pagination.pages}
+              className="p-2 rounded-lg border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+            >
+              <HiOutlineChevronRight className="w-5 h-5 text-gray-600" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Create Idea Modal */}
+      {showCreateModal && (
+        <CreateIdeaModal
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={handleIdeaCreated}
+        />
       )}
     </div>
   )
