@@ -13,10 +13,23 @@ const REDIRECT_URI = `${PRODUCTION_URL}/api/auth/google/callback`;
 export async function GET(request) {
   try {
     const token = request.headers.get('Authorization')?.split(' ')[1];
+    
+    if (!token) {
+      return NextResponse.json({ 
+        isConnected: false, 
+        email: null, 
+        accounts: [] 
+      });
+    }
+    
     const payload = await verifyToken(token);
 
     if (!payload) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ 
+        isConnected: false, 
+        email: null, 
+        accounts: [] 
+      });
     }
 
     await connectDB();
@@ -60,8 +73,14 @@ export async function GET(request) {
     });
 
   } catch (error) {
-    console.error('Error getting email account:', error);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    console.error('[Mail API GET] Error:', error.message, error.stack);
+    // Return a safe response instead of 500 to prevent repeated retries
+    return NextResponse.json({ 
+      isConnected: false, 
+      email: null, 
+      accounts: [],
+      error: 'Failed to check email status'
+    });
   }
 }
 

@@ -41,10 +41,21 @@ async function getAuthenticatedClient(emailAccount) {
 export async function GET(request) {
     try {
         const token = request.headers.get('Authorization')?.split(' ')[1];
+        
+        if (!token) {
+            return NextResponse.json({ 
+                folderCounts: {},
+                userLabels: []
+            });
+        }
+        
         const payload = await verifyToken(token);
 
         if (!payload) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+            return NextResponse.json({ 
+                folderCounts: {},
+                userLabels: []
+            });
         }
 
         await connectDB();
@@ -52,7 +63,11 @@ export async function GET(request) {
         const emailAccount = await EmailAccount.findOne({ user: payload.userId, isConnected: true }).select('+accessToken +refreshToken');
 
         if (!emailAccount) {
-            return NextResponse.json({ error: 'Email not connected' }, { status: 400 });
+            // Return empty labels when not connected
+            return NextResponse.json({ 
+                folderCounts: {},
+                userLabels: []
+            });
         }
 
         const oauth2Client = await getAuthenticatedClient(emailAccount);
@@ -145,13 +160,16 @@ export async function GET(request) {
         });
 
     } catch (error) {
-        console.error('Error fetching labels:', error);
+        console.error('[Mail Labels API] Error fetching labels:', error.message);
 
-        if (error.message === 'Token refresh failed') {
-            return NextResponse.json({ error: 'Session expired. Please reconnect your email.' }, { status: 401 });
-        }
-
-        return NextResponse.json({ error: error.message || 'Failed to fetch labels' }, { status: 500 });
+        // Return empty data instead of error to prevent UI issues
+        return NextResponse.json({ 
+            folderCounts: {},
+            userLabels: [],
+            error: error.message === 'Token refresh failed' 
+                ? 'Session expired. Please reconnect your email.' 
+                : 'Failed to fetch labels'
+        });
     }
 }
 
