@@ -26,10 +26,11 @@ app.prepare().then(() => {
     }
   });
 
-  // Initialize Socket.IO
+  // Initialize Socket.IO with increased payload limit for voice audio
   io = new Server(server, {
     path: '/api/socketio',
     addTrailingSlash: false,
+    maxHttpBufferSize: 5e6, // 5MB - needed for base64 encoded voice audio
     cors: {
       origin: process.env.NEXT_PUBLIC_APP_URL || '*',
       methods: ['GET', 'POST'],

@@ -200,11 +200,15 @@ export async function POST(request) {
       try {
         // Generate voice for each personalized message
         for (const pm of processedMessages) {
+          console.log(`[CallAlert] Generating voice for receiver ${pm.receiverId}, message length: ${pm.message.length}`);
+          
           const voiceResult = await generateSpeechBase64(pm.message, {
             preset: priority === 'urgent' ? 'urgent' : 'default'
           });
 
           if (voiceResult.success) {
+            console.log(`[CallAlert] Voice generated successfully, audioDataUrl length: ${voiceResult.audioDataUrl?.length || 0}`);
+            
             voiceGenerationResults.push({
               receiverId: pm.receiverId,
               audioDataUrl: voiceResult.audioDataUrl,
@@ -217,6 +221,7 @@ export async function POST(request) {
               generatedAt: new Date()
             });
           } else {
+            console.error(`[CallAlert] Voice generation failed for receiver ${pm.receiverId}:`, voiceResult.error);
             voiceGenerationResults.push({
               receiverId: pm.receiverId,
               success: false,
@@ -264,9 +269,17 @@ export async function POST(request) {
           triggerLocation
         };
 
+        // Log payload details for debugging
+        console.log(`📢 [CallAlert] Emitting alert to user:${receiver.user}`, {
+          voiceEnabled: alertPayload.voiceEnabled,
+          hasAudioDataUrl: !!alertPayload.audioDataUrl,
+          audioDataUrlLength: alertPayload.audioDataUrl?.length || 0,
+          priority: alertPayload.priority
+        });
+
         // Emit to user's room
         global.io.to(`user:${receiver.user}`).emit('call-alert', alertPayload);
-        console.log(`📢 [CallAlert] Alert sent to user:${receiver.user}`);
+        console.log(`📢 [CallAlert] Alert emitted to user:${receiver.user}`);
 
         // Mark as delivered via Socket.IO
         const receiverRecord = callAlert.receivers.find(

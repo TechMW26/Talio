@@ -282,6 +282,19 @@ export default function CallAlertReceiver() {
       message: alert.message?.substring(0, 50)
     }, null, 2));
 
+    // Validate audioDataUrl if voice is enabled
+    if (alert.voiceEnabled && alert.audioDataUrl) {
+      if (!alert.audioDataUrl.startsWith('data:audio/')) {
+        console.error('[CallAlert] Invalid audioDataUrl format - does not start with data:audio/');
+        alert.voiceEnabled = false;
+      } else if (alert.audioDataUrl.length < 1000) {
+        console.error('[CallAlert] audioDataUrl too short, likely truncated:', alert.audioDataUrl.length);
+        alert.voiceEnabled = false;
+      } else {
+        console.log('[CallAlert] audioDataUrl validated successfully');
+      }
+    }
+
     // If no active alert, set as active and play
     // Use ref to avoid stale closure issue
     if (!activeAlertRef.current) {
