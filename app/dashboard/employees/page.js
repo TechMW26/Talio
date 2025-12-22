@@ -91,7 +91,7 @@ export default function EmployeesPage() {
     try {
       const token = localStorage.getItem('token')
       const response = await fetch('/api/departments', {
-        headers: { 'Authorization': \`Bearer \${token}\` },
+        headers: { 'Authorization': `Bearer ${token}` },
       })
       const data = await response.json()
       if (data.success) {
@@ -106,7 +106,7 @@ export default function EmployeesPage() {
     try {
       const token = localStorage.getItem('token')
       const response = await fetch('/api/designations', {
-        headers: { 'Authorization': \`Bearer \${token}\` },
+        headers: { 'Authorization': `Bearer ${token}` },
       })
       const data = await response.json()
       if (data.success) {
@@ -121,7 +121,7 @@ export default function EmployeesPage() {
     try {
       const token = localStorage.getItem('token')
       const response = await fetch('/api/employees?limit=1000&status=active', {
-        headers: { 'Authorization': \`Bearer \${token}\` },
+        headers: { 'Authorization': `Bearer ${token}` },
       })
       const data = await response.json()
       if (data.success) {
@@ -151,8 +151,8 @@ export default function EmployeesPage() {
       if (selectedLevel) params.append('level', selectedLevel)
       if (selectedStatus) params.append('status', selectedStatus)
       
-      const response = await fetch(\`/api/employees?\${params.toString()}\`, {
-        headers: { 'Authorization': \`Bearer \${token}\` },
+      const response = await fetch(`/api/employees?${params.toString()}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
       })
 
       const data = await response.json()
@@ -186,15 +186,15 @@ export default function EmployeesPage() {
 
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch(\`/api/employees/\${employee._id}\`, {
+      const response = await fetch(`/api/employees/${employee._id}`, {
         method: 'DELETE',
-        headers: { 'Authorization': \`Bearer \${token}\` },
+        headers: { 'Authorization': `Bearer ${token}` },
       })
 
       const data = await response.json()
 
       if (data.success) {
-        toast.success(\`\${employee.firstName} \${employee.lastName} has been permanently deleted\`)
+        toast.success(`${employee.firstName} ${employee.lastName} has been permanently deleted`)
         fetchEmployees()
         setSelectedEmployees(prev => prev.filter(id => id !== employee._id))
       } else {
@@ -218,10 +218,10 @@ export default function EmployeesPage() {
 
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch(\`/api/employees/\${employeeId}\`, {
+      const response = await fetch(`/api/employees/${employeeId}`, {
         method: 'PATCH',
         headers: {
-          'Authorization': \`Bearer \${token}\`,
+          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ status: newStatus }),
@@ -317,10 +317,10 @@ export default function EmployeesPage() {
       if (bulkEditData.reportingManager) updatePayload.reportingManager = bulkEditData.reportingManager
 
       const updatePromises = selectedEmployees.map(empId => 
-        fetch(\`/api/employees/\${empId}\`, {
+        fetch(`/api/employees/${empId}`, {
           method: 'PATCH',
           headers: {
-            'Authorization': \`Bearer \${token}\`,
+            'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(updatePayload),
@@ -332,7 +332,7 @@ export default function EmployeesPage() {
       const failCount = results.length - successCount
 
       if (successCount > 0) {
-        toast.success(\`Successfully updated \${successCount} employee(s)\`)
+        toast.success(`Successfully updated ${successCount} employee(s)`)
         fetchEmployees()
         setSelectedEmployees([])
         setShowBulkEditModal(false)
@@ -346,7 +346,7 @@ export default function EmployeesPage() {
       }
       
       if (failCount > 0) {
-        toast.error(\`Failed to update \${failCount} employee(s)\`)
+        toast.error(`Failed to update ${failCount} employee(s)`)
       }
     } catch (error) {
       console.error('Bulk update error:', error)
@@ -414,7 +414,7 @@ export default function EmployeesPage() {
             </div>
             <div className="flex items-center space-x-2">
               <select
-                value={\`\${sortBy}-\${sortOrder}\`}
+                value={`${sortBy}-${sortOrder}`}
                 onChange={(e) => {
                   const [field, order] = e.target.value.split('-')
                   setSortBy(field)
@@ -432,7 +432,7 @@ export default function EmployeesPage() {
               </select>
               <button 
                 onClick={() => setShowFilters(!showFilters)}
-                className={\`btn-secondary flex items-center space-x-2 \${showFilters || hasActiveFilters ? 'bg-primary-50 text-primary-700 border-primary-200' : ''}\`}
+                className={`btn-secondary flex items-center space-x-2 ${showFilters || hasActiveFilters ? 'bg-primary-50 text-primary-700 border-primary-200' : ''}`}
               >
                 <FaFilter />
                 <span>Filters</span>
@@ -589,7 +589,7 @@ export default function EmployeesPage() {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {employees.map((employee) => (
-                    <tr key={employee._id} className={\`hover:bg-gray-50 \${selectedEmployees.includes(employee._id) ? 'bg-primary-50' : ''}\`}>
+                    <tr key={employee._id} className={`hover:bg-gray-50 ${selectedEmployees.includes(employee._id) ? 'bg-primary-50' : ''}`}>
                       {canManageEmployees() && (
                         <td className="px-4 py-4">
                           <input
@@ -605,7 +605,7 @@ export default function EmployeesPage() {
                           <div className="flex-shrink-0 h-10 w-10">
                             <div className="h-10 w-10 rounded-full bg-primary-500 flex items-center justify-center text-white font-semibold overflow-hidden">
                               {employee.profilePicture ? (
-                                <img src={employee.profilePicture} alt={\`\${employee.firstName} \${employee.lastName}\`} className="w-full h-full object-cover" />
+                                <img src={employee.profilePicture} alt={`${employee.firstName} ${employee.lastName}`} className="w-full h-full object-cover" />
                               ) : (
                                 <span>{employee.firstName?.[0]}{employee.lastName?.[0]}</span>
                               )}
@@ -629,14 +629,14 @@ export default function EmployeesPage() {
                             value={employee.status || 'active'}
                             onChange={(e) => handleStatusChange(employee._id, e.target.value)}
                             disabled={statusUpdating === employee._id}
-                            className={\`px-2 py-1 text-xs font-semibold rounded-full border-0 cursor-pointer focus:ring-2 focus:ring-primary-500 \${statusUpdating === employee._id ? 'opacity-50' : ''} \${STATUS_OPTIONS.find(s => s.value === employee.status)?.color || 'bg-gray-100 text-gray-800'}\`}
+                            className={`px-2 py-1 text-xs font-semibold rounded-full border-0 cursor-pointer focus:ring-2 focus:ring-primary-500 ${statusUpdating === employee._id ? 'opacity-50' : ''} ${STATUS_OPTIONS.find(s => s.value === employee.status)?.color || 'bg-gray-100 text-gray-800'}`}
                           >
                             {STATUS_OPTIONS.map(option => (
                               <option key={option.value} value={option.value}>{option.label}</option>
                             ))}
                           </select>
                         ) : (
-                          <span className={\`px-2 inline-flex text-xs leading-5 font-semibold rounded-full \${STATUS_OPTIONS.find(s => s.value === employee.status)?.color || 'bg-gray-100 text-gray-800'}\`}>
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${STATUS_OPTIONS.find(s => s.value === employee.status)?.color || 'bg-gray-100 text-gray-800'}`}>
                             {STATUS_OPTIONS.find(s => s.value === employee.status)?.label || employee.status}
                           </span>
                         )}
@@ -644,13 +644,13 @@ export default function EmployeesPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex space-x-2">
                           {canViewEmployeeDetails() && (
-                            <button onClick={() => router.push(\`/dashboard/employees/\${employee._id}\`)} className="text-blue-600 hover:text-blue-900 p-2 rounded-lg hover:bg-blue-50 transition-colors" title="View Details">
+                            <button onClick={() => router.push(`/dashboard/employees/${employee._id}`)} className="text-blue-600 hover:text-blue-900 p-2 rounded-lg hover:bg-blue-50 transition-colors" title="View Details">
                               <FaEye />
                             </button>
                           )}
                           {canManageEmployees() && (
                             <>
-                              <button onClick={() => router.push(\`/dashboard/employees/edit/\${employee._id}\`)} className="text-green-600 hover:text-green-900 p-2 rounded-lg hover:bg-green-50 transition-colors" title="Edit Employee">
+                              <button onClick={() => router.push(`/dashboard/employees/edit/${employee._id}`)} className="text-green-600 hover:text-green-900 p-2 rounded-lg hover:bg-green-50 transition-colors" title="Edit Employee">
                                 <FaEdit />
                               </button>
                               <button onClick={() => handleDelete(employee)} className="text-red-600 hover:text-red-900 p-2 rounded-lg hover:bg-red-50 transition-colors" title="Permanently Delete Employee">
@@ -707,7 +707,7 @@ export default function EmployeesPage() {
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-full bg-primary-500 flex items-center justify-center text-white font-semibold overflow-hidden">
                       {deleteModal.employee.profilePicture ? (
-                        <img src={deleteModal.employee.profilePicture} alt={\`\${deleteModal.employee.firstName} \${deleteModal.employee.lastName}\`} className="w-full h-full object-cover" />
+                        <img src={deleteModal.employee.profilePicture} alt={`${deleteModal.employee.firstName} ${deleteModal.employee.lastName}`} className="w-full h-full object-cover" />
                       ) : (
                         <span>{deleteModal.employee.firstName?.[0]}{deleteModal.employee.lastName?.[0]}</span>
                       )}
