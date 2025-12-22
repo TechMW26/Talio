@@ -37,7 +37,7 @@ export default function GeofenceMap({ center, radius, onUpdate }) {
     // Load Google Maps script
     if (!window.google) {
       const script = document.createElement('script')
-      script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&libraries=places`
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`
       script.async = true
       script.defer = true
       script.onload = initMap

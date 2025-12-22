@@ -19,12 +19,14 @@ export async function GET(request) {
     const limit = parseInt(searchParams.get('limit')) || 10
     const search = searchParams.get('search') || ''
     const department = searchParams.get('department')
+    const designation = searchParams.get('designation')
+    const level = searchParams.get('level')
     const status = searchParams.get('status')
     const sortBy = searchParams.get('sortBy') || 'createdAt'
     const sortOrder = searchParams.get('sortOrder') || 'desc'
 
     // Generate cache key
-    const cacheKey = queryCache.generateKey('employees', page, limit, search, department, status, sortBy, sortOrder)
+    const cacheKey = queryCache.generateKey('employees', page, limit, search, department, designation, level, status, sortBy, sortOrder)
     const cached = queryCache.get(cacheKey)
     if (cached) {
       return NextResponse.json(cached)
@@ -44,6 +46,14 @@ export async function GET(request) {
 
     if (department) {
       query.department = department
+    }
+
+    if (designation) {
+      query.designation = designation
+    }
+
+    if (level) {
+      query.designationLevel = parseInt(level)
     }
 
     if (status) {

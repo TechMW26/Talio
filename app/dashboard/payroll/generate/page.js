@@ -6,7 +6,8 @@ import toast from 'react-hot-toast'
 import {
   FaMoneyBillWave, FaArrowLeft, FaCalculator, FaEye, FaDownload,
   FaFilter, FaSync, FaExclamationTriangle, FaCheckCircle, FaClock,
-  FaUserClock, FaCalendarCheck, FaInfoCircle, FaToggleOn, FaToggleOff
+  FaUserClock, FaCalendarCheck, FaInfoCircle, FaToggleOn, FaToggleOff,
+  FaExclamationCircle
 } from 'react-icons/fa'
 import { formatDepartments } from '@/lib/formatters'
 
@@ -15,12 +16,14 @@ export default function GeneratePayrollPage() {
   const [employees, setEmployees] = useState([])
   const [existingPayrollEmployeeIds, setExistingPayrollEmployeeIds] = useState([])
   const [attendanceData, setAttendanceData] = useState({})
+  const [leaveData, setLeaveData] = useState({}) // Leave data per employee
   const [companySettings, setCompanySettings] = useState(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const [selectedEmployees, setSelectedEmployees] = useState([])
   const [employeeOvertimeGrace, setEmployeeOvertimeGrace] = useState({}) // Per-employee overtime grace toggle
+  const [pendingLeavesWarning, setPendingLeavesWarning] = useState([]) // Employees with pending leaves
   const [formData, setFormData] = useState({
     month: new Date().getMonth() + 1,
     year: new Date().getFullYear(),
@@ -54,6 +57,7 @@ export default function GeneratePayrollPage() {
   useEffect(() => {
     if (employees.length > 0 && companySettings) {
       fetchAttendanceData()
+      fetchLeaveData() // Fetch leave data for accurate payroll calculation
       fetchExistingPayrolls()
     }
   }, [formData.month, formData.year, employees, companySettings])
@@ -124,6 +128,9 @@ export default function GeneratePayrollPage() {
     lateThreshold: 15,
     halfDayHours: 4,
     fullDayHours: 8,
+    // Hour thresholds for determining day status
+    fullDayThreshold: 7.5, // 7.5 hours or more = full day (allows 30 min grace)
+    halfDayThreshold: 3.5, // 3.5 hours or more but less than fullDayThreshold = half day
     workingDays: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'],
     payroll: {
       workingDaysPerMonth: 26,
@@ -136,8 +143,8 @@ export default function GeneratePayrollPage() {
       esiEnabled: true,
       esiPercentage: 0.75,
       professionalTax: { enabled: true, amount: 200 },
-      tdsEnabled: true,
-      tdsPercentage: 10,
+      tdsEnabled: false, // TDS disabled by default - must be configured manually
+      tdsPercentage: 0,
     },
   })
 
@@ -153,6 +160,11 @@ export default function GeneratePayrollPage() {
       )
 
       const data = await response.json()
+
+      // Get hour thresholds from company settings
+      const settings = companySettings || getDefaultSettings()
+      const fullDayThreshold = settings.fullDayThreshold || 7.5 // Default: 7.5 hours = full day
+      const halfDayThreshold = settings.halfDayThreshold || 3.5 // Default: 3.5 hours = half day
 
       if (data.success && data.data) {
         // Process attendance data per employee with detailed tracking
@@ -182,10 +194,25 @@ export default function GeneratePayrollPage() {
           const status = record.status?.toLowerCase() || ''
           const checkInStatus = record.checkInStatus?.toLowerCase() || ''
           const checkOutStatus = record.checkOutStatus?.toLowerCase() || ''
+          const workHours = record.workHours || 0
 
+          // Use hour-based threshold to determine day type
+          // This allows grace period - e.g., 7.5 hours counts as full day even if 8 hours expected
           if (status === 'present' || status === 'approved' || status === 'in-progress') {
-            attendanceMap[empId].presentDays++
-            attendanceMap[empId].totalWorkHours += record.workHours || 0
+            // Check if work hours meet full day threshold
+            if (workHours >= fullDayThreshold) {
+              attendanceMap[empId].presentDays++
+            } else if (workHours >= halfDayThreshold) {
+              // Between half day and full day threshold = half day
+              attendanceMap[empId].halfDays++
+            } else if (workHours > 0) {
+              // Less than half day threshold but some hours worked = half day (benefit of doubt)
+              attendanceMap[empId].halfDays++
+            } else {
+              // No hours recorded but status is present - count as present
+              attendanceMap[empId].presentDays++
+            }
+            attendanceMap[empId].totalWorkHours += workHours
 
             if (checkInStatus === 'early') {
               attendanceMap[empId].earlyCheckIns++
@@ -205,7 +232,7 @@ export default function GeneratePayrollPage() {
             }
           } else if (status === 'half-day' || status === 'halfday') {
             attendanceMap[empId].halfDays++
-            attendanceMap[empId].totalWorkHours += record.workHours || 0
+            attendanceMap[empId].totalWorkHours += workHours
           } else if (status === 'absent') {
             attendanceMap[empId].absentDays++
           } else if (status === 'leave' || status === 'on-leave') {
@@ -220,11 +247,100 @@ export default function GeneratePayrollPage() {
     }
   }
 
+  // Fetch leave data for the selected month
+  const fetchLeaveData = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const leaveMap = {}
+      const pendingWarnings = []
+
+      // Calculate start and end of the month
+      const startOfMonth = new Date(formData.year, formData.month - 1, 1)
+      const endOfMonth = new Date(formData.year, formData.month, 0)
+
+      // Fetch all leaves
+      const response = await fetch('/api/leave', {
+        headers: { 'Authorization': 'Bearer ' + token }
+      })
+
+      const data = await response.json()
+
+      if (data.success && data.data) {
+        data.data.forEach(leave => {
+          const empId = leave.employee?._id || leave.employee
+          if (!empId) return
+
+          // Check if leave overlaps with selected month
+          const leaveStart = new Date(leave.startDate)
+          const leaveEnd = new Date(leave.endDate)
+          
+          // Only consider leaves that overlap with the payroll month
+          if (leaveEnd < startOfMonth || leaveStart > endOfMonth) return
+
+          if (!leaveMap[empId]) {
+            leaveMap[empId] = {
+              approvedDays: 0,
+              deniedDays: 0,
+              pendingDays: 0,
+              approvedLeaves: [],
+              deniedLeaves: [],
+              pendingLeaves: [],
+            }
+          }
+
+          // Calculate days within this month
+          const effectiveStart = leaveStart < startOfMonth ? startOfMonth : leaveStart
+          const effectiveEnd = leaveEnd > endOfMonth ? endOfMonth : leaveEnd
+          const daysInMonth = Math.ceil((effectiveEnd - effectiveStart) / (1000 * 60 * 60 * 24)) + 1
+
+          if (leave.status === 'approved') {
+            leaveMap[empId].approvedDays += leave.isHalfDay ? 0.5 : daysInMonth
+            leaveMap[empId].approvedLeaves.push({
+              ...leave,
+              daysInMonth: leave.isHalfDay ? 0.5 : daysInMonth
+            })
+          } else if (leave.status === 'rejected') {
+            leaveMap[empId].deniedDays += leave.isHalfDay ? 0.5 : daysInMonth
+            leaveMap[empId].deniedLeaves.push({
+              ...leave,
+              daysInMonth: leave.isHalfDay ? 0.5 : daysInMonth
+            })
+          } else if (leave.status === 'pending') {
+            leaveMap[empId].pendingDays += leave.isHalfDay ? 0.5 : daysInMonth
+            leaveMap[empId].pendingLeaves.push({
+              ...leave,
+              daysInMonth: leave.isHalfDay ? 0.5 : daysInMonth
+            })
+
+            // Add to pending warnings
+            const employee = employees.find(e => e._id === empId)
+            if (employee) {
+              pendingWarnings.push({
+                employeeId: empId,
+                employeeName: `${employee.firstName} ${employee.lastName}`,
+                employeeCode: employee.employeeCode,
+                pendingDays: leave.isHalfDay ? 0.5 : daysInMonth,
+                leaveId: leave._id,
+                startDate: leave.startDate,
+                endDate: leave.endDate,
+              })
+            }
+          }
+        })
+      }
+
+      setLeaveData(leaveMap)
+      setPendingLeavesWarning(pendingWarnings)
+    } catch (error) {
+      console.error('Fetch leave data error:', error)
+    }
+  }
+
   const calculateEmployeePayroll = (employee) => {
     const settings = companySettings || getDefaultSettings()
     const payrollSettings = settings.payroll || getDefaultSettings().payroll
     const attendance = attendanceData[employee._id] || {
-      presentDays: payrollSettings.workingDaysPerMonth,
+      presentDays: 0, // No assumption - use actual attendance data only
       absentDays: 0,
       halfDays: 0,
       lateDays: 0,
@@ -236,12 +352,41 @@ export default function GeneratePayrollPage() {
       totalWorkHours: 0,
     }
 
+    // Get leave data for this employee
+    const employeeLeaves = leaveData[employee._id] || {
+      approvedDays: 0,
+      deniedDays: 0,
+      pendingDays: 0,
+      approvedLeaves: [],
+      deniedLeaves: [],
+      pendingLeaves: [],
+    }
+
     // Use employee's salary fields if available, otherwise fallback to zero (no demo data)
     const empSalary = employee.salary || {}
     const basicSalary = empSalary.basic || employee.basicSalary || 0
     const workingDays = payrollSettings.workingDaysPerMonth || 26
     const perDaySalary = basicSalary > 0 ? basicSalary / workingDays : 0
     const perHourSalary = perDaySalary > 0 ? perDaySalary / (settings.fullDayHours || 8) : 0
+
+    // ATTENDANCE-BASED PAYROLL CALCULATION
+    // Calculate effective present days and absent days based on actual attendance
+    // Present days = days with 'present' status in attendance
+    // Approved leaves = count as paid leave (not deducted)
+    // Half days = count as 0.5 day salary deduction
+    // Absent days = working days - present - halfDays - approved leaves (no record days are treated as absent)
+    const effectivePresentDays = attendance.presentDays || 0
+    const effectiveHalfDays = attendance.halfDays || 0
+    const effectiveApprovedLeaves = employeeLeaves.approvedDays || 0
+    const effectiveDeniedLeaves = employeeLeaves.deniedDays || 0
+    const effectivePendingLeaves = employeeLeaves.pendingDays || 0
+    
+    // Calculate actual absent days: total working days minus (present + half days counted as 0.5 + approved leaves)
+    // Days with no attendance record are counted as absent
+    const accountedDays = effectivePresentDays + effectiveHalfDays + effectiveApprovedLeaves + (attendance.leaveDays || 0)
+    const calculatedAbsentDays = Math.max(0, workingDays - accountedDays)
+    // Use actual attendance-based absent days if available, otherwise use calculated
+    const effectiveAbsentDays = attendance.absentDays > 0 ? attendance.absentDays : calculatedAbsentDays
 
     // Use employee's allowances if available, otherwise zero (no auto-calculation)
     const hra = empSalary.hra || 0
@@ -284,17 +429,22 @@ export default function GeneratePayrollPage() {
       professionalTax = employee.professionalTax?.amount || payrollSettings.professionalTax.amount || 200
     }
 
+    // TDS calculation - Use employee's TDS configuration if available, otherwise 0
+    // TDS must be manually configured for each employee - no auto-calculation
     let tds = 0
-    if (payrollSettings.tdsEnabled) {
-      const annualSalary = grossSalary * 12
-      if (annualSalary > 1000000) {
-        tds = grossSalary * 0.2
-      } else if (annualSalary > 500000) {
-        tds = grossSalary * 0.1
-      } else if (annualSalary > 250000) {
-        tds = grossSalary * 0.05
+    const employeeTds = employee.tdsConfiguration || {}
+    if (employeeTds.enabled) {
+      // Employee has TDS manually configured
+      if (employeeTds.fixedAmount > 0) {
+        tds = employeeTds.fixedAmount
+      } else if (employeeTds.percentage > 0) {
+        tds = grossSalary * employeeTds.percentage / 100
       }
+    } else if (payrollSettings.tdsEnabled && payrollSettings.tdsPercentage > 0) {
+      // Fall back to company settings if employee TDS not configured but company TDS is enabled
+      tds = grossSalary * (payrollSettings.tdsPercentage / 100)
     }
+    // If neither employee nor company TDS is configured, TDS remains 0
 
     let lateDeduction = 0
     let chargeableLates = 0
@@ -315,32 +465,40 @@ export default function GeneratePayrollPage() {
     }
 
     let halfDayDeduction = 0
-    if (payrollSettings.halfDayDeduction?.enabled && attendance.halfDays > 0) {
+    if (payrollSettings.halfDayDeduction?.enabled && effectiveHalfDays > 0) {
       const deductionType = payrollSettings.halfDayDeduction.type
       const deductionValue = payrollSettings.halfDayDeduction.value || 50
 
       if (deductionType === 'fixed') {
-        halfDayDeduction = attendance.halfDays * deductionValue
+        halfDayDeduction = effectiveHalfDays * deductionValue
       } else if (deductionType === 'percentage' || deductionType === 'half-day-salary') {
-        halfDayDeduction = perDaySalary * attendance.halfDays * (deductionValue / 100)
+        halfDayDeduction = perDaySalary * effectiveHalfDays * (deductionValue / 100)
       }
     }
 
+    // ABSENT DEDUCTION - Uses calculated absent days (days with no record or marked absent)
     let absentDeduction = 0
-    if (payrollSettings.absentDeduction?.enabled && attendance.absentDays > 0) {
+    if (payrollSettings.absentDeduction?.enabled && effectiveAbsentDays > 0) {
       const deductionType = payrollSettings.absentDeduction.type
       const deductionValue = payrollSettings.absentDeduction.value || 100
 
       if (deductionType === 'fixed') {
-        absentDeduction = attendance.absentDays * deductionValue
+        absentDeduction = effectiveAbsentDays * deductionValue
       } else if (deductionType === 'percentage' || deductionType === 'full-day-salary') {
-        absentDeduction = perDaySalary * attendance.absentDays * (deductionValue / 100)
+        absentDeduction = perDaySalary * effectiveAbsentDays * (deductionValue / 100)
       }
+    }
+
+    // DENIED LEAVE DEDUCTION - Deduct salary for days where leave was denied
+    // These are days employee took leave but it was rejected, so salary should be deducted
+    let deniedLeaveDeduction = 0
+    if (effectiveDeniedLeaves > 0) {
+      deniedLeaveDeduction = perDaySalary * effectiveDeniedLeaves
     }
 
     let earlyCheckOutDeduction = 0
 
-    const attendanceDeductions = lateDeduction + halfDayDeduction + absentDeduction + earlyCheckOutDeduction
+    const attendanceDeductions = lateDeduction + halfDayDeduction + absentDeduction + deniedLeaveDeduction + earlyCheckOutDeduction
     const totalDeductions = pf + esi + professionalTax + tds + attendanceDeductions
     
     // Calculate net salary with overtime grace logic
@@ -377,7 +535,19 @@ export default function GeneratePayrollPage() {
 
     return {
       employee,
-      attendance: { ...attendance, chargeableLates },
+      attendance: { 
+        ...attendance, 
+        chargeableLates,
+        effectivePresentDays,
+        effectiveAbsentDays,
+        effectiveHalfDays,
+      },
+      // Leave data for display
+      leaves: {
+        approvedDays: effectiveApprovedLeaves,
+        deniedDays: effectiveDeniedLeaves,
+        pendingDays: effectivePendingLeaves,
+      },
       basicSalary,
       perDaySalary,
       perHourSalary,
@@ -394,6 +564,7 @@ export default function GeneratePayrollPage() {
       lateDeduction,
       halfDayDeduction,
       absentDeduction,
+      deniedLeaveDeduction,
       earlyCheckOutDeduction,
       attendanceDeductions,
       totalDeductions,
@@ -413,7 +584,7 @@ export default function GeneratePayrollPage() {
       if (!employee) return null
       return calculateEmployeePayroll(employee)
     }).filter(Boolean)
-  }, [selectedEmployees, showPreview, employees, attendanceData, companySettings, formData.enableOvertimeGrace, employeeOvertimeGrace])
+  }, [selectedEmployees, showPreview, employees, attendanceData, leaveData, companySettings, formData.enableOvertimeGrace, employeeOvertimeGrace])
 
   const handleSelectAll = (e) => {
     if (e.target.checked) {
@@ -481,7 +652,7 @@ export default function GeneratePayrollPage() {
             esi: payroll.esi,
             professionalTax: payroll.professionalTax,
             tds: payroll.tds,
-            lateDeduction: payroll.lateDeduction + payroll.halfDayDeduction + payroll.absentDeduction + payroll.earlyCheckOutDeduction,
+            lateDeduction: payroll.lateDeduction + payroll.halfDayDeduction + payroll.absentDeduction + payroll.deniedLeaveDeduction + payroll.earlyCheckOutDeduction,
             loanRepayment: 0,
             advance: 0,
             other: 0,
@@ -491,15 +662,17 @@ export default function GeneratePayrollPage() {
           totalDeductions: payroll.totalDeductions,
           netSalary: payroll.netSalary,
           workingDays: payroll.workingDays || 26,
-          presentDays: payroll.attendance.presentDays,
-          absentDays: payroll.attendance.absentDays,
-          leaveDays: payroll.attendance.leaveDays,
+          presentDays: payroll.attendance.effectivePresentDays || payroll.attendance.presentDays || 0,
+          absentDays: payroll.attendance.effectiveAbsentDays || payroll.attendance.absentDays || 0,
+          leaveDays: payroll.leaves?.approvedDays || payroll.attendance.leaveDays || 0,
           // Attendance details
           attendanceDetails: {
-            lateDays: payroll.attendance.lateDays,
-            halfDays: payroll.attendance.halfDays,
-            overtimeHours: payroll.attendance.overtimeHours,
+            lateDays: payroll.attendance.lateDays || 0,
+            halfDays: payroll.attendance.effectiveHalfDays || payroll.attendance.halfDays || 0,
+            overtimeHours: payroll.attendance.overtimeHours || 0,
             holidaysWorked: 0,
+            deniedLeaveDays: payroll.leaves?.deniedDays || 0,
+            pendingLeaveDays: payroll.leaves?.pendingDays || 0,
           },
           // Overtime grace tracking
           overtimeGrace: {
@@ -557,6 +730,7 @@ export default function GeneratePayrollPage() {
       tds: acc.tds + p.tds,
       overtimeEarnings: acc.overtimeEarnings + p.overtimeEarnings,
       attendanceDeductions: acc.attendanceDeductions + p.attendanceDeductions,
+      deniedLeaveDeductions: acc.deniedLeaveDeductions + (p.deniedLeaveDeduction || 0),
       overtimeGraceApplied: acc.overtimeGraceApplied + (p.overtimeGrace?.appliedAmount || 0),
     }), {
       grossSalary: 0,
@@ -567,9 +741,15 @@ export default function GeneratePayrollPage() {
       tds: 0,
       overtimeEarnings: 0,
       attendanceDeductions: 0,
+      deniedLeaveDeductions: 0,
       overtimeGraceApplied: 0,
     })
   }, [calculatedPayrollData])
+
+  // Get pending leaves for selected employees
+  const selectedEmployeesPendingLeaves = useMemo(() => {
+    return pendingLeavesWarning.filter(warning => selectedEmployees.includes(warning.employeeId))
+  }, [pendingLeavesWarning, selectedEmployees])
 
   if (loading) {
     return (
@@ -806,16 +986,16 @@ export default function GeneratePayrollPage() {
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Basic Salary</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Gross Salary</th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase bg-blue-50">OT Grace</th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase bg-green-50">Present</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase bg-green-50">Early In</th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase bg-yellow-50">Late</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase bg-orange-50">Early Out</th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase bg-purple-50">Overtime</th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase bg-blue-50">Half-Day</th>
                   <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase bg-red-50">Absent</th>
-                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase bg-gray-100">Leave</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase bg-green-100">Approved Leaves</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase bg-pink-50">Denied Leaves</th>
+                  <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase bg-yellow-100">Pending Leaves</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -832,6 +1012,7 @@ export default function GeneratePayrollPage() {
                 ) : (
                   availableEmployees.map((employee) => {
                     const attendance = attendanceData[employee._id] || {}
+                    const employeeLeaves = leaveData[employee._id] || {}
                     return (
                       <tr key={employee._id} className="hover:bg-gray-50">
                         <td className="px-4 py-3">
@@ -847,7 +1028,7 @@ export default function GeneratePayrollPage() {
                           <div className="text-xs text-gray-500">{employee.employeeCode}</div>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-gray-600">{formatDepartments(employee)}</td>
-                        <td className="px-4 py-3 whitespace-nowrap text-right font-semibold text-gray-900">{formatCurrency(employee.salary)}</td>
+                        <td className="px-4 py-3 whitespace-nowrap text-right font-semibold text-gray-900">{formatCurrency(employee.salary?.grossSalary || employee.salary?.basic || 0)}</td>
                         <td className="px-4 py-3 whitespace-nowrap text-center bg-blue-50">
                           <button
                             type="button"
@@ -861,14 +1042,8 @@ export default function GeneratePayrollPage() {
                         <td className="px-4 py-3 whitespace-nowrap text-center bg-green-50">
                           <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">{attendance.presentDays || 0}</span>
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-center bg-green-50">
-                          <span className={'px-2 py-1 text-xs font-medium rounded-full ' + (attendance.earlyCheckIns > 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-500')}>{attendance.earlyCheckIns || 0}</span>
-                        </td>
                         <td className="px-4 py-3 whitespace-nowrap text-center bg-yellow-50">
                           <span className={'px-2 py-1 text-xs font-medium rounded-full ' + (attendance.lateDays > 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-500')}>{attendance.lateDays || 0}</span>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-center bg-orange-50">
-                          <span className={'px-2 py-1 text-xs font-medium rounded-full ' + (attendance.earlyCheckOuts > 0 ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-500')}>{attendance.earlyCheckOuts || 0}</span>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-center bg-purple-50">
                           <span className={'px-2 py-1 text-xs font-medium rounded-full ' + (attendance.overtimeHours > 0 ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-500')}>{attendance.overtimeHours ? attendance.overtimeHours.toFixed(1) + 'h' : '0'}</span>
@@ -879,8 +1054,14 @@ export default function GeneratePayrollPage() {
                         <td className="px-4 py-3 whitespace-nowrap text-center bg-red-50">
                           <span className={'px-2 py-1 text-xs font-medium rounded-full ' + (attendance.absentDays > 0 ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-500')}>{attendance.absentDays || 0}</span>
                         </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-center bg-gray-100">
-                          <span className={'px-2 py-1 text-xs font-medium rounded-full ' + (attendance.leaveDays > 0 ? 'bg-gray-200 text-gray-700' : 'bg-gray-100 text-gray-500')}>{attendance.leaveDays || 0}</span>
+                        <td className="px-4 py-3 whitespace-nowrap text-center bg-green-100">
+                          <span className={'px-2 py-1 text-xs font-medium rounded-full ' + (employeeLeaves.approvedDays > 0 ? 'bg-green-200 text-green-800' : 'bg-gray-100 text-gray-500')}>{employeeLeaves.approvedDays || 0}</span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-center bg-pink-50">
+                          <span className={'px-2 py-1 text-xs font-medium rounded-full ' + (employeeLeaves.deniedDays > 0 ? 'bg-pink-200 text-pink-800' : 'bg-gray-100 text-gray-500')}>{employeeLeaves.deniedDays || 0}</span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-center bg-yellow-100">
+                          <span className={'px-2 py-1 text-xs font-medium rounded-full ' + (employeeLeaves.pendingDays > 0 ? 'bg-yellow-200 text-yellow-800' : 'bg-gray-100 text-gray-500')}>{employeeLeaves.pendingDays || 0}</span>
                         </td>
                       </tr>
                     )
@@ -956,6 +1137,7 @@ export default function GeneratePayrollPage() {
                   <th className="px-3 py-3 text-right font-semibold text-gray-700 bg-yellow-50">Late</th>
                   <th className="px-3 py-3 text-right font-semibold text-gray-700 bg-orange-50">Half-Day</th>
                   <th className="px-3 py-3 text-right font-semibold text-gray-700 bg-red-50">Absent</th>
+                  <th className="px-3 py-3 text-right font-semibold text-gray-700 bg-pink-50">Denied Leave</th>
                   <th className="px-3 py-3 text-right font-semibold text-gray-700 bg-red-100">Total Ded.</th>
                   {formData.enableOvertimeGrace && (
                     <th className="px-3 py-3 text-right font-semibold text-gray-700 bg-blue-100">Grace</th>
@@ -970,7 +1152,7 @@ export default function GeneratePayrollPage() {
                       <div className="font-medium text-gray-900">{payroll.employee.firstName} {payroll.employee.lastName}</div>
                       <div className="text-gray-500">{payroll.employee.employeeCode}</div>
                       <div className="text-gray-400 text-[10px] mt-1">
-                        P:{payroll.attendance.presentDays} | L:{payroll.attendance.lateDays}
+                        P:{payroll.attendance.effectivePresentDays || payroll.attendance.presentDays} | A:{payroll.attendance.effectiveAbsentDays || 0} | L:{payroll.attendance.lateDays}
                         {payroll.attendance.chargeableLates > 0 && <span className="text-yellow-600"> ({payroll.attendance.chargeableLates} charged)</span>}
                         {payroll.attendance.overtimeHours > 0 && <span className="text-purple-600"> | OT:{payroll.attendance.overtimeHours.toFixed(1)}h</span>}
                       </div>
@@ -995,6 +1177,9 @@ export default function GeneratePayrollPage() {
                     <td className="px-3 py-3 text-right bg-red-50">
                       {payroll.absentDeduction > 0 ? <span className="text-red-700 font-medium">{formatCurrency(payroll.absentDeduction)}</span> : <span className="text-gray-400">-</span>}
                     </td>
+                    <td className="px-3 py-3 text-right bg-pink-50">
+                      {payroll.deniedLeaveDeduction > 0 ? <span className="text-pink-700 font-medium">{formatCurrency(payroll.deniedLeaveDeduction)}</span> : <span className="text-gray-400">-</span>}
+                    </td>
                     <td className="px-3 py-3 text-right font-semibold text-red-700 bg-red-100">{formatCurrency(payroll.totalDeductions)}</td>
                     {formData.enableOvertimeGrace && (
                       <td className="px-3 py-3 text-right bg-blue-100">
@@ -1017,6 +1202,7 @@ export default function GeneratePayrollPage() {
                   <td className="px-3 py-3 text-right font-bold text-red-700">{formatCurrency(summaryTotals.esi)}</td>
                   <td className="px-3 py-3" colSpan={2}></td>
                   <td className="px-3 py-3 text-right font-bold text-orange-700 bg-orange-100" colSpan={3}>{formatCurrency(summaryTotals.attendanceDeductions)}</td>
+                  <td className="px-3 py-3 text-right font-bold text-pink-700 bg-pink-100">{formatCurrency(summaryTotals.deniedLeaveDeductions)}</td>
                   <td className="px-3 py-3 text-right font-bold text-red-700 bg-red-200">{formatCurrency(summaryTotals.totalDeductions)}</td>
                   {formData.enableOvertimeGrace && (
                     <td className="px-3 py-3 text-right font-bold text-blue-700 bg-blue-200">{formatCurrency(summaryTotals.overtimeGraceApplied)}</td>
@@ -1026,6 +1212,37 @@ export default function GeneratePayrollPage() {
               </tfoot>
             </table>
           </div>
+
+          {/* Pending Leaves Warning Section */}
+          {selectedEmployeesPendingLeaves.length > 0 && (
+            <div className="p-4 bg-yellow-50 border-t border-yellow-200">
+              <div className="flex items-start space-x-3">
+                <FaExclamationCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="text-sm font-semibold text-yellow-800">Pending Leave Requests</h3>
+                  <p className="text-xs text-yellow-700 mt-1 mb-2">
+                    The following employees have pending leave requests for this period. Please approve or reject before finalizing payroll.
+                  </p>
+                  <div className="space-y-2">
+                    {selectedEmployeesPendingLeaves.map((warning, idx) => (
+                      <div key={idx} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-yellow-200">
+                        <div>
+                          <span className="font-medium text-gray-800">{warning.employeeName}</span>
+                          <span className="text-gray-500 text-xs ml-2">({warning.employeeCode})</span>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <span className="text-yellow-700 text-sm font-medium">{warning.pendingDays} day(s) pending</span>
+                          <span className="text-xs text-gray-500">
+                            {new Date(warning.startDate).toLocaleDateString()} - {new Date(warning.endDate).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="p-6 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
             <div className="text-sm text-gray-600">

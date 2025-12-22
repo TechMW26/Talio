@@ -259,11 +259,11 @@ const CompanySettingsSchema = new mongoose.Schema({
     },
     tdsEnabled: {
       type: Boolean,
-      default: true,
+      default: false, // TDS disabled by default - must be configured manually
     },
     tdsPercentage: {
       type: Number,
-      default: 10, // 10% TDS
+      default: 0, // No TDS by default
     },
   },
   

@@ -1,7 +1,14 @@
 const mongoose = require('mongoose');
+require('dotenv').config();
 
-// MongoDB connection string
-const MONGODB_URI = 'mongodb+srv://avirajsharma_db_user:aviraj@taliocluster.mvnlgwj.mongodb.net/hrms_db';
+// MongoDB connection string from environment
+const MONGODB_URI = process.env.MONGODB_URI;
+
+if (!MONGODB_URI) {
+  console.error('❌ MONGODB_URI environment variable is not set');
+  console.error('Please create a .env file with your MongoDB connection string');
+  process.exit(1);
+}
 
 async function clearFCMTokens() {
     try {

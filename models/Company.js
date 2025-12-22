@@ -121,8 +121,8 @@ const CompanySchema = new mongoose.Schema({
       enabled: { type: Boolean, default: true },
       amount: { type: Number, default: 200 }
     },
-    tdsEnabled: { type: Boolean, default: true },
-    tdsPercentage: { type: Number, default: 10 }
+    tdsEnabled: { type: Boolean, default: false }, // TDS disabled by default - must be configured manually
+    tdsPercentage: { type: Number, default: 0 }
   },
   // Notification Settings
   notifications: {

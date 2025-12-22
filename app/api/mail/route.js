@@ -2,25 +2,12 @@ import { NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
 import connectDB from '@/lib/mongodb';
 import EmailAccount from '@/models/EmailAccount';
-import { google } from 'googleapis';
 
 // Production URL - must match Google Cloud Console
 const PRODUCTION_URL = 'https://app.talio.in';
 
 // The SAME redirect URI that's already whitelisted for Google Sign-In
 const REDIRECT_URI = `${PRODUCTION_URL}/api/auth/google/callback`;
-
-// Create OAuth2 client
-function getOAuth2Client() {
-  const clientId = process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-
-  if (!clientId || !clientSecret) {
-    throw new Error('Google OAuth credentials not configured');
-  }
-
-  return new google.auth.OAuth2(clientId, clientSecret, REDIRECT_URI);
-}
 
 // GET - Check if email is connected and get email account info
 export async function GET(request) {
@@ -82,24 +69,40 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     const token = request.headers.get('Authorization')?.split(' ')[1];
+    
+    if (!token) {
+      console.error('[Mail OAuth] No token provided');
+      return NextResponse.json({ error: 'No authentication token provided' }, { status: 401 });
+    }
+    
     const payload = await verifyToken(token);
 
     if (!payload) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      console.error('[Mail OAuth] Token verification failed');
+      return NextResponse.json({ error: 'Unauthorized - invalid token' }, { status: 401 });
     }
 
     const clientId = process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
     if (!clientId) {
-      return NextResponse.json({ error: 'Google OAuth not configured' }, { status: 500 });
+      console.error('[Mail OAuth] GOOGLE_CLIENT_ID not configured');
+      return NextResponse.json({ error: 'Google OAuth client ID not configured' }, { status: 500 });
+    }
+
+    if (!clientSecret) {
+      console.error('[Mail OAuth] GOOGLE_CLIENT_SECRET not configured');
+      return NextResponse.json({ error: 'Google OAuth client secret not configured' }, { status: 500 });
     }
 
     // Generate a state token to identify this as a mail connection request
-    const state = Buffer.from(JSON.stringify({
+    const stateData = JSON.stringify({
       type: 'mail_connect',  // This tells the callback it's for mail
       userId: payload.userId,
       timestamp: Date.now()
-    })).toString('base64');
+    });
+    // Use Buffer.from which is available in Node.js runtime
+    const state = Buffer.from(stateData).toString('base64url');
 
     // Gmail scopes for reading, sending, and modifying emails
     const scopes = [
@@ -126,8 +129,11 @@ export async function POST(request) {
     return NextResponse.json({ authUrl, state });
 
   } catch (error) {
-    console.error('Error generating auth URL:', error);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    console.error('[Mail OAuth] Error generating auth URL:', error.message, error.stack);
+    return NextResponse.json({ 
+      error: 'Server error while generating OAuth URL',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
+    }, { status: 500 });
   }
 }
 

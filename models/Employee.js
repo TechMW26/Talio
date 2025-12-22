@@ -132,6 +132,12 @@ const EmployeeSchema = new mongoose.Schema({
     applicable: { type: Boolean, default: true },
     amount: { type: Number, default: 200 }, // Monthly PT amount
   },
+  // TDS (Tax Deducted at Source) configuration
+  tdsConfiguration: {
+    enabled: { type: Boolean, default: false }, // TDS disabled by default - must be configured manually
+    percentage: { type: Number, default: 0 }, // Custom TDS percentage for employee (0 = no TDS)
+    fixedAmount: { type: Number, default: 0 }, // Fixed TDS amount (if percentage is 0)
+  },
   // Corporate Health Insurance
   healthInsurance: {
     enrolled: { type: Boolean, default: false },

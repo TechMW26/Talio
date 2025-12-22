@@ -167,32 +167,7 @@ export default function UsersPage() {
         </div>
       </div>
 
-      {/* Quick Login Credentials */}
-      <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
-        <h3 className="text-lg font-semibold text-blue-800 mb-4">Quick Login Credentials</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white p-4 rounded-lg border">
-            <h4 className="font-semibold text-purple-600">Admin</h4>
-            <p className="text-sm text-gray-600">admin@hrms.com</p>
-            <p className="text-sm font-mono bg-gray-100 px-2 py-1 rounded mt-1">admin123</p>
-          </div>
-          <div className="bg-white p-4 rounded-lg border">
-            <h4 className="font-semibold text-blue-600">HR Manager</h4>
-            <p className="text-sm text-gray-600">hr@hrms.com</p>
-            <p className="text-sm font-mono bg-gray-100 px-2 py-1 rounded mt-1">hr123</p>
-          </div>
-          <div className="bg-white p-4 rounded-lg border">
-            <h4 className="font-semibold text-green-600">Manager</h4>
-            <p className="text-sm text-gray-600">manager@hrms.com</p>
-            <p className="text-sm font-mono bg-gray-100 px-2 py-1 rounded mt-1">manager123</p>
-          </div>
-          <div className="bg-white p-4 rounded-lg border">
-            <h4 className="font-semibold text-gray-600">Employee</h4>
-            <p className="text-sm text-gray-600">employee@hrms.com</p>
-            <p className="text-sm font-mono bg-gray-100 px-2 py-1 rounded mt-1">employee123</p>
-          </div>
-        </div>
-      </div>
+
     </div>
   )
 }

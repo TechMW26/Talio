@@ -28,6 +28,8 @@ yarn-error.log*
 # Use only .env (not .env.local) - but keep it private
 .env*.local
 .env
+.env.firebase
+.env.production
 
 # vercel
 .vercel
@@ -67,7 +69,6 @@ pids
 certbot/
 
 # prod secrets
-.env.production
 SERVER_ENV_CREDENTIALS.txt
 
 # Windows app
