@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { SignJWT } from 'jose';
-import bcrypt from 'bcryptjs';
 import connectDB from '@/lib/mongodb';
 import User from '@/models/User';
 import Employee from '@/models/Employee';
@@ -81,10 +80,6 @@ export async function POST(request) {
       );
     }
 
-    // Hash password
-    const salt = await bcrypt.genSalt(12);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
     // Create employee record first
     const employee = new Employee({
       firstName,
@@ -99,10 +94,10 @@ export async function POST(request) {
     await employee.save();
     console.log('[Setup] Created employee record:', employee._id);
 
-    // Create admin user
+    // Create admin user (password will be hashed by User model pre-save hook)
     const user = new User({
       email: email.toLowerCase(),
-      password: hashedPassword,
+      password: password, // Plain password - will be hashed by pre-save hook
       role: 'admin', // First admin gets admin role
       employeeId: employee._id,
       isActive: true,
@@ -127,7 +122,7 @@ export async function POST(request) {
     syncUserToBackup({
       originalUserId: user._id.toString(),
       email: user.email,
-      password: hashedPassword, // Already hashed
+      password: user.password, // Use the hashed password from saved user
       role: user.role,
       employeeId: employee._id.toString(),
       isActive: user.isActive,

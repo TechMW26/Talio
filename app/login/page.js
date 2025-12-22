@@ -118,10 +118,6 @@ export default function LoginPage() {
 
         if (error) {
           const errorMessages = {
-            no_code: 'Google authentication failed. Please try again.',
-            token_exchange_failed: 'Failed to authenticate with Google.',
-            user_info_failed: 'Failed to get user information from Google.',
-            user_not_found: 'No account found with this Google email. Please contact your administrator.',
             account_deactivated: 'Your account has been deactivated. Please contact your administrator.',
             authentication_failed: 'Authentication failed. Please try again.',
           }
@@ -225,82 +221,6 @@ export default function LoginPage() {
     } catch (error) {
       toast.error('An error occurred. Please try again.')
     } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleGoogleSignIn = async () => {
-    try {
-      setLoading(true)
-      toast.loading('Redirecting to Google...')
-
-      // Check if running in TWA (Trusted Web Activity) / Android app
-      const isInApp = window.matchMedia('(display-mode: standalone)').matches ||
-        window.navigator.standalone ||
-        document.referrer.includes('android-app://') ||
-        window.navigator.userAgent.includes('wv') || // Android WebView
-        window.navigator.userAgent.includes('Android')
-
-      // Check if current URL is production
-      const isProduction = window.location.hostname === 'app.talio.in' || 
-        window.location.hostname.includes('talio.in')
-
-      // Always use production URL for redirect to avoid localhost issues
-      // The redirect URI must match what's configured in Google Cloud Console
-      const productionUrl = 'https://app.talio.in'
-      
-      // Use production URL if:
-      // 1. Running in Android app (TWA/WebView)
-      // 2. Already on production domain
-      // 3. URL contains localhost but we want to redirect to production
-      const useProductionUrl = isInApp || isProduction || window.location.hostname === 'localhost'
-      
-      const appOrigin = useProductionUrl ? productionUrl : window.location.origin
-      const redirectUri = `${appOrigin}/api/auth/google/callback`
-
-      console.log('[Google OAuth] Is in app:', isInApp)
-      console.log('[Google OAuth] Is production:', isProduction)
-      console.log('[Google OAuth] Use production URL:', useProductionUrl)
-      console.log('[Google OAuth] App origin:', appOrigin)
-      console.log('[Google OAuth] Redirect URI:', redirectUri)
-
-      // Check if running in desktop app
-      const isDesktopApp = typeof window !== 'undefined' && (window.talioDesktop || window.electronAPI);
-      
-      let stateParam = '';
-      if (isDesktopApp) {
-        const stateObj = { type: 'desktop_login' };
-        // Use btoa for browser-side base64 encoding
-        stateParam = `&state=${btoa(JSON.stringify(stateObj))}`;
-      }
-
-      // Redirect to Google OAuth
-      const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
-        `client_id=${process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID}&` +
-        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
-        `response_type=code&` +
-        `scope=openid%20email%20profile&` +
-        `access_type=offline&` +
-        `prompt=consent` + 
-        stateParam
-
-      // For desktop apps, open in external browser
-      if (isDesktopApp) {
-        const desktopAPI = window.talioDesktop || window.electronAPI;
-        if (desktopAPI && desktopAPI.openExternal) {
-          console.log('[Google OAuth] Opening in external browser for desktop app');
-          desktopAPI.openExternal(googleAuthUrl);
-          toast.dismiss();
-          toast.success('Please complete sign-in in your browser');
-          setLoading(false);
-          return;
-        }
-      }
-
-      window.location.href = googleAuthUrl
-    } catch (error) {
-      console.error('[Google OAuth] Error:', error)
-      toast.error('Failed to initiate Google Sign-In')
       setLoading(false)
     }
   }
@@ -461,27 +381,6 @@ export default function LoginPage() {
                   ) : (
                     'Sign in'
                   )}
-                </button>
-
-                {/* Divider */}
-                <div className="relative my-6">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-200"></div>
-                  </div>
-                  <div className="relative flex justify-center text-sm">
-                    <span className="px-4 bg-white text-gray-500">or continue with</span>
-                  </div>
-                </div>
-
-                {/* Google Sign In */}
-                <button
-                  type="button"
-                  onClick={handleGoogleSignIn}
-                  disabled={loading}
-                  className="w-full py-3.5 px-4 bg-white hover:bg-gray-50 border-2 border-gray-200 text-gray-700 font-medium rounded-xl flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-                >
-                  <img src="/google.svg" alt="Google" className="h-5 w-5" />
-                  <span>Sign in with Google</span>
                 </button>
               </form>
             </div>
