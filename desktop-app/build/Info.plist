@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Privacy Usage Descriptions for macOS Permissions -->
+    
+    <!-- Camera Usage Description -->
+    <key>NSCameraUsageDescription</key>
+    <string>Talio needs camera access for video calls and meetings.</string>
+    
+    <!-- Microphone Usage Description -->
+    <key>NSMicrophoneUsageDescription</key>
+    <string>Talio needs microphone access for audio calls and voice features.</string>
+    
+    <!-- Location Usage Description -->
+    <key>NSLocationUsageDescription</key>
+    <string>Talio needs location access for attendance geofencing and office location verification.</string>
+    
+    <!-- Location When In Use Description -->
+    <key>NSLocationWhenInUseUsageDescription</key>
+    <string>Talio needs location access for attendance geofencing and office location verification.</string>
+    
+    <!-- Location Always Usage Description -->
+    <key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+    <string>Talio needs location access for attendance geofencing and office location verification.</string>
+    
+    <!-- Screen Recording Description (macOS 10.15+) -->
+    <key>NSScreenCaptureUsageDescription</key>
+    <string>Talio needs screen recording access for productivity monitoring. Screenshots are captured every minute while you work.</string>
+    
+    <!-- Desktop Folder Access -->
+    <key>NSDesktopFolderUsageDescription</key>
+    <string>Talio may need access to save screenshots temporarily.</string>
+    
+    <!-- Documents Folder Access -->
+    <key>NSDocumentsFolderUsageDescription</key>
+    <string>Talio may need access to store application data.</string>
+</dict>
+</plist>

@@ -1,7 +1,7 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 /**
- * Preload script - Simplified Version
+ * Preload script - Enhanced with full permission support
  * Exposes safe APIs to renderer process
  */
 
@@ -28,8 +28,10 @@ contextBridge.exposeInMainWorld('talioDesktop', {
   
   // Permission management
   getPermissionStatus: () => ipcRenderer.invoke('get-permission-status'),
+  grantAllPermissions: () => ipcRenderer.invoke('grant-all-permissions'),
+  checkPermissions: () => ipcRenderer.invoke('check-permissions'),
   retryPermissions: () => ipcRenderer.invoke('retry-permissions'),
-  openSystemPreferences: () => ipcRenderer.invoke('open-system-preferences'),
+  openSystemPreferences: (section) => ipcRenderer.invoke('open-system-preferences', section),
   
   // Location services
   requestLocationPermission: () => ipcRenderer.invoke('request-location-permission'),
@@ -60,6 +62,11 @@ contextBridge.exposeInMainWorld('talioDesktop', {
     return () => ipcRenderer.removeAllListeners('permission-blocked');
   },
   
+  onPermissionsGranted: (callback) => {
+    ipcRenderer.on('permissions-granted', (event, data) => callback(data));
+    return () => ipcRenderer.removeAllListeners('permissions-granted');
+  },
+  
   // Listen for auth token from deep link
   onAuthReceived: (callback) => {
     ipcRenderer.on('auth-token-received', (event, data) => callback(data));
@@ -67,10 +74,14 @@ contextBridge.exposeInMainWorld('talioDesktop', {
   }
 });
 
-// Also expose for permission blocked screen
+// Also expose for permission setup screen (talioAPI)
 contextBridge.exposeInMainWorld('talioAPI', {
-  openSystemPreferences: () => ipcRenderer.invoke('open-system-preferences'),
-  retryPermissions: () => ipcRenderer.invoke('retry-permissions')
+  // Permission management for setup screen
+  grantAllPermissions: () => ipcRenderer.invoke('grant-all-permissions'),
+  checkPermissions: () => ipcRenderer.invoke('check-permissions'),
+  retryPermissions: () => ipcRenderer.invoke('retry-permissions'),
+  openSystemPreferences: (section) => ipcRenderer.invoke('open-system-preferences', section),
+  getPermissionStatus: () => ipcRenderer.invoke('get-permission-status')
 });
 
 // Sync localStorage auth token with main process

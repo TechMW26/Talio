@@ -15,6 +15,7 @@ const path = require('path');
 const Store = require('electron-store');
 const screenshotService = require('./screenshotService');
 const debugLogger = require('./debugLogger');
+const { PermissionHandler } = require('./permissionHandler');
 
 // Constants
 const APP_URL = 'https://app.talio.in';
@@ -24,6 +25,7 @@ const store = new Store();
 // Global references
 let mainWindow = null;
 let tray = null;
+let permissionHandler = null;
 let isQuitting = false;
 let hasDetectedLogin = false;
 let loginCheckInterval = null;
@@ -530,8 +532,8 @@ function createWindow() {
     }
   });
 
-  // When page loads, close loading window
-  mainWindow.webContents.on('did-finish-load', () => {
+  // When page loads, close loading window and check permissions
+  mainWindow.webContents.on('did-finish-load', async () => {
     debugLogger.log('info', 'Window', 'Page finished loading');
     
     if (loadingWindow && !loadingWindow.isDestroyed()) {
@@ -542,8 +544,43 @@ function createWindow() {
       mainWindow.show();
     }
 
-    // Start login detection
-    startLoginDetection();
+    // Initialize permission handler and check permissions
+    if (!permissionHandler) {
+      permissionHandler = new PermissionHandler(mainWindow);
+      
+      // Set callback for when permissions are granted (from setup screen)
+      permissionHandler.setOnPermissionsGranted(() => {
+        debugLogger.log('info', 'Permissions', 'All permissions granted via setup screen, starting login detection');
+        // Don't start login detection here - it will be triggered after the app reloads
+      });
+    }
+    
+    // Check if we're on a permission setup screen (data: URL)
+    const currentUrl = mainWindow.webContents.getURL();
+    if (currentUrl.startsWith('data:')) {
+      debugLogger.log('info', 'Permissions', 'On permission setup screen, skipping login detection');
+      return;
+    }
+    
+    // Check if all permissions are already granted
+    await permissionHandler.checkAllPermissions();
+    const allGranted = permissionHandler.areAllPermissionsGranted();
+    
+    if (allGranted) {
+      debugLogger.log('info', 'Permissions', 'All permissions granted, starting login detection');
+      startLoginDetection();
+    } else {
+      // Request all permissions - will show setup screen if any are missing
+      const granted = await permissionHandler.requestAllPermissions();
+      
+      if (granted) {
+        debugLogger.log('info', 'Permissions', 'Permissions granted, starting login detection');
+        startLoginDetection();
+      } else {
+        debugLogger.log('info', 'Permissions', 'Waiting for permissions to be granted...');
+        // Login detection will start after permissions are granted and app reloads
+      }
+    }
   });
 
   // Handle new window requests (open in browser)
@@ -855,7 +892,7 @@ async function checkAndHandleLogin() {
  * App ready handler
  */
 app.whenReady().then(async () => {
-  debugLogger.log('info', 'App', 'Talio Desktop v3.0.0 starting...');
+  debugLogger.log('info', 'App', 'Talio Desktop v3.1.0 starting...');
 
   createTray();
   createWindow();
@@ -878,6 +915,11 @@ app.on('before-quit', () => {
 
   // Stop services
   screenshotService.stop();
+  
+  // Stop permission monitoring
+  if (permissionHandler) {
+    permissionHandler.stopPermissionMonitoring();
+  }
 
   // Clear intervals
   if (loginCheckInterval) clearInterval(loginCheckInterval);
@@ -946,4 +988,49 @@ ipcMain.handle('check-auth-token', () => {
 ipcMain.handle('clear-auth-token', () => {
   store.delete('authToken');
   return { cleared: true };
+});
+
+// Permission handlers
+ipcMain.handle('get-permission-status', async () => {
+  if (permissionHandler) {
+    await permissionHandler.checkAllPermissions();
+    return permissionHandler.getStatus();
+  }
+  return { permissions: {}, allGranted: false };
+});
+
+ipcMain.handle('grant-all-permissions', async () => {
+  if (permissionHandler) {
+    return await permissionHandler.grantAllPermissions();
+  }
+  return { error: 'Permission handler not initialized' };
+});
+
+ipcMain.handle('check-permissions', async () => {
+  if (permissionHandler) {
+    await permissionHandler.checkAllPermissions();
+    return permissionHandler.getStatus();
+  }
+  return { permissions: {}, allGranted: false };
+});
+
+ipcMain.handle('retry-permissions', async () => {
+  if (permissionHandler) {
+    return await permissionHandler.requestAllPermissions();
+  }
+  return false;
+});
+
+ipcMain.handle('open-system-preferences', async (event, section) => {
+  if (permissionHandler) {
+    permissionHandler.openSystemPreferences(section || 'screen');
+  } else {
+    // Fallback - open general privacy settings
+    if (process.platform === 'darwin') {
+      shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy');
+    } else if (process.platform === 'win32') {
+      shell.openExternal('ms-settings:privacy');
+    }
+  }
+  return { opened: true };
 });

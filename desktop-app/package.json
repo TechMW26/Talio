@@ -54,11 +54,14 @@
         }
       ],
       "extendInfo": {
-        "NSCameraUsageDescription": "Talio needs camera access for video calls and meetings",
-        "NSMicrophoneUsageDescription": "Talio needs microphone access for audio calls and meetings",
-        "NSScreenCaptureUsageDescription": "Talio needs screen capture access for productivity monitoring and screen sharing in meetings",
-        "NSLocationUsageDescription": "Talio needs location access for attendance geofencing",
-        "NSLocationWhenInUseUsageDescription": "Talio needs location access for attendance geofencing"
+        "NSCameraUsageDescription": "Talio needs camera access for video calls and meetings.",
+        "NSMicrophoneUsageDescription": "Talio needs microphone access for audio calls and voice features.",
+        "NSScreenCaptureUsageDescription": "Talio needs screen recording access for productivity monitoring. Screenshots are captured every minute while you work.",
+        "NSLocationUsageDescription": "Talio needs location access for attendance geofencing and office location verification.",
+        "NSLocationWhenInUseUsageDescription": "Talio needs location access for attendance geofencing and office location verification.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Talio needs location access for attendance geofencing and office location verification.",
+        "NSDesktopFolderUsageDescription": "Talio may need access to save screenshots temporarily.",
+        "NSDocumentsFolderUsageDescription": "Talio may need access to store application data."
       }
     },
     "dmg": {
