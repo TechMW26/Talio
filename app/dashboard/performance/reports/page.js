@@ -195,9 +195,9 @@ export default function PerformanceReportsPage() {
       const deptId = metric.employee?.department?._id || metric.employee?.department || 'unknown'
       if (deptMap[deptId]) {
         deptMap[deptId].totalScore += metric.metrics?.performanceScore || 0
-        deptMap[deptId].productivitySum += metric.metrics?.productivity || 75
-        deptMap[deptId].qualitySum += metric.metrics?.quality || 80
-        deptMap[deptId].innovationSum += metric.metrics?.innovation || 70
+        deptMap[deptId].productivitySum += metric.metrics?.productivity || 0
+        deptMap[deptId].qualitySum += metric.metrics?.quality || 0
+        deptMap[deptId].innovationSum += metric.metrics?.innovation || 0
       }
     })
 
@@ -270,10 +270,10 @@ export default function PerformanceReportsPage() {
         goalsCompleted: completedGoals,
         totalGoals: empGoals.length,
         goalCompletion: empGoals.length > 0 ? ((completedGoals / empGoals.length) * 100).toFixed(0) : '0',
-        productivity: empMetric?.metrics?.productivity || 75,
-        quality: empMetric?.metrics?.quality || 80,
-        innovation: empMetric?.metrics?.innovation || 70,
-        engagement: empMetric?.metrics?.engagement || 75
+        productivity: empMetric?.metrics?.productivity || 0,
+        quality: empMetric?.metrics?.quality || 0,
+        innovation: empMetric?.metrics?.innovation || 0,
+        engagement: empMetric?.metrics?.engagement || 0
       }
     }).sort((a, b) => b.performanceScore - a.performanceScore)
 
