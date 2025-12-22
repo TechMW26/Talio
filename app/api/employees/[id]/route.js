@@ -395,24 +395,19 @@ export async function DELETE(request, { params }) {
   }
 }
 
-// PATCH - Update employee status only
+// PATCH - Partial update for employee (supports bulk edit)
 export async function PATCH(request, { params }) {
   try {
     const { id } = await params;
     const body = await request.json()
-    const { status } = body
 
-    if (!status) {
+    // Check if at least one field is provided
+    const allowedFields = ['status', 'department', 'departments', 'designation', 'designationLevel', 'reportingManager', 'level']
+    const hasValidField = allowedFields.some(field => body[field] !== undefined && body[field] !== '')
+    
+    if (!hasValidField) {
       return NextResponse.json(
-        { success: false, message: 'Status is required' },
-        { status: 400 }
-      )
-    }
-
-    const validStatuses = ['active', 'inactive', 'terminated', 'resigned', 'on_leave', 'probation']
-    if (!validStatuses.includes(status)) {
-      return NextResponse.json(
-        { success: false, message: `Invalid status. Must be one of: ${validStatuses.join(', ')}` },
+        { success: false, message: 'At least one field is required to update' },
         { status: 400 }
       )
     }
@@ -428,18 +423,65 @@ export async function PATCH(request, { params }) {
     }
 
     const oldStatus = employee.status
-    
-    // Update employee status
-    employee.status = status
+    const updateData = {}
+
+    // Handle status update
+    if (body.status) {
+      const validStatuses = ['active', 'inactive', 'terminated', 'resigned', 'on_leave', 'probation']
+      if (!validStatuses.includes(body.status)) {
+        return NextResponse.json(
+          { success: false, message: `Invalid status. Must be one of: ${validStatuses.join(', ')}` },
+          { status: 400 }
+        )
+      }
+      updateData.status = body.status
+    }
+
+    // Handle department update
+    if (body.department) {
+      updateData.department = body.department
+    }
+
+    // Handle departments array update
+    if (body.departments && Array.isArray(body.departments)) {
+      updateData.departments = body.departments.filter(d => d && d !== '')
+      // Set primary department if not already set
+      if (!updateData.department && updateData.departments.length > 0) {
+        updateData.department = updateData.departments[0]
+      }
+    }
+
+    // Handle designation update
+    if (body.designation) {
+      updateData.designation = body.designation
+    }
+
+    // Handle designation level update
+    if (body.designationLevel !== undefined) {
+      updateData.designationLevel = parseInt(body.designationLevel)
+    }
+
+    // Handle level update (alias for designationLevel)
+    if (body.level !== undefined) {
+      updateData.designationLevel = parseInt(body.level)
+    }
+
+    // Handle reporting manager update
+    if (body.reportingManager) {
+      updateData.reportingManager = body.reportingManager
+    }
+
+    // Apply updates
+    Object.assign(employee, updateData)
     await employee.save()
 
-    // If status is terminated or resigned, also deactivate the user account
-    if (['terminated', 'resigned'].includes(status)) {
+    // If status changed to terminated or resigned, deactivate the user account
+    if (updateData.status && ['terminated', 'resigned'].includes(updateData.status)) {
       await User.findOneAndUpdate(
         { employeeId: id },
         { isActive: false }
       )
-    } else if (status === 'active') {
+    } else if (updateData.status === 'active' && oldStatus !== 'active') {
       // Reactivate user if status is set back to active
       await User.findOneAndUpdate(
         { employeeId: id },
@@ -452,16 +494,20 @@ export async function PATCH(request, { params }) {
 
     return NextResponse.json({
       success: true,
-      message: `Employee status changed from ${oldStatus} to ${status}`,
+      message: 'Employee updated successfully',
       employee: {
         _id: employee._id,
         status: employee.status,
+        department: employee.department,
+        designation: employee.designation,
+        designationLevel: employee.designationLevel,
+        reportingManager: employee.reportingManager,
       },
     })
   } catch (error) {
-    console.error('Update employee status error:', error)
+    console.error('Update employee error:', error)
     return NextResponse.json(
-      { success: false, message: 'Failed to update employee status' },
+      { success: false, message: 'Failed to update employee', error: error.message },
       { status: 500 }
     )
   }
