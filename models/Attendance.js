@@ -67,6 +67,15 @@ const AttendanceSchema = new mongoose.Schema({
       latitude: Number,
       longitude: Number,
       address: String,
+      addressDetails: {
+        city: String,
+        state: String,
+        country: String,
+        pincode: String,
+        fullAddress: String,
+      },
+      capturedAt: Date, // Timestamp when location was captured
+      accuracy: Number, // GPS accuracy in meters
       geofenceLocation: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'GeofenceLocation',
@@ -77,6 +86,15 @@ const AttendanceSchema = new mongoose.Schema({
       latitude: Number,
       longitude: Number,
       address: String,
+      addressDetails: {
+        city: String,
+        state: String,
+        country: String,
+        pincode: String,
+        fullAddress: String,
+      },
+      capturedAt: Date, // Timestamp when location was captured
+      accuracy: Number, // GPS accuracy in meters
       geofenceLocation: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'GeofenceLocation',

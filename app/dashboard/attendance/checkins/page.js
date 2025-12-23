@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
-import { FaClock, FaUsers, FaCalendarAlt, FaSearch, FaDownload } from 'react-icons/fa'
+import { FaClock, FaUsers, FaCalendarAlt, FaSearch, FaDownload, FaMapMarkerAlt } from 'react-icons/fa'
 
 export default function EmployeeCheckinsPage() {
   const [checkins, setCheckins] = useState([])
@@ -16,14 +16,14 @@ export default function EmployeeCheckinsPage() {
     if (userData) {
       const parsedUser = JSON.parse(userData)
       setUser(parsedUser)
-      
+
       // Check if user is admin
       if (parsedUser.role !== 'admin') {
         toast.error('Access denied. Only Admin can view employee check-ins.')
         window.location.href = '/dashboard'
         return
       }
-      
+
       fetchCheckins()
     }
   }, [selectedDate])
@@ -91,14 +91,16 @@ export default function EmployeeCheckinsPage() {
 
   const exportCheckins = () => {
     const csvData = []
-    csvData.push(['Employee Code', 'Employee Name', 'Check In', 'Check Out', 'Work Hours', 'Status'])
-    
+    csvData.push(['Employee Code', 'Employee Name', 'Check In', 'Check In Location', 'Check Out', 'Check Out Location', 'Work Hours', 'Status'])
+
     filteredCheckins.forEach(checkin => {
       csvData.push([
         checkin.employee.employeeCode,
-        `${checkin.employee.firstName} ${checkin.employee.lastName}`,
+        `"${checkin.employee.firstName} ${checkin.employee.lastName}"`,
         formatTime(checkin.checkInTime, checkin.employee?.companyTimezone),
+        `"${checkin.location?.checkIn?.address || 'Not captured'}"`,
         formatTime(checkin.checkOutTime, checkin.employee?.companyTimezone),
+        `"${checkin.location?.checkOut?.address || 'Not captured'}"`,
         calculateWorkHours(checkin.checkInTime, checkin.checkOutTime, checkin.status),
         checkin.status
       ])
@@ -200,15 +202,15 @@ export default function EmployeeCheckinsPage() {
       <div className="bg-white rounded-lg shadow-md">
         <div className="px-6 py-4 border-b border-gray-200">
           <h2 className="text-lg font-semibold text-gray-800">
-            Check-ins for {new Date(selectedDate).toLocaleDateString('en-US', { 
-              weekday: 'long', 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
+            Check-ins for {new Date(selectedDate).toLocaleDateString('en-US', {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric'
             })}
           </h2>
         </div>
-        
+
         {filteredCheckins.length === 0 ? (
           <div className="p-8 text-center text-gray-500">
             <FaClock className="w-12 h-12 mx-auto mb-4 text-gray-300" />
@@ -219,25 +221,28 @@ export default function EmployeeCheckinsPage() {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Employee
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Check In
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">
                     In Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Check Out
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">
                     Out Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Work Hours
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
+                    Locations
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Hours
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
                 </tr>
@@ -245,23 +250,23 @@ export default function EmployeeCheckinsPage() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredCheckins.map((checkin) => (
                   <tr key={checkin._id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className="w-10 h-10 bg-primary-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                        <div className="w-8 h-8 bg-primary-500 rounded-full flex items-center justify-center text-white font-semibold text-xs">
                           {checkin.employee?.firstName?.charAt(0)}{checkin.employee?.lastName?.charAt(0)}
                         </div>
-                        <div className="ml-3">
+                        <div className="ml-2">
                           <div className="text-sm font-medium text-gray-900">
                             {checkin.employee?.firstName} {checkin.employee?.lastName}
                           </div>
-                          <div className="text-sm text-gray-500">{checkin.employee?.employeeCode}</div>
+                          <div className="text-xs text-gray-500">{checkin.employee?.employeeCode}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                       {formatTime(checkin.checkInTime, checkin.employee?.companyTimezone)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-4 whitespace-nowrap hidden lg:table-cell">
                       {checkin.status === 'absent' ? (
                         <span className="text-gray-400">-</span>
                       ) : (
@@ -270,10 +275,10 @@ export default function EmployeeCheckinsPage() {
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                       {formatTime(checkin.checkOutTime, checkin.employee?.companyTimezone)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-4 whitespace-nowrap hidden lg:table-cell">
                       {checkin.status === 'absent' || !checkin.checkOutTime ? (
                         <span className="text-gray-400">-</span>
                       ) : (
@@ -282,10 +287,38 @@ export default function EmployeeCheckinsPage() {
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-4 py-4 text-xs text-gray-600 hidden md:table-cell max-w-[200px]">
+                      {checkin.location?.checkIn?.address || checkin.location?.checkOut?.address ? (
+                        <div className="space-y-1">
+                          {checkin.location?.checkIn?.address && (
+                            <div className="flex items-start gap-1" title={checkin.location.checkIn.address}>
+                              <FaMapMarkerAlt className="text-green-500 mt-0.5 flex-shrink-0 w-3 h-3" />
+                              <span className="truncate">
+                                {checkin.location.checkIn.address.length > 35
+                                  ? checkin.location.checkIn.address.substring(0, 35) + '...'
+                                  : checkin.location.checkIn.address}
+                              </span>
+                            </div>
+                          )}
+                          {checkin.location?.checkOut?.address && (
+                            <div className="flex items-start gap-1" title={checkin.location.checkOut.address}>
+                              <FaMapMarkerAlt className="text-red-500 mt-0.5 flex-shrink-0 w-3 h-3" />
+                              <span className="truncate">
+                                {checkin.location.checkOut.address.length > 35
+                                  ? checkin.location.checkOut.address.substring(0, 35) + '...'
+                                  : checkin.location.checkOut.address}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 italic">Not captured</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
                       {calculateWorkHours(checkin.checkInTime, checkin.checkOutTime, checkin.status)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 py-4 whitespace-nowrap">
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(checkin.status)}`}>
                         {checkin.status}
                       </span>

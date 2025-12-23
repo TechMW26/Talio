@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import toast from 'react-hot-toast'
-import { FaClock, FaSignInAlt, FaSignOutAlt, FaCalendarAlt, FaEdit, FaCheck, FaTimes, FaExclamationCircle, FaPlus, FaChevronLeft, FaChevronRight, FaList, FaTh } from 'react-icons/fa'
+import { FaClock, FaSignInAlt, FaSignOutAlt, FaCalendarAlt, FaEdit, FaCheck, FaTimes, FaExclamationCircle, FaPlus, FaChevronLeft, FaChevronRight, FaList, FaTh, FaMapMarkerAlt } from 'react-icons/fa'
 import OvertimePrompt, { useOvertimeCheck } from '@/components/OvertimePrompt'
 import ModalPortal from '@/components/ui/ModalPortal'
+import useLocationCapture from '@/hooks/useLocationCapture'
 
 export default function AttendancePage() {
   const [loading, setLoading] = useState(false)
@@ -13,11 +14,14 @@ export default function AttendancePage() {
   const [user, setUser] = useState(null)
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [viewMode, setViewMode] = useState('calendar') // 'calendar' or 'list'
-  
+
+  // Location capture hook
+  const { captureLocation, loading: locationLoading, error: locationError, permissionStatus, checkPermission } = useLocationCapture()
+
   // Overtime check hook
   const { hasPendingRequest, pendingRequest, refresh: refreshOvertime } = useOvertimeCheck()
   const [showOvertimePrompt, setShowOvertimePrompt] = useState(false)
-  
+
   // Correction modal state
   const [showCorrectionModal, setShowCorrectionModal] = useState(false)
   const [selectedRecord, setSelectedRecord] = useState(null)
@@ -30,16 +34,16 @@ export default function AttendancePage() {
     reason: ''
   })
   const [submittingCorrection, setSubmittingCorrection] = useState(false)
-  
+
   // My correction requests
   const [myCorrections, setMyCorrections] = useState([])
   const [showMyCorrections, setShowMyCorrections] = useState(false)
-  
+
   // Pending approvals (for admins/HRs/dept heads)
   const [pendingCorrections, setPendingCorrections] = useState([])
   const [showPendingApprovals, setShowPendingApprovals] = useState(false)
   const [canApprove, setCanApprove] = useState(false)
-  
+
   // Missing entry modal
   const [showMissingEntryModal, setShowMissingEntryModal] = useState(false)
   const [missingEntryForm, setMissingEntryForm] = useState({
@@ -72,7 +76,7 @@ export default function AttendancePage() {
     }
     fetchHolidays()
   }, [])
-  
+
   // Show overtime prompt when there's a pending request
   useEffect(() => {
     if (hasPendingRequest && pendingRequest) {
@@ -121,7 +125,7 @@ export default function AttendancePage() {
       // Handle both object and string formats for employeeId
       const empId = parsedUser.employeeId?._id || parsedUser.employeeId || parsedUser._id
       console.log('📊 Extracted empId:', empId)
-      
+
       // Check if user can approve corrections
       const role = parsedUser.role
       if (['admin', 'hr', 'department_head', 'manager'].includes(role)) {
@@ -179,25 +183,25 @@ export default function AttendancePage() {
     setSubmittingCorrection(true)
     try {
       const token = localStorage.getItem('token')
-      
+
       // Get the date from the selected record (use selectedDayForEdit or record date)
       const recordDate = selectedDayForEdit || selectedRecord.date
       const dateOnly = new Date(recordDate).toISOString().split('T')[0]
-      
+
       // Build the full datetime strings using the record's date and user's time input
       let requestedCheckIn = undefined
       let requestedCheckOut = undefined
-      
+
       if (correctionForm.requestedCheckIn && ['check-in', 'both'].includes(correctionForm.correctionType)) {
         // Combine the record date with the time input
         requestedCheckIn = `${dateOnly}T${correctionForm.requestedCheckIn}:00`
       }
-      
+
       if (correctionForm.requestedCheckOut && ['check-out', 'both'].includes(correctionForm.correctionType)) {
         // Combine the record date with the time input
         requestedCheckOut = `${dateOnly}T${correctionForm.requestedCheckOut}:00`
       }
-      
+
       const response = await fetch('/api/attendance/corrections', {
         method: 'POST',
         headers: {
@@ -236,7 +240,7 @@ export default function AttendancePage() {
   const handleMissingEntryRequest = async () => {
     // Use selectedDayForMissingEntry if available, otherwise use form date
     const dateToUse = selectedDayForMissingEntry || missingEntryForm.date
-    
+
     if (!dateToUse || !missingEntryForm.reason) {
       toast.error('Please provide date and reason')
       return
@@ -519,7 +523,7 @@ export default function AttendancePage() {
       date.setHours(0, 0, 0, 0)
 
       const record = attendanceMap[dateKey]
-        
+
       // Find holiday for this date
       const holiday = holidays.find(h => {
         const hDate = new Date(h.date)
@@ -603,39 +607,21 @@ export default function AttendancePage() {
     setLoading(true)
 
     try {
-      // Get user's location
-      let latitude = null
-      let longitude = null
-      let address = 'Location not available'
+      // Capture location with high accuracy - REQUIRED for check-in
+      let locationData = null
 
-      if (navigator.geolocation) {
-        try {
-          const position = await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-              enableHighAccuracy: true,
-              timeout: 10000,
-              maximumAge: 0
-            })
-          })
+      try {
+        locationData = await captureLocation()
+      } catch (locationError) {
+        setLoading(false)
+        toast.error(locationError.message || 'Location is required for check-in. Please enable location services and try again.')
+        return // Block check-in if location capture fails
+      }
 
-          latitude = position.coords.latitude
-          longitude = position.coords.longitude
-
-          // Try to get address from coordinates
-          try {
-            const geocodeResponse = await fetch(
-              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
-            )
-            const geocodeData = await geocodeResponse.json()
-            address = geocodeData.display_name || 'Location detected'
-          } catch (geocodeError) {
-            console.warn('Geocoding failed:', geocodeError)
-            address = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
-          }
-        } catch (geoError) {
-          console.warn('Geolocation error:', geoError)
-          toast.error('Location access denied. Please enable location services.')
-        }
+      if (!locationData || !locationData.latitude || !locationData.longitude) {
+        setLoading(false)
+        toast.error('Unable to capture location. Please enable location services and try again.')
+        return
       }
 
       const token = localStorage.getItem('token')
@@ -648,20 +634,26 @@ export default function AttendancePage() {
         body: JSON.stringify({
           employeeId: getEmployeeId(user),
           type: 'clock-in',
-          latitude,
-          longitude,
-          address,
+          latitude: locationData.latitude,
+          longitude: locationData.longitude,
+          accuracy: locationData.accuracy,
+          // Address will be resolved server-side for accuracy
         }),
       })
 
       const data = await response.json()
 
       if (data.success) {
-        toast.success('Clocked in successfully')
+        const address = data.data?.location?.checkIn?.address || 'Location captured'
+        toast.success(`Clocked in successfully\n📍 ${address}`, { duration: 4000 })
         setTodayAttendance(data.data)
         fetchAttendance(getEmployeeId(user))
       } else {
-        toast.error(data.message || 'Failed to clock in')
+        if (data.requiresLocation) {
+          toast.error('Location is required for attendance. Please enable location services.')
+        } else {
+          toast.error(data.message || 'Failed to clock in')
+        }
       }
     } catch (error) {
       console.error('Clock in error:', error)
@@ -676,38 +668,21 @@ export default function AttendancePage() {
     setLoading(true)
 
     try {
-      // Get user's location
-      let latitude = null
-      let longitude = null
-      let address = 'Location not available'
+      // Capture location with high accuracy - REQUIRED for check-out
+      let locationData = null
 
-      if (navigator.geolocation) {
-        try {
-          const position = await new Promise((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, {
-              enableHighAccuracy: true,
-              timeout: 10000,
-              maximumAge: 0
-            })
-          })
+      try {
+        locationData = await captureLocation()
+      } catch (locationError) {
+        setLoading(false)
+        toast.error(locationError.message || 'Location is required for check-out. Please enable location services and try again.')
+        return // Block check-out if location capture fails
+      }
 
-          latitude = position.coords.latitude
-          longitude = position.coords.longitude
-
-          // Try to get address from coordinates
-          try {
-            const geocodeResponse = await fetch(
-              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
-            )
-            const geocodeData = await geocodeResponse.json()
-            address = geocodeData.display_name || 'Location detected'
-          } catch (geocodeError) {
-            console.warn('Geocoding failed:', geocodeError)
-            address = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
-          }
-        } catch (geoError) {
-          console.warn('Geolocation error:', geoError)
-        }
+      if (!locationData || !locationData.latitude || !locationData.longitude) {
+        setLoading(false)
+        toast.error('Unable to capture location. Please enable location services and try again.')
+        return
       }
 
       const token = localStorage.getItem('token')
@@ -720,20 +695,26 @@ export default function AttendancePage() {
         body: JSON.stringify({
           employeeId: getEmployeeId(user),
           type: 'clock-out',
-          latitude,
-          longitude,
-          address,
+          latitude: locationData.latitude,
+          longitude: locationData.longitude,
+          accuracy: locationData.accuracy,
+          // Address will be resolved server-side for accuracy
         }),
       })
 
       const data = await response.json()
 
       if (data.success) {
-        toast.success('Clocked out successfully')
+        const address = data.data?.location?.checkOut?.address || 'Location captured'
+        toast.success(`Clocked out successfully\n📍 ${address}`, { duration: 4000 })
         setTodayAttendance(data.data)
         fetchAttendance(getEmployeeId(user))
       } else {
-        toast.error(data.message || 'Failed to clock out')
+        if (data.requiresLocation) {
+          toast.error('Location is required for attendance. Please enable location services.')
+        } else {
+          toast.error(data.message || 'Failed to clock out')
+        }
       }
     } catch (error) {
       console.error('Clock out error:', error)
@@ -862,11 +843,10 @@ export default function AttendancePage() {
                       <p className="text-xs sm:text-sm text-gray-600">Type: {correction.correctionType}</p>
                       <p className="text-xs sm:text-sm text-gray-500 italic line-clamp-2">&quot;{correction.reason}&quot;</p>
                     </div>
-                    <span className={`px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-full whitespace-nowrap self-start ${
-                      correction.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                      correction.status === 'approved' ? 'bg-green-100 text-green-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
+                    <span className={`px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-full whitespace-nowrap self-start ${correction.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                        correction.status === 'approved' ? 'bg-green-100 text-green-800' :
+                          'bg-red-100 text-red-800'
+                      }`}>
                       {correction.status}
                     </span>
                   </div>
@@ -905,23 +885,48 @@ export default function AttendancePage() {
                 </div>
               )}
             </div>
+            {/* Location Display */}
+            {(todayAttendance?.location?.checkIn?.address || todayAttendance?.location?.checkOut?.address) && (
+              <div className="mt-3 pt-3 border-t border-gray-100">
+                <div className="flex flex-col gap-2 text-xs sm:text-sm">
+                  {todayAttendance?.location?.checkIn?.address && (
+                    <div className="flex items-start gap-2 text-gray-600">
+                      <FaMapMarkerAlt className="text-green-500 w-3 h-3 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <span className="font-medium text-gray-700">Check-in: </span>
+                        <span className="text-gray-600">{todayAttendance.location.checkIn.address}</span>
+                      </div>
+                    </div>
+                  )}
+                  {todayAttendance?.location?.checkOut?.address && (
+                    <div className="flex items-start gap-2 text-gray-600">
+                      <FaMapMarkerAlt className="text-red-500 w-3 h-3 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <span className="font-medium text-gray-700">Check-out: </span>
+                        <span className="text-gray-600">{todayAttendance.location.checkOut.address}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
           <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
             <button
               onClick={handleClockIn}
-              disabled={loading || (todayAttendance && todayAttendance.checkIn)}
+              disabled={loading || locationLoading || (todayAttendance && todayAttendance.checkIn)}
               className="btn-theme-primary flex items-center justify-center gap-2 px-6 py-3 sm:p-8 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold shadow-md hover:shadow-lg transition-all duration-200 text-sm sm:text-base"
             >
               <FaSignInAlt className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span>Clock In</span>
+              <span>{loading || locationLoading ? 'Getting Location...' : 'Clock In'}</span>
             </button>
             <button
               onClick={handleClockOut}
-              disabled={loading || !todayAttendance || !todayAttendance.checkIn || todayAttendance.checkOut}
+              disabled={loading || locationLoading || !todayAttendance || !todayAttendance.checkIn || todayAttendance.checkOut}
               className="btn-theme-secondary flex items-center justify-center gap-2 px-6 py-3 sm:p-8 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold shadow-md hover:shadow-lg transition-all duration-200 text-sm sm:text-base"
             >
               <FaSignOutAlt className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span>Clock Out</span>
+              <span>{loading || locationLoading ? 'Getting Location...' : 'Clock Out'}</span>
             </button>
           </div>
         </div>
@@ -939,24 +944,22 @@ export default function AttendancePage() {
             <div className="flex bg-gray-100 rounded-lg p-1 w-full sm:w-auto">
               <button
                 onClick={() => setViewMode('calendar')}
-                className={`flex items-center justify-center gap-1 px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors flex-1 sm:flex-initial ${
-                  viewMode === 'calendar' ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:text-gray-700'
-                }`}
+                className={`flex items-center justify-center gap-1 px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors flex-1 sm:flex-initial ${viewMode === 'calendar' ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:text-gray-700'
+                  }`}
               >
                 <FaTh className="w-3 h-3 sm:w-4 sm:h-4" />
                 <span>Calendar</span>
               </button>
               <button
                 onClick={() => setViewMode('list')}
-                className={`flex items-center justify-center gap-1 px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors flex-1 sm:flex-initial ${
-                  viewMode === 'list' ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:text-gray-700'
-                }`}
+                className={`flex items-center justify-center gap-1 px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors flex-1 sm:flex-initial ${viewMode === 'list' ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:text-gray-700'
+                  }`}
               >
                 <FaList className="w-3 h-3 sm:w-4 sm:h-4" />
                 <span>List</span>
               </button>
             </div>
-            
+
             {/* Month Navigation */}
             <div className="flex items-center gap-2 w-full sm:w-auto">
               <button
@@ -1026,140 +1029,140 @@ export default function AttendancePage() {
                   </div>
                 ))}
               </div>
-              
+
               {/* Calendar Grid */}
               <div className="grid grid-cols-7 gap-1">
-              {calendarData.map((dayData, index) => {
-                const pendingCorrection = dayData.day ? getPendingCorrectionForDay(dayData) : null
-                const hasPending = !!pendingCorrection
-                const isWeekend = dayData.date ? (dayData.date.getDay() === 0 || dayData.date.getDay() === 6) : false
-                const isHoliday = dayData.record?.status === 'holiday' || dayData.holiday
-                const holidayName = dayData.holiday?.name || (dayData.record?.status === 'holiday' ? 'Holiday' : '')
-                
-                // Determine status color
-                let statusColor = 'bg-gray-50'
-                if (dayData.record) {
-                  if (dayData.record.status === 'present') statusColor = 'bg-green-50 border-green-100'
-                  else if (dayData.record.status === 'absent') statusColor = 'bg-red-50 border-red-100'
-                  else if (dayData.record.status === 'late') statusColor = 'bg-yellow-50 border-yellow-100'
-                  else if (dayData.record.status === 'half-day') statusColor = 'bg-orange-50 border-orange-100'
-                  else if (dayData.record.status === 'leave') statusColor = 'bg-blue-50 border-blue-100'
-                  else if (dayData.record.status === 'holiday') statusColor = 'bg-purple-50 border-purple-100'
-                } else if (isHoliday) {
-                  statusColor = 'bg-purple-50 border-purple-100'
-                }
+                {calendarData.map((dayData, index) => {
+                  const pendingCorrection = dayData.day ? getPendingCorrectionForDay(dayData) : null
+                  const hasPending = !!pendingCorrection
+                  const isWeekend = dayData.date ? (dayData.date.getDay() === 0 || dayData.date.getDay() === 6) : false
+                  const isHoliday = dayData.record?.status === 'holiday' || dayData.holiday
+                  const holidayName = dayData.holiday?.name || (dayData.record?.status === 'holiday' ? 'Holiday' : '')
 
-                return (
-                  <div
-                    key={index}
-                    onClick={() => {
-                      if (dayData.holiday) {
-                        setSelectedHoliday(dayData.holiday)
-                        setShowHolidayModal(true)
-                      } else if (dayData.record) {
-                        setSelectedRecord(dayData.record)
-                        setShowDetailsModal(true)
-                      } else if (dayData.isCurrentMonth && !isWeekend && !isHoliday && new Date(dayData.date) < new Date()) {
-                        // Handle missing entry click
-                        setMissingEntryForm(prev => ({
-                          ...prev,
-                          date: dayData.date.toISOString().split('T')[0]
-                        }))
-                        setShowMissingEntryModal(true)
-                      }
-                    }}
-                    className={`
-                      min-h-[80px] sm:min-h-[120px] p-1.5 sm:p-2 border rounded transition-all cursor-pointer relative group
-                      ${statusColor}
-                      ${dayData.isToday ? 'ring-2 ring-blue-500' : ''}
-                      ${!dayData.isCurrentMonth ? 'opacity-40 bg-gray-50 border-transparent' : 'bg-white hover:shadow'}
-                    `}
-                  >
-                    {/* Day number */}
-                    <div className="font-bold text-xs sm:text-sm mb-1">
-                      <span className={dayData.isToday ? 'text-blue-600' : 'text-gray-700'}>
-                        {dayData.day}
-                      </span>
-                    </div>
+                  // Determine status color
+                  let statusColor = 'bg-gray-50'
+                  if (dayData.record) {
+                    if (dayData.record.status === 'present') statusColor = 'bg-green-50 border-green-100'
+                    else if (dayData.record.status === 'absent') statusColor = 'bg-red-50 border-red-100'
+                    else if (dayData.record.status === 'late') statusColor = 'bg-yellow-50 border-yellow-100'
+                    else if (dayData.record.status === 'half-day') statusColor = 'bg-orange-50 border-orange-100'
+                    else if (dayData.record.status === 'leave') statusColor = 'bg-blue-50 border-blue-100'
+                    else if (dayData.record.status === 'holiday') statusColor = 'bg-purple-50 border-purple-100'
+                  } else if (isHoliday) {
+                    statusColor = 'bg-purple-50 border-purple-100'
+                  }
 
-                    {/* Status badge */}
-                    {dayData.record?.status && (
-                      <div className="mb-1">
-                        <span className={`
-                          inline-block text-[9px] sm:text-[10px] px-1 py-0.5 rounded border font-medium uppercase tracking-tight leading-tight
-                          ${getStatusBadgeColor(dayData.record.status)}
-                          break-words max-w-full
-                        `} style={{ wordBreak: 'break-word', hyphens: 'auto' }}>
-                          {dayData.record.status}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Edit button for regularisation - show on hover */}
-                    {dayData.isCurrentMonth && dayData.record && !isHoliday && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          openCorrectionModal(dayData.record)
-                        }}
-                        className="absolute top-0.5 sm:top-1 right-0.5 sm:right-1 p-0.5 sm:p-1 rounded-full bg-white shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-50 z-10"
-                        title="Request Regularisation"
-                      >
-                        <FaEdit className="w-2 h-2 sm:w-3 sm:h-3 text-blue-600" />
-                      </button>
-                    )}
-
-                    {/* Pending correction indicator */}
-                    {hasPending && (
-                      <div className="absolute bottom-0.5 sm:bottom-1 right-0.5 sm:right-1">
-                        <span className="text-[7px] sm:text-[8px] px-0.5 sm:px-1 py-0.5 bg-yellow-400 text-yellow-900 rounded font-medium">
-                          Pending
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Add button for missing entry - show on hover for past dates without records */}
-                    {dayData.isCurrentMonth && !dayData.record && !isWeekend && !isHoliday && dayData.date && new Date(dayData.date) < new Date() && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
+                  return (
+                    <div
+                      key={index}
+                      onClick={() => {
+                        if (dayData.holiday) {
+                          setSelectedHoliday(dayData.holiday)
+                          setShowHolidayModal(true)
+                        } else if (dayData.record) {
+                          setSelectedRecord(dayData.record)
+                          setShowDetailsModal(true)
+                        } else if (dayData.isCurrentMonth && !isWeekend && !isHoliday && new Date(dayData.date) < new Date()) {
+                          // Handle missing entry click
                           setMissingEntryForm(prev => ({
                             ...prev,
                             date: dayData.date.toISOString().split('T')[0]
                           }))
                           setShowMissingEntryModal(true)
-                        }}
-                        className="absolute top-0.5 sm:top-1 right-0.5 sm:right-1 p-0.5 sm:p-1 rounded-full bg-white shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-green-50 z-10"
-                        title="Add Missing Entry"
-                      >
-                        <FaPlus className="w-2 h-2 sm:w-3 sm:h-3 text-green-600" />
-                      </button>
-                    )}
-
-                    {/* Holiday Name */}
-                    {isHoliday && (
-                      <div className="text-[9px] sm:text-[10px] leading-tight text-purple-700 mt-1 font-medium bg-purple-100/50 px-1 py-0.5 rounded break-words" style={{ wordBreak: 'break-word', hyphens: 'auto' }}>
-                        {holidayName}
+                        }
+                      }}
+                      className={`
+                      min-h-[80px] sm:min-h-[120px] p-1.5 sm:p-2 border rounded transition-all cursor-pointer relative group
+                      ${statusColor}
+                      ${dayData.isToday ? 'ring-2 ring-blue-500' : ''}
+                      ${!dayData.isCurrentMonth ? 'opacity-40 bg-gray-50 border-transparent' : 'bg-white hover:shadow'}
+                    `}
+                    >
+                      {/* Day number */}
+                      <div className="font-bold text-xs sm:text-sm mb-1">
+                        <span className={dayData.isToday ? 'text-blue-600' : 'text-gray-700'}>
+                          {dayData.day}
+                        </span>
                       </div>
-                    )}
 
-                    {/* Time details for present/late/half-day */}
-                    {dayData.record && ['present', 'late', 'half-day'].includes(dayData.record.status) && (
-                      <div className="text-[9px] sm:text-[10px] text-gray-600 mt-1 space-y-0.5 max-h-[50px] sm:max-h-[70px] overflow-y-auto overflow-x-hidden">
-                        {dayData.record.checkIn && (
-                          <div className="truncate" title={`In: ${formatTime(dayData.record.checkIn)}`}>In: {formatTime(dayData.record.checkIn)}</div>
-                        )}
-                        {dayData.record.checkOut && (
-                          <div className="truncate" title={`Out: ${formatTime(dayData.record.checkOut)}`}>Out: {formatTime(dayData.record.checkOut)}</div>
-                        )}
-                        {dayData.record.workHours && (
-                          <div className="font-medium truncate">{dayData.record.workHours}h</div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
+                      {/* Status badge */}
+                      {dayData.record?.status && (
+                        <div className="mb-1">
+                          <span className={`
+                          inline-block text-[9px] sm:text-[10px] px-1 py-0.5 rounded border font-medium uppercase tracking-tight leading-tight
+                          ${getStatusBadgeColor(dayData.record.status)}
+                          break-words max-w-full
+                        `} style={{ wordBreak: 'break-word', hyphens: 'auto' }}>
+                            {dayData.record.status}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Edit button for regularisation - show on hover */}
+                      {dayData.isCurrentMonth && dayData.record && !isHoliday && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            openCorrectionModal(dayData.record)
+                          }}
+                          className="absolute top-0.5 sm:top-1 right-0.5 sm:right-1 p-0.5 sm:p-1 rounded-full bg-white shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-50 z-10"
+                          title="Request Regularisation"
+                        >
+                          <FaEdit className="w-2 h-2 sm:w-3 sm:h-3 text-blue-600" />
+                        </button>
+                      )}
+
+                      {/* Pending correction indicator */}
+                      {hasPending && (
+                        <div className="absolute bottom-0.5 sm:bottom-1 right-0.5 sm:right-1">
+                          <span className="text-[7px] sm:text-[8px] px-0.5 sm:px-1 py-0.5 bg-yellow-400 text-yellow-900 rounded font-medium">
+                            Pending
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Add button for missing entry - show on hover for past dates without records */}
+                      {dayData.isCurrentMonth && !dayData.record && !isWeekend && !isHoliday && dayData.date && new Date(dayData.date) < new Date() && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setMissingEntryForm(prev => ({
+                              ...prev,
+                              date: dayData.date.toISOString().split('T')[0]
+                            }))
+                            setShowMissingEntryModal(true)
+                          }}
+                          className="absolute top-0.5 sm:top-1 right-0.5 sm:right-1 p-0.5 sm:p-1 rounded-full bg-white shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-green-50 z-10"
+                          title="Add Missing Entry"
+                        >
+                          <FaPlus className="w-2 h-2 sm:w-3 sm:h-3 text-green-600" />
+                        </button>
+                      )}
+
+                      {/* Holiday Name */}
+                      {isHoliday && (
+                        <div className="text-[9px] sm:text-[10px] leading-tight text-purple-700 mt-1 font-medium bg-purple-100/50 px-1 py-0.5 rounded break-words" style={{ wordBreak: 'break-word', hyphens: 'auto' }}>
+                          {holidayName}
+                        </div>
+                      )}
+
+                      {/* Time details for present/late/half-day */}
+                      {dayData.record && ['present', 'late', 'half-day'].includes(dayData.record.status) && (
+                        <div className="text-[9px] sm:text-[10px] text-gray-600 mt-1 space-y-0.5 max-h-[50px] sm:max-h-[70px] overflow-y-auto overflow-x-hidden">
+                          {dayData.record.checkIn && (
+                            <div className="truncate" title={`In: ${formatTime(dayData.record.checkIn)}`}>In: {formatTime(dayData.record.checkIn)}</div>
+                          )}
+                          {dayData.record.checkOut && (
+                            <div className="truncate" title={`Out: ${formatTime(dayData.record.checkOut)}`}>Out: {formatTime(dayData.record.checkOut)}</div>
+                          )}
+                          {dayData.record.workHours && (
+                            <div className="font-medium truncate">{dayData.record.workHours}h</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           </div>
@@ -1169,18 +1172,19 @@ export default function AttendancePage() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Check In</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Check Out</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Work Hours</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Check In</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Check Out</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">Locations</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hours</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {attendance.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
+                    <td colSpan="7" className="px-4 py-4 text-center text-gray-500">
                       No attendance records found for this month
                     </td>
                   </tr>
@@ -1188,27 +1192,54 @@ export default function AttendancePage() {
                   attendance.map((record) => {
                     const pendingCorrection = getPendingCorrectionForRecord(record)
                     const hasPending = !!pendingCorrection
-                    
+
                     return (
                       <tr key={record._id} className={`hover:bg-gray-50 ${hasPending ? 'bg-yellow-50' : ''}`}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatDate(record.date)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatTime(record.checkIn)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatTime(record.checkOut)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{record.workHours ? `${record.workHours}h` : 'N/A'}</td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            record.status === 'present' ? 'bg-green-100 text-green-800' :
-                            record.status === 'absent' ? 'bg-red-100 text-red-800' :
-                            record.status === 'half-day' ? 'bg-yellow-100 text-yellow-800' :
-                            record.status === 'in-progress' ? 'bg-orange-100 text-orange-800' :
-                            record.status === 'late' ? 'bg-amber-100 text-amber-800' :
-                            record.status === 'on-leave' ? 'bg-blue-100 text-blue-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{formatDate(record.date)}</td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{formatTime(record.checkIn)}</td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{formatTime(record.checkOut)}</td>
+                        <td className="px-4 py-4 text-xs text-gray-600 hidden md:table-cell max-w-xs">
+                          {record.location?.checkIn?.address || record.location?.checkOut?.address ? (
+                            <div className="space-y-1">
+                              {record.location?.checkIn?.address && (
+                                <div className="flex items-start gap-1">
+                                  <FaMapMarkerAlt className="text-green-500 mt-0.5 flex-shrink-0 w-3 h-3" />
+                                  <span className="truncate" title={record.location.checkIn.address}>
+                                    {record.location.checkIn.address.length > 40
+                                      ? record.location.checkIn.address.substring(0, 40) + '...'
+                                      : record.location.checkIn.address}
+                                  </span>
+                                </div>
+                              )}
+                              {record.location?.checkOut?.address && (
+                                <div className="flex items-start gap-1">
+                                  <FaMapMarkerAlt className="text-red-500 mt-0.5 flex-shrink-0 w-3 h-3" />
+                                  <span className="truncate" title={record.location.checkOut.address}>
+                                    {record.location.checkOut.address.length > 40
+                                      ? record.location.checkOut.address.substring(0, 40) + '...'
+                                      : record.location.checkOut.address}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 italic">Not captured</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{record.workHours ? `${record.workHours}h` : 'N/A'}</td>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${record.status === 'present' ? 'bg-green-100 text-green-800' :
+                              record.status === 'absent' ? 'bg-red-100 text-red-800' :
+                                record.status === 'half-day' ? 'bg-yellow-100 text-yellow-800' :
+                                  record.status === 'in-progress' ? 'bg-orange-100 text-orange-800' :
+                                    record.status === 'late' ? 'bg-amber-100 text-amber-800' :
+                                      record.status === 'on-leave' ? 'bg-blue-100 text-blue-800' :
+                                        'bg-gray-100 text-gray-800'
+                            }`}>
                             {record.status === 'in-progress' ? 'In Progress' : record.status}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-4 py-4 whitespace-nowrap">
                           {hasPending ? (
                             <span className="inline-flex items-center space-x-1 px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium border border-yellow-300">
                               <FaClock className="w-3 h-3" />
@@ -1287,8 +1318,32 @@ export default function AttendancePage() {
                 <p className="text-xs text-blue-600 mt-1">
                   Current: {selectedRecord && formatTime(selectedRecord.checkIn)} - {selectedRecord && formatTime(selectedRecord.checkOut)} ({selectedRecord?.status})
                 </p>
+                {/* Location Display in Modal */}
+                {(selectedRecord?.location?.checkIn?.address || selectedRecord?.location?.checkOut?.address) && (
+                  <div className="mt-2 pt-2 border-t border-blue-200">
+                    {selectedRecord?.location?.checkIn?.address && (
+                      <p className="text-xs text-blue-600 flex items-start gap-1">
+                        <FaMapMarkerAlt className="text-green-600 mt-0.5 flex-shrink-0" />
+                        <span><strong>Check-in:</strong> {selectedRecord.location.checkIn.address}</span>
+                      </p>
+                    )}
+                    {selectedRecord?.location?.checkOut?.address && (
+                      <p className="text-xs text-blue-600 flex items-start gap-1 mt-1">
+                        <FaMapMarkerAlt className="text-red-600 mt-0.5 flex-shrink-0" />
+                        <span><strong>Check-out:</strong> {selectedRecord.location.checkOut.address}</span>
+                      </p>
+                    )}
+                  </div>
+                )}
+                {/* Show "Location not captured" for old records */}
+                {selectedRecord && !selectedRecord?.location?.checkIn?.address && !selectedRecord?.location?.checkOut?.address && (
+                  <p className="text-xs text-gray-500 mt-2 pt-2 border-t border-blue-200 flex items-center gap-1">
+                    <FaMapMarkerAlt className="text-gray-400" />
+                    <span>Location not captured</span>
+                  </p>
+                )}
               </div>
-              
+
               <div className="space-y-4">
                 <div>
                   <label className="modal-label">Correction Type</label>
@@ -1393,7 +1448,7 @@ export default function AttendancePage() {
             </div>
             <div className="modal-body">
               <p className="text-sm text-gray-600 mb-4">Submit a request to add attendance for a day you forgot to clock in/out.</p>
-              
+
               <div className="space-y-4">
                 {/* Show date as read-only info box when selected from calendar */}
                 {selectedDayForMissingEntry ? (
@@ -1499,14 +1554,14 @@ export default function AttendancePage() {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-bold text-gray-800">{selectedHoliday.name}</h3>
-              <button 
-                onClick={() => setShowHolidayModal(false)} 
+              <button
+                onClick={() => setShowHolidayModal(false)}
                 className="text-gray-400 hover:text-gray-600 transition-colors p-1 hover:bg-gray-100 rounded-full"
               >
                 <FaTimes size={20} />
               </button>
             </div>
-            
+
             <div className="space-y-4">
               <div className="flex items-center p-3 bg-purple-50 rounded-lg border border-purple-100">
                 <div className="bg-white p-2 rounded-full shadow-sm mr-3">
@@ -1515,11 +1570,11 @@ export default function AttendancePage() {
                 <div>
                   <p className="text-xs text-purple-600 font-semibold uppercase tracking-wide">Date</p>
                   <p className="text-gray-800 font-medium">
-                    {new Date(selectedHoliday.date).toLocaleDateString('en-US', { 
-                      weekday: 'long', 
-                      year: 'numeric', 
-                      month: 'long', 
-                      day: 'numeric' 
+                    {new Date(selectedHoliday.date).toLocaleDateString('en-US', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
                     })}
                   </p>
                 </div>
@@ -1544,7 +1599,7 @@ export default function AttendancePage() {
                 </span>
               </div>
             </div>
-            
+
             <div className="mt-6 flex justify-end">
               <button
                 onClick={() => setShowHolidayModal(false)}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import toast from 'react-hot-toast'
-import { FaUsers, FaBuilding, FaArrowLeft, FaCalendarAlt, FaClock, FaChevronLeft, FaChevronRight, FaSearch, FaUserCircle } from 'react-icons/fa'
+import { FaUsers, FaBuilding, FaArrowLeft, FaCalendarAlt, FaClock, FaChevronLeft, FaChevronRight, FaSearch, FaUserCircle, FaMapMarkerAlt } from 'react-icons/fa'
 
 export default function TeamAttendancePage() {
   const [loading, setLoading] = useState(true)
@@ -30,13 +30,13 @@ export default function TeamAttendancePage() {
   const checkUserRoleAndFetchData = async (parsedUser) => {
     try {
       const token = localStorage.getItem('token')
-      
+
       // Check if user is a department head
       const checkHeadResponse = await fetch('/api/team/check-head', {
         headers: { 'Authorization': `Bearer ${token}` }
       })
       const checkHeadData = await checkHeadResponse.json()
-      
+
       if (checkHeadData.success && checkHeadData.isDepartmentHead) {
         setIsDepartmentHead(true)
         setDepartmentInfo({
@@ -250,7 +250,7 @@ export default function TeamAttendancePage() {
     return fullName.includes(searchTerm.toLowerCase()) || code.includes(searchTerm.toLowerCase())
   })
 
-  const filteredDepartments = departments.filter(dept => 
+  const filteredDepartments = departments.filter(dept =>
     dept.name.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
@@ -501,7 +501,7 @@ export default function TeamAttendancePage() {
                   </div>
                 ))}
               </div>
-              
+
               {/* Calendar Grid */}
               <div className="grid grid-cols-7 gap-1">
                 {calendarData.map((dayData, index) => (
@@ -509,7 +509,7 @@ export default function TeamAttendancePage() {
                     key={index}
                     className={`
                       min-h-[100px] p-2 rounded-lg border-2 transition-all
-                      ${dayData.day === null ? 'bg-transparent border-transparent' : 
+                      ${dayData.day === null ? 'bg-transparent border-transparent' :
                         `${getStatusColor(dayData.record, dayData.isFuture)}`
                       }
                       ${dayData.isToday ? 'ring-2 ring-blue-500 ring-offset-2' : ''}
@@ -522,7 +522,7 @@ export default function TeamAttendancePage() {
                             {dayData.day}
                           </span>
                         </div>
-                        
+
                         {dayData.record ? (
                           <div className="space-y-1">
                             <span className={`text-xs font-medium capitalize ${getStatusTextColor(dayData.record.status)}`}>
@@ -539,6 +539,29 @@ export default function TeamAttendancePage() {
                                 <div className="font-medium">{dayData.record.workHours}h</div>
                               )}
                             </div>
+                            {/* Location indicators */}
+                            {(dayData.record.location?.checkIn?.address || dayData.record.location?.checkOut?.address) && (
+                              <div className="text-[9px] text-gray-400 mt-1 space-y-0.5">
+                                {dayData.record.location?.checkIn?.address && (
+                                  <div className="flex items-start gap-0.5" title={dayData.record.location.checkIn.address}>
+                                    <FaMapMarkerAlt className="text-green-500 w-2 h-2 mt-0.5 flex-shrink-0" />
+                                    <span className="truncate max-w-[60px]">
+                                      {dayData.record.location.checkIn.addressDetails?.city ||
+                                        dayData.record.location.checkIn.address.split(',')[0]}
+                                    </span>
+                                  </div>
+                                )}
+                                {dayData.record.location?.checkOut?.address && (
+                                  <div className="flex items-start gap-0.5" title={dayData.record.location.checkOut.address}>
+                                    <FaMapMarkerAlt className="text-red-500 w-2 h-2 mt-0.5 flex-shrink-0" />
+                                    <span className="truncate max-w-[60px]">
+                                      {dayData.record.location.checkOut.addressDetails?.city ||
+                                        dayData.record.location.checkOut.address.split(',')[0]}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         ) : !dayData.isFuture ? (
                           <div className="text-xs text-gray-400 mt-1">
@@ -582,7 +605,7 @@ export default function TeamAttendancePage() {
                 <p className="text-sm text-yellow-700">Half Days</p>
               </div>
             </div>
-            
+
             {/* Total Work Hours */}
             <div className="mt-4 bg-blue-50 rounded-lg p-4">
               <div className="flex items-center justify-between">

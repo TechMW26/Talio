@@ -29,11 +29,11 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url)
     const dateParam = searchParams.get('date')
-    
+
     // Default to today if no date provided
     const targetDate = dateParam ? new Date(dateParam) : new Date()
     targetDate.setHours(0, 0, 0, 0)
-    
+
     const nextDay = new Date(targetDate)
     nextDay.setDate(nextDay.getDate() + 1)
 
@@ -66,7 +66,7 @@ export async function GET(request) {
     // Create complete check-in data including absent employees
     const checkinData = allEmployees.map(employee => {
       const attendance = attendanceMap.get(employee._id.toString())
-      
+
       if (attendance) {
         return {
           _id: attendance._id,
@@ -86,7 +86,8 @@ export async function GET(request) {
           checkOutStatus: attendance.checkOutStatus,
           status: attendance.status,
           workHours: attendance.workHours,
-          notes: attendance.notes
+          notes: attendance.notes,
+          location: attendance.location // Include location data
         }
       } else {
         // Employee is absent

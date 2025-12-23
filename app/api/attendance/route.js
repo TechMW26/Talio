@@ -14,6 +14,7 @@ import { logActivity } from '@/lib/activityLogger'
 import { sendEmail } from '@/lib/mailer'
 import { sendPushToUser } from '@/lib/pushNotification'
 import { calculateEffectiveWorkHours, determineAttendanceStatus } from '@/lib/attendanceShrinkage'
+import { reverseGeocode, validateLocationData } from '@/lib/geocoding'
 
 // Ensure models are registered for populate
 const _ensureModels = { Company };
@@ -141,9 +142,9 @@ export async function GET(request) {
       query.date = { $gte: startDate, $lte: endDate }
     }
 
-    // Optimized: Use lean() and select only needed fields
+    // Optimized: Use lean() and select only needed fields (including location for display)
     const attendance = await Attendance.find(query)
-      .select('employee date checkIn checkOut checkInStatus checkOutStatus status workHours overtime totalLoggedHours breakMinutes shrinkagePercentage')
+      .select('employee date checkIn checkOut checkInStatus checkOutStatus status workHours overtime totalLoggedHours breakMinutes shrinkagePercentage location')
       .populate({
         path: 'employee',
         select: 'firstName lastName employeeCode company',
@@ -157,13 +158,13 @@ export async function GET(request) {
     // Also fix past-day records that are still 'in-progress' without checkOut
     const fixedData = attendance.map(record => {
       const timezone = record.employee?.company?.timezone || 'Asia/Kolkata';
-      
+
       // Get YYYY-MM-DD in company timezone
       const todayString = new Date().toLocaleDateString("en-CA", { timeZone: timezone });
       const recordDateString = new Date(record.date).toLocaleDateString("en-CA", { timeZone: timezone });
-      
+
       const isPastDay = recordDateString < todayString;
-      
+
       // Case 1: Has checkOut but still showing in-progress
       if (record.status === 'in-progress' && record.checkIn && record.checkOut && record.workHours) {
         // Determine correct status based on work hours
@@ -173,22 +174,22 @@ export async function GET(request) {
         } else if (record.workHours >= 4) { // 50% of 8 hours
           correctedStatus = 'half-day'
         }
-        
+
         // Update the database in background (non-blocking)
         Attendance.updateOne(
           { _id: record._id },
           { status: correctedStatus, statusReason: 'Auto-fixed: Status was in-progress after clock-out' }
         ).exec().catch(err => console.error('Auto-fix attendance status error:', err))
-        
+
         return { ...record, status: correctedStatus }
       }
-      
+
       // Case 2: Past day, has checkIn but no checkOut - mark as incomplete (will be handled by scheduler)
       if (isPastDay && record.status === 'in-progress' && record.checkIn && !record.checkOut) {
         // This will be fixed by the scheduler, but flag it in the response
         return { ...record, _needsAutoCorrection: true }
       }
-      
+
       return record
     })
 
@@ -216,7 +217,21 @@ export async function POST(request) {
     await connectDB()
 
     const data = await request.json()
-    const { employeeId, type, latitude, longitude, address } = data // type: 'clock-in' or 'clock-out'
+    const { employeeId, type, latitude, longitude, address, accuracy } = data // type: 'clock-in' or 'clock-out'
+
+    // STRICT LOCATION VALIDATION - Block if location not provided
+    const locationValidation = validateLocationData({ latitude, longitude })
+    if (!locationValidation.valid) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Location is required for attendance. Please enable location services and try again.',
+          error: locationValidation.message,
+          requiresLocation: true
+        },
+        { status: 400 }
+      )
+    }
 
     const today = new Date()
     today.setHours(0, 0, 0, 0)
@@ -237,7 +252,7 @@ export async function POST(request) {
 
     // Determine settings based on employee's company
     let settings = await CompanySettings.findOne().lean()
-    
+
     if (employee.company && employee.company.workingHours) {
       // Override global settings with company-specific settings
       const companySettings = employee.company
@@ -286,15 +301,15 @@ export async function POST(request) {
       const localNow = new Date(new Date().toLocaleString("en-US", { timeZone: companyTimezone }));
       const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
       const currentDayName = daysOfWeek[localNow.getDay()];
-      
+
       // Default to Mon-Fri if not specified
       const workingDays = settings?.workingDays || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
-      
+
       // Allow check-in if it's a working day OR if there is an approved leave/WFH (handled later but we should check here)
       // Actually, if it's a non-working day, you shouldn't check in unless you have specific permission.
       // For now, strict blocking as requested.
       if (!workingDays.includes(currentDayName)) {
-         return NextResponse.json(
+        return NextResponse.json(
           { success: false, message: `Check-in is not allowed today (${currentDayName} is not a working day).` },
           { status: 403 }
         )
@@ -307,15 +322,15 @@ export async function POST(request) {
       localTodayEnd.setHours(23, 59, 59, 999);
 
       const holiday = await Holiday.findOne({
-        date: { 
-          $gte: localTodayStart, 
-          $lte: localTodayEnd 
+        date: {
+          $gte: localTodayStart,
+          $lte: localTodayEnd
         },
         isActive: true
       });
 
       if (holiday) {
-         return NextResponse.json(
+        return NextResponse.json(
           { success: false, message: `Check-in is not allowed today (Holiday: ${holiday.name}).` },
           { status: 403 }
         )
@@ -382,6 +397,26 @@ export async function POST(request) {
         checkInStatus = 'late'
       }
 
+      // Server-side reverse geocoding for accurate address
+      let resolvedAddress = address || 'Location captured'
+      let addressDetails = null
+
+      try {
+        const geocodeResult = await reverseGeocode(latitude, longitude)
+        if (geocodeResult.success) {
+          resolvedAddress = geocodeResult.address
+          addressDetails = geocodeResult.details
+          console.log(`📍 Check-in location resolved: ${resolvedAddress}`)
+        } else {
+          console.warn(`⚠️ Geocoding failed for check-in: ${geocodeResult.error}`)
+          // Fallback to coordinates if geocoding fails
+          resolvedAddress = address || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
+        }
+      } catch (geocodeError) {
+        console.error('Geocoding error during check-in:', geocodeError)
+        resolvedAddress = address || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
+      }
+
       const attendanceData = {
         checkIn: checkInTime,
         checkInStatus: checkInStatus,
@@ -391,7 +426,16 @@ export async function POST(request) {
         'location.checkIn': {
           latitude,
           longitude,
-          address,
+          address: resolvedAddress,
+          addressDetails: addressDetails ? {
+            city: addressDetails.city,
+            state: addressDetails.state,
+            country: addressDetails.country,
+            pincode: addressDetails.pincode,
+            fullAddress: addressDetails.fullAddress
+          } : null,
+          capturedAt: checkInTime,
+          accuracy: accuracy || null,
           geofenceLocation,
           geofenceLocationName
         }
@@ -548,6 +592,25 @@ export async function POST(request) {
       const checkOutTime = new Date()
       attendance.checkOut = checkOutTime
 
+      // Server-side reverse geocoding for accurate address
+      let resolvedAddress = address || 'Location captured'
+      let addressDetails = null
+
+      try {
+        const geocodeResult = await reverseGeocode(latitude, longitude)
+        if (geocodeResult.success) {
+          resolvedAddress = geocodeResult.address
+          addressDetails = geocodeResult.details
+          console.log(`📍 Check-out location resolved: ${resolvedAddress}`)
+        } else {
+          console.warn(`⚠️ Geocoding failed for check-out: ${geocodeResult.error}`)
+          resolvedAddress = address || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
+        }
+      } catch (geocodeError) {
+        console.error('Geocoding error during check-out:', geocodeError)
+        resolvedAddress = address || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
+      }
+
       // Store check-out location
       if (!attendance.location) {
         attendance.location = {}
@@ -555,14 +618,23 @@ export async function POST(request) {
       attendance.location.checkOut = {
         latitude,
         longitude,
-        address,
+        address: resolvedAddress,
+        addressDetails: addressDetails ? {
+          city: addressDetails.city,
+          state: addressDetails.state,
+          country: addressDetails.country,
+          pincode: addressDetails.pincode,
+          fullAddress: addressDetails.fullAddress
+        } : null,
+        capturedAt: checkOutTime,
+        accuracy: accuracy || null,
         geofenceLocation,
         geofenceLocationName
       }
 
       // Use office end time from settings
       const [endHour, endMin] = (settings?.checkOutTime || '18:00').split(':').map(Number)
-      
+
       // Construct office end time in IST (Asia/Kolkata) to ensure correct comparison
       // regardless of server timezone
       const checkOutDateIST = new Date(checkOutTime).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // YYYY-MM-DD
@@ -571,28 +643,28 @@ export async function POST(request) {
 
       // Determine check-out status
       let checkOutStatus = 'on-time'
-      
+
       // Allow a small buffer (e.g., 1 minute) for precision issues
       const bufferMs = 60 * 1000;
-      
+
       if (checkOutTime.getTime() < officeEndTime.getTime() - bufferMs) {
         checkOutStatus = 'early'
-      } 
+      }
       // If checked out after office end time, it's still considered "on-time" (or overtime), not "late"
       // "Late" usually implies a negative connotation for check-outs (which doesn't make sense)
-      
+
       attendance.checkOutStatus = checkOutStatus
 
       // Calculate work hours using shrinkage method
       const checkIn = new Date(attendance.checkIn)
       const checkOut = new Date(attendance.checkOut)
-      
+
       // Get break timings from settings
       const breakTimings = settings?.breakTimings || []
-      
+
       // Calculate effective work hours accounting for breaks (shrinkage)
       const workHoursCalc = calculateEffectiveWorkHours(checkIn, checkOut, breakTimings)
-      
+
       // Store both logged and effective hours
       attendance.workHours = workHoursCalc.effectiveWorkHours // Effective hours after shrinkage
       attendance.totalLoggedHours = workHoursCalc.totalLoggedHours // Raw logged hours
@@ -605,7 +677,7 @@ export async function POST(request) {
         fullDayHours: settings?.fullDayHours || 8,
         halfDayHours: settings?.halfDayHours || 4
       })
-      
+
       attendance.status = statusResult.status
       attendance.statusReason = statusResult.reason
 
@@ -623,12 +695,12 @@ export async function POST(request) {
           const overtimeHours = overtimeMs > 0 ? overtimeMs / (1000 * 60 * 60) : 0
 
           attendance.overtime = parseFloat(overtimeHours.toFixed(2))
-          
+
           // Update the overtime request
           overtimeRequest.overtimeHours = attendance.overtime
           overtimeRequest.status = 'manual-checkout'
           await overtimeRequest.save()
-          
+
           console.log(`[Attendance] Overtime recorded: ${attendance.overtime}h for ${employeeId}`)
         }
       } catch (overtimeError) {
