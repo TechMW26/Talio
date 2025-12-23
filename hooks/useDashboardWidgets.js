@@ -18,6 +18,9 @@ export function useDashboardWidgets(userId = 'default', userRole = 'employee') {
   // Generate unique storage key per user
   const storageKey = `${STORAGE_KEY}_${userId}`
 
+  // Ensure we have a valid role - default to 'employee'
+  const effectiveRole = userRole || 'employee'
+
   // Load saved configuration from localStorage on mount
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -28,8 +31,11 @@ export function useDashboardWidgets(userId = 'default', userRole = 'employee') {
       if (savedConfig) {
         const { enabled, order } = JSON.parse(savedConfig)
 
-        // Validate that saved widgets still exist in registry
-        const validEnabled = enabled.filter(id => WIDGET_REGISTRY[id])
+        // Validate that saved widgets still exist in registry AND are allowed for this role
+        const validEnabled = enabled.filter(id => {
+          const widget = WIDGET_REGISTRY[id]
+          return widget && widget.roles && widget.roles.includes(effectiveRole)
+        })
         const validOrder = order.filter(id => validEnabled.includes(id))
 
         // Add any enabled widgets that aren't in order
@@ -43,7 +49,7 @@ export function useDashboardWidgets(userId = 'default', userRole = 'employee') {
         setWidgetOrder(validOrder)
       } else {
         // First time - use default widgets for role
-        const defaultWidgets = getDefaultWidgetsForRole(userRole)
+        const defaultWidgets = getDefaultWidgetsForRole(effectiveRole)
         const defaultIds = defaultWidgets.map(w => w.id)
 
         setEnabledWidgets(defaultIds)
@@ -52,14 +58,14 @@ export function useDashboardWidgets(userId = 'default', userRole = 'employee') {
     } catch (error) {
       console.error('Error loading dashboard widgets config:', error)
       // Fallback to defaults
-      const defaultWidgets = getDefaultWidgetsForRole(userRole)
+      const defaultWidgets = getDefaultWidgetsForRole(effectiveRole)
       const defaultIds = defaultWidgets.map(w => w.id)
       setEnabledWidgets(defaultIds)
       setWidgetOrder(defaultIds)
     }
 
     setIsInitialized(true)
-  }, [storageKey, userRole])
+  }, [storageKey, effectiveRole])
 
   // Save configuration to localStorage
   const saveConfig = useCallback((enabled, order) => {

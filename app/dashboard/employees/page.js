@@ -474,7 +474,7 @@ export default function EmployeesPage() {
                 >
                   <option value="">All Designations</option>
                   {designations.map(des => (
-                    <option key={des._id} value={des._id}>{des.name}</option>
+                    <option key={des._id} value={des._id}>{des.title}</option>
                   ))}
                 </select>
               </div>

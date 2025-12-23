@@ -15,10 +15,13 @@ export default function AddWidgetModal({
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('all')
 
+  // Ensure we always have a valid role for filtering - default to 'employee' if undefined/null
+  const effectiveRole = userRole || 'employee'
+
   // Get all widgets categorized for the user's role
   const categorizedWidgets = useMemo(() =>
-    getCategorizedWidgets(userRole),
-    [userRole]
+    getCategorizedWidgets(effectiveRole),
+    [effectiveRole]
   )
 
   // Filter widgets based on search and category
@@ -68,9 +71,9 @@ export default function AddWidgetModal({
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+              className="p-2 hover:bg-black/10 bg-white/90 rounded-lg transition-colors"
             >
-              <FaTimes className="w-5 h-5 text-white" />
+              <FaTimes className="w-5 h-5 text-gray-800" />
             </button>
           </div>
 
