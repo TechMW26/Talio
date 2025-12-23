@@ -260,7 +260,7 @@ export default function ActiveSessionsSection() {
                     <button
                       onClick={() => handleRevokeSession(session.id)}
                       disabled={revoking === session.id}
-                      className="px-3 py-1.5 text-xs font-medium text-red-600 hover:text-white hover:bg-red-500 bg-white border border-slate-200 hover:border-red-500 rounded-lg transition-all disabled:opacity-50"
+                      className="px-3 py-1.5 text-xs font-medium text-red-600 hover:text-red hover:bg-red-500 bg-white border border-slate-200 hover:border-red-500 rounded-lg transition-all disabled:opacity-50"
                     >
                       {revoking === session.id ? (
                         <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">

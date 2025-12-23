@@ -204,6 +204,16 @@ export default function ChatPopup({ chat, index }) {
     return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
   }
 
+  // Get other participant's profile picture (for 1-on-1 chats)
+  const getOtherParticipantPicture = () => {
+    if (chat.isGroup) return null
+    const otherParticipant = chat.participants?.find(p => {
+      const pId = p._id || p
+      return pId !== currentEmployeeId && pId !== currentUserId
+    })
+    return otherParticipant?.profilePicture || null
+  }
+
   // Join chat room and fetch messages
   useEffect(() => {
     if (chat._id) {
@@ -669,8 +679,21 @@ export default function ChatPopup({ chat, index }) {
           onMouseDown={handleMouseDown}
         >
           <div className="flex items-center gap-2 text-white min-w-0">
-            <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-sm font-medium flex-shrink-0 shadow-sm">
-              {chat.isGroup ? <FaUsers className="w-4 h-4" /> : getInitials()}
+            <div 
+              className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 shadow-sm overflow-hidden"
+              style={{ backgroundColor: getOtherParticipantPicture() ? 'transparent' : 'rgba(0, 0, 0, 0.3)' }}
+            >
+              {chat.isGroup ? (
+                <FaUsers className="w-4 h-4 text-white" />
+              ) : getOtherParticipantPicture() ? (
+                <img 
+                  src={getOtherParticipantPicture()} 
+                  alt="" 
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <span className="text-white">{getInitials()}</span>
+              )}
             </div>
             <div className="min-w-0">
               <span className="font-medium text-sm truncate block">{getChatName()}</span>

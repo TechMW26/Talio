@@ -283,6 +283,10 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
   const bloodGroup = employee?.bloodGroup || "B+";
   const email = employee?.email || "user@example.com";
   const address = employee?.address || "Not Provided";
+  
+  // Company data for ID card back
+  const companyLogo = employee?.company?.logo || employee?.companyLogo || null;
+  const companyName = employee?.company?.name || employee?.companyName || "Talio";
 
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
@@ -419,9 +423,13 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
             <div className="card-shine"></div>
 
             <div className="back-content">
-              {/* Website Logo Placeholder */}
-              <div className="back-logo" style={{ background: '#111827', padding: '15px' }}>
-                <img src="/assets/lanyard-card-logo.webp" alt="Talio" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+              {/* Company Logo - falls back to Talio logo */}
+              <div className="back-logo" style={{ background: companyLogo ? 'transparent' : '#111827', padding: '15px' }}>
+                <img 
+                  src={companyLogo || "/assets/lanyard-card-logo.webp"} 
+                  alt={companyName} 
+                  style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
+                />
               </div>
 
               <div className="back-contact" style={{ width: '100%', alignItems: 'flex-start', padding: '0 4px', marginTop: '20px' }}>
@@ -438,7 +446,7 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
 
             <div className="back-footer">
               If found, please return to<br />
-              <span>Talio</span>
+              <span>{companyName}</span>
             </div>
           </div>
         </div>

@@ -50,6 +50,18 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
     return () => window.removeEventListener('resize', checkDesktop)
   }, [])
 
+  // Get user initials for avatar fallback
+  const getUserInitials = () => {
+    const firstName = employeeData?.firstName || user?.firstName || ''
+    const lastName = employeeData?.lastName || user?.lastName || ''
+    if (firstName || lastName) {
+      return `${firstName[0] || ''}${lastName[0] || ''}`.toUpperCase()
+    }
+    // Fallback to email first letter
+    const email = user?.email || ''
+    return email[0]?.toUpperCase() || 'U'
+  }
+
   useEffect(() => {
     setMounted(true)
     const userData = localStorage.getItem('user')
@@ -570,7 +582,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <FaUser className="w-4 h-4 sm:w-4 sm:h-4 text-white" />
+                    <span className="text-white text-xs sm:text-sm font-medium">{getUserInitials()}</span>
                   )}
                 </div>
                 {/* Notification badge placeholder - can be added here if needed */}
@@ -603,7 +615,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                             className="w-full h-full object-cover"
                           />
                         ) : (
-                          <FaUser className="w-5 h-5 text-white" />
+                          <span className="text-white text-sm font-medium">{getUserInitials()}</span>
                         )}
                       </div>
                       <div className="flex-1 min-w-0">

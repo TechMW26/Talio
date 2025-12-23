@@ -178,6 +178,22 @@ export default function FloatingChatWidget() {
     return 'Chat'
   }
 
+  // Get other participant's profile picture (for 1-on-1 chats)
+  const getChatAvatar = (chat) => {
+    if (chat.isGroup) return null
+    const otherParticipant = chat.participants?.find(p => {
+      const pId = p._id || p
+      return pId !== currentEmployeeId && pId !== currentUserId
+    })
+    return otherParticipant?.profilePicture || null
+  }
+
+  // Get initials from chat name
+  const getChatInitials = (chat) => {
+    const name = getChatName(chat)
+    return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+  }
+
   // Get unread count for a chat
   const getUnreadCount = (chatId) => {
     return unreadChats?.[chatId] || 0
@@ -375,10 +391,14 @@ export default function FloatingChatWidget() {
                           className="w-full px-4 py-3 flex items-center gap-3 hover:bg-white/60 transition-colors border-b border-white/30"
                         >
                           <div 
-                            className="w-10 h-10 rounded-full flex items-center justify-center text-white font-medium text-sm shadow-sm"
+                            className="w-10 h-10 rounded-full flex items-center justify-center text-white font-medium text-sm shadow-sm overflow-hidden"
                             style={{ backgroundColor: primaryColor }}
                           >
-                            {emp.firstName?.[0]}{emp.lastName?.[0]}
+                            {emp.profilePicture ? (
+                              <img src={emp.profilePicture} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <>{emp.firstName?.[0]}{emp.lastName?.[0]}</>
+                            )}
                           </div>
                           <div className="flex-1 text-left">
                             <p className="font-medium text-gray-900 text-sm">
@@ -419,13 +439,15 @@ export default function FloatingChatWidget() {
                       >
                         <div className="relative">
                           <div 
-                            className="w-11 h-11 rounded-full flex items-center justify-center text-white font-medium text-sm shadow-sm"
+                            className="w-11 h-11 rounded-full flex items-center justify-center text-white font-medium text-sm shadow-sm overflow-hidden"
                             style={{ backgroundColor: chat.isGroup ? primaryDark : primaryColor }}
                           >
                             {chat.isGroup ? (
                               <FaUsers className="w-5 h-5" />
+                            ) : getChatAvatar(chat) ? (
+                              <img src={getChatAvatar(chat)} alt="" className="w-full h-full object-cover" />
                             ) : (
-                              getChatName(chat).split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+                              getChatInitials(chat)
                             )}
                           </div>
                           <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-sm"></div>

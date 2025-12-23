@@ -870,7 +870,8 @@ export default function ProfilePage() {
                     email: employee?.email,
                     address: employee?.address,
                     dob: employee?.dateOfBirth,
-                    joiningDate: employee?.dateOfJoining
+                    joiningDate: employee?.dateOfJoining,
+                    company: employee?.company
                   }}
                   onImageClick={() => fileInputRef.current?.click()}
                   uploadingImage={uploadingImage}
