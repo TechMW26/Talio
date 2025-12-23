@@ -1,7 +1,6 @@
 'use client';
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { FaCamera } from 'react-icons/fa';
-import { useTheme } from '@/contexts/ThemeContext';
 import './Lanyard.css';
 
 export default function Lanyard({ employee, onImageClick, uploadingImage }) {
@@ -11,11 +10,6 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
   const lanyardPathRef = useRef(null);
   const lanyardPathBorderRef = useRef(null);
   const lanyardLogosRef = useRef(null);
-  
-  // Get theme colors
-  const { theme } = useTheme();
-  const darkPrimaryColor = theme?.primary?.[800] || theme?.primary?.[700] || '#1E40AF';
-  const accentColor = theme?.primary?.[600] || '#2563EB';
   
   // Memoize company data to ensure it updates when employee changes
   const { companyLogo, companyName, hasCompanyLogo } = useMemo(() => {
@@ -40,13 +34,13 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
     const lanyardLogos = lanyardLogosRef.current;
     const container = containerRef.current;
 
-    // Responsive card dimensions based on viewport width - increased sizes
+    // Responsive card dimensions based on viewport width - elegant compact sizes
     const isMobile = window.innerWidth <= 480;
     const isTablet = window.innerWidth <= 768 && window.innerWidth > 480;
     
-    const CARD_W = isMobile ? 300 : isTablet ? 320 : 320;
-    const CARD_H = isMobile ? 430 : isTablet ? 460 : 460;
-    const CLIP_HEIGHT = 18;
+    const CARD_W = isMobile ? 260 : isTablet ? 280 : 280;
+    const CARD_H = isMobile ? 390 : isTablet ? 420 : 420;
+    const CLIP_HEIGHT = 14;
 
     // Update card outer dimensions
     cardOuter.style.width = CARD_W + 'px';
@@ -62,10 +56,10 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
     }
     window.addEventListener("resize", handleResize);
 
-    // PHYSICS PARAMETERS - adjust rest position for larger card, moved higher
-    const restPosY = isMobile ? 360 : isTablet ? 400 : 480;
+    // PHYSICS PARAMETERS - adjust rest position for elegant card, positioned higher
+    const restPosY = isMobile ? 320 : isTablet ? 360 : 420;
     const restPos = { x: 0, y: restPosY };
-    let pos = { x: 0, y: isMobile ? 220 : isTablet ? 240 : 280 };
+    let pos = { x: 0, y: isMobile ? 200 : isTablet ? 220 : 260 };
     let vel = { x: 0, y: 0 };
 
     const kSpring = 200.35;
@@ -322,13 +316,13 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
       <svg className="lanyard-svg">
         <defs>
           <linearGradient id="lanyard-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" style={{ stopColor: "#5eada4" }} />
-            <stop offset="100%" style={{ stopColor: "#6bc4ba" }} />
+            <stop offset="0%" style={{ stopColor: "#94a3b8" }} />
+            <stop offset="100%" style={{ stopColor: "#cbd5e1" }} />
           </linearGradient>
 
           <pattern id="lanyard-logo-pattern" patternUnits="userSpaceOnUse" width="60" height="40" patternTransform="rotate(0)">
-            <rect width="60" height="40" fill="#5eada4" />
-            <text x="30" y="25" textAnchor="middle" fill="rgba(255,255,255,0.3)" fontFamily="Inter, sans-serif" fontSize="11" fontWeight="700">MG</text>
+            <rect width="60" height="40" fill="#94a3b8" />
+            <text x="30" y="25" textAnchor="middle" fill="rgba(255,255,255,0.2)" fontFamily="Inter, sans-serif" fontSize="10" fontWeight="600">•</text>
           </pattern>
         </defs>
         <path id="lanyard-path-border" className="lanyard-path-border" ref={lanyardPathBorderRef}></path>
@@ -343,9 +337,6 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
           {/* FRONT */}
           <div className="card-face front">
             <div className="card-shine"></div>
-
-            {/* Header removed as requested */}
-            <div style={{ height: '12px' }}></div>
 
             <div className="profile-section">
               <div className="avatar-container">
@@ -393,37 +384,37 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
                     className="avatar-camera-btn"
                   >
                     {uploadingImage ? (
-                      <div style={{ width: '16px', height: '16px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
+                      <div style={{ width: '10px', height: '10px', border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
                     ) : (
-                      <FaCamera className="camera-icon" style={{ color: '#ffffff', fontSize: '18px', width: '18px', height: '18px', display: 'block' }} />
+                      <FaCamera className="camera-icon" />
                     )}
                   </button>
                 )}
               </div>
-              <div className="emp-name" style={{ color: darkPrimaryColor }}>{name}</div>
-              <div className="emp-designation" style={{ color: accentColor }}>{designation}</div>
-              <div className="emp-id" style={{ color: darkPrimaryColor }}>ID: {empId}</div>
+              <div className="emp-name" style={{ color: '#1e293b' }}>{name}</div>
+              <div className="emp-designation" style={{ color: '#64748b' }}>{designation}</div>
+              <div className="emp-id">{empId}</div>
             </div>
 
             <div className="info-section">
               <div className="info-row">
                 <div className="info-item">
-                  <div className="label" style={{ color: accentColor }}>Phone</div>
-                  <div className="value" style={{ color: darkPrimaryColor }}>{phone}</div>
+                  <div className="label">Phone</div>
+                  <div className="value">{phone}</div>
                 </div>
                 <div className="info-item center">
-                  <div className="label" style={{ color: accentColor }}>Blood</div>
-                  <div className="blood-badge" style={{ backgroundColor: darkPrimaryColor }}>{bloodGroup}</div>
+                  <div className="label">Blood</div>
+                  <div className="blood-badge">{bloodGroup}</div>
                 </div>
               </div>
-              <div className="info-row" style={{ marginTop: '8px' }}>
+              <div className="info-row">
                 <div className="info-item">
-                  <div className="label" style={{ color: accentColor }}>DOB</div>
-                  <div className="value" style={{ color: darkPrimaryColor }}>{dob}</div>
+                  <div className="label">DOB</div>
+                  <div className="value">{dob}</div>
                 </div>
                 <div className="info-item">
-                  <div className="label" style={{ color: accentColor }}>Joined</div>
-                  <div className="value" style={{ color: darkPrimaryColor }}>{joiningDate}</div>
+                  <div className="label">Joined</div>
+                  <div className="value">{joiningDate}</div>
                 </div>
               </div>
             </div>
@@ -447,34 +438,34 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
                     className="company-logo-img"
                   />
                 ) : (
-                  <div className="company-name-fallback" style={{ color: darkPrimaryColor }}>
+                  <div className="company-name-fallback">
                     {companyName}
                   </div>
                 )}
               </div>
 
-              <div className="back-contact" style={{ width: '100%', alignItems: 'flex-start', padding: '0 4px', marginTop: '20px' }}>
-                <div className="info-item" style={{ marginBottom: '12px', width: '100%' }}>
-                  <div className="label" style={{ marginBottom: '2px', color: accentColor }}>Email</div>
-                  <div className="value" style={{ wordBreak: 'break-all', fontSize: '13px', color: darkPrimaryColor }}>{email}</div>
+              <div className="back-contact">
+                <div className="info-item" style={{ marginBottom: '8px', width: '100%' }}>
+                  <div className="label" style={{ marginBottom: '3px' }}>Email</div>
+                  <div className="value" style={{ wordBreak: 'break-all', fontSize: '11px' }}>{email}</div>
                 </div>
-                <div className="info-item" style={{ marginBottom: '12px', width: '100%' }}>
-                  <div className="label" style={{ marginBottom: '2px', color: accentColor }}>Address</div>
-                  <div className="value" style={{ lineHeight: '1.4', fontSize: '13px', color: darkPrimaryColor }}>{address}</div>
+                <div className="info-item" style={{ width: '100%' }}>
+                  <div className="label" style={{ marginBottom: '3px' }}>Address</div>
+                  <div className="value" style={{ lineHeight: '1.4', fontSize: '11px' }}>{address}</div>
                 </div>
               </div>
             </div>
 
-            <div className="back-footer" style={{ color: accentColor }}>
+            <div className="back-footer">
               If found, please return to<br />
-              <span style={{ color: darkPrimaryColor, fontWeight: 600 }}>{companyName}</span>
+              <span>{companyName}</span>
             </div>
           </div>
         </div>
       </div>
 
       <div className="helper-text">
-        <strong>Drag</strong> to swing the card • <strong>Tap</strong> to flip
+        <strong>Drag</strong> to swing • <strong>Tap</strong> to flip
       </div>
     </div>
   );
