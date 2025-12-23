@@ -449,10 +449,13 @@ function showOfflinePage() {
           padding: 12px 32px;
           background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
           color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer;
+          transition: transform 0.2s, opacity 0.2s;
         }
         button:hover { transform: translateY(-2px); }
+        button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
         .status { margin-top: 24px; font-size: 14px; color: #888; }
         .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ff6b6b; margin-right: 8px; animation: blink 2s infinite; }
+        .dot.checking { background: #ffa500; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
       </style>
     </head>
@@ -462,8 +465,36 @@ function showOfflinePage() {
       </svg>
       <h1>No Internet Connection</h1>
       <p>Please check your network. Talio will reconnect automatically.</p>
-      <button onclick="window.location.reload()">Try Again</button>
-      <div class="status"><span class="dot"></span>Waiting for connection...</div>
+      <button id="retryBtn" onclick="retryConnection()">Try Again</button>
+      <div class="status"><span class="dot" id="statusDot"></span><span id="statusText">Waiting for connection...</span></div>
+      <script>
+        async function retryConnection() {
+          const btn = document.getElementById('retryBtn');
+          const dot = document.getElementById('statusDot');
+          const statusText = document.getElementById('statusText');
+          
+          btn.disabled = true;
+          btn.textContent = 'Checking...';
+          dot.classList.add('checking');
+          statusText.textContent = 'Checking connection...';
+          
+          try {
+            const response = await fetch('${APP_URL}/api/health', { method: 'HEAD', cache: 'no-cache' });
+            if (response.ok) {
+              statusText.textContent = 'Connected! Redirecting...';
+              dot.style.background = '#10b981';
+              window.location.href = '${APP_URL}';
+            } else {
+              throw new Error('Server not responding');
+            }
+          } catch (err) {
+            statusText.textContent = 'Still offline. Try again later.';
+            dot.classList.remove('checking');
+            btn.disabled = false;
+            btn.textContent = 'Try Again';
+          }
+        }
+      </script>
     </body>
     </html>
   `;
