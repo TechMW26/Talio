@@ -194,6 +194,9 @@ export async function POST(request) {
     // Generate voice for each unique message if enabled
     let voiceGenerationResults = [];
     if (generateVoice) {
+      console.log(`[CallAlert] Voice generation ENABLED, starting generation for ${processedMessages.length} messages...`);
+      console.log(`[CallAlert] ElevenLabs API Key present:`, !!process.env.ELEVENLABS_API_KEY || !!process.env.NEXT_PUBLIC_ELEVENLABS_API_KEY);
+      
       callAlert.voiceGeneration.status = 'generating';
       await callAlert.save();
 
@@ -207,7 +210,7 @@ export async function POST(request) {
           });
 
           if (voiceResult.success) {
-            console.log(`[CallAlert] Voice generated successfully, audioDataUrl length: ${voiceResult.audioDataUrl?.length || 0}`);
+            console.log(`[CallAlert] ✅ Voice generated successfully, audioDataUrl length: ${voiceResult.audioDataUrl?.length || 0}`);
             
             voiceGenerationResults.push({
               receiverId: pm.receiverId,
