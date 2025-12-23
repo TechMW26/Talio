@@ -7,7 +7,6 @@ import Header from '@/components/Header'
 import BottomNav from '@/components/BottomNav'
 import { OfflineIndicator } from '@/components/PWAInstaller'
 import OutOfPremisesPopup from '@/components/OutOfPremisesPopup'
-import OfflineDetector from '@/components/OfflineDetector'
 import ChatWidgetContainer from '@/components/chat/ChatWidgetContainer'
 import ProfileCompletionModal from '@/components/ProfileCompletionModal'
 
@@ -288,9 +287,6 @@ export default function DashboardLayout({ children }) {
             
             {/* Main Layout Container - Flex Row */}
             <div className="flex h-screen w-full overflow-hidden" style={{ backgroundColor: 'var(--color-bg-main)' }}>
-
-              {/* Offline Detector */}
-              <OfflineDetector />
 
               {/* Sidebar - Static on Desktop, Fixed on Mobile */}
               <Sidebar 
