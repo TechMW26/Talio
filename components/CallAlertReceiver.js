@@ -40,35 +40,137 @@ const priorityConfig = {
   }
 };
 
+// Global AudioContext instance for reliable playback across browsers
+let audioContextInstance = null;
+let audioContextUnlocked = false;
+
 /**
- * Simple audio player function - creates new Audio instance each time
- * This avoids issues with reusing audio elements
+ * Get or create AudioContext instance
+ * AudioContext is required for reliable audio playback in production browsers
  */
-async function playAudioSimple(src) {
-  return new Promise((resolve, reject) => {
+function getAudioContext() {
+  if (!audioContextInstance && typeof window !== 'undefined') {
+    audioContextInstance = new (window.AudioContext || window.webkitAudioContext)();
+    console.log('[AudioContext] Created new AudioContext, state:', audioContextInstance.state);
+  }
+  return audioContextInstance;
+}
+
+/**
+ * Unlock AudioContext - required for browsers that suspend audio until user interaction
+ * This is critical for production environments
+ */
+async function unlockAudioContext() {
+  const ctx = getAudioContext();
+  if (!ctx) return false;
+
+  if (ctx.state === 'suspended') {
+    console.log('[AudioContext] Context is suspended, attempting to resume...');
     try {
-      console.log('[Audio] Creating new Audio for:', src.substring(0, 60));
+      await ctx.resume();
+      console.log('[AudioContext] Successfully resumed, state:', ctx.state);
+    } catch (err) {
+      console.error('[AudioContext] Failed to resume:', err);
+      return false;
+    }
+  }
+
+  audioContextUnlocked = ctx.state === 'running';
+  return audioContextUnlocked;
+}
+
+/**
+ * Convert base64 data URL to ArrayBuffer
+ */
+function base64ToArrayBuffer(base64) {
+  // Remove data URL prefix if present
+  const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
+  const binaryString = atob(base64Data);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  return bytes.buffer;
+}
+
+/**
+ * Play audio using Web Audio API - works reliably in production
+ * Falls back to HTML5 Audio if AudioContext fails
+ */
+async function playAudioWithContext(src) {
+  const ctx = getAudioContext();
+
+  // First, try to unlock/resume AudioContext
+  await unlockAudioContext();
+
+  return new Promise(async (resolve, reject) => {
+    try {
+      console.log('[Audio] Playing audio, source type:', src.startsWith('data:') ? 'base64' : 'url');
+
+      // Try Web Audio API first (more reliable in production)
+      if (ctx && ctx.state === 'running') {
+        try {
+          let audioBuffer;
+
+          if (src.startsWith('data:')) {
+            // Base64 data URL - decode directly
+            console.log('[Audio] Decoding base64 audio data...');
+            const arrayBuffer = base64ToArrayBuffer(src);
+            audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+          } else {
+            // URL - fetch and decode
+            console.log('[Audio] Fetching audio from URL:', src);
+            const response = await fetch(src);
+            const arrayBuffer = await response.arrayBuffer();
+            audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+          }
+
+          console.log('[Audio] Audio decoded successfully, duration:', audioBuffer.duration.toFixed(2), 'seconds');
+
+          // Create buffer source and play
+          const source = ctx.createBufferSource();
+          source.buffer = audioBuffer;
+          source.connect(ctx.destination);
+
+          source.onended = () => {
+            console.log('[Audio] Web Audio API playback ended');
+            resolve({ success: true });
+          };
+
+          source.start(0);
+          console.log('[Audio] Web Audio API playback started');
+          return;
+
+        } catch (webAudioErr) {
+          console.warn('[Audio] Web Audio API failed, falling back to HTML5 Audio:', webAudioErr.message);
+        }
+      } else {
+        console.log('[Audio] AudioContext not running (state:', ctx?.state, '), using HTML5 Audio fallback');
+      }
+
+      // Fallback to HTML5 Audio element
+      console.log('[Audio] Using HTML5 Audio fallback for:', src.substring(0, 60));
       const audio = new Audio(src);
-      
+
       audio.onended = () => {
-        console.log('[Audio] Playback ended');
+        console.log('[Audio] HTML5 Audio playback ended');
         resolve({ success: true });
       };
-      
+
       audio.onerror = (e) => {
-        console.error('[Audio] Error event:', e);
+        console.error('[Audio] HTML5 Audio error event:', e);
         reject(new Error('Audio playback failed'));
       };
-      
+
       // Attempt to play
       const playPromise = audio.play();
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
-            console.log('[Audio] Play started successfully');
+            console.log('[Audio] HTML5 Audio play started successfully');
           })
           .catch((err) => {
-            console.error('[Audio] Play promise rejected:', err);
+            console.error('[Audio] HTML5 Audio play promise rejected:', err);
             reject(err);
           });
       }
@@ -80,6 +182,14 @@ async function playAudioSimple(src) {
 }
 
 /**
+ * Simple audio player function - uses AudioContext for production reliability
+ * Falls back to HTML5 Audio if needed
+ */
+async function playAudioSimple(src) {
+  return playAudioWithContext(src);
+}
+
+/**
  * Play the full alert sequence: notification ding + voice message
  */
 async function playFullAlertSequence(alert) {
@@ -87,10 +197,10 @@ async function playFullAlertSequence(alert) {
   console.log('[CallAlert] Voice enabled:', alert?.voiceEnabled);
   console.log('[CallAlert] Audio URL present:', !!alert?.audioDataUrl);
   console.log('[CallAlert] Audio URL length:', alert?.audioDataUrl?.length || 0);
-  
+
   let notificationPlayed = false;
   let voicePlayed = false;
-  
+
   // Step 1: Play notification sound
   try {
     console.log('[CallAlert] Step 1: Playing notification sound...');
@@ -100,7 +210,7 @@ async function playFullAlertSequence(alert) {
   } catch (err) {
     console.error('[CallAlert] ❌ Notification sound failed:', err.message);
   }
-  
+
   // Step 2: Play voice message if available
   if (alert?.voiceEnabled && alert?.audioDataUrl) {
     try {
@@ -115,11 +225,11 @@ async function playFullAlertSequence(alert) {
   } else {
     console.log('[CallAlert] Step 2: Skipped (voice not enabled or no audio URL)');
   }
-  
+
   console.log('[CallAlert] ========== SEQUENCE COMPLETE ==========');
   console.log('[CallAlert] Notification played:', notificationPlayed);
   console.log('[CallAlert] Voice played:', voicePlayed);
-  
+
   return { notificationPlayed, voicePlayed };
 }
 
@@ -129,9 +239,40 @@ export default function CallAlertReceiver() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioError, setAudioError] = useState(false);
   const [acknowledging, setAcknowledging] = useState(false);
-  
+
   const alertQueue = useRef([]);
   const activeAlertRef = useRef(null);
+
+  // Unlock AudioContext on first user interaction
+  // This is CRITICAL for production audio playback
+  useEffect(() => {
+    const unlockHandler = () => {
+      console.log('[CallAlert] User interaction detected, unlocking AudioContext...');
+      unlockAudioContext().then((unlocked) => {
+        if (unlocked) {
+          console.log('[CallAlert] ✅ AudioContext unlocked via user interaction');
+          // Remove listeners after successful unlock
+          document.removeEventListener('click', unlockHandler);
+          document.removeEventListener('touchstart', unlockHandler);
+          document.removeEventListener('keydown', unlockHandler);
+        }
+      });
+    };
+
+    // Set up listeners for various user interaction types
+    document.addEventListener('click', unlockHandler, { once: false, passive: true });
+    document.addEventListener('touchstart', unlockHandler, { once: false, passive: true });
+    document.addEventListener('keydown', unlockHandler, { once: false, passive: true });
+
+    // Also try to unlock immediately in case context is already available
+    unlockAudioContext();
+
+    return () => {
+      document.removeEventListener('click', unlockHandler);
+      document.removeEventListener('touchstart', unlockHandler);
+      document.removeEventListener('keydown', unlockHandler);
+    };
+  }, []);
 
   // Play the current alert's audio
   const playCurrentAlert = useCallback(async () => {
@@ -140,10 +281,10 @@ export default function CallAlertReceiver() {
       console.log('[CallAlert] No active alert to play');
       return;
     }
-    
+
     setIsPlaying(true);
     setAudioError(false);
-    
+
     try {
       const result = await playFullAlertSequence(alert);
       if (alert?.voiceEnabled && !result.voicePlayed) {
@@ -153,7 +294,7 @@ export default function CallAlertReceiver() {
       console.error('[CallAlert] Play sequence error:', err);
       setAudioError(true);
     }
-    
+
     setIsPlaying(false);
   }, []);
 
@@ -168,7 +309,7 @@ export default function CallAlertReceiver() {
     setActiveAlert(null);
     setIsPlaying(false);
     setAudioError(false);
-    
+
     // Process next alert in queue
     if (alertQueue.current.length > 0) {
       const nextAlert = alertQueue.current.shift();
@@ -199,7 +340,7 @@ export default function CallAlertReceiver() {
       });
 
       const data = await response.json();
-      
+
       if (data.success) {
         toast.success('Alert acknowledged');
         dismissAlert();
@@ -227,7 +368,7 @@ export default function CallAlertReceiver() {
     }
     console.log('[CallAlert] Message:', alert.message?.substring(0, 100));
     console.log('');
-    
+
     // Validate audioDataUrl if voice is enabled
     if (alert.voiceEnabled && alert.audioDataUrl) {
       if (!alert.audioDataUrl.startsWith('data:audio/')) {
@@ -253,12 +394,12 @@ export default function CallAlertReceiver() {
       // Queue the alert
       console.log('[CallAlert] Current alert exists, queueing. Queue size:', alertQueue.current.length + 1);
       alertQueue.current.push(alert);
-      
+
       // Still play audio for queued alerts immediately
       console.log('[CallAlert] Playing queued alert audio immediately');
       playFullAlertSequence(alert);
-      
-      toast(`New alert received! (${alertQueue.current.length} queued)`, { 
+
+      toast(`New alert received! (${alertQueue.current.length} queued)`, {
         icon: '📢',
         duration: 4000
       });
@@ -270,7 +411,7 @@ export default function CallAlertReceiver() {
     if (activeAlert) {
       activeAlertRef.current = activeAlert;
       console.log('[CallAlert] Active alert set, scheduling playback in 100ms');
-      
+
       const timer = setTimeout(() => {
         playCurrentAlert();
       }, 100);
@@ -310,7 +451,7 @@ export default function CallAlertReceiver() {
       {/* Modal using project's unified modal system */}
       <div className="modal-overlay" style={{ zIndex: 99999 }}>
         <div className="modal-backdrop" />
-        
+
         <div className="modal-container modal-md" style={{ overflow: 'visible', borderRadius: '30px' }}>
           {/* Header with priority color */}
           <div className={`modal-header ${config.headerBg}`} style={{ borderBottom: 'none', borderRadius: '30px 30px 0 0' }}>
@@ -325,7 +466,7 @@ export default function CallAlertReceiver() {
                 </span>
               </div>
             </div>
-            
+
             {/* Queue indicator */}
             {alertQueue.current.length > 0 && (
               <span className="px-2 py-1 bg-black/10 text-gray-900 text-xs rounded-full font-medium">
@@ -391,10 +532,10 @@ export default function CallAlertReceiver() {
 
             {/* Timestamp */}
             <p className="text-center text-xs text-gray-400">
-              Received at {new Date(activeAlert.timestamp).toLocaleTimeString([], { 
-                hour: '2-digit', 
+              Received at {new Date(activeAlert.timestamp).toLocaleTimeString([], {
+                hour: '2-digit',
                 minute: '2-digit',
-                hour12: true 
+                hour12: true
               })}
             </p>
           </div>
