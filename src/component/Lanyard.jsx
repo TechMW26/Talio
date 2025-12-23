@@ -1,6 +1,7 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { FaCamera } from 'react-icons/fa';
+import { useTheme } from '@/contexts/ThemeContext';
 import './Lanyard.css';
 
 export default function Lanyard({ employee, onImageClick, uploadingImage }) {
@@ -10,6 +11,24 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
   const lanyardPathRef = useRef(null);
   const lanyardPathBorderRef = useRef(null);
   const lanyardLogosRef = useRef(null);
+  
+  // Get theme colors
+  const { theme } = useTheme();
+  const darkPrimaryColor = theme?.primary?.[800] || theme?.primary?.[700] || '#1E40AF';
+  const accentColor = theme?.primary?.[600] || '#2563EB';
+  
+  // Memoize company data to ensure it updates when employee changes
+  const { companyLogo, companyName, hasCompanyLogo } = useMemo(() => {
+    const logo = employee?.company?.logo || employee?.companyLogo || null;
+    const name = employee?.company?.name || employee?.companyName || "Talio";
+    console.log('🔄 Lanyard useMemo - company data:', { 
+      rawCompany: employee?.company, 
+      logo, 
+      name,
+      hasLogo: !!logo 
+    });
+    return { companyLogo: logo, companyName: name, hasCompanyLogo: !!logo };
+  }, [employee?.company, employee?.companyLogo, employee?.companyName]);
 
   useEffect(() => {
     if (!containerRef.current || !cardOuterRef.current) return;
@@ -283,10 +302,6 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
   const bloodGroup = employee?.bloodGroup || "B+";
   const email = employee?.email || "user@example.com";
   const address = employee?.address || "Not Provided";
-  
-  // Company data for ID card back
-  const companyLogo = employee?.company?.logo || employee?.companyLogo || null;
-  const companyName = employee?.company?.name || employee?.companyName || "Talio";
 
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
@@ -385,30 +400,30 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
                   </button>
                 )}
               </div>
-              <div className="emp-name">{name}</div>
-              <div className="emp-designation">{designation}</div>
-              <div className="emp-id">ID: {empId}</div>
+              <div className="emp-name" style={{ color: darkPrimaryColor }}>{name}</div>
+              <div className="emp-designation" style={{ color: accentColor }}>{designation}</div>
+              <div className="emp-id" style={{ color: darkPrimaryColor }}>ID: {empId}</div>
             </div>
 
             <div className="info-section">
               <div className="info-row">
                 <div className="info-item">
-                  <div className="label">Phone</div>
-                  <div className="value">{phone}</div>
+                  <div className="label" style={{ color: accentColor }}>Phone</div>
+                  <div className="value" style={{ color: darkPrimaryColor }}>{phone}</div>
                 </div>
                 <div className="info-item center">
-                  <div className="label">Blood</div>
-                  <div className="blood-badge">{bloodGroup}</div>
+                  <div className="label" style={{ color: accentColor }}>Blood</div>
+                  <div className="blood-badge" style={{ backgroundColor: darkPrimaryColor }}>{bloodGroup}</div>
                 </div>
               </div>
               <div className="info-row" style={{ marginTop: '8px' }}>
                 <div className="info-item">
-                  <div className="label">DOB</div>
-                  <div className="value">{dob}</div>
+                  <div className="label" style={{ color: accentColor }}>DOB</div>
+                  <div className="value" style={{ color: darkPrimaryColor }}>{dob}</div>
                 </div>
                 <div className="info-item">
-                  <div className="label">Joined</div>
-                  <div className="value">{joiningDate}</div>
+                  <div className="label" style={{ color: accentColor }}>Joined</div>
+                  <div className="value" style={{ color: darkPrimaryColor }}>{joiningDate}</div>
                 </div>
               </div>
             </div>
@@ -423,30 +438,36 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
             <div className="card-shine"></div>
 
             <div className="back-content">
-              {/* Company Logo - falls back to Talio logo */}
-              <div className="back-logo" style={{ background: companyLogo ? 'transparent' : '#111827', padding: '15px' }}>
-                <img 
-                  src={companyLogo || "/assets/lanyard-card-logo.webp"} 
-                  alt={companyName} 
-                  style={{ width: '100%', height: '100%', objectFit: 'contain' }} 
-                />
+              {/* Company Logo or Company Name */}
+              <div className="back-logo-container">
+                {hasCompanyLogo ? (
+                  <img 
+                    src={companyLogo} 
+                    alt={companyName}
+                    className="company-logo-img"
+                  />
+                ) : (
+                  <div className="company-name-fallback" style={{ color: darkPrimaryColor }}>
+                    {companyName}
+                  </div>
+                )}
               </div>
 
               <div className="back-contact" style={{ width: '100%', alignItems: 'flex-start', padding: '0 4px', marginTop: '20px' }}>
                 <div className="info-item" style={{ marginBottom: '12px', width: '100%' }}>
-                  <div className="label" style={{ marginBottom: '2px' }}>Email</div>
-                  <div className="value" style={{ wordBreak: 'break-all', fontSize: '13px' }}>{email}</div>
+                  <div className="label" style={{ marginBottom: '2px', color: accentColor }}>Email</div>
+                  <div className="value" style={{ wordBreak: 'break-all', fontSize: '13px', color: darkPrimaryColor }}>{email}</div>
                 </div>
                 <div className="info-item" style={{ marginBottom: '12px', width: '100%' }}>
-                  <div className="label" style={{ marginBottom: '2px' }}>Address</div>
-                  <div className="value" style={{ lineHeight: '1.4', fontSize: '13px' }}>{address}</div>
+                  <div className="label" style={{ marginBottom: '2px', color: accentColor }}>Address</div>
+                  <div className="value" style={{ lineHeight: '1.4', fontSize: '13px', color: darkPrimaryColor }}>{address}</div>
                 </div>
               </div>
             </div>
 
-            <div className="back-footer">
+            <div className="back-footer" style={{ color: accentColor }}>
               If found, please return to<br />
-              <span>{companyName}</span>
+              <span style={{ color: darkPrimaryColor, fontWeight: 600 }}>{companyName}</span>
             </div>
           </div>
         </div>

@@ -1,8 +1,11 @@
 // Talio Service Worker - Network-First Strategy for Production
 // Version bump triggers re-install and cache refresh
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 const CACHE_NAME = `talio-network-first-${CACHE_VERSION}`;
 const OFFLINE_URL = '/offline.html';
+
+// Build timestamp - auto-updated on each deployment
+const BUILD_TIMESTAMP = Date.now();
 
 // Minimal assets for offline fallback only
 const PRECACHE_ASSETS = [

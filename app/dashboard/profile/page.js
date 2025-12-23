@@ -124,6 +124,7 @@ export default function ProfilePage() {
 
       const result = await response.json()
       if (result.success) {
+        console.log('Profile data - company:', result.data.employee?.company)
         setUser(result.data.user)
         setEmployee(result.data.employee)
         setEditedEmployee(result.data.employee)
@@ -860,6 +861,7 @@ export default function ProfilePage() {
             {typeof window !== 'undefined' && (
               <div className="relative w-full overflow-visible z-10 h-[560px] sm:h-[620px] md:h-[680px] lg:h-[750px] mt-[-60px] lg:mt-[-140px]">
                 <Lanyard
+                  key={`lanyard-${employee?.company?._id || employee?.company || 'default'}`}
                   employee={{
                     name: employee ? `${employee.firstName} ${employee.lastName}` : undefined,
                     designation: employee?.designation?.title || employee?.designation,
@@ -871,7 +873,11 @@ export default function ProfilePage() {
                     address: employee?.address,
                     dob: employee?.dateOfBirth,
                     joiningDate: employee?.dateOfJoining,
-                    company: employee?.company
+                    company: employee?.company ? {
+                      _id: employee.company._id,
+                      name: employee.company.name,
+                      logo: employee.company.logo
+                    } : null
                   }}
                   onImageClick={() => fileInputRef.current?.click()}
                   uploadingImage={uploadingImage}
