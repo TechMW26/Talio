@@ -59,10 +59,92 @@
 /* Improved touch targets (minimum 44x44px for mobile) */
 @media (max-width: 767px) {
   .btn,
-  button,
+  button:not(.toggle-switch):not(.toggle-btn):not([class*="rounded-full"]),
   a[role="button"] {
     min-height: 44px;
   }
+  
+  /* Ensure toggle switches don't get inflated */
+  .toggle-switch,
+  .toggle-btn,
+  label.relative input[type="checkbox"] + div,
+  div[class*="w-11"][class*="h-6"][class*="rounded-full"],
+  div[class*="w-10"][class*="h-5"][class*="rounded-full"] {
+    min-height: auto !important;
+    max-height: 24px !important;
+  }
+}
+
+/* ============================================
+   TOGGLE SWITCH - Mobile Optimized
+   ============================================ */
+.toggle-switch,
+.toggle-btn {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  min-height: 22px !important;
+  max-height: 22px;
+  border-radius: 11px;
+  background-color: #d1d5db;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.toggle-switch.active,
+.toggle-btn.active,
+.toggle-switch[data-active="true"],
+.toggle-btn[data-active="true"] {
+  background-color: #3b82f6;
+}
+
+.toggle-switch::after,
+.toggle-btn::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background-color: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease;
+}
+
+.toggle-switch.active::after,
+.toggle-btn.active::after,
+.toggle-switch[data-active="true"]::after,
+.toggle-btn[data-active="true"]::after {
+  transform: translateX(18px);
+}
+
+/* Small toggle variant */
+.toggle-switch-sm,
+.toggle-btn-sm {
+  width: 32px;
+  height: 18px;
+  min-height: 18px !important;
+  max-height: 18px;
+  border-radius: 9px;
+}
+
+.toggle-switch-sm::after,
+.toggle-btn-sm::after {
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+}
+
+.toggle-switch-sm.active::after,
+.toggle-btn-sm.active::after,
+.toggle-switch-sm[data-active="true"]::after,
+.toggle-btn-sm[data-active="true"]::after {
+  transform: translateX(14px);
 }
 
 /* Touch manipulation for better tap responsiveness */

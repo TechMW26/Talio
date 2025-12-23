@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import BottomNav from '@/components/BottomNav'
-import PWAInstaller, { OfflineIndicator } from '@/components/PWAInstaller'
+import { OfflineIndicator } from '@/components/PWAInstaller'
 import OutOfPremisesPopup from '@/components/OutOfPremisesPopup'
 import OfflineDetector from '@/components/OfflineDetector'
 import ChatWidgetContainer from '@/components/chat/ChatWidgetContainer'
@@ -335,9 +335,6 @@ export default function DashboardLayout({ children }) {
                 {/* Bottom Navigation for Mobile */}
                 <BottomNav />
               </div>
-
-              {/* PWA Install Prompt */}
-              <PWAInstaller />
 
               {/* Out of Premises Popup */}
               <OutOfPremisesPopup />

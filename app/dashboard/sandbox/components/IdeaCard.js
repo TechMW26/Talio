@@ -9,22 +9,32 @@ import {
   HiOutlineEye,
   HiOutlineEyeSlash,
   HiOutlineChevronDown,
-  HiOutlineChevronUp
+  HiOutlineChevronUp,
+  HiOutlineLightBulb,
+  HiOutlineCog6Tooth,
+  HiOutlineCurrencyDollar,
+  HiOutlineComputerDesktop,
+  HiOutlineBuildingOffice2,
+  HiOutlineUserGroup,
+  HiOutlineCube,
+  HiOutlineShieldCheck,
+  HiOutlineGlobeAlt,
+  HiOutlineAcademicCap
 } from 'react-icons/hi2'
 import { FaThumbtack, FaUserSecret, FaUser, FaSpinner, FaPaperPlane } from 'react-icons/fa'
 import toast from 'react-hot-toast'
 
 const CATEGORIES = {
-  'process_improvement': { label: 'Process', icon: '⚙️' },
-  'cost_reduction': { label: 'Cost', icon: '💰' },
-  'technology': { label: 'Tech', icon: '💻' },
-  'workplace': { label: 'Workplace', icon: '🏢' },
-  'customer_service': { label: 'Service', icon: '🤝' },
-  'product': { label: 'Product', icon: '📦' },
-  'safety': { label: 'Safety', icon: '🛡️' },
-  'environment': { label: 'Environment', icon: '🌱' },
-  'training': { label: 'Training', icon: '📚' },
-  'other': { label: 'Other', icon: '💡' }
+  'process_improvement': { label: 'Process', Icon: HiOutlineCog6Tooth },
+  'cost_reduction': { label: 'Cost', Icon: HiOutlineCurrencyDollar },
+  'technology': { label: 'Tech', Icon: HiOutlineComputerDesktop },
+  'workplace': { label: 'Workplace', Icon: HiOutlineBuildingOffice2 },
+  'customer_service': { label: 'Service', Icon: HiOutlineUserGroup },
+  'product': { label: 'Product', Icon: HiOutlineCube },
+  'safety': { label: 'Safety', Icon: HiOutlineShieldCheck },
+  'environment': { label: 'Environment', Icon: HiOutlineGlobeAlt },
+  'training': { label: 'Training', Icon: HiOutlineAcademicCap },
+  'other': { label: 'Other', Icon: HiOutlineLightBulb }
 }
 
 const STATUS_STYLES = {
@@ -150,7 +160,9 @@ export default function IdeaCard({ idea, onVote, onPin, onDelete, isAdmin }) {
         {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex items-start gap-2 flex-1 min-w-0">
-            <span className="text-xl flex-shrink-0">{categoryInfo.icon}</span>
+            <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <categoryInfo.Icon className="w-4 h-4 text-gray-600" />
+            </div>
             <div className="flex-1 min-w-0">
               <h3 className="font-semibold text-gray-800 line-clamp-2 mb-1">
                 {idea.title}
