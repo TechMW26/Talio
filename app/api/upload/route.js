@@ -4,7 +4,7 @@ import { writeFile, mkdir, unlink } from 'fs/promises'
 import path from 'path'
 import { existsSync } from 'fs'
 import { optimizeImage, isValidImage } from '@/lib/imageOptimization'
-import { uploadWithTempStorage, uploadImageToImageKit, getImageKitFolder, generateEmployeeFolderName } from '@/lib/imagekit'
+import { uploadImageToImageKit, getImageKitFolder, generateEmployeeFolderName } from '@/lib/imagekit'
 import connectDB from '@/lib/mongodb'
 import User from '@/models/User'
 import Employee from '@/models/Employee'
@@ -116,14 +116,17 @@ export async function POST(request) {
     if (isImageKitConfigured() && isImage) {
       try {
         console.log('[Upload] Attempting ImageKit upload...')
+        console.log('[Upload] Buffer size:', buffer.length, 'bytes')
 
         // Build safe tags (no undefined values)
         const safeTags = ['upload', folder, employee?.employeeCode].filter(Boolean)
 
-        const imagekitResult = await uploadWithTempStorage(buffer, {
+        // Use uploadImageToImageKit directly (no temp file) - works better in serverless/Docker
+        const imagekitResult = await uploadImageToImageKit(buffer, {
           fileName: finalFilename,
           folder: imagekitFolder,
           tags: safeTags,
+          useUniqueFileName: true,
         })
 
         console.log('[Upload] ImageKit SUCCESS:', imagekitResult.url)
@@ -153,7 +156,7 @@ export async function POST(request) {
 
     // Fallback: Local file storage
     const uploadsDir = path.join(process.cwd(), 'public', 'uploads', folder)
-    
+
     try {
       if (!existsSync(uploadsDir)) {
         await mkdir(uploadsDir, { recursive: true, mode: 0o755 })
@@ -165,22 +168,22 @@ export async function POST(request) {
       try {
         execSync(`mkdir -p "${uploadsDir}"`, { stdio: 'ignore' })
       } catch (e) {
-        return NextResponse.json({ 
-          success: false, 
-          message: `Upload directory creation failed. Please ensure the server has write permissions to: ${uploadsDir}` 
+        return NextResponse.json({
+          success: false,
+          message: `Upload directory creation failed. Please ensure the server has write permissions to: ${uploadsDir}`
         }, { status: 500 })
       }
     }
 
     const filepath = path.join(uploadsDir, finalFilename)
-    
+
     try {
       await writeFile(filepath, buffer)
     } catch (writeError) {
       console.error('[Upload] Failed to write file:', writeError.message)
-      return NextResponse.json({ 
-        success: false, 
-        message: `Failed to save file. Permission denied on: ${uploadsDir}. Please check server write permissions.` 
+      return NextResponse.json({
+        success: false,
+        message: `Failed to save file. Permission denied on: ${uploadsDir}. Please check server write permissions.`
       }, { status: 500 })
     }
 

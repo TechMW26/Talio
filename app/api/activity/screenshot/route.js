@@ -4,7 +4,7 @@ import { mkdir, writeFile, access, constants, unlink } from 'fs/promises';
 import path from 'path';
 import connectDB from '@/lib/mongodb';
 import { uploadScreenshot, getScreenshot } from '@/lib/gridfs';
-import { uploadWithTempStorage, getImageKitFolder, generateEmployeeFolderName } from '@/lib/imagekit';
+import { uploadImageToImageKit, getImageKitFolder, generateEmployeeFolderName } from '@/lib/imagekit';
 import Screenshot from '@/models/Screenshot';
 import User from '@/models/User';
 import Employee from '@/models/Employee';
@@ -138,27 +138,30 @@ export async function POST(request) {
     // === IMAGEKIT STORAGE (primary - CDN delivery) ===
     if (isImageKitConfigured()) {
       try {
-        const imagekitResult = await uploadWithTempStorage(buffer, {
+        console.log('[Screenshot] Attempting ImageKit upload...');
+        console.log('[Screenshot] Folder:', imagekitFolder);
+        console.log('[Screenshot] Buffer size:', buffer.length, 'bytes');
+
+        // Use uploadImageToImageKit directly (no temp file) - works better in serverless/Docker
+        const imagekitResult = await uploadImageToImageKit(buffer, {
           fileName: filename,
           folder: imagekitFolder,
           tags: ['screenshot', 'productivity', dateString, employeeCode],
-          customMetadata: {
-            userId,
-            employeeId: employeeId?.toString(),
-            employeeName: employee ? `${employee.firstName} ${employee.lastName}` : 'Unknown',
-            employeeCode: employeeCode,
-            capturedAt: now.toISOString(),
-            sessionId,
-          },
+          useUniqueFileName: true,
         });
 
         imagekitUrl = imagekitResult.url;
         imagekitFileId = imagekitResult.fileId;
         publicPath = imagekitUrl;
-        console.log(`[Screenshot] Uploaded to ImageKit: ${imagekitFolder}/${filename}`);
+        console.log(`[Screenshot] ✅ Uploaded to ImageKit: ${imagekitUrl}`);
       } catch (imagekitError) {
-        console.error('[Screenshot] ImageKit upload failed, falling back:', imagekitError.message);
+        console.error('[Screenshot] ❌ ImageKit upload failed:');
+        console.error('[Screenshot] Error name:', imagekitError.name);
+        console.error('[Screenshot] Error message:', imagekitError.message);
+        // Fall through to filesystem storage
       }
+    } else {
+      console.log('[Screenshot] ImageKit not configured, using filesystem storage');
     }
 
     // === FALLBACK: FILESYSTEM STORAGE (for dashboard display) ===

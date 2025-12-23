@@ -3,7 +3,7 @@ import { verifyToken } from '@/lib/auth'
 import connectDB from '@/lib/mongodb'
 import User from '@/models/User'
 import Employee from '@/models/Employee'
-import { uploadWithTempStorage, deleteFromImageKit, getProfilePictureUrl, getImageKitFolder, generateEmployeeFolderName } from '@/lib/imagekit'
+import { uploadImageToImageKit, deleteFromImageKit, getProfilePictureUrl, getImageKitFolder, generateEmployeeFolderName } from '@/lib/imagekit'
 import { optimizeImage, isValidImage } from '@/lib/imageOptimization'
 import path from 'path'
 import fs from 'fs/promises'
@@ -145,22 +145,33 @@ export async function POST(request) {
         // Try ImageKit upload if configured
         if (isImageKitConfigured()) {
             try {
+                console.log('[Profile Picture] Attempting ImageKit upload...')
+                console.log('[Profile Picture] Folder:', imagekitFolder)
+                console.log('[Profile Picture] Buffer size:', optimizedBuffer.length, 'bytes')
+
                 // Build safe tags (no undefined values)
                 const safeTags = ['profile', 'avatar', employeeCode].filter(Boolean)
 
-                const imagekitResult = await uploadWithTempStorage(optimizedBuffer, {
+                // Use uploadImageToImageKit directly (no temp file) - works better in serverless/Docker
+                const imagekitResult = await uploadImageToImageKit(optimizedBuffer, {
                     fileName: filename,
                     folder: imagekitFolder,
                     tags: safeTags,
+                    useUniqueFileName: true,
                 })
 
                 fileUrl = imagekitResult.url
                 fileId = imagekitResult.fileId
                 thumbnailUrl = imagekitResult.thumbnailUrl
-                console.log(`[Profile Picture] Uploaded to ImageKit: ${imagekitFolder}/${filename}`)
+                console.log(`[Profile Picture] ✅ Uploaded to ImageKit: ${fileUrl}`)
             } catch (imagekitError) {
-                console.error('[Profile Picture] ImageKit failed, falling back to local:', imagekitError.message)
+                console.error('[Profile Picture] ❌ ImageKit upload failed:')
+                console.error('[Profile Picture] Error name:', imagekitError.name)
+                console.error('[Profile Picture] Error message:', imagekitError.message)
+                // Fall through to local storage
             }
+        } else {
+            console.log('[Profile Picture] ImageKit not configured, using local storage')
         }
 
         // Fallback: Local file storage with employee folder structure

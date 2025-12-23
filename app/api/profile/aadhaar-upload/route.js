@@ -5,7 +5,7 @@ import User from '@/models/User'
 import Employee from '@/models/Employee'
 import path from 'path'
 import fs from 'fs/promises'
-import { uploadWithTempStorage, deleteFromImageKit, getImageKitFolder, generateEmployeeFolderName } from '@/lib/imagekit'
+import { deleteFromImageKit, getImageKitFolder, generateEmployeeFolderName } from '@/lib/imagekit'
 
 export const dynamic = 'force-dynamic'
 
@@ -118,22 +118,38 @@ export async function POST(request) {
     // Try ImageKit upload if configured
     if (isImageKitConfigured()) {
       try {
+        console.log('[Aadhaar Upload] ImageKit is configured, attempting upload...')
+        console.log('[Aadhaar Upload] Folder:', imagekitFolder)
+        console.log('[Aadhaar Upload] Filename:', filename)
+        console.log('[Aadhaar Upload] Buffer size:', imageBuffer.length, 'bytes')
+
         // Build safe tags (no undefined values)
         const safeTags = ['aadhaar', side, 'document', employeeCode].filter(Boolean)
 
-        const imagekitResult = await uploadWithTempStorage(imageBuffer, {
+        // Use uploadImageToImageKit directly (no temp file) - works better in serverless/Docker
+        const { uploadImageToImageKit } = await import('@/lib/imagekit')
+        const imagekitResult = await uploadImageToImageKit(imageBuffer, {
           fileName: filename,
           folder: imagekitFolder,
           tags: safeTags,
+          useUniqueFileName: true,
         })
 
         fileUrl = imagekitResult.url
         fileId = imagekitResult.fileId
-        console.log(`[Aadhaar Upload] Uploaded to ImageKit: ${imagekitFolder}/${filename}`)
+        console.log(`[Aadhaar Upload] ✅ Uploaded to ImageKit: ${fileUrl}`)
       } catch (imagekitError) {
-        console.error('[Aadhaar Upload] ImageKit failed, falling back to local:', imagekitError.message)
+        console.error('[Aadhaar Upload] ❌ ImageKit upload failed:')
+        console.error('[Aadhaar Upload] Error name:', imagekitError.name)
+        console.error('[Aadhaar Upload] Error message:', imagekitError.message)
+        console.error('[Aadhaar Upload] Error stack:', imagekitError.stack)
         // Fall through to local storage
       }
+    } else {
+      console.log('[Aadhaar Upload] ImageKit not configured, using local storage')
+      console.log('[Aadhaar Upload] IMAGEKIT_PUBLIC_KEY:', process.env.IMAGEKIT_PUBLIC_KEY ? 'SET' : 'NOT SET')
+      console.log('[Aadhaar Upload] IMAGEKIT_PRIVATE_KEY:', process.env.IMAGEKIT_PRIVATE_KEY ? 'SET' : 'NOT SET')
+      console.log('[Aadhaar Upload] IMAGEKIT_URL_ENDPOINT:', process.env.IMAGEKIT_URL_ENDPOINT ? 'SET' : 'NOT SET')
     }
 
     // Fallback: Local file storage with employee folder structure

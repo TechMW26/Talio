@@ -73,10 +73,19 @@ export default function AadhaarVerificationSection({
     loadExistingImages()
   }, [])
 
-  // Load image through secured API endpoint
+  // Load image - either directly from external URL (ImageKit) or through secured API endpoint
   const loadSecuredImage = async (url, setPreview, token) => {
     try {
+      // If URL is an external URL (ImageKit, etc.), use it directly
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        console.log('[Aadhaar] Loading image directly from external URL:', url)
+        setPreview(url)
+        return
+      }
+
+      // For local paths, load through secured API endpoint
       const apiUrl = `/api${url}`
+      console.log('[Aadhaar] Loading image through secured API:', apiUrl)
       const response = await fetch(apiUrl, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
@@ -263,8 +272,8 @@ export default function AadhaarVerificationSection({
 
   return (
     <section className={`bg-white rounded-3xl border shadow-sm p-4 sm:p-6 ${showUrgentWarning
-        ? 'border-red-200 ring-2 ring-red-100'
-        : 'border-slate-100 shadow-slate-900/5'
+      ? 'border-red-200 ring-2 ring-red-100'
+      : 'border-slate-100 shadow-slate-900/5'
       }`}>
       {/* Header */}
       <div className="flex items-center justify-between mb-4 sm:mb-5">
@@ -314,8 +323,8 @@ export default function AadhaarVerificationSection({
           <div
             onClick={() => !uploadingFront && frontInputRef.current?.click()}
             className={`relative border-2 border-dashed rounded-2xl p-4 transition-all cursor-pointer ${frontPreview
-                ? 'border-green-300 bg-green-50/50'
-                : 'border-slate-300 hover:border-blue-400 hover:bg-blue-50/50'
+              ? 'border-green-300 bg-green-50/50'
+              : 'border-slate-300 hover:border-blue-400 hover:bg-blue-50/50'
               }`}
           >
             {frontPreview ? (
@@ -398,8 +407,8 @@ export default function AadhaarVerificationSection({
           <div
             onClick={() => !uploadingBack && backInputRef.current?.click()}
             className={`relative border-2 border-dashed rounded-2xl p-4 transition-all cursor-pointer ${backPreview
-                ? 'border-green-300 bg-green-50/50'
-                : 'border-slate-300 hover:border-blue-400 hover:bg-blue-50/50'
+              ? 'border-green-300 bg-green-50/50'
+              : 'border-slate-300 hover:border-blue-400 hover:bg-blue-50/50'
               }`}
           >
             {backPreview ? (
@@ -477,8 +486,8 @@ export default function AadhaarVerificationSection({
             onClick={handleVerify}
             disabled={verifying || uploadingFront || uploadingBack || !frontPreview || !backPreview}
             className={`w-full py-3 px-4 rounded-xl font-medium text-sm transition-colors flex items-center justify-center gap-2 ${!frontPreview || !backPreview || uploadingFront || uploadingBack
-                ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                : 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed'
+              ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+              : 'bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed'
               }`}
           >
             {verifying ? (
