@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import Suggestion from '@/models/Suggestion';
+import User from '@/models/User';
 import { verifyToken } from '@/lib/auth';
 
 /**
  * POST /api/ideas/[id]/vote
- * Vote on an idea (like/dislike)
+ * Vote on an idea (upvote/downvote)
  */
 export async function POST(request, { params }) {
   try {
@@ -22,7 +23,14 @@ export async function POST(request, { params }) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 });
     }
 
-    const { id } = params;
+    // Get employeeId from User
+    const currentUser = await User.findById(decoded.userId).select('employeeId');
+    if (!currentUser || !currentUser.employeeId) {
+      return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 });
+    }
+    const employeeId = currentUser.employeeId.toString();
+
+    const { id } = await params;
     const body = await request.json();
     const { type } = body; // 'upvote' or 'downvote' or 'remove'
 
@@ -38,7 +46,7 @@ export async function POST(request, { params }) {
 
     // Find existing vote
     const existingVoteIndex = idea.votes.findIndex(
-      v => v.voter?.toString() === decoded.employeeId
+      v => v.voter?.toString() === employeeId
     );
 
     if (type === 'remove') {
@@ -53,7 +61,7 @@ export async function POST(request, { params }) {
     } else {
       // Add new vote
       idea.votes.push({
-        voter: decoded.employeeId,
+        voter: currentUser.employeeId,
         type,
         votedAt: new Date()
       });
@@ -63,7 +71,7 @@ export async function POST(request, { params }) {
 
     const likes = idea.votes.filter(v => v.type === 'upvote').length;
     const dislikes = idea.votes.filter(v => v.type === 'downvote').length;
-    const userVote = idea.votes.find(v => v.voter?.toString() === decoded.employeeId)?.type || null;
+    const userVote = idea.votes.find(v => v.voter?.toString() === employeeId)?.type || null;
 
     return NextResponse.json({
       success: true,

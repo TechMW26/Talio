@@ -107,30 +107,37 @@ export async function GET(request) {
       .lean();
 
     // Format ideas for response
-    const formattedIdeas = ideas.map(idea => ({
-      _id: idea._id,
-      title: idea.title,
-      description: idea.description,
-      summary: idea.summary,
-      category: idea.category,
-      status: idea.status,
-      priority: idea.priority,
-      isAnonymous: idea.isAnonymous,
-      isPinned: idea.isPinned || false,
-      author: idea.isAnonymous ? null : {
-        _id: idea.submittedBy?._id,
-        name: `${idea.submittedBy?.firstName || ''} ${idea.submittedBy?.lastName || ''}`.trim() || 'Unknown',
-        profilePicture: idea.submittedBy?.profilePicture,
-        department: idea.submittedBy?.department?.name || 'Unknown'
-      },
-      likes: idea.votes?.filter(v => v.type === 'upvote').length || 0,
-      dislikes: idea.votes?.filter(v => v.type === 'downvote').length || 0,
-      commentsCount: idea.comments?.length || 0,
-      tags: idea.tags || [],
-      createdAt: idea.createdAt,
-      updatedAt: idea.updatedAt,
-      isOwner: idea.submittedBy?._id?.toString() === employeeId?.toString()
-    }));
+    const formattedIdeas = ideas.map(idea => {
+      const userVote = employeeId 
+        ? idea.votes?.find(v => v.voter?.toString() === employeeId.toString())?.type || null
+        : null;
+      
+      return {
+        _id: idea._id,
+        title: idea.title,
+        description: idea.description,
+        summary: idea.summary,
+        category: idea.category,
+        status: idea.status,
+        priority: idea.priority,
+        isAnonymous: idea.isAnonymous,
+        isPinned: idea.isPinned || false,
+        author: idea.isAnonymous ? null : {
+          _id: idea.submittedBy?._id,
+          name: `${idea.submittedBy?.firstName || ''} ${idea.submittedBy?.lastName || ''}`.trim() || 'Unknown',
+          profilePicture: idea.submittedBy?.profilePicture,
+          department: idea.submittedBy?.department?.name || 'Unknown'
+        },
+        likes: idea.votes?.filter(v => v.type === 'upvote').length || 0,
+        dislikes: idea.votes?.filter(v => v.type === 'downvote').length || 0,
+        userVote,
+        commentsCount: idea.comments?.length || 0,
+        tags: idea.tags || [],
+        createdAt: idea.createdAt,
+        updatedAt: idea.updatedAt,
+        isOwner: idea.submittedBy?._id?.toString() === employeeId?.toString()
+      };
+    });
 
     return NextResponse.json({
       success: true,

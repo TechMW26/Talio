@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import Suggestion from '@/models/Suggestion';
+import User from '@/models/User';
 import { verifyToken } from '@/lib/auth';
 
 /**
@@ -22,7 +23,7 @@ export async function GET(request, { params }) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 });
     }
 
-    const { id } = params;
+    const { id } = await params;
 
     const idea = await Suggestion.findById(id)
       .populate({
@@ -73,19 +74,55 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 });
     }
 
-    const { id } = params;
+    // Get employeeId and role from User
+    const currentUser = await User.findById(decoded.userId).select('employeeId role');
+    if (!currentUser) {
+      return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 });
+    }
+    const employeeId = currentUser.employeeId?.toString();
+    const userRole = currentUser.role;
+
+    const { id } = await params;
     const body = await request.json();
-    const { title, description, category, isAnonymous, status, isPinned, tags } = body;
+    const { action, title, description, category, isAnonymous, status, tags } = body;
 
     const idea = await Suggestion.findById(id);
     if (!idea) {
       return NextResponse.json({ success: false, message: 'Idea not found' }, { status: 404 });
     }
 
-    const isOwner = idea.submittedBy.toString() === decoded.employeeId;
-    const isAdmin = decoded.role === 'admin';
+    const isOwner = idea.submittedBy?.toString() === employeeId;
+    const isAdmin = userRole === 'admin' || userRole === 'hr' || userRole === 'department_head';
 
-    // Owner can update content and anonymity
+    // Handle pin action
+    if (action === 'pin') {
+      if (!isAdmin) {
+        return NextResponse.json({ success: false, message: 'Only admins can pin ideas' }, { status: 403 });
+      }
+      idea.isPinned = !idea.isPinned;
+      await idea.save();
+      return NextResponse.json({
+        success: true,
+        message: idea.isPinned ? 'Idea pinned' : 'Idea unpinned',
+        data: { isPinned: idea.isPinned }
+      });
+    }
+
+    // Handle toggle anonymous action
+    if (action === 'toggleAnonymous') {
+      if (!isOwner) {
+        return NextResponse.json({ success: false, message: 'Only owner can change anonymity' }, { status: 403 });
+      }
+      idea.isAnonymous = !idea.isAnonymous;
+      await idea.save();
+      return NextResponse.json({
+        success: true,
+        message: idea.isAnonymous ? 'Now anonymous' : 'No longer anonymous',
+        data: { isAnonymous: idea.isAnonymous }
+      });
+    }
+
+    // Owner can update content
     if (isOwner) {
       if (title) idea.title = title.trim();
       if (description) idea.description = description.trim();
@@ -94,10 +131,9 @@ export async function PUT(request, { params }) {
       if (tags) idea.tags = tags;
     }
 
-    // Admin can update status and pin
-    if (isAdmin) {
-      if (status) idea.status = status;
-      if (typeof isPinned === 'boolean') idea.isPinned = isPinned;
+    // Admin can update status
+    if (isAdmin && status) {
+      idea.status = status;
     }
 
     if (!isOwner && !isAdmin) {
@@ -140,15 +176,23 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 });
     }
 
-    const { id } = params;
+    // Get employeeId and role from User
+    const currentUser = await User.findById(decoded.userId).select('employeeId role');
+    if (!currentUser) {
+      return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 });
+    }
+    const employeeId = currentUser.employeeId?.toString();
+    const userRole = currentUser.role;
+
+    const { id } = await params;
 
     const idea = await Suggestion.findById(id);
     if (!idea) {
       return NextResponse.json({ success: false, message: 'Idea not found' }, { status: 404 });
     }
 
-    const isOwner = idea.submittedBy.toString() === decoded.employeeId;
-    const isAdmin = decoded.role === 'admin';
+    const isOwner = idea.submittedBy?.toString() === employeeId;
+    const isAdmin = userRole === 'admin' || userRole === 'hr';
 
     if (!isOwner && !isAdmin) {
       return NextResponse.json({ success: false, message: 'Not authorized to delete this idea' }, { status: 403 });
