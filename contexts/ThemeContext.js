@@ -160,28 +160,40 @@ export const themes = {
 
 export function ThemeProvider({ children }) {
   const [currentTheme, setCurrentTheme] = useState('default')
+  const [isInitialized, setIsInitialized] = useState(false)
 
-  // Load theme from localStorage on mount
+  // Load theme from localStorage on mount - NON-BLOCKING
   useEffect(() => {
-    const savedTheme = localStorage.getItem('app-theme')
-    if (savedTheme && themes[savedTheme]) {
-      setCurrentTheme(savedTheme)
-      applyTheme(savedTheme)
-    } else {
+    // Wrap in try-catch for Electron/SSR safety
+    try {
+      const savedTheme = localStorage.getItem('app-theme')
+      if (savedTheme && themes[savedTheme]) {
+        setCurrentTheme(savedTheme)
+        applyTheme(savedTheme)
+      } else {
+        applyTheme('default')
+      }
+    } catch (err) {
+      console.warn('[ThemeProvider] localStorage not available:', err)
       applyTheme('default')
     }
+    setIsInitialized(true)
   }, [])
 
   const applyTheme = (themeName) => {
     const theme = themes[themeName]
     if (!theme) return
 
-    const root = document.documentElement
+    // Wrap in try-catch for SSR/Electron safety
+    try {
+      if (typeof document === 'undefined') return
+      
+      const root = document.documentElement
 
-    // Apply primary colors
-    Object.keys(theme.primary).forEach(shade => {
-      root.style.setProperty(`--color-primary-${shade}`, theme.primary[shade])
-    })
+      // Apply primary colors
+      Object.keys(theme.primary).forEach(shade => {
+        root.style.setProperty(`--color-primary-${shade}`, theme.primary[shade])
+      })
 
     // Apply background colors
     root.style.setProperty('--color-bg-main', theme.background.main)
@@ -196,13 +208,20 @@ export function ThemeProvider({ children }) {
     // Apply accent colors
     root.style.setProperty('--color-accent-profile', theme.accent.profile)
     root.style.setProperty('--color-accent-gradient', theme.accent.gradient)
+    } catch (err) {
+      console.warn('[ThemeProvider] Failed to apply theme:', err)
+    }
   }
 
   const changeTheme = (themeName) => {
     if (themes[themeName]) {
       setCurrentTheme(themeName)
       applyTheme(themeName)
-      localStorage.setItem('app-theme', themeName)
+      try {
+        localStorage.setItem('app-theme', themeName)
+      } catch (err) {
+        console.warn('[ThemeProvider] Failed to save theme:', err)
+      }
     }
   }
 

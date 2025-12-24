@@ -547,15 +547,39 @@ function createWindow() {
       contextIsolation: true,
       partition: 'persist:talio',
       webSecurity: true,
-      backgroundThrottling: false
+      backgroundThrottling: false,
+      // Disable features that can cause white screen
+      spellcheck: false,
+      enableWebSQL: false
     },
     icon: path.join(__dirname, '..', 'build', 'icon.png')
   });
 
   mainWindow.setMenu(null);
 
+  // Show window early - don't wait for full load to prevent white screen
+  mainWindow.once('ready-to-show', () => {
+    debugLogger.log('info', 'Window', 'Window ready to show');
+    if (loadingWindow && !loadingWindow.isDestroyed()) {
+      loadingWindow.close();
+    }
+    mainWindow.show();
+  });
+
+  // Fallback: show window after 3 seconds regardless
+  const showTimeout = setTimeout(() => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      debugLogger.log('warn', 'Window', 'Forcing window show after timeout');
+      if (loadingWindow && !loadingWindow.isDestroyed()) {
+        loadingWindow.close();
+      }
+      mainWindow.show();
+    }
+  }, 3000);
+
   // Handle load failures
   mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    clearTimeout(showTimeout);
     debugLogger.log('error', 'Window', `Load failed: ${errorCode} - ${errorDescription}`);
     if ([-106, -105, -102, -118].includes(errorCode)) {
       showOfflinePage();
@@ -563,14 +587,11 @@ function createWindow() {
     }
   });
 
-  // When page loads, close loading window and check permissions
+  // When page loads, check permissions (window already shown via ready-to-show)
   mainWindow.webContents.on('did-finish-load', async () => {
     debugLogger.log('info', 'Window', 'Page finished loading');
     
-    if (loadingWindow && !loadingWindow.isDestroyed()) {
-      loadingWindow.close();
-    }
-
+    // Ensure window is visible (in case ready-to-show didn't fire)
     if (!mainWindow.isVisible()) {
       mainWindow.show();
     }

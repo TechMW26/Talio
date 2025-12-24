@@ -25,6 +25,12 @@ export default function SplashVideo({ children }) {
     if (initRef.current) return;
     initRef.current = true;
 
+    // Skip splash entirely for desktop app - prevents potential blocking issues
+    if (typeof window !== 'undefined' && window.talioDesktop?.isDesktopApp) {
+      console.log('[SplashVideo] Desktop app detected, skipping splash');
+      return;
+    }
+
     // Check if this is the first session start
     try {
       const hasSeenSplash = sessionStorage.getItem('talio_splash_shown');

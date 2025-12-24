@@ -18,8 +18,17 @@ export function Providers({ children }) {
 
     // Check for version changes and clear caches if needed
     useEffect(() => {
+        // Skip cache operations in Electron desktop app to prevent reload loops
+        const isDesktopApp = typeof window !== 'undefined' && window.talioDesktop?.isDesktopApp
+        
         // Use requestIdleCallback for non-critical cache check
         const scheduleCheck = () => {
+            // Skip cache clearing in desktop app - it can cause white screen reload loops
+            if (isDesktopApp) {
+                console.log('[Providers] Desktop app detected, skipping cache check');
+                return;
+            }
+            
             if ('requestIdleCallback' in window) {
                 requestIdleCallback(() => {
                     checkAndClearCaches().then((cleared) => {
