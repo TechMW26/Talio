@@ -4,9 +4,38 @@ import { useEffect, useCallback } from 'react'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { checkAndClearCaches } from '@/lib/cacheManager'
 
+/**
+ * Check if running in Electron/desktop app environment
+ * Multiple detection methods for reliability
+ */
+function isElectronApp() {
+    if (typeof window === 'undefined') return false
+    
+    // Method 1: Check talioDesktop API from preload
+    if (window.talioDesktop?.isDesktopApp) return true
+    
+    // Method 2: Check user agent for Electron
+    if (navigator.userAgent.toLowerCase().includes('electron')) return true
+    
+    // Method 3: Check for Electron-specific objects
+    if (window.process?.type === 'renderer') return true
+    
+    // Method 4: Check if running in a non-standard browser context (no window.chrome, etc.)
+    // Electron doesn't have chrome.runtime
+    if (typeof window.require === 'function') return true
+    
+    return false
+}
+
 export function Providers({ children }) {
     // Defer non-critical initialization
     const initializeNonCritical = useCallback(async () => {
+        // Skip audio initialization in desktop app to prevent issues
+        if (isElectronApp()) {
+            console.log('[Providers] Desktop app detected, skipping audio init')
+            return
+        }
+        
         // Initialize audio system lazily (don't block render)
         try {
             const { initAudio } = await import('@/utils/audio')
@@ -18,17 +47,15 @@ export function Providers({ children }) {
 
     // Check for version changes and clear caches if needed
     useEffect(() => {
-        // Skip cache operations in Electron desktop app to prevent reload loops
-        const isDesktopApp = typeof window !== 'undefined' && window.talioDesktop?.isDesktopApp
+        // CRITICAL: Skip ALL cache and reload operations in desktop app
+        // This prevents white screen issues caused by reload loops
+        if (isElectronApp()) {
+            console.log('[Providers] Desktop app detected, skipping all cache operations')
+            return
+        }
         
         // Use requestIdleCallback for non-critical cache check
         const scheduleCheck = () => {
-            // Skip cache clearing in desktop app - it can cause white screen reload loops
-            if (isDesktopApp) {
-                console.log('[Providers] Desktop app detected, skipping cache check');
-                return;
-            }
-            
             if ('requestIdleCallback' in window) {
                 requestIdleCallback(() => {
                     checkAndClearCaches().then((cleared) => {

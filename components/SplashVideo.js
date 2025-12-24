@@ -8,6 +8,17 @@ const SplashContext = createContext({ splashComplete: true });
 export const useSplashComplete = () => useContext(SplashContext);
 
 /**
+ * Check if running in Electron/desktop app environment
+ */
+function isElectronApp() {
+  if (typeof window === 'undefined') return false
+  if (window.talioDesktop?.isDesktopApp) return true
+  if (navigator.userAgent.toLowerCase().includes('electron')) return true
+  if (window.process?.type === 'renderer') return true
+  return false
+}
+
+/**
  * SplashVideo Component
  * Plays a full-screen Lottie splash animation on first session start
  * NON-BLOCKING: Children always render immediately, splash is just an overlay on top
@@ -26,7 +37,7 @@ export default function SplashVideo({ children }) {
     initRef.current = true;
 
     // Skip splash entirely for desktop app - prevents potential blocking issues
-    if (typeof window !== 'undefined' && window.talioDesktop?.isDesktopApp) {
+    if (isElectronApp()) {
       console.log('[SplashVideo] Desktop app detected, skipping splash');
       return;
     }
