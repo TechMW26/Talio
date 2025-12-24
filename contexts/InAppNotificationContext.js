@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useCallback, useEffect } from 'rea
 import { usePathname } from 'next/navigation'
 import InAppNotification from '@/components/InAppNotification'
 import { useSocket } from './SocketContext'
-import { playNotificationSound, playMessageNotificationSound } from '@/utils/audio'
+import { playNotificationSound, playMessageNotificationSound, playTaskDoneSound } from '@/utils/audio'
 
 const InAppNotificationContext = createContext({
   showNotification: () => { }
@@ -37,11 +37,25 @@ export function InAppNotificationProvider({ children }) {
 
     setNotifications(prev => [...prev, newNotification])
 
-    // Play notification sound (unless it's a message - that uses its own sound)
+    // Play appropriate sound based on notification type
     if (playSoundEffect && notification.type !== 'message') {
-      playNotificationSound().catch((err) => {
-        console.warn('[InAppNotification] Notification sound failed:', err)
-      })
+      // Play task done sound for completions and approvals
+      if (
+        notification.type === 'task_completed' ||
+        notification.type === 'project_completed' ||
+        notification.type === 'project_approved' ||
+        notification.type === 'task_approved' ||
+        notification.soundType === 'taskDone'
+      ) {
+        playTaskDoneSound().catch((err) => {
+          console.warn('[InAppNotification] Task done sound failed:', err)
+        })
+      } else {
+        // Default notification sound
+        playNotificationSound().catch((err) => {
+          console.warn('[InAppNotification] Notification sound failed:', err)
+        })
+      }
     }
   }, [])
 
@@ -168,13 +182,20 @@ export function InAppNotificationProvider({ children }) {
       if (isAssignedToMe || isCreatedByMe) {
         let title = 'Task Update'
         let message = task?.title || 'A task has been updated'
+        let notificationType = 'task_status_update'
 
         if (action === 'assigned') {
           title = 'New Task Assigned'
           message = `You have been assigned: ${task?.title}`
+          notificationType = 'task_assigned'
         } else if (action === 'completed') {
           title = 'Task Completed'
           message = `Task completed: ${task?.title}`
+          notificationType = 'task_completed'
+        } else if (action === 'approved') {
+          title = 'Task Approved'
+          message = `Task approved: ${task?.title}`
+          notificationType = 'task_approved'
         } else if (action === 'status_update') {
           title = 'Task Status Updated'
           message = `${task?.title} - Status: ${task?.status}`
@@ -184,7 +205,7 @@ export function InAppNotificationProvider({ children }) {
           title,
           message,
           url: `/dashboard/tasks/my-tasks`,
-          type: action === 'assigned' ? 'task_assigned' : 'task_status_update'
+          type: notificationType
         })
       }
     })
@@ -301,16 +322,33 @@ export function InAppNotificationProvider({ children }) {
     const unsubscribe = onProjectAssignment((data) => {
       const { project, action, assignedBy } = data
 
-      const title = action === 'assigned' ? '📊 New Project Assigned' : '📊 Project Updated'
+      let title = '📊 Project Updated'
+      let notificationType = 'project_update'
+      
+      if (action === 'assigned') {
+        title = '📊 New Project Assigned'
+        notificationType = 'project_assignment'
+      } else if (action === 'completed') {
+        title = '🎉 Project Completed'
+        notificationType = 'project_completed'
+      } else if (action === 'approved') {
+        title = '✅ Project Approved'
+        notificationType = 'project_approved'
+      }
+
       const message = action === 'assigned'
         ? `You have been assigned to project: ${project.name || 'Untitled'}`
+        : action === 'completed'
+        ? `Project completed: ${project.name || 'Untitled'}`
+        : action === 'approved'
+        ? `Project approved: ${project.name || 'Untitled'}`
         : `Project updated: ${project.name || 'Untitled'}`
 
       showNotification({
         title,
         message,
         url: '/dashboard/projects',
-        type: 'project_assignment'
+        type: notificationType
       })
     })
 

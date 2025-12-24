@@ -1,28 +1,33 @@
 /**
  * Custom toast utility wrapper that adds sound effects
- * This wraps react-hot-toast to add audio feedback for error notifications
+ * This wraps react-hot-toast to add audio feedback for notifications
  */
 
 import hotToast from 'react-hot-toast'
-import { playErrorSound, unlockAudio } from './audio'
+import { playErrorSound, playSuccessSound, unlockAudio } from './audio'
 
 /**
  * Custom toast wrapper with sound support
- * Wraps react-hot-toast and adds sound for error notifications
+ * Wraps react-hot-toast and adds sounds for success and error notifications
  */
 const toast = (message, options) => {
   return hotToast(message, options)
 }
 
-// Success toast (no sound - positive feedback is visual)
+// Success toast with sound - plays for ALL success/approved/positive messages
 toast.success = (message, options) => {
+  // Play success sound asynchronously (don't block the toast)
+  unlockAudio().then(() => {
+    playSuccessSound().catch((err) => {
+      console.warn('[Toast] Success sound failed:', err)
+    })
+  })
   return hotToast.success(message, options)
 }
 
 // Error toast with sound - plays for ALL error/denied/negative messages
 toast.error = (message, options) => {
   // Play error sound asynchronously (don't block the toast)
-  // unlockAudio first, then play
   unlockAudio().then(() => {
     playErrorSound().catch((err) => {
       console.warn('[Toast] Error sound failed:', err)

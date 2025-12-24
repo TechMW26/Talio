@@ -602,8 +602,8 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
 
             {showProfileMenu && (
               <>
-                <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40" onClick={() => setShowProfileMenu(false)} />
-                <div className="absolute right-0 mt-2 w-44 sm:w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[102]" onClick={() => setShowProfileMenu(false)} />
+                <div className="absolute right-0 mt-2 w-44 sm:w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-[103]">
                   {/* User Info Section */}
                   <div className="px-2 md:px-4 py-3 border-b border-gray-200">
                     <div className="flex items-center space-x-3">

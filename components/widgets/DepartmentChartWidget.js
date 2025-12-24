@@ -31,6 +31,7 @@ export default function DepartmentChartWidget({ departmentStats = [] }) {
   const [hoveredIndex, setHoveredIndex] = useState(null)
   const [containerWidth, setContainerWidth] = useState(0)
   const containerRef = useRef(null)
+  const widgetRef = useRef(null)
 
   // Measure container width
   useEffect(() => {
@@ -80,10 +81,59 @@ export default function DepartmentChartWidget({ departmentStats = [] }) {
   const totalContentWidth = needsOverflow ? (numBars * MIN_BAR_WIDTH) + totalGapWidth + 32 : '100%'
 
   return (
-    <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+    <div ref={widgetRef} className="p-4 sm:p-6 flex-1 flex flex-col h-full relative">
       <div className="mb-4">
         <h3 className="text-base sm:text-lg font-bold text-gray-800">Department Distribution</h3>
       </div>
+      
+      {/* Centralized Tooltip - always positioned in center of widget */}
+      {hoveredIndex !== null && departmentStats[hoveredIndex] && (() => {
+        const dept = departmentStats[hoveredIndex]
+        const percentage = total > 0 ? ((dept.value / total) * 100) : 0
+        const color = CHART_COLORS[hoveredIndex % CHART_COLORS.length]
+        
+        return (
+          <div className="absolute left-1/2 top-12 -translate-x-1/2 z-20 pointer-events-none">
+            <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden min-w-[140px]">
+              {/* Tooltip Header with department color */}
+              <div 
+                className="px-3 py-2 border-b border-gray-200"
+                style={{ backgroundColor: color }}
+              >
+                <p className="text-xs sm:text-sm font-semibold text-white truncate">
+                  {dept.name}
+                </p>
+              </div>
+              
+              {/* Tooltip Content */}
+              <div className="px-3 py-2 bg-white">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs sm:text-sm text-gray-600">
+                    Employees:
+                  </span>
+                  <span className="text-xs sm:text-sm font-semibold text-gray-900">
+                    {dept.value}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-3 mt-1">
+                  <span className="text-xs sm:text-sm text-gray-600">
+                    Percentage:
+                  </span>
+                  <span className="text-xs sm:text-sm font-semibold text-gray-900">
+                    {percentage.toFixed(1)}%
+                  </span>
+                </div>
+              </div>
+            </div>
+            {/* Arrow */}
+            <div className="flex justify-center -mt-[1px]">
+              <div 
+                className="w-3 h-3 bg-white border-r border-b border-gray-200 transform rotate-45"
+              />
+            </div>
+          </div>
+        )
+      })()}
       
       {/* Scrollable container for bar chart */}
       <div 
@@ -100,7 +150,6 @@ export default function DepartmentChartWidget({ departmentStats = [] }) {
           }}
         >
           {departmentStats.map((dept, index) => {
-            const percentage = total > 0 ? ((dept.value / total) * 100) : 0
             // Calculate height based on value relative to max
             const barHeight = maxValue > 0 ? Math.max((dept.value / maxValue) * chartHeight, 20) : 20
             const color = CHART_COLORS[index % CHART_COLORS.length]
@@ -114,49 +163,6 @@ export default function DepartmentChartWidget({ departmentStats = [] }) {
                 onMouseEnter={() => setHoveredIndex(index)}
                 onMouseLeave={() => setHoveredIndex(null)}
               >
-                {/* Tooltip on hover - matching CustomPieTooltip style */}
-                {isHovered && (
-                  <div className="absolute bottom-full mb-3 z-20 pointer-events-none left-1/2 -translate-x-1/2">
-                    <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden min-w-[140px]">
-                      {/* Tooltip Header with department color */}
-                      <div 
-                        className="px-3 py-2 border-b border-gray-200"
-                        style={{ backgroundColor: color }}
-                      >
-                        <p className="text-xs sm:text-sm font-semibold text-white truncate">
-                          {dept.name}
-                        </p>
-                      </div>
-                      
-                      {/* Tooltip Content */}
-                      <div className="px-3 py-2 bg-white">
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="text-xs sm:text-sm text-gray-600">
-                            Employees:
-                          </span>
-                          <span className="text-xs sm:text-sm font-semibold text-gray-900">
-                            {dept.value}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between gap-3 mt-1">
-                          <span className="text-xs sm:text-sm text-gray-600">
-                            Percentage:
-                          </span>
-                          <span className="text-xs sm:text-sm font-semibold text-gray-900">
-                            {percentage.toFixed(1)}%
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    {/* Arrow */}
-                    <div className="flex justify-center -mt-[1px]">
-                      <div 
-                        className="w-3 h-3 bg-white border-r border-b border-gray-200 transform rotate-45"
-                      />
-                    </div>
-                  </div>
-                )}
-                
                 {/* Bar */}
                 <div 
                   className="cursor-pointer transition-all duration-200 rounded-t"

@@ -1,25 +1,10 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
-import dynamic from 'next/dynamic'
-
-// Dynamically import dashboards to reduce initial bundle
-const AdminDashboard = dynamic(() => import('@/components/dashboards/AdminDashboard'), {
-  loading: () => <DashboardSkeleton />,
-  ssr: false
-})
-const HRDashboard = dynamic(() => import('@/components/dashboards/HRDashboard'), {
-  loading: () => <DashboardSkeleton />,
-  ssr: false
-})
-const ManagerDashboard = dynamic(() => import('@/components/dashboards/ManagerDashboard'), {
-  loading: () => <DashboardSkeleton />,
-  ssr: false
-})
-const EmployeeDashboard = dynamic(() => import('@/components/dashboards/EmployeeDashboard'), {
-  loading: () => <DashboardSkeleton />,
-  ssr: false
-})
+import { useEffect, useState } from 'react'
+import AdminDashboard from '@/components/dashboards/AdminDashboard'
+import HRDashboard from '@/components/dashboards/HRDashboard'
+import ManagerDashboard from '@/components/dashboards/ManagerDashboard'
+import EmployeeDashboard from '@/components/dashboards/EmployeeDashboard'
 
 // Lightweight skeleton for faster perceived loading
 function DashboardSkeleton() {
@@ -67,36 +52,34 @@ export default function DashboardPage() {
 
   useEffect(() => {
     // Immediately try to get user from localStorage
-    const userData = localStorage.getItem('user')
-    if (userData) {
-      try {
+    try {
+      const userData = localStorage.getItem('user')
+      if (userData) {
         setUser(JSON.parse(userData))
-      } catch (e) {
-        console.error('[Dashboard] Failed to parse user data:', e)
       }
+    } catch (e) {
+      console.error('[Dashboard] Failed to parse user data:', e)
     }
     setLoading(false)
 
     // Play login success sound if coming from fresh login (defer to not block render)
-    const shouldPlaySound = sessionStorage.getItem('playLoginSound')
-    if (shouldPlaySound === 'true') {
-      sessionStorage.removeItem('playLoginSound')
-      // Use requestIdleCallback if available for non-blocking sound
-      const playSound = async () => {
-        try {
-          const { unlockAudio, playLoginSuccessSound } = await import('@/utils/audio')
-          await unlockAudio()
-          await playLoginSuccessSound()
-        } catch (err) {
-          console.warn('[Dashboard] Login success sound failed:', err)
-        }
+    try {
+      const shouldPlaySound = sessionStorage.getItem('playLoginSound')
+      if (shouldPlaySound === 'true') {
+        sessionStorage.removeItem('playLoginSound')
+        // Defer sound to not block render
+        setTimeout(async () => {
+          try {
+            const { unlockAudio, playLoginSuccessSound } = await import('@/utils/audio')
+            await unlockAudio()
+            await playLoginSuccessSound()
+          } catch (err) {
+            console.warn('[Dashboard] Login success sound failed:', err)
+          }
+        }, 500)
       }
-      
-      if ('requestIdleCallback' in window) {
-        requestIdleCallback(playSound)
-      } else {
-        setTimeout(playSound, 300)
-      }
+    } catch (e) {
+      // Ignore sessionStorage errors
     }
   }, [])
 

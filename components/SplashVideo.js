@@ -1,92 +1,98 @@
 'use client';
 
-import { useState, useEffect, useRef, createContext, useContext, lazy, Suspense } from 'react';
-import dynamic from 'next/dynamic';
+import { useState, useEffect, useRef, createContext, useContext } from 'react';
 
-// Dynamically import Lottie to reduce initial bundle size
-const Lottie = dynamic(() => import('lottie-react'), { 
-  ssr: false,
-  loading: () => null 
-});
-
-const ANIMATION_URL = '/splash-animation.json';
-
-// Context to track splash completion for blocking content
-const SplashContext = createContext({ splashComplete: false });
+// Context to track splash completion
+const SplashContext = createContext({ splashComplete: true });
 
 export const useSplashComplete = () => useContext(SplashContext);
 
 /**
  * SplashVideo Component
  * Plays a full-screen Lottie splash animation on first session start
- * - Desktop: Animation width reduced by 20%, centered
- * - Mobile: Full width, centered
- * - Background: #fbfcfc
- * - Auto-hides after animation ends
- * - Highest z-index to overlay all content
- * - BLOCKS all content rendering until splash is complete
+ * NON-BLOCKING: Children always render immediately, splash is just an overlay on top
  */
 export default function SplashVideo({ children }) {
-  const [showSplash, setShowSplash] = useState(null); // null = not yet determined
+  const [showSplash, setShowSplash] = useState(false);
   const [animationData, setAnimationData] = useState(null);
   const [isAnimating, setIsAnimating] = useState(false);
-  const [splashComplete, setSplashComplete] = useState(false);
+  const [Lottie, setLottie] = useState(null);
   const lottieRef = useRef(null);
+  const initRef = useRef(false);
 
   useEffect(() => {
+    // Prevent double initialization in React StrictMode
+    if (initRef.current) return;
+    initRef.current = true;
+
     // Check if this is the first session start
-    const hasSeenSplash = sessionStorage.getItem('talio_splash_shown');
-    
-    if (hasSeenSplash) {
-      // Already seen splash this session, don't show
-      setShowSplash(false);
-      setSplashComplete(true);
-    } else {
-      // Show splash and load animation
-      setShowSplash(true);
-      // Set theme color for mobile
-      const metaTheme = document.querySelector('meta[name="theme-color"]');
-      if (metaTheme) {
-        metaTheme.setAttribute('content', '#fbfcfc');
-      }
+    try {
+      const hasSeenSplash = sessionStorage.getItem('talio_splash_shown');
       
-      // Load animation data
-      loadAnimation();
+      if (!hasSeenSplash) {
+        // Show splash overlay (children still render underneath)
+        setShowSplash(true);
+        
+        // Set theme color for mobile
+        const metaTheme = document.querySelector('meta[name="theme-color"]');
+        if (metaTheme) {
+          metaTheme.setAttribute('content', '#fbfcfc');
+        }
+        
+        // Load Lottie and animation data
+        loadSplash();
+      }
+    } catch (e) {
+      // sessionStorage might not be available (private browsing, etc.)
+      console.warn('[SplashVideo] sessionStorage not available:', e);
     }
   }, []);
 
-  const loadAnimation = async () => {
+  const loadSplash = async () => {
     try {
-      const response = await fetch(ANIMATION_URL);
+      // Dynamically import Lottie only when needed
+      const lottieModule = await import('lottie-react');
+      setLottie(() => lottieModule.default);
+
+      // Fetch animation data
+      const response = await fetch('/splash-animation.json');
+      if (!response.ok) throw new Error('Failed to fetch animation');
+      
       const data = await response.json();
       setAnimationData(data);
       setIsAnimating(true);
       
-      // Set 2x speed after animation loads
+      // Set speed after animation loads
       setTimeout(() => {
         if (lottieRef.current) {
-          lottieRef.current.setSpeed(2);
+          lottieRef.current.setSpeed(1.5);
         }
       }, 50);
+      
+      // Fallback: auto-close after 5 seconds if animation doesn't complete
+      setTimeout(() => {
+        handleAnimationEnd();
+      }, 5000);
     } catch (error) {
-      console.log('[SplashVideo] Error loading animation:', error.message);
-      // On error, skip splash
+      console.warn('[SplashVideo] Error loading animation:', error.message);
+      // On error, just hide splash
       handleAnimationEnd();
     }
   };
 
   const handleAnimationEnd = () => {
-    // Mark splash as shown for this session
-    sessionStorage.setItem('talio_splash_shown', 'true');
+    try {
+      // Mark splash as shown for this session
+      sessionStorage.setItem('talio_splash_shown', 'true');
+    } catch (e) {
+      // Ignore sessionStorage errors
+    }
     
-    // Fade out and hide
-    setShowSplash(false);
+    // Fade out and hide splash overlay
     setIsAnimating(false);
-    
-    // Mark splash as complete - this allows content to render
     setTimeout(() => {
-      setSplashComplete(true);
-    }, 300); // Wait for fade animation
+      setShowSplash(false);
+    }, 300);
     
     // Restore theme color
     const metaTheme = document.querySelector('meta[name="theme-color"]');
@@ -95,44 +101,14 @@ export default function SplashVideo({ children }) {
     }
   };
 
-  // Show loading screen while determining if splash should show
-  if (showSplash === null) {
-    return (
-      <div 
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100vw',
-          height: '100vh',
-          backgroundColor: '#fbfcfc',
-          zIndex: 999999,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        {/* Empty loading state with same background */}
-      </div>
-    );
-  }
-
-  // If already determined not to show splash, just render children
-  if (showSplash === false && splashComplete) {
-    return (
-      <SplashContext.Provider value={{ splashComplete }}>
-        {children}
-      </SplashContext.Provider>
-    );
-  }
-
-  // Show splash animation
   return (
-    <SplashContext.Provider value={{ splashComplete }}>
-      {/* Splash Screen Overlay */}
+    <SplashContext.Provider value={{ splashComplete: true }}>
+      {/* ALWAYS render children immediately - never block */}
+      {children}
+      
+      {/* Splash Screen Overlay - only shown on first session */}
       {showSplash && (
         <div 
-          className="splash-video-container"
           style={{
             position: 'fixed',
             top: 0,
@@ -147,11 +123,11 @@ export default function SplashVideo({ children }) {
             opacity: isAnimating ? 1 : 0,
             transition: 'opacity 0.3s ease-out',
             overflow: 'hidden',
+            pointerEvents: isAnimating ? 'auto' : 'none',
           }}
         >
-          {animationData && (
+          {Lottie && animationData && (
             <div 
-              className="splash-animation-wrapper"
               style={{
                 height: '100vh',
                 aspectRatio: '9 / 16',
@@ -165,53 +141,19 @@ export default function SplashVideo({ children }) {
                 animationData={animationData}
                 loop={false}
                 autoplay={true}
-                onDOMLoaded={() => {
-                  if (lottieRef.current) {
-                    lottieRef.current.setSpeed(1.5);
-                  }
-                }}
                 onComplete={handleAnimationEnd}
                 style={{
                   width: '100%',
                   height: '100%',
                 }}
-                className="splash-animation"
                 rendererSettings={{
                   preserveAspectRatio: 'xMidYMax slice'
                 }}
               />
             </div>
           )}
-
-          {/* Responsive styles */}
-          <style jsx global>{`
-            .splash-animation-wrapper {
-              height: 100vh !important;
-              aspect-ratio: 9 / 16 !important;
-              max-width: 100vw !important;
-            }
-            
-            @media (max-width: 768px) {
-              .splash-animation-wrapper {
-                height: 100vh !important;
-                height: 100dvh !important;
-                width: 100vw !important;
-                max-width: 100vw !important;
-                aspect-ratio: unset !important;
-              }
-              
-              .splash-animation-wrapper svg {
-                width: 100% !important;
-                height: 100% !important;
-                object-fit: cover !important;
-              }
-            }
-          `}</style>
         </div>
       )}
-      
-      {/* Only render children when splash is complete */}
-      {splashComplete && children}
     </SplashContext.Provider>
   );
 }

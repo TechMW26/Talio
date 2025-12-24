@@ -9,7 +9,9 @@ const SOUNDS = {
   loginSuccess: '/sounds/login-success.mp3',
   messageNotification: '/sounds/message-notifications.mp3',
   error: '/sounds/error.mp3',
-  notification: '/sounds/notification.mp3'
+  notification: '/sounds/notification.mp3',
+  success: '/sounds/success.mp3',
+  taskDone: '/sounds/taskdone.mp3'
 }
 
 // Global AudioContext instance (same pattern as CallAlertReceiver)
@@ -19,8 +21,8 @@ let audioContextUnlocked = false
 // In-memory audio buffer cache
 const audioBufferCache = {}
 
-// localStorage key for cached audio data
-const AUDIO_CACHE_KEY = 'talio_audio_cache_v1'
+// localStorage key for cached audio data (v2 includes new sounds)
+const AUDIO_CACHE_KEY = 'talio_audio_cache_v2'
 
 /**
  * Get or create AudioContext instance
@@ -369,6 +371,22 @@ export const playErrorSound = async () => {
 export const playNotificationSound = async () => {
   console.log('[Audio] >> playNotificationSound called')
   return playSound('notification', 0.7)
+}
+
+/**
+ * Play success sound - for all success toasts and positive feedback
+ */
+export const playSuccessSound = async () => {
+  console.log('[Audio] >> playSuccessSound called')
+  return playSound('success', 0.7)
+}
+
+/**
+ * Play task done sound - for task/project completion and approvals
+ */
+export const playTaskDoneSound = async () => {
+  console.log('[Audio] >> playTaskDoneSound called')
+  return playSound('taskDone', 0.8)
 }
 
 /**
