@@ -1,4 +1,4 @@
-import { Inter, Poppins, Caveat, Dancing_Script, Indie_Flower, Patrick_Hand, Shadows_Into_Light } from 'next/font/google'
+import { Raleway, Poppins, Caveat, Dancing_Script, Indie_Flower, Patrick_Hand, Shadows_Into_Light } from 'next/font/google'
 import Script from 'next/script'
 import './globals.css'
 import '../styles/mobile-responsive.css'
@@ -11,36 +11,57 @@ import { Providers } from '@/components/Providers'
 import ErrorPageCache from '@/components/ErrorPageCache'
 import SplashVideo from '@/components/SplashVideo'
 
-const inter = Inter({ subsets: ['latin'] })
+// Primary font - preload for faster rendering
+const raleway = Raleway({ 
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-raleway',
+  display: 'swap',
+  preload: true,
+})
 
-// Whiteboard handwriting fonts
+// Secondary fonts - lazy load with display swap
 const poppins = Poppins({ 
   weight: ['400', '500', '600', '700'],
   subsets: ['latin'],
-  variable: '--font-poppins'
+  variable: '--font-poppins',
+  display: 'swap',
+  preload: false,
 })
+
+// Whiteboard handwriting fonts - lazy load (not critical)
 const caveat = Caveat({ 
   subsets: ['latin'],
-  variable: '--font-caveat'
+  variable: '--font-caveat',
+  display: 'swap',
+  preload: false,
 })
 const dancingScript = Dancing_Script({ 
   subsets: ['latin'],
-  variable: '--font-dancing-script'
+  variable: '--font-dancing-script',
+  display: 'swap',
+  preload: false,
 })
 const indieFlower = Indie_Flower({ 
   weight: '400',
   subsets: ['latin'],
-  variable: '--font-indie-flower'
+  variable: '--font-indie-flower',
+  display: 'swap',
+  preload: false,
 })
 const patrickHand = Patrick_Hand({ 
   weight: '400',
   subsets: ['latin'],
-  variable: '--font-patrick-hand'
+  variable: '--font-patrick-hand',
+  display: 'swap',
+  preload: false,
 })
 const shadowsIntoLight = Shadows_Into_Light({ 
   weight: '400',
   subsets: ['latin'],
-  variable: '--font-shadows-into-light'
+  variable: '--font-shadows-into-light',
+  display: 'swap',
+  preload: false,
 })
 
 export const metadata = {
@@ -94,10 +115,21 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/* DNS Prefetch for faster external resource loading */}
+        <link rel="dns-prefetch" href="https://cdn.socket.io" />
+        <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+        <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
+        
+        {/* Preconnect to critical origins */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        
         {/* Preload splash animation for immediate loading */}
         <link rel="preload" href="/splash-animation.json" as="fetch" type="application/json" crossOrigin="anonymous" />
+        
         {/* FCM Handler - For Android App Token Registration */}
         <script src="/fcm-handler.js" defer></script>
+        
         {/* Patch for Next.js dev overlay removeChild error */}
         <script dangerouslySetInnerHTML={{
           __html: `
@@ -115,13 +147,13 @@ export default function RootLayout({ children }) {
         }} />
       </head>
 
-      <body className={`${inter.className} ${poppins.variable} ${caveat.variable} ${dancingScript.variable} ${indieFlower.variable} ${patrickHand.variable} ${shadowsIntoLight.variable}`} suppressHydrationWarning>
-        {/* Socket.IO Client - Load globally for messaging system */}
+      <body className={`${raleway.className} ${raleway.variable} ${poppins.variable} ${caveat.variable} ${dancingScript.variable} ${indieFlower.variable} ${patrickHand.variable} ${shadowsIntoLight.variable}`} suppressHydrationWarning>
+        {/* Socket.IO Client - Load after interactive for faster initial paint */}
         <Script 
           src="https://cdn.socket.io/4.8.1/socket.io.min.js" 
           integrity="sha384-mkQ3/7FUtcGyoppY6bz/PORYoGqOl7/aSUMn2ymDOJcapfS6PHqxhRTMh1RR0Q6+" 
           crossOrigin="anonymous"
-          strategy="beforeInteractive"
+          strategy="afterInteractive"
         />
         
         {/* PWA Window Controls Overlay - Draggable title bar region */}

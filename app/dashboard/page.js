@@ -1,10 +1,49 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import AdminDashboard from '@/components/dashboards/AdminDashboard'
-import HRDashboard from '@/components/dashboards/HRDashboard'
-import ManagerDashboard from '@/components/dashboards/ManagerDashboard'
-import EmployeeDashboard from '@/components/dashboards/EmployeeDashboard'
+import { useEffect, useState, Suspense } from 'react'
+import dynamic from 'next/dynamic'
+
+// Dynamically import dashboards to reduce initial bundle
+const AdminDashboard = dynamic(() => import('@/components/dashboards/AdminDashboard'), {
+  loading: () => <DashboardSkeleton />,
+  ssr: false
+})
+const HRDashboard = dynamic(() => import('@/components/dashboards/HRDashboard'), {
+  loading: () => <DashboardSkeleton />,
+  ssr: false
+})
+const ManagerDashboard = dynamic(() => import('@/components/dashboards/ManagerDashboard'), {
+  loading: () => <DashboardSkeleton />,
+  ssr: false
+})
+const EmployeeDashboard = dynamic(() => import('@/components/dashboards/EmployeeDashboard'), {
+  loading: () => <DashboardSkeleton />,
+  ssr: false
+})
+
+// Lightweight skeleton for faster perceived loading
+function DashboardSkeleton() {
+  return (
+    <div className="min-h-screen bg-gray-50 p-4 sm:p-6">
+      <div className="animate-pulse space-y-4">
+        {/* Header skeleton */}
+        <div className="h-16 bg-white rounded-xl shadow-sm"></div>
+        {/* KPI cards skeleton */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[1,2,3,4].map(i => (
+            <div key={i} className="h-24 bg-white rounded-xl shadow-sm"></div>
+          ))}
+        </div>
+        {/* Widget grid skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1,2,3,4,5,6].map(i => (
+            <div key={i} className="h-48 bg-white rounded-xl shadow-sm"></div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // Helper function to render role-based dashboard
 const renderDashboardByRole = (user) => {
@@ -27,19 +66,42 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // Immediately try to get user from localStorage
     const userData = localStorage.getItem('user')
     if (userData) {
-      setUser(JSON.parse(userData))
+      try {
+        setUser(JSON.parse(userData))
+      } catch (e) {
+        console.error('[Dashboard] Failed to parse user data:', e)
+      }
     }
     setLoading(false)
+
+    // Play login success sound if coming from fresh login (defer to not block render)
+    const shouldPlaySound = sessionStorage.getItem('playLoginSound')
+    if (shouldPlaySound === 'true') {
+      sessionStorage.removeItem('playLoginSound')
+      // Use requestIdleCallback if available for non-blocking sound
+      const playSound = async () => {
+        try {
+          const { unlockAudio, playLoginSuccessSound } = await import('@/utils/audio')
+          await unlockAudio()
+          await playLoginSuccessSound()
+        } catch (err) {
+          console.warn('[Dashboard] Login success sound failed:', err)
+        }
+      }
+      
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(playSound)
+      } else {
+        setTimeout(playSound, 300)
+      }
+    }
   }, [])
 
   if (loading) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    )
+    return <DashboardSkeleton />
   }
 
   return renderDashboardByRole(user)

@@ -7,6 +7,10 @@ module.exports = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['var(--font-raleway)', 'Raleway', 'system-ui', 'sans-serif'],
+        raleway: ['var(--font-raleway)', 'Raleway', 'system-ui', 'sans-serif'],
+      },
       colors: {
         primary: {
           50: 'var(--color-primary-50, #EFF6FF)',

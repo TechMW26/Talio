@@ -4,6 +4,12 @@ const nextConfig = {
   poweredByHeader: false, // Remove X-Powered-By header
   compress: true, // Enable gzip compression
   
+  // Enable React strict mode for better debugging
+  reactStrictMode: false, // Disable in prod for performance
+  
+  // Enable SWC minification (faster than Terser)
+  swcMinify: true,
+  
   // Increase body size limit for file uploads (10MB)
   experimental: {
     serverActions: {
@@ -14,7 +20,9 @@ const nextConfig = {
       'react-icons',
       'date-fns',
       'lodash',
-      '@heroicons/react'
+      '@heroicons/react',
+      'recharts',
+      'lottie-react'
     ],
   },
 
@@ -29,7 +37,7 @@ const nextConfig = {
     ],
     // Optimize image loading
     formats: ['image/avif', 'image/webp'],
-    minimumCacheTTL: 60, // Cache images for 60 seconds minimum
+    minimumCacheTTL: 31536000, // Cache images for 1 year
     deviceSizes: [640, 750, 828, 1080, 1200, 1920],
     imageSizes: [16, 32, 48, 64, 96, 128, 256],
   },
@@ -53,8 +61,8 @@ const nextConfig = {
   async headers() {
     return [
       {
-        // Static assets caching
-        source: '/(.*).(:png|jpg|jpeg|gif|webp|svg|ico|woff|woff2)',
+        // Static assets caching (images, fonts, etc)
+        source: '/:path*.(png|jpg|jpeg|gif|webp|svg|ico|woff|woff2|ttf|eot)',
         headers: [
           {
             key: 'Cache-Control',
@@ -63,8 +71,38 @@ const nextConfig = {
         ],
       },
       {
+        // Sound files caching
+        source: '/sounds/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
+        // JSON files (like animations)
+        source: '/:path*.json',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=86400, stale-while-revalidate=604800',
+          },
+        ],
+      },
+      {
         // Next.js static files
-        source: '/_next/static/(.*)',
+        source: '/_next/static/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
+        // JS and CSS bundles
+        source: '/_next/:path*.(js|css)',
         headers: [
           {
             key: 'Cache-Control',
@@ -74,11 +112,21 @@ const nextConfig = {
       },
       {
         // API routes - no caching
-        source: '/api/(.*)',
+        source: '/api/:path*',
         headers: [
           {
             key: 'Cache-Control',
             value: 'no-store, no-cache, must-revalidate',
+          },
+        ],
+      },
+      {
+        // HTML pages - short cache with revalidation
+        source: '/:path*',
+        headers: [
+          {
+            key: 'X-DNS-Prefetch-Control',
+            value: 'on',
           },
         ],
       },

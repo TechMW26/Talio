@@ -1,7 +1,13 @@
 'use client';
 
-import { useState, useEffect, useRef, createContext, useContext } from 'react';
-import Lottie from 'lottie-react';
+import { useState, useEffect, useRef, createContext, useContext, lazy, Suspense } from 'react';
+import dynamic from 'next/dynamic';
+
+// Dynamically import Lottie to reduce initial bundle size
+const Lottie = dynamic(() => import('lottie-react'), { 
+  ssr: false,
+  loading: () => null 
+});
 
 const ANIMATION_URL = '/splash-animation.json';
 

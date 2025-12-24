@@ -3,15 +3,25 @@
 @tailwind utilities;
 
 /* ============================================
-   WHITEBOARD FONT FAMILIES
+   GLOBAL FONT FAMILY - Raleway
    ============================================ */
 :root {
+  --font-raleway: 'Raleway', system-ui, sans-serif;
   --font-poppins: 'Poppins', system-ui, sans-serif;
   --font-caveat: 'Caveat', cursive;
   --font-dancing-script: 'Dancing Script', cursive;
   --font-indie-flower: 'Indie Flower', cursive;
   --font-patrick-hand: 'Patrick Hand', cursive;
   --font-shadows-into-light: 'Shadows Into Light', cursive;
+}
+
+/* Apply Raleway globally */
+html, body {
+  font-family: var(--font-raleway);
+}
+
+* {
+  font-family: inherit;
 }
 
 /* ============================================

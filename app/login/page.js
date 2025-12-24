@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import toast from '@/utils/toast'
-import { playLoginSuccessSound, unlockAudio } from '@/utils/audio'
 import { FaEnvelope, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa'
 
 export default function LoginPage() {
@@ -137,12 +136,8 @@ export default function LoginPage() {
       const data = await response.json()
 
       if (response.ok) {
-        // Unlock audio and play login success sound (user just clicked, so we have interaction permission)
-        unlockAudio().then(() => {
-          playLoginSuccessSound().catch((err) => {
-            console.warn('[Login] Login success sound failed:', err)
-          })
-        })
+        // Set flag for dashboard to play login success sound
+        sessionStorage.setItem('playLoginSound', 'true')
         
         toast.success('Login successful!')
         // Store in localStorage
