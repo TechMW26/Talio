@@ -17,7 +17,7 @@ async function canApproveCorrections(userId, targetEmployeeId) {
   if (!user) return { canApprove: false, reason: 'User not found' }
 
   const role = user.role
-  
+
   // God admin, admin, and HR can approve all corrections
   if (['admin', 'hr'].includes(role)) {
     return { canApprove: true, role }
@@ -32,8 +32,8 @@ async function canApproveCorrections(userId, targetEmployeeId) {
     const department = await Department.findById(targetEmployee.department).lean()
     if (department) {
       const isHead = department.head?.toString() === user.employeeId._id.toString() ||
-                     (department.heads && department.heads.some(h => h.toString() === user.employeeId._id.toString()))
-      
+        (department.heads && department.heads.some(h => h.toString() === user.employeeId._id.toString()))
+
       if (isHead) {
         return { canApprove: true, role: 'department_head' }
       }
@@ -79,7 +79,7 @@ export async function GET(request) {
     } else if (type === 'pending') {
       // Get pending requests for approval (for admins/HRs/dept heads)
       const canApprove = await canApproveCorrections(decoded.userId, null)
-      
+
       if (['admin', 'hr'].includes(user?.role)) {
         // Can see all pending
         query.status = 'pending'
@@ -91,11 +91,11 @@ export async function GET(request) {
             { heads: user.employeeId._id }
           ]
         }).lean()
-        
+
         const deptIds = departments.map(d => d._id)
         const deptEmployees = await Employee.find({ department: { $in: deptIds } }).select('_id').lean()
         const empIds = deptEmployees.map(e => e._id)
-        
+
         query.employee = { $in: empIds }
         query.status = 'pending'
       }
@@ -143,15 +143,15 @@ export async function POST(request) {
     await connectDB()
 
     const data = await request.json()
-    const { 
-      attendanceId, 
+    const {
+      attendanceId,
       date,
-      correctionType, 
-      requestedCheckIn, 
-      requestedCheckOut, 
+      correctionType,
+      requestedCheckIn,
+      requestedCheckOut,
       requestedStatus,
       reason,
-      attachments 
+      attachments
     } = data
 
     const user = await User.findById(decoded.userId).populate('employeeId').lean()
@@ -203,9 +203,9 @@ export async function POST(request) {
     }).lean()
 
     if (existingCorrection) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'A pending correction request already exists for this date' 
+      return NextResponse.json({
+        success: false,
+        message: 'A pending correction request already exists for this date'
       }, { status: 400 })
     }
 
@@ -300,13 +300,13 @@ export async function PATCH(request) {
       if (attendance.checkIn && attendance.checkOut) {
         const settings = await CompanySettings.findOne().lean()
         const breakTimings = settings?.breakTimings || []
-        
+
         const workHoursCalc = calculateEffectiveWorkHours(
-          attendance.checkIn, 
-          attendance.checkOut, 
+          attendance.checkIn,
+          attendance.checkOut,
           breakTimings
         )
-        
+
         attendance.workHours = workHoursCalc.effectiveWorkHours
         attendance.totalLoggedHours = workHoursCalc.totalLoggedHours
         attendance.breakMinutes = workHoursCalc.breakMinutes
@@ -317,7 +317,7 @@ export async function PATCH(request) {
           fullDayHours: settings?.fullDayHours || 8,
           halfDayHours: settings?.halfDayHours || 4
         })
-        
+
         attendance.status = correction.requestedStatus || statusResult.status
         attendance.statusReason = `Corrected: ${statusResult.reason}`
       } else if (correction.requestedStatus) {
@@ -326,7 +326,7 @@ export async function PATCH(request) {
 
       attendance.isManualEntry = true
       attendance.remarks = `Corrected on ${new Date().toLocaleDateString()} - ${correction.reason}`
-      
+
       await attendance.save()
 
       // Update correction record
@@ -338,7 +338,7 @@ export async function PATCH(request) {
       correction.appliedCheckOut = attendance.checkOut
       correction.appliedStatus = attendance.status
       correction.appliedWorkHours = attendance.workHours
-      
+
       await correction.save()
 
       return NextResponse.json({
@@ -352,7 +352,7 @@ export async function PATCH(request) {
       correction.reviewedBy = reviewerEmployeeId
       correction.reviewedAt = new Date()
       correction.reviewerComments = reviewerComments
-      
+
       await correction.save()
 
       return NextResponse.json({
