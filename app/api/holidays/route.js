@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import connectDB from '@/lib/mongodb'
 import Holiday from '@/models/Holiday'
+import { emitHolidayUpdate } from '@/lib/realtimeEvents'
 
 // GET - List holidays
 export async function GET(request) {
@@ -42,6 +43,22 @@ export async function POST(request) {
     const data = await request.json()
 
     const holiday = await Holiday.create(data)
+
+    // Emit real-time holiday update to all users
+    try {
+      emitHolidayUpdate(
+        {
+          _id: holiday._id,
+          name: holiday.name,
+          date: holiday.date,
+          type: holiday.type,
+          isOptional: holiday.isOptional
+        },
+        { action: 'create', broadcast: true }
+      )
+    } catch (emitError) {
+      console.error('Failed to emit holiday update:', emitError)
+    }
 
     return NextResponse.json({
       success: true,

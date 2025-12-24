@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   FaUsers, FaClock, FaCalendarAlt, FaChartLine,
@@ -12,6 +12,7 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { getEmployeeId } from '@/utils/userHelper'
 import { CustomizableDashboard } from '@/components/dashboard'
 import CallAlertButton from '@/components/CallAlertButton'
+import useRealtimeDashboard from '@/hooks/useRealtimeDashboard'
 import {
   CheckInOutWidget,
   QuickGlanceWidget,
@@ -198,6 +199,20 @@ export default function ManagerDashboard({ user }) {
       console.error('Error fetching employee data:', error)
     }
   }
+
+  // Callback for refreshing dashboard data on real-time events
+  const refreshDashboard = useCallback(async () => {
+    console.log('[ManagerDashboard] Real-time refresh triggered')
+    await Promise.all([
+      fetchManagerStats(),
+      fetchPendingLeaves(),
+      employeeIdStr ? fetchTodayAttendance() : Promise.resolve(),
+      employeeIdStr ? fetchEmployeeData() : Promise.resolve()
+    ])
+  }, [employeeIdStr])
+
+  // Subscribe to real-time updates
+  useRealtimeDashboard({ onDashboardRefresh: refreshDashboard })
 
   const handleClockIn = async () => {
     if (!employeeIdStr) return

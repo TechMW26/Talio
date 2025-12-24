@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import {
@@ -20,6 +20,7 @@ import DraggableDashboard from '@/components/dashboard/DraggableDashboard'
 import DraggableKPIGrid from '@/components/dashboard/DraggableKPIGrid'
 import { CustomizableDashboard } from '@/components/dashboard'
 import CallAlertButton from '@/components/CallAlertButton'
+import useRealtimeDashboard from '@/hooks/useRealtimeDashboard'
 import {
   CheckInOutWidget,
   QuickGlanceWidget,
@@ -76,6 +77,32 @@ export default function AdminDashboard({ user }) {
 
   // Get employee ID string for API calls
   const employeeIdStr = getEmployeeId(user)
+
+  // Real-time dashboard updates - automatically refresh data when changes occur
+  const handleRealtimeUpdate = useCallback((data) => {
+    console.log('🔄 [Admin Dashboard] Real-time update received, refreshing data...')
+    // Refresh dashboard data when any update is received
+    fetchDashboardData()
+  }, [])
+
+  const handleAttendanceUpdate = useCallback((data) => {
+    console.log('🔄 [Admin Dashboard] Attendance update received')
+    fetchDashboardData()
+    if (employeeIdStr) {
+      fetchTodayAttendance()
+    }
+  }, [employeeIdStr])
+
+  const { isConnected } = useRealtimeDashboard({
+    onAttendanceUpdate: handleAttendanceUpdate,
+    onLeaveUpdate: handleRealtimeUpdate,
+    onExpenseUpdate: handleRealtimeUpdate,
+    onProjectUpdate: handleRealtimeUpdate,
+    onTaskUpdate: handleRealtimeUpdate,
+    onEmployeeUpdate: handleRealtimeUpdate,
+    onAnnouncementUpdate: handleRealtimeUpdate,
+    onDashboardRefresh: handleRealtimeUpdate
+  })
 
   useEffect(() => {
     // Load all data in parallel

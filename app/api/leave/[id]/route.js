@@ -5,6 +5,7 @@ import LeaveBalance from '@/models/LeaveBalance'
 import Employee from '@/models/Employee'
 import User from '@/models/User'
 import { sendLeaveApprovedNotification, sendLeaveRejectedNotification } from '@/lib/notificationService'
+import { emitLeaveUpdate, emitDashboardRefresh } from '@/lib/realtimeEvents'
 
 // PUT - Update leave status (Approve/Reject)
 export async function PUT(request, { params }) {
@@ -132,7 +133,32 @@ export async function PUT(request, { params }) {
       }
     } catch (notifError) {
       console.error('Failed to send leave status notification:', notifError)
-    } return NextResponse.json({
+    }
+
+    // Emit real-time update to all admin/HR dashboards for live refresh
+    try {
+      const adminUsers = await User.find({ role: { $in: ['admin', 'hr', 'manager'] }, isActive: true }).select('_id').lean()
+      const targetUserIds = adminUsers.map(u => u._id.toString())
+      
+      emitLeaveUpdate(
+        {
+          _id: leave._id,
+          employee: populatedLeave.employee,
+          leaveType: populatedLeave.leaveType,
+          startDate: leave.startDate,
+          endDate: leave.endDate,
+          numberOfDays: leave.numberOfDays,
+          status: leave.status,
+          approvedBy: populatedLeave.approvedBy
+        },
+        targetUserIds,
+        { action: status }
+      )
+    } catch (emitError) {
+      console.error('Failed to emit leave update to dashboards:', emitError)
+    }
+
+    return NextResponse.json({
       success: true,
       message: `Leave request ${status} successfully`,
       data: populatedLeave,

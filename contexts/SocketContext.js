@@ -4,6 +4,51 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import { io } from 'socket.io-client'
 import toast from '@/utils/toast'
 
+// Real-time event names (mirrored from lib/realtimeEvents.js for client-side)
+export const REALTIME_EVENTS = {
+  ATTENDANCE_UPDATE: 'attendance-update',
+  ATTENDANCE_CHECK_IN: 'attendance-check-in',
+  ATTENDANCE_CHECK_OUT: 'attendance-check-out',
+  LEAVE_REQUEST: 'leave-request',
+  LEAVE_STATUS_UPDATE: 'leave-status-update',
+  LEAVE_CANCELLED: 'leave-cancelled',
+  EXPENSE_SUBMITTED: 'expense-submitted',
+  EXPENSE_STATUS_UPDATE: 'expense-status-update',
+  TRAVEL_REQUEST: 'travel-request',
+  TRAVEL_STATUS_UPDATE: 'travel-status-update',
+  PROJECT_CREATED: 'project-created',
+  PROJECT_UPDATED: 'project-updated',
+  PROJECT_DELETED: 'project-deleted',
+  PROJECT_ASSIGNMENT: 'project-assignment',
+  TASK_CREATED: 'task-created',
+  TASK_UPDATED: 'task-updated',
+  TASK_DELETED: 'task-deleted',
+  TASK_STATUS_CHANGED: 'task-status-changed',
+  TASK_ASSIGNED: 'task-assigned',
+  EMPLOYEE_CREATED: 'employee-created',
+  EMPLOYEE_UPDATED: 'employee-updated',
+  EMPLOYEE_DELETED: 'employee-deleted',
+  DEPARTMENT_UPDATED: 'department-updated',
+  ANNOUNCEMENT_CREATED: 'announcement-created',
+  ANNOUNCEMENT_UPDATED: 'announcement-updated',
+  NEW_NOTIFICATION: 'new-notification',
+  DASHBOARD_REFRESH: 'dashboard-refresh',
+  GEOFENCE_APPROVAL: 'geofence-approval',
+  PERFORMANCE_REVIEW: 'performance-review',
+  HELPDESK_TICKET: 'helpdesk-ticket',
+  HELPDESK_TICKET_UPDATED: 'helpdesk-ticket-updated',
+  DOCUMENT_UPDATE: 'document-update',
+  ASSET_UPDATE: 'asset-update',
+  PAYROLL_UPDATE: 'payroll-update',
+  MEETING_CREATED: 'meeting-created',
+  MEETING_UPDATED: 'meeting-updated',
+  MEETING_CANCELLED: 'meeting-cancelled',
+  DAILY_GOAL_UPDATED: 'daily-goal-updated',
+  RECRUITMENT_UPDATE: 'recruitment-update',
+  HOLIDAY_UPDATE: 'holiday-update',
+  POLICY_UPDATE: 'policy-update',
+}
+
 const SocketContext = createContext()
 
 export function SocketProvider({ children }) {
@@ -411,6 +456,135 @@ export function SocketProvider({ children }) {
     }
   }, [socket])
 
+  // Subscribe to attendance update events
+  const onAttendanceUpdate = useCallback((callback) => {
+    if (socket) {
+      socket.on(REALTIME_EVENTS.ATTENDANCE_UPDATE, callback)
+      return () => socket.off(REALTIME_EVENTS.ATTENDANCE_UPDATE, callback)
+    }
+    return () => {}
+  }, [socket])
+
+  // Subscribe to leave request events
+  const onLeaveRequest = useCallback((callback) => {
+    if (socket) {
+      socket.on(REALTIME_EVENTS.LEAVE_REQUEST, callback)
+      return () => socket.off(REALTIME_EVENTS.LEAVE_REQUEST, callback)
+    }
+    return () => {}
+  }, [socket])
+
+  // Subscribe to project created events
+  const onProjectCreated = useCallback((callback) => {
+    if (socket) {
+      socket.on(REALTIME_EVENTS.PROJECT_CREATED, callback)
+      return () => socket.off(REALTIME_EVENTS.PROJECT_CREATED, callback)
+    }
+    return () => {}
+  }, [socket])
+
+  // Subscribe to project updated events
+  const onProjectUpdated = useCallback((callback) => {
+    if (socket) {
+      socket.on(REALTIME_EVENTS.PROJECT_UPDATED, callback)
+      return () => socket.off(REALTIME_EVENTS.PROJECT_UPDATED, callback)
+    }
+    return () => {}
+  }, [socket])
+
+  // Subscribe to task created events
+  const onTaskCreated = useCallback((callback) => {
+    if (socket) {
+      socket.on(REALTIME_EVENTS.TASK_CREATED, callback)
+      return () => socket.off(REALTIME_EVENTS.TASK_CREATED, callback)
+    }
+    return () => {}
+  }, [socket])
+
+  // Subscribe to task status changed events
+  const onTaskStatusChanged = useCallback((callback) => {
+    if (socket) {
+      socket.on(REALTIME_EVENTS.TASK_STATUS_CHANGED, callback)
+      return () => socket.off(REALTIME_EVENTS.TASK_STATUS_CHANGED, callback)
+    }
+    return () => {}
+  }, [socket])
+
+  // Subscribe to employee created events
+  const onEmployeeCreated = useCallback((callback) => {
+    if (socket) {
+      socket.on(REALTIME_EVENTS.EMPLOYEE_CREATED, callback)
+      return () => socket.off(REALTIME_EVENTS.EMPLOYEE_CREATED, callback)
+    }
+    return () => {}
+  }, [socket])
+
+  // Subscribe to employee updated events
+  const onEmployeeUpdated = useCallback((callback) => {
+    if (socket) {
+      socket.on(REALTIME_EVENTS.EMPLOYEE_UPDATED, callback)
+      return () => socket.off(REALTIME_EVENTS.EMPLOYEE_UPDATED, callback)
+    }
+    return () => {}
+  }, [socket])
+
+  // Subscribe to dashboard refresh events
+  const onDashboardRefresh = useCallback((callback) => {
+    if (socket) {
+      socket.on(REALTIME_EVENTS.DASHBOARD_REFRESH, callback)
+      return () => socket.off(REALTIME_EVENTS.DASHBOARD_REFRESH, callback)
+    }
+    return () => {}
+  }, [socket])
+
+  // Subscribe to meeting events
+  const onMeetingUpdate = useCallback((callback) => {
+    if (socket) {
+      const handler = (data) => callback(data)
+      socket.on(REALTIME_EVENTS.MEETING_CREATED, handler)
+      socket.on(REALTIME_EVENTS.MEETING_UPDATED, handler)
+      socket.on(REALTIME_EVENTS.MEETING_CANCELLED, handler)
+      return () => {
+        socket.off(REALTIME_EVENTS.MEETING_CREATED, handler)
+        socket.off(REALTIME_EVENTS.MEETING_UPDATED, handler)
+        socket.off(REALTIME_EVENTS.MEETING_CANCELLED, handler)
+      }
+    }
+    return () => {}
+  }, [socket])
+
+  // Subscribe to announcement events
+  const onAnnouncementUpdate = useCallback((callback) => {
+    if (socket) {
+      const handler = (data) => callback(data)
+      socket.on(REALTIME_EVENTS.ANNOUNCEMENT_CREATED, handler)
+      socket.on(REALTIME_EVENTS.ANNOUNCEMENT_UPDATED, handler)
+      return () => {
+        socket.off(REALTIME_EVENTS.ANNOUNCEMENT_CREATED, handler)
+        socket.off(REALTIME_EVENTS.ANNOUNCEMENT_UPDATED, handler)
+      }
+    }
+    return () => {}
+  }, [socket])
+
+  // Subscribe to holiday update events
+  const onHolidayUpdate = useCallback((callback) => {
+    if (socket) {
+      socket.on(REALTIME_EVENTS.HOLIDAY_UPDATE, callback)
+      return () => socket.off(REALTIME_EVENTS.HOLIDAY_UPDATE, callback)
+    }
+    return () => {}
+  }, [socket])
+
+  // Generic subscribe function for any event
+  const subscribe = useCallback((eventName, callback) => {
+    if (socket) {
+      socket.on(eventName, callback)
+      return () => socket.off(eventName, callback)
+    }
+    return () => {}
+  }, [socket])
+
   const value = {
     socket,
     isConnected,
@@ -446,7 +620,23 @@ export function SocketProvider({ children }) {
     onPayrollUpdate,
     onNewNotification,
     onCallAlert,
-    onCallAlertAcknowledged
+    onCallAlertAcknowledged,
+    // New real-time event subscriptions
+    onAttendanceUpdate,
+    onLeaveRequest,
+    onProjectCreated,
+    onProjectUpdated,
+    onTaskCreated,
+    onTaskStatusChanged,
+    onEmployeeCreated,
+    onEmployeeUpdated,
+    onDashboardRefresh,
+    onMeetingUpdate,
+    onAnnouncementUpdate,
+    onHolidayUpdate,
+    subscribe,
+    // Export event constants for components to use
+    REALTIME_EVENTS,
   }
 
   return (

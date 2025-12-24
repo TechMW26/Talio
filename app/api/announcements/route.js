@@ -5,6 +5,7 @@ import User from '@/models/User'
 import Employee from '@/models/Employee'
 import { sendAnnouncementNotification } from '@/lib/notificationService'
 import jwt from 'jsonwebtoken'
+import { emitDashboardRefresh, REALTIME_EVENTS } from '@/lib/realtimeEvents'
 
 // GET - List announcements
 export async function GET(request) {
@@ -279,6 +280,9 @@ export async function POST(request) {
               })
             })
             console.log(`Socket.IO announcement event emitted to ${userIds.length} user(s)`)
+            
+            // Also emit dashboard refresh for all users
+            emitDashboardRefresh({ reason: 'announcement-created' })
           }
         } catch (socketError) {
           console.error('Failed to emit Socket.IO announcement event:', socketError)

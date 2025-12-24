@@ -15,6 +15,7 @@ import { sendEmail } from '@/lib/mailer'
 import { sendPushToUser } from '@/lib/pushNotification'
 import { calculateEffectiveWorkHours, determineAttendanceStatus } from '@/lib/attendanceShrinkage'
 import { reverseGeocode, validateLocationData } from '@/lib/geocoding'
+import { emitAttendanceUpdate, emitDashboardRefresh } from '@/lib/realtimeEvents'
 
 // Ensure models are registered for populate
 const _ensureModels = { Company };
@@ -551,6 +552,27 @@ export async function POST(request) {
         console.error('Failed to send clock-in push notification:', pushError)
       }
 
+      // Emit real-time attendance update to all relevant users (employee + admins/HR)
+      try {
+        const adminUsers = await User.find({ role: { $in: ['admin', 'hr', 'manager'] }, isActive: true }).select('_id').lean()
+        const targetUserIds = [employee.user?.toString(), ...adminUsers.map(u => u._id.toString())].filter(Boolean)
+        
+        emitAttendanceUpdate(
+          { 
+            _id: attendance._id,
+            employee: { _id: employeeId, firstName: employee.firstName, lastName: employee.lastName },
+            checkIn: attendance.checkIn,
+            checkInStatus: attendance.checkInStatus,
+            status: attendance.status,
+            date: attendance.date
+          },
+          targetUserIds,
+          { action: 'check-in' }
+        )
+      } catch (emitError) {
+        console.error('Failed to emit attendance update:', emitError)
+      }
+
       return NextResponse.json({
         success: true,
         message: 'Clocked in successfully',
@@ -820,6 +842,30 @@ export async function POST(request) {
         }
       } catch (pushError) {
         console.error('Failed to send clock-out push notification:', pushError)
+      }
+
+      // Emit real-time attendance update to all relevant users (employee + admins/HR)
+      try {
+        const adminUsers = await User.find({ role: { $in: ['admin', 'hr', 'manager'] }, isActive: true }).select('_id').lean()
+        const targetUserIds = [employee.user?.toString(), ...adminUsers.map(u => u._id.toString())].filter(Boolean)
+        
+        emitAttendanceUpdate(
+          { 
+            _id: attendance._id,
+            employee: { _id: employeeId, firstName: employee.firstName, lastName: employee.lastName },
+            checkIn: attendance.checkIn,
+            checkOut: attendance.checkOut,
+            checkInStatus: attendance.checkInStatus,
+            checkOutStatus: attendance.checkOutStatus,
+            status: attendance.status,
+            workHours: attendance.workHours,
+            date: attendance.date
+          },
+          targetUserIds,
+          { action: 'check-out' }
+        )
+      } catch (emitError) {
+        console.error('Failed to emit attendance update:', emitError)
       }
 
       return NextResponse.json({

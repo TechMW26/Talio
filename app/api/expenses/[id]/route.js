@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import connectDB from '@/lib/mongodb'
 import Expense from '@/models/Expense'
+import User from '@/models/User'
+import { emitExpenseUpdate } from '@/lib/realtimeEvents'
 
 // PUT - Update/Approve expense
 export async function PUT(request, { params }) {
@@ -68,6 +70,23 @@ export async function PUT(request, { params }) {
             console.error('Failed to send expense FCM notification:', fcmError)
           }
         }
+
+        // Emit real-time update to all admin/HR dashboards
+        const adminUsers = await User.find({ role: { $in: ['admin', 'hr', 'manager'] }, isActive: true }).select('_id').lean()
+        const targetUserIds = adminUsers.map(u => u._id.toString())
+        
+        emitExpenseUpdate(
+          {
+            _id: expense._id,
+            employee: expense.employee,
+            category: expense.category,
+            amount: expense.amount,
+            status: expense.status,
+            approvedBy: expense.approvedBy
+          },
+          targetUserIds,
+          { action: data.status }
+        )
       }
     } catch (socketError) {
       console.error('Failed to send expense socket notification:', socketError)

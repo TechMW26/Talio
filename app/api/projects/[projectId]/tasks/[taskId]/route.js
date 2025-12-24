@@ -14,8 +14,10 @@ import {
 } from '@/lib/projectService'
 import { 
   notifyTaskStatusChanged,
-  notifyTaskAssigned
+  notifyTaskAssigned,
+  getProjectMemberUserIds
 } from '@/lib/projectNotifications'
+import { emitTaskUpdate } from '@/lib/realtimeEvents'
 
 // GET - Get single task details
 export async function GET(request, { params }) {
@@ -393,6 +395,32 @@ export async function PUT(request, { params }) {
     const updatedTask = await Task.findById(taskId)
       .populate('createdBy', 'firstName lastName profilePicture')
       .populate('assignedBy', 'firstName lastName')
+
+    // Emit real-time task update to all project members
+    try {
+      const memberUserIds = await getProjectMemberUserIds(projectId)
+      
+      emitTaskUpdate(
+        {
+          _id: updatedTask._id,
+          title: updatedTask.title,
+          status: updatedTask.status,
+          priority: updatedTask.priority,
+          project: projectId,
+          progressPercentage: updatedTask.progressPercentage,
+          dueDate: updatedTask.dueDate
+        },
+        memberUserIds.map(id => id.toString()),
+        { 
+          action: 'update', 
+          statusChanged: status && status !== oldStatus,
+          oldStatus,
+          newStatus: status
+        }
+      )
+    } catch (emitError) {
+      console.error('Failed to emit task update:', emitError)
+    }
 
     return NextResponse.json({
       success: true,

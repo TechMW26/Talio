@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import toast from '@/utils/toast'
 import {
   FaClock, FaCalendarAlt, FaMoneyBillWave, FaFileAlt,
@@ -12,6 +12,7 @@ import { useTheme } from '@/contexts/ThemeContext'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
 import { CustomizableDashboard } from '@/components/dashboard'
 import CallAlertButton from '@/components/CallAlertButton'
+import useRealtimeDashboard from '@/hooks/useRealtimeDashboard'
 import {
   CheckInOutWidget,
   QuickGlanceWidget,
@@ -63,6 +64,35 @@ export default function EmployeeDashboard({ user: userProp }) {
 
   // Get employee ID string for API calls
   const employeeIdStr = getEmployeeId(user)
+
+  // Real-time dashboard updates - automatically refresh data when changes occur
+  const handleRealtimeUpdate = useCallback((data) => {
+    console.log('🔄 [Employee Dashboard] Real-time update received, refreshing data...')
+    fetchDashboardData()
+  }, [])
+
+  const handleAttendanceUpdate = useCallback((data) => {
+    console.log('🔄 [Employee Dashboard] Attendance update received')
+    if (employeeIdStr) {
+      fetchTodayAttendance()
+    }
+  }, [employeeIdStr])
+
+  const handleLeaveUpdate = useCallback((data) => {
+    console.log('🔄 [Employee Dashboard] Leave update received')
+    fetchDashboardData()
+  }, [])
+
+  const { isConnected } = useRealtimeDashboard({
+    onAttendanceUpdate: handleAttendanceUpdate,
+    onLeaveUpdate: handleLeaveUpdate,
+    onExpenseUpdate: handleRealtimeUpdate,
+    onProjectUpdate: handleRealtimeUpdate,
+    onTaskUpdate: handleRealtimeUpdate,
+    onAnnouncementUpdate: handleRealtimeUpdate,
+    onHolidayUpdate: handleRealtimeUpdate,
+    onDashboardRefresh: handleRealtimeUpdate
+  })
 
   // Load user from localStorage if not provided via props
   useEffect(() => {

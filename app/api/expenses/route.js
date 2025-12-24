@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import connectDB from '@/lib/mongodb'
 import Expense from '@/models/Expense'
+import User from '@/models/User'
+import { emitExpenseUpdate } from '@/lib/realtimeEvents'
 
 // GET - List expenses
 export async function GET(request) {
@@ -55,6 +57,28 @@ export async function POST(request) {
 
     const populatedExpense = await Expense.findById(expense._id)
       .populate('employee', 'firstName lastName employeeCode')
+
+    // Emit real-time expense update to admins/HR
+    try {
+      const adminUsers = await User.find({ role: { $in: ['admin', 'hr', 'manager'] }, isActive: true }).select('_id').lean()
+      const targetUserIds = adminUsers.map(u => u._id.toString())
+      
+      emitExpenseUpdate(
+        {
+          _id: expense._id,
+          employee: populatedExpense.employee,
+          category: expense.category,
+          amount: expense.amount,
+          status: expense.status,
+          description: expense.description,
+          submittedDate: expense.submittedDate
+        },
+        targetUserIds,
+        { isNew: true, action: 'submit' }
+      )
+    } catch (emitError) {
+      console.error('Failed to emit expense update:', emitError)
+    }
 
     return NextResponse.json({
       success: true,

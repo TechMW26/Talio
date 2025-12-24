@@ -3,7 +3,9 @@ import connectDB from '@/lib/mongodb'
 import Leave from '@/models/Leave'
 import LeaveBalance from '@/models/LeaveBalance'
 import LeaveType from '@/models/LeaveType'
+import User from '@/models/User'
 import { logActivity } from '@/lib/activityLogger'
+import { emitLeaveUpdate } from '@/lib/realtimeEvents'
 
 // GET - List leave requests
 export async function GET(request) {
@@ -93,6 +95,29 @@ export async function POST(request) {
       relatedModel: 'Leave',
       relatedId: leave._id
     })
+
+    // Emit real-time leave update to admins/HR/managers
+    try {
+      const adminUsers = await User.find({ role: { $in: ['admin', 'hr', 'manager'] }, isActive: true }).select('_id').lean()
+      const targetUserIds = adminUsers.map(u => u._id.toString())
+      
+      emitLeaveUpdate(
+        {
+          _id: leave._id,
+          employee: populatedLeave.employee,
+          leaveType: populatedLeave.leaveType,
+          startDate: leave.startDate,
+          endDate: leave.endDate,
+          numberOfDays: leave.numberOfDays,
+          status: leave.status,
+          reason: leave.reason
+        },
+        targetUserIds,
+        { isNew: true, action: 'request' }
+      )
+    } catch (emitError) {
+      console.error('Failed to emit leave update:', emitError)
+    }
 
     return NextResponse.json({
       success: true,

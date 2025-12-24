@@ -10,6 +10,7 @@ import { logActivity } from '@/lib/activityLogger'
 import { uploadImageToImageKit, deleteFromImageKit, getImageKitFolder, generateEmployeeFolderName } from '@/lib/imagekit'
 import { optimizeImage, isValidImage } from '@/lib/imageOptimization'
 import { deleteUserFromBackup } from '@/lib/backupDb'
+import { emitEmployeeUpdate, emitDashboardRefresh } from '@/lib/realtimeEvents'
 
 // Check if ImageKit is configured
 const isImageKitConfigured = () => {
@@ -323,6 +324,14 @@ export async function PUT(request, { params }) {
       relatedId: id
     })
 
+    // Emit real-time update for employee update
+    emitEmployeeUpdate({
+      action: 'updated',
+      employee: updatedEmployee,
+      employeeId: id,
+    })
+    emitDashboardRefresh({ reason: 'employee-updated' })
+
     return NextResponse.json({
       success: true,
       message: 'Employee updated successfully',
@@ -383,6 +392,14 @@ export async function DELETE(request, { params }) {
 
     // Clear cache
     queryCache.delete(queryCache.generateKey('employee', id))
+
+    // Emit real-time update for employee deletion
+    emitEmployeeUpdate({
+      action: 'deleted',
+      employeeId: id,
+      departmentId: employee.department,
+    })
+    emitDashboardRefresh({ reason: 'employee-deleted' })
 
     return NextResponse.json({
       success: true,
@@ -500,6 +517,14 @@ export async function PATCH(request, { params }) {
 
     // Clear cache
     queryCache.delete(queryCache.generateKey('employee', id))
+
+    // Emit real-time update for employee patch update
+    emitEmployeeUpdate({
+      action: 'updated',
+      employeeId: id,
+      updates: updateData,
+    })
+    emitDashboardRefresh({ reason: 'employee-updated' })
 
     return NextResponse.json({
       success: true,

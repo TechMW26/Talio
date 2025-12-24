@@ -16,6 +16,7 @@ import {
   notifyProjectInvitation,
   getProjectMemberUserIds
 } from '@/lib/projectNotifications'
+import { emitProjectUpdate } from '@/lib/realtimeEvents'
 
 export const dynamic = 'force-dynamic'
 
@@ -201,6 +202,28 @@ export async function POST(request) {
       .populate('createdBy', 'firstName lastName')
       .populate('department', 'name')
       .populate('chatGroup')
+
+    // Emit real-time project creation to all members and admins
+    try {
+      const memberUserIds = await getProjectMemberUserIds(project._id)
+      const adminUsers = await User.find({ role: { $in: ['admin', 'hr'] }, isActive: true }).select('_id').lean()
+      const allUserIds = [...new Set([...memberUserIds.map(id => id.toString()), ...adminUsers.map(u => u._id.toString())])]
+      
+      emitProjectUpdate(
+        {
+          _id: project._id,
+          name: project.name,
+          status: project.status,
+          projectHead: populatedProject.projectHead,
+          startDate: project.startDate,
+          endDate: project.endDate
+        },
+        allUserIds,
+        { isNew: true, action: 'create' }
+      )
+    } catch (emitError) {
+      console.error('Failed to emit project update:', emitError)
+    }
 
     return NextResponse.json({
       success: true,

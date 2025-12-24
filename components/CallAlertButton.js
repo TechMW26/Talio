@@ -139,6 +139,17 @@ export default function CallAlertButton({ user }) {
       if (data.success) {
         setRecipients(data.data.recipients);
         setDepartments(data.data.departments);
+        
+        // If user is a department head (not admin), default to their department
+        const permissions = data.data.permissions;
+        if (permissions?.isDepartmentHead && !permissions?.isAdmin && permissions?.headOfDepartments?.length > 0) {
+          // Set the first department they head as default filter
+          const defaultDeptId = permissions.headOfDepartments[0];
+          setSelectedDepartment(defaultDeptId);
+          // Also expand that department by default
+          setExpandedDepts(prev => ({ ...prev, [defaultDeptId]: true }));
+          console.log('[CallAlertButton] Defaulting to department head\'s department:', defaultDeptId);
+        }
       }
     } catch (error) {
       console.error('Error fetching recipients:', error);

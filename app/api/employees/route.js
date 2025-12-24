@@ -8,6 +8,7 @@ import queryCache from '@/lib/queryCache'
 import bcrypt from 'bcryptjs'
 import { sendAndLogOnboardingEmail } from '@/lib/mailer'
 import { syncUserToBackup } from '@/lib/backupDb'
+import { emitEmployeeUpdate, emitDashboardRefresh } from '@/lib/realtimeEvents'
 
 // GET - List all employees with filters
 export async function GET(request) {
@@ -291,6 +292,14 @@ export async function POST(request) {
     }).catch(err => {
       console.error('[Employee Create] Failed to send onboarding email:', err)
     })
+
+    // Emit real-time update for new employee
+    emitEmployeeUpdate({
+      action: 'created',
+      employee: populatedEmployee,
+      departmentId: data.department,
+    })
+    emitDashboardRefresh({ reason: 'employee-created' })
 
     return NextResponse.json({
       success: true,

@@ -13,7 +13,8 @@ import {
   calculateCompletionPercentage,
   createTimelineEvent 
 } from '@/lib/projectService'
-import { notifyTaskAssigned } from '@/lib/projectNotifications'
+import { notifyTaskAssigned, getProjectMemberUserIds } from '@/lib/projectNotifications'
+import { emitTaskUpdate } from '@/lib/realtimeEvents'
 
 // GET - Get tasks for a project
 export async function GET(request, { params }) {
@@ -268,6 +269,28 @@ export async function POST(request, { params }) {
 
     const taskAssignees = await TaskAssignee.find({ task: task._id })
       .populate('user', 'firstName lastName profilePicture employeeCode')
+
+    // Emit real-time task creation to all project members
+    try {
+      const memberUserIds = await getProjectMemberUserIds(projectId)
+      
+      emitTaskUpdate(
+        {
+          _id: task._id,
+          title: task.title,
+          status: task.status,
+          priority: task.priority,
+          project: projectId,
+          createdBy: populatedTask.createdBy,
+          assignees: taskAssignees.map(a => ({ _id: a.user._id, firstName: a.user.firstName, lastName: a.user.lastName })),
+          dueDate: task.dueDate
+        },
+        memberUserIds.map(id => id.toString()),
+        { isNew: true, action: 'create' }
+      )
+    } catch (emitError) {
+      console.error('Failed to emit task update:', emitError)
+    }
 
     return NextResponse.json({
       success: true,
