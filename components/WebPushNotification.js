@@ -51,68 +51,80 @@ export function WebPushPrompt({ onClose }) {
     }
 
     return (
-        <div className="fixed bottom-20 md:bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-[380px] bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-700 p-5 z-50 animate-in slide-in-from-bottom-4 duration-300">
-            {/* Close button */}
-            <button
-                onClick={handleDismiss}
-                className="absolute top-3 right-3 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-            >
-                <X className="w-4 h-4" />
-            </button>
+        <div className="fixed bottom-20 md:bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-[420px] z-50 animate-in slide-in-from-bottom-4 duration-300">
+            {/* Main Card */}
+            <div className="relative bg-white dark:bg-gray-800 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)] overflow-hidden">
+                {/* Gradient Accent */}
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600"></div>
 
-            <div className="flex flex-col items-center text-center">
-                {/* Icon */}
-                <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center mb-4 shadow-lg shadow-blue-500/25">
-                    <Bell className="w-7 h-7 text-white" />
-                </div>
+                {/* Close Button */}
+                <button
+                    onClick={handleDismiss}
+                    className="absolute top-5 right-5 p-1.5 rounded-full hover:bg-slate-100 dark:hover:bg-gray-700 transition-colors duration-200 group"
+                    aria-label="Close"
+                >
+                    <X className="w-4 h-4 text-slate-400 group-hover:text-slate-600 dark:group-hover:text-gray-300" />
+                </button>
 
-                {/* Title */}
-                <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2">
-                    Enable Push Notifications
-                </h3>
-
-                {/* Description */}
-                <p className="text-sm text-gray-500 dark:text-gray-400 mb-4 leading-relaxed">
-                    Get instant alerts for leave approvals, attendance updates, tasks, and more — even when you're not on this page.
-                </p>
-
-                {/* Error message */}
-                {error && (
-                    <div className="w-full mb-4 p-2.5 bg-red-50 dark:bg-red-900/20 rounded-lg border border-red-200 dark:border-red-800">
-                        <p className="text-xs text-red-600 dark:text-red-400 flex items-center justify-center gap-1.5">
-                            <AlertCircle className="w-3.5 h-3.5" />
-                            {error}
-                        </p>
+                {/* Content Container */}
+                <div className="px-8 py-10 text-center">
+                    {/* Icon Container with Gradient Background */}
+                    <div className="relative inline-flex items-center justify-center mb-6">
+                        <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl blur-lg opacity-30"></div>
+                        <div className="relative bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl p-4 shadow-lg">
+                            <Bell className="w-7 h-7 text-white" strokeWidth={2.5} />
+                        </div>
                     </div>
-                )}
 
-                {/* Buttons */}
-                <div className="flex items-center gap-3 w-full">
-                    <button
-                        onClick={handleEnable}
-                        disabled={isLoading}
-                        className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md shadow-blue-500/20 hover:shadow-lg hover:shadow-blue-500/30"
-                    >
-                        {isLoading ? (
-                            <>
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                                Enabling...
-                            </>
-                        ) : (
-                            <>
-                                <Check className="w-4 h-4" />
-                                Enable
-                            </>
-                        )}
-                    </button>
-                    <button
-                        onClick={handleDismiss}
-                        className="px-4 py-2.5 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded-xl transition-colors"
-                    >
-                        Later
-                    </button>
+                    {/* Title */}
+                    <h3 className="text-xl font-semibold text-slate-800 dark:text-white mb-3 tracking-tight">
+                        Stay Updated
+                    </h3>
+
+                    {/* Description */}
+                    <p className="text-sm text-slate-500 dark:text-gray-400 mb-8 leading-relaxed max-w-sm mx-auto">
+                        Get instant alerts for leave approvals, attendance updates, tasks and more — even when you're not on this page.
+                    </p>
+
+                    {/* Error message */}
+                    {error && (
+                        <div className="mb-6 p-3 bg-red-50 dark:bg-red-900/20 rounded-xl border border-red-200 dark:border-red-800">
+                            <p className="text-xs text-red-600 dark:text-red-400 flex items-center justify-center gap-1.5">
+                                <AlertCircle className="w-3.5 h-3.5" />
+                                {error}
+                            </p>
+                        </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-3">
+                        <button
+                            onClick={handleEnable}
+                            disabled={isLoading}
+                            className="flex-1 bg-gradient-to-r from-blue-500 to-indigo-600 text-white py-3.5 rounded-xl font-medium shadow-[0_4px_12px_rgba(59,130,246,0.3)] hover:shadow-[0_6px_20px_rgba(59,130,246,0.4)] hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
+                        >
+                            {isLoading ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Enabling...
+                                </>
+                            ) : (
+                                'Enable Notifications'
+                            )}
+                        </button>
+                        <button
+                            onClick={handleDismiss}
+                            className="px-6 py-3.5 text-sm font-medium text-slate-500 dark:text-gray-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-gray-700 rounded-xl transition-all duration-200"
+                        >
+                            Later
+                        </button>
+                    </div>
                 </div>
             </div>
+
+            {/* Decorative Elements */}
+            <div className="absolute -bottom-4 -right-4 w-24 h-24 bg-gradient-to-br from-blue-400/20 to-indigo-500/20 rounded-full blur-2xl -z-10"></div>
+            <div className="absolute -top-4 -left-4 w-32 h-32 bg-gradient-to-br from-indigo-400/20 to-blue-500/20 rounded-full blur-2xl -z-10"></div>
         </div>
     );
 }
