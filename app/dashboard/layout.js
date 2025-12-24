@@ -9,6 +9,7 @@ import { OfflineIndicator } from '@/components/PWAInstaller'
 import OutOfPremisesPopup from '@/components/OutOfPremisesPopup'
 import ChatWidgetContainer from '@/components/chat/ChatWidgetContainer'
 import ProfileCompletionModal from '@/components/ProfileCompletionModal'
+import { WebPushPrompt } from '@/components/WebPushNotification'
 
 import useGeofencing from '@/hooks/useGeofencing'
 import { SocketProvider } from '@/contexts/SocketContext'
@@ -21,11 +22,11 @@ import CallAlertReceiver from '@/components/CallAlertReceiver'
 // Component to sync sidebar state with chat widget context
 function SidebarStateSync({ sidebarCollapsed }) {
   const { updateSidebarCollapsed } = useChatWidget()
-  
+
   useEffect(() => {
     updateSidebarCollapsed(sidebarCollapsed)
   }, [sidebarCollapsed, updateSidebarCollapsed])
-  
+
   return null
 }
 
@@ -44,26 +45,26 @@ export default function DashboardLayout({ children }) {
     const checkPasswordChangeRequired = async () => {
       const token = getToken()
       const user = getCurrentUser()
-      
+
       if (!token || !user) {
         // No auth, redirect to login
         window.location.href = '/login'
         return
       }
-      
+
       // Check if localStorage user data indicates password change needed
       if (user.forcePasswordChange) {
         console.log('[Dashboard] Password change required (from localStorage), redirecting...')
         window.location.href = '/auth/change-password'
         return
       }
-      
+
       // Verify with server
       try {
         const response = await fetch('/api/auth/validate', {
           headers: { 'Authorization': `Bearer ${token}` }
         })
-        
+
         if (!response.ok) {
           // Token invalid, redirect to login
           localStorage.removeItem('token')
@@ -73,9 +74,9 @@ export default function DashboardLayout({ children }) {
           window.location.href = '/login'
           return
         }
-        
+
         const data = await response.json()
-        
+
         if (data.forcePasswordChange) {
           console.log('[Dashboard] Password change required (from server), redirecting...')
           // Update localStorage to reflect this
@@ -84,9 +85,9 @@ export default function DashboardLayout({ children }) {
           window.location.href = '/auth/change-password'
           return
         }
-        
+
         setIsCheckingAuth(false)
-        
+
         // Check profile completion status after auth is verified
         // Small delay to ensure layout is mounted
         setTimeout(() => {
@@ -98,7 +99,7 @@ export default function DashboardLayout({ children }) {
         setIsCheckingAuth(false)
       }
     }
-    
+
     checkPasswordChangeRequired()
   }, [])
 
@@ -109,34 +110,34 @@ export default function DashboardLayout({ children }) {
       const response = await fetch('/api/profile/completion-status', {
         headers: { 'Authorization': `Bearer ${token}` }
       })
-      
+
       if (response.ok) {
         const data = await response.json()
         console.log('[Dashboard] Profile completion data:', data)
         if (data.success && data.data) {
           setProfileCompletionStatus(data.data)
-          
+
           // Show modal if profile is not complete and not on profile page
           const shouldShowModal = data.data.showModal
           const isOnProfilePage = pathname?.includes('/profile')
-          
+
           console.log('[Dashboard] Modal check - showModal:', shouldShowModal, 'isOnProfilePage:', isOnProfilePage)
-          
+
           if (shouldShowModal && !isOnProfilePage) {
             // Check if user has dismissed the modal in this session
             // Use a more specific key that includes user ID to avoid cross-session issues
             const userId = data.data.firstLoginAt ? 'user' : 'unknown'
             const dismissedKey = `profileModal_dismissed_${new Date().toDateString()}`
             const dismissed = sessionStorage.getItem(dismissedKey)
-            
+
             console.log('[Dashboard] Modal dismissed today:', dismissed)
-            
+
             if (!dismissed) {
               console.log('[Dashboard] *** SHOWING PROFILE COMPLETION MODAL ***')
               setShowProfileCompletionModal(true)
             }
           }
-          
+
           // If account is suspended, show suspension message
           if (data.data.status === 'suspended') {
             console.log('[Dashboard] Account suspended due to incomplete profile')
@@ -162,18 +163,18 @@ export default function DashboardLayout({ children }) {
   // Sync user data on mount to ensure employee info is complete
   useEffect(() => {
     if (isCheckingAuth) return // Don't sync while checking auth
-    
+
     const syncEmployeeData = async () => {
       const user = getCurrentUser()
       const token = getToken()
-      
+
       if (!user || !token) return
-      
+
       // Check if we need to sync (missing firstName or employeeId structure is incomplete)
-      const needsSync = !user.firstName || 
+      const needsSync = !user.firstName ||
         (user.employeeId && typeof user.employeeId !== 'object') ||
         (user.employeeId && !user.employeeId.firstName)
-      
+
       if (needsSync) {
         const empId = getEmployeeId(user)
         if (empId) {
@@ -193,7 +194,7 @@ export default function DashboardLayout({ children }) {
         }
       }
     }
-    
+
     syncEmployeeData()
   }, [])
 
@@ -201,17 +202,17 @@ export default function DashboardLayout({ children }) {
   useEffect(() => {
     const userData = localStorage.getItem('user')
     const token = localStorage.getItem('token')
-    
+
     if (userData) {
       try {
         const user = JSON.parse(userData)
         setUserId(user.id || user._id)
-        
+
         // Initialize desktop app monitoring if running in Electron
         if ((window.talioDesktop || window.electronAPI) && token) {
           const desktopAPI = window.talioDesktop || window.electronAPI
           console.log('[Dashboard] Initializing desktop app monitoring...')
-          
+
           // Set auth to start monitoring
           if (desktopAPI.setAuth) {
             desktopAPI.setAuth(token, user).catch(err => {
@@ -233,19 +234,19 @@ export default function DashboardLayout({ children }) {
   }
 
   // Check if current page is a bottom nav page (excluding chat which doesn't show fade)
-  const isBottomNavPage = 
-    pathname === '/dashboard' || 
-    pathname?.startsWith('/dashboard/tasks') || 
+  const isBottomNavPage =
+    pathname === '/dashboard' ||
+    pathname?.startsWith('/dashboard/tasks') ||
     pathname?.startsWith('/dashboard/projects') ||
     pathname?.startsWith('/dashboard/leave') ||
     pathname?.startsWith('/dashboard/sandbox')
-  
+
   // Chat pages don't show the fade
   const isChatPage = pathname?.startsWith('/dashboard/chat')
-  
+
   // Meeting room pages should have no chrome (sidebar/header)
   const isMeetingRoomPage = pathname?.includes('/meetings/room/')
-  
+
   // Only show fade on bottom nav pages (not chat)
   const shouldShowFade = isBottomNavPage && !isChatPage
 
@@ -284,16 +285,16 @@ export default function DashboardLayout({ children }) {
           <ChatWidgetProvider>
             {/* Sync sidebar state to chat widget context */}
             <SidebarStateSync sidebarCollapsed={sidebarCollapsed} />
-            
+
             {/* Main Layout Container - Flex Row */}
             <div className="flex h-screen w-full overflow-hidden" style={{ backgroundColor: 'var(--color-bg-main)' }}>
 
               {/* Sidebar - Static on Desktop, Fixed on Mobile */}
-              <Sidebar 
-                isOpen={sidebarOpen} 
-                setIsOpen={setSidebarOpen} 
-                isCollapsed={sidebarCollapsed} 
-                setIsCollapsed={setSidebarCollapsed} 
+              <Sidebar
+                isOpen={sidebarOpen}
+                setIsOpen={setSidebarOpen}
+                isCollapsed={sidebarCollapsed}
+                setIsCollapsed={setSidebarCollapsed}
               />
 
               {/* Right Side Content - Flex Column */}
@@ -309,7 +310,7 @@ export default function DashboardLayout({ children }) {
                   <div className={`min-h-full ${isChatPage ? 'sm:pb-16 px-0 md:px-4 lg:px-8' : 'px-0 sm:px-6 lg:px-8 py-6'}`}>
                     {children}
                   </div>
-                  
+
                   {/* Bottom padding for mobile nav */}
                   <div className={`w-full flex-shrink-0 md:hidden ${shouldShowFade ? 'h-20' : 'h-16'}`}></div>
                   <div className="w-full flex-shrink-0 hidden md:block h-4"></div>
@@ -317,9 +318,9 @@ export default function DashboardLayout({ children }) {
 
                 {/* Gradient above bottom nav - Mobile only */}
                 {shouldShowFade && (
-                  <div 
+                  <div
                     className="md:hidden fixed left-0 right-0 h-[124px] pointer-events-none z-[39]"
-                    style={{ 
+                    style={{
                       bottom: '68px',
                       background: `linear-gradient(179.13deg, rgba(249, 250, 251, 0) 0%, var(--color-bg-main) 71.18%)`,
                       opacity: 1,
@@ -347,6 +348,9 @@ export default function DashboardLayout({ children }) {
 
               {/* Call Alert Receiver - Global alert listener */}
               <CallAlertReceiver />
+
+              {/* Web Push Notification Prompt */}
+              <WebPushPrompt />
             </div>
           </ChatWidgetProvider>
         </InAppNotificationProvider>

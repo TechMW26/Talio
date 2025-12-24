@@ -7,6 +7,11 @@ const pushSubscriptionSchema = new mongoose.Schema({
     required: true,
     index: true
   },
+  company: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Company',
+    index: true
+  },
   endpoint: {
     type: String,
     required: true,
@@ -22,11 +27,28 @@ const pushSubscriptionSchema = new mongoose.Schema({
       required: true
     }
   },
+  platform: {
+    type: String,
+    enum: ['web', 'android', 'ios'],
+    default: 'web'
+  },
   deviceInfo: {
     userAgent: String,
     platform: String,
     browser: String,
-    os: String
+    os: String,
+    deviceType: String // 'desktop', 'mobile', 'tablet'
+  },
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  failureCount: {
+    type: Number,
+    default: 0
+  },
+  lastFailure: {
+    type: Date
   },
   createdAt: {
     type: Date,
@@ -44,7 +66,7 @@ const pushSubscriptionSchema = new mongoose.Schema({
 pushSubscriptionSchema.index({ user: 1, endpoint: 1 }, { unique: true })
 
 // Update lastUsed timestamp
-pushSubscriptionSchema.methods.updateLastUsed = function() {
+pushSubscriptionSchema.methods.updateLastUsed = function () {
   this.lastUsed = new Date()
   return this.save()
 }

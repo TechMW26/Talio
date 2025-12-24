@@ -29,6 +29,7 @@
     "bcryptjs": "^2.4.3",
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.3",
+    "firebase": "^11.9.0",
     "firebase-admin": "^13.0.1",
     "fuse.js": "^7.1.0",
     "googleapis": "^149.0.0",
@@ -60,6 +61,7 @@
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
     "three": "^0.181.2",
+    "web-push": "^3.6.7",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {

@@ -112,13 +112,20 @@ const UserSchema = new mongoose.Schema({
     },
     device: {
       type: String,
-      enum: ['android'],
+      enum: ['android', 'web', 'ios'],
+      default: 'android'
+    },
+    platform: {
+      type: String,
+      enum: ['android', 'web', 'ios'],
       default: 'android'
     },
     deviceInfo: {
       model: String,
       osVersion: String,
-      appVersion: String
+      appVersion: String,
+      browser: String,
+      userAgent: String
     },
     createdAt: {
       type: Date,

@@ -42,20 +42,30 @@ export async function POST(request) {
             )
         }
 
+        // Determine platform from deviceInfo
+        const platform = deviceInfo?.platform || deviceInfo?.device || 'android'
+        const device = platform === 'web' ? 'web' : platform === 'ios' ? 'ios' : 'android'
+
         // Check if token already exists
         const existingTokenIndex = user.fcmTokens.findIndex(t => t.token === fcmToken)
 
         if (existingTokenIndex !== -1) {
             // Update existing token
             user.fcmTokens[existingTokenIndex].lastUsed = new Date()
+            user.fcmTokens[existingTokenIndex].device = device
+            user.fcmTokens[existingTokenIndex].platform = platform
             if (deviceInfo) {
-                user.fcmTokens[existingTokenIndex].deviceInfo = deviceInfo
+                user.fcmTokens[existingTokenIndex].deviceInfo = {
+                    ...user.fcmTokens[existingTokenIndex].deviceInfo,
+                    ...deviceInfo
+                }
             }
         } else {
             // Add new token
             user.fcmTokens.push({
                 token: fcmToken,
-                device: 'android',
+                device: device,
+                platform: platform,
                 deviceInfo: deviceInfo || {},
                 createdAt: new Date(),
                 lastUsed: new Date()
@@ -64,12 +74,13 @@ export async function POST(request) {
 
         await user.save()
 
-        console.log(`✅ FCM token registered for user ${user.email}`)
+        console.log(`✅ FCM token registered for user ${user.email} (platform: ${platform})`)
 
         return NextResponse.json({
             success: true,
             message: 'FCM token registered successfully',
-            tokenCount: user.fcmTokens.length
+            tokenCount: user.fcmTokens.length,
+            platform: platform
         })
     } catch (error) {
         console.error('Register FCM token error:', error)
