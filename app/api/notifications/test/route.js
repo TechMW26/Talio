@@ -94,12 +94,4 @@ export async function GET(request) {
     )
   }
 }
-  } catch (error) {
-  console.error('Test config error:', error)
-  return NextResponse.json({
-    success: false,
-    message: 'Failed to test configuration: ' + error.message
-  }, { status: 500 })
-}
-}
 
