@@ -7,8 +7,7 @@ const nextConfig = {
   // Enable React strict mode for better debugging
   reactStrictMode: false, // Disable in prod for performance
   
-  // Enable SWC minification (faster than Terser)
-  swcMinify: true,
+  // Note: swcMinify is now default in Next.js 15+, no need to specify
   
   // Increase body size limit for file uploads (10MB)
   experimental: {

@@ -94,30 +94,6 @@ export async function GET(request) {
     )
   }
 }
-      } else if (response.status === 404) {
-  errorMessage += 'App ID not found. Please verify your App ID.'
-} else {
-  errorMessage += result.errors ? result.errors.join(', ') : 'Unknown error occurred.'
-}
-
-return NextResponse.json({
-  success: false,
-  message: errorMessage,
-  details: result
-}, { status: 400 })
-    }
-
-// Success - credentials are valid
-return NextResponse.json({
-  success: true,
-  message: 'OneSignal configuration is valid and working!',
-  appInfo: {
-    name: result.name,
-    players: result.players,
-    messageable_players: result.messageable_players,
-    updated_at: result.updated_at
-  }
-})
   } catch (error) {
   console.error('Test config error:', error)
   return NextResponse.json({
