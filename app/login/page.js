@@ -343,6 +343,11 @@ export default function LoginPage() {
               <p className="text-center text-gray-500 text-xs">
                 Powered by <span className="text-purple-600 font-medium">Talio</span>
               </p>
+              <p className="text-center text-gray-400 text-xs mt-2">
+                <Link href="/superadmin/login" className="hover:text-purple-600 transition-colors">
+                  SuperAdmin Portal →
+                </Link>
+              </p>
             </div>
           </div>
         </div>

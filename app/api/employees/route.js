@@ -9,6 +9,8 @@ import bcrypt from 'bcryptjs'
 import { sendAndLogOnboardingEmail } from '@/lib/mailer'
 import { syncUserToBackup } from '@/lib/backupDb'
 import { emitEmployeeUpdate, emitDashboardRefresh } from '@/lib/realtimeEvents'
+import { verifyTokenFromRequest } from '@/lib/auth'
+import { checkUserLimit, registerUserTenantMapping, getTenantCompanyByDbName } from '@/lib/tenantContext'
 
 // GET - List all employees with filters
 export async function GET(request) {
@@ -152,6 +154,32 @@ export async function POST(request) {
   try {
     await connectDB()
 
+    // Verify token and get tenant info
+    const auth = await verifyTokenFromRequest(request)
+    if (!auth.success) {
+      return NextResponse.json(
+        { success: false, message: auth.message || 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    // Check user limit for tenant if tenant info is available
+    if (auth.tenant?.databaseName) {
+      const limitCheck = await checkUserLimit(auth.tenant.databaseName)
+      if (!limitCheck.allowed) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            message: limitCheck.message || 'User limit reached',
+            userLimitExceeded: true,
+            currentCount: limitCheck.currentCount,
+            maxUsers: limitCheck.maxUsers
+          },
+          { status: 403 }
+        )
+      }
+    }
+
     const data = await request.json()
 
     // Optimized: Check both in parallel
@@ -234,6 +262,21 @@ export async function POST(request) {
 
     // Update employee with userId reference
     await Employee.findByIdAndUpdate(employee._id, { userId: user._id })
+
+    // Register user in tenant mapping if this is a multi-tenant setup
+    if (auth.tenant?.databaseName) {
+      const tenantCompany = await getTenantCompanyByDbName(auth.tenant.databaseName)
+      if (tenantCompany) {
+        registerUserTenantMapping({
+          email: data.email,
+          tenantCompanyId: tenantCompany._id,
+          databaseName: auth.tenant.databaseName,
+          companyName: tenantCompany.name,
+          companySlug: tenantCompany.slug,
+          role: data.role || 'employee',
+        }).catch(err => console.error('[Employee Create] Tenant mapping failed:', err))
+      }
+    }
 
     // Sync user to backup database (fire-and-forget)
     // Get the hashed password from the created user for backup

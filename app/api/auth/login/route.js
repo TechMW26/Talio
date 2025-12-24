@@ -11,13 +11,15 @@ import { sendLoginAlertEmail } from '@/lib/mailer'
 import { sendPushToUser } from '@/lib/pushNotification'
 import crypto from 'crypto'
 
+// Multi-tenant imports
+import { getTenantByEmail, updateUserLoginStats, checkServiceStatus } from '@/lib/tenantContext'
+import { getTenantModel, getTenantModels } from '@/lib/tenantModels'
+
 // Ensure models are registered for populate
 const _ensureModels = { Department, Designation };
 
 export async function POST(request) {
   try {
-    await connectDB()
-
     const { email, password } = await request.json()
 
     // Validate input
@@ -28,8 +30,57 @@ export async function POST(request) {
       )
     }
 
+    // ============================================
+    // MULTI-TENANT DETECTION
+    // ============================================
+    // Look up which tenant database this user belongs to
+    let tenantInfo = null;
+    let TenantUser, TenantEmployee, TenantDepartment, TenantDesignation, TenantUserSession, TenantCompanySettings;
+    
+    try {
+      tenantInfo = await getTenantByEmail(email);
+    } catch (tenantError) {
+      console.warn('[Login] Tenant lookup failed, falling back to default:', tenantError.message);
+    }
+    
+    if (tenantInfo) {
+      // Check if tenant service is active
+      const serviceCheck = await checkServiceStatus(tenantInfo.databaseName);
+      if (!serviceCheck.active) {
+        return NextResponse.json(
+          { message: serviceCheck.reason || 'Service is currently unavailable' },
+          { status: 403 }
+        );
+      }
+      
+      console.log(`[Login] User ${email} belongs to tenant: ${tenantInfo.companySlug} (${tenantInfo.databaseName})`);
+      
+      // Get models bound to tenant database
+      const tenantModels = await getTenantModels(tenantInfo.databaseName, [
+        'User', 'Employee', 'Department', 'Designation', 'UserSession', 'CompanySettings'
+      ]);
+      
+      TenantUser = tenantModels.User;
+      TenantEmployee = tenantModels.Employee;
+      TenantDepartment = tenantModels.Department;
+      TenantDesignation = tenantModels.Designation;
+      TenantUserSession = tenantModels.UserSession;
+      TenantCompanySettings = tenantModels.CompanySettings;
+    } else {
+      // Fallback to default database (hrms_db) for backwards compatibility
+      console.log(`[Login] No tenant mapping found for ${email}, using default database`);
+      await connectDB();
+      
+      TenantUser = User;
+      TenantEmployee = Employee;
+      TenantDepartment = Department;
+      TenantDesignation = Designation;
+      TenantUserSession = UserSession;
+      TenantCompanySettings = CompanySettings;
+    }
+
     // Find user and include password field (forcePasswordChange and isActive are included by default)
-    const user = await User.findOne({ email }).select('+password')
+    const user = await TenantUser.findOne({ email }).select('+password')
 
     if (!user) {
       return NextResponse.json(
@@ -85,12 +136,19 @@ export async function POST(request) {
         console.log('[Login] Setting first login and profile completion deadline:', deadline)
       }
       
-      await User.updateOne(
+      await TenantUser.updateOne(
         { _id: user._id },
         { $set: updateData },
         { timestamps: false }
       )
       user.lastLogin = lastLogin
+      
+      // Update tenant login stats (fire and forget)
+      if (tenantInfo) {
+        updateUserLoginStats(email).catch(err => 
+          console.warn('[Login] Failed to update tenant login stats:', err.message)
+        );
+      }
     } catch (error) {
       console.error('Failed to update lastLogin:', error)
     }
@@ -114,6 +172,12 @@ export async function POST(request) {
       email: user.email,
       role: user.role,
       tokenId, // Include tokenId for session management
+      // Multi-tenant info - included in JWT for API route authorization
+      ...(tenantInfo && {
+        databaseName: tenantInfo.databaseName,
+        companySlug: tenantInfo.companySlug,
+        companyName: tenantInfo.companyName,
+      }),
     })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
@@ -128,10 +192,12 @@ export async function POST(request) {
     // Create UserSession record (fire and forget)
     ;(async () => {
       try {
-        const deviceInfo = UserSession.parseUserAgent(userAgent)
+        const deviceInfo = TenantUserSession.parseUserAgent ? 
+          TenantUserSession.parseUserAgent(userAgent) : 
+          { browser: 'Unknown', isMobile: false, device: 'Unknown' }
         const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
 
-        await UserSession.create({
+        await TenantUserSession.create({
           user: user._id,
           tokenId,
           deviceInfo,
@@ -151,7 +217,7 @@ export async function POST(request) {
     let employeeData = null
     if (user.employeeId) {
       try {
-        employeeData = await Employee.findById(user.employeeId)
+        employeeData = await TenantEmployee.findById(user.employeeId)
           .populate('designation')
           .populate('department')
           .populate('reportingManager', 'firstName lastName email')
@@ -168,7 +234,7 @@ export async function POST(request) {
     // Best-effort: send login alert email to the user (controlled by admin settings) - fire and forget
     (async () => {
       try {
-        const companySettings = await CompanySettings.findOne().lean().catch(() => null)
+        const companySettings = await TenantCompanySettings.findOne().lean().catch(() => null)
 
         const emailNotificationsEnabled =
           companySettings?.notifications?.emailNotifications !== false
@@ -252,7 +318,7 @@ export async function POST(request) {
     // If not in user meta, check Department model (fallback for existing data)
     if (!isDepartmentHead && user.employeeId) {
       try {
-        const deptHeadCheck = await Department.find({
+        const deptHeadCheck = await TenantDepartment.find({
           isActive: true,
           $or: [
             { head: user.employeeId },
@@ -265,7 +331,7 @@ export async function POST(request) {
           headOfDepartments = deptHeadCheck.map(d => d._id);
           
           // Sync to user meta (fire and forget)
-          User.updateOne(
+          TenantUser.updateOne(
             { _id: user._id },
             { $set: { isDepartmentHead: true, headOfDepartments } }
           ).catch(err => console.error('Failed to sync department head status:', err));
@@ -282,6 +348,14 @@ export async function POST(request) {
       email: user.email,
       role: user.role,
       isActive: user.isActive,
+      // Multi-tenant info - for frontend to know which company user belongs to
+      ...(tenantInfo && {
+        tenant: {
+          databaseName: tenantInfo.databaseName,
+          companySlug: tenantInfo.companySlug,
+          companyName: tenantInfo.companyName,
+        },
+      }),
       // Department head meta - allows department heads to use special features regardless of role
       isDepartmentHead,
       headOfDepartments: headOfDepartments.map(d => d.toString()),

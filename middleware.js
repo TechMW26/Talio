@@ -8,6 +8,18 @@ export async function middleware(request) {
     return NextResponse.redirect(redirectUrl, { status: 301 })
   }
 
+  // SuperAdmin routes - handle separately (uses superadmin_token on client side)
+  // SuperAdmin auth is handled by the API routes themselves using superadminAuth.js
+  if (request.nextUrl.pathname.startsWith('/superadmin')) {
+    // Allow superadmin pages - they handle their own auth via localStorage
+    return NextResponse.next()
+  }
+
+  // SuperAdmin API routes - use their own auth mechanism
+  if (request.nextUrl.pathname.startsWith('/api/superadmin')) {
+    return NextResponse.next()
+  }
+
   const token = request.headers.get('authorization')?.split(' ')[1] ||
     request.cookies.get('token')?.value
 
@@ -23,6 +35,7 @@ export async function middleware(request) {
     '/api/assetlinks',
     '/api/setup/check',
     '/api/setup/create-admin',
+    '/api/setup/tenant', // Tenant setup with setup code
     '/api/test-imagekit', // Test route for ImageKit debugging
     '/api/cron/' // Cron routes use CRON_SECRET for auth
   ]
@@ -106,6 +119,6 @@ export async function middleware(request) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/api/:path*', '/auth/:path*', '/resources/:path*'],
+  matcher: ['/dashboard/:path*', '/api/:path*', '/auth/:path*', '/resources/:path*', '/superadmin/:path*', '/setup/:path*'],
 }
 
