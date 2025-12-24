@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import toast from '@/utils/toast'
 import { FaClock, FaSignInAlt, FaSignOutAlt, FaCalendarAlt, FaEdit, FaCheck, FaTimes, FaExclamationCircle, FaPlus, FaChevronLeft, FaChevronRight, FaList, FaTh, FaMapMarkerAlt } from 'react-icons/fa'
 import OvertimePrompt, { useOvertimeCheck } from '@/components/OvertimePrompt'
 import ModalPortal from '@/components/ui/ModalPortal'
 import useLocationCapture from '@/hooks/useLocationCapture'
+import { useSocket } from '@/contexts/SocketContext'
 
 export default function AttendancePage() {
   const [loading, setLoading] = useState(false)
@@ -14,6 +15,9 @@ export default function AttendancePage() {
   const [user, setUser] = useState(null)
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [viewMode, setViewMode] = useState('calendar') // 'calendar' or 'list'
+
+  // Socket.IO for real-time updates
+  const { socket, isConnected } = useSocket()
 
   // Location capture hook
   const { captureLocation, loading: locationLoading, error: locationError, permissionStatus, checkPermission } = useLocationCapture()
@@ -57,6 +61,9 @@ export default function AttendancePage() {
   const [holidays, setHolidays] = useState([])
   const [selectedHoliday, setSelectedHoliday] = useState(null)
   const [showHolidayModal, setShowHolidayModal] = useState(false)
+
+  // Details modal state (for viewing attendance record details)
+  const [showDetailsModal, setShowDetailsModal] = useState(false)
 
   // Fetch holidays
   useEffect(() => {
@@ -143,6 +150,46 @@ export default function AttendancePage() {
       }
     }
   }, [])
+
+  // Socket.IO listener for real-time attendance updates
+  // This handles when corrections are approved/rejected
+  useEffect(() => {
+    if (!socket || !isConnected || !user) return
+
+    const handleAttendanceUpdate = (data) => {
+      console.log('📡 Real-time attendance update received:', data)
+
+      const empId = getEmployeeId(user)
+
+      // Check if this update is for the current user
+      if (data.employeeId === empId) {
+        // Refresh attendance data
+        fetchTodayAttendance(empId)
+        fetchAttendance(empId)
+        fetchMyCorrections()
+
+        // Show toast notification
+        if (data.type === 'correction-approved') {
+          toast.success(data.message || 'Your attendance correction has been approved!', {
+            duration: 5000,
+            icon: '✅'
+          })
+        } else if (data.type === 'correction-rejected') {
+          toast.error(data.message || 'Your attendance correction has been rejected.', {
+            duration: 5000,
+            icon: '❌'
+          })
+        }
+      }
+    }
+
+    socket.on('attendance-updated', handleAttendanceUpdate)
+    console.log('📡 Listening for attendance-updated events')
+
+    return () => {
+      socket.off('attendance-updated', handleAttendanceUpdate)
+    }
+  }, [socket, isConnected, user])
 
   const fetchMyCorrections = async () => {
     try {
@@ -303,10 +350,23 @@ export default function AttendancePage() {
         toast.success(`Correction ${action}d successfully`)
         fetchPendingCorrections()
         fetchMyCorrections()
-        // Refresh attendance data to show updated values after approval
-        if (user && action === 'approve') {
-          fetchAttendance(getEmployeeId(user))
-          fetchTodayAttendance(getEmployeeId(user))
+
+        // Refresh attendance data for the EMPLOYEE whose correction was processed
+        // Use employeeId from response (the employee whose correction was approved/rejected)
+        // NOT the current user (who may be the approver)
+        if (action === 'approve') {
+          const employeeId = data.data?.employeeId
+          const currentUserEmployeeId = user ? getEmployeeId(user) : null
+
+          // Always refresh current user's view
+          if (currentUserEmployeeId) {
+            fetchAttendance(currentUserEmployeeId)
+            fetchTodayAttendance(currentUserEmployeeId)
+          }
+
+          // If the approved correction was for a different employee, 
+          // the socket event will handle their refresh
+          console.log(`✅ Correction approved for employee: ${employeeId}`)
         }
       } else {
         toast.error(data.message || `Failed to ${action} correction`)
@@ -740,6 +800,45 @@ export default function AttendancePage() {
     })
   }
 
+  // Calculate dynamic status based on work hours
+  // This ensures the displayed status reflects actual work time
+  const calculateDynamicStatus = (checkIn, checkOut) => {
+    if (!checkIn || !checkOut) return null
+
+    const checkInTime = new Date(checkIn)
+    const checkOutTime = new Date(checkOut)
+
+    // Handle overnight shifts (checkout next day)
+    let workHours = (checkOutTime - checkInTime) / (1000 * 60 * 60)
+    if (workHours < 0) {
+      // Checkout is next day
+      workHours += 24
+    }
+
+    // Status thresholds (90% of 8h = 7.2h for present, 50% of 8h = 4h for half-day)
+    const fullDayThreshold = 7.2
+    const halfDayThreshold = 4
+
+    if (workHours >= fullDayThreshold) return 'present'
+    if (workHours >= halfDayThreshold) return 'half-day'
+    return 'absent'
+  }
+
+  // Get work hours from check-in/check-out
+  const calculateWorkHours = (checkIn, checkOut) => {
+    if (!checkIn || !checkOut) return 0
+
+    const checkInTime = new Date(checkIn)
+    const checkOutTime = new Date(checkOut)
+
+    let workHours = (checkOutTime - checkInTime) / (1000 * 60 * 60)
+    if (workHours < 0) {
+      workHours += 24 // Handle overnight shifts
+    }
+
+    return workHours
+  }
+
   return (
     <div className="page-container">
       {/* Header */}
@@ -783,46 +882,63 @@ export default function AttendancePage() {
         <div className="bg-purple-50 rounded-lg shadow-md p-4 sm:p-6 mb-4 sm:mb-6 border border-purple-200">
           <h2 className="text-lg sm:text-xl font-semibold text-purple-800 mb-4">Pending Correction Approvals</h2>
           <div className="space-y-4">
-            {pendingCorrections.map((correction) => (
-              <div key={correction._id} className="bg-white rounded-lg p-3 sm:p-4 border border-purple-100">
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
-                  <div className="flex-1">
-                    <p className="font-semibold text-sm sm:text-base text-gray-800">
-                      {correction.employee?.firstName} {correction.employee?.lastName}
-                    </p>
-                    <p className="text-xs sm:text-sm text-gray-600 mt-1">
-                      Date: {formatDate(correction.date)} | Type: {correction.correctionType}
-                    </p>
-                    <p className="text-xs sm:text-sm text-gray-500 mt-1">
-                      <strong>Current:</strong> {formatTime(correction.currentCheckIn)} - {formatTime(correction.currentCheckOut)} ({correction.currentStatus})
-                    </p>
-                    <p className="text-xs sm:text-sm text-blue-600 mt-1">
-                      <strong>Requested:</strong> {correction.requestedCheckIn ? formatTime(correction.requestedCheckIn) : 'N/A'} - {correction.requestedCheckOut ? formatTime(correction.requestedCheckOut) : 'N/A'} {correction.requestedStatus ? `(${correction.requestedStatus})` : ''}
-                    </p>
-                    <p className="text-xs sm:text-sm text-gray-600 mt-2 italic line-clamp-2">&quot;{correction.reason}&quot;</p>
-                  </div>
-                  <div className="flex gap-2 flex-shrink-0">
-                    <button
-                      onClick={() => handleApproveReject(correction._id, 'approve')}
-                      className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
-                      title="Approve"
-                    >
-                      <FaCheck className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        const comment = prompt('Reason for rejection (optional):')
-                        handleApproveReject(correction._id, 'reject', comment || '')
-                      }}
-                      className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-                      title="Reject"
-                    >
-                      <FaTimes className="w-4 h-4" />
-                    </button>
+            {pendingCorrections.map((correction) => {
+              // Calculate what status WOULD BE if approved
+              const requestedCheckIn = correction.requestedCheckIn || correction.currentCheckIn
+              const requestedCheckOut = correction.requestedCheckOut || correction.currentCheckOut
+              const expectedStatus = requestedCheckIn && requestedCheckOut
+                ? calculateDynamicStatus(requestedCheckIn, requestedCheckOut)
+                : correction.requestedStatus || correction.currentStatus
+              const expectedWorkHours = requestedCheckIn && requestedCheckOut
+                ? calculateWorkHours(requestedCheckIn, requestedCheckOut)
+                : 0
+
+              return (
+                <div key={correction._id} className="bg-white rounded-lg p-3 sm:p-4 border border-purple-100">
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
+                    <div className="flex-1">
+                      <p className="font-semibold text-sm sm:text-base text-gray-800">
+                        {correction.employee?.firstName} {correction.employee?.lastName}
+                      </p>
+                      <p className="text-xs sm:text-sm text-gray-600 mt-1">
+                        Date: {formatDate(correction.date)} | Type: {correction.correctionType}
+                      </p>
+                      <p className="text-xs sm:text-sm text-gray-500 mt-1">
+                        <strong>Current:</strong> {formatTime(correction.currentCheckIn)} - {formatTime(correction.currentCheckOut)} ({correction.currentStatus})
+                      </p>
+                      <p className="text-xs sm:text-sm text-blue-600 mt-1">
+                        <strong>Requested:</strong> {correction.requestedCheckIn ? formatTime(correction.requestedCheckIn) : formatTime(correction.currentCheckIn)} - {correction.requestedCheckOut ? formatTime(correction.requestedCheckOut) : formatTime(correction.currentCheckOut)}
+                      </p>
+                      {expectedWorkHours > 0 && (
+                        <p className="text-xs sm:text-sm text-green-600 mt-1 font-medium">
+                          <strong>If approved:</strong> {expectedWorkHours.toFixed(1)}h worked → <span className={`px-1.5 py-0.5 rounded text-white ${expectedStatus === 'present' ? 'bg-green-500' : expectedStatus === 'half-day' ? 'bg-yellow-500' : 'bg-red-500'}`}>{expectedStatus}</span>
+                        </p>
+                      )}
+                      <p className="text-xs sm:text-sm text-gray-600 mt-2 italic line-clamp-2">&quot;{correction.reason}&quot;</p>
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => handleApproveReject(correction._id, 'approve')}
+                        className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                        title="Approve"
+                      >
+                        <FaCheck className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => {
+                          const comment = prompt('Reason for rejection (optional):')
+                          handleApproveReject(correction._id, 'reject', comment || '')
+                        }}
+                        className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+                        title="Reject"
+                      >
+                        <FaTimes className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       )}
@@ -844,8 +960,8 @@ export default function AttendancePage() {
                       <p className="text-xs sm:text-sm text-gray-500 italic line-clamp-2">&quot;{correction.reason}&quot;</p>
                     </div>
                     <span className={`px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-full whitespace-nowrap self-start ${correction.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                        correction.status === 'approved' ? 'bg-green-100 text-green-800' :
-                          'bg-red-100 text-red-800'
+                      correction.status === 'approved' ? 'bg-green-100 text-green-800' :
+                        'bg-red-100 text-red-800'
                       }`}>
                       {correction.status}
                     </span>
@@ -1060,8 +1176,8 @@ export default function AttendancePage() {
                           setSelectedHoliday(dayData.holiday)
                           setShowHolidayModal(true)
                         } else if (dayData.record) {
-                          setSelectedRecord(dayData.record)
-                          setShowDetailsModal(true)
+                          // Open correction modal to view/edit the attendance record
+                          openCorrectionModal(dayData.record)
                         } else if (dayData.isCurrentMonth && !isWeekend && !isHoliday && new Date(dayData.date) < new Date()) {
                           // Handle missing entry click
                           setMissingEntryForm(prev => ({
@@ -1229,12 +1345,12 @@ export default function AttendancePage() {
                         <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{record.workHours ? `${record.workHours}h` : 'N/A'}</td>
                         <td className="px-4 py-4 whitespace-nowrap">
                           <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${record.status === 'present' ? 'bg-green-100 text-green-800' :
-                              record.status === 'absent' ? 'bg-red-100 text-red-800' :
-                                record.status === 'half-day' ? 'bg-yellow-100 text-yellow-800' :
-                                  record.status === 'in-progress' ? 'bg-orange-100 text-orange-800' :
-                                    record.status === 'late' ? 'bg-amber-100 text-amber-800' :
-                                      record.status === 'on-leave' ? 'bg-blue-100 text-blue-800' :
-                                        'bg-gray-100 text-gray-800'
+                            record.status === 'absent' ? 'bg-red-100 text-red-800' :
+                              record.status === 'half-day' ? 'bg-yellow-100 text-yellow-800' :
+                                record.status === 'in-progress' ? 'bg-orange-100 text-orange-800' :
+                                  record.status === 'late' ? 'bg-amber-100 text-amber-800' :
+                                    record.status === 'on-leave' ? 'bg-blue-100 text-blue-800' :
+                                      'bg-gray-100 text-gray-800'
                             }`}>
                             {record.status === 'in-progress' ? 'In Progress' : record.status}
                           </span>
@@ -1315,9 +1431,36 @@ export default function AttendancePage() {
                   <FaCalendarAlt className="inline mr-2" />
                   Date: {selectedRecord && formatDate(selectedRecord.date)}
                 </p>
-                <p className="text-xs text-blue-600 mt-1">
-                  Current: {selectedRecord && formatTime(selectedRecord.checkIn)} - {selectedRecord && formatTime(selectedRecord.checkOut)} ({selectedRecord?.status})
-                </p>
+                {(() => {
+                  // Dynamically calculate status based on actual work hours
+                  const dynamicStatus = selectedRecord?.checkIn && selectedRecord?.checkOut
+                    ? calculateDynamicStatus(selectedRecord.checkIn, selectedRecord.checkOut)
+                    : selectedRecord?.status
+                  const workHours = selectedRecord?.checkIn && selectedRecord?.checkOut
+                    ? calculateWorkHours(selectedRecord.checkIn, selectedRecord.checkOut)
+                    : selectedRecord?.workHours || 0
+                  const storedStatus = selectedRecord?.status
+                  const statusMismatch = dynamicStatus && storedStatus && dynamicStatus !== storedStatus
+
+                  return (
+                    <>
+                      <p className="text-xs text-blue-600 mt-1">
+                        Current: {selectedRecord && formatTime(selectedRecord.checkIn)} - {selectedRecord && formatTime(selectedRecord.checkOut)}
+                        <span className={`ml-1 ${statusMismatch ? 'text-orange-600 font-medium' : ''}`}>
+                          ({dynamicStatus || storedStatus || 'N/A'})
+                        </span>
+                        {workHours > 0 && (
+                          <span className="ml-1 text-gray-500">• {workHours.toFixed(1)}h worked</span>
+                        )}
+                      </p>
+                      {statusMismatch && (
+                        <p className="text-xs text-orange-600 mt-1 bg-orange-50 rounded px-2 py-1">
+                          ⚠️ Stored status "{storedStatus}" differs from calculated "{dynamicStatus}" - correction may fix this
+                        </p>
+                      )}
+                    </>
+                  )
+                })()}
                 {/* Location Display in Modal */}
                 {(selectedRecord?.location?.checkIn?.address || selectedRecord?.location?.checkOut?.address) && (
                   <div className="mt-2 pt-2 border-t border-blue-200">

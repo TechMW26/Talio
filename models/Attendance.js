@@ -76,6 +76,7 @@ const AttendanceSchema = new mongoose.Schema({
       },
       capturedAt: Date, // Timestamp when location was captured
       accuracy: Number, // GPS accuracy in meters
+      warning: String, // Warning message if location not captured
       geofenceLocation: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'GeofenceLocation',
@@ -95,6 +96,7 @@ const AttendanceSchema = new mongoose.Schema({
       },
       capturedAt: Date, // Timestamp when location was captured
       accuracy: Number, // GPS accuracy in meters
+      warning: String, // Warning message if location not captured
       geofenceLocation: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'GeofenceLocation',
@@ -116,6 +118,10 @@ const AttendanceSchema = new mongoose.Schema({
     approvedAt: Date,
     reason: String,
   },
+  // Location warning - populated when GPS location was not captured
+  locationWarning: {
+    type: String,
+  },
   remarks: {
     type: String,
   },
@@ -127,6 +133,25 @@ const AttendanceSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Employee',
   },
+  // Audit fields for tracking system-generated records
+  source: {
+    type: String,
+    enum: ['user_checkin', 'manual_entry', 'system_auto_absent', 'system_backfill', 'correction', 'import'],
+    default: 'user_checkin',
+  },
+  createdBySystem: {
+    type: Boolean,
+    default: false,
+  },
+  // For tracking who made manual entries
+  createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  lastModifiedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
 }, {
   timestamps: true,
 });
@@ -136,6 +161,8 @@ AttendanceSchema.index({ employee: 1, date: 1 }, { unique: true });
 // Additional indexes for common queries
 AttendanceSchema.index({ date: 1, status: 1 }); // Date-based reports
 AttendanceSchema.index({ employee: 1, date: -1 }); // Employee attendance history
+AttendanceSchema.index({ source: 1, createdBySystem: 1 }); // Audit queries for system-generated records
+AttendanceSchema.index({ date: 1, source: 1 }); // Date-based audit queries
 
 export default mongoose.models.Attendance || mongoose.model('Attendance', AttendanceSchema);
 

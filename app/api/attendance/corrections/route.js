@@ -8,8 +8,30 @@ import User from '@/models/User'
 import { verifyToken } from '@/lib/auth'
 import { calculateEffectiveWorkHours, determineAttendanceStatus } from '@/lib/attendanceShrinkage'
 import CompanySettings from '@/models/CompanySettings'
+import queryCache from '@/lib/queryCache'
 
 export const dynamic = 'force-dynamic'
+
+/**
+ * ATTENDANCE CORRECTION FLOW - STREAMLINED
+ * =========================================
+ * 
+ * DATA SOURCES:
+ * - Attendance Collection: Single source of truth for attendance data
+ * - AttendanceCorrection Collection: Stores correction requests and audit trail
+ * 
+ * FLOW:
+ * 1. Employee submits correction request → Creates AttendanceCorrection record
+ * 2. Admin/Head approves → Updates Attendance record (source of truth)
+ * 3. UI reads attendance data from Attendance collection only
+ * 4. AttendanceCorrection stores audit trail (what was requested, what was applied)
+ * 
+ * STATUS CALCULATION:
+ * - When checkIn AND checkOut exist: Status is ALWAYS calculated from work hours
+ * - Formula: workHours >= 7.2h (90% of 8h) = present
+ *            workHours >= 4h (50% of 8h) = half-day
+ *            workHours < 4h = absent
+ */
 
 // Helper to check if user can approve corrections
 async function canApproveCorrections(userId, targetEmployeeId) {
@@ -263,6 +285,9 @@ export async function PATCH(request) {
       return NextResponse.json({ success: false, message: 'Invalid request' }, { status: 400 })
     }
 
+    // =====================================================
+    // STEP 1: Load correction request from AttendanceCorrection
+    // =====================================================
     const correction = await AttendanceCorrection.findById(correctionId)
     if (!correction) {
       return NextResponse.json({ success: false, message: 'Correction request not found' }, { status: 404 })
@@ -282,13 +307,17 @@ export async function PATCH(request) {
     const reviewerEmployeeId = user?.employeeId?._id
 
     if (action === 'approve') {
-      // Apply the correction to the attendance record
+      // =====================================================
+      // STEP 2: Load the Attendance record (SOURCE OF TRUTH)
+      // =====================================================
       const attendance = await Attendance.findById(correction.attendance)
       if (!attendance) {
         return NextResponse.json({ success: false, message: 'Attendance record not found' }, { status: 404 })
       }
 
-      // Apply requested changes
+      // =====================================================
+      // STEP 3: Apply requested check-in/check-out times
+      // =====================================================
       if (correction.requestedCheckIn) {
         attendance.checkIn = correction.requestedCheckIn
       }
@@ -296,69 +325,185 @@ export async function PATCH(request) {
         attendance.checkOut = correction.requestedCheckOut
       }
 
-      // Recalculate work hours if both check-in and check-out exist
+      // =====================================================
+      // STEP 4: Calculate work hours and status
+      // This is the CRITICAL part - status is ALWAYS calculated
+      // from work hours when both checkIn and checkOut exist
+      // =====================================================
+      let calculatedStatus = 'absent'
+      let calculatedWorkHours = 0
+      let statusReason = ''
+
       if (attendance.checkIn && attendance.checkOut) {
+        // Get company settings for break timings and thresholds
         const settings = await CompanySettings.findOne().lean()
         const breakTimings = settings?.breakTimings || []
+        const fullDayHours = settings?.fullDayHours || 8
+        const halfDayHours = settings?.halfDayHours || 4
 
+        // Calculate effective work hours (accounting for breaks)
         const workHoursCalc = calculateEffectiveWorkHours(
           attendance.checkIn,
           attendance.checkOut,
           breakTimings
         )
 
-        attendance.workHours = workHoursCalc.effectiveWorkHours
+        calculatedWorkHours = workHoursCalc.effectiveWorkHours
+
+        // Update attendance with calculated values
+        attendance.workHours = calculatedWorkHours
         attendance.totalLoggedHours = workHoursCalc.totalLoggedHours
         attendance.breakMinutes = workHoursCalc.breakMinutes
         attendance.shrinkagePercentage = workHoursCalc.shrinkagePercentage
 
-        // Determine status
-        const statusResult = determineAttendanceStatus(workHoursCalc.effectiveWorkHours, {
-          fullDayHours: settings?.fullDayHours || 8,
-          halfDayHours: settings?.halfDayHours || 4
+        // =====================================================
+        // STEP 5: Determine status based on work hours
+        // This OVERRIDES any requestedStatus from the correction
+        // =====================================================
+        const statusResult = determineAttendanceStatus(calculatedWorkHours, {
+          fullDayHours,
+          halfDayHours
         })
 
-        attendance.status = correction.requestedStatus || statusResult.status
-        attendance.statusReason = `Corrected: ${statusResult.reason}`
-      } else if (correction.requestedStatus) {
-        attendance.status = correction.requestedStatus
+        calculatedStatus = statusResult.status
+        statusReason = statusResult.reason
+
+        console.log(`\n📝 CORRECTION APPROVAL - Employee: ${correction.employee}`)
+        console.log(`   CheckIn: ${attendance.checkIn}`)
+        console.log(`   CheckOut: ${attendance.checkOut}`)
+        console.log(`   Work Hours: ${calculatedWorkHours.toFixed(2)}h`)
+        console.log(`   Full Day Threshold: ${fullDayHours * 0.9}h (90% of ${fullDayHours}h)`)
+        console.log(`   Half Day Threshold: ${fullDayHours * 0.5}h (50% of ${fullDayHours}h)`)
+        console.log(`   Calculated Status: ${calculatedStatus}`)
+        console.log(`   Reason: ${statusReason}\n`)
+
+      } else if (correction.requestedStatus && !attendance.checkIn && !attendance.checkOut) {
+        // Only use requestedStatus when there's NO check-in/check-out at all
+        calculatedStatus = correction.requestedStatus
+        statusReason = 'Manual status set (no check-in/out times)'
       }
 
-      attendance.isManualEntry = true
-      attendance.remarks = `Corrected on ${new Date().toLocaleDateString()} - ${correction.reason}`
+      // =====================================================
+      // STEP 6: Update Attendance record (SOURCE OF TRUTH)
+      // This is the CRITICAL update - all fields must be set here
+      // =====================================================
 
+      // Core status fields
+      attendance.status = calculatedStatus
+      attendance.statusReason = `Corrected: ${statusReason}`
+
+      // Audit/tracking fields
+      attendance.isManualEntry = true
+      attendance.source = 'correction'
+      attendance.remarks = `Corrected on ${new Date().toLocaleDateString('en-IN')} - ${correction.reason}`
+
+      // Clear system-generated flags (important for auto-absent records)
+      attendance.createdBySystem = false
+
+      // Set correction audit fields
+      attendance.lastModifiedBy = decoded.userId
+      attendance.approvedBy = reviewerEmployeeId
+
+      // Save the attendance record
       await attendance.save()
 
-      // Update correction record
+      // =====================================================
+      // STEP 7: Reload to confirm saved values
+      // =====================================================
+      const savedAttendance = await Attendance.findById(attendance._id).lean()
+
+      // =====================================================
+      // STEP 8: Update correction record with ACTUAL saved values
+      // This is for audit trail only - UI reads from Attendance
+      // =====================================================
       correction.status = 'approved'
       correction.reviewedBy = reviewerEmployeeId
       correction.reviewedAt = new Date()
-      correction.reviewerComments = reviewerComments
-      correction.appliedCheckIn = attendance.checkIn
-      correction.appliedCheckOut = attendance.checkOut
-      correction.appliedStatus = attendance.status
-      correction.appliedWorkHours = attendance.workHours
+      correction.reviewerComments = reviewerComments || ''
+
+      // Store what was ACTUALLY applied (from the saved Attendance record)
+      correction.appliedCheckIn = savedAttendance.checkIn
+      correction.appliedCheckOut = savedAttendance.checkOut
+      correction.appliedStatus = savedAttendance.status
+      correction.appliedWorkHours = savedAttendance.workHours
 
       await correction.save()
+
+      // =====================================================
+      // STEP 9: Invalidate attendance cache for this employee
+      // This ensures the next API call fetches fresh data
+      // =====================================================
+      const attendanceDate = new Date(savedAttendance.date)
+      const month = attendanceDate.getMonth() + 1
+      const year = attendanceDate.getFullYear()
+
+      // Clear all cache entries for this employee's attendance
+      queryCache.clearPattern(`attendance.*${correction.employee}`)
+      console.log(`🗑️ Cache invalidated for employee: ${correction.employee}`)
+
+      // =====================================================
+      // STEP 10: Emit real-time update via Socket.IO
+      // This notifies the employee's browser to refresh
+      // =====================================================
+      const employeeUser = await User.findOne({ employeeId: correction.employee }).select('_id').lean()
+      if (global.io && employeeUser) {
+        global.io.to(`user:${employeeUser._id}`).emit('attendance-updated', {
+          type: 'correction-approved',
+          attendanceId: savedAttendance._id,
+          employeeId: correction.employee.toString(),
+          date: savedAttendance.date,
+          status: savedAttendance.status,
+          workHours: savedAttendance.workHours,
+          message: `Your attendance correction for ${new Date(savedAttendance.date).toLocaleDateString('en-IN')} has been approved. Status: ${savedAttendance.status}`
+        })
+        console.log(`📡 Socket event sent to user: ${employeeUser._id}`)
+      }
+
+      console.log(`✅ CORRECTION COMPLETE:`)
+      console.log(`   Attendance ID: ${savedAttendance._id}`)
+      console.log(`   Employee ID: ${correction.employee}`)
+      console.log(`   Final Status: ${savedAttendance.status}`)
+      console.log(`   Final Work Hours: ${savedAttendance.workHours}h\n`)
 
       return NextResponse.json({
         success: true,
-        message: 'Correction approved and applied successfully',
-        data: correction
+        message: `Correction approved - Status: ${savedAttendance.status} (${savedAttendance.workHours?.toFixed(2) || 0}h worked)`,
+        data: {
+          correction,
+          attendance: savedAttendance,  // Return the actual attendance data
+          employeeId: correction.employee.toString() // Return employee ID for frontend refresh
+        }
       })
     } else {
-      // Reject
+      // =====================================================
+      // REJECTION - Only update correction record
+      // =====================================================
       correction.status = 'rejected'
       correction.reviewedBy = reviewerEmployeeId
       correction.reviewedAt = new Date()
-      correction.reviewerComments = reviewerComments
+      correction.reviewerComments = reviewerComments || ''
 
       await correction.save()
+
+      // Emit rejection event to employee
+      const employeeUser = await User.findOne({ employeeId: correction.employee }).select('_id').lean()
+      if (global.io && employeeUser) {
+        global.io.to(`user:${employeeUser._id}`).emit('attendance-updated', {
+          type: 'correction-rejected',
+          correctionId: correction._id,
+          employeeId: correction.employee.toString(),
+          date: correction.date,
+          message: `Your attendance correction for ${new Date(correction.date).toLocaleDateString('en-IN')} has been rejected.`
+        })
+      }
 
       return NextResponse.json({
         success: true,
         message: 'Correction request rejected',
-        data: correction
+        data: {
+          correction,
+          employeeId: correction.employee.toString()
+        }
       })
     }
   } catch (error) {

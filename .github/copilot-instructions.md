@@ -50,6 +50,7 @@ const analysis = await generateVisionContent(prompt, images)      // Vision task
 | Production | `npm start` |
 | DB Migration | `npm run migrate` |
 | Debug DB | `node check-db-status.js` |
+| Backfill Absents | `node scripts/backfill-absent-attendance.js --start-date=YYYY-MM-DD` |
 
 ## Common Pitfalls
 1. **Using `next dev`** breaks Socket.IO — always use `npm run dev`
@@ -58,9 +59,73 @@ const analysis = await generateVisionContent(prompt, images)      // Vision task
 4. **Env file**: Use `.env` (not `.env.local`)
 5. **Public routes**: Add exceptions in [middleware.js](../middleware.js) `publicRoutes`/`publicApiRoutes` arrays
 
+## Automatic Absent Marking
+The system automatically marks employees as absent when no attendance record exists for a working day:
+
+- **Daily Cron**: `/api/cron/mark-absent` runs at 12:30 AM IST (7:00 PM UTC)
+- **Manual API**: POST `/api/attendance/mark-absent` with `{ date, startDate, endDate, dryRun }`
+- **Backfill Script**: `node scripts/backfill-absent-attendance.js --start-date=YYYY-MM-DD`
+- **Audit API**: GET `/api/attendance/audit` to view system-generated records
+
+The system validates:
+- Working days (Company.workingHours.workingDays)
+- Holidays (Holiday model)
+- Approved leaves (Leave model with status='approved')
+- Employee joining date
+
+## Attendance Correction Flow
+**Single Source of Truth: `Attendance` collection**
+
+### CRITICAL RULES:
+1. `Attendance` collection is the FINAL authority for status, checkIn, checkOut, workHours
+2. `AttendanceCorrection` is for AUDIT ONLY - never used for UI rendering
+3. UI ALWAYS reads from `/api/attendance` endpoint
+4. Status is ALWAYS calculated from work hours (never from stored requestedStatus/currentStatus)
+
+### Data Flow:
+1. Employee submits correction → `AttendanceCorrection` record created (stores current values)
+2. Admin/Head approves → **Attendance record updated** with:
+   - New checkIn/checkOut times
+   - Recalculated workHours
+   - Dynamically determined status (present/half-day/absent)
+   - `source: 'correction'`, `createdBySystem: false`
+3. **Cache invalidated** → `queryCache.clearPattern()` clears stale data
+4. **Socket.IO event** → `attendance-updated` emitted to employee's browser
+5. AttendanceCorrection updated with `appliedStatus`, `appliedWorkHours` (audit only)
+
+### Status Calculation (on approval):
+When checkIn AND checkOut exist, status is ALWAYS calculated from work hours:
+- `workHours >= 7.2h` (90% of 8h) → **present**
+- `workHours >= 4h` (50% of 8h) → **half-day**
+- `workHours < 4h` → **absent**
+
+⚠️ `requestedStatus` from correction is IGNORED when checkIn/checkOut exist
+
+### System Auto-Absent Handling:
+When correction is approved for a system-generated absent record:
+- `createdBySystem` is set to `false`
+- `source` is changed to `'correction'`
+- Status is recalculated from actual work hours
+
+### Real-Time Sync:
+- **Socket Event**: `attendance-updated` with `{ type, employeeId, date, status, message }`
+- **Frontend Listener**: `app/dashboard/attendance/page.js` listens and auto-refreshes
+- **Cache Key Pattern**: `attendance.*{employeeId}` for invalidation
+
+### Key APIs:
+- **POST** `/api/attendance/corrections` — Submit correction request
+- **PATCH** `/api/attendance/corrections` — Approve/reject (updates `Attendance` record)
+- **GET** `/api/attendance` — Get attendance data (single source of truth)
+
+### Utility Scripts:
+- `node scripts/rectify-all-attendance.js` — **COMPREHENSIVE FIX** for all stale records
+- `node scripts/fix-correction-status.js` — Fix stale correction records
+- `node scripts/fix-absent-with-checkin.js` — Fix attendance with checkIn/Out but wrong status
+
 ## Key Files
 - [server.js](../server.js) — Entry point (Socket.IO + Next.js)
 - [middleware.js](../middleware.js) — Auth & route protection
 - [lib/mongodb.js](../lib/mongodb.js) — DB connection with auto-retry
 - [lib/auth.js](../lib/auth.js) — JWT utilities (`verifyToken`, `verifyTokenFromRequest`)
 - [contexts/SocketContext.js](../contexts/SocketContext.js) — Client socket management
+

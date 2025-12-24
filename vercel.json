@@ -3,5 +3,19 @@
     "app/**/*.js": {
       "maxDuration": 60
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/mark-absent",
+      "schedule": "30 19 * * *"
+    },
+    {
+      "path": "/api/cron/process-scheduled-notifications",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/check-profile-deadlines",
+      "schedule": "0 6 * * *"
+    }
+  ]
 }

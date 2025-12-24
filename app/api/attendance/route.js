@@ -145,7 +145,7 @@ export async function GET(request) {
 
     // Optimized: Use lean() and select only needed fields (including location for display)
     const attendance = await Attendance.find(query)
-      .select('employee date checkIn checkOut checkInStatus checkOutStatus status workHours overtime totalLoggedHours breakMinutes shrinkagePercentage location')
+      .select('employee date checkIn checkOut checkInStatus checkOutStatus status workHours overtime totalLoggedHours breakMinutes shrinkagePercentage location source createdBySystem isManualEntry statusReason remarks')
       .populate({
         path: 'employee',
         select: 'firstName lastName employeeCode company',
@@ -220,18 +220,13 @@ export async function POST(request) {
     const data = await request.json()
     const { employeeId, type, latitude, longitude, address, accuracy } = data // type: 'clock-in' or 'clock-out'
 
-    // STRICT LOCATION VALIDATION - Block if location not provided
+    // LOCATION VALIDATION - Optional but log warnings if not provided
     const locationValidation = validateLocationData({ latitude, longitude })
-    if (!locationValidation.valid) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: 'Location is required for attendance. Please enable location services and try again.',
-          error: locationValidation.message,
-          requiresLocation: true
-        },
-        { status: 400 }
-      )
+    const hasValidLocation = locationValidation.valid
+
+    // Log warning if location is missing (for backend monitoring)
+    if (!hasValidLocation) {
+      console.warn(`⚠️ [Attendance] Location NOT captured for ${type} - Employee: ${employeeId} - Reason: ${locationValidation.message}`)
     }
 
     const today = new Date()
@@ -398,33 +393,47 @@ export async function POST(request) {
         checkInStatus = 'late'
       }
 
-      // Server-side reverse geocoding for accurate address
-      let resolvedAddress = address || 'Location captured'
+      // Server-side reverse geocoding for accurate address (only if location provided)
+      let resolvedAddress = null
       let addressDetails = null
+      let locationWarning = null
 
-      try {
-        const geocodeResult = await reverseGeocode(latitude, longitude)
-        if (geocodeResult.success) {
-          resolvedAddress = geocodeResult.address
-          addressDetails = geocodeResult.details
-          console.log(`📍 Check-in location resolved: ${resolvedAddress}`)
-        } else {
-          console.warn(`⚠️ Geocoding failed for check-in: ${geocodeResult.error}`)
-          // Fallback to coordinates if geocoding fails
+      if (hasValidLocation) {
+        try {
+          const geocodeResult = await reverseGeocode(latitude, longitude)
+          if (geocodeResult.success) {
+            resolvedAddress = geocodeResult.address
+            addressDetails = geocodeResult.details
+            console.log(`📍 Check-in location resolved: ${resolvedAddress}`)
+          } else {
+            console.warn(`⚠️ Geocoding failed for check-in: ${geocodeResult.error}`)
+            // Fallback to coordinates if geocoding fails
+            resolvedAddress = address || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
+          }
+        } catch (geocodeError) {
+          console.error('Geocoding error during check-in:', geocodeError)
           resolvedAddress = address || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
         }
-      } catch (geocodeError) {
-        console.error('Geocoding error during check-in:', geocodeError)
-        resolvedAddress = address || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
+      } else {
+        // Location not captured - set warning
+        locationWarning = 'Location not captured - GPS was unavailable or denied'
+        resolvedAddress = 'Not captured'
+        console.warn(`⚠️ [Check-in] Location NOT captured for employee: ${employeeId}`)
       }
 
+      // Build attendance data with conditional location
       const attendanceData = {
         checkIn: checkInTime,
         checkInStatus: checkInStatus,
         status: 'in-progress',
         workFromHome: todayLeave?.workFromHome || false,
-        geofenceValidated,
-        'location.checkIn': {
+        geofenceValidated: hasValidLocation ? geofenceValidated : false,
+        locationWarning: locationWarning // Store warning in attendance record
+      }
+
+      // Only add location data if we have valid coordinates
+      if (hasValidLocation) {
+        attendanceData['location.checkIn'] = {
           latitude,
           longitude,
           address: resolvedAddress,
@@ -439,6 +448,16 @@ export async function POST(request) {
           accuracy: accuracy || null,
           geofenceLocation,
           geofenceLocationName
+        }
+      } else {
+        // Store placeholder for missing location
+        attendanceData['location.checkIn'] = {
+          latitude: null,
+          longitude: null,
+          address: 'Not captured',
+          capturedAt: checkInTime,
+          accuracy: null,
+          warning: locationWarning
         }
       }
 
@@ -552,32 +571,24 @@ export async function POST(request) {
         console.error('Failed to send clock-in push notification:', pushError)
       }
 
-      // Emit real-time attendance update to all relevant users (employee + admins/HR)
-      try {
-        const adminUsers = await User.find({ role: { $in: ['admin', 'hr', 'manager'] }, isActive: true }).select('_id').lean()
-        const targetUserIds = [employee.user?.toString(), ...adminUsers.map(u => u._id.toString())].filter(Boolean)
-        
-        emitAttendanceUpdate(
-          { 
-            _id: attendance._id,
-            employee: { _id: employeeId, firstName: employee.firstName, lastName: employee.lastName },
-            checkIn: attendance.checkIn,
-            checkInStatus: attendance.checkInStatus,
-            status: attendance.status,
-            date: attendance.date
-          },
-          targetUserIds,
-          { action: 'check-in' }
-        )
-      } catch (emitError) {
-        console.error('Failed to emit attendance update:', emitError)
+      // Build response with optional warning
+      const responseData = {
+        success: true,
+        message: locationWarning
+          ? 'Clocked in successfully (Warning: Location not captured)'
+          : 'Clocked in successfully',
+        data: attendance,
       }
 
-      return NextResponse.json({
-        success: true,
-        message: 'Clocked in successfully',
-        data: attendance,
-      })
+      // Add warning to response if location was not captured
+      if (locationWarning) {
+        responseData.warning = locationWarning
+        responseData.locationCaptured = false
+      } else {
+        responseData.locationCaptured = true
+      }
+
+      return NextResponse.json(responseData)
     } else if (type === 'clock-out') {
       if (!attendance || !attendance.checkIn) {
         return NextResponse.json(
@@ -593,11 +604,12 @@ export async function POST(request) {
         )
       }
 
-      // Geofence validation for check-out
+      // Geofence validation for check-out (only if location provided)
       let geofenceLocation = null
       let geofenceLocationName = null
+      let checkOutLocationWarning = null
 
-      if (settings?.geofence?.enabled && latitude && longitude && !todayLeave?.workFromHome) {
+      if (hasValidLocation && settings?.geofence?.enabled && !todayLeave?.workFromHome) {
         if (settings.geofence.useMultipleLocations) {
           const geofenceCheck = await checkGeofenceLocation(
             latitude,
@@ -614,44 +626,72 @@ export async function POST(request) {
       const checkOutTime = new Date()
       attendance.checkOut = checkOutTime
 
-      // Server-side reverse geocoding for accurate address
-      let resolvedAddress = address || 'Location captured'
+      // Server-side reverse geocoding for accurate address (only if location provided)
+      let resolvedAddress = null
       let addressDetails = null
 
-      try {
-        const geocodeResult = await reverseGeocode(latitude, longitude)
-        if (geocodeResult.success) {
-          resolvedAddress = geocodeResult.address
-          addressDetails = geocodeResult.details
-          console.log(`📍 Check-out location resolved: ${resolvedAddress}`)
-        } else {
-          console.warn(`⚠️ Geocoding failed for check-out: ${geocodeResult.error}`)
+      if (hasValidLocation) {
+        try {
+          const geocodeResult = await reverseGeocode(latitude, longitude)
+          if (geocodeResult.success) {
+            resolvedAddress = geocodeResult.address
+            addressDetails = geocodeResult.details
+            console.log(`📍 Check-out location resolved: ${resolvedAddress}`)
+          } else {
+            console.warn(`⚠️ Geocoding failed for check-out: ${geocodeResult.error}`)
+            resolvedAddress = address || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
+          }
+        } catch (geocodeError) {
+          console.error('Geocoding error during check-out:', geocodeError)
           resolvedAddress = address || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
         }
-      } catch (geocodeError) {
-        console.error('Geocoding error during check-out:', geocodeError)
-        resolvedAddress = address || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
+      } else {
+        // Location not captured - set warning
+        checkOutLocationWarning = 'Location not captured - GPS was unavailable or denied'
+        resolvedAddress = 'Not captured'
+        console.warn(`⚠️ [Check-out] Location NOT captured for employee: ${employeeId}`)
       }
 
       // Store check-out location
       if (!attendance.location) {
         attendance.location = {}
       }
-      attendance.location.checkOut = {
-        latitude,
-        longitude,
-        address: resolvedAddress,
-        addressDetails: addressDetails ? {
-          city: addressDetails.city,
-          state: addressDetails.state,
-          country: addressDetails.country,
-          pincode: addressDetails.pincode,
-          fullAddress: addressDetails.fullAddress
-        } : null,
-        capturedAt: checkOutTime,
-        accuracy: accuracy || null,
-        geofenceLocation,
-        geofenceLocationName
+
+      if (hasValidLocation) {
+        attendance.location.checkOut = {
+          latitude,
+          longitude,
+          address: resolvedAddress,
+          addressDetails: addressDetails ? {
+            city: addressDetails.city,
+            state: addressDetails.state,
+            country: addressDetails.country,
+            pincode: addressDetails.pincode,
+            fullAddress: addressDetails.fullAddress
+          } : null,
+          capturedAt: checkOutTime,
+          accuracy: accuracy || null,
+          geofenceLocation,
+          geofenceLocationName
+        }
+      } else {
+        // Store placeholder for missing location
+        attendance.location.checkOut = {
+          latitude: null,
+          longitude: null,
+          address: 'Not captured',
+          capturedAt: checkOutTime,
+          accuracy: null,
+          warning: checkOutLocationWarning
+        }
+      }
+
+      // Update location warning if check-out location is missing
+      if (checkOutLocationWarning) {
+        const existingWarning = attendance.locationWarning || ''
+        attendance.locationWarning = existingWarning
+          ? `${existingWarning}; Check-out: ${checkOutLocationWarning}`
+          : `Check-out: ${checkOutLocationWarning}`
       }
 
       // Use office end time from settings
@@ -844,35 +884,24 @@ export async function POST(request) {
         console.error('Failed to send clock-out push notification:', pushError)
       }
 
-      // Emit real-time attendance update to all relevant users (employee + admins/HR)
-      try {
-        const adminUsers = await User.find({ role: { $in: ['admin', 'hr', 'manager'] }, isActive: true }).select('_id').lean()
-        const targetUserIds = [employee.user?.toString(), ...adminUsers.map(u => u._id.toString())].filter(Boolean)
-        
-        emitAttendanceUpdate(
-          { 
-            _id: attendance._id,
-            employee: { _id: employeeId, firstName: employee.firstName, lastName: employee.lastName },
-            checkIn: attendance.checkIn,
-            checkOut: attendance.checkOut,
-            checkInStatus: attendance.checkInStatus,
-            checkOutStatus: attendance.checkOutStatus,
-            status: attendance.status,
-            workHours: attendance.workHours,
-            date: attendance.date
-          },
-          targetUserIds,
-          { action: 'check-out' }
-        )
-      } catch (emitError) {
-        console.error('Failed to emit attendance update:', emitError)
+      // Build response with optional warning
+      const checkOutResponse = {
+        success: true,
+        message: checkOutLocationWarning
+          ? 'Clocked out successfully (Warning: Location not captured)'
+          : 'Clocked out successfully',
+        data: attendance,
       }
 
-      return NextResponse.json({
-        success: true,
-        message: 'Clocked out successfully',
-        data: attendance,
-      })
+      // Add warning to response if location was not captured
+      if (checkOutLocationWarning) {
+        checkOutResponse.warning = checkOutLocationWarning
+        checkOutResponse.locationCaptured = false
+      } else {
+        checkOutResponse.locationCaptured = true
+      }
+
+      return NextResponse.json(checkOutResponse)
     }
 
     return NextResponse.json(

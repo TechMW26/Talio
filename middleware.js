@@ -23,7 +23,8 @@ export async function middleware(request) {
     '/api/assetlinks',
     '/api/setup/check',
     '/api/setup/create-admin',
-    '/api/test-imagekit' // Test route for ImageKit debugging
+    '/api/test-imagekit', // Test route for ImageKit debugging
+    '/api/cron/' // Cron routes use CRON_SECRET for auth
   ]
 
   // Routes allowed during forced password change
