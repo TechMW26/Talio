@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { FaUserShield, FaEnvelope, FaLock, FaUser, FaEye, FaEyeSlash, FaBuilding, FaArrowRight } from 'react-icons/fa';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 
 export default function SetupPage() {
   const router = useRouter();

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { FaUser, FaEye, FaEyeSlash, FaCopy } from 'react-icons/fa'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 
 export default function UsersPage() {
   const [users, setUsers] = useState([])

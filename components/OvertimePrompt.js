@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 import { FaClock, FaCheck, FaTimes, FaBell, FaMapMarkerAlt, FaSpinner } from 'react-icons/fa'
 
 /**

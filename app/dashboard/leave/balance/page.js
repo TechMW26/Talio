@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 import { FaCalendarAlt, FaClock, FaChartPie, FaHistory } from 'react-icons/fa'
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import CustomTooltip, { CustomPieTooltip } from '@/components/charts/CustomTooltip'

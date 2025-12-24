@@ -3,12 +3,14 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { FaTimes, FaComment, FaTasks, FaBullhorn, FaBell } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
+import { useChatWidget } from '@/contexts/ChatWidgetContext'
 
 export default function InAppNotification({ notification, onClose }) {
   const [isVisible, setIsVisible] = useState(false)
   const isMountedRef = useRef(true)
   const timersRef = useRef([])
   const router = useRouter()
+  const { openChat, openWidget } = useChatWidget()
 
   const clearAllTimers = useCallback(() => {
     timersRef.current.forEach(timer => clearTimeout(timer))
@@ -63,9 +65,74 @@ export default function InAppNotification({ notification, onClose }) {
     console.log('[InAppNotification] Clicked notification:', {
       url: notification.url,
       type: notification.type,
-      title: notification.title
+      title: notification.title,
+      chatId: notification.chatId
     })
 
+    // For message notifications on desktop, open chat widget directly
+    if (notification.type === 'message' && notification.chatId && typeof window !== 'undefined' && window.innerWidth >= 768) {
+      console.log('[InAppNotification] Opening chat widget for chatId:', notification.chatId)
+      
+      // Fetch chat data if not provided, or use provided data
+      const openChatDirectly = async () => {
+        try {
+          // If we have sender info, build a minimal chat object
+          if (notification.senderInfo || notification.chatData) {
+            const chatData = notification.chatData || {
+              _id: notification.chatId,
+              participants: notification.senderInfo ? [notification.senderInfo] : []
+            }
+            
+            // If we need to fetch full chat data
+            const token = localStorage.getItem('token')
+            if (token) {
+              const response = await fetch(`/api/chat/${notification.chatId}`, {
+                headers: {
+                  'Authorization': `Bearer ${token}`
+                }
+              })
+              
+              if (response.ok) {
+                const fullChatData = await response.json()
+                openChat(fullChatData)
+              } else {
+                // Use minimal data
+                openChat(chatData)
+              }
+            } else {
+              openChat(chatData)
+            }
+          } else {
+            // Fetch chat data from API
+            const token = localStorage.getItem('token')
+            if (token) {
+              const response = await fetch(`/api/chat/${notification.chatId}`, {
+                headers: {
+                  'Authorization': `Bearer ${token}`
+                }
+              })
+              
+              if (response.ok) {
+                const chatData = await response.json()
+                openChat(chatData)
+              }
+            }
+          }
+        } catch (error) {
+          console.error('[InAppNotification] Error fetching chat data:', error)
+          // Fall back to URL navigation
+          if (notification.url) {
+            router.push(notification.url)
+          }
+        }
+      }
+      
+      openChatDirectly()
+      handleClose()
+      return
+    }
+
+    // Default behavior: navigate to URL
     if (notification.url) {
       console.log('[InAppNotification] Navigating to:', notification.url)
       router.push(notification.url)
@@ -79,7 +146,7 @@ export default function InAppNotification({ notification, onClose }) {
     } else {
       handleClose()
     }
-  }, [notification, router, handleClose])
+  }, [notification, router, handleClose, openChat])
 
   const getIconAndColor = () => {
     switch (notification.type) {

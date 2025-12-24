@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { FaMoneyBillWave, FaPlus, FaEdit, FaTrash, FaSave, FaTimes } from 'react-icons/fa'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 
 export default function SalaryStructurePage() {
   const [structures, setStructures] = useState([])

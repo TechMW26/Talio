@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 import { FaUser, FaEnvelope, FaPhone, FaMapMarkerAlt, FaEdit, FaArrowLeft, FaBriefcase, FaCalendarAlt } from 'react-icons/fa'
 import { formatDesignation, formatDepartments } from '@/lib/formatters'
 

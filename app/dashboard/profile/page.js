@@ -21,7 +21,7 @@ import {
   FaAdjust,
   FaExclamationTriangle,
 } from 'react-icons/fa'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 import ModalPortal from '@/components/ModalPortal'
 import { formatDesignation, formatDepartments, getLevelNameFromNumber } from '@/lib/formatters'
 import TiltWrapper from "@/components/TiltWrapper";

@@ -10,7 +10,7 @@ import {
   FaList,
   FaTh
 } from 'react-icons/fa'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 
 export default function CalendarPage() {
   const [currentMonth, setCurrentMonth] = useState(new Date())

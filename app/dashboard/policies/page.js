@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 import { FaPlus, FaFileAlt, FaEdit, FaTrash, FaCheckCircle, FaExclamationCircle } from 'react-icons/fa'
 import ModalPortal from '@/components/ModalPortal'
 

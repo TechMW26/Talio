@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 import { FaBullhorn, FaUsers, FaCalendarAlt, FaExclamationTriangle } from 'react-icons/fa'
 
 export default function CreateAnnouncementPage() {

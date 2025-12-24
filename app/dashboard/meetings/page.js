@@ -17,7 +17,7 @@ import {
   HiOutlineChevronRight,
   HiOutlineEllipsisVertical
 } from 'react-icons/hi2'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 import CreateMeetingModal from './components/CreateMeetingModal'
 import MeetingCard from './components/MeetingCard'
 

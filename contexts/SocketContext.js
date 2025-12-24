@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { io } from 'socket.io-client'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 
 const SocketContext = createContext()
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 import { FaCheck, FaTimes, FaEye, FaFileInvoiceDollar, FaUser } from 'react-icons/fa'
 import { getCurrentUser } from '@/utils/userHelper'
 import { useRouter } from 'next/navigation'

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { FaTrophy, FaDownload, FaShare, FaCalendar, FaClock, FaAward, FaMedal } from 'react-icons/fa'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 
 export default function CertificatesPage() {
   const [certificates, setCertificates] = useState([])

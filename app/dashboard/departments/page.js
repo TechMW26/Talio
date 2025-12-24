@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 import { FaPlus, FaEdit, FaTrash, FaBuilding, FaUsers, FaTimes, FaUserTie, FaSearch } from 'react-icons/fa'
 
 export default function DepartmentsPage() {

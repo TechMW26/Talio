@@ -22,7 +22,7 @@ import {
   HiVideoCamera 
 } from 'react-icons/hi2'
 import { BsPin, BsPinFill, BsEmojiSmile } from 'react-icons/bs'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 
 // Reaction emojis
 const REACTIONS = [

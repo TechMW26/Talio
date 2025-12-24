@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 import { FaSave, FaArrowLeft, FaChevronDown, FaTimes } from 'react-icons/fa'
 
 export default function EditEmployeePage() {

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 import { FaArrowLeft, FaSave, FaTrash, FaPlus, FaTimes, FaUsers, FaArchive } from 'react-icons/fa'
 import Portal from '@/components/ui/Portal'
 

@@ -12,7 +12,7 @@ import {
 } from 'react-icons/hi2'
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { getMenuItemsForRole } from '@/utils/roleBasedMenus'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
 import UnreadBadge from './UnreadBadge'

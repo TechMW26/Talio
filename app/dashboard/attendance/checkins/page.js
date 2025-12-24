@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 import { FaClock, FaUsers, FaCalendarAlt, FaSearch, FaDownload, FaMapMarkerAlt } from 'react-icons/fa'
 
 export default function EmployeeCheckinsPage() {

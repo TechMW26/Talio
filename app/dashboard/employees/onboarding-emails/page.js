@@ -17,7 +17,7 @@ import {
   HiOutlineExclamationTriangle,
   HiOutlineBolt,
 } from 'react-icons/hi2'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 
 export default function OnboardingEmailsPage() {
   const router = useRouter()

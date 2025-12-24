@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { FaBell, FaClock, FaRedo, FaPaperPlane, FaUsers, FaBuilding, FaUserTag, FaCalendar, FaTrash, FaEdit, FaPause, FaPlay, FaHistory, FaCheck, FaTimes, FaChevronDown, FaSync } from 'react-icons/fa'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 
 export default function NotificationManagement() {
   const [activeTab, setActiveTab] = useState('send')

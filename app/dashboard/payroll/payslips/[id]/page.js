@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 import { FaDownload, FaArrowLeft, FaPrint, FaEnvelope } from 'react-icons/fa'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'

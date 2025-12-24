@@ -20,7 +20,7 @@ import {
   HiOutlineCheck
 } from 'react-icons/hi2'
 import { FaSpinner, FaThumbtack, FaUserSecret, FaPaperPlane } from 'react-icons/fa'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 import CreateIdeaModal from './components/CreateIdeaModal'
 import IdeaCard from './components/IdeaCard'
 

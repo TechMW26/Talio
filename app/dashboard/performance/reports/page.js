@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 import * as XLSX from 'xlsx'
 import { FaDownload, FaChartBar, FaUsers, FaTrophy, FaCalendarAlt, FaFilter, FaRobot, FaSpinner, FaFileExcel, FaChevronDown, FaChevronUp, FaBrain, FaStar, FaAward, FaTasks, FaBullseye, FaSearch } from 'react-icons/fa'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Area, AreaChart } from 'recharts'

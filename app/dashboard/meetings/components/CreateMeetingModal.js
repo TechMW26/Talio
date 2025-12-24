@@ -15,7 +15,7 @@ import {
   HiOutlinePlus,
   HiOutlineTrash
 } from 'react-icons/hi2'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 import ModalPortal from '@/components/ui/ModalPortal'
 
 export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {

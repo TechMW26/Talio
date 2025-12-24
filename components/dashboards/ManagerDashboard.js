@@ -6,7 +6,7 @@ import {
   FaUsers, FaClock, FaCalendarAlt, FaChartLine,
   FaAward, FaExclamationCircle
 } from 'react-icons/fa'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 import { formatDesignation } from '@/lib/formatters'
 import { useTheme } from '@/contexts/ThemeContext'
 import { getEmployeeId } from '@/utils/userHelper'

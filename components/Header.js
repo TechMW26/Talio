@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { FaBars, FaBell, FaUser, FaSignOutAlt, FaCog, FaSearch, FaComments, FaTimes, FaSpinner } from 'react-icons/fa'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'

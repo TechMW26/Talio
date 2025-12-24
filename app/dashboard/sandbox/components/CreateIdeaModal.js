@@ -18,7 +18,7 @@ import {
   HiOutlineEyeSlash
 } from 'react-icons/hi2'
 import { FaSpinner } from 'react-icons/fa'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 
 const CATEGORIES = [
   { value: 'process_improvement', label: 'Process', Icon: HiOutlineCog6Tooth },

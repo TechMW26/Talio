@@ -4,7 +4,7 @@ import { createContext, useContext, useState, useCallback, useEffect } from 'rea
 import { usePathname } from 'next/navigation'
 import InAppNotification from '@/components/InAppNotification'
 import { useSocket } from './SocketContext'
-import { playNotificationSound } from '@/utils/audio'
+import { playNotificationSound, playMessageNotificationSound } from '@/utils/audio'
 
 const InAppNotificationContext = createContext({
   showNotification: () => { }
@@ -13,6 +13,8 @@ const InAppNotificationContext = createContext({
 export function InAppNotificationProvider({ children }) {
   const [notifications, setNotifications] = useState([])
   const {
+    socket,
+    isConnected,
     onNewMessage,
     onTaskUpdate,
     onAnnouncement,
@@ -29,14 +31,18 @@ export function InAppNotificationProvider({ children }) {
   } = useSocket()
   const pathname = usePathname()
 
-  const showNotification = useCallback((notification) => {
+  const showNotification = useCallback((notification, playSoundEffect = true) => {
     const id = Date.now() + Math.random()
     const newNotification = { ...notification, id }
 
     setNotifications(prev => [...prev, newNotification])
 
-    // Play notification sound
-    playNotificationSound()
+    // Play notification sound (unless it's a message - that uses its own sound)
+    if (playSoundEffect && notification.type !== 'message') {
+      playNotificationSound().catch((err) => {
+        console.warn('[InAppNotification] Notification sound failed:', err)
+      })
+    }
   }, [])
 
   const removeNotification = useCallback((id) => {
@@ -45,12 +51,18 @@ export function InAppNotificationProvider({ children }) {
 
   // Listen for new messages via Socket.IO
   useEffect(() => {
+    // Wait for socket to be connected
+    if (!socket || !isConnected) {
+      console.log('[InAppNotification] Socket not connected yet, isConnected:', isConnected)
+      return
+    }
+
     if (!onNewMessage) {
       console.log('[InAppNotification] onNewMessage not available yet')
       return
     }
 
-    console.log('[InAppNotification] Setting up message listener')
+    console.log('[InAppNotification] Setting up message listener, socket connected:', isConnected)
 
     const unsubscribe = onNewMessage((data) => {
       console.log('[InAppNotification] Raw message data received:', data)
@@ -99,22 +111,41 @@ export function InAppNotificationProvider({ children }) {
           ? `${message.sender.firstName} ${message.sender.lastName || ''}`
           : 'Someone'
 
+        // Build chat data for opening chat widget directly
+        const chatData = {
+          _id: chatId,
+          // Include participant info from sender for display
+          participants: message.sender ? [message.sender] : [],
+          senderInfo: message.sender || null
+        }
+
         const notificationData = {
           title: `New message from ${senderName}`,
           message: message.content || message.text || message.fileName || 'Sent a file',
           url: `/dashboard/chat?chatId=${chatId}`,
-          type: 'message'
+          type: 'message',
+          // Include chat data so clicking notification can open chat widget
+          chatId: chatId,
+          chatData: chatData,
+          senderInfo: message.sender || null
         }
 
         console.log('[InAppNotification] Showing notification:', notificationData)
-        showNotification(notificationData)
+        
+        // Play message notification sound (MP3 on desktop)
+        playMessageNotificationSound().catch((err) => {
+          console.warn('[InAppNotification] Message notification sound failed:', err)
+        })
+        
+        // Show notification without playing default sound (we just played the MP3)
+        showNotification(notificationData, false)
       } else {
         console.log('[InAppNotification] Not showing notification - conditions not met')
       }
     })
 
     return unsubscribe
-  }, [onNewMessage, pathname, showNotification])
+  }, [socket, isConnected, onNewMessage, pathname, showNotification])
 
   // Listen for task updates via Socket.IO
   useEffect(() => {

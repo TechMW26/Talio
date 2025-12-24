@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 import { FaSave, FaTimes, FaChevronDown, FaCheck, FaTimes as FaX, FaUserPlus, FaFileUpload } from 'react-icons/fa'
 import BulkImportEmployees from '@/components/employees/BulkImportEmployees'
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { FaMapMarkerAlt, FaCheck, FaTimes, FaClock, FaUser, FaFilter } from 'react-icons/fa'
-import { toast } from 'react-hot-toast'
+import { toast } from '@/utils/toast'
 
 export default function GeofencingPage() {
   const [logs, setLogs] = useState([])

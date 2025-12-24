@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { toast } from 'react-hot-toast'
+import { toast } from '@/utils/toast'
 import { getCurrentISTDate, getCurrentISTMinutesSinceMidnight, getCurrentISTDayName } from '@/lib/timezone'
 
 export default function useGeofencing() {

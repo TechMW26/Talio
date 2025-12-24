@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 import * as XLSX from 'xlsx'
 import { 
   FaUsers, FaChartLine, FaClock, FaCalendarAlt, FaExclamationTriangle,

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { FaBook, FaClock, FaUsers, FaStar, FaPlay, FaFilter, FaSearch, FaGraduationCap } from 'react-icons/fa'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 
 export default function CoursesPage() {
   const [courses, setCourses] = useState([])

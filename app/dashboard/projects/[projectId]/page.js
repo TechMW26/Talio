@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams, useParams } from 'next/navigation'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 import { useSocket } from '@/contexts/SocketContext'
 import { 
   HiOutlineArrowLeft, HiOutlinePencil, HiOutlinePlus, HiOutlineUsers, 

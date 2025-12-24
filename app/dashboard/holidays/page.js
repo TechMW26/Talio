@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 import { 
   FaPlus, FaEdit, FaTrash, FaCalendarAlt, FaSync, FaRobot, 
   FaList, FaTh, FaChevronLeft, FaChevronRight 

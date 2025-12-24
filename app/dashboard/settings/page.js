@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { FaBuilding, FaBriefcase, FaCalendarAlt, FaUmbrellaBeach, FaCog, FaMapMarkerAlt, FaClock, FaImage, FaPalette, FaCheck, FaBell, FaMoneyBillWave, FaArrowLeft } from 'react-icons/fa'
 import { HiOutlineOfficeBuilding, HiOutlineCog, HiOutlineArrowLeft } from 'react-icons/hi2'
-import { toast } from 'react-hot-toast'
+import { toast } from '@/utils/toast'
 import dynamic from 'next/dynamic'
 import { useTheme } from '@/contexts/ThemeContext'
 

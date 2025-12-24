@@ -14,7 +14,7 @@ import {
   FaTimes,
   FaSync
 } from 'react-icons/fa'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 import ModalPortal from '@/components/ModalPortal'
 
 /**

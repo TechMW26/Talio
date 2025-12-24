@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 import {
   FaMoneyBillWave, FaArrowLeft, FaCalculator, FaEye, FaDownload,
   FaFilter, FaSync, FaExclamationTriangle, FaCheckCircle, FaClock,

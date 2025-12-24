@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { FaPhoneAlt, FaVolumeUp, FaVolumeMute, FaCheck, FaUser, FaExclamationTriangle } from 'react-icons/fa';
 import { useSocket } from '@/contexts/SocketContext';
-import toast from 'react-hot-toast';
+import toast from '@/utils/toast';
 
 // Alert sound URL - using existing notification sound
 const ALERT_SOUND_URL = '/sounds/notification.mp3';

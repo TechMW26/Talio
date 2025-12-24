@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { checkAndClearCaches } from '@/lib/cacheManager'
+import { initAudio } from '@/utils/audio'
 
 export function Providers({ children }) {
     // Check for version changes and clear caches if needed
@@ -14,6 +15,11 @@ export function Providers({ children }) {
                 window.location.reload();
             }
         });
+        
+        // Initialize audio system (preloads sounds and sets up unlock listener)
+        if (typeof window !== 'undefined') {
+            initAudio();
+        }
     }, []);
 
     return (

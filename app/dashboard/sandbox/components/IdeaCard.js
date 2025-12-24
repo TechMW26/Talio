@@ -22,7 +22,7 @@ import {
   HiOutlineAcademicCap
 } from 'react-icons/hi2'
 import { FaThumbtack, FaUserSecret, FaUser, FaSpinner, FaPaperPlane } from 'react-icons/fa'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 
 const CATEGORIES = {
   'process_improvement': { label: 'Process', Icon: HiOutlineCog6Tooth },

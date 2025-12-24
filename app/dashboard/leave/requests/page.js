@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 import { FaCalendarAlt, FaClock, FaCheck, FaTimes, FaEye, FaFilter } from 'react-icons/fa'
 import ModalPortal from '@/components/ModalPortal'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'

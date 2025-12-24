@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 import { FaUsers, FaBuilding, FaArrowLeft, FaCalendarAlt, FaClock, FaChevronLeft, FaChevronRight, FaSearch, FaUserCircle, FaMapMarkerAlt } from 'react-icons/fa'
 
 export default function TeamAttendancePage() {

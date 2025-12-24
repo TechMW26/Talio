@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 import { FaCog, FaMoneyBillWave, FaClock, FaCalendarAlt, FaSave } from 'react-icons/fa'
 
 export default function PreferencesPage() {

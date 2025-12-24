@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 
 export default function ActiveSessionsSection() {
   const [sessions, setSessions] = useState([])

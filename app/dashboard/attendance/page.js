@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import toast from 'react-hot-toast'
+import toast from '@/utils/toast'
 import { FaClock, FaSignInAlt, FaSignOutAlt, FaCalendarAlt, FaEdit, FaCheck, FaTimes, FaExclamationCircle, FaPlus, FaChevronLeft, FaChevronRight, FaList, FaTh, FaMapMarkerAlt } from 'react-icons/fa'
 import OvertimePrompt, { useOvertimeCheck } from '@/components/OvertimePrompt'
 import ModalPortal from '@/components/ui/ModalPortal'
