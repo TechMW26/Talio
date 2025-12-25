@@ -21,29 +21,29 @@ export async function POST(request, { params }) {
     }
 
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Meeting', 'Employee', 'User'])
+    const auth = await getAuthAndModels(request, ['Meeting', 'Employee', 'User']);
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
+      return NextResponse.json({ message: auth.message }, { status: 401 });
     }
-    const { user, models } = auth
-    const { Meeting, Employee, User } = models
+    const { models } = auth;
+    const { Meeting, Employee, User } = models;
 
-    const data = await request.json()
-    const { response, reason } = data // response: 'accepted', 'rejected', 'maybe'
+    const data = await request.json();
+    const { response, reason } = data; // response: 'accepted', 'rejected', 'maybe'
 
     if (!response || !['accepted', 'rejected', 'maybe'].includes(response)) {
       return NextResponse.json({ 
         success: false, 
         message: 'Invalid response. Must be accepted, rejected, or maybe' 
-      }, { status: 400 })
+      }, { status: 400 });
     }
 
     // Get current user's employee record - first check User.employeeId, then Employee.userId
-    const user = await User.findById(decoded.userId).select('employeeId').lean()
+    const userRecord = await User.findById(decoded.userId).select('employeeId').lean();
     
-    let employee = null
-    if (user?.employeeId) {
-      employee = await Employee.findById(user.employeeId).lean()
+    let employee = null;
+    if (userRecord?.employeeId) {
+      employee = await Employee.findById(userRecord.employeeId).lean();
     }
     
     // If user doesn't have employeeId directly, try to find employee by userId

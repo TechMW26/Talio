@@ -130,32 +130,32 @@ export async function POST(request) {
     }
 
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['GeofenceLog', 'GeofenceLocation', 'Employee', 'User', 'CompanySettings'])
+    const auth = await getAuthAndModels(request, ['GeofenceLog', 'GeofenceLocation', 'Employee', 'User', 'CompanySettings']);
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
+      return NextResponse.json({ message: auth.message }, { status: 401 });
     }
-    const { user, models } = auth
-    const { GeofenceLog, GeofenceLocation, Employee, User, CompanySettings } = models
+    const { models } = auth;
+    const { GeofenceLog, GeofenceLocation, Employee, User, CompanySettings } = models;
 
-    const { latitude, longitude, accuracy, eventType, reason } = await request.json()
+    const { latitude, longitude, accuracy, eventType, reason } = await request.json();
 
     if (!latitude || !longitude) {
       return NextResponse.json(
         { success: false, message: 'Location coordinates are required' },
         { status: 400 }
-      )
+      );
     }
 
     // Get user and employee data
-    const user = await User.findById(decoded.userId).populate('employeeId')
-    if (!user || !user.employeeId) {
+    const userRecord = await User.findById(decoded.userId).populate('employeeId');
+    if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json(
         { success: false, message: 'Employee not found' },
         { status: 404 }
-      )
+      );
     }
 
-    const employee = await Employee.findById(user.employeeId)
+    const employee = await Employee.findById(userRecord.employeeId)
       .populate('department')
       .populate('reportingManager')
 
@@ -288,31 +288,39 @@ export async function POST(request) {
 // GET - Get geofence logs (filtered by role and department)
 export async function GET(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
+    const token = request.headers.get('authorization')?.replace('Bearer ', '');
     if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
+      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 });
     }
 
-    const decoded = await verifyToken(token)
+    const decoded = await verifyToken(token);
     if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
+      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 });
     }
 
-    const { searchParams } = new URL(request.url)
-    const employeeId = searchParams.get('employeeId')
-    const status = searchParams.get('status')
-    const limit = parseInt(searchParams.get('limit')) || 50
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['GeofenceLog', 'Employee', 'User']);
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 });
+    }
+    const { models } = auth;
+    const { GeofenceLog, Employee, User } = models;
+
+    const { searchParams } = new URL(request.url);
+    const employeeId = searchParams.get('employeeId');
+    const status = searchParams.get('status');
+    const limit = parseInt(searchParams.get('limit')) || 50;
 
     // Get user and employee data
-    const user = await User.findById(decoded.userId).populate('employeeId')
-    if (!user || !user.employeeId) {
+    const userRecord = await User.findById(decoded.userId).populate('employeeId');
+    if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json(
         { success: false, message: 'Employee not found' },
         { status: 404 }
-      )
+      );
     }
 
-    const employee = await Employee.findById(user.employeeId)
+    const employee = await Employee.findById(userRecord.employeeId);
 
     let query = {}
 

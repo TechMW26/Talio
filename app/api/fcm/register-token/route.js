@@ -35,25 +35,24 @@ export async function POST(request) {
       )
     }
 
-    // Connect to database
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User'])
+    const auth = await getAuthAndModels(request, ['User']);
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
+      return NextResponse.json({ message: auth.message }, { status: 401 });
     }
-    const { user, models } = auth
-    const { User } = models
+    const { user: authUser, models } = auth;
+    const { User } = models;
 
     // Find user
-    const user = await User.findById(decoded.userId)
-    if (!user) {
+    const userRecord = await User.findById(decoded.userId);
+    if (!userRecord) {
       return NextResponse.json(
         { success: false, message: 'User not found' },
         { status: 404 }
-      )
+      );
     }
 
-    console.log(`[OneSignal] User ${user.email} registered with device: ${device}`)
+    console.log(`[OneSignal] User ${userRecord.email} registered with device: ${device}`);
 
     return NextResponse.json({
       success: true,

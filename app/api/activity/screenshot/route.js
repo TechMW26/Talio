@@ -73,14 +73,12 @@ export async function POST(request) {
     }
 
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User', 'Employee'])
+    const auth = await getAuthAndModels(request, ['User', 'Employee']);
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
+      return NextResponse.json({ message: auth.message }, { status: 401 });
     }
-    const { user, models } = auth
-    const { User, Employee } = models
-
-    ;
+    const { models } = auth;
+    const { User, Employee } = models;
 
     // Get form data
     const formData = await request.formData();
@@ -110,16 +108,16 @@ export async function POST(request) {
     }
 
     // Get employee info with full details for folder structure
-    const user = await User.findById(userId).select('employeeId name email');
+    const userRecord = await User.findById(userId).select('employeeId name email');
     let employee = null;
-    let employeeId = user?.employeeId;
+    let employeeId = userRecord?.employeeId;
 
     if (employeeId) {
       employee = await Employee.findById(employeeId).select('firstName lastName employeeCode');
     }
 
-    if (!employee && user?.email) {
-      employee = await Employee.findOne({ email: user.email.toLowerCase() }).select('firstName lastName employeeCode');
+    if (!employee && userRecord?.email) {
+      employee = await Employee.findOne({ email: userRecord.email.toLowerCase() }).select('firstName lastName employeeCode');
       if (employee) {
         employeeId = employee._id;
       }

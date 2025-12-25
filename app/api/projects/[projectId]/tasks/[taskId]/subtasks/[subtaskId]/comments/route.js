@@ -21,7 +21,7 @@ export async function GET(request, { params }) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
+    const { models } = auth
     const { Task, TaskAssignee, User, Employee, Project } = models
 
     const { taskId, subtaskId } = await params

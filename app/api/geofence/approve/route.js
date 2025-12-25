@@ -17,39 +17,39 @@ export async function POST(request) {
     }
 
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['GeofenceLog', 'Employee', 'User'])
+    const auth = await getAuthAndModels(request, ['GeofenceLog', 'Employee', 'User']);
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
+      return NextResponse.json({ message: auth.message }, { status: 401 });
     }
-    const { user, models } = auth
-    const { GeofenceLog, Employee, User } = models
+    const { models } = auth;
+    const { GeofenceLog, Employee, User } = models;
 
-    const { logId, action, comments } = await request.json()
+    const { logId, action, comments } = await request.json();
 
     if (!logId || !action) {
       return NextResponse.json(
         { success: false, message: 'Log ID and action are required' },
         { status: 400 }
-      )
+      );
     }
 
     if (!['approved', 'rejected'].includes(action)) {
       return NextResponse.json(
         { success: false, message: 'Invalid action. Must be "approved" or "rejected"' },
         { status: 400 }
-      )
+      );
     }
 
     // Get user and employee data
-    const user = await User.findById(decoded.userId).populate('employeeId')
-    if (!user || !user.employeeId) {
+    const userRecord = await User.findById(decoded.userId).populate('employeeId');
+    if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json(
         { success: false, message: 'Employee not found' },
         { status: 404 }
-      )
+      );
     }
 
-    const reviewer = await Employee.findById(user.employeeId)
+    const reviewer = await Employee.findById(userRecord.employeeId);
 
     // Get the geofence log
     const log = await GeofenceLog.findById(logId)

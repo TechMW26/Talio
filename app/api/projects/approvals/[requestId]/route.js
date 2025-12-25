@@ -22,7 +22,7 @@ export async function PUT(request, { params }) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
+    const { models } = auth
     const { Project, Task, TaskAssignee, ProjectApprovalRequest, User, Employee } = models
 
     const { requestId } = await params

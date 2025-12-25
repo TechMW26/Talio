@@ -7,52 +7,52 @@ const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET)
 export async function POST(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Helpdesk', 'User'])
+    const auth = await getAuthAndModels(request, ['Helpdesk', 'User']);
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
+      return NextResponse.json({ message: auth.message }, { status: 401 });
     }
-    const { user, models } = auth
-    const { Helpdesk, User } = models
+    const { models } = auth;
+    const { Helpdesk, User } = models;
 
-    const { id } = await params
+    const { id } = await params;
     
     // Verify auth
-    const authHeader = request.headers.get('authorization')
+    const authHeader = request.headers.get('authorization');
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json(
         { success: false, message: 'Unauthorized' },
         { status: 401 }
-      )
+      );
     }
 
-    const token = authHeader.substring(7)
-    let decoded
+    const token = authHeader.substring(7);
+    let decoded;
     try {
-      decoded = await jwtVerify(token, JWT_SECRET)
+      decoded = await jwtVerify(token, JWT_SECRET);
     } catch {
       return NextResponse.json(
         { success: false, message: 'Invalid token' },
         { status: 401 }
-      )
+      );
     }
 
-    const userId = decoded.payload.userId
-    const user = await User.findById(userId).populate('employeeId')
-    if (!user || !user.employeeId) {
+    const userId = decoded.payload.userId;
+    const userRecord = await User.findById(userId).populate('employeeId');
+    if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json(
         { success: false, message: 'User not found' },
         { status: 404 }
-      )
+      );
     }
 
-    const data = await request.json()
-    const { comment, isInternal = false } = data
+    const data = await request.json();
+    const { comment, isInternal = false } = data;
 
     if (!comment || !comment.trim()) {
       return NextResponse.json(
         { success: false, message: 'Comment is required' },
         { status: 400 }
-      )
+      );
     }
 
     const ticket = await Helpdesk.findByIdAndUpdate(
@@ -61,7 +61,7 @@ export async function POST(request, { params }) {
         $push: {
           comments: {
             comment: comment.trim(),
-            commentedBy: user.employeeId._id,
+            commentedBy: userRecord.employeeId._id,
             commentedAt: new Date(),
             isInternal
           }

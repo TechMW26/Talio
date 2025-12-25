@@ -9,7 +9,7 @@ export async function GET(request, { params }) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
+    const { models } = auth
     const { Employee, Department, Designation, User } = models
 
     const { id } = params

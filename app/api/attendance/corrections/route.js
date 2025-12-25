@@ -81,7 +81,7 @@ export async function GET(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
+    const { models } = auth
     const { AttendanceCorrection, Attendance, Employee, Department, User, CompanySettings } = models
 
     const { searchParams } = new URL(request.url)

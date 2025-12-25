@@ -24,7 +24,7 @@ export async function GET(request, { params }) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
+    const { models } = auth
     const { Meeting, Employee, User } = models
 
     const meeting = await Meeting.findById(id)

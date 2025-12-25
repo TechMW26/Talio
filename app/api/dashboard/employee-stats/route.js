@@ -18,30 +18,30 @@ export async function GET(request) {
     }
 
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Attendance', 'LeaveBalance', 'LeaveType', 'Payroll', 'Employee', 'Designation', 'Department', 'User', 'Performance'])
+    const auth = await getAuthAndModels(request, ['Attendance', 'LeaveBalance', 'LeaveType', 'Payroll', 'Employee', 'Designation', 'Department', 'User', 'Performance']);
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
+      return NextResponse.json({ message: auth.message }, { status: 401 });
     }
-    const { user, models } = auth
-    const { Attendance, LeaveBalance, LeaveType, Payroll, Employee, Designation, Department, User, Performance } = models
+    const { models } = auth;
+    const { Attendance, LeaveBalance, LeaveType, Payroll, Employee, Designation, Department, User, Performance } = models;
 
     // Find the user first to get the employeeId
-    const user = await User.findById(decoded.userId).populate({
+    const userWithEmployee = await User.findById(decoded.userId).populate({
       path: 'employeeId',
       populate: [
         { path: 'designation', select: 'title code levelName' },
         { path: 'department', select: 'name' }
       ]
-    })
-    if (!user) {
-      return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
+    });
+    if (!userWithEmployee) {
+      return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 });
     }
 
-    if (!user.employeeId) {
-      return NextResponse.json({ success: false, message: 'Employee profile not found' }, { status: 404 })
+    if (!userWithEmployee.employeeId) {
+      return NextResponse.json({ success: false, message: 'Employee profile not found' }, { status: 404 });
     }
 
-    const employee = user.employeeId
+    const employee = userWithEmployee.employeeId;
 
     const currentDate = new Date()
     const currentMonth = currentDate.getMonth() + 1

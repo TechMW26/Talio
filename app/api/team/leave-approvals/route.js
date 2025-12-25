@@ -10,7 +10,7 @@ export async function GET(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
+    const { models } = auth
     const { Department, Employee, Leave } = models
 
     // Get user's employee ID from auth

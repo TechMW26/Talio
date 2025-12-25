@@ -102,7 +102,7 @@ export async function GET(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
+    const { models } = auth
     const { User, Employee, Leave, Attendance, Department, Designation, Document, Asset, Announcement, Policy } = models
 
     const user = await User.findById(decoded.userId).populate('employeeId')
