@@ -1,31 +1,21 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { logActivity } from '@/lib/activityLogger'
 
 // GET - Fetch all pending leave requests for department
 export async function GET(request) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Department', 'Employee', 'Leave', 'User'])
+    const auth = await getAuthAndModels(request, ['Department', 'Employee', 'Leave'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Department, Employee, Leave, User } = models
+    const { Department, Employee, Leave } = models
 
-    // Get user's employee ID
-    const user = await User.findById(decoded.userId).select('employeeId')
-    if (!user || !user.employeeId) {
+    // Get user's employee ID from auth
+    const employeeId = user?.employeeId?._id || user?.employeeId
+    if (!employeeId) {
       // Return empty data for users without employee records
       return NextResponse.json({
         success: true,
@@ -36,7 +26,7 @@ export async function GET(request) {
 
     // Check if user is a department head
     const department = await Department.findOne({ 
-      head: user.employeeId,
+      head: employeeId,
       isActive: true 
     })
 

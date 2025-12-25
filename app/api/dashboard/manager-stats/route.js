@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -7,27 +7,16 @@ export const dynamic = 'force-dynamic'
 // GET - Get Manager dashboard statistics
 export async function GET(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Employee', 'Leave', 'Attendance', 'Performance', 'User', 'Department'])
+    const auth = await getAuthAndModels(request, ['Employee', 'Leave', 'Attendance', 'Performance', 'Department'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Employee, Leave, Attendance, Performance, User, Department } = models
+    const { Employee, Leave, Attendance, Performance, Department } = models
 
-    // Get user to find employee ID
-    const user = await User.findById(decoded.userId).select('employeeId role').lean()
-    if (!user || !user.employeeId) {
+    // Check if user has employee ID
+    if (!user.employeeId) {
       // Return empty stats for users without employee records
       return NextResponse.json({
         success: true,
@@ -51,7 +40,7 @@ export async function GET(request) {
     }
 
     // Find the manager's employee record
-    const manager = await Employee.findById(user.employeeId)
+    const manager = await Employee.findById(user.employeeId._id || user.employeeId)
     if (!manager) {
       return NextResponse.json({ success: false, message: 'Manager not found' }, { status: 404 })
     }

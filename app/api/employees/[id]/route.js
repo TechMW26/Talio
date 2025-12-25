@@ -16,9 +16,6 @@ const isImageKitConfigured = () => {
   )
 }
 
-// Ensure models are registered for populate
-const _ensureModels = { Department, Designation, Company };
-
 // GET - Get single employee
 export async function GET(request, { params }) {
   try {
@@ -105,14 +102,14 @@ export async function GET(request, { params }) {
     }
 
     // Get user data for this employee (reverse lookup)
-    const user = await User.findOne({ employeeId: employee._id })
+    const employeeUser = await User.findOne({ employeeId: employee._id })
       .select('_id email role')
       .lean()
 
     // Add user data to employee
     const employeeWithUser = {
       ...employee,
-      userId: user || null
+      userId: employeeUser || null
     }
 
     const response = {

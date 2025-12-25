@@ -1,30 +1,20 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { getTodaysTasks, getUserProjectsSummaryForMaya } from '@/lib/projectService'
 
 // GET - Get user's tasks (today's, pending, all)
 export async function GET(request) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Task', 'TaskAssignee', 'User'])
+    const auth = await getAuthAndModels(request, ['Task', 'TaskAssignee'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Task, TaskAssignee, User } = models
+    const { Task, TaskAssignee } = models
 
-    const user = await User.findById(decoded.userId).select('employeeId')
-    if (!user || !user.employeeId) {
+    const employeeId = user?.employeeId?._id || user?.employeeId
+    if (!employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -34,7 +24,7 @@ export async function GET(request) {
 
     // Get all assignments for user
     const assignmentQuery = {
-      user: user.employeeId,
+      user: employeeId,
       assignmentStatus: { $in: ['pending', 'accepted'] }
     }
     

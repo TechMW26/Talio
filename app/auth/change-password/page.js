@@ -59,6 +59,10 @@ export default function ChangePasswordPage() {
 
         const data = await response.json()
 
+        // CRITICAL: Ensure cookie is set before any redirects
+        // This fixes the loop where localStorage has token but cookie is missing
+        document.cookie = `token=${token}; path=/; max-age=${7 * 24 * 60 * 60}` // 7 days
+
         if (!data.forcePasswordChange) {
           router.push('/dashboard')
           return

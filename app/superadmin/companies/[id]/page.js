@@ -18,6 +18,14 @@ export default function CompanyDetailPage({ params }) {
   const [showEmailModal, setShowEmailModal] = useState(false)
   const [emailForm, setEmailForm] = useState({ subject: '', body: '' })
   const [sendingEmail, setSendingEmail] = useState(false)
+  // Admin management state
+  const [admins, setAdmins] = useState([])
+  const [loadingAdmins, setLoadingAdmins] = useState(false)
+  const [showAdminModal, setShowAdminModal] = useState(false)
+  const [adminForm, setAdminForm] = useState({ email: '', password: '', firstName: '', lastName: '', phone: '' })
+  const [creatingAdmin, setCreatingAdmin] = useState(false)
+  const [resettingPassword, setResettingPassword] = useState(null)
+  const [newPassword, setNewPassword] = useState('')
 
   useEffect(() => {
     fetchCompany()
@@ -57,6 +65,120 @@ export default function CompanyDetailPage({ params }) {
       setLoading(false)
     }
   }
+
+  // Fetch admins for this company
+  const fetchAdmins = async () => {
+    try {
+      setLoadingAdmins(true)
+      const token = localStorage.getItem('superadmin_token')
+      const res = await fetch(`/api/superadmin/companies/${id}/admin`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json()
+      if (data.success) {
+        setAdmins(data.admins)
+      }
+    } catch (error) {
+      console.error('Failed to fetch admins:', error)
+    } finally {
+      setLoadingAdmins(false)
+    }
+  }
+
+  // Create new admin
+  const createAdmin = async (e) => {
+    e.preventDefault()
+    if (!adminForm.email || !adminForm.password || !adminForm.firstName) {
+      toast.error('Email, password, and first name are required')
+      return
+    }
+    try {
+      setCreatingAdmin(true)
+      const token = localStorage.getItem('superadmin_token')
+      const res = await fetch(`/api/superadmin/companies/${id}/admin`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(adminForm),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('Admin created successfully!')
+        setShowAdminModal(false)
+        setAdminForm({ email: '', password: '', firstName: '', lastName: '', phone: '' })
+        fetchAdmins()
+        fetchCompany() // Refresh company data (setup status might have changed)
+      } else {
+        toast.error(data.message)
+      }
+    } catch (error) {
+      toast.error('Failed to create admin')
+    } finally {
+      setCreatingAdmin(false)
+    }
+  }
+
+  // Reset admin password
+  const resetAdminPassword = async (userId) => {
+    if (!newPassword || newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters')
+      return
+    }
+    try {
+      const token = localStorage.getItem('superadmin_token')
+      const res = await fetch(`/api/superadmin/companies/${id}/admin`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ userId, password: newPassword }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('Password reset successfully!')
+        setResettingPassword(null)
+        setNewPassword('')
+      } else {
+        toast.error(data.message)
+      }
+    } catch (error) {
+      toast.error('Failed to reset password')
+    }
+  }
+
+  // Toggle admin active status
+  const toggleAdminStatus = async (userId, currentStatus) => {
+    try {
+      const token = localStorage.getItem('superadmin_token')
+      const res = await fetch(`/api/superadmin/companies/${id}/admin`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ userId, isActive: !currentStatus }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(`Admin ${currentStatus ? 'deactivated' : 'activated'} successfully!`)
+        fetchAdmins()
+      } else {
+        toast.error(data.message)
+      }
+    } catch (error) {
+      toast.error('Failed to update admin status')
+    }
+  }
+
+  // Load admins when switching to admins tab
+  useEffect(() => {
+    if (activeTab === 'admins' && company) {
+      fetchAdmins()
+    }
+  }, [activeTab, company])
 
   const updateCompany = async (updates) => {
     try {
@@ -271,6 +393,7 @@ export default function CompanyDetailPage({ params }) {
 
   const tabs = [
     { id: 'overview', label: 'Overview' },
+    { id: 'admins', label: 'Admins' },
     { id: 'business', label: 'Business Details' },
     { id: 'subscription', label: 'Subscription' },
     { id: 'payments', label: 'Payments' },
@@ -521,6 +644,156 @@ export default function CompanyDetailPage({ params }) {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Admin Management Tab */}
+        {activeTab === 'admins' && (
+          <div className="space-y-6">
+            {/* Header */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">Admin Users</h2>
+                <p className="text-sm text-gray-500">Manage admin accounts for this company</p>
+              </div>
+              <button
+                onClick={() => setShowAdminModal(true)}
+                className="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors flex items-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                Add Admin
+              </button>
+            </div>
+
+            {/* Admins List */}
+            {loadingAdmins ? (
+              <div className="animate-pulse space-y-4">
+                {[1, 2].map((i) => (
+                  <div key={i} className="bg-gray-100 rounded-2xl h-24"></div>
+                ))}
+              </div>
+            ) : admins.length === 0 ? (
+              <div className="bg-white rounded-2xl p-8 border border-gray-200 shadow-sm text-center">
+                <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No Admin Users</h3>
+                <p className="text-gray-500 mb-4">This company doesn&apos;t have any admin users yet. Create one to allow access.</p>
+                <button
+                  onClick={() => setShowAdminModal(true)}
+                  className="px-6 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors"
+                >
+                  Create First Admin
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {admins.map((admin) => (
+                  <div key={admin._id} className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center text-white font-bold">
+                          {admin.employee?.firstName?.charAt(0) || admin.email?.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <h3 className="font-medium text-gray-900">
+                            {admin.employee ? `${admin.employee.firstName} ${admin.employee.lastName || ''}` : admin.email}
+                          </h3>
+                          <p className="text-sm text-gray-500">{admin.email}</p>
+                          {admin.employee?.employeeId && (
+                            <p className="text-xs text-gray-400 font-mono">{admin.employee.employeeId}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-1 text-xs rounded-full ${
+                          admin.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                        }`}>
+                          {admin.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                        {admin.forcePasswordChange && (
+                          <span className="px-2 py-1 text-xs rounded-full bg-orange-100 text-orange-700">
+                            Password Change Required
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap items-center gap-3">
+                      {/* Reset Password */}
+                      {resettingPassword === admin._id ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="password"
+                            placeholder="New password (min 6 chars)"
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          />
+                          <button
+                            onClick={() => resetAdminPassword(admin._id)}
+                            className="px-3 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={() => { setResettingPassword(null); setNewPassword(''); }}
+                            className="px-3 py-2 bg-gray-100 text-gray-700 text-sm rounded-lg hover:bg-gray-200"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setResettingPassword(admin._id)}
+                          className="px-3 py-2 bg-blue-100 text-blue-700 text-sm rounded-lg hover:bg-blue-200 transition-colors flex items-center gap-1"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                          </svg>
+                          Reset Password
+                        </button>
+                      )}
+                      
+                      {/* Toggle Active */}
+                      <button
+                        onClick={() => toggleAdminStatus(admin._id, admin.isActive)}
+                        className={`px-3 py-2 text-sm rounded-lg transition-colors flex items-center gap-1 ${
+                          admin.isActive 
+                            ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                            : 'bg-green-100 text-green-700 hover:bg-green-200'
+                        }`}
+                      >
+                        {admin.isActive ? (
+                          <>
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                            </svg>
+                            Deactivate
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            Activate
+                          </>
+                        )}
+                      </button>
+
+                      {/* Last Login */}
+                      <span className="text-xs text-gray-400 ml-auto">
+                        Last login: {admin.lastLogin ? new Date(admin.lastLogin).toLocaleString() : 'Never'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -1072,6 +1345,112 @@ export default function CompanyDetailPage({ params }) {
           </div>
         )}
       </div>
+
+      {/* Create Admin Modal */}
+      {showAdminModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-gray-900">Create Admin User</h2>
+                <button
+                  onClick={() => setShowAdminModal(false)}
+                  className="p-2 text-gray-400 hover:text-gray-600 rounded-lg"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <form onSubmit={createAdmin} className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">First Name *</label>
+                  <input
+                    type="text"
+                    value={adminForm.firstName}
+                    onChange={(e) => setAdminForm({ ...adminForm, firstName: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white"
+                    placeholder="John"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
+                  <input
+                    type="text"
+                    value={adminForm.lastName}
+                    onChange={(e) => setAdminForm({ ...adminForm, lastName: e.target.value })}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white"
+                    placeholder="Doe"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Email *</label>
+                <input
+                  type="email"
+                  value={adminForm.email}
+                  onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white"
+                  placeholder="admin@company.com"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Password *</label>
+                <input
+                  type="password"
+                  value={adminForm.password}
+                  onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white"
+                  placeholder="Min 6 characters"
+                  minLength={6}
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-1">User will be required to change password on first login</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
+                <input
+                  type="tel"
+                  value={adminForm.phone}
+                  onChange={(e) => setAdminForm({ ...adminForm, phone: e.target.value })}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white"
+                  placeholder="+91 98765 43210"
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowAdminModal(false)}
+                  className="px-6 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={creatingAdmin || !adminForm.email || !adminForm.password || !adminForm.firstName}
+                  className="px-6 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                >
+                  {creatingAdmin ? (
+                    <>
+                      <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Creating...
+                    </>
+                  ) : (
+                    <>Create Admin</>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Email Modal */}
       {showEmailModal && (

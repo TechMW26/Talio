@@ -21,20 +21,21 @@ export async function GET(request, context) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Chat, Employee, User } = models
+    const { Chat, Employee } = models
 
     const params = await context.params
     const { chatId } = params
 
-    // Get user to find employee ID
-    const userDoc = await User.findById(decoded.userId).select('employeeId')
-    if (!userDoc || !userDoc.employeeId) {
+    // Get employee ID from authenticated user
+    if (!user || !user.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
+    const employeeId = user.employeeId._id || user.employeeId
+
     // Get employee details
-    const user = await Employee.findById(userDoc.employeeId)
-    if (!user) {
+    const employee = await Employee.findById(employeeId)
+    if (!employee) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -47,7 +48,7 @@ export async function GET(request, context) {
     }
 
     // Check if user is a participant
-    const isParticipant = chat.participants.some(p => p.toString() === user._id.toString())
+    const isParticipant = chat.participants.some(p => p.toString() === employee._id.toString())
     if (!isParticipant) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 403 })
     }
@@ -82,30 +83,29 @@ export async function GET(request, context) {
 // POST - Send a message
 export async function POST(request, context) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Chat', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
+    const { user, models } = auth
+    const { Chat, Employee } = models
 
     const params = await context.params
     const { chatId } = params
     const body = await request.json()
     const { content, fileUrl, fileId, fileName, fileType, fileSize, replyTo } = body
 
-    // Get user to find employee ID
-    const userDoc = await User.findById(decoded.userId).select('employeeId')
-    if (!userDoc || !userDoc.employeeId) {
+    // Get employee ID from authenticated user
+    if (!user || !user.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
+    const employeeId = user.employeeId._id || user.employeeId
+
     // Get employee details
-    const user = await Employee.findById(userDoc.employeeId)
-    if (!user) {
+    const employee = await Employee.findById(employeeId)
+    if (!employee) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -116,19 +116,19 @@ export async function POST(request, context) {
     }
 
     // Check if user is a participant
-    const isParticipant = chat.participants.some(p => p.toString() === user._id.toString())
+    const isParticipant = chat.participants.some(p => p.toString() === employee._id.toString())
     if (!isParticipant) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 403 })
     }
 
     // Create message
     const message = {
-      sender: user._id,
+      sender: employee._id,
       content: content || '',
       createdAt: new Date(),
       // Mark as read by sender immediately
       isRead: [{
-        user: user._id,
+        user: employee._id,
         readAt: new Date()
       }]
     }

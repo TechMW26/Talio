@@ -25,11 +25,6 @@ async function getUserFromToken(request) {
  */
 export async function GET(request) {
   try {
-    const user = await getUserFromToken(request)
-    if (!user) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['OvertimeRequest', 'Attendance', 'Employee', 'CompanySettings'])
     if (!auth.success) {

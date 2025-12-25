@@ -19,10 +19,9 @@ export async function GET(request) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Chat, User } = models
+    const { Chat } = models
 
-    // Get user's employee ID
-    const user = await User.findById(decoded.userId).select('employeeId')
+    // Check user's employee ID
     if (!user || !user.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
@@ -50,21 +49,20 @@ export async function GET(request) {
 // POST - Create a new chat (direct or group)
 export async function POST(request) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Chat'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
+    const { user, models } = auth
+    const { Chat } = models
 
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
-    // Get user's employee ID
-    const user = await User.findById(decoded.userId).select('employeeId')
+    // Check user's employee ID
     if (!user || !user.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
+
+    const employeeId = user.employeeId._id || user.employeeId
 
     const body = await request.json()
     const { isGroup, participants, name } = body
@@ -82,7 +80,7 @@ export async function POST(request) {
 
       const existingChat = await Chat.findOne({
         isGroup: false,
-        participants: { $all: [user.employeeId, participants[0]] }
+        participants: { $all: [employeeId, participants[0]] }
       })
 
       if (existingChat) {
@@ -97,8 +95,8 @@ export async function POST(request) {
     // Create new chat
     const chatData = {
       isGroup,
-      participants: isGroup ? [...participants, user.employeeId] : [user.employeeId, participants[0]],
-      createdBy: user.employeeId,
+      participants: isGroup ? [...participants, employeeId] : [employeeId, participants[0]],
+      createdBy: employeeId,
       messages: []
     }
 
@@ -107,7 +105,7 @@ export async function POST(request) {
         return NextResponse.json({ success: false, message: 'Group name is required' }, { status: 400 })
       }
       chatData.name = name
-      chatData.admin = user.employeeId
+      chatData.admin = employeeId
     }
 
     const chat = await Chat.create(chatData)

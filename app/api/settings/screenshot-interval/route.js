@@ -33,9 +33,6 @@ export async function POST(request) {
     const { user, models } = auth
     const { User } = models
 
-    ;
-
-    const user = await User.findById(userId).select('role');
     if (!user) {
       return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 });
     }

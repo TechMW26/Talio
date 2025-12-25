@@ -89,8 +89,7 @@ export async function GET(request) {
     const employeeId = searchParams.get('employeeId')
     const type = searchParams.get('type') // 'my' for own requests, 'pending' for requests to approve
 
-    const user = await User.findById(decoded.userId).populate('employeeId').lean()
-    const userEmployeeId = user?.employeeId?._id?.toString()
+    const userEmployeeId = user?.employeeId?._id?.toString() || user?.employeeId?.toString()
 
     let query = {}
 

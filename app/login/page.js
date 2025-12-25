@@ -16,25 +16,13 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [checking, setChecking] = useState(true)
 
-  // Check if user is already logged in or if setup is needed
+  // Check if user is already logged in
   useEffect(() => {
     const checkSession = async () => {
       console.log('[Login Page] Checking session...')
       
-      // First, check if initial setup is needed
-      try {
-        const setupResponse = await fetch('/api/setup/check')
-        const setupData = await setupResponse.json()
-        
-        if (setupData.success && setupData.needsSetup) {
-          console.log('[Login Page] Initial setup needed, redirecting to setup...')
-          window.location.href = '/setup'
-          return
-        }
-      } catch (setupError) {
-        console.error('[Login Page] Setup check error:', setupError)
-        // Continue with normal login flow if setup check fails
-      }
+      // Multi-tenant: No setup check needed - admin accounts are created by superadmin
+      // Login uses dynamic tenant detection based on user email
       
       const token = localStorage.getItem('token')
       const user = localStorage.getItem('user')
@@ -53,6 +41,10 @@ export default function LoginPage() {
           
           if (response.ok) {
             const data = await response.json()
+            
+            // CRITICAL: Ensure cookie is set before redirecting
+            // This fixes the loop where localStorage has token but cookie is missing
+            document.cookie = `token=${token}; path=/; max-age=${7 * 24 * 60 * 60}` // 7 days
             
             // Check if user needs to change password
             if (data.forcePasswordChange) {

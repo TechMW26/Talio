@@ -25,18 +25,17 @@ export async function GET(request) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Project, ProjectMember, User } = models
+    const { Project, ProjectMember } = models
 
     const { searchParams } = new URL(request.url)
     const view = searchParams.get('view') || 'all'
     const timeframe = searchParams.get('timeframe') || 'all'
 
-    const user = await User.findById(decoded.userId).select('employeeId role')
     if (!user) {
       return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
     }
 
-    const empId = user.employeeId?.toString()
+    const empId = user.employeeId?._id?.toString() || user.employeeId?.toString()
 
     // Get projects where user is a member
     const memberProjectIds = await ProjectMember.find({

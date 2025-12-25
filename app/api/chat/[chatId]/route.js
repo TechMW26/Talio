@@ -1,31 +1,20 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 // GET - Fetch a single chat by ID
 export async function GET(request, context) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Chat', 'User'])
+    const auth = await getAuthAndModels(request, ['Chat'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Chat, User } = models
+    const { Chat } = models
 
     const { chatId } = await context.params
 
-    // Get user's employee ID
-    const user = await User.findById(decoded.userId).select('employeeId')
-    if (!user || !user.employeeId) {
+    // Get user's employee ID from authenticated user
+    if (!user.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -41,7 +30,7 @@ export async function GET(request, context) {
 
     // Verify user is a participant
     const isParticipant = chat.participants.some(
-      p => p._id.toString() === user.employeeId.toString()
+      p => p._id.toString() === user.employeeId._id.toString()
     )
 
     if (!isParticipant) {

@@ -1,36 +1,27 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 export async function DELETE(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Chat', 'User', 'Employee'])
+    const auth = await getAuthAndModels(request, ['Chat', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Chat, User, Employee } = models
-
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const decoded = verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, error: 'Invalid token' }, { status: 401 })
-    }
+    const { Chat, Employee } = models
 
     const { chatId, messageId } = params
 
-    // Get user to find employee ID
-    const userDoc = await User.findById(decoded.userId).select('employeeId')
-    if (!userDoc || !userDoc.employeeId) {
+    // Get employee ID from authenticated user
+    if (!user || !user.employeeId) {
       return NextResponse.json({ success: false, error: 'Employee not found' }, { status: 404 })
     }
 
+    const employeeId = user.employeeId._id || user.employeeId
+
     // Get employee details
-    const user = await Employee.findById(userDoc.employeeId)
-    if (!user) {
+    const employee = await Employee.findById(employeeId)
+    if (!employee) {
       return NextResponse.json({ success: false, error: 'Employee not found' }, { status: 404 })
     }
 
@@ -47,7 +38,7 @@ export async function DELETE(request, { params }) {
     }
 
     // Check if user is the sender
-    if (message.sender.toString() !== user._id.toString()) {
+    if (message.sender.toString() !== employee._id.toString()) {
       return NextResponse.json({ success: false, error: 'You can only delete your own messages' }, { status: 403 })
     }
 

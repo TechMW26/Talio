@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import ProjectCompletionApproval from '@/models/ProjectCompletionApproval'
 import { 
   checkProjectAccess, 
@@ -11,28 +11,18 @@ import {
 // GET - Get project details
 export async function GET(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'Task', 'TaskAssignee', 'ProjectTimelineEvent', 'User', 'Employee', 'Chat'])
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'Task', 'TaskAssignee', 'ProjectTimelineEvent', 'Employee', 'Chat'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Project, ProjectMember, Task, TaskAssignee, ProjectTimelineEvent, User, Employee, Chat } = models
+    const { Project, ProjectMember, Task, TaskAssignee, ProjectTimelineEvent, Employee, Chat } = models
 
     const { projectId } = await params
 
-    const user = await User.findById(decoded.userId).select('employeeId role')
-    if (!user || !user.employeeId) {
+    const employeeId = user?.employeeId?._id || user?.employeeId
+    if (!employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -50,7 +40,7 @@ export async function GET(request, { params }) {
     // Check access (allow admins to view any project)
     const isAdmin = ['admin', 'hr'].includes(user.role)
     if (!isAdmin) {
-      const { hasAccess } = await checkProjectAccess(projectId, user.employeeId, 'view')
+      const { hasAccess } = await checkProjectAccess(projectId, employeeId, 'view')
       if (!hasAccess) {
         return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
       }
@@ -113,20 +103,18 @@ export async function GET(request, { params }) {
 // PUT - Update project
 export async function PUT(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Project', 'Employee', 'Chat'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
+    const { user, models } = auth
+    const { Project, Employee, Chat } = models
 
     const { projectId } = await params
 
-    const user = await User.findById(decoded.userId).select('employeeId role')
-    if (!user || !user.employeeId) {
+    const employeeId = user?.employeeId?._id || user?.employeeId
+    if (!employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -137,7 +125,7 @@ export async function PUT(request, { params }) {
 
     // Only project head can update project (except admins)
     const isAdmin = ['admin'].includes(user.role)
-    const isHead = project.projectHead.toString() === user.employeeId.toString()
+    const isHead = project.projectHead.toString() === employeeId.toString()
 
     if (!isAdmin && !isHead) {
       return NextResponse.json({ 
@@ -183,7 +171,7 @@ export async function PUT(request, { params }) {
 
     // Handle status change separately using service
     if (status && status !== project.status) {
-      const employee = await Employee.findById(user.employeeId)
+      const employee = await Employee.findById(employeeId)
       try {
         await updateProjectStatus(projectId, status, employee, { reason: 'Manual update' })
       } catch (err) {
@@ -194,11 +182,11 @@ export async function PUT(request, { params }) {
     if (Object.keys(updates).length > 0) {
       await Project.findByIdAndUpdate(projectId, updates)
 
-      const employee = await Employee.findById(user.employeeId)
+      const employee = await Employee.findById(employeeId)
       await createTimelineEvent({
         project: projectId,
         type: 'project_updated',
-        createdBy: user.employeeId,
+        createdBy: employeeId,
         description: changes.join(', '),
         metadata: { changes, updates }
       })
@@ -223,20 +211,18 @@ export async function PUT(request, { params }) {
 // DELETE - Archive project
 export async function DELETE(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Project'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
+    const { user, models } = auth
+    const { Project } = models
 
     const { projectId } = await params
 
-    const user = await User.findById(decoded.userId).select('employeeId role')
-    if (!user || !user.employeeId) {
+    const employeeId = user?.employeeId?._id || user?.employeeId
+    if (!employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -247,7 +233,7 @@ export async function DELETE(request, { params }) {
 
     // Only admin or project head can archive
     const isAdmin = ['admin'].includes(user.role)
-    const isHead = project.projectHead.toString() === user.employeeId.toString()
+    const isHead = project.projectHead.toString() === employeeId.toString()
 
     if (!isAdmin && !isHead) {
       return NextResponse.json({ 
@@ -263,7 +249,7 @@ export async function DELETE(request, { params }) {
     await createTimelineEvent({
       project: projectId,
       type: 'project_status_changed',
-      createdBy: user.employeeId,
+      createdBy: employeeId,
       description: 'Project archived',
       metadata: { oldStatus: project.status, newStatus: 'archived' }
     })

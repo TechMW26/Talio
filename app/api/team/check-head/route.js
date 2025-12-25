@@ -1,37 +1,25 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 export const dynamic = 'force-dynamic'
 
 
 // GET - Check if user is a department head
 export async function GET(request) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Department', 'User', 'Employee'])
+    const auth = await getAuthAndModels(request, ['Department', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Department, User, Employee } = models
+    const { Department, Employee } = models
 
-    // Get user's employee ID
-    const user = await User.findById(decoded.userId).select('employeeId')
-
-    let employeeId = user?.employeeId;
+    // Get user's employee ID from auth
+    let employeeId = user?.employeeId?._id || user?.employeeId;
     
     // If user doesn't have employeeId directly, try to find employee by userId
     if (!employeeId) {
-      const employee = await Employee.findOne({ userId: decoded.userId }).select('_id');
+      const employee = await Employee.findOne({ userId: user._id }).select('_id');
       employeeId = employee?._id;
     }
 
@@ -55,7 +43,7 @@ export async function GET(request) {
     }).select('name code _id')
 
     console.log('[Check Head API] Result:', { 
-      userId: decoded.userId, 
+      userId: user._id, 
       employeeId: employeeId?.toString(), 
       isDepartmentHead: !!department,
       departmentId: department?._id?.toString(),
