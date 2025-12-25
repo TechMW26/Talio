@@ -1,9 +1,5 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import LeaveBalance from '@/models/LeaveBalance'
-import Employee from '@/models/Employee'
-import LeaveType from '@/models/LeaveType'
-import { verifyToken } from '@/lib/auth'
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 
 // GET - Get leave balances
 export async function GET(request) {
@@ -18,7 +14,13 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['LeaveBalance', 'Employee', 'LeaveType'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { LeaveBalance, Employee, LeaveType } = models
 
     const { searchParams } = new URL(request.url)
     const employeeId = searchParams.get('employeeId')
@@ -91,8 +93,6 @@ export async function POST(request) {
     if (!['admin', 'hr'].includes(decoded.role)) {
       return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
     }
-
-    await connectDB()
 
     const body = await request.json()
     const { employee, leaveType, totalDays, year } = body

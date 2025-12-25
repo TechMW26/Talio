@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Employee from '@/models/Employee'
-import LeaveType from '@/models/LeaveType'
-import LeaveBalance from '@/models/LeaveBalance'
-
+import { getAuthAndModels } from '@/lib/auth'
 // POST - Bulk allocate leave for all employees
 export async function POST(request) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Employee', 'LeaveType', 'LeaveBalance'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Employee, LeaveType, LeaveBalance } = models
 
     const { year } = await request.json()
     

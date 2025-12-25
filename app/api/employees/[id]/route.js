@@ -1,10 +1,5 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Employee from '@/models/Employee'
-import User from '@/models/User'
-import Department from '@/models/Department'
-import Designation from '@/models/Designation'
-import Company from '@/models/Company'
+import { getAuthAndModels } from '@/lib/auth'
 import queryCache from '@/lib/queryCache'
 import { logActivity } from '@/lib/activityLogger'
 import { uploadImageToImageKit, deleteFromImageKit, getImageKitFolder, generateEmployeeFolderName } from '@/lib/imagekit'
@@ -30,7 +25,13 @@ export async function GET(request, { params }) {
     // Await params in Next.js 15
     const { id } = await params;
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Employee', 'User', 'Department', 'Designation', 'Company'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Employee, User, Department, Designation, Company } = models
 
     // Check cache first
     const cacheKey = queryCache.generateKey('employee', id)
@@ -138,8 +139,6 @@ export async function PUT(request, { params }) {
   try {
     // Await params in Next.js 15
     const { id } = await params;
-
-    await connectDB()
 
     const data = await request.json()
 
@@ -352,8 +351,6 @@ export async function DELETE(request, { params }) {
     // Await params in Next.js 15
     const { id } = await params;
 
-    await connectDB()
-
     const employee = await Employee.findById(id)
     if (!employee) {
       return NextResponse.json(
@@ -437,8 +434,6 @@ export async function PATCH(request, { params }) {
         { status: 400 }
       )
     }
-
-    await connectDB()
 
     const employee = await Employee.findById(id)
     if (!employee) {

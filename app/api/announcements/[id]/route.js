@@ -1,13 +1,17 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Announcement from '@/models/Announcement'
-import User from '@/models/User'
+import { getAuthAndModels } from '@/lib/auth'
 import { sendPushToUsers } from '@/lib/pushNotification'
 
 // PUT - Update announcement
 export async function PUT(request, { params }) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Announcement', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Announcement, User } = models
 
     const data = await request.json()
 
@@ -68,8 +72,6 @@ export async function PUT(request, { params }) {
 // DELETE - Delete announcement
 export async function DELETE(request, { params }) {
   try {
-    await connectDB()
-
     const announcement = await Announcement.findByIdAndDelete(params.id)
 
     if (!announcement) {

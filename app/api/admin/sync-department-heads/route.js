@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
+import { getAuthAndModels } from '@/lib/auth'
 import { jwtVerify } from 'jose';
-import connectDB from '@/lib/mongodb';
-import User from '@/models/User';
+;
+;
 import { syncDepartmentHeadStatus, getAllDepartmentHeads } from '@/lib/departmentHeadSync';
 
 /**
@@ -15,7 +16,15 @@ import { syncDepartmentHeadStatus, getAllDepartmentHeads } from '@/lib/departmen
 
 export async function GET(request) {
   try {
-    await connectDB();
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { User } = models
+
+    ;
 
     // Verify authentication
     const authHeader = request.headers.get('authorization');
@@ -61,7 +70,7 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
-    await connectDB();
+    ;
 
     // Verify authentication
     const authHeader = request.headers.get('authorization');

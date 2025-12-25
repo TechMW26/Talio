@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
+import { getAuthAndModels } from '@/lib/auth'
 import { jwtVerify } from 'jose';
-import connectDB from '@/lib/mongodb';
+;
 import Screenshot from '@/models/Screenshot';
-import User from '@/models/User';
-import Employee from '@/models/Employee';
-import Department from '@/models/Department';
+;
+;
+;
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
@@ -103,7 +104,15 @@ export async function GET(request) {
     const limit = Math.min(parseInt(searchParams.get('limit')) || 100, 500);
     const skip = parseInt(searchParams.get('skip')) || 0;
 
-    await connectDB();
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { User, Employee, Department } = models
+
+    ;
 
     // Check access permission
     const canView = await canViewUserScreenshots(viewerId, targetUserId, viewerRole);

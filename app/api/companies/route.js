@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Company from '@/models/Company'
-import { verifyToken } from '@/lib/auth'
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 import { uploadImageToImageKit, getImageKitFolder } from '@/lib/imagekit'
 
 // Check if ImageKit is configured
@@ -16,7 +14,13 @@ const isImageKitConfigured = () => {
 // GET - List all companies
 export async function GET(request) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Company'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Company } = models
 
     const companies = await Company.find({ isActive: true })
       .populate('createdBy', 'email')
@@ -66,8 +70,6 @@ export async function POST(request) {
         { status: 403 }
       )
     }
-
-    await connectDB()
 
     const data = await request.json()
 

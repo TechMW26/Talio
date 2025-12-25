@@ -1,11 +1,4 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import User from '@/models/User'
-import Employee from '@/models/Employee'
-import Department from '@/models/Department'
-import Designation from '@/models/Designation'
-import CompanySettings from '@/models/CompanySettings'
-import UserSession from '@/models/UserSession'
 import { SignJWT } from 'jose'
 import { sendLoginAlertEmail } from '@/lib/mailer'
 import { sendPushToUser } from '@/lib/pushNotification'
@@ -13,10 +6,7 @@ import crypto from 'crypto'
 
 // Multi-tenant imports
 import { getTenantByEmail, updateUserLoginStats, checkServiceStatus } from '@/lib/tenantContext'
-import { getTenantModel, getTenantModels } from '@/lib/tenantModels'
-
-// Ensure models are registered for populate
-const _ensureModels = { Department, Designation };
+import { getTenantModels } from '@/lib/tenantModels'
 
 export async function POST(request) {
   try {
@@ -31,7 +21,7 @@ export async function POST(request) {
     }
 
     // ============================================
-    // MULTI-TENANT DETECTION
+    // MULTI-TENANT DETECTION (REQUIRED)
     // ============================================
     // Look up which tenant database this user belongs to
     let tenantInfo = null;
@@ -40,44 +30,44 @@ export async function POST(request) {
     try {
       tenantInfo = await getTenantByEmail(email);
     } catch (tenantError) {
-      console.warn('[Login] Tenant lookup failed, falling back to default:', tenantError.message);
+      console.error('[Login] Tenant lookup failed:', tenantError.message);
+      return NextResponse.json(
+        { message: 'Invalid email or password' },
+        { status: 401 }
+      );
     }
     
-    if (tenantInfo) {
-      // Check if tenant service is active
-      const serviceCheck = await checkServiceStatus(tenantInfo.databaseName);
-      if (!serviceCheck.active) {
-        return NextResponse.json(
-          { message: serviceCheck.reason || 'Service is currently unavailable' },
-          { status: 403 }
-        );
-      }
-      
-      console.log(`[Login] User ${email} belongs to tenant: ${tenantInfo.companySlug} (${tenantInfo.databaseName})`);
-      
-      // Get models bound to tenant database
-      const tenantModels = await getTenantModels(tenantInfo.databaseName, [
-        'User', 'Employee', 'Department', 'Designation', 'UserSession', 'CompanySettings'
-      ]);
-      
-      TenantUser = tenantModels.User;
-      TenantEmployee = tenantModels.Employee;
-      TenantDepartment = tenantModels.Department;
-      TenantDesignation = tenantModels.Designation;
-      TenantUserSession = tenantModels.UserSession;
-      TenantCompanySettings = tenantModels.CompanySettings;
-    } else {
-      // Fallback to default database (hrms_db) for backwards compatibility
-      console.log(`[Login] No tenant mapping found for ${email}, using default database`);
-      await connectDB();
-      
-      TenantUser = User;
-      TenantEmployee = Employee;
-      TenantDepartment = Department;
-      TenantDesignation = Designation;
-      TenantUserSession = UserSession;
-      TenantCompanySettings = CompanySettings;
+    if (!tenantInfo) {
+      // SECURITY: No tenant mapping = no access
+      console.warn(`[Login] No tenant mapping found for ${email} - access denied`);
+      return NextResponse.json(
+        { message: 'Invalid email or password' },
+        { status: 401 }
+      );
     }
+    
+    // Check if tenant service is active
+    const serviceCheck = await checkServiceStatus(tenantInfo.databaseName);
+    if (!serviceCheck.active) {
+      return NextResponse.json(
+        { message: serviceCheck.reason || 'Service is currently unavailable' },
+        { status: 403 }
+      );
+    }
+    
+    console.log(`[Login] User ${email} belongs to tenant: ${tenantInfo.companySlug} (${tenantInfo.databaseName})`);
+    
+    // Get models bound to tenant database
+    const tenantModels = await getTenantModels(tenantInfo.databaseName, [
+      'User', 'Employee', 'Department', 'Designation', 'UserSession', 'CompanySettings'
+    ]);
+    
+    TenantUser = tenantModels.User;
+    TenantEmployee = tenantModels.Employee;
+    TenantDepartment = tenantModels.Department;
+    TenantDesignation = tenantModels.Designation;
+    TenantUserSession = tenantModels.UserSession;
+    TenantCompanySettings = tenantModels.CompanySettings;
 
     // Find user and include password field (forcePasswordChange and isActive are included by default)
     const user = await TenantUser.findOne({ email }).select('+password')

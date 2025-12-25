@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import UserSession from '@/models/UserSession'
-import { verifyToken } from '@/lib/auth'
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 
 // DELETE - Revoke a specific session
 export async function DELETE(request, { params }) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['UserSession'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { UserSession } = models
 
     const token = request.headers.get('authorization')?.split(' ')[1]
     if (!token) {

@@ -1,15 +1,18 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Attendance from '@/models/Attendance'
-import Employee from '@/models/Employee'
-
+import { getAuthAndModels } from '@/lib/auth'
 export const dynamic = 'force-dynamic'
 
 
 // GET - Get attendance summary for dashboard
 export async function GET(request) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Attendance', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Attendance, Employee } = models
 
     const { searchParams } = new URL(request.url)
     const days = parseInt(searchParams.get('days')) || 7 // Default to last 7 days

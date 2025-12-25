@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Recruitment from '@/models/Recruitment'
-
+import { getAuthAndModels } from '@/lib/auth'
 // GET - Get single job posting
 export async function GET(request, { params }) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Recruitment'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Recruitment } = models
 
     const job = await Recruitment.findById(params.id)
       .populate('department', 'name')
@@ -34,8 +38,6 @@ export async function GET(request, { params }) {
 // PUT - Update job posting
 export async function PUT(request, { params }) {
   try {
-    await connectDB()
-
     const data = await request.json()
 
     const job = await Recruitment.findByIdAndUpdate(
@@ -70,8 +72,6 @@ export async function PUT(request, { params }) {
 // DELETE - Delete job posting
 export async function DELETE(request, { params }) {
   try {
-    await connectDB()
-
     const job = await Recruitment.findByIdAndDelete(params.id)
 
     if (!job) {

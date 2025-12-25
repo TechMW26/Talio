@@ -1,11 +1,6 @@
 import { NextResponse } from 'next/server'
+import { getAuthAndModels } from '@/lib/auth'
 import { jwtVerify } from 'jose'
-import connectDB from '@/lib/mongodb'
-import Attendance from '@/models/Attendance'
-import Employee from '@/models/Employee'
-import CompanySettings from '@/models/CompanySettings'
-import GeofenceLocation from '@/models/GeofenceLocation'
-import OvertimeRequest from '@/models/OvertimeRequest'
 import { calculateEffectiveWorkHours, determineAttendanceStatus } from '@/lib/attendanceShrinkage'
 import { sendPushToUser } from '@/lib/pushNotification'
 
@@ -45,7 +40,13 @@ export async function POST(request) {
     const token = authHeader.substring(7)
     const { payload } = await jwtVerify(token, JWT_SECRET)
     
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Attendance', 'Employee', 'CompanySettings', 'GeofenceLocation', 'OvertimeRequest'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Attendance, Employee, CompanySettings, GeofenceLocation, OvertimeRequest } = models
 
     const { latitude, longitude } = await request.json()
 

@@ -1,12 +1,5 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Employee from '@/models/Employee'
-import Leave from '@/models/Leave'
-import Attendance from '@/models/Attendance'
-import Recruitment from '@/models/Recruitment'
-import Performance from '@/models/Performance'
-import Payroll from '@/models/Payroll'
-import { verifyToken } from '@/lib/auth'
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,7 +17,13 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 403 })
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Employee', 'Leave', 'Attendance', 'Recruitment', 'Performance', 'Payroll'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Employee, Leave, Attendance, Recruitment, Performance, Payroll } = models
 
     // Date calculations
     const today = new Date()

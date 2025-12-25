@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server'
+import { getAuthAndModels } from '@/lib/auth'
 import { jwtVerify } from 'jose'
-import connectDB from '@/lib/mongodb'
-import User from '@/models/User'
-import Employee from '@/models/Employee'
 import PasswordResetToken from '@/models/PasswordResetToken'
 import { sendPasswordResetEmail } from '@/lib/mailer'
 
@@ -39,7 +37,13 @@ export async function POST(request, { params }) {
       )
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['User', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { User, Employee } = models
 
     // Verify requesting user is admin or HR
     const requestingUser = await User.findById(payload.userId).select('role')

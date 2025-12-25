@@ -4,7 +4,7 @@ import { useState, useEffect, use } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import Image from 'next/image'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 const PASSWORD_REQUIREMENTS = [
   { id: 'length', label: 'At least 8 characters', test: (p) => p.length >= 8 },
@@ -17,6 +17,8 @@ const PASSWORD_REQUIREMENTS = [
 export default function ResetPasswordPage({ params }) {
   const { token } = use(params)
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const tenant = searchParams.get('tenant')
 
   const [isValidating, setIsValidating] = useState(true)
   const [isValid, setIsValid] = useState(false)
@@ -35,7 +37,11 @@ export default function ResetPasswordPage({ params }) {
   useEffect(() => {
     async function validateToken() {
       try {
-        const response = await fetch(`/api/auth/reset-password/${token}`)
+        // Include tenant slug in validation request
+        const url = tenant 
+          ? `/api/auth/reset-password/${token}?tenant=${encodeURIComponent(tenant)}`
+          : `/api/auth/reset-password/${token}`
+        const response = await fetch(url)
         const data = await response.json()
 
         if (data.valid) {
@@ -56,7 +62,7 @@ export default function ResetPasswordPage({ params }) {
     if (token) {
       validateToken()
     }
-  }, [token])
+  }, [token, tenant])
 
   // Check password requirements
   const passwordChecks = PASSWORD_REQUIREMENTS.map((req) => ({
@@ -89,7 +95,7 @@ export default function ResetPasswordPage({ params }) {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ password, tenant }),
       })
 
       const data = await response.json()

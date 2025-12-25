@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Company from '@/models/Company'
-import { verifyToken } from '@/lib/auth'
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 import { uploadImageToImageKit, deleteFromImageKit, getImageKitFolder } from '@/lib/imagekit'
 
 // Check if ImageKit is configured
@@ -17,7 +15,13 @@ const isImageKitConfigured = () => {
 export async function GET(request, { params }) {
   try {
     const { id } = await params
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Company'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Company } = models
 
     const company = await Company.findById(id)
       .populate('createdBy', 'email')
@@ -74,8 +78,6 @@ export async function PUT(request, { params }) {
         { status: 403 }
       )
     }
-
-    await connectDB()
 
     const data = await request.json()
 
@@ -212,8 +214,6 @@ export async function DELETE(request, { params }) {
         { status: 403 }
       )
     }
-
-    await connectDB()
 
     // Soft delete by setting isActive to false
     const company = await Company.findByIdAndUpdate(

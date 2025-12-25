@@ -1,11 +1,8 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import User from '@/models/User'
-import Employee from '@/models/Employee'
-import EmailAccount from '@/models/EmailAccount'
-import UserSession from '@/models/UserSession'
 import { SignJWT } from 'jose'
 import crypto from 'crypto'
+import { getTenantByEmail, checkServiceStatus } from '@/lib/tenantContext'
+import { getTenantModels } from '@/lib/tenantModels'
 
 // Mark this route as dynamic
 export const dynamic = 'force-dynamic'
@@ -112,11 +109,42 @@ export async function GET(request) {
     const googleUser = await userInfoResponse.json()
     console.log('✅ Google user info received:', googleUser.email)
 
-    await connectDB()
-    console.log('✅ Connected to database')
+    // ============================================
+    // MULTI-TENANT LOOKUP
+    // ============================================
+    let tenantInfo = null;
+    try {
+      tenantInfo = await getTenantByEmail(googleUser.email);
+    } catch (tenantError) {
+      console.error('[Google Login] Tenant lookup failed:', tenantError.message);
+      return NextResponse.redirect(new URL('/login?error=user_not_found', baseUrl));
+    }
+    
+    if (!tenantInfo) {
+      console.warn(`[Google Login] No tenant mapping found for ${googleUser.email} - access denied`);
+      return NextResponse.redirect(new URL('/login?error=user_not_found', baseUrl));
+    }
+    
+    // Check if tenant service is active
+    const serviceCheck = await checkServiceStatus(tenantInfo.databaseName);
+    if (!serviceCheck.active) {
+      return NextResponse.redirect(new URL(`/login?error=${encodeURIComponent(serviceCheck.reason || 'service_unavailable')}`, baseUrl));
+    }
+    
+    console.log(`[Google Login] User ${googleUser.email} belongs to tenant: ${tenantInfo.companySlug} (${tenantInfo.databaseName})`);
+    
+    // Get tenant-specific models
+    const tenantModels = await getTenantModels(tenantInfo.databaseName, [
+      'User', 'Employee', 'UserSession'
+    ]);
+    
+    const TenantUser = tenantModels.User;
+    const TenantEmployee = tenantModels.Employee;
+    const TenantUserSession = tenantModels.UserSession;
+    console.log('✅ Connected to tenant database')
 
     // Check if user exists in database
-    let user = await User.findOne({ email: googleUser.email })
+    let user = await TenantUser.findOne({ email: googleUser.email })
     console.log('User found in database:', user ? 'Yes' : 'No')
 
     // Only allow login if user exists in database
@@ -137,7 +165,7 @@ export async function GET(request) {
     let employeeData = null
     if (user.employeeId) {
       try {
-        employeeData = await Employee.findById(user.employeeId)
+        employeeData = await TenantEmployee.findById(user.employeeId)
           .populate('designation')
           .populate('department')
           .populate('reportingManager', 'firstName lastName email')
@@ -150,7 +178,7 @@ export async function GET(request) {
 
     // Update last login and clear forcePasswordChange (Google OAuth users don't need to change password)
     try {
-      await User.updateOne(
+      await TenantUser.updateOne(
         { _id: user._id },
         { $set: { lastLogin: new Date(), forcePasswordChange: false } },
         { timestamps: false }
@@ -160,7 +188,7 @@ export async function GET(request) {
       console.error('⚠️ Failed to update lastLogin:', error)
     }
 
-    // Create JWT token
+    // Create JWT token with tenant info
     const secret = new TextEncoder().encode(process.env.JWT_SECRET)
     
     // Generate unique token ID for session tracking
@@ -171,13 +199,17 @@ export async function GET(request) {
       email: user.email,
       role: user.role,
       tokenId, // Include tokenId for session management
+      // Include tenant info for multi-tenant support
+      databaseName: tenantInfo.databaseName,
+      companySlug: tenantInfo.companySlug,
+      companyName: tenantInfo.companyName,
     })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt()
       .setExpirationTime('7d')
       .sign(secret)
 
-    console.log('✅ JWT token created')
+    console.log('✅ JWT token created with tenant info')
 
     // Get request info for session tracking
     const userAgent = request.headers.get('user-agent') || 'Unknown'
@@ -187,10 +219,10 @@ export async function GET(request) {
     // Create UserSession record (fire and forget)
     ;(async () => {
       try {
-        const deviceInfo = UserSession.parseUserAgent(userAgent)
+        const deviceInfo = TenantUserSession.parseUserAgent ? TenantUserSession.parseUserAgent(userAgent) : { browser: userAgent }
         const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
 
-        await UserSession.create({
+        await TenantUserSession.create({
           user: user._id,
           tokenId,
           deviceInfo,
@@ -337,6 +369,23 @@ async function handleMailCallback(request, code, error, mailState, baseUrl) {
       return NextResponse.redirect(new URL('/dashboard/mail?error=expired', baseUrl))
     }
 
+    // Get tenant from the state (added during OAuth flow) or from superadmin lookup
+    let databaseName = mailState.databaseName;
+    if (!databaseName) {
+      // Fallback: lookup user's tenant from superadmin DB
+      const { getTenantByUserId } = await import('@/lib/tenantContext');
+      const tenantInfo = await getTenantByUserId(mailState.userId);
+      if (!tenantInfo) {
+        console.error('📧 User not found in tenant mappings:', mailState.userId);
+        return NextResponse.redirect(new URL('/dashboard/mail?error=unauthorized', baseUrl));
+      }
+      databaseName = tenantInfo.databaseName;
+    }
+
+    // Get tenant-specific EmailAccount model
+    const tenantModels = await getTenantModels(databaseName, ['EmailAccount']);
+    const TenantEmailAccount = tenantModels.EmailAccount;
+
     const redirectUri = `${baseUrl}/api/auth/google/callback`
     const clientId = process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET
@@ -383,10 +432,8 @@ async function handleMailCallback(request, code, error, mailState, baseUrl) {
     const googleUser = await userInfoResponse.json()
     console.log('📧 Google user email:', googleUser.email)
 
-    await connectDB()
-
-    // Save or update email account
-    await EmailAccount.findOneAndUpdate(
+    // Save or update email account in tenant DB
+    await TenantEmailAccount.findOneAndUpdate(
       { user: mailState.userId },
       {
         user: mailState.userId,

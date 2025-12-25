@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Attendance from '@/models/Attendance'
-import Employee from '@/models/Employee'
-import { verifyToken } from '@/lib/auth'
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 
 // Mark this route as dynamic
 export const dynamic = 'force-dynamic'
@@ -25,7 +22,13 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Attendance', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Attendance, Employee } = models
 
     const { searchParams } = new URL(request.url)
     const dateParam = searchParams.get('date')

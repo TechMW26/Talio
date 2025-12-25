@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Payroll from '@/models/Payroll'
-
+import { getAuthAndModels } from '@/lib/auth'
 // GET - List payroll records
 export async function GET(request) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Payroll'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Payroll } = models
 
     const { searchParams } = new URL(request.url)
     const employeeId = searchParams.get('employeeId')
@@ -43,8 +47,6 @@ export async function GET(request) {
 // POST - Generate payroll
 export async function POST(request) {
   try {
-    await connectDB()
-
     const data = await request.json()
 
     // Check if payroll already exists for this employee and month

@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
+import { getAuthAndModels } from '@/lib/auth'
 import { jwtVerify } from 'jose';
-import connectDB from '@/lib/mongodb';
-import CallAlert from '@/models/CallAlert';
+;
+;
 
 /**
  * POST /api/call-alert/[id]/acknowledge
@@ -9,7 +10,15 @@ import CallAlert from '@/models/CallAlert';
  */
 export async function POST(request, { params }) {
   try {
-    await connectDB();
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['CallAlert'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { CallAlert } = models
+
+    ;
 
     const { id } = await params;
 

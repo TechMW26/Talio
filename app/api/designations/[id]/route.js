@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Designation from '@/models/Designation'
-
+import { getAuthAndModels } from '@/lib/auth'
 // GET - Get single designation
 export async function GET(request, { params }) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Designation'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Designation } = models
 
     const designation = await Designation.findById(params.id)
 
@@ -32,8 +36,6 @@ export async function GET(request, { params }) {
 // PUT - Update designation
 export async function PUT(request, { params }) {
   try {
-    await connectDB()
-
     const data = await request.json()
 
     // Prevent department updates (no longer used)
@@ -87,8 +89,6 @@ export async function PUT(request, { params }) {
 // DELETE - Delete designation
 export async function DELETE(request, { params }) {
   try {
-    await connectDB()
-
     const designation = await Designation.findByIdAndDelete(params.id)
 
     if (!designation) {

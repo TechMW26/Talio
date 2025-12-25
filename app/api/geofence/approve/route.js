@@ -1,9 +1,5 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import GeofenceLog from '@/models/GeofenceLog'
-import Employee from '@/models/Employee'
-import User from '@/models/User'
-import { verifyToken } from '@/lib/auth'
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 import { sendPushToUser } from '@/lib/pushNotification'
 import { getIO } from '@/lib/socket'
 
@@ -20,7 +16,13 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['GeofenceLog', 'Employee', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { GeofenceLog, Employee, User } = models
 
     const { logId, action, comments } = await request.json()
 

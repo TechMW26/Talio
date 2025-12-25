@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import User from '@/models/User'
-import { verifyTokenFromRequest } from '@/lib/auth'
+import { verifyTokenFromRequest, getAuthAndModels } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,8 +23,10 @@ export async function GET(request) {
       )
     }
 
-    await connectDB()
-
+    // TODO: MIGRATION - Replace verifyTokenFromRequest with getAuthAndModels
+    // const { success, user, models, message } = await getAuthAndModels(request, ['User'])
+    // if (!success) return NextResponse.json({ message }, { status: 401 })
+    // const { User } = models
     // Fetch all users with passwords and populate employee data
     const users = await User.find({})
       .select('+password') // Include password field

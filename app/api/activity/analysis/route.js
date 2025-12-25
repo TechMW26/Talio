@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
+import { getAuthAndModels } from '@/lib/auth'
 import { jwtVerify } from 'jose';
-import connectDB from '@/lib/mongodb';
+;
 import ScreenshotAnalysis from '@/models/ScreenshotAnalysis';
-import User from '@/models/User';
-import Employee from '@/models/Employee';
-import Department from '@/models/Department';
+;
+;
+;
 import { triggerScheduledTasks, analyzeUserDay } from '@/lib/screenshotAnalysis';
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
@@ -91,7 +92,15 @@ export async function GET(request) {
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
 
-    await connectDB();
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { User, Employee, Department } = models
+
+    ;
 
     // Check access
     const canView = await canViewAnalysis(viewerId, targetUserId, viewerRole);
@@ -228,7 +237,7 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    await connectDB();
+    ;
 
     // Run analysis
     const analysis = await analyzeUserDay(targetUserId, dateString);

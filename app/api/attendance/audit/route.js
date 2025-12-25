@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Attendance from '@/models/Attendance'
-import Employee from '@/models/Employee'
-import { verifyTokenFromRequest } from '@/lib/auth'
+import { verifyTokenFromRequest, getAuthAndModels } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,9 +36,11 @@ export async function GET(request) {
             )
         }
 
-        await connectDB()
-
-        const { searchParams } = new URL(request.url)
+        // TODO: MIGRATION - Replace verifyTokenFromRequest with getAuthAndModels
+    // const { success, user, models, message } = await getAuthAndModels(request, ['Attendance', 'Employee'])
+    // if (!success) return NextResponse.json({ message }, { status: 401 })
+    // const { Attendance, Employee } = models
+    const { searchParams } = new URL(request.url)
         const date = searchParams.get('date')
         const startDate = searchParams.get('startDate')
         const endDate = searchParams.get('endDate')

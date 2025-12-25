@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Helpdesk from '@/models/Helpdesk'
-import Employee from '@/models/Employee'
-
+import { getAuthAndModels } from '@/lib/auth'
 export async function POST(request, { params }) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Helpdesk', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Helpdesk, Employee } = models
 
     const { comment, commentedBy } = await request.json()
 

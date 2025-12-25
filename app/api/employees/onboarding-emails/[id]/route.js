@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import OnboardingEmail from '@/models/OnboardingEmail'
-import { verifyToken } from '@/lib/auth'
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 import { retryOnboardingEmail } from '@/lib/mailer'
 
 /**
@@ -27,8 +25,14 @@ export async function POST(request, { params }) {
       return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
     }
     
-    await connectDB()
-    
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['OnboardingEmail'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { OnboardingEmail } = models
+
     const { id } = await params
     
     if (!id) {
@@ -86,8 +90,6 @@ export async function GET(request, { params }) {
     if (!['admin', 'hr'].includes(payload.role)) {
       return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
     }
-    
-    await connectDB()
     
     const { id } = await params
     

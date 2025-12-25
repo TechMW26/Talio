@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import PushSubscription from '@/models/PushSubscription'
-import { verifyToken } from '@/lib/auth'
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 
 // POST - Save push subscription
 export async function POST(request) {
@@ -16,7 +14,13 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['PushSubscription'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { PushSubscription } = models
 
     const { subscription, deviceInfo } = await request.json()
 
@@ -87,8 +91,6 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
-    await connectDB()
-
     const subscriptions = await PushSubscription.find({ user: decoded.userId })
       .sort({ lastUsed: -1 })
 
@@ -118,8 +120,6 @@ export async function DELETE(request) {
     if (!decoded) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
-
-    await connectDB()
 
     const { endpoint } = await request.json()
 

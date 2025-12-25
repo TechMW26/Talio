@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { jwtVerify } from 'jose'
-import connectDB from '@/lib/mongodb'
-import User from '@/models/User'
+import { getTenantModel } from '@/lib/tenantModels'
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key')
 
@@ -29,8 +28,18 @@ export async function GET(request) {
       )
     }
 
+    // SECURITY: Require tenant context from JWT
+    if (!payload.databaseName) {
+      return NextResponse.json(
+        { valid: false, message: 'Invalid session - please log in again' },
+        { status: 401 }
+      )
+    }
+
+    // Get tenant-specific User model
+    const User = await getTenantModel(payload.databaseName, 'User')
+    
     // Check if user still exists and is active
-    await connectDB()
     const user = await User.findById(payload.userId).select('isActive email forcePasswordChange')
 
     if (!user) {

@@ -1,12 +1,6 @@
 import { NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth'
-import connectDB from '@/lib/mongodb'
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 import mongoose from 'mongoose'
-import Task from '@/models/Task'
-import TaskAssignee from '@/models/TaskAssignee'
-import User from '@/models/User'
-import Project from '@/models/Project'
-import ProjectApprovalRequest from '@/models/ProjectApprovalRequest'
 import { calculateCompletionPercentage, createTimelineEvent } from '@/lib/projectService'
 
 // GET - Get all subtasks for a task
@@ -22,7 +16,13 @@ export async function GET(request, { params }) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Task', 'TaskAssignee', 'User', 'Project', 'ProjectApprovalRequest'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Task, TaskAssignee, User, Project, ProjectApprovalRequest } = models
 
     const { taskId } = await params
 
@@ -56,8 +56,6 @@ export async function POST(request, { params }) {
     if (!decoded) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
-
-    await connectDB()
 
     const { taskId } = await params
     const body = await request.json()
@@ -201,8 +199,6 @@ export async function PUT(request, { params }) {
     if (!decoded) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
-
-    await connectDB()
 
     const { taskId } = await params
     const body = await request.json()
@@ -519,8 +515,6 @@ export async function DELETE(request, { params }) {
     if (!decoded) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
-
-    await connectDB()
 
     const { taskId } = await params
     const { searchParams } = new URL(request.url)

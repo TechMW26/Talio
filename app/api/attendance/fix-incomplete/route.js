@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
+import { getAuthAndModels } from '@/lib/auth'
 import { jwtVerify } from 'jose'
-import connectDB from '@/lib/mongodb'
-import User from '@/models/User'
 import { processPastDayIncompleteAttendance } from '@/lib/attendanceNotificationScheduler'
 
 export const dynamic = 'force-dynamic'
@@ -26,7 +25,13 @@ export async function POST(request) {
     const token = authHeader.split(' ')[1]
     const { payload } = await jwtVerify(token, JWT_SECRET)
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { User } = models
 
     // Check if user has admin/hr role
     const user = await User.findById(payload.userId).lean()

@@ -1,28 +1,22 @@
 import { NextResponse } from 'next/server'
-import { jwtVerify } from 'jose'
-import connectDB from '@/lib/mongodb'
+import { getAuthAndModels } from '@/lib/auth'
 import { sendTestNotification, getNotificationStatus } from '@/lib/unifiedPushService'
 
 // POST - Test push notification (send test to authenticated user)
 export async function POST(request) {
   try {
-    await connectDB()
-
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // Authenticate and initialize tenant connection
+    const auth = await getAuthAndModels(request, ['User', 'PushSubscription'])
+    if (!auth.success) {
       return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
+        { success: false, message: auth.message || 'Unauthorized' },
         { status: 401 }
       )
     }
-
-    const token = authHeader.substring(7)
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET)
-    const { payload: decoded } = await jwtVerify(token, secret)
+    const { user } = auth
 
     // Get notification status for the user
-    const status = await getNotificationStatus(decoded.userId)
+    const status = await getNotificationStatus(user.userId)
 
     if (!status.hasAndroid && !status.hasWeb) {
       return NextResponse.json({
@@ -33,7 +27,7 @@ export async function POST(request) {
     }
 
     // Send test notification
-    const result = await sendTestNotification(decoded.userId)
+    const result = await sendTestNotification(user.userId)
 
     if (result.success) {
       return NextResponse.json({
@@ -66,21 +60,17 @@ export async function POST(request) {
 // GET - Get notification status for the user
 export async function GET(request) {
   try {
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // Authenticate and initialize tenant connection
+    const auth = await getAuthAndModels(request, ['User', 'PushSubscription'])
+    if (!auth.success) {
       return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
+        { success: false, message: auth.message || 'Unauthorized' },
         { status: 401 }
       )
     }
+    const { user } = auth
 
-    const token = authHeader.substring(7)
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET)
-    const { payload: decoded } = await jwtVerify(token, secret)
-
-    await connectDB()
-
-    const status = await getNotificationStatus(decoded.userId)
+    const status = await getNotificationStatus(user.userId)
 
     return NextResponse.json({
       success: true,

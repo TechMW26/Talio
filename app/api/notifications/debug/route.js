@@ -1,9 +1,6 @@
 import { NextResponse } from 'next/server'
+import { getAuthAndModels } from '@/lib/auth'
 import { jwtVerify } from 'jose'
-import connectDB from '@/lib/mongodb'
-import ScheduledNotification from '@/models/ScheduledNotification'
-import RecurringNotification from '@/models/RecurringNotification'
-
 // GET - Debug endpoint to check notification status
 export async function GET(request) {
     try {
@@ -28,9 +25,15 @@ export async function GET(request) {
             )
         }
 
-        await connectDB()
+        // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['ScheduledNotification', 'RecurringNotification'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { ScheduledNotification, RecurringNotification } = models
 
-        const now = new Date()
+    const now = new Date()
 
         // Get scheduled notifications summary
         const scheduledPending = await ScheduledNotification.find({ status: 'pending' })

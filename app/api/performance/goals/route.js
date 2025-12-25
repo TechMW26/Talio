@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import PerformanceGoal from '@/models/PerformanceGoal'
-import Employee from '@/models/Employee'
-import { verifyToken } from '@/lib/auth'
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 
 // GET - Fetch performance goals
 export async function GET(request) {
@@ -14,7 +11,13 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['PerformanceGoal', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { PerformanceGoal, Employee } = models
 
     const { searchParams } = new URL(request.url)
     const goalId = searchParams.get('goalId')
@@ -139,8 +142,6 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
     }
 
-    await connectDB()
-
     const body = await request.json()
     const {
       employeeId,
@@ -232,8 +233,6 @@ export async function PUT(request) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
-    await connectDB()
-
     const body = await request.json()
     const { goalId, ...updateData } = body
 
@@ -317,8 +316,6 @@ export async function DELETE(request) {
     if (!['admin', 'hr', 'manager', 'department_head'].includes(decoded.role)) {
       return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
     }
-
-    await connectDB()
 
     const { searchParams } = new URL(request.url)
     const goalId = searchParams.get('goalId')

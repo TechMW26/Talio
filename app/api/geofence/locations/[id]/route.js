@@ -1,9 +1,5 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import GeofenceLocation from '@/models/GeofenceLocation'
-import { verifyToken } from '@/lib/auth'
-import User from '@/models/User'
-
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 // GET - Get single geofence location
 export async function GET(request, { params }) {
   try {
@@ -17,7 +13,13 @@ export async function GET(request, { params }) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['GeofenceLocation', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { GeofenceLocation, User } = models
 
     // Await params to get the id
     const { id } = await params
@@ -68,8 +70,6 @@ export async function PUT(request, { params }) {
         { status: 403 }
       )
     }
-
-    await connectDB()
 
     // Await params to get the id
     const { id } = await params
@@ -141,8 +141,6 @@ export async function DELETE(request, { params }) {
         { status: 403 }
       )
     }
-
-    await connectDB()
 
     // Await params to get the id
     const { id } = await params

@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import UserSession from '@/models/UserSession'
-import { verifyToken } from '@/lib/auth'
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 
 // GET - List all active sessions for current user
 export async function GET(request) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['UserSession'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { UserSession } = models
 
     const token = request.headers.get('authorization')?.split(' ')[1]
     if (!token) {
@@ -58,8 +62,6 @@ export async function GET(request) {
 // DELETE - Revoke all sessions except current
 export async function DELETE(request) {
   try {
-    await connectDB()
-
     const token = request.headers.get('authorization')?.split(' ')[1]
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import CompanySettings from '@/models/CompanySettings'
-import { verifyToken } from '@/lib/auth'
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,7 +17,13 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['CompanySettings'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { CompanySettings } = models
 
     // Get company settings (there should only be one document)
     let settings = await CompanySettings.findOne()
@@ -77,8 +81,6 @@ export async function PUT(request) {
         { status: 403 }
       )
     }
-
-    await connectDB()
 
     const body = await request.json()
 

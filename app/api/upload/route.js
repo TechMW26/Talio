@@ -1,14 +1,10 @@
 import { NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth'
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 import { writeFile, mkdir, unlink } from 'fs/promises'
 import path from 'path'
 import { existsSync } from 'fs'
 import { optimizeImage, isValidImage } from '@/lib/imageOptimization'
 import { uploadImageToImageKit, getImageKitFolder, generateEmployeeFolderName } from '@/lib/imagekit'
-import connectDB from '@/lib/mongodb'
-import User from '@/models/User'
-import Employee from '@/models/Employee'
-
 // Configure route for larger file uploads (10MB)
 export const config = {
   api: {
@@ -69,7 +65,14 @@ export async function POST(request) {
     }
 
     // Get employee info for folder structure
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['User', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { User, Employee } = models
+
     const user = await User.findById(decoded.userId).select('employeeId')
     let employee = null
     if (user?.employeeId) {

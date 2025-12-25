@@ -1,9 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth'
-import connectDB from '@/lib/mongodb'
-import Chat from '@/models/Chat'
-import User from '@/models/User'
-
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 // GET - Fetch a single chat by ID
 export async function GET(request, context) {
   try {
@@ -17,7 +13,13 @@ export async function GET(request, context) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Chat', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Chat, User } = models
 
     const { chatId } = await context.params
 

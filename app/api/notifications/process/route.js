@@ -1,9 +1,5 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import ScheduledNotification from '@/models/ScheduledNotification'
-import RecurringNotification from '@/models/RecurringNotification'
-import User from '@/models/User'
-import Employee from '@/models/Employee'
+import { getAuthAndModels } from '@/lib/auth'
 import { sendPushToUsers } from '@/lib/pushNotification'
 
 export const dynamic = 'force-dynamic'
@@ -22,7 +18,13 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET(request) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['ScheduledNotification', 'RecurringNotification', 'User', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { ScheduledNotification, RecurringNotification, User, Employee } = models
 
     // Verify cron secret to prevent unauthorized access
     const { searchParams } = new URL(request.url)

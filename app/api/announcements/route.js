@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Announcement from '@/models/Announcement'
-import User from '@/models/User'
-import Employee from '@/models/Employee'
+import { getAuthAndModels } from '@/lib/auth'
 import { sendAnnouncementNotification } from '@/lib/notificationService'
 import jwt from 'jsonwebtoken'
 import { emitDashboardRefresh, REALTIME_EVENTS } from '@/lib/realtimeEvents'
@@ -10,7 +7,13 @@ import { emitDashboardRefresh, REALTIME_EVENTS } from '@/lib/realtimeEvents'
 // GET - List announcements
 export async function GET(request) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Announcement', 'User', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Announcement, User, Employee } = models
 
     const { searchParams } = new URL(request.url)
     const limit = parseInt(searchParams.get('limit')) || 10
@@ -103,8 +106,6 @@ export async function GET(request) {
 // POST - Create announcement
 export async function POST(request) {
   try {
-    await connectDB()
-
     const data = await request.json()
 
     // Get user info from token

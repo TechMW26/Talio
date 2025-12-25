@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import connectDB from '@/lib/mongodb';
-import Suggestion from '@/models/Suggestion';
-import User from '@/models/User';
-import { verifyToken } from '@/lib/auth';
+;
+;
+;
+import { verifyToken, getAuthAndModels } from '@/lib/auth';
 
 /**
  * GET /api/ideas/[id]
@@ -10,7 +10,15 @@ import { verifyToken } from '@/lib/auth';
  */
 export async function GET(request, { params }) {
   try {
-    await connectDB();
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Suggestion', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Suggestion, User } = models
+
+    ;
 
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
@@ -61,7 +69,7 @@ export async function GET(request, { params }) {
  */
 export async function PUT(request, { params }) {
   try {
-    await connectDB();
+    ;
 
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
@@ -163,7 +171,7 @@ export async function PUT(request, { params }) {
  */
 export async function DELETE(request, { params }) {
   try {
-    await connectDB();
+    ;
 
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {

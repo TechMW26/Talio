@@ -1,9 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth'
-import connectDB from '@/lib/mongodb'
-import Task from '@/models/Task'
-import TaskAssignee from '@/models/TaskAssignee'
-import User from '@/models/User'
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 import { getTodaysTasks, getUserProjectsSummaryForMaya } from '@/lib/projectService'
 
 // GET - Get user's tasks (today's, pending, all)
@@ -19,7 +15,13 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Task', 'TaskAssignee', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Task, TaskAssignee, User } = models
 
     const user = await User.findById(decoded.userId).select('employeeId')
     if (!user || !user.employeeId) {

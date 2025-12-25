@@ -1,16 +1,18 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Leave from '@/models/Leave'
-import LeaveBalance from '@/models/LeaveBalance'
-import Employee from '@/models/Employee'
-import User from '@/models/User'
+import { getAuthAndModels } from '@/lib/auth'
 import { sendLeaveApprovedNotification, sendLeaveRejectedNotification } from '@/lib/notificationService'
 import { emitLeaveUpdate, emitDashboardRefresh } from '@/lib/realtimeEvents'
 
 // PUT - Update leave status (Approve/Reject)
 export async function PUT(request, { params }) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Leave', 'LeaveBalance', 'Employee', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Leave, LeaveBalance, Employee, User } = models
 
     const data = await request.json()
     const { status, approvedBy, rejectionReason } = data
@@ -175,8 +177,6 @@ export async function PUT(request, { params }) {
 // DELETE - Cancel leave request
 export async function DELETE(request, { params }) {
   try {
-    await connectDB()
-
     const leave = await Leave.findById(params.id)
     if (!leave) {
       return NextResponse.json(

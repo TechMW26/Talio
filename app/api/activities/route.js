@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Activity from '@/models/Activity'
-import User from '@/models/User'
-import { verifyToken } from '@/lib/auth'
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 
 // GET - Fetch activities
 export async function GET(request) {
@@ -17,7 +14,13 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Activity', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Activity, User } = models
 
     const currentUser = await User.findById(decoded.userId).select('employeeId role')
     const employeeId = currentUser?.employeeId
@@ -91,8 +94,6 @@ export async function POST(request) {
     if (!decoded) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
-
-    await connectDB()
 
     const currentUser = await User.findById(decoded.userId).select('employeeId')
     const employeeId = currentUser?.employeeId

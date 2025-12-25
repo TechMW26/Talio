@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server'
+import { getAuthAndModels } from '@/lib/auth'
 import { jwtVerify } from 'jose'
-import connectDB from '@/lib/mongodb'
-import User from '@/models/User'
-import Employee from '@/models/Employee'
-import Department from '@/models/Department'
-import Notification from '@/models/Notification'
 import { sendPushToUsers } from '@/lib/pushNotification'
 
 export async function POST(request) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department', 'Notification'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { User, Employee, Department, Notification } = models
 
     // Verify authentication
     const authHeader = request.headers.get('authorization')

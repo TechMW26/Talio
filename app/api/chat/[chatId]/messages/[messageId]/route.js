@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Chat from '@/models/Chat'
-import { verifyToken } from '@/lib/auth'
-import User from '@/models/User'
-import Employee from '@/models/Employee'
-
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 export async function DELETE(request, { params }) {
   try {
-    await connectDB()
-    
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Chat', 'User', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Chat, User, Employee } = models
+
     const token = request.headers.get('authorization')?.replace('Bearer ', '')
     if (!token) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })

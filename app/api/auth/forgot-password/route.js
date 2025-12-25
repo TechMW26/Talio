@@ -1,18 +1,13 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import User from '@/models/User'
-import Employee from '@/models/Employee'
-import PasswordResetToken from '@/models/PasswordResetToken'
 import { sendPasswordResetEmail } from '@/lib/mailer'
+import { getTenantByEmail } from '@/lib/tenantContext'
+import { getTenantModels } from '@/lib/tenantModels'
 
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000 // 1 hour
 const MAX_REQUESTS_PER_WINDOW = 3
 
 export async function POST(request) {
   try {
-    await connectDB()
-    console.log('[forgot-password] Connected to database')
-
     const { email } = await request.json()
     console.log('[forgot-password] Received request for email:', email)
 
@@ -26,13 +21,31 @@ export async function POST(request) {
     const normalizedEmail = email.toLowerCase().trim()
     console.log('[forgot-password] Normalized email:', normalizedEmail)
 
+    // Look up tenant for this email
+    const tenantInfo = await getTenantByEmail(normalizedEmail)
+    if (!tenantInfo) {
+      console.log(`[forgot-password] No tenant mapping found for: ${normalizedEmail}`)
+      return NextResponse.json(
+        { success: false, error: 'No account found with this email address. Please check and try again.' },
+        { status: 404 }
+      )
+    }
+
+    console.log(`[forgot-password] User belongs to tenant: ${tenantInfo.companySlug} (${tenantInfo.databaseName})`)
+
+    // Get tenant-specific models
+    const tenantModels = await getTenantModels(tenantInfo.databaseName, ['User', 'Employee', 'PasswordResetToken'])
+    const TenantUser = tenantModels.User
+    const TenantEmployee = tenantModels.Employee
+    const TenantPasswordResetToken = tenantModels.PasswordResetToken
+
     // Get request info for security logging
     const forwarded = request.headers.get('x-forwarded-for')
     const ipAddress = forwarded ? forwarded.split(',')[0].trim() : request.headers.get('x-real-ip') || 'unknown'
     const userAgent = request.headers.get('user-agent') || 'unknown'
 
     // Find user by email
-    const user = await User.findOne({ email: normalizedEmail })
+    const user = await TenantUser.findOne({ email: normalizedEmail })
     console.log('[forgot-password] User found:', user ? 'Yes' : 'No', user ? `(${user._id})` : '')
 
     if (!user) {
@@ -59,7 +72,7 @@ export async function POST(request) {
 
     // Check rate limiting - count recent reset requests for this user
     const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_MS)
-    const recentRequests = await PasswordResetToken.countDocuments({
+    const recentRequests = await TenantPasswordResetToken.countDocuments({
       user: user._id,
       createdAt: { $gte: windowStart },
     })
@@ -71,18 +84,18 @@ export async function POST(request) {
     }
 
     // Invalidate any existing unused tokens
-    await PasswordResetToken.updateMany(
+    await TenantPasswordResetToken.updateMany(
       { user: user._id, usedAt: null },
       { usedAt: new Date() }
     )
 
     // Generate new token
-    const { token, tokenHash } = PasswordResetToken.generateToken()
+    const { token, tokenHash } = TenantPasswordResetToken.generateToken()
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000) // 15 minutes
     console.log('[forgot-password] Generated token, expires at:', expiresAt)
 
     // Save token to database
-    await PasswordResetToken.create({
+    await TenantPasswordResetToken.create({
       user: user._id,
       token: tokenHash, // Store hashed version
       tokenHash,
@@ -92,9 +105,10 @@ export async function POST(request) {
     })
     console.log('[forgot-password] Token saved to database')
 
-    // Build reset link
+    // Build reset link with tenant info
     const baseUrl = process.env.NEXTAUTH_URL || 'https://app.talio.in'
-    const resetLink = `${baseUrl}/auth/reset-password/${token}`
+    // Include tenant slug in the reset link for multi-tenant support
+    const resetLink = `${baseUrl}/auth/reset-password/${token}?tenant=${encodeURIComponent(tenantInfo.companySlug)}`
     console.log('[forgot-password] Reset link generated:', resetLink)
 
     // Get first name from user or employee
@@ -103,7 +117,7 @@ export async function POST(request) {
       firstName = user.name.split(' ')[0]
     } else if (user.employeeId) {
       try {
-        const employee = await Employee.findById(user.employeeId).select('firstName').lean()
+        const employee = await TenantEmployee.findById(user.employeeId).select('firstName').lean()
         if (employee?.firstName) {
           firstName = employee.firstName
         }

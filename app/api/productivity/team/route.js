@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
+import { getAuthAndModels } from '@/lib/auth'
 import { jwtVerify } from 'jose';
-import connectDB from '@/lib/mongodb';
-import ProductivitySession from '@/models/ProductivitySession';
-import User from '@/models/User';
-import Employee from '@/models/Employee';
-import Department from '@/models/Department';
+;
+;
+;
+;
+;
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
@@ -37,7 +38,15 @@ export async function GET(request) {
     const currentUserId = decoded.payload.userId;
     const currentUserRole = decoded.payload.role;
     
-    await connectDB();
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['ProductivitySession', 'User', 'Employee', 'Department'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { ProductivitySession, User, Employee, Department } = models
+
+    ;
     
     const { searchParams } = new URL(request.url);
     const dateParam = searchParams.get('date') || new Date().toISOString().split('T')[0];

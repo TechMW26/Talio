@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
-import { verifyToken } from '@/lib/auth';
-import connectDB from '@/lib/mongodb';
-import EmailAccount from '@/models/EmailAccount';
+import { getAuthAndModels } from '@/lib/auth';
 import { google } from 'googleapis';
 
 // Production URL and redirect URI - must match Google Cloud Console
@@ -82,25 +80,17 @@ function parseEmailAddress(str) {
 // GET - Fetch emails
 export async function GET(request) {
   try {
-    const token = request.headers.get('Authorization')?.split(' ')[1];
-    
-    if (!token) {
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['EmailAccount'])
+    if (!auth.success) {
       return NextResponse.json({ 
         emails: [], 
         nextPageToken: null,
         unreadCount: 0
       });
     }
-    
-    const payload = await verifyToken(token);
-
-    if (!payload) {
-      return NextResponse.json({ 
-        emails: [], 
-        nextPageToken: null,
-        unreadCount: 0
-      });
-    }
+    const { user, models } = auth
+    const { EmailAccount } = models
 
     const { searchParams } = new URL(request.url);
     const folder = searchParams.get('folder') || 'inbox';
@@ -109,20 +99,18 @@ export async function GET(request) {
     const accountId = searchParams.get('accountId'); // Optional: specific account ID
     const allAccounts = searchParams.get('allAccounts') === 'true'; // Fetch from all accounts
 
-    await connectDB();
-
     // Get email accounts
     let emailAccounts;
     if (accountId) {
       // Fetch specific account
-      const account = await EmailAccount.findOne({ _id: accountId, user: payload.userId }).select('+accessToken +refreshToken');
+      const account = await EmailAccount.findOne({ _id: accountId, user: user._id }).select('+accessToken +refreshToken');
       emailAccounts = account ? [account] : [];
     } else if (allAccounts) {
       // Fetch from all connected accounts
-      emailAccounts = await EmailAccount.find({ user: payload.userId, isConnected: true }).select('+accessToken +refreshToken');
+      emailAccounts = await EmailAccount.find({ user: user._id, isConnected: true }).select('+accessToken +refreshToken');
     } else {
       // Fetch from primary account or first available
-      const accounts = await EmailAccount.find({ user: payload.userId, isConnected: true }).select('+accessToken +refreshToken');
+      const accounts = await EmailAccount.find({ user: user._id, isConnected: true }).select('+accessToken +refreshToken');
       const primary = accounts.find(a => a.isPrimary) || accounts[0];
       emailAccounts = primary ? [primary] : [];
     }
@@ -321,12 +309,13 @@ export async function GET(request) {
 // POST - Send email
 export async function POST(request) {
   try {
-    const token = request.headers.get('Authorization')?.split(' ')[1];
-    const payload = await verifyToken(token);
-
-    if (!payload) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['EmailAccount'])
+    if (!auth.success) {
+      return NextResponse.json({ error: auth.message }, { status: 401 });
     }
+    const { user, models } = auth
+    const { EmailAccount } = models
 
     const { to, cc, bcc, subject, body, isHtml, attachments } = await request.json();
 
@@ -334,9 +323,7 @@ export async function POST(request) {
       return NextResponse.json({ error: 'To and subject are required' }, { status: 400 });
     }
 
-    await connectDB();
-
-    const emailAccount = await EmailAccount.findOne({ user: payload.userId }).select('+accessToken +refreshToken');
+    const emailAccount = await EmailAccount.findOne({ user: user._id }).select('+accessToken +refreshToken');
 
     if (!emailAccount || !emailAccount.isConnected) {
       return NextResponse.json({ error: 'Email not connected' }, { status: 400 });
@@ -414,12 +401,13 @@ export async function POST(request) {
 // PATCH - Mark email as read/unread or starred/unstarred
 export async function PATCH(request) {
   try {
-    const token = request.headers.get('Authorization')?.split(' ')[1];
-    const payload = await verifyToken(token);
-
-    if (!payload) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['EmailAccount'])
+    if (!auth.success) {
+      return NextResponse.json({ error: auth.message }, { status: 401 });
     }
+    const { user, models } = auth
+    const { EmailAccount } = models
 
     const { messageId, action } = await request.json();
 
@@ -427,9 +415,7 @@ export async function PATCH(request) {
       return NextResponse.json({ error: 'Message ID and action are required' }, { status: 400 });
     }
 
-    await connectDB();
-
-    const emailAccount = await EmailAccount.findOne({ user: payload.userId }).select('+accessToken +refreshToken');
+    const emailAccount = await EmailAccount.findOne({ user: user._id }).select('+accessToken +refreshToken');
 
     if (!emailAccount || !emailAccount.isConnected) {
       return NextResponse.json({ error: 'Email not connected' }, { status: 400 });
@@ -522,12 +508,13 @@ export async function PATCH(request) {
 // DELETE - Delete email permanently
 export async function DELETE(request) {
   try {
-    const token = request.headers.get('Authorization')?.split(' ')[1];
-    const payload = await verifyToken(token);
-
-    if (!payload) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['EmailAccount'])
+    if (!auth.success) {
+      return NextResponse.json({ error: auth.message }, { status: 401 });
     }
+    const { user, models } = auth
+    const { EmailAccount } = models
 
     const { searchParams } = new URL(request.url);
     const messageId = searchParams.get('messageId');
@@ -536,9 +523,7 @@ export async function DELETE(request) {
       return NextResponse.json({ error: 'Message ID is required' }, { status: 400 });
     }
 
-    await connectDB();
-
-    const emailAccount = await EmailAccount.findOne({ user: payload.userId }).select('+accessToken +refreshToken');
+    const emailAccount = await EmailAccount.findOne({ user: user._id }).select('+accessToken +refreshToken');
 
     if (!emailAccount || !emailAccount.isConnected) {
       return NextResponse.json({ error: 'Email not connected' }, { status: 400 });

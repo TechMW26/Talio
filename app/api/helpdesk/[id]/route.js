@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Helpdesk from '@/models/Helpdesk'
-
+import { getAuthAndModels } from '@/lib/auth'
 // GET - Get single ticket
 export async function GET(request, { params }) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Helpdesk'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Helpdesk } = models
 
     const ticket = await Helpdesk.findById(params.id)
       .populate('createdBy', 'firstName lastName employeeCode userId')
@@ -35,8 +39,6 @@ export async function GET(request, { params }) {
 // PUT - Update ticket
 export async function PUT(request, { params }) {
   try {
-    await connectDB()
-
     const data = await request.json()
 
     const ticket = await Helpdesk.findByIdAndUpdate(
@@ -175,8 +177,6 @@ export async function PUT(request, { params }) {
 // DELETE - Delete ticket
 export async function DELETE(request, { params }) {
   try {
-    await connectDB()
-
     const { id } = await params
     const ticket = await Helpdesk.findByIdAndDelete(id)
 
@@ -203,8 +203,6 @@ export async function DELETE(request, { params }) {
 // PATCH - Partial update ticket
 export async function PATCH(request, { params }) {
   try {
-    await connectDB()
-
     const { id } = await params
     const data = await request.json()
 

@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Document from '@/models/Document'
-
+import { getAuthAndModels } from '@/lib/auth'
 // GET - List documents
 export async function GET(request) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Document'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Document } = models
 
     const { searchParams } = new URL(request.url)
     const employeeId = searchParams.get('employeeId')
@@ -42,8 +46,6 @@ export async function GET(request) {
 // POST - Upload document
 export async function POST(request) {
   try {
-    await connectDB()
-
     const data = await request.json()
 
     const document = await Document.create(data)

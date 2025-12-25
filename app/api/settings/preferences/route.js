@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import SystemPreferences from '@/models/SystemPreferences'
-import { verifyToken } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { uploadImageToImageKit, deleteFromImageKit, getImageKitFolder } from '@/lib/imagekit'
 
 export const dynamic = 'force-dynamic'
@@ -19,17 +17,13 @@ const isImageKitConfigured = () => {
 // GET - Get system preferences
 export async function GET(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['SystemPreferences'])
+    if (!auth.success) {
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
-    await connectDB()
+    const { models } = auth
+    const { SystemPreferences } = models
 
     // Get system preferences (there should be only one document)
     let preferences = await SystemPreferences.findOne()
@@ -78,22 +72,18 @@ export async function GET(request) {
 // PUT - Update system preferences (Admin only)
 export async function PUT(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['SystemPreferences'])
+    if (!auth.success) {
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
+    const { user, models } = auth
+    const { SystemPreferences } = models
 
     // Only admin can update preferences
-    if (decoded.role !== 'admin') {
+    if (user.role !== 'admin') {
       return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
     }
-
-    await connectDB()
 
     const body = await request.json()
 

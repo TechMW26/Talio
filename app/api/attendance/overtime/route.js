@@ -1,10 +1,6 @@
 import { NextResponse } from 'next/server'
+import { getAuthAndModels } from '@/lib/auth'
 import { jwtVerify } from 'jose'
-import connectDB from '@/lib/mongodb'
-import OvertimeRequest from '@/models/OvertimeRequest'
-import Attendance from '@/models/Attendance'
-import Employee from '@/models/Employee'
-import CompanySettings from '@/models/CompanySettings'
 import { calculateEffectiveWorkHours, determineAttendanceStatus } from '@/lib/attendanceShrinkage'
 import { sendPushToUser } from '@/lib/pushNotification'
 
@@ -34,7 +30,13 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['OvertimeRequest', 'Attendance', 'Employee', 'CompanySettings'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { OvertimeRequest, Attendance, Employee, CompanySettings } = models
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status') || 'pending'
@@ -80,8 +82,6 @@ export async function POST(request) {
     if (!user) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
     }
-
-    await connectDB()
 
     const body = await request.json()
     const { requestId, isWorkingOvertime, estimatedEndTime } = body
@@ -189,8 +189,6 @@ export async function POST(request) {
  */
 export async function PATCH(request) {
   try {
-    await connectDB()
-
     const body = await request.json()
     const { attendanceId, checkOutTime } = body
 

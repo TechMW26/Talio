@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Meeting from '@/models/Meeting'
-
+import { getAuthAndModels } from '@/lib/auth'
 export const dynamic = 'force-dynamic'
 
 /**
@@ -15,7 +13,13 @@ export const dynamic = 'force-dynamic'
  */
 export async function POST(request) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Meeting'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Meeting } = models
 
     const now = new Date()
 
@@ -93,8 +97,6 @@ export async function POST(request) {
  */
 export async function GET(request) {
   try {
-    await connectDB()
-
     const now = new Date()
 
     const expiredCount = await Meeting.countDocuments({

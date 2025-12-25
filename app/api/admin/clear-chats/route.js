@@ -1,9 +1,6 @@
 import { NextResponse } from 'next/server';
-import { jwtVerify } from 'jose';
-import connectDB from '@/lib/mongodb';
-import mongoose from 'mongoose';
-
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
+import { getAuthAndModels } from '@/lib/auth';
+import { getTenantConnection } from '@/lib/tenantDb';
 
 /**
  * DELETE /api/admin/clear-chats
@@ -11,34 +8,29 @@ const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
  */
 export async function DELETE(request) {
   try {
-    await connectDB();
-
-    // Verify JWT token
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { error: 'Unauthorized - No token provided' },
-        { status: 401 }
-      );
+    // Get authenticated user and tenant info
+    const auth = await getAuthAndModels(request, ['Chat'])
+    if (!auth.success) {
+      return NextResponse.json({ error: auth.message }, { status: 401 })
     }
-
-    const token = authHeader.substring(7);
-    const decoded = await jwtVerify(token, JWT_SECRET);
+    const { user, tenant } = auth
     
     // Only admin can clear all chats
-    if (!['admin'].includes(decoded.payload.role)) {
+    if (!['admin'].includes(user.role)) {
       return NextResponse.json(
         { error: 'Forbidden - Admin access required' },
         { status: 403 }
       );
     }
 
-    const db = mongoose.connection.db;
+    // Get tenant database connection
+    const connection = await getTenantConnection(tenant.databaseName);
+    const db = connection.db;
 
     // Delete all chats
     const chatsResult = await db.collection('chats').deleteMany({});
     
-    // Delete all messages
+    // Delete all messages (if stored separately)
     const messagesResult = await db.collection('messages').deleteMany({});
 
     console.log(`✅ Cleared ${chatsResult.deletedCount} chats and ${messagesResult.deletedCount} messages`);

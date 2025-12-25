@@ -1,11 +1,5 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import HealthScore from '@/models/HealthScore'
-import Employee from '@/models/Employee'
-import Attendance from '@/models/Attendance'
-import Performance from '@/models/Performance'
-import Leave from '@/models/Leave'
-import { verifyToken } from '@/lib/auth'
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 
 // POST - Calculate health scores for all employees
 export async function POST(request) {
@@ -20,7 +14,13 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 403 })
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['HealthScore', 'Employee', 'Attendance', 'Performance', 'Leave'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { HealthScore, Employee, Attendance, Performance, Leave } = models
 
     // Get all active employees
     const employees = await Employee.find({ status: 'active' })

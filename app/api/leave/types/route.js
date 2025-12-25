@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import LeaveType from '@/models/LeaveType'
-
+import { getAuthAndModels } from '@/lib/auth'
 // GET - List all leave types
 export async function GET(request) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['LeaveType'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { LeaveType } = models
 
     const leaveTypes = await LeaveType.find({ isActive: true })
       .sort({ name: 1 })
@@ -26,8 +30,6 @@ export async function GET(request) {
 // POST - Create leave type
 export async function POST(request) {
   try {
-    await connectDB()
-
     const data = await request.json()
 
     const leaveType = await LeaveType.create(data)

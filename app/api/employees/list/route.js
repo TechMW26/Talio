@@ -1,10 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth'
-import connectDB from '@/lib/mongodb'
-import Employee from '@/models/Employee'
-import User from '@/models/User'
-import Designation from '@/models/Designation'
-import Department from '@/models/Department'
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 import queryCache from '@/lib/queryCache'
 
 export const dynamic = 'force-dynamic'
@@ -30,7 +25,13 @@ export async function GET(request) {
       return NextResponse.json(cached)
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Employee', 'User', 'Designation', 'Department'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Employee, User, Designation, Department } = models
 
     // Get current user
     const currentUserDoc = await User.findById(decoded.userId).select('employeeId role').lean()

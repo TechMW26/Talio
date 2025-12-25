@@ -1,17 +1,19 @@
 import { NextResponse } from 'next/server'
+import { getAuthAndModels } from '@/lib/auth'
 import jwt from 'jsonwebtoken'
-import connectDB from '@/lib/mongodb'
-import Chat from '@/models/Chat'
-import Employee from '@/models/Employee'
-import User from '@/models/User'
-
 export const dynamic = 'force-dynamic'
 
 
 // GET - Get unread message count for current user
 export async function GET(request) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Chat', 'Employee', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Chat, Employee, User } = models
 
     // Get user from token
     const token = request.headers.get('authorization')?.replace('Bearer ', '')

@@ -1,13 +1,6 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import AttendanceCorrection from '@/models/AttendanceCorrection'
-import Attendance from '@/models/Attendance'
-import Employee from '@/models/Employee'
-import Department from '@/models/Department'
-import User from '@/models/User'
-import { verifyToken } from '@/lib/auth'
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 import { calculateEffectiveWorkHours, determineAttendanceStatus } from '@/lib/attendanceShrinkage'
-import CompanySettings from '@/models/CompanySettings'
 import queryCache from '@/lib/queryCache'
 
 export const dynamic = 'force-dynamic'
@@ -83,7 +76,13 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['AttendanceCorrection', 'Attendance', 'Employee', 'Department', 'User', 'CompanySettings'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { AttendanceCorrection, Attendance, Employee, Department, User, CompanySettings } = models
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
@@ -161,8 +160,6 @@ export async function POST(request) {
     if (!decoded) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
-
-    await connectDB()
 
     const data = await request.json()
     const {
@@ -275,8 +272,6 @@ export async function PATCH(request) {
     if (!decoded) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
-
-    await connectDB()
 
     const data = await request.json()
     const { correctionId, action, reviewerComments } = data

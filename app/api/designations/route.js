@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Designation from '@/models/Designation'
-
+import { getAuthAndModels } from '@/lib/auth'
 // GET - List all designations
 export async function GET(request) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Designation'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Designation } = models
 
     const designations = await Designation.find({ isActive: true }).sort({ title: 1 })
 
@@ -25,8 +29,6 @@ export async function GET(request) {
 // POST - Create new designation
 export async function POST(request) {
   try {
-    await connectDB()
-
     const data = await request.json()
 
     // Remove department if present (no longer used)

@@ -1,16 +1,6 @@
 import { NextResponse } from 'next/server'
+import { getAuthAndModels } from '@/lib/auth'
 import { jwtVerify } from 'jose'
-import connectDB from '@/lib/mongodb'
-import User from '@/models/User'
-import Employee from '@/models/Employee'
-import Leave from '@/models/Leave'
-import Attendance from '@/models/Attendance'
-import Department from '@/models/Department'
-import Designation from '@/models/Designation'
-import Document from '@/models/Document'
-import Asset from '@/models/Asset'
-import Announcement from '@/models/Announcement'
-import Policy from '@/models/Policy'
 import Fuse from 'fuse.js'
 import { getMenuItemsForRole } from '@/utils/roleBasedMenus'
 
@@ -107,7 +97,13 @@ export async function GET(request) {
     }
 
     const { payload: decoded } = await jwtVerify(token, secret)
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Leave', 'Attendance', 'Department', 'Designation', 'Document', 'Asset', 'Announcement', 'Policy'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { User, Employee, Leave, Attendance, Department, Designation, Document, Asset, Announcement, Policy } = models
 
     const user = await User.findById(decoded.userId).populate('employeeId')
     if (!user || !user.employeeId) {

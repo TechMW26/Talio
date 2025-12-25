@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Payroll from '@/models/Payroll'
-import Company from '@/models/Company'
-
+import { getAuthAndModels } from '@/lib/auth'
 // GET - Get single payroll
 export async function GET(request, { params }) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Payroll', 'Company'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Payroll, Company } = models
 
     const payroll = await Payroll.findById(params.id)
       .populate({
@@ -41,8 +44,6 @@ export async function GET(request, { params }) {
 // PUT - Update payroll
 export async function PUT(request, { params }) {
   try {
-    await connectDB()
-
     const data = await request.json()
 
     const payroll = await Payroll.findByIdAndUpdate(
@@ -126,8 +127,6 @@ export async function PUT(request, { params }) {
 // DELETE - Delete payroll
 export async function DELETE(request, { params }) {
   try {
-    await connectDB()
-
     const payroll = await Payroll.findByIdAndDelete(params.id)
 
     if (!payroll) {

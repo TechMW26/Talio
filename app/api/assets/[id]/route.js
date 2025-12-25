@@ -1,12 +1,17 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Asset from '@/models/Asset'
+import { getAuthAndModels } from '@/lib/auth'
 import jwt from 'jsonwebtoken'
 
 // PUT - Update asset
 export async function PUT(request, { params }) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Asset'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Asset } = models
 
     // Auth check
     const token = request.headers.get('authorization')?.split(' ')[1]
@@ -105,8 +110,6 @@ export async function PUT(request, { params }) {
 // DELETE - Delete asset
 export async function DELETE(request, { params }) {
   try {
-    await connectDB()
-
     // Auth check
     const token = request.headers.get('authorization')?.split(' ')[1]
     if (!token) {

@@ -1,15 +1,18 @@
 import { NextResponse } from 'next/server'
+import { getAuthAndModels } from '@/lib/auth'
 import { jwtVerify } from 'jose'
-import connectDB from '@/lib/mongodb'
-import Helpdesk from '@/models/Helpdesk'
-import User from '@/models/User'
-
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET)
 
 // POST - Add comment to ticket
 export async function POST(request, { params }) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Helpdesk', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Helpdesk, User } = models
 
     const { id } = await params
     

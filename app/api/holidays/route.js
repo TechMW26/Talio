@@ -1,12 +1,17 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Holiday from '@/models/Holiday'
+import { getAuthAndModels } from '@/lib/auth'
 import { emitHolidayUpdate } from '@/lib/realtimeEvents'
 
 // GET - List holidays
 export async function GET(request) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Holiday'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Holiday } = models
 
     const { searchParams } = new URL(request.url)
     const year = searchParams.get('year')
@@ -38,8 +43,6 @@ export async function GET(request) {
 // POST - Create holiday
 export async function POST(request) {
   try {
-    await connectDB()
-
     const data = await request.json()
 
     const holiday = await Holiday.create(data)

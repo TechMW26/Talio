@@ -1,9 +1,5 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import GeofenceLocation from '@/models/GeofenceLocation'
-import { verifyToken } from '@/lib/auth'
-import User from '@/models/User'
-
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 // GET - List all geofence locations
 export async function GET(request) {
   try {
@@ -17,7 +13,13 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['GeofenceLocation', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { GeofenceLocation, User } = models
 
     const { searchParams } = new URL(request.url)
     const activeOnly = searchParams.get('activeOnly') === 'true'
@@ -65,8 +67,6 @@ export async function POST(request) {
         { status: 403 }
       )
     }
-
-    await connectDB()
 
     const user = await User.findById(decoded.userId).populate('employeeId')
     const employeeId = user?.employeeId?._id

@@ -1,14 +1,17 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Payroll from '@/models/Payroll'
-import Employee from '@/models/Employee'
-import CompanySettings from '@/models/CompanySettings'
+import { getAuthAndModels } from '@/lib/auth'
 import { sendEmail } from '@/lib/mailer'
 
 // POST - Bulk update payroll status and optionally send emails
 export async function POST(request) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Payroll', 'Employee', 'CompanySettings'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Payroll, Employee, CompanySettings } = models
 
     const { payrollIds, action, sendEmails } = await request.json()
 
@@ -134,8 +137,6 @@ export async function POST(request) {
 // DELETE - Bulk delete payrolls
 export async function DELETE(request) {
   try {
-    await connectDB()
-
     const { payrollIds } = await request.json()
 
     if (!payrollIds || !Array.isArray(payrollIds) || payrollIds.length === 0) {

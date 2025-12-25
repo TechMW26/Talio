@@ -1,11 +1,5 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Attendance from '@/models/Attendance'
-import Employee from '@/models/Employee'
-import Leave from '@/models/Leave'
-import Holiday from '@/models/Holiday'
-import CompanySettings from '@/models/CompanySettings'
-import Company from '@/models/Company'
+import { getAuthAndModels } from '@/lib/auth'
 import { sendPushToUser } from '@/lib/pushNotification'
 
 export const dynamic = 'force-dynamic'
@@ -78,7 +72,13 @@ export async function POST(request) {
       )
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Attendance', 'Employee', 'Leave', 'Holiday', 'CompanySettings', 'Company'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Attendance, Employee, Leave, Holiday, CompanySettings, Company } = models
 
     const body = await request.json().catch(() => ({}))
     const { date, startDate, endDate, sendNotifications = false, dryRun = false } = body
@@ -372,8 +372,6 @@ export async function GET(request) {
         { status: 401 }
       )
     }
-
-    await connectDB()
 
     const { searchParams } = new URL(request.url)
     const date = searchParams.get('date')

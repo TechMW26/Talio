@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth'
-import connectDB from '@/lib/mongodb'
-import User from '@/models/User'
-import Employee from '@/models/Employee'
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 import { uploadImageToImageKit, deleteFromImageKit, getProfilePictureUrl, getImageKitFolder, generateEmployeeFolderName } from '@/lib/imagekit'
 import { optimizeImage, isValidImage } from '@/lib/imageOptimization'
 import path from 'path'
@@ -42,9 +39,15 @@ export async function POST(request) {
             return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
         }
 
-        await connectDB()
+        // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['User', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { User, Employee } = models
 
-        const user = await User.findById(decoded.userId).populate('employeeId')
+    const user = await User.findById(decoded.userId).populate('employeeId')
         if (!user) {
             return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
         }
@@ -264,8 +267,6 @@ export async function DELETE(request) {
         if (!decoded) {
             return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
         }
-
-        await connectDB()
 
         const user = await User.findById(decoded.userId).populate('employeeId')
         if (!user) {

@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import connectDB from '@/lib/mongodb';
-import Suggestion from '@/models/Suggestion';
-import User from '@/models/User';
-import { verifyToken } from '@/lib/auth';
+;
+;
+;
+import { verifyToken, getAuthAndModels } from '@/lib/auth';
 
 /**
  * POST /api/ideas/[id]/vote
@@ -10,7 +10,15 @@ import { verifyToken } from '@/lib/auth';
  */
 export async function POST(request, { params }) {
   try {
-    await connectDB();
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Suggestion', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Suggestion, User } = models
+
+    ;
 
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {

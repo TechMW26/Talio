@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
+import { getAuthAndModels } from '@/lib/auth'
 import { jwtVerify } from 'jose';
-import connectDB from '@/lib/mongodb';
-import Attendance from '@/models/Attendance';
-import User from '@/models/User';
+;
+;
+;
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
@@ -43,7 +44,15 @@ export async function GET(request) {
       );
     }
 
-    await connectDB();
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Attendance', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Attendance, User } = models
+
+    ;
 
     // Get user with employee reference
     const user = await User.findById(userId).select('employeeId');

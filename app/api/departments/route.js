@@ -1,13 +1,17 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Department from '@/models/Department'
-import Employee from '@/models/Employee'
+import { getAuthAndModels } from '@/lib/auth'
 import { updateDepartmentHeadsForDepartment } from '@/lib/departmentHeadSync'
 
 // GET - List all departments
 export async function GET(request) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Department', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Department, Employee } = models
 
     const departments = await Department.find({ isActive: true })
       .populate('head', 'firstName lastName employeeCode email designation')
@@ -49,8 +53,6 @@ export async function GET(request) {
 // POST - Create new department
 export async function POST(request) {
   try {
-    await connectDB()
-
     const data = await request.json()
 
     // Handle multiple heads - ensure backwards compatibility

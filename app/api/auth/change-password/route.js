@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server'
 import { jwtVerify } from 'jose'
-import connectDB from '@/lib/mongodb'
-import User from '@/models/User'
-import Employee from '@/models/Employee'
+import { getTenantModels } from '@/lib/tenantModels'
 import { syncUserToBackup } from '@/lib/backupDb'
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key')
@@ -40,7 +38,16 @@ export async function POST(request) {
       )
     }
 
-    await connectDB()
+    // SECURITY: Require tenant context from JWT
+    if (!payload.databaseName) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid session - please log in again' },
+        { status: 401 }
+      )
+    }
+
+    // Get tenant-specific models
+    const { User, Employee } = await getTenantModels(payload.databaseName, ['User', 'Employee'])
 
     // Get request body
     const { currentPassword, newPassword } = await request.json()
@@ -232,7 +239,16 @@ export async function GET(request) {
       )
     }
 
-    await connectDB()
+    // SECURITY: Require tenant context from JWT
+    if (!payload.databaseName) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid session - please log in again' },
+        { status: 401 }
+      )
+    }
+
+    // Get tenant-specific User model
+    const { User } = await getTenantModels(payload.databaseName, ['User'])
 
     const user = await User.findById(payload.userId).select('forcePasswordChange isActive')
 

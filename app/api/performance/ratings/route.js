@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Employee from '@/models/Employee'
-import { verifyToken } from '@/lib/auth'
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,7 +13,13 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Employee } = models
 
     // Build query based on role
     let query = { status: 'active' }
@@ -103,8 +107,6 @@ export async function DELETE(request) {
     if (!id) {
       return NextResponse.json({ success: false, message: 'Rating ID is required' }, { status: 400 })
     }
-
-    await connectDB()
 
     // Find employee with this review
     const employee = await Employee.findOne({ 'reviews._id': id })

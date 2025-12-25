@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
+import { getAuthAndModels } from '@/lib/auth'
 import { readdir, stat } from 'fs/promises';
 import path from 'path';
 import { jwtVerify } from 'jose';
-import connectDB from '@/lib/mongodb';
-import ProductivitySession from '@/models/ProductivitySession';
-import User from '@/models/User';
-import Employee from '@/models/Employee';
-import Department from '@/models/Department';
+;
+;
+;
+;
+;
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 const SCREENSHOTS_PER_SESSION = 30;
@@ -141,7 +142,15 @@ export async function GET(request) {
     const currentUserId = decoded.payload.userId;
     const currentUserRole = decoded.payload.role;
     
-    await connectDB();
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['ProductivitySession', 'User', 'Employee', 'Department'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { ProductivitySession, User, Employee, Department } = models
+
+    ;
     
     const { searchParams } = new URL(request.url);
     const targetUserId = searchParams.get('userId') || currentUserId;
@@ -230,7 +239,7 @@ export async function POST(request) {
 
     const userId = decoded.payload.userId;
     
-    await connectDB();
+    ;
     
     const body = await request.json();
     const date = body.date ? new Date(body.date) : new Date();

@@ -1,15 +1,16 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Employee from '@/models/Employee'
-import Department from '@/models/Department'
-import Designation from '@/models/Designation'
-import User from '@/models/User'
-import { verifyToken } from '@/lib/auth'
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 
 // GET - Get individual team member details
 export async function GET(request, { params }) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Employee', 'Department', 'Designation', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Employee, Department, Designation, User } = models
 
     const { id } = params
 
@@ -94,8 +95,6 @@ export async function GET(request, { params }) {
 // POST - Add review/rating/remark for team member
 export async function POST(request, { params }) {
   try {
-    await connectDB()
-
     const { id } = params
 
     // Verify authentication

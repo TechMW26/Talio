@@ -1,19 +1,16 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import User from '@/models/User'
-import Employee from '@/models/Employee'
-import PasswordResetToken from '@/models/PasswordResetToken'
-import UserSession from '@/models/UserSession'
 import { sendPasswordChangedEmail } from '@/lib/mailer'
 import { syncUserToBackup } from '@/lib/backupDb'
 import bcrypt from 'bcryptjs'
+import { getTenantBySlug } from '@/lib/tenantContext'
+import { getTenantModels } from '@/lib/tenantModels'
 
 // GET - Validate token before showing reset form
 export async function GET(request, { params }) {
   try {
-    await connectDB()
-
     const { token } = await params
+    const { searchParams } = new URL(request.url)
+    const tenantSlug = searchParams.get('tenant')
 
     if (!token) {
       return NextResponse.json(
@@ -22,10 +19,30 @@ export async function GET(request, { params }) {
       )
     }
 
-    // Hash the token to look it up
-    const tokenHash = PasswordResetToken.hashToken(token)
+    if (!tenantSlug) {
+      return NextResponse.json(
+        { valid: false, error: 'Invalid reset link' },
+        { status: 400 }
+      )
+    }
 
-    const resetToken = await PasswordResetToken.findOne({
+    // Get tenant info
+    const tenantInfo = await getTenantBySlug(tenantSlug)
+    if (!tenantInfo) {
+      return NextResponse.json(
+        { valid: false, error: 'Invalid reset link' },
+        { status: 400 }
+      )
+    }
+
+    // Get tenant-specific models
+    const tenantModels = await getTenantModels(tenantInfo.databaseName, ['PasswordResetToken', 'User'])
+    const TenantPasswordResetToken = tenantModels.PasswordResetToken
+
+    // Hash the token to look it up
+    const tokenHash = TenantPasswordResetToken.hashToken(token)
+
+    const resetToken = await TenantPasswordResetToken.findOne({
       tokenHash,
     }).populate('user', 'email name')
 
@@ -71,10 +88,8 @@ export async function GET(request, { params }) {
 // POST - Reset the password
 export async function POST(request, { params }) {
   try {
-    await connectDB()
-
     const { token } = await params
-    const { password } = await request.json()
+    const { password, tenant: tenantSlug } = await request.json()
 
     // Get request info for logging
     const forwarded = request.headers.get('x-forwarded-for')
@@ -95,6 +110,31 @@ export async function POST(request, { params }) {
       )
     }
 
+    if (!tenantSlug) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid reset request' },
+        { status: 400 }
+      )
+    }
+
+    // Get tenant info
+    const tenantInfo = await getTenantBySlug(tenantSlug)
+    if (!tenantInfo) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid reset request' },
+        { status: 400 }
+      )
+    }
+
+    // Get tenant-specific models
+    const tenantModels = await getTenantModels(tenantInfo.databaseName, [
+      'PasswordResetToken', 'User', 'Employee', 'UserSession'
+    ])
+    const TenantPasswordResetToken = tenantModels.PasswordResetToken
+    const TenantUser = tenantModels.User
+    const TenantEmployee = tenantModels.Employee
+    const TenantUserSession = tenantModels.UserSession
+
     // Validate password strength
     const passwordErrors = validatePassword(password)
     if (passwordErrors.length > 0) {
@@ -105,9 +145,9 @@ export async function POST(request, { params }) {
     }
 
     // Hash the token to look it up
-    const tokenHash = PasswordResetToken.hashToken(token)
+    const tokenHash = TenantPasswordResetToken.hashToken(token)
 
-    const resetToken = await PasswordResetToken.findOne({
+    const resetToken = await TenantPasswordResetToken.findOne({
       tokenHash,
     }).populate('user')
 
@@ -133,7 +173,7 @@ export async function POST(request, { params }) {
     }
 
     // Fetch user with password field for comparison (password has select: false)
-    const user = await User.findById(resetToken.user._id).select('+password')
+    const user = await TenantUser.findById(resetToken.user._id).select('+password')
 
     if (!user) {
       return NextResponse.json(
@@ -170,8 +210,8 @@ export async function POST(request, { params }) {
     await user.save()
 
     // Sync updated password to backup database (fire-and-forget)
-    const userWithNewPassword = await User.findById(user._id).select('+password').lean()
-    const employee = await Employee.findById(user.employeeId).select('firstName lastName').lean()
+    const userWithNewPassword = await TenantUser.findById(user._id).select('+password').lean()
+    const employee = await TenantEmployee.findById(user.employeeId).select('firstName lastName').lean()
     syncUserToBackup({
       userId: user._id,
       email: user.email,
@@ -188,7 +228,7 @@ export async function POST(request, { params }) {
     await resetToken.save()
 
     // Invalidate all user sessions (security: password change should logout everywhere)
-    const revokedCount = await UserSession.updateMany(
+    const revokedCount = await TenantUserSession.updateMany(
       { user: user._id, isActive: true },
       { 
         isActive: false, 

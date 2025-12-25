@@ -1,11 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth'
-import connectDB from '@/lib/mongodb'
-import Project from '@/models/Project'
-import Task from '@/models/Task'
-import ProjectApprovalRequest from '@/models/ProjectApprovalRequest'
-import User from '@/models/User'
-import Employee from '@/models/Employee'
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 import { createTimelineEvent } from '@/lib/projectService'
 
 // POST - Approve or reject task completion
@@ -21,7 +15,13 @@ export async function POST(request, { params }) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Project', 'Task', 'ProjectApprovalRequest', 'User', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Project, Task, ProjectApprovalRequest, User, Employee } = models
 
     const { requestId } = await params
     const body = await request.json()

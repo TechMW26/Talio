@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
-import { verifyToken } from '@/lib/auth';
-import connectDB from '@/lib/mongodb';
-import EmailAccount from '@/models/EmailAccount';
+import { getAuthAndModels } from '@/lib/auth';
 
 // Production URL - must match Google Cloud Console
 const PRODUCTION_URL = 'https://app.talio.in';
@@ -12,30 +10,20 @@ const REDIRECT_URI = `${PRODUCTION_URL}/api/auth/google/callback`;
 // GET - Check if email is connected and get email account info
 export async function GET(request) {
   try {
-    const token = request.headers.get('Authorization')?.split(' ')[1];
-    
-    if (!token) {
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['EmailAccount'])
+    if (!auth.success) {
       return NextResponse.json({ 
         isConnected: false, 
         email: null, 
         accounts: [] 
       });
     }
-    
-    const payload = await verifyToken(token);
-
-    if (!payload) {
-      return NextResponse.json({ 
-        isConnected: false, 
-        email: null, 
-        accounts: [] 
-      });
-    }
-
-    await connectDB();
+    const { user, models } = auth
+    const { EmailAccount } = models
 
     // Get all connected email accounts for this user
-    const emailAccounts = await EmailAccount.find({ user: payload.userId, isConnected: true });
+    const emailAccounts = await EmailAccount.find({ user: user._id, isConnected: true });
 
     if (!emailAccounts || emailAccounts.length === 0) {
       return NextResponse.json({
@@ -87,19 +75,13 @@ export async function GET(request) {
 // POST - Generate OAuth URL for Gmail connection
 export async function POST(request) {
   try {
-    const token = request.headers.get('Authorization')?.split(' ')[1];
-    
-    if (!token) {
-      console.error('[Mail OAuth] No token provided');
-      return NextResponse.json({ error: 'No authentication token provided' }, { status: 401 });
+    // Get authenticated user
+    const auth = await getAuthAndModels(request, [])
+    if (!auth.success) {
+      console.error('[Mail OAuth] Authentication failed:', auth.message);
+      return NextResponse.json({ error: auth.message }, { status: 401 });
     }
-    
-    const payload = await verifyToken(token);
-
-    if (!payload) {
-      console.error('[Mail OAuth] Token verification failed');
-      return NextResponse.json({ error: 'Unauthorized - invalid token' }, { status: 401 });
-    }
+    const { user } = auth
 
     const clientId = process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
@@ -117,7 +99,7 @@ export async function POST(request) {
     // Generate a state token to identify this as a mail connection request
     const stateData = JSON.stringify({
       type: 'mail_connect',  // This tells the callback it's for mail
-      userId: payload.userId,
+      userId: user._id.toString(),
       timestamp: Date.now()
     });
     // Use Buffer.from which is available in Node.js runtime
@@ -159,17 +141,16 @@ export async function POST(request) {
 // DELETE - Disconnect email account
 export async function DELETE(request) {
   try {
-    const token = request.headers.get('Authorization')?.split(' ')[1];
-    const payload = await verifyToken(token);
-
-    if (!payload) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['EmailAccount'])
+    if (!auth.success) {
+      return NextResponse.json({ error: auth.message }, { status: 401 });
     }
-
-    await connectDB();
+    const { user, models } = auth
+    const { EmailAccount } = models
 
     // Remove email account
-    await EmailAccount.findOneAndDelete({ user: payload.userId });
+    await EmailAccount.findOneAndDelete({ user: user._id });
 
     return NextResponse.json({ success: true, message: 'Email disconnected successfully' });
 

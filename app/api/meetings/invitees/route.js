@@ -1,9 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth'
-import connectDB from '@/lib/mongodb'
-import Employee from '@/models/Employee'
-import Department from '@/models/Department'
-
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 export const dynamic = 'force-dynamic'
 
 // GET - Get employees grouped by department for meeting invitations
@@ -19,7 +15,13 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Employee', 'Department'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Employee, Department } = models
 
     const { searchParams } = new URL(request.url)
     const search = searchParams.get('search') || ''

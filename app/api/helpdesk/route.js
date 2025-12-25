@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Helpdesk from '@/models/Helpdesk'
-
+import { getAuthAndModels } from '@/lib/auth'
 // GET - List helpdesk tickets
 export async function GET(request) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Helpdesk'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Helpdesk } = models
 
     const { searchParams } = new URL(request.url)
     const employeeId = searchParams.get('employeeId')
@@ -47,8 +51,6 @@ export async function GET(request) {
 // POST - Create helpdesk ticket
 export async function POST(request) {
   try {
-    await connectDB()
-
     const data = await request.json()
 
     const ticket = await Helpdesk.create({

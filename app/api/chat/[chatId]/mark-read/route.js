@@ -1,14 +1,16 @@
 import { NextResponse } from 'next/server'
+import { getAuthAndModels } from '@/lib/auth'
 import jwt from 'jsonwebtoken'
-import connectDB from '@/lib/mongodb'
-import Chat from '@/models/Chat'
-import Employee from '@/models/Employee'
-import User from '@/models/User'
-
 // POST - Mark all messages in a chat as read
 export async function POST(request, context) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Chat', 'Employee', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Chat, Employee, User } = models
 
     // Get user from token
     const token = request.headers.get('authorization')?.replace('Bearer ', '')

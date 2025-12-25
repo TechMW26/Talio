@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Performance from '@/models/Performance'
-
+import { getAuthAndModels } from '@/lib/auth'
 // GET - List performance reviews
 export async function GET(request) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Performance'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Performance } = models
 
     const { searchParams } = new URL(request.url)
     const employeeId = searchParams.get('employeeId')
@@ -42,8 +46,6 @@ export async function GET(request) {
 // POST - Create performance review
 export async function POST(request) {
   try {
-    await connectDB()
-
     const data = await request.json()
 
     // Calculate overall rating

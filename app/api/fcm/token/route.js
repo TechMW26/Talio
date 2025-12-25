@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth'
-import connectDB from '@/lib/mongodb'
-import User from '@/models/User'
-
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 // POST - Register/Update FCM Token
 export async function POST(request) {
     try {
@@ -22,9 +19,15 @@ export async function POST(request) {
             )
         }
 
-        await connectDB()
+        // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { User } = models
 
-        const { fcmToken, deviceInfo } = await request.json()
+    const { fcmToken, deviceInfo } = await request.json()
 
         if (!fcmToken) {
             return NextResponse.json(
@@ -110,8 +113,6 @@ export async function DELETE(request) {
             )
         }
 
-        await connectDB()
-
         const { fcmToken } = await request.json()
 
         if (!fcmToken) {
@@ -166,8 +167,6 @@ export async function PUT(request) {
                 { status: 401 }
             )
         }
-
-        await connectDB()
 
         const { preferences } = await request.json()
 

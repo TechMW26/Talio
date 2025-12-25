@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth'
-import connectDB from '@/lib/mongodb'
-import User from '@/models/User'
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 import fs from 'fs/promises'
 import path from 'path'
 
@@ -27,7 +25,13 @@ export async function GET(request, context) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { User } = models
 
     // Get the file path from params
     if (!pathSegments || pathSegments.length < 2) {

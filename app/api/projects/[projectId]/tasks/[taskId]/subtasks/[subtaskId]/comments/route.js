@@ -1,12 +1,6 @@
 import { NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth'
-import connectDB from '@/lib/mongodb'
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 import mongoose from 'mongoose'
-import Task from '@/models/Task'
-import TaskAssignee from '@/models/TaskAssignee'
-import User from '@/models/User'
-import Employee from '@/models/Employee'
-import Project from '@/models/Project'
 import { createTimelineEvent } from '@/lib/projectService'
 
 // GET - Get all comments for a subtask
@@ -22,7 +16,13 @@ export async function GET(request, { params }) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Task', 'TaskAssignee', 'User', 'Employee', 'Project'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Task, TaskAssignee, User, Employee, Project } = models
 
     const { taskId, subtaskId } = await params
 
@@ -76,8 +76,6 @@ export async function POST(request, { params }) {
     if (!decoded) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
-
-    await connectDB()
 
     const { projectId, taskId, subtaskId } = await params
     const body = await request.json()
@@ -223,8 +221,6 @@ export async function DELETE(request, { params }) {
     if (!decoded) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
-
-    await connectDB()
 
     const { taskId, subtaskId } = await params
     const { searchParams } = new URL(request.url)

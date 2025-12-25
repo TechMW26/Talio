@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
+import { getAuthAndModels } from '@/lib/auth'
 import { jwtVerify } from 'jose';
 import { mkdir, access, constants } from 'fs/promises';
 import path from 'path';
-import connectDB from '@/lib/mongodb';
-import User from '@/models/User';
+;
+;
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
@@ -65,7 +66,15 @@ export async function GET(request) {
     // Connect to DB to verify connection
     let dbConnected = false;
     try {
-      await connectDB();
+      // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { User } = models
+
+    ;
       dbConnected = true;
     } catch (error) {
       console.error('[Health] DB connection error:', error.message);

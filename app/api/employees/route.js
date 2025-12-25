@@ -1,21 +1,23 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Employee from '@/models/Employee'
-import User from '@/models/User'
-import Department from '@/models/Department'
-import Designation from '@/models/Designation'
 import queryCache from '@/lib/queryCache'
 import bcrypt from 'bcryptjs'
 import { sendAndLogOnboardingEmail } from '@/lib/mailer'
 import { syncUserToBackup } from '@/lib/backupDb'
 import { emitEmployeeUpdate, emitDashboardRefresh } from '@/lib/realtimeEvents'
-import { verifyTokenFromRequest } from '@/lib/auth'
+import { verifyTokenFromRequest, getAuthAndModels } from '@/lib/auth'
 import { checkUserLimit, registerUserTenantMapping, getTenantCompanyByDbName } from '@/lib/tenantContext'
 
 // GET - List all employees with filters
 export async function GET(request) {
   try {
-    await connectDB()
+    // Get auth and tenant-aware models
+    const auth = await getAuthAndModels(request, ['Employee', 'User', 'Department', 'Designation']);
+    
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message || 'Unauthorized' }, { status: 401 });
+    }
+    
+    const { models: { Employee: TenantEmployee, User: TenantUser, Department: TenantDepartment, Designation: TenantDesignation } } = auth;
 
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page')) || 1
@@ -71,7 +73,7 @@ export async function GET(request) {
 
     // Optimized: Use select() to fetch only needed fields and lean() for plain objects
     // Include salary and statutory fields for payroll calculations
-    const employees = await Employee.find(query)
+    const employees = await TenantEmployee.find(query)
       .select('employeeCode firstName lastName email phone department departments designation designationLevel designationLevelName reportingManager dateOfJoining status profilePicture salary pfEnrollment esiEnrollment professionalTax healthInsurance basicSalary')
       .populate({
         path: 'department',
@@ -100,7 +102,7 @@ export async function GET(request) {
 
     // Optimized: Single query to get all user data
     const employeeIds = employees.map(emp => emp._id)
-    const users = await User.find({ employeeId: { $in: employeeIds } })
+    const users = await TenantUser.find({ employeeId: { $in: employeeIds } })
       .select('_id email role employeeId')
       .lean()
 
@@ -122,7 +124,7 @@ export async function GET(request) {
       userId: userMap[emp._id.toString()] || null
     }))
 
-    const total = await Employee.countDocuments(query)
+    const total = await TenantEmployee.countDocuments(query)
 
     const response = {
       success: true,
@@ -152,16 +154,16 @@ export async function GET(request) {
 // POST - Create new employee
 export async function POST(request) {
   try {
-    await connectDB()
-
-    // Verify token and get tenant info
-    const auth = await verifyTokenFromRequest(request)
+    // Get auth and tenant-aware models
+    const auth = await getAuthAndModels(request, ['Employee', 'User', 'Department', 'Designation']);
     if (!auth.success) {
       return NextResponse.json(
         { success: false, message: auth.message || 'Unauthorized' },
         { status: 401 }
       )
     }
+
+    const { models: { Employee: TenantEmployee, User: TenantUser } } = auth;
 
     // Check user limit for tenant if tenant info is available
     if (auth.tenant?.databaseName) {
@@ -184,9 +186,9 @@ export async function POST(request) {
 
     // Optimized: Check both in parallel
     const [existingEmployee, existingEmail, existingUser] = await Promise.all([
-      Employee.findOne({ employeeCode: data.employeeCode }).lean(),
-      Employee.findOne({ email: data.email }).lean(),
-      User.findOne({ email: data.email }).lean()
+      TenantEmployee.findOne({ employeeCode: data.employeeCode }).lean(),
+      TenantEmployee.findOne({ email: data.email }).lean(),
+      TenantUser.findOne({ email: data.email }).lean()
     ])
 
     if (existingEmployee) {
@@ -240,7 +242,7 @@ export async function POST(request) {
     }
 
     // Create employee first
-    const employee = await Employee.create(employeeData)
+    const employee = await TenantEmployee.create(employeeData)
 
     // Create user account for the employee
     const password = data.password || 'employee123' // Default password if not provided
@@ -258,10 +260,10 @@ export async function POST(request) {
       userData.company = data.company
     }
 
-    const user = await User.create(userData)
+    const user = await TenantUser.create(userData)
 
     // Update employee with userId reference
-    await Employee.findByIdAndUpdate(employee._id, { userId: user._id })
+    await TenantEmployee.findByIdAndUpdate(employee._id, { userId: user._id })
 
     // Register user in tenant mapping if this is a multi-tenant setup
     if (auth.tenant?.databaseName) {
@@ -280,7 +282,7 @@ export async function POST(request) {
 
     // Sync user to backup database (fire-and-forget)
     // Get the hashed password from the created user for backup
-    const userWithPassword = await User.findById(user._id).select('+password').lean()
+    const userWithPassword = await TenantUser.findById(user._id).select('+password').lean()
     syncUserToBackup({
       userId: user._id,
       email: user.email,
@@ -290,7 +292,7 @@ export async function POST(request) {
       role: user.role,
     }).catch(err => console.error('[Employee Create] Backup sync failed:', err))
 
-    const populatedEmployee = await Employee.findById(employee._id)
+    const populatedEmployee = await TenantEmployee.findById(employee._id)
       .select('employeeCode firstName lastName email phone department departments designation designationLevel designationLevelName reportingManager dateOfJoining status salary pfEnrollment esiEnrollment professionalTax healthInsurance basicSalary')
       .populate({
         path: 'department',

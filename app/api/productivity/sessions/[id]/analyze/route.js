@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
+import { getAuthAndModels } from '@/lib/auth'
 import { readFile } from 'fs/promises';
 import path from 'path';
 import { jwtVerify } from 'jose';
-import connectDB from '@/lib/mongodb';
-import ProductivitySession from '@/models/ProductivitySession';
-import User from '@/models/User';
+;
+;
+;
 import { generateVisionContent, generateContent } from '@/lib/gemini';
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
@@ -41,7 +42,15 @@ export async function POST(request, { params }) {
     const currentUserId = decoded.payload.userId;
     const currentUserRole = decoded.payload.role;
     
-    await connectDB();
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['ProductivitySession', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { ProductivitySession, User } = models
+
+    ;
     
     // Get session
     const session = await ProductivitySession.findById(sessionId);
@@ -293,7 +302,7 @@ export async function GET(request, { params }) {
       );
     }
 
-    await connectDB();
+    ;
     
     const session = await ProductivitySession.findById(sessionId);
     if (!session) {

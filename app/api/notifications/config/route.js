@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import { jwtVerify } from 'jose'
-import connectDB from '@/lib/mongodb'
+import { verifyToken } from '@/lib/auth'
 import fs from 'fs'
 import path from 'path'
 
@@ -50,11 +49,12 @@ export async function GET(request) {
       })
     }
 
-    await connectDB()
-
     const token = authHeader.substring(7)
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET)
-    const { payload: decoded } = await jwtVerify(token, secret)
+    const decoded = await verifyToken(token)
+    
+    if (!decoded) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    }
 
     // Check if Firebase is configured (server-side keys)
     const firebaseProjectId = process.env.FIREBASE_PROJECT_ID
@@ -112,8 +112,6 @@ export async function GET(request) {
 // This endpoint is kept for compatibility but returns info message
 export async function POST(request) {
   try {
-    await connectDB()
-
     // Verify authentication
     const authHeader = request.headers.get('authorization')
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -124,8 +122,11 @@ export async function POST(request) {
     }
 
     const token = authHeader.substring(7)
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET)
-    const { payload: decoded } = await jwtVerify(token, secret)
+    const decoded = await verifyToken(token)
+    
+    if (!decoded) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    }
 
     // Only admin can access configuration
     if (decoded.role !== 'admin') {

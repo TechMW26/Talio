@@ -3,26 +3,40 @@
 ## Architecture (CRITICAL)
 **Custom Server**: Always use `npm run dev` (not `next dev`) — [server.js](../server.js) initializes Socket.IO alongside Next.js. `global.io` is available in API routes.
 
-**Tech Stack**: Next.js 15 (App Router), MongoDB/Mongoose, Socket.IO, TailwindCSS, AI (Gemini → OpenAI fallback)
+**Tech Stack**: Next.js 15 (App Router), MongoDB/Mongoose (Multi-Tenant), Socket.IO, TailwindCSS, AI (Gemini → OpenAI fallback)
+
+**Multi-Tenant Database**: Each company has its own database. Never use `connectDB()` in authenticated routes - use `getAuthAndModels()` instead.
 
 ## Core Patterns
 
-### API Routes ([app/api/](../app/api/))
+### API Routes ([app/api/](../app/api/)) - MULTI-TENANT AWARE
 ```javascript
-import connectDB from '@/lib/mongodb'
-import { verifyToken } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 
 export async function POST(request) {
-  await connectDB()                                              // Always connect first
-  const token = request.headers.get('authorization')?.split(' ')[1]
-  const payload = await verifyToken(token)                       // JWT auth
-  // ... logic
-  if (global.io) global.io.to(`user:${userId}`).emit('event', data)  // Real-time
+  // Get auth + tenant-aware models in one call
+  const auth = await getAuthAndModels(request, ['Employee', 'Attendance', 'User']);
+  if (!auth.success) {
+    return NextResponse.json({ message: auth.message }, { status: 401 });
+  }
+  
+  const { user, models } = auth;
+  // Use tenant models - these are bound to the user's database
+  const employee = await models.Employee.findById(user.employeeId);
+  
+  // Real-time events
+  if (global.io) global.io.to(`user:${user.userId}`).emit('event', data);
 }
 ```
 
+### Multi-Tenant Key Files
+- **lib/tenantModels.js**: Schema registry with 40+ models, dynamic model binding to tenant connections
+- **lib/tenantContext.js**: Tenant lookup functions (`getTenantByEmail`, `getTenantBySlug`, `getTenantByUserId`)
+- **lib/auth.js**: `getAuthAndModels(request, modelNames)` - ALWAYS use this in authenticated routes
+
 ### Mongoose Models ([models/](../models/))
-**Always use this pattern** to prevent HMR recompilation errors:
+**Static models in /models/ are DEPRECATED for authenticated routes**. Use `auth.models.ModelName` instead.
+Models still use this pattern for schema definition:
 ```javascript
 export default mongoose.models.ModelName || mongoose.model('ModelName', schema)
 ```

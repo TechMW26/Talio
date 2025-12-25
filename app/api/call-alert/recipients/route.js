@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
+import { getAuthAndModels } from '@/lib/auth'
 import { jwtVerify } from 'jose';
-import connectDB from '@/lib/mongodb';
-import User from '@/models/User';
-import Employee from '@/models/Employee';
-import Department from '@/models/Department';
+;
+;
+;
+;
 
 /**
  * GET /api/call-alert/recipients
@@ -18,7 +19,15 @@ import Department from '@/models/Department';
  */
 export async function GET(request) {
   try {
-    await connectDB();
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { User, Employee, Department } = models
+
+    ;
 
     // Verify authentication
     const authHeader = request.headers.get('authorization');

@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Attendance from '@/models/Attendance'
+import { getAuthAndModels } from '@/lib/auth'
 import mongoose from 'mongoose'
 
 // Helper to validate MongoDB ObjectId
@@ -22,7 +21,13 @@ export async function GET(request, { params }) {
       )
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Attendance'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Attendance } = models
 
     const attendance = await Attendance.findById(id)
       .populate('employee', 'firstName lastName employeeCode')
@@ -59,8 +64,6 @@ export async function PUT(request, { params }) {
         { status: 400 }
       )
     }
-
-    await connectDB()
 
     const data = await request.json()
 
@@ -103,8 +106,6 @@ export async function DELETE(request, { params }) {
         { status: 400 }
       )
     }
-
-    await connectDB()
 
     const attendance = await Attendance.findByIdAndDelete(id)
 

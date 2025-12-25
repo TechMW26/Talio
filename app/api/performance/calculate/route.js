@@ -1,13 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth'
-import connectDB from '@/lib/mongodb'
-import Employee from '@/models/Employee'
-import ProjectMember from '@/models/ProjectMember'
-import TaskAssignee from '@/models/TaskAssignee'
-import Attendance from '@/models/Attendance'
-import PerformanceGoal from '@/models/PerformanceGoal'
-import DailyGoal from '@/models/DailyGoal'
-
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 export const dynamic = 'force-dynamic'
 
 // GET - Calculate performance metrics based on reviews, projects, tasks, attendance, and goals
@@ -20,7 +12,13 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Employee', 'ProjectMember', 'TaskAssignee', 'Attendance', 'PerformanceGoal', 'DailyGoal'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Employee, ProjectMember, TaskAssignee, Attendance, PerformanceGoal, DailyGoal } = models
 
     const { searchParams } = new URL(request.url)
     const employeeId = searchParams.get('employeeId')

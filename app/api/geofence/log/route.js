@@ -1,11 +1,5 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import GeofenceLog from '@/models/GeofenceLog'
-import GeofenceLocation from '@/models/GeofenceLocation'
-import Employee from '@/models/Employee'
-import User from '@/models/User'
-import CompanySettings from '@/models/CompanySettings'
-import { verifyToken } from '@/lib/auth'
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 
 // Calculate distance between two coordinates (Haversine formula)
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -135,7 +129,13 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['GeofenceLog', 'GeofenceLocation', 'Employee', 'User', 'CompanySettings'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { GeofenceLog, GeofenceLocation, Employee, User, CompanySettings } = models
 
     const { latitude, longitude, accuracy, eventType, reason } = await request.json()
 
@@ -297,8 +297,6 @@ export async function GET(request) {
     if (!decoded) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
-
-    await connectDB()
 
     const { searchParams } = new URL(request.url)
     const employeeId = searchParams.get('employeeId')

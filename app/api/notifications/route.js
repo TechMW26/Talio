@@ -1,12 +1,16 @@
 import { NextResponse } from 'next/server'
+import { getAuthAndModels } from '@/lib/auth'
 import { jwtVerify } from 'jose'
-import connectDB from '@/lib/mongodb'
-import Notification from '@/models/Notification'
-
 // GET - Fetch user's notifications
 export async function GET(request) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Notification'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Notification } = models
 
     // Verify authentication
     const authHeader = request.headers.get('authorization')
@@ -72,8 +76,6 @@ export async function GET(request) {
 // PATCH - Mark notification(s) as read
 export async function PATCH(request) {
   try {
-    await connectDB()
-
     // Verify authentication
     const authHeader = request.headers.get('authorization')
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -130,8 +132,6 @@ export async function PATCH(request) {
 // DELETE - Delete notification(s)
 export async function DELETE(request) {
   try {
-    await connectDB()
-
     // Verify authentication
     const authHeader = request.headers.get('authorization')
     if (!authHeader || !authHeader.startsWith('Bearer ')) {

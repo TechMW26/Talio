@@ -1,10 +1,5 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Attendance from '@/models/Attendance'
-import Employee from '@/models/Employee'
-import User from '@/models/User'
-import Leave from '@/models/Leave'
-import CompanySettings from '@/models/CompanySettings'
+import { getAuthAndModels } from '@/lib/auth'
 import { jwtVerify } from 'jose'
 
 export const dynamic = 'force-dynamic'
@@ -12,7 +7,13 @@ export const dynamic = 'force-dynamic'
 // GET - Get team attendance for today with proper status calculation
 export async function GET(request) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Attendance', 'Employee', 'User', 'Leave', 'CompanySettings'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Attendance, Employee, User, Leave, CompanySettings } = models
 
     const authHeader = request.headers.get('authorization')
     if (!authHeader?.startsWith('Bearer ')) {

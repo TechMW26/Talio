@@ -1,14 +1,16 @@
 import { NextResponse } from 'next/server'
+import { getAuthAndModels } from '@/lib/auth'
 import { jwtVerify } from 'jose'
-import connectDB from '@/lib/mongodb'
-import ScheduledNotification from '@/models/ScheduledNotification'
-import Employee from '@/models/Employee'
-import User from '@/models/User'
-
 // GET - List scheduled notifications
 export async function GET(request) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['ScheduledNotification', 'Employee', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { ScheduledNotification, Employee, User } = models
 
     // Verify authentication
     const authHeader = request.headers.get('authorization')
@@ -85,8 +87,6 @@ export async function GET(request) {
 // POST - Create scheduled notification
 export async function POST(request) {
   try {
-    await connectDB()
-
     // Verify authentication
     const authHeader = request.headers.get('authorization')
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -168,8 +168,6 @@ export async function POST(request) {
 // DELETE - Cancel scheduled notification
 export async function DELETE(request) {
   try {
-    await connectDB()
-
     // Verify authentication
     const authHeader = request.headers.get('authorization')
     if (!authHeader || !authHeader.startsWith('Bearer ')) {

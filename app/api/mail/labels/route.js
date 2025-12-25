@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server';
-import { verifyToken } from '@/lib/auth';
-import connectDB from '@/lib/mongodb';
-import EmailAccount from '@/models/EmailAccount';
+import { getAuthAndModels } from '@/lib/auth';
 import { google } from 'googleapis';
 
 // Production URL and redirect URI - must match Google Cloud Console
@@ -40,27 +38,18 @@ async function getAuthenticatedClient(emailAccount) {
 // GET - Fetch all labels with message counts
 export async function GET(request) {
     try {
-        const token = request.headers.get('Authorization')?.split(' ')[1];
-        
-        if (!token) {
+        // Get authenticated user and tenant-specific models
+        const auth = await getAuthAndModels(request, ['EmailAccount'])
+        if (!auth.success) {
             return NextResponse.json({ 
                 folderCounts: {},
                 userLabels: []
             });
         }
-        
-        const payload = await verifyToken(token);
+        const { user, models } = auth
+        const { EmailAccount } = models
 
-        if (!payload) {
-            return NextResponse.json({ 
-                folderCounts: {},
-                userLabels: []
-            });
-        }
-
-        await connectDB();
-
-        const emailAccount = await EmailAccount.findOne({ user: payload.userId, isConnected: true }).select('+accessToken +refreshToken');
+        const emailAccount = await EmailAccount.findOne({ user: user._id, isConnected: true }).select('+accessToken +refreshToken');
 
         if (!emailAccount) {
             // Return empty labels when not connected
@@ -176,12 +165,11 @@ export async function GET(request) {
 // POST - Create a new label
 export async function POST(request) {
     try {
-        const token = request.headers.get('Authorization')?.split(' ')[1];
-        const payload = await verifyToken(token);
-
-        if (!payload) {
+        const auth = await getAuthAndModels(request, ['EmailAccount']);
+        if (!auth.success) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+        const { models, user } = auth;
 
         const { name, backgroundColor, textColor } = await request.json();
 
@@ -189,9 +177,7 @@ export async function POST(request) {
             return NextResponse.json({ error: 'Label name is required' }, { status: 400 });
         }
 
-        await connectDB();
-
-        const emailAccount = await EmailAccount.findOne({ user: payload.userId, isConnected: true }).select('+accessToken +refreshToken');
+        const emailAccount = await models.EmailAccount.findOne({ user: user.userId, isConnected: true }).select('+accessToken +refreshToken');
 
         if (!emailAccount) {
             return NextResponse.json({ error: 'Email not connected' }, { status: 400 });
@@ -237,12 +223,11 @@ export async function POST(request) {
 // DELETE - Delete a label
 export async function DELETE(request) {
     try {
-        const token = request.headers.get('Authorization')?.split(' ')[1];
-        const payload = await verifyToken(token);
-
-        if (!payload) {
+        const auth = await getAuthAndModels(request, ['EmailAccount']);
+        if (!auth.success) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
+        const { models, user } = auth;
 
         const { searchParams } = new URL(request.url);
         const labelId = searchParams.get('labelId');
@@ -251,9 +236,7 @@ export async function DELETE(request) {
             return NextResponse.json({ error: 'Label ID is required' }, { status: 400 });
         }
 
-        await connectDB();
-
-        const emailAccount = await EmailAccount.findOne({ user: payload.userId, isConnected: true }).select('+accessToken +refreshToken');
+        const emailAccount = await models.EmailAccount.findOne({ user: user.userId, isConnected: true }).select('+accessToken +refreshToken');
 
         if (!emailAccount) {
             return NextResponse.json({ error: 'Email not connected' }, { status: 400 });

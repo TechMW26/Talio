@@ -1,10 +1,5 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Employee from '@/models/Employee'
-import User from '@/models/User'
-import Department from '@/models/Department'
-import Designation from '@/models/Designation'
-import Company from '@/models/Company'
+import { getAuthAndModels } from '@/lib/auth'
 import queryCache from '@/lib/queryCache'
 import * as XLSX from 'xlsx'
 import { sendAndLogOnboardingEmail } from '@/lib/mailer'
@@ -1452,7 +1447,13 @@ function parseExcelRow(row, headers) {
  */
 export async function POST(request) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Employee', 'User', 'Department', 'Designation', 'Company'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Employee, User, Department, Designation, Company } = models
 
     // Parse form data
     const formData = await request.formData()

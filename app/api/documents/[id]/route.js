@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Document from '@/models/Document'
-
+import { getAuthAndModels } from '@/lib/auth'
 // GET - Get single document
 export async function GET(request, { params }) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Document'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Document } = models
 
     const document = await Document.findById(params.id)
       .populate('employee', 'firstName lastName employeeCode')
@@ -34,8 +38,6 @@ export async function GET(request, { params }) {
 // PUT - Update document
 export async function PUT(request, { params }) {
   try {
-    await connectDB()
-
     const data = await request.json()
 
     const document = await Document.findByIdAndUpdate(
@@ -119,8 +121,6 @@ export async function PUT(request, { params }) {
 // DELETE - Delete document
 export async function DELETE(request, { params }) {
   try {
-    await connectDB()
-
     const document = await Document.findByIdAndDelete(params.id)
 
     if (!document) {

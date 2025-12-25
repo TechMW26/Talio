@@ -1,9 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth'
-import connectDB from '@/lib/mongodb'
-import Chat from '@/models/Chat'
-import User from '@/models/User'
-
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 // GET - Fetch all chats for the current user
 export async function GET(request) {
   try {
@@ -17,7 +13,13 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Chat', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Chat, User } = models
 
     // Get user's employee ID
     const user = await User.findById(decoded.userId).select('employeeId')
@@ -57,8 +59,6 @@ export async function POST(request) {
     if (!decoded) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
-
-    await connectDB()
 
     // Get user's employee ID
     const user = await User.findById(decoded.userId).select('employeeId')

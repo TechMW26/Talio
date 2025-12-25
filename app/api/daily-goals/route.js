@@ -1,9 +1,5 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import DailyGoal from '@/models/DailyGoal'
-import Employee from '@/models/Employee'
-import User from '@/models/User'
-import { verifyToken } from '@/lib/auth'
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 
 // GET - Get daily goals
 export async function GET(request) {
@@ -18,7 +14,13 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['DailyGoal', 'Employee', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { DailyGoal, Employee, User } = models
 
     // Get current user's employee ID
     const currentUser = await User.findById(decoded.userId).select('employeeId')
@@ -96,8 +98,6 @@ export async function POST(request) {
     if (!decoded) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
-
-    await connectDB()
 
     // Get current user's employee ID
     const currentUser = await User.findById(decoded.userId).select('employeeId')
@@ -191,8 +191,6 @@ export async function PUT(request) {
     if (!decoded) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
-
-    await connectDB()
 
     // Get current user's employee ID
     const currentUser = await User.findById(decoded.userId).select('employeeId')

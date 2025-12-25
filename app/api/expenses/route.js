@@ -1,13 +1,17 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Expense from '@/models/Expense'
-import User from '@/models/User'
+import { getAuthAndModels } from '@/lib/auth'
 import { emitExpenseUpdate } from '@/lib/realtimeEvents'
 
 // GET - List expenses
 export async function GET(request) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Expense', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Expense, User } = models
 
     const { searchParams } = new URL(request.url)
     const employeeId = searchParams.get('employeeId')
@@ -44,8 +48,6 @@ export async function GET(request) {
 // POST - Create expense
 export async function POST(request) {
   try {
-    await connectDB()
-
     const data = await request.json()
 
     // Set status to 'submitted' for approval instead of 'draft'

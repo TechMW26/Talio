@@ -1,9 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth'
-import connectDB from '@/lib/mongodb'
-import Meeting from '@/models/Meeting'
-import Employee from '@/models/Employee'
-import User from '@/models/User'
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 import { writeFile, mkdir } from 'fs/promises'
 import path from 'path'
 
@@ -24,7 +20,13 @@ export async function POST(request, { params }) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Meeting', 'Employee', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Meeting, Employee, User } = models
 
     const formData = await request.formData()
     const audioFile = formData.get('audio')
@@ -137,8 +139,6 @@ export async function PUT(request, { params }) {
     if (!decoded) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
-
-    await connectDB()
 
     const data = await request.json()
     const { consent } = data

@@ -1,16 +1,18 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Leave from '@/models/Leave'
-import LeaveBalance from '@/models/LeaveBalance'
-import LeaveType from '@/models/LeaveType'
-import User from '@/models/User'
+import { getAuthAndModels } from '@/lib/auth'
 import { logActivity } from '@/lib/activityLogger'
 import { emitLeaveUpdate } from '@/lib/realtimeEvents'
 
 // GET - List leave requests
 export async function GET(request) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Leave', 'LeaveBalance', 'LeaveType', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Leave, LeaveBalance, LeaveType, User } = models
 
     const { searchParams } = new URL(request.url)
     const employeeId = searchParams.get('employeeId')
@@ -48,8 +50,6 @@ export async function GET(request) {
 // POST - Apply for leave
 export async function POST(request) {
   try {
-    await connectDB()
-
     const data = await request.json()
 
     // Calculate number of days

@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
-import connectDB from '@/lib/mongodb';
-import Suggestion from '@/models/Suggestion';
-import Employee from '@/models/Employee';
-import Department from '@/models/Department';
-import User from '@/models/User';
-import { verifyToken } from '@/lib/auth';
+;
+;
+;
+;
+;
+import { verifyToken, getAuthAndModels } from '@/lib/auth';
 
 /**
  * GET /api/ideas
@@ -12,7 +12,15 @@ import { verifyToken } from '@/lib/auth';
  */
 export async function GET(request) {
   try {
-    await connectDB();
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Suggestion', 'Employee', 'Department', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Suggestion, Employee, Department, User } = models
+
+    ;
 
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {
@@ -166,7 +174,7 @@ export async function GET(request) {
  */
 export async function POST(request) {
   try {
-    await connectDB();
+    ;
 
     const authHeader = request.headers.get('authorization');
     if (!authHeader?.startsWith('Bearer ')) {

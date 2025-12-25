@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth'
-import connectDB from '@/lib/mongodb'
-import User from '@/models/User'
-
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 export const dynamic = 'force-dynamic'
 
 /**
@@ -21,7 +18,13 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { User } = models
 
     // Verify admin/HR role
     const adminUser = await User.findById(decoded.userId).select('role')
@@ -112,8 +115,6 @@ export async function GET(request) {
     if (!decoded) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
-
-    await connectDB()
 
     // Verify admin/HR role
     const adminUser = await User.findById(decoded.userId).select('role')

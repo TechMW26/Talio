@@ -1,14 +1,17 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Policy from '@/models/Policy'
-import User from '@/models/User'
-import Employee from '@/models/Employee'
+import { getAuthAndModels } from '@/lib/auth'
 import { sendPolicyNotification } from '@/lib/notificationService'
 
 // GET - List policies
 export async function GET(request) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Policy', 'User', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Policy, User, Employee } = models
 
     const { searchParams } = new URL(request.url)
     const category = searchParams.get('category')
@@ -39,8 +42,6 @@ export async function GET(request) {
 // POST - Create policy
 export async function POST(request) {
   try {
-    await connectDB()
-
     const data = await request.json()
 
     const policy = await Policy.create(data)

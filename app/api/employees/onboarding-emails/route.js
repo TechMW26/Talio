@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import OnboardingEmail from '@/models/OnboardingEmail'
-import CompanySettings from '@/models/CompanySettings'
-import { verifyToken } from '@/lib/auth'
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 
 /**
  * GET - Fetch onboarding email history with filters
@@ -27,8 +24,14 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
     }
     
-    await connectDB()
-    
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['OnboardingEmail', 'CompanySettings'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { OnboardingEmail, CompanySettings } = models
+
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page')) || 1
     const limit = parseInt(searchParams.get('limit')) || 20
@@ -125,8 +128,6 @@ export async function PATCH(request) {
     if (payload.role !== 'admin') {
       return NextResponse.json({ success: false, message: 'Only admin can change this setting' }, { status: 403 })
     }
-    
-    await connectDB()
     
     const body = await request.json()
     const { enabled } = body

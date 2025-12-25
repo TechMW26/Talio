@@ -1,10 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth'
-import connectDB from '@/lib/mongodb'
-import Department from '@/models/Department'
-import Employee from '@/models/Employee'
-import Leave from '@/models/Leave'
-import User from '@/models/User'
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 import { logActivity } from '@/lib/activityLogger'
 
 // GET - Fetch all pending leave requests for department
@@ -20,7 +15,13 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Department', 'Employee', 'Leave', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Department, Employee, Leave, User } = models
 
     // Get user's employee ID
     const user = await User.findById(decoded.userId).select('employeeId')
@@ -93,8 +94,6 @@ export async function POST(request) {
     if (!decoded) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
-
-    await connectDB()
 
     // Get user's employee ID
     const user = await User.findById(decoded.userId).select('employeeId')

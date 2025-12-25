@@ -1,11 +1,15 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Recruitment from '@/models/Recruitment'
-
+import { getAuthAndModels } from '@/lib/auth'
 // GET - List job postings
 export async function GET(request) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Recruitment'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Recruitment } = models
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
@@ -37,8 +41,6 @@ export async function GET(request) {
 // POST - Create job posting
 export async function POST(request) {
   try {
-    await connectDB()
-
     const data = await request.json()
 
     const job = await Recruitment.create(data)

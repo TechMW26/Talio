@@ -1,11 +1,17 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Holiday from '@/models/Holiday'
+import { getAuthAndModels } from '@/lib/auth'
 import { generateContent } from '@/lib/gemini'
 
 export async function POST(request) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Holiday'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Holiday } = models
+
     const { country, year } = await request.json()
 
     if (!country || !year) {

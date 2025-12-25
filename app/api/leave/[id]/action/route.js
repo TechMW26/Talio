@@ -1,15 +1,17 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Leave from '@/models/Leave'
-import LeaveBalance from '@/models/LeaveBalance'
-import User from '@/models/User'
-import Employee from '@/models/Employee'
+import { getAuthAndModels } from '@/lib/auth'
 import { sendPushToUser } from '@/lib/pushNotification'
 
 // PUT - Approve or reject leave request
 export async function PUT(request, { params }) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Leave', 'LeaveBalance', 'User', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Leave, LeaveBalance, User, Employee } = models
 
     const { id } = params
     const { action, reason, approvedBy } = await request.json()

@@ -4,10 +4,8 @@
  */
 
 import { NextResponse } from 'next/server'
+import { getAuthAndModels } from '@/lib/auth'
 import { jwtVerify } from 'jose'
-import connectDB from '@/lib/mongodb'
-import User from '@/models/User'
-
 /**
  * POST /api/fcm/register-token
  * Register user with OneSignal (backward compatible endpoint)
@@ -38,7 +36,13 @@ export async function POST(request) {
     }
 
     // Connect to database
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { User } = models
 
     // Find user
     const user = await User.findById(decoded.userId)
@@ -92,8 +96,6 @@ export async function DELETE(request) {
     }
 
     // Connect to database
-    await connectDB()
-
     // Find user and remove token
     const user = await User.findOne({ email: session.user.email })
     if (!user) {

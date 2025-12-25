@@ -1,14 +1,4 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Attendance from '@/models/Attendance'
-import Employee from '@/models/Employee'
-import User from '@/models/User'
-import Leave from '@/models/Leave'
-import Holiday from '@/models/Holiday'
-import CompanySettings from '@/models/CompanySettings'
-import GeofenceLocation from '@/models/GeofenceLocation'
-import OvertimeRequest from '@/models/OvertimeRequest'
-import Company from '@/models/Company'
 import queryCache from '@/lib/queryCache'
 import { logActivity } from '@/lib/activityLogger'
 import { sendEmail } from '@/lib/mailer'
@@ -16,9 +6,7 @@ import { sendPushToUser } from '@/lib/pushNotification'
 import { calculateEffectiveWorkHours, determineAttendanceStatus } from '@/lib/attendanceShrinkage'
 import { reverseGeocode, validateLocationData } from '@/lib/geocoding'
 import { emitAttendanceUpdate, emitDashboardRefresh } from '@/lib/realtimeEvents'
-
-// Ensure models are registered for populate
-const _ensureModels = { Company };
+import { getAuthAndModels } from '@/lib/auth'
 
 // Calculate distance between two coordinates (Haversine formula)
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -37,8 +25,8 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 }
 
 // Check employee against multiple geofence locations
-async function checkGeofenceLocation(latitude, longitude, employeeId, departmentId) {
-  const locations = await GeofenceLocation.find({ isActive: true })
+async function checkGeofenceLocation(latitude, longitude, employeeId, departmentId, GeofenceLocationModel) {
+  const locations = await GeofenceLocationModel.find({ isActive: true })
 
   let closestLocation = null
   let minDistance = Infinity
@@ -85,7 +73,14 @@ async function checkGeofenceLocation(latitude, longitude, employeeId, department
 // GET - List attendance records
 export async function GET(request) {
   try {
-    await connectDB()
+    // Get auth and tenant-aware models
+    const auth = await getAuthAndModels(request, ['Attendance', 'Employee', 'User', 'Company']);
+    
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message || 'Unauthorized' }, { status: 401 });
+    }
+    
+    const { models: { Attendance: TenantAttendance, Employee: TenantEmployee, User: TenantUser } } = auth;
 
     const { searchParams } = new URL(request.url)
     const date = searchParams.get('date')
@@ -113,11 +108,11 @@ export async function GET(request) {
     if (employeeId) {
       // Try to find as Employee first
       let resolvedEmployeeId = employeeId
-      const employee = await Employee.findById(employeeId).select('_id').lean()
+      const employee = await TenantEmployee.findById(employeeId).select('_id').lean()
 
       if (!employee) {
         // Not an Employee ID, check if it's a User ID
-        const user = await User.findById(employeeId).select('employeeId').lean()
+        const user = await TenantUser.findById(employeeId).select('employeeId').lean()
         if (user && user.employeeId) {
           resolvedEmployeeId = user.employeeId
         } else {
@@ -144,7 +139,7 @@ export async function GET(request) {
     }
 
     // Optimized: Use lean() and select only needed fields (including location for display)
-    const attendance = await Attendance.find(query)
+    const attendance = await TenantAttendance.find(query)
       .select('employee date checkIn checkOut checkInStatus checkOutStatus status workHours overtime totalLoggedHours breakMinutes shrinkagePercentage location source createdBySystem isManualEntry statusReason remarks')
       .populate({
         path: 'employee',
@@ -177,7 +172,7 @@ export async function GET(request) {
         }
 
         // Update the database in background (non-blocking)
-        Attendance.updateOne(
+        TenantAttendance.updateOne(
           { _id: record._id },
           { status: correctedStatus, statusReason: 'Auto-fixed: Status was in-progress after clock-out' }
         ).exec().catch(err => console.error('Auto-fix attendance status error:', err))
@@ -215,7 +210,18 @@ export async function GET(request) {
 // POST - Mark attendance (Clock in/out)
 export async function POST(request) {
   try {
-    await connectDB()
+    // Get auth and tenant-aware models
+    const auth = await getAuthAndModels(request, ['Attendance', 'Employee', 'Leave', 'Company', 'CompanySettings', 'Holiday', 'User', 'GeofenceLocation', 'OvertimeRequest']);
+    
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message || 'Unauthorized' }, { status: 401 });
+    }
+    
+    const { models } = auth;
+    const TenantAttendance = models.Attendance;
+    const TenantEmployee = models.Employee;
+    const TenantLeave = models.Leave;
+    const TenantCompanySettings = models.CompanySettings;
 
     const data = await request.json()
     const { employeeId, type, latitude, longitude, address, accuracy } = data // type: 'clock-in' or 'clock-out'
@@ -235,7 +241,7 @@ export async function POST(request) {
     tomorrow.setDate(tomorrow.getDate() + 1)
 
     // Get employee data first to determine company
-    const employee = await Employee.findById(employeeId)
+    const employee = await TenantEmployee.findById(employeeId)
       .populate('department')
       .populate('company')
 
@@ -247,7 +253,7 @@ export async function POST(request) {
     }
 
     // Determine settings based on employee's company
-    let settings = await CompanySettings.findOne().lean()
+    let settings = await TenantCompanySettings.findOne().lean()
 
     if (employee.company && employee.company.workingHours) {
       // Override global settings with company-specific settings
@@ -267,7 +273,7 @@ export async function POST(request) {
     }
 
     // Check for approved leave or work from home for today
-    const todayLeave = await Leave.findOne({
+    const todayLeave = await TenantLeave.findOne({
       employee: employeeId,
       status: 'approved',
       startDate: { $lte: new Date() },
@@ -275,14 +281,14 @@ export async function POST(request) {
     })
 
     // Check if attendance already exists for today
-    let attendance = await Attendance.findOne({
+    let attendance = await TenantAttendance.findOne({
       employee: employeeId,
       date: { $gte: today, $lt: tomorrow },
     })
 
     // If no attendance record exists but there's an approved leave/WFH, create one
     if (!attendance && todayLeave) {
-      attendance = await Attendance.create({
+      attendance = await TenantAttendance.create({
         employee: employeeId,
         date: today,
         status: todayLeave.workFromHome ? 'in-progress' : 'on-leave',
@@ -317,7 +323,8 @@ export async function POST(request) {
       const localTodayEnd = new Date(localNow);
       localTodayEnd.setHours(23, 59, 59, 999);
 
-      const holiday = await Holiday.findOne({
+      const TenantHoliday = models.Holiday;
+      const holiday = await TenantHoliday.findOne({
         date: {
           $gte: localTodayStart,
           $lte: localTodayEnd
@@ -347,11 +354,13 @@ export async function POST(request) {
 
       if (settings?.geofence?.enabled && latitude && longitude && !todayLeave?.workFromHome) {
         if (settings.geofence.useMultipleLocations) {
+          const TenantGeofenceLocation = models.GeofenceLocation;
           const geofenceCheck = await checkGeofenceLocation(
             latitude,
             longitude,
             employeeId,
-            employee?.department?._id
+            employee?.department?._id,
+            TenantGeofenceLocation
           )
 
           if (settings.geofence.strictMode && !geofenceCheck.isWithinGeofence) {
@@ -462,7 +471,7 @@ export async function POST(request) {
       }
 
       if (!attendance) {
-        attendance = await Attendance.create({
+        attendance = await TenantAttendance.create({
           employee: employeeId,
           date: new Date(),
           ...attendanceData
@@ -611,11 +620,13 @@ export async function POST(request) {
 
       if (hasValidLocation && settings?.geofence?.enabled && !todayLeave?.workFromHome) {
         if (settings.geofence.useMultipleLocations) {
+          const TenantGeofenceLocation = models.GeofenceLocation;
           const geofenceCheck = await checkGeofenceLocation(
             latitude,
             longitude,
             employeeId,
-            employee?.department?._id
+            employee?.department?._id,
+            TenantGeofenceLocation
           )
 
           geofenceLocation = geofenceCheck.location?._id
@@ -745,7 +756,8 @@ export async function POST(request) {
 
       // Calculate overtime if there was a confirmed overtime request
       try {
-        const overtimeRequest = await OvertimeRequest.findOne({
+        const TenantOvertimeRequest = models.OvertimeRequest;
+        const overtimeRequest = await TenantOvertimeRequest.findOne({
           attendance: attendance._id,
           status: 'overtime-confirmed'
         })

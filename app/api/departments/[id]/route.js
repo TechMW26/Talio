@@ -1,12 +1,17 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Department from '@/models/Department'
+import { getAuthAndModels } from '@/lib/auth'
 import { updateDepartmentHeadsForDepartment } from '@/lib/departmentHeadSync'
 
 // GET - Get single department
 export async function GET(request, { params }) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Department'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Department } = models
 
     const department = await Department.findById(params.id)
       .populate('head', 'firstName lastName employeeCode designation')
@@ -35,8 +40,6 @@ export async function GET(request, { params }) {
 // PUT - Update department
 export async function PUT(request, { params }) {
   try {
-    await connectDB()
-
     const data = await request.json()
     
     // Get current department to compare heads
@@ -114,8 +117,6 @@ export async function PUT(request, { params }) {
 // DELETE - Delete department
 export async function DELETE(request, { params }) {
   try {
-    await connectDB()
-    
     // Get department to remove heads
     const department = await Department.findById(params.id).lean()
     if (!department) {

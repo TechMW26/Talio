@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Holiday from '@/models/Holiday'
-import Employee from '@/models/Employee'
-import Attendance from '@/models/Attendance'
-
+import { getAuthAndModels } from '@/lib/auth'
 export async function POST(request) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Holiday', 'Employee', 'Attendance'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Holiday, Employee, Attendance } = models
 
     // Get current year
     const currentYear = new Date().getFullYear()

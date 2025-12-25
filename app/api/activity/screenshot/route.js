@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
+import { getAuthAndModels } from '@/lib/auth'
 import { jwtVerify } from 'jose';
 import { mkdir, writeFile, access, constants, unlink } from 'fs/promises';
 import path from 'path';
-import connectDB from '@/lib/mongodb';
+;
 import { uploadScreenshot, getScreenshot } from '@/lib/gridfs';
 import { uploadImageToImageKit, getImageKitFolder, generateEmployeeFolderName } from '@/lib/imagekit';
 import Screenshot from '@/models/Screenshot';
-import User from '@/models/User';
-import Employee from '@/models/Employee';
+;
+;
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
@@ -71,7 +72,15 @@ export async function POST(request) {
       }, { status: 400 });
     }
 
-    await connectDB();
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['User', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { User, Employee } = models
+
+    ;
 
     // Get form data
     const formData = await request.formData();
@@ -284,7 +293,7 @@ export async function GET(request) {
       }, { status: 400 });
     }
 
-    await connectDB();
+    ;
 
     // Get screenshot metadata
     const screenshot = await Screenshot.findById(screenshotId);

@@ -1,13 +1,17 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Expense from '@/models/Expense'
-import User from '@/models/User'
+import { getAuthAndModels } from '@/lib/auth'
 import { emitExpenseUpdate } from '@/lib/realtimeEvents'
 
 // PUT - Update/Approve expense
 export async function PUT(request, { params }) {
   try {
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Expense', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Expense, User } = models
 
     const data = await request.json()
 
@@ -109,8 +113,6 @@ export async function PUT(request, { params }) {
 // DELETE - Delete expense
 export async function DELETE(request, { params }) {
   try {
-    await connectDB()
-
     const expense = await Expense.findByIdAndDelete(params.id)
 
     if (!expense) {

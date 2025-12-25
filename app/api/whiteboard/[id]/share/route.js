@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
+import { getAuthAndModels } from '@/lib/auth'
 import { jwtVerify } from 'jose';
-import connectDB from '@/lib/mongodb';
-import Whiteboard from '@/models/Whiteboard';
-import User from '@/models/User';
+;
+;
+;
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key');
 
@@ -31,7 +32,15 @@ export async function GET(request, { params }) {
     }
 
     const { id } = await params;
-    await connectDB();
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Whiteboard', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Whiteboard, User } = models
+
+    ;
 
     const whiteboard = await Whiteboard.findById(id)
       .select('owner sharing isPublic publicLink')
@@ -68,7 +77,7 @@ export async function POST(request, { params }) {
     }
 
     const { id } = await params;
-    await connectDB();
+    ;
 
     const whiteboard = await Whiteboard.findById(id);
     if (!whiteboard) {
@@ -163,7 +172,7 @@ export async function DELETE(request, { params }) {
     const { searchParams } = new URL(request.url);
     const userIdToRemove = searchParams.get('userId');
 
-    await connectDB();
+    ;
 
     const whiteboard = await Whiteboard.findById(id);
     if (!whiteboard) {

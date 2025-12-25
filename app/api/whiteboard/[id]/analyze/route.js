@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
+import { getAuthAndModels } from '@/lib/auth'
 import { jwtVerify } from 'jose';
-import connectDB from '@/lib/mongodb';
-import Whiteboard from '@/models/Whiteboard';
+;
+;
 import { generateContent, generateVisionContent } from '@/lib/gemini';
 import { generateSmartContent } from '@/lib/promptEngine';
 
@@ -261,10 +262,6 @@ function cleanAIResponse(text) {
     .trim();
 }
 
-
-
-
-
 // POST - Analyze canvas or continue chat
 export async function POST(request, { params }) {
   try {
@@ -273,7 +270,15 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    await connectDB();
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Whiteboard'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Whiteboard } = models
+
+    ;
     
     const { id } = await params;
     const body = await request.json();
@@ -1172,7 +1177,7 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    await connectDB();
+    ;
     
     const { id } = await params;
     const whiteboard = await Whiteboard.findById(id);

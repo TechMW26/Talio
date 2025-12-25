@@ -1,15 +1,5 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Attendance from '@/models/Attendance'
-import LeaveBalance from '@/models/LeaveBalance'
-import LeaveType from '@/models/LeaveType'
-import Payroll from '@/models/Payroll'
-import Employee from '@/models/Employee'
-import Designation from '@/models/Designation'
-import Department from '@/models/Department'
-import User from '@/models/User'
-import Performance from '@/models/Performance'
-import { verifyToken } from '@/lib/auth'
+import { verifyToken, getAuthAndModels } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,7 +17,13 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
-    await connectDB()
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Attendance', 'LeaveBalance', 'LeaveType', 'Payroll', 'Employee', 'Designation', 'Department', 'User', 'Performance'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Attendance, LeaveBalance, LeaveType, Payroll, Employee, Designation, Department, User, Performance } = models
 
     // Find the user first to get the employeeId
     const user = await User.findById(decoded.userId).populate({
