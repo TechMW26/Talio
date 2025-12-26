@@ -39,12 +39,12 @@ export async function POST(request) {
 
     // Connect to database
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User'])
+    const auth = await getAuthAndModels(request, ['User', 'Notification'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { User } = models
+    const { User, Notification } = models
 
     // Find target user (or use current user if no userId provided)
     const targetUser = userId
@@ -68,7 +68,8 @@ export async function POST(request) {
       {
         data,
         url: data.url || '/dashboard',
-        type: data.type || 'custom'
+        type: data.type || 'custom',
+        models: { User, Notification }
       }
     )
 

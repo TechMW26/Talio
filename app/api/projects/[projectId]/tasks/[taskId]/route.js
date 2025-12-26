@@ -96,6 +96,14 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'Task', 'TaskAssignee', 'User', 'Employee', 'ProjectTimelineEvent', 'ProjectApprovalRequest'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Project, ProjectMember, Task, TaskAssignee, User, Employee, ProjectApprovalRequest } = models
+
     const { projectId, taskId } = await params
 
     const user = await User.findById(decoded.userId).select('employeeId role')
@@ -196,7 +204,6 @@ export async function PUT(request, { params }) {
         changes.push(`Status changed from ${oldStatus} to review`)
         
         // Create approval request for task review (instead of completion)
-        const ProjectApprovalRequest = (await import('@/models/ProjectApprovalRequest')).default
         await ProjectApprovalRequest.create({
           project: projectId,
           type: 'task_review',
@@ -216,7 +223,6 @@ export async function PUT(request, { params }) {
         changes.push(`Status changed from ${oldStatus} to review`)
         
         // Create approval request for task review
-        const ProjectApprovalRequest = (await import('@/models/ProjectApprovalRequest')).default
         await ProjectApprovalRequest.create({
           project: projectId,
           type: 'task_review',
@@ -340,7 +346,7 @@ export async function PUT(request, { params }) {
 
     const updaterEmployee = await Employee.findById(user.employeeId)
 
-    // Create timeline events
+    // Create timeline events - pass models for multi-tenant
     if (status && status !== oldStatus) {
       // Create timeline event (don't await to speed up response)
       createTimelineEvent({
@@ -350,7 +356,7 @@ export async function PUT(request, { params }) {
         relatedTask: taskId,
         description: `Task "${task.title}" status changed from ${oldStatus} to ${status}`,
         metadata: { taskTitle: task.title, oldStatus, newStatus: status }
-      }).catch(console.error)
+      }, models).catch(console.error)
 
       // Notify relevant users (non-blocking)
       TaskAssignee.find({ 
@@ -376,8 +382,8 @@ export async function PUT(request, { params }) {
         }).catch(console.error)
       }).catch(console.error)
 
-      // Recalculate completion percentage if status changed (non-blocking)
-      calculateCompletionPercentage(projectId).catch(console.error)
+      // Recalculate completion percentage if status changed (non-blocking) - pass models
+      calculateCompletionPercentage(projectId, models).catch(console.error)
     } else if (changes.length > 0) {
       createTimelineEvent({
         project: projectId,
@@ -386,7 +392,7 @@ export async function PUT(request, { params }) {
         relatedTask: taskId,
         description: changes.join(', '),
         metadata: { changes, updates }
-      }).catch(console.error)
+      }, models).catch(console.error)
     }
 
     const updatedTask = await Task.findById(taskId)
@@ -395,7 +401,7 @@ export async function PUT(request, { params }) {
 
     // Emit real-time task update to all project members
     try {
-      const memberUserIds = await getProjectMemberUserIds(projectId)
+      const memberUserIds = await getProjectMemberUserIds(projectId, null, models)
       
       emitTaskUpdate(
         {
@@ -443,6 +449,14 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Project', 'Task', 'TaskAssignee', 'User', 'Employee', 'ProjectTimelineEvent'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Project, Task, TaskAssignee, User, Employee } = models
+
     const { projectId, taskId } = await params
     const { searchParams } = new URL(request.url)
     const reason = searchParams.get('reason') || ''
@@ -488,17 +502,17 @@ export async function DELETE(request, { params }) {
       await TaskAssignee.deleteMany({ task: taskId })
       await Task.findByIdAndDelete(taskId)
 
-      // Recalculate completion percentage (non-blocking)
-      calculateCompletionPercentage(projectId).catch(console.error)
+      // Recalculate completion percentage (non-blocking) - pass models
+      calculateCompletionPercentage(projectId, models).catch(console.error)
 
-      // Create timeline event (non-blocking)
+      // Create timeline event (non-blocking) - pass models
       createTimelineEvent({
         project: projectId,
         type: 'task_deleted',
         createdBy: user.employeeId,
         description: `Task "${taskTitle}" was deleted`,
         metadata: { taskTitle }
-      }).catch(console.error)
+      }, models).catch(console.error)
 
       return NextResponse.json({
         success: true,
@@ -531,7 +545,7 @@ export async function DELETE(request, { params }) {
     }
     await task.save()
 
-    // Create timeline event
+    // Create timeline event - pass models
     await createTimelineEvent({
       project: projectId,
       type: 'task_deletion_requested',
@@ -539,7 +553,7 @@ export async function DELETE(request, { params }) {
       relatedTask: taskId,
       description: `Deletion requested for task "${task.title}"`,
       metadata: { taskTitle: task.title, reason }
-    })
+    }, models)
 
     return NextResponse.json({
       success: true,

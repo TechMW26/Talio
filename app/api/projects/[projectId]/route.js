@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-import ProjectCompletionApproval from '@/models/ProjectCompletionApproval'
 import { 
   checkProjectAccess, 
   getProjectTaskStats,
@@ -12,12 +11,12 @@ import {
 export async function GET(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'Task', 'TaskAssignee', 'ProjectTimelineEvent', 'Employee', 'Chat'])
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'Task', 'TaskAssignee', 'ProjectTimelineEvent', 'ProjectCompletionApproval', 'Employee', 'Chat'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Project, ProjectMember, Task, TaskAssignee, ProjectTimelineEvent, Employee, Chat } = models
+    const { Project, ProjectMember, Task, TaskAssignee, ProjectTimelineEvent, ProjectCompletionApproval, Employee, Chat } = models
 
     const { projectId } = await params
 
@@ -40,7 +39,7 @@ export async function GET(request, { params }) {
     // Check access (allow admins to view any project)
     const isAdmin = ['admin', 'hr'].includes(user.role)
     if (!isAdmin) {
-      const { hasAccess } = await checkProjectAccess(projectId, employeeId, 'view')
+      const { hasAccess } = await checkProjectAccess(projectId, employeeId, 'view', models)
       if (!hasAccess) {
         return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
       }
@@ -63,8 +62,8 @@ export async function GET(request, { params }) {
       return true
     })
 
-    // Get task statistics
-    const taskStats = await getProjectTaskStats(projectId)
+    // Get task statistics - pass models for multi-tenant
+    const taskStats = await getProjectTaskStats(projectId, models)
 
     // Get pending completion approval if exists
     const pendingApproval = await ProjectCompletionApproval.findOne({
@@ -73,9 +72,9 @@ export async function GET(request, { params }) {
     })
       .populate('requestedBy', 'firstName lastName')
 
-    // Get current user's membership
+    // Get current user's membership - use the extracted employeeId for consistency
     const userMembership = members.find(m => 
-      m.user._id.toString() === user.employeeId.toString()
+      m.user._id.toString() === employeeId.toString()
     )
 
     return NextResponse.json({
@@ -84,14 +83,14 @@ export async function GET(request, { params }) {
         ...project.toObject(),
         members: members.map(m => ({
           ...m.toObject(),
-          isCurrentUser: m.user._id.toString() === user.employeeId.toString()
+          isCurrentUser: m.user._id.toString() === employeeId.toString()
         })),
         taskStats,
         pendingApproval,
         currentUserRole: userMembership?.role,
         currentUserInvitationStatus: userMembership?.invitationStatus,
-        isProjectHead: project.projectHead._id.toString() === user.employeeId.toString(),
-        isCreator: project.createdBy._id.toString() === user.employeeId.toString()
+        isProjectHead: project.projectHead._id.toString() === employeeId.toString(),
+        isCreator: project.createdBy._id.toString() === employeeId.toString()
       }
     })
   } catch (error) {
@@ -104,7 +103,7 @@ export async function GET(request, { params }) {
 export async function PUT(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'Employee', 'Chat'])
+    const auth = await getAuthAndModels(request, ['Project', 'Employee', 'Chat', 'ProjectTimelineEvent'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
@@ -173,7 +172,7 @@ export async function PUT(request, { params }) {
     if (status && status !== project.status) {
       const employee = await Employee.findById(employeeId)
       try {
-        await updateProjectStatus(projectId, status, employee, { reason: 'Manual update' })
+        await updateProjectStatus(projectId, status, employee, { reason: 'Manual update' }, models)
       } catch (err) {
         return NextResponse.json({ success: false, message: err.message }, { status: 400 })
       }
@@ -189,7 +188,7 @@ export async function PUT(request, { params }) {
         createdBy: employeeId,
         description: changes.join(', '),
         metadata: { changes, updates }
-      })
+      }, models)
     }
 
     const updatedProject = await Project.findById(projectId)
@@ -212,7 +211,7 @@ export async function PUT(request, { params }) {
 export async function DELETE(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project'])
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectTimelineEvent'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
@@ -252,7 +251,7 @@ export async function DELETE(request, { params }) {
       createdBy: employeeId,
       description: 'Project archived',
       metadata: { oldStatus: project.status, newStatus: 'archived' }
-    })
+    }, models)
 
     return NextResponse.json({
       success: true,

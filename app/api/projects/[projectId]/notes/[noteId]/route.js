@@ -14,12 +14,12 @@ export async function PUT(request, { params }) {
     }
 
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['ProjectNote', 'Project', 'User'])
+    const auth = await getAuthAndModels(request, ['ProjectNote', 'Project', 'Task', 'User'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { models } = auth
-    const { ProjectNote, Project, User } = models
+    const { ProjectNote, Project, Task, User } = models
 
     const { projectId, noteId } = await params
 
@@ -86,6 +86,14 @@ export async function DELETE(request, { params }) {
     if (!decoded) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
+
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['ProjectNote', 'Project', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { ProjectNote, Project, User } = models
 
     const { projectId, noteId } = await params
 

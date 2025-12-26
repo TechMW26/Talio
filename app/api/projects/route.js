@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { 
   createProject, 
-  getUserProjects, 
   calculateCompletionPercentage,
-  getProjectTaskStats,
   createTimelineEvent
 } from '@/lib/projectService'
 import { 
@@ -19,26 +17,17 @@ export const dynamic = 'force-dynamic'
 export async function GET(request) {
   console.log('GET /api/projects called');
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'User', 'Employee'])
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'User', 'Employee', 'Task'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
-    const { Project, ProjectMember, User, Employee } = models
+    const { user: authUser, models } = auth
+    const { Project, ProjectMember, User, Employee, Task } = models
 
-    const user = await User.findById(decoded.userId).select('employeeId role')
-    if (!user || !user.employeeId) {
+    // Get employeeId - could be object or string
+    const employeeId = authUser.employeeId?._id || authUser.employeeId
+    if (!employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -51,7 +40,7 @@ export async function GET(request) {
     let projects
 
     // Admin can see all projects
-    if (all === 'true' && ['admin', 'hr'].includes(user.role)) {
+    if (all === 'true' && ['admin', 'hr'].includes(authUser.role)) {
       const query = {}
       if (status) {
         query.status = status === 'active' 
@@ -68,22 +57,79 @@ export async function GET(request) {
         .populate('department', 'name')
         .sort({ updatedAt: -1 })
     } else {
-      // Regular user - get their projects
-      const filters = {}
+      // Regular user - get their projects (inline getUserProjects logic with tenant models)
+      const memberQuery = { user: employeeId }
+      
+      if (invitationStatus) {
+        memberQuery.invitationStatus = invitationStatus
+      }
+      if (role) {
+        memberQuery.role = role
+      }
+      
+      const memberships = await ProjectMember.find(memberQuery)
+        .select('project role invitationStatus')
+      
+      const projectIds = memberships.map(m => m.project)
+      
+      const projectQuery = { _id: { $in: projectIds } }
+      
       if (status) {
-        filters.status = status === 'active' 
+        const statusArray = status === 'active' 
           ? ['planned', 'ongoing', 'pending', 'completed_pending_approval', 'overdue']
           : status.split(',')
+        projectQuery.status = { $in: statusArray }
       }
-      if (role) filters.role = role
-      if (invitationStatus) filters.invitationStatus = invitationStatus
+      
+      // Exclude archived unless specifically requested
+      if (!status) {
+        projectQuery.status = { $ne: 'archived' }
+      }
+      
+      const projectResults = await Project.find(projectQuery)
+        .populate('projectHead', 'firstName lastName profilePicture')
+        .populate('createdBy', 'firstName lastName')
+        .populate('department', 'name')
+        .sort({ updatedAt: -1 })
+      
+      // Attach membership info to each project
+      projects = projectResults.map(project => {
+        const membership = memberships.find(m => m.project.toString() === project._id.toString())
+        return {
+          ...project.toObject(),
+          userRole: membership?.role,
+          userInvitationStatus: membership?.invitationStatus
+        }
+      })
+    }
 
-      projects = await getUserProjects(user.employeeId, filters)
+    // Helper function to get task stats (inline with tenant Task model)
+    async function getTaskStats(projectId) {
+      const tasks = await Task.find({
+        project: projectId,
+        status: { $ne: 'archived' }
+      }).select('status dueDate')
+      
+      const now = new Date()
+      
+      return {
+        total: tasks.length,
+        completed: tasks.filter(t => t.status === 'completed').length,
+        inProgress: tasks.filter(t => t.status === 'in-progress').length,
+        todo: tasks.filter(t => t.status === 'todo').length,
+        review: tasks.filter(t => t.status === 'review').length,
+        blocked: tasks.filter(t => t.status === 'blocked').length,
+        rejected: tasks.filter(t => t.status === 'rejected').length,
+        overdue: tasks.filter(t => 
+          t.dueDate && new Date(t.dueDate) < now && 
+          !['completed', 'archived'].includes(t.status)
+        ).length
+      }
     }
 
     // Add task stats to each project
     const projectsWithStats = await Promise.all(projects.map(async (project) => {
-      const stats = await getProjectTaskStats(project._id)
+      const stats = await getTaskStats(project._id)
       return {
         ...project.toObject ? project.toObject() : project,
         taskStats: stats
@@ -93,7 +139,7 @@ export async function GET(request) {
     return NextResponse.json({
       success: true,
       data: projectsWithStats,
-      currentEmployeeId: user.employeeId.toString()
+      currentEmployeeId: employeeId.toString()
     })
   } catch (error) {
     console.error('Get projects error:', error)
@@ -104,22 +150,21 @@ export async function GET(request) {
 // POST - Create a new project
 export async function POST(request) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'User', 'Employee', 'Chat', 'ProjectTimelineEvent', 'Notification'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
+    const { user: authUser, models } = auth
+    const { Project, User, Employee } = models
 
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
-    const user = await User.findById(decoded.userId).select('employeeId')
-    if (!user || !user.employeeId) {
+    // Get employeeId - could be object or string
+    const employeeId = authUser.employeeId?._id || authUser.employeeId
+    if (!employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
-    const creatorEmployee = await Employee.findById(user.employeeId)
+    const creatorEmployee = await Employee.findById(employeeId)
     if (!creatorEmployee) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
@@ -165,7 +210,7 @@ export async function POST(request) {
       }, { status: 404 })
     }
 
-    // Create the project with service
+    // Create the project with service - pass models for multi-tenant support
     const project = await createProject(
       {
         name,
@@ -184,14 +229,20 @@ export async function POST(request) {
         role: m.role || 'member',
         isExternal: m.isExternal || false,
         sourceDepartment: m.sourceDepartment
-      }))
+      })),
+      models // Pass tenant-specific models
     )
 
-    // Send notifications to invited members
+    // Send notifications to invited members (non-blocking)
     for (const member of members) {
-      const invitedEmployee = await Employee.findById(member.userId)
-      if (invitedEmployee) {
-        await notifyProjectInvitation(project, invitedEmployee, creatorEmployee)
+      try {
+        const invitedEmployee = await Employee.findById(member.userId)
+        if (invitedEmployee) {
+          await notifyProjectInvitation(project, invitedEmployee, creatorEmployee, models)
+        }
+      } catch (notifyError) {
+        console.error('Failed to send project invitation notification:', notifyError)
+        // Continue - don't fail project creation due to notification issues
       }
     }
 
@@ -204,7 +255,7 @@ export async function POST(request) {
 
     // Emit real-time project creation to all members and admins
     try {
-      const memberUserIds = await getProjectMemberUserIds(project._id)
+      const memberUserIds = await getProjectMemberUserIds(project._id, null, models)
       const adminUsers = await User.find({ role: { $in: ['admin', 'hr'] }, isActive: true }).select('_id').lean()
       const allUserIds = [...new Set([...memberUserIds.map(id => id.toString()), ...adminUsers.map(u => u._id.toString())])]
       

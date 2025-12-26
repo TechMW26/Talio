@@ -18,7 +18,7 @@ export async function PUT(request, { params }) {
     }
 
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'Task', 'TaskAssignee', 'ProjectApprovalRequest', 'User', 'Employee'])
+    const auth = await getAuthAndModels(request, ['Project', 'Task', 'TaskAssignee', 'ProjectApprovalRequest', 'User', 'Employee', 'ProjectTimelineEvent'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
@@ -108,7 +108,7 @@ export async function PUT(request, { params }) {
             })
             
             // Recalculate completion percentage
-            calculateCompletionPercentage(approvalRequest.project).catch(console.error)
+            calculateCompletionPercentage(approvalRequest.project, models).catch(console.error)
 
             // Create timeline event
             createTimelineEvent({
@@ -118,7 +118,7 @@ export async function PUT(request, { params }) {
               relatedTask: taskId,
               description: `Task "${taskTitle}" completion approved`,
               metadata: { taskTitle, approvedBy: user.employeeId }
-            }).catch(console.error)
+            }, models).catch(console.error)
           }
           break
         
@@ -132,7 +132,7 @@ export async function PUT(request, { params }) {
             await Task.findByIdAndDelete(taskId)
             
             // Recalculate completion percentage
-            calculateCompletionPercentage(approvalRequest.project).catch(console.error)
+            calculateCompletionPercentage(approvalRequest.project, models).catch(console.error)
 
             // Create timeline event
             createTimelineEvent({
@@ -141,7 +141,7 @@ export async function PUT(request, { params }) {
               createdBy: user.employeeId,
               description: `Task "${taskTitle}" was deleted (approved by project head)`,
               metadata: { taskTitle, approvedBy: user.employeeId }
-            }).catch(console.error)
+            }, models).catch(console.error)
           }
           break
           
@@ -158,7 +158,7 @@ export async function PUT(request, { params }) {
             createdBy: user.employeeId,
             description: 'Project completion approved',
             metadata: { approvedBy: user.employeeId }
-          }).catch(console.error)
+          }, models).catch(console.error)
           break
           
         case 'task_review':
@@ -174,7 +174,7 @@ export async function PUT(request, { params }) {
             })
             
             // Recalculate completion percentage
-            calculateCompletionPercentage(approvalRequest.project).catch(console.error)
+            calculateCompletionPercentage(approvalRequest.project, models).catch(console.error)
 
             // Create timeline event
             createTimelineEvent({
@@ -184,7 +184,7 @@ export async function PUT(request, { params }) {
               relatedTask: taskId,
               description: `Task "${taskTitle}" review approved and marked complete`,
               metadata: { taskTitle, approvedBy: user.employeeId }
-            }).catch(console.error)
+            }, models).catch(console.error)
           }
           break
           
@@ -275,7 +275,7 @@ export async function PUT(request, { params }) {
           }
           
           // Recalculate project completion percentage
-          calculateCompletionPercentage(approvalRequest.project).catch(console.error)
+          calculateCompletionPercentage(approvalRequest.project, models).catch(console.error)
           
           // Get task assignees for notifications
           const taskAssignees = await TaskAssignee.find({ 
@@ -369,7 +369,7 @@ export async function PUT(request, { params }) {
               isRejection: true,
               colorCode: 'red'
             }
-          }).catch(console.error)
+          }, models).catch(console.error)
         }
       }
     }

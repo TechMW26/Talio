@@ -155,7 +155,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     // Get auth and tenant-aware models
-    const auth = await getAuthAndModels(request, ['Employee', 'User', 'Department', 'Designation']);
+    const auth = await getAuthAndModels(request, ['Employee', 'User', 'Department', 'Designation', 'OnboardingEmail', 'CompanySettings']);
     if (!auth.success) {
       return NextResponse.json(
         { success: false, message: auth.message || 'Unauthorized' },
@@ -163,7 +163,7 @@ export async function POST(request) {
       )
     }
 
-    const { models: { Employee: TenantEmployee, User: TenantUser } } = auth;
+    const { models: { Employee: TenantEmployee, User: TenantUser, OnboardingEmail: TenantOnboardingEmail, CompanySettings: TenantCompanySettings } } = auth;
 
     // Check user limit for tenant if tenant info is available
     if (auth.tenant?.databaseName) {
@@ -334,6 +334,7 @@ export async function POST(request) {
       department: populatedEmployee?.department?.name,
       dateOfJoining: data.dateOfJoining,
       triggeredBy: 'manual_creation',
+      models: { OnboardingEmail: TenantOnboardingEmail, CompanySettings: TenantCompanySettings },
     }).catch(err => {
       console.error('[Employee Create] Failed to send onboarding email:', err)
     })

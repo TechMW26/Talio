@@ -1,18 +1,11 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
 // GET - Fetch all employee ratings (reviews)
 export async function GET(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    const decoded = await verifyToken(token)
-    
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Employee'])
     if (!auth.success) {
@@ -24,25 +17,36 @@ export async function GET(request) {
     // Build query based on role
     let query = { status: 'active' }
     
-    if (decoded.role === 'employee') {
+    // Get employeeId - could be object or string
+    const employeeId = user.employeeId?._id || user.employeeId
+    
+    if (user.role === 'employee') {
       // Employees can only see their own reviews
-      query._id = decoded.employeeId
-    } else if (decoded.role === 'manager') {
+      query._id = employeeId
+    } else if (user.role === 'manager') {
       // Managers can see reviews for their team members
       const teamMembers = await Employee.find({ 
-        reportingManager: decoded.employeeId,
+        reportingManager: employeeId,
         status: 'active'
       }).select('_id')
       
       const teamMemberIds = teamMembers.map(member => member._id)
-      query._id = { $in: [...teamMemberIds, decoded.employeeId] }
+      query._id = { $in: [...teamMemberIds, employeeId] }
     }
     // Admin and HR can see all employees
 
     // Fetch employees with reviews
     const employees = await Employee.find(query)
-      .populate('reviews.reviewedBy', 'firstName lastName designation profilePicture')
-      .populate('department', 'name')
+      .populate({
+        path: 'reviews.reviewedBy',
+        select: 'firstName lastName designation profilePicture',
+        options: { strictPopulate: false }
+      })
+      .populate({
+        path: 'department',
+        select: 'name',
+        options: { strictPopulate: false }
+      })
       .select('firstName lastName employeeCode department designation profilePicture reviews')
       .lean()
 
@@ -94,11 +98,16 @@ export async function GET(request) {
 // DELETE - Delete a rating
 export async function DELETE(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    const decoded = await verifyToken(token)
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Employee } = models
     
-    if (!decoded || !['admin', 'hr', 'manager'].includes(decoded.role)) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    if (!['admin', 'hr', 'manager'].includes(user.role)) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 403 })
     }
 
     const { searchParams } = new URL(request.url)

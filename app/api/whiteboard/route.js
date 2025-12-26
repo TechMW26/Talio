@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth'
 import { jwtVerify } from 'jose';
-;
-;
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key');
 
@@ -36,27 +34,33 @@ export async function GET(request) {
     }
 
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Whiteboard'])
+    const auth = await getAuthAndModels(request, ['Whiteboard', 'User', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { models } = auth
-    const { Whiteboard } = models
+    const { Whiteboard, User, Employee } = models
 
-    ;
+    // Get employee ID from user
+    const userRecord = await User.findById(user.id).select('employeeId').lean()
+    let employeeId = userRecord?.employeeId
+    
+    if (!employeeId) {
+      const employee = await Employee.findOne({ userId: user.id }).select('_id').lean()
+      employeeId = employee?._id
+    }
 
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search') || '';
-    const folder = searchParams.get('folder');
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
     const skip = (page - 1) * limit;
 
-    // Build query - get boards owned by user OR shared with user
+    // Build query - get boards created by user OR shared with user
     const query = {
       $or: [
-        { owner: user.id },
-        { 'sharing.userId': user.id }
+        { createdBy: employeeId },
+        { sharedWith: employeeId }
       ]
     };
 
@@ -65,26 +69,19 @@ export async function GET(request) {
       query.$and = [
         { $or: query.$or },
         { $or: [
-          { title: { $regex: search, $options: 'i' } },
-          { description: { $regex: search, $options: 'i' } },
-          { tags: { $in: [new RegExp(search, 'i')] } }
+          { name: { $regex: search, $options: 'i' } },
+          { description: { $regex: search, $options: 'i' } }
         ]}
       ];
       delete query.$or;
     }
 
-    // Add folder filter
-    if (folder === 'null' || folder === 'root') {
-      query.folderId = null;
-    } else if (folder) {
-      query.folderId = folder;
-    }
-
     const [boards, total] = await Promise.all([
       Whiteboard.find(query)
-        .select('title description thumbnail owner sharing theme lastModified createdAt tags')
-        .populate('owner', 'name email avatar')
-        .sort({ lastModified: -1 })
+        .select('name description thumbnail createdBy sharedWith isPublic createdAt updatedAt')
+        .populate('createdBy', 'firstName lastName email profilePicture')
+        .populate('sharedWith', 'firstName lastName email profilePicture')
+        .sort({ updatedAt: -1 })
         .skip(skip)
         .limit(limit)
         .lean(),
@@ -93,23 +90,16 @@ export async function GET(request) {
 
     // Add permission info for each board
     const boardsWithPermissions = boards.map(board => {
-      let permission = 'view_only';
-      const isOwner = board.owner._id.toString() === user.id;
-      if (isOwner) {
-        permission = 'owner';
-      } else {
-        const share = board.sharing?.find(s => s.userId.toString() === user.id);
-        if (share) {
-          permission = share.permission;
-        }
-      }
+      const isOwner = board.createdBy?._id?.toString() === employeeId?.toString();
+      const isShared = board.sharedWith?.some(s => s._id?.toString() === employeeId?.toString());
+      
       return { 
         ...board, 
-        // Normalize fields - use 'name' for UI compatibility
-        name: board.title,
-        userPermission: permission,
-        isOwner: isOwner,
-        sharedWith: board.sharing || []
+        // Normalize fields for UI compatibility
+        title: board.name,
+        owner: board.createdBy,
+        userPermission: isOwner ? 'owner' : (isShared ? 'editor' : 'view_only'),
+        isOwner: isOwner
       };
     });
 
@@ -136,22 +126,37 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    ;
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Whiteboard', 'User', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ error: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Whiteboard, User, Employee } = models
+
+    // Get employee ID from user
+    const userRecord = await User.findById(user.id).select('employeeId').lean()
+    let employeeId = userRecord?.employeeId
+    
+    if (!employeeId) {
+      const employee = await Employee.findOne({ userId: user.id }).select('_id').lean()
+      employeeId = employee?._id
+    }
+
+    if (!employeeId) {
+      return NextResponse.json({ error: 'Employee not found' }, { status: 404 })
+    }
 
     const body = await request.json();
-    const { title, description, theme, folderId } = body;
+    const { title, name, description } = body;
 
     const whiteboard = new Whiteboard({
-      title: title || 'Untitled Board',
+      name: name || title || 'Untitled Board',
       description: description || '',
-      owner: user.id,
-      theme: theme || 'white',
-      folderId: folderId || null,
-      pages: [{
-        id: `page-${Date.now()}`,
-        objects: [],
-        thumbnail: null
-      }]
+      createdBy: employeeId,
+      data: null,
+      isPublic: false,
+      sharedWith: []
     });
 
     await whiteboard.save();
@@ -160,9 +165,9 @@ export async function POST(request) {
       success: true,
       whiteboard: {
         _id: whiteboard._id,
-        title: whiteboard.title,
+        name: whiteboard.name,
+        title: whiteboard.name, // For UI compatibility
         description: whiteboard.description,
-        theme: whiteboard.theme,
         createdAt: whiteboard.createdAt
       }
     }, { status: 201 });

@@ -2,8 +2,14 @@ import { NextResponse } from 'next/server'
 import { verifyToken, getAuthAndModels } from '@/lib/auth'
 import { sendPushToUser } from '@/lib/pushNotification'
 import { sendMeetingInviteEmail } from '@/lib/mailer'
+import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
+
+// Generate unique room ID for online meetings
+function generateRoomId() {
+  return crypto.randomBytes(12).toString('hex')
+}
 
 // GET - List meetings
 export async function GET(request) {
@@ -142,29 +148,27 @@ export async function GET(request) {
 // POST - Create a new meeting
 export async function POST(request) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Meeting', 'Employee', 'Department', 'User', 'Notification'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
+    const { user, models } = auth
+    const { Meeting, Employee, Department, User, Notification } = models
 
     const data = await request.json()
 
-    // Get employee ID from user - first check User.employeeId, then Employee.userId
-    const user = await User.findById(decoded.userId).select('employeeId').lean()
+    // Get employee ID from authenticated user
+    const employeeId = user.employeeId?._id || user.employeeId
     
     let organizer = null
-    if (user?.employeeId) {
-      organizer = await Employee.findById(user.employeeId).lean()
+    if (employeeId) {
+      organizer = await Employee.findById(employeeId).lean()
     }
     
     // If user doesn't have employeeId directly, try to find employee by userId
     if (!organizer) {
-      organizer = await Employee.findOne({ userId: decoded.userId }).lean()
+      organizer = await Employee.findOne({ userId: user._id }).lean()
     }
 
     if (!organizer) {
@@ -172,7 +176,7 @@ export async function POST(request) {
     }
     
     // Add userId to organizer for notification purposes
-    organizer.userId = decoded.userId
+    organizer.userId = user._id
 
     // Validate required fields
     if (!data.title || !data.type || !data.scheduledStart || !data.scheduledEnd) {
@@ -181,6 +185,27 @@ export async function POST(request) {
         message: 'Title, type, start time and end time are required' 
       }, { status: 400 })
     }
+
+    // Parse and validate times
+    let startTime = new Date(data.scheduledStart)
+    let endTime = new Date(data.scheduledEnd)
+
+    // Validate that dates are valid
+    if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
+      return NextResponse.json({ 
+        success: false, 
+        message: 'Invalid date format for start or end time' 
+      }, { status: 400 })
+    }
+
+    // Smart time handling: If end time is before or equal to start time, auto-set end time to 1 hour after start
+    if (endTime <= startTime) {
+      endTime = new Date(startTime.getTime() + 60 * 60 * 1000) // Add 1 hour
+      console.log(`[Meeting] Auto-adjusted end time to 1 hour after start: ${endTime.toISOString()}`)
+    }
+
+    // Calculate duration in minutes
+    const durationMinutes = Math.round((endTime - startTime) / (1000 * 60))
 
     // Validate meeting type
     if (data.type === 'offline' && !data.location) {
@@ -239,20 +264,25 @@ export async function POST(request) {
       }
     }
 
-    // Calculate duration in minutes
-    const startTime = new Date(data.scheduledStart)
-    const endTime = new Date(data.scheduledEnd)
-    const durationMinutes = Math.round((endTime - startTime) / (1000 * 60))
+    // Generate roomId for online meetings
+    const roomId = data.type === 'online' ? generateRoomId() : undefined
 
-    // Create meeting
+    // Create meeting - use startTime/endTime for tenant schema compatibility
+    // Note: startTime, endTime, and durationMinutes were already calculated above during validation
     const meeting = new Meeting({
       title: data.title,
       description: data.description || '',
       type: data.type,
+      // Tenant schema uses startTime/endTime (required fields)
+      startTime: startTime,
+      endTime: endTime,
+      // Also set scheduledStart/scheduledEnd for backward compatibility
       scheduledStart: startTime,
       scheduledEnd: endTime,
       duration: durationMinutes,
       location: data.location,
+      isOnline: data.type === 'online',
+      roomId: roomId,
       organizer: organizer._id,
       invitees,
       invitedDepartments,
@@ -260,8 +290,8 @@ export async function POST(request) {
       agenda: data.agenda || [],
       tags: data.tags || [],
       isRecurring: data.isRecurring || false,
-      recurrence: data.recurrence,
-      reminders: data.reminders || [{ type: '15min', sent: false }]
+      recurrence: data.recurrence && typeof data.recurrence === 'object' ? data.recurrence : undefined,
+      reminders: data.reminders || [{ time: new Date(startTime.getTime() - 15 * 60 * 1000), sent: false }]
     })
 
     await meeting.save()

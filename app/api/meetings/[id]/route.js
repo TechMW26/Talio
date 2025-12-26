@@ -95,6 +95,14 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Meeting', 'Employee', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Meeting, Employee, User } = models
+
     const data = await request.json()
 
     // Get current user's employee record - first check User.employeeId, then Employee.userId
@@ -154,9 +162,9 @@ export async function PUT(request, { params }) {
           })
 
           // Send notification to new invitee
-          const inviteeEmp = await Employee.findById(empId).populate('user', '_id').lean()
-          if (inviteeEmp?.user?._id) {
-            sendPushToUser(inviteeEmp.user._id, {
+          const inviteeEmp = await Employee.findById(empId).select('userId').lean()
+          if (inviteeEmp?.userId) {
+            sendPushToUser(inviteeEmp.userId, {
               title: '📅 Meeting Invitation',
               body: `${employee.firstName} ${employee.lastName} invited you to "${meeting.title}"`
             }, {
@@ -219,8 +227,17 @@ export async function DELETE(request, { params }) {
 
     const { searchParams } = new URL(request.url)
     const reason = searchParams.get('reason') || 'Meeting cancelled'
+    const permanentDelete = searchParams.get('permanent') === 'true'
 
-    // Get current user's employee record - first check User.employeeId, then Employee.userId
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Meeting', 'Employee', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Meeting, Employee, User } = models
+
+    // Get current user's employee record
     const user = await User.findById(decoded.userId).select('employeeId').lean()
     
     let employee = null
@@ -228,7 +245,6 @@ export async function DELETE(request, { params }) {
       employee = await Employee.findById(user.employeeId).lean()
     }
     
-    // If user doesn't have employeeId directly, try to find employee by userId
     if (!employee) {
       employee = await Employee.findOne({ userId: decoded.userId }).lean()
     }
@@ -238,7 +254,7 @@ export async function DELETE(request, { params }) {
     }
 
     const meeting = await Meeting.findById(id)
-      .populate('invitees.employee', 'user')
+      .populate('invitees.employee', 'userId')
 
     if (!meeting) {
       return NextResponse.json({ success: false, message: 'Meeting not found' }, { status: 404 })
@@ -252,7 +268,39 @@ export async function DELETE(request, { params }) {
       }, { status: 403 })
     }
 
-    // Cancel meeting instead of deleting (soft delete)
+    // If permanent delete requested, actually delete the meeting
+    if (permanentDelete) {
+      await Meeting.findByIdAndDelete(id)
+      
+      // Notify all invitees about deletion
+      for (const invitee of meeting.invitees) {
+        if (invitee.employee?.userId) {
+          const userId = invitee.employee.userId
+          sendPushToUser(userId, {
+            title: '🗑️ Meeting Deleted',
+            body: `"${meeting.title}" has been deleted.`
+          }, {
+            eventType: 'meeting-deleted',
+            clickAction: `/dashboard/meetings`,
+            data: { meetingId: meeting._id.toString() }
+          }).catch(console.error)
+
+          if (global.io) {
+            global.io.to(`user:${userId}`).emit('meeting-deleted', {
+              meetingId: meeting._id,
+              title: meeting.title
+            })
+          }
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Meeting deleted successfully'
+      })
+    }
+
+    // Cancel meeting (soft delete)
     meeting.status = 'cancelled'
     meeting.cancelledBy = employee._id
     meeting.cancellationReason = reason
@@ -262,8 +310,8 @@ export async function DELETE(request, { params }) {
 
     // Notify all invitees
     for (const invitee of meeting.invitees) {
-      if (invitee.employee?.user) {
-        const userId = invitee.employee.user._id || invitee.employee.user
+      if (invitee.employee?.userId) {
+        const userId = invitee.employee.userId
         sendPushToUser(userId, {
           title: '❌ Meeting Cancelled',
           body: `"${meeting.title}" has been cancelled. Reason: ${reason}`
@@ -273,7 +321,6 @@ export async function DELETE(request, { params }) {
           data: { meetingId: meeting._id.toString() }
         }).catch(console.error)
 
-        // Socket notification
         if (global.io) {
           global.io.to(`user:${userId}`).emit('meeting-cancelled', {
             meetingId: meeting._id,

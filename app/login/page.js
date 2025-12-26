@@ -68,10 +68,14 @@ export default function LoginPage() {
           }
         } catch (error) {
           console.error('[Login Page] Token validation error:', error)
-          // Network error - still try to redirect if token exists
-          console.log('[Login Page] Redirecting to dashboard despite validation error...')
-          window.location.href = '/dashboard'
-          return
+          // Network error - clear invalid session and show login form
+          // Do NOT redirect to dashboard as token may be invalid
+          console.log('[Login Page] Network error during validation, clearing session...')
+          localStorage.removeItem('token')
+          localStorage.removeItem('user')
+          localStorage.removeItem('userId')
+          document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+          setChecking(false)
         }
       } else {
         // Check for error in URL params

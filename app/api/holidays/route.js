@@ -15,10 +15,19 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url)
     const year = searchParams.get('year')
+    const startDateParam = searchParams.get('startDate')
+    const endDateParam = searchParams.get('endDate')
 
     const query = {}
 
-    if (year) {
+    if (startDateParam && endDateParam) {
+      // Support for date range queries (used by report page)
+      const startDate = new Date(startDateParam)
+      startDate.setHours(0, 0, 0, 0)
+      const endDate = new Date(endDateParam)
+      endDate.setHours(23, 59, 59, 999)
+      query.date = { $gte: startDate, $lte: endDate }
+    } else if (year) {
       const startDate = new Date(year, 0, 1)
       const endDate = new Date(year, 11, 31, 23, 59, 59)
       query.date = { $gte: startDate, $lte: endDate }

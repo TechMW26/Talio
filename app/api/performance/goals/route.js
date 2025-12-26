@@ -131,14 +131,15 @@ export async function GET(request) {
 // POST - Create new performance goal
 export async function POST(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    const decoded = await verifyToken(token)
-    
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['PerformanceGoal', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
+    const { user, models } = auth
+    const { PerformanceGoal, Employee } = models
 
-    if (!['admin', 'hr', 'manager', 'department_head'].includes(decoded.role)) {
+    if (!['admin', 'hr', 'manager', 'department_head'].includes(user.role)) {
       return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
     }
 
@@ -175,7 +176,7 @@ export async function POST(request) {
       )
     }
 
-    const creator = await Employee.findOne({ userId: decoded.userId }).select('_id')
+    const creator = await Employee.findOne({ userId: user._id }).select('_id')
     if (!creator) {
       return NextResponse.json(
         { success: false, message: 'Creator employee profile not found' },
@@ -226,12 +227,13 @@ export async function POST(request) {
 // PUT - Update performance goal
 export async function PUT(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    const decoded = await verifyToken(token)
-    
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['PerformanceGoal', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
+    const { user, models } = auth
+    const { PerformanceGoal, Employee } = models
 
     const body = await request.json()
     const { goalId, ...updateData } = body
@@ -251,8 +253,8 @@ export async function PUT(request) {
       )
     }
 
-    const canUpdateAll = ['admin', 'hr', 'manager', 'department_head'].includes(decoded.role)
-    const employee = await Employee.findOne({ userId: decoded.userId }).select('_id')
+    const canUpdateAll = ['admin', 'hr', 'manager', 'department_head'].includes(user.role)
+    const employee = await Employee.findOne({ userId: user._id }).select('_id')
 
     if (!canUpdateAll) {
       if (!employee || goal.employee.toString() !== employee._id.toString()) {
@@ -306,14 +308,15 @@ export async function PUT(request) {
 // DELETE - Delete performance goal
 export async function DELETE(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    const decoded = await verifyToken(token)
-    
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['PerformanceGoal'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
+    const { user, models } = auth
+    const { PerformanceGoal } = models
 
-    if (!['admin', 'hr', 'manager', 'department_head'].includes(decoded.role)) {
+    if (!['admin', 'hr', 'manager', 'department_head'].includes(user.role)) {
       return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
     }
 

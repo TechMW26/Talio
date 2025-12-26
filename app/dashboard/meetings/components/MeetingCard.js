@@ -243,7 +243,7 @@ export default function MeetingCard({ meeting, onRespond, showResponseActions = 
           ) : (
             <div className="flex items-center gap-2">
               {/* Join meeting button for online meetings */}
-              {meeting.type === 'online' && (isNow || (isUpcoming && meeting.status === 'scheduled')) && meeting.myInviteStatus === 'accepted' && (
+              {meeting.type === 'online' && (isNow || (isUpcoming && meeting.status === 'scheduled')) && (meeting.isOrganizer || meeting.myInviteStatus === 'accepted') && (
                 <Link
                   href={`/dashboard/meetings/room/${meeting.roomId}`}
                   className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"

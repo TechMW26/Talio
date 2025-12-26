@@ -27,14 +27,36 @@ export async function POST(request) {
     let tenantInfo = null;
     let TenantUser, TenantEmployee, TenantDepartment, TenantDesignation, TenantUserSession, TenantCompanySettings;
     
-    try {
-      tenantInfo = await getTenantByEmail(email);
-    } catch (tenantError) {
-      console.error('[Login] Tenant lookup failed:', tenantError.message);
-      return NextResponse.json(
-        { message: 'Invalid email or password' },
-        { status: 401 }
-      );
+    // Retry logic for transient network errors (e.g., DNS timeouts)
+    const MAX_RETRIES = 2;
+    let lastError = null;
+    
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        tenantInfo = await getTenantByEmail(email);
+        break; // Success, exit retry loop
+      } catch (tenantError) {
+        lastError = tenantError;
+        console.error(`[Login] Tenant lookup attempt ${attempt}/${MAX_RETRIES} failed:`, tenantError.message);
+        
+        // Check if it's a transient error worth retrying
+        const isTransient = tenantError.message.includes('ETIMEOUT') || 
+                           tenantError.message.includes('ECONNREFUSED') ||
+                           tenantError.message.includes('querySrv');
+        
+        if (isTransient && attempt < MAX_RETRIES) {
+          // Wait before retry (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+          continue;
+        }
+        
+        // Non-transient error or max retries reached
+        console.error('[Login] Tenant lookup failed after retries:', tenantError.message);
+        return NextResponse.json(
+          { message: 'Service temporarily unavailable. Please try again.' },
+          { status: 503 }
+        );
+      }
     }
     
     if (!tenantInfo) {

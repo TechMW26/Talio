@@ -357,7 +357,7 @@ export default function CreateProjectPage() {
 
         {/* Project Head Section */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mb-6">
-          <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
+          <h2 className="text-lg font-semibold text-black-800 mb-4">
             Project Head <span className="text-red-500">*</span>
           </h2>
 
@@ -407,7 +407,7 @@ export default function CreateProjectPage() {
         {/* Team Members Section */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-800 dark:text-white">
+            <h2 className="text-lg font-semibold text-black-800 dark:text-black">
               <FaUsers className="inline mr-2" />
               Team Members
             </h2>

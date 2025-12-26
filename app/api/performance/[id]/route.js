@@ -38,6 +38,14 @@ export async function GET(request, { params }) {
 // PUT - Update performance review
 export async function PUT(request, { params }) {
   try {
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Performance'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Performance } = models
+
     const data = await request.json()
 
     const performance = await Performance.findByIdAndUpdate(
@@ -72,6 +80,14 @@ export async function PUT(request, { params }) {
 // DELETE - Delete performance review
 export async function DELETE(request, { params }) {
   try {
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Performance'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Performance } = models
+
     const performance = await Performance.findByIdAndDelete(params.id)
 
     if (!performance) {

@@ -1,12 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth'
-import { jwtVerify } from 'jose';
-;
-;
-;
-;
-
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
+import { getAuthAndModels } from '@/lib/auth';
 
 // Roles that can initiate manual captures
 const ALLOWED_INITIATOR_ROLES = ['admin', 'department_head'];
@@ -21,36 +14,16 @@ const PROTECTED_ROLES = ['admin'];
  */
 export async function POST(request) {
   try {
-    // Verify JWT token
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized - No token provided' },
-        { status: 401 }
-      );
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department']);
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 });
     }
+    const { user, models } = auth;
+    const { User, Employee, Department } = models;
 
-    const token = authHeader.substring(7);
-    
-    let decoded;
-    try {
-      decoded = await jwtVerify(token, JWT_SECRET);
-    } catch {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized - Invalid token' },
-        { status: 401 }
-      );
-    }
-    
-    const initiatorId = decoded.payload.userId;
-    const initiatorRole = decoded.payload.role;
-
-    if (!initiatorId) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized - User not found' },
-        { status: 401 }
-      );
-    }
+    const initiatorId = user._id.toString();
+    const initiatorRole = user.role;
 
     // Check if initiator has permission to request manual captures
     if (!ALLOWED_INITIATOR_ROLES.includes(initiatorRole)) {
@@ -79,16 +52,6 @@ export async function POST(request) {
         { status: 403 }
       );
     }
-
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
-    const { user, models } = auth
-    const { User, Employee, Department } = models
-
-    ;
 
     // Get target user info
     const targetUser = await User.findById(targetUserId).populate('employeeId');
@@ -198,28 +161,16 @@ export async function POST(request) {
  */
 export async function GET(request) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department']);
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 });
     }
+    const { user, models } = auth;
+    const { User, Employee, Department } = models;
 
-    const token = authHeader.substring(7);
-    
-    let decoded;
-    try {
-      decoded = await jwtVerify(token, JWT_SECRET);
-    } catch {
-      return NextResponse.json(
-        { success: false, error: 'Invalid token' },
-        { status: 401 }
-      );
-    }
-
-    const userId = decoded.payload.userId;
-    const userRole = decoded.payload.role;
+    const userId = user._id.toString();
+    const userRole = user.role;
 
     // Determine permissions based on role
     const canInitiateCapture = ALLOWED_INITIATOR_ROLES.includes(userRole);
@@ -229,8 +180,6 @@ export async function GET(request) {
     let targetableUsers = [];
 
     if (canInitiateCapture) {
-      ;
-      
       if (['admin'].includes(userRole)) {
         captureScope = 'all'; // Can capture any non-admin user
         
@@ -239,13 +188,13 @@ export async function GET(request) {
           role: { $nin: PROTECTED_ROLES },
           isActive: true,
           _id: { $ne: userId }
-        }).populate('employeeId', 'name employeeId department').select('email role');
+        }).populate('employeeId', 'firstName lastName employeeCode department').select('email role');
         
         targetableUsers = users.map(u => ({
           _id: u._id,
           email: u.email,
-          name: u.employeeId?.name || u.email,
-          employeeCode: u.employeeId?.employeeId,
+          name: u.employeeId ? `${u.employeeId.firstName || ''} ${u.employeeId.lastName || ''}`.trim() : u.email,
+          employeeCode: u.employeeId?.employeeCode,
           role: u.role
         }));
         
@@ -254,30 +203,67 @@ export async function GET(request) {
         
         // Get department head's departments
         const currentUser = await User.findById(userId).populate('employeeId');
-        const deptIds = currentUser?.employeeId?.departments || [];
+        const employeeId = currentUser?.employeeId?._id || currentUser?.employeeId;
         
-        if (currentUser?.employeeId?.department) {
-          deptIds.push(currentUser.employeeId.department);
+        if (!employeeId) {
+          return NextResponse.json({
+            success: true,
+            permissions: {
+              canInitiateCapture,
+              isProtectedFromCapture,
+              captureScope: 'none',
+              role: userRole
+            },
+            targetableUsers: []
+          });
         }
         
-        // Get users in those departments
-        const employees = await Employee.find({
+        // Find departments where user is head
+        const depts = await Department.find({
           $or: [
-            { department: { $in: deptIds } },
-            { departments: { $in: deptIds } }
+            { head: employeeId },
+            { heads: employeeId }
           ],
-          status: 'active'
-        }).populate('userId', 'role email');
+          isActive: true
+        }).select('_id');
         
-        targetableUsers = employees
-          .filter(e => e.userId && !PROTECTED_ROLES.includes(e.userId.role) && e.userId._id.toString() !== userId)
-          .map(e => ({
-            _id: e.userId._id,
-            email: e.userId.email,
-            name: e.name,
-            employeeCode: e.employeeId,
-            role: e.userId.role
-          }));
+        const deptIds = depts.map(d => d._id);
+        
+        if (deptIds.length === 0) {
+          return NextResponse.json({
+            success: true,
+            permissions: {
+              canInitiateCapture,
+              isProtectedFromCapture,
+              captureScope: 'none',
+              role: userRole
+            },
+            targetableUsers: []
+          });
+        }
+        
+        // Get employees in those departments
+        const employees = await Employee.find({
+          department: { $in: deptIds },
+          status: 'active'
+        }).select('firstName lastName employeeCode');
+        
+        // Get users for these employees
+        const employeeIds = employees.map(e => e._id);
+        const users = await User.find({
+          employeeId: { $in: employeeIds },
+          role: { $nin: PROTECTED_ROLES },
+          isActive: true,
+          _id: { $ne: userId }
+        }).populate('employeeId', 'firstName lastName employeeCode');
+        
+        targetableUsers = users.map(u => ({
+          _id: u._id,
+          email: u.email,
+          name: u.employeeId ? `${u.employeeId.firstName || ''} ${u.employeeId.lastName || ''}`.trim() : u.email,
+          employeeCode: u.employeeId?.employeeCode,
+          role: u.role
+        }));
       }
     }
 

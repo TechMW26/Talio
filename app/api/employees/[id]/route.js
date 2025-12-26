@@ -137,6 +137,14 @@ export async function PUT(request, { params }) {
     // Await params in Next.js 15
     const { id } = await params;
 
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Employee', 'User', 'Department', 'Designation'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Employee, User, Department, Designation } = models
+
     const data = await request.json()
 
     // Check if employee exists
@@ -348,6 +356,14 @@ export async function DELETE(request, { params }) {
     // Await params in Next.js 15
     const { id } = await params;
 
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Employee', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Employee, User } = models
+
     const employee = await Employee.findById(id)
     if (!employee) {
       return NextResponse.json(
@@ -419,6 +435,15 @@ export async function DELETE(request, { params }) {
 export async function PATCH(request, { params }) {
   try {
     const { id } = await params;
+
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Employee', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Employee, User } = models
+
     const body = await request.json()
 
     // Check if at least one field is provided

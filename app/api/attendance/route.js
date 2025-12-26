@@ -87,9 +87,12 @@ export async function GET(request) {
     const employeeId = searchParams.get('employeeId')
     const month = searchParams.get('month')
     const year = searchParams.get('year')
+    const startDateParam = searchParams.get('startDate')
+    const endDateParam = searchParams.get('endDate')
+    const department = searchParams.get('department')
 
     // Generate cache key
-    const cacheKey = queryCache.generateKey('attendance', date, employeeId, month, year)
+    const cacheKey = queryCache.generateKey('attendance', date, employeeId, month, year, startDateParam, endDateParam, department)
     const cached = queryCache.get(cacheKey)
     if (cached) {
       return NextResponse.json(cached)
@@ -126,7 +129,14 @@ export async function GET(request) {
       query.employee = resolvedEmployeeId
     }
 
-    if (date) {
+    if (startDateParam && endDateParam) {
+      // Support for date range queries (used by report page)
+      const startDate = new Date(startDateParam)
+      startDate.setHours(0, 0, 0, 0)
+      const endDate = new Date(endDateParam)
+      endDate.setHours(23, 59, 59, 999)
+      query.date = { $gte: startDate, $lte: endDate }
+    } else if (date) {
       const startDate = new Date(date)
       startDate.setHours(0, 0, 0, 0)
       const endDate = new Date(date)
@@ -136,6 +146,14 @@ export async function GET(request) {
       const startDate = new Date(year, month - 1, 1)
       const endDate = new Date(year, month, 0, 23, 59, 59, 999)
       query.date = { $gte: startDate, $lte: endDate }
+    }
+
+    // Filter by department if specified
+    if (department && department !== 'all') {
+      // Get employees in this department
+      const deptEmployees = await TenantEmployee.find({ department }).select('_id').lean()
+      const deptEmployeeIds = deptEmployees.map(e => e._id)
+      query.employee = { $in: deptEmployeeIds }
     }
 
     // Optimized: Use lean() and select only needed fields (including location for display)

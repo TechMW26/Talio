@@ -1,15 +1,8 @@
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth';
 import { readdir, stat } from 'fs/promises';
 import path from 'path';
-import { jwtVerify } from 'jose';
-;
-;
-;
-;
-;
 
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 const SCREENSHOTS_PER_SESSION = 30;
 
 /**
@@ -31,8 +24,12 @@ function parseScreenshotTimestamp(filename) {
 
 /**
  * Scan filesystem for screenshots and create/update sessions
+ * @param {string} userId - User ID
+ * @param {Date} date - Date to scan
+ * @param {Object} models - Tenant-specific models { User, ProductivitySession }
  */
-async function syncScreenshotsToSessions(userId, date) {
+async function syncScreenshotsToSessions(userId, date, models) {
+  const { User, ProductivitySession } = models;
   const activityDir = path.join(process.cwd(), 'public', 'activity', userId);
   const dateFolder = date.toISOString().split('T')[0];
   const datePath = path.join(activityDir, dateFolder);
@@ -119,38 +116,16 @@ async function syncScreenshotsToSessions(userId, date) {
  */
 export async function GET(request) {
   try {
-    // Verify JWT token
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    const token = authHeader.substring(7);
-    let decoded;
-    try {
-      decoded = await jwtVerify(token, JWT_SECRET);
-    } catch {
-      return NextResponse.json(
-        { success: false, error: 'Invalid token' },
-        { status: 401 }
-      );
-    }
-
-    const currentUserId = decoded.payload.userId;
-    const currentUserRole = decoded.payload.role;
-    
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['ProductivitySession', 'User', 'Employee', 'Department'])
+    const auth = await getAuthAndModels(request, ['ProductivitySession', 'User', 'Employee', 'Department']);
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
+      return NextResponse.json({ message: auth.message }, { status: 401 });
     }
-    const { models } = auth
-    const { ProductivitySession, User, Employee, Department } = models
+    const { user, models } = auth;
+    const { ProductivitySession, User, Employee, Department } = models;
 
-    ;
+    const currentUserId = user._id.toString();
+    const currentUserRole = user.role;
     
     const { searchParams } = new URL(request.url);
     const targetUserId = searchParams.get('userId') || currentUserId;
@@ -183,7 +158,7 @@ export async function GET(request) {
     }
     
     // Sync screenshots from filesystem and get sessions
-    const sessions = await syncScreenshotsToSessions(targetUserId, date);
+    const sessions = await syncScreenshotsToSessions(targetUserId, date, models);
     
     // Fetch from database to get full session data with analysis
     const dbSessions = await ProductivitySession.find({
@@ -218,33 +193,19 @@ export async function GET(request) {
  */
 export async function POST(request) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['ProductivitySession', 'User', 'Employee']);
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 });
     }
+    const { user, models } = auth;
 
-    const token = authHeader.substring(7);
-    let decoded;
-    try {
-      decoded = await jwtVerify(token, JWT_SECRET);
-    } catch {
-      return NextResponse.json(
-        { success: false, error: 'Invalid token' },
-        { status: 401 }
-      );
-    }
-
-    const userId = decoded.payload.userId;
-    
-    ;
+    const userId = user._id.toString();
     
     const body = await request.json();
     const date = body.date ? new Date(body.date) : new Date();
     
-    const sessions = await syncScreenshotsToSessions(userId, date);
+    const sessions = await syncScreenshotsToSessions(userId, date, models);
     
     return NextResponse.json({
       success: true,

@@ -57,6 +57,14 @@ export async function POST(request, { params }) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Task', 'TaskAssignee', 'User', 'Project', 'ProjectTimelineEvent'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Task, TaskAssignee, User, Project, ProjectTimelineEvent } = models
+
     const { taskId } = await params
     const body = await request.json()
     const { title, estimatedDays, estimatedHours } = body
@@ -154,7 +162,7 @@ export async function POST(request, { params }) {
     // Recalculate project completion percentage (includes subtask progress)
     const projectId = task.project?._id || task.project
     if (projectId) {
-      calculateCompletionPercentage(projectId).catch(console.error)
+      calculateCompletionPercentage(projectId, models).catch(console.error)
       
       // Create timeline event for subtask addition
       createTimelineEvent({
@@ -169,7 +177,7 @@ export async function POST(request, { params }) {
           estimatedDays: newSubtask.estimatedDays,
           estimatedHours: newSubtask.estimatedHours
         }
-      }).catch(console.error)
+      }, models).catch(console.error)
     }
 
     return NextResponse.json({
@@ -199,6 +207,14 @@ export async function PUT(request, { params }) {
     if (!decoded) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
+
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Task', 'TaskAssignee', 'User', 'Project', 'ProjectTimelineEvent', 'ProjectApprovalRequest'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Task, TaskAssignee, User, Project, ProjectTimelineEvent, ProjectApprovalRequest } = models
 
     const { taskId } = await params
     const body = await request.json()
@@ -420,7 +436,7 @@ export async function PUT(request, { params }) {
     // Recalculate project completion percentage
     const projectId = task.project?._id || task.project
     if (projectId) {
-      calculateCompletionPercentage(projectId).catch(console.error)
+      calculateCompletionPercentage(projectId, models).catch(console.error)
       
       // Create timeline event for subtask update
       const subtaskTitle = updatedSubtasks[subtaskIndex]?.title || 'Subtask'
@@ -451,7 +467,7 @@ export async function PUT(request, { params }) {
             statusChanged,
             newStatus
           }
-        }).catch(console.error)
+        }, models).catch(console.error)
       }
       
       // Additional timeline event for task status change
@@ -480,7 +496,7 @@ export async function PUT(request, { params }) {
             trigger: 'subtask_completion',
             approvalCreated
           }
-        }).catch(console.error)
+        }, models).catch(console.error)
       }
     }
 
@@ -515,6 +531,14 @@ export async function DELETE(request, { params }) {
     if (!decoded) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
+
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Task', 'TaskAssignee', 'User', 'Project', 'ProjectTimelineEvent'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Task, TaskAssignee, User, Project, ProjectTimelineEvent } = models
 
     const { taskId } = await params
     const { searchParams } = new URL(request.url)
@@ -587,7 +611,7 @@ export async function DELETE(request, { params }) {
     // Recalculate project completion percentage
     const projectId = task.project?._id || task.project
     if (projectId) {
-      calculateCompletionPercentage(projectId).catch(console.error)
+      calculateCompletionPercentage(projectId, models).catch(console.error)
       
       // Create timeline event for subtask deletion
       createTimelineEvent({
@@ -601,7 +625,7 @@ export async function DELETE(request, { params }) {
           subtaskTitle: deletedSubtask?.title,
           remainingSubtasks: remainingSubtasks.length
         }
-      }).catch(console.error)
+      }, models).catch(console.error)
     }
 
     return NextResponse.json({

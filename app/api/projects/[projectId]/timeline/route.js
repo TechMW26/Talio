@@ -16,12 +16,12 @@ export async function GET(request, { params }) {
     }
 
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'ProjectTimelineEvent', 'User', 'Employee'])
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'ProjectTimelineEvent', 'Task', 'User', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { models } = auth
-    const { Project, ProjectMember, ProjectTimelineEvent, User, Employee } = models
+    const { Project, ProjectMember, ProjectTimelineEvent, Task, User, Employee } = models
 
     const { projectId } = await params
     const { searchParams } = new URL(request.url)
@@ -37,7 +37,7 @@ export async function GET(request, { params }) {
     // Check access
     const isAdmin = ['admin', 'hr'].includes(user.role)
     if (!isAdmin) {
-      const { hasAccess } = await checkProjectAccess(projectId, user.employeeId, 'view')
+      const { hasAccess } = await checkProjectAccess(projectId, user.employeeId, 'view', models)
       if (!hasAccess) {
         return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
       }
@@ -88,6 +88,14 @@ export async function POST(request, { params }) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'ProjectTimelineEvent', 'Task', 'User', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Project, ProjectTimelineEvent, Task, User, Employee } = models
+
     const { projectId } = await params
 
     const user = await User.findById(decoded.userId).select('employeeId role')
@@ -103,7 +111,7 @@ export async function POST(request, { params }) {
     // Check if user can add comments (must be accepted member)
     const isAdmin = ['admin'].includes(user.role)
     if (!isAdmin) {
-      const { hasAccess } = await checkProjectAccess(projectId, user.employeeId, 'participate')
+      const { hasAccess } = await checkProjectAccess(projectId, user.employeeId, 'participate', models)
       if (!hasAccess) {
         return NextResponse.json({ 
           success: false, 
@@ -133,7 +141,7 @@ export async function POST(request, { params }) {
         taskId,
         commentPreview: content.substring(0, 100)
       }
-    })
+    }, models)
 
     // Notify other members (with throttling - only if last comment was > 5 mins ago)
     const lastCommentByUser = await ProjectTimelineEvent.findOne({
@@ -147,7 +155,7 @@ export async function POST(request, { params }) {
       (new Date() - lastCommentByUser.createdAt) > 5 * 60 * 1000 // 5 minutes
 
     if (shouldNotify) {
-      const memberUserIds = await getProjectMemberUserIds(projectId, user.employeeId)
+      const memberUserIds = await getProjectMemberUserIds(projectId, user.employeeId, models)
       await notifyCommentAdded(project, employee, memberUserIds, content)
     }
 

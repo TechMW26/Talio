@@ -189,8 +189,10 @@ export default function ChatPopup({ chat, index }) {
   const getChatName = () => {
     if (chat.isGroup) return chat.name || 'Group Chat'
     const otherParticipant = chat.participants?.find(p => {
-      const pId = p._id || p
-      return pId !== currentEmployeeId && pId !== currentUserId
+      const pId = (p._id || p).toString()
+      const currentEmpId = currentEmployeeId?.toString()
+      // Only compare Employee IDs (participants are Employee documents)
+      return pId !== currentEmpId
     })
     if (otherParticipant) {
       return `${otherParticipant.firstName || ''} ${otherParticipant.lastName || ''}`.trim() || otherParticipant.email || 'User'
@@ -208,8 +210,10 @@ export default function ChatPopup({ chat, index }) {
   const getOtherParticipantPicture = () => {
     if (chat.isGroup) return null
     const otherParticipant = chat.participants?.find(p => {
-      const pId = p._id || p
-      return pId !== currentEmployeeId && pId !== currentUserId
+      const pId = (p._id || p).toString()
+      const currentEmpId = currentEmployeeId?.toString()
+      // Only compare Employee IDs (participants are Employee documents)
+      return pId !== currentEmpId
     })
     return otherParticipant?.profilePicture || null
   }
@@ -241,8 +245,10 @@ export default function ChatPopup({ chat, index }) {
       if (chatId === chat._id && newMessage) {
         setMessages(prev => {
           if (prev.some(msg => msg._id === newMessage._id)) return prev
-          const senderId = newMessage.sender?._id || newMessage.sender
-          if (senderId !== currentEmployeeId && senderId !== currentUserId) {
+          const senderId = (newMessage.sender?._id || newMessage.sender)?.toString()
+          const currentEmpId = currentEmployeeId?.toString()
+          // Only play sound if message is from someone else
+          if (senderId !== currentEmpId) {
             playNotificationSound?.()
           }
           return [...prev, newMessage]
@@ -252,14 +258,16 @@ export default function ChatPopup({ chat, index }) {
     })
 
     return unsubscribe
-  }, [chat._id, currentUserId, currentEmployeeId, onNewMessage, markChatAsRead])
+  }, [chat._id, currentEmployeeId, onNewMessage, markChatAsRead])
 
   // Listen for typing
   useEffect(() => {
     if (!chat._id) return
 
     const unsubTyping = onUserTyping?.((data) => {
-      if (data.chatId === chat._id && data.userId !== currentUserId && data.userId !== currentEmployeeId) {
+      const dataUserId = data.userId?.toString()
+      const currentEmpId = currentEmployeeId?.toString()
+      if (data.chatId === chat._id && dataUserId !== currentEmpId) {
         setTypingUsers(prev => ({ ...prev, [data.userId]: data.userName }))
       }
     })
@@ -278,7 +286,7 @@ export default function ChatPopup({ chat, index }) {
       unsubTyping?.()
       unsubStopTyping?.()
     }
-  }, [chat._id, currentUserId, currentEmployeeId])
+  }, [chat._id, currentEmployeeId])
 
   // Auto scroll
   useEffect(() => {
@@ -549,8 +557,10 @@ export default function ChatPopup({ chat, index }) {
 
   // Check if message is from current user
   const isMyMessage = (msg) => {
-    const senderId = msg.sender?._id || msg.sender
-    return senderId === currentEmployeeId || senderId === currentUserId
+    const senderId = (msg.sender?._id || msg.sender)?.toString()
+    const currentEmpId = currentEmployeeId?.toString()
+    // Compare Employee IDs only (sender is an Employee document)
+    return senderId === currentEmpId
   }
 
   // Render file message

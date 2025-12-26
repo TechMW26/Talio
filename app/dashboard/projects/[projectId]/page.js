@@ -1022,7 +1022,7 @@ export default function ProjectDetailPage() {
   const isProjectHead = project.isProjectHead
   const isCreator = project.isCreator
   const canManage = isProjectHead || isCreator || (user && ['admin'].includes(user.role))
-  const isAcceptedMember = project.currentUserInvitationStatus === 'accepted'
+  const isAcceptedMember = project.currentUserInvitationStatus === 'accepted' || isProjectHead || isCreator || (user && ['admin'].includes(user.role))
   const isPendingInvitation = project.currentUserInvitationStatus === 'invited'
   const isOverdue = new Date(project.endDate) < new Date() && !['completed', 'approved', 'archived'].includes(project.status)
 
@@ -1070,8 +1070,8 @@ export default function ProjectDetailPage() {
           </div>
         </div>
 
-        {/* Only project head can edit/delete project */}
-        {isProjectHead && (
+        {/* Project head, creator, or admin can edit/manage project */}
+        {canManage && (
           <div className="flex gap-2">
             <button
               onClick={() => router.push(`/dashboard/projects/${projectId}/edit`)}
@@ -1080,7 +1080,7 @@ export default function ProjectDetailPage() {
               <FaEdit className="mr-2" />
               Edit
             </button>
-            {project.status === 'ongoing' && project.completionPercentage >= 80 && (
+            {project.status === 'ongoing' && project.completionPercentage >= 80 && isProjectHead && (
               <button
                 onClick={handleRequestCompletion}
                 disabled={submitting}

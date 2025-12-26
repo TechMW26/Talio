@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth'
 import { jwtVerify } from 'jose';
-;
-;
 import { generateContent, generateVisionContent } from '@/lib/gemini';
 import { generateSmartContent } from '@/lib/promptEngine';
 
@@ -1177,7 +1175,13 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    ;
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Whiteboard'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Whiteboard } = models
     
     const { id } = await params;
     const whiteboard = await Whiteboard.findById(id);

@@ -169,8 +169,10 @@ export default function FloatingChatWidget() {
   const getChatName = (chat) => {
     if (chat.isGroup) return chat.name || 'Group Chat'
     const otherParticipant = chat.participants?.find(p => {
-      const pId = p._id || p
-      return pId !== currentEmployeeId && pId !== currentUserId
+      const pId = (p._id || p).toString()
+      const currentEmpId = currentEmployeeId?.toString()
+      // Only compare Employee IDs (participants are Employee documents)
+      return pId !== currentEmpId
     })
     if (otherParticipant) {
       return `${otherParticipant.firstName || ''} ${otherParticipant.lastName || ''}`.trim() || otherParticipant.email || 'User'
@@ -182,8 +184,10 @@ export default function FloatingChatWidget() {
   const getChatAvatar = (chat) => {
     if (chat.isGroup) return null
     const otherParticipant = chat.participants?.find(p => {
-      const pId = p._id || p
-      return pId !== currentEmployeeId && pId !== currentUserId
+      const pId = (p._id || p).toString()
+      const currentEmpId = currentEmployeeId?.toString()
+      // Only compare Employee IDs (participants are Employee documents)
+      return pId !== currentEmpId
     })
     return otherParticipant?.profilePicture || null
   }

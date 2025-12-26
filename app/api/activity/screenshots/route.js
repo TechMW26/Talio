@@ -1,18 +1,16 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth'
 import { jwtVerify } from 'jose';
-;
-import Screenshot from '@/models/Screenshot';
-;
-;
-;
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
 /**
  * Check if a user is a department head who can view another user's screenshots
+ * @param {Object} models - Tenant models (User, Employee, Department)
  */
-async function canViewUserScreenshots(viewerId, targetUserId, viewerRole) {
+async function canViewUserScreenshots(viewerId, targetUserId, viewerRole, models) {
+  const { User, Employee, Department } = models;
+  
   // Admins and HR can view all
   if (['admin', 'hr'].includes(viewerRole)) {
     return true;
@@ -105,17 +103,15 @@ export async function GET(request) {
     const skip = parseInt(searchParams.get('skip')) || 0;
 
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department'])
+    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department', 'Activity'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { User, Employee, Department } = models
-
-    ;
+    const { User, Employee, Department, Activity: Screenshot } = models
 
     // Check access permission
-    const canView = await canViewUserScreenshots(viewerId, targetUserId, viewerRole);
+    const canView = await canViewUserScreenshots(viewerId, targetUserId, viewerRole, models);
     if (!canView) {
       return NextResponse.json({ 
         success: false, 

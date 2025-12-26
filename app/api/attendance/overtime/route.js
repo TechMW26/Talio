@@ -1,23 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-import { jwtVerify } from 'jose'
 import { calculateEffectiveWorkHours, determineAttendanceStatus } from '@/lib/attendanceShrinkage'
 import { sendPushToUser } from '@/lib/pushNotification'
-
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET)
-
-async function getUserFromToken(request) {
-  const authHeader = request.headers.get('authorization')
-  if (!authHeader?.startsWith('Bearer ')) return null
-  
-  try {
-    const token = authHeader.split(' ')[1]
-    const { payload } = await jwtVerify(token, JWT_SECRET)
-    return payload
-  } catch (error) {
-    return null
-  }
-}
 
 /**
  * GET /api/attendance/overtime
@@ -30,13 +14,15 @@ export async function GET(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { OvertimeRequest, Attendance, Employee, CompanySettings } = models
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status') || 'pending'
 
-    const employee = await Employee.findOne({ user: user.id }).lean()
+    // Get employee ID from auth user
+    const employeeId = user.employeeId?._id || user.employeeId
+    const employee = await Employee.findById(employeeId).lean()
     if (!employee) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
@@ -73,10 +59,13 @@ export async function GET(request) {
  */
 export async function POST(request) {
   try {
-    const user = await getUserFromToken(request)
-    if (!user) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['OvertimeRequest', 'Attendance', 'Employee', 'CompanySettings'])
+    if (!auth.success) {
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
+    const { user, models } = auth
+    const { OvertimeRequest, Attendance, Employee, CompanySettings } = models
 
     const body = await request.json()
     const { requestId, isWorkingOvertime, estimatedEndTime } = body
@@ -85,7 +74,9 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: 'Request ID is required' }, { status: 400 })
     }
 
-    const employee = await Employee.findOne({ user: user.id }).lean()
+    // Get employee ID from auth user
+    const employeeId = user.employeeId?._id || user.employeeId
+    const employee = await Employee.findById(employeeId).lean()
     if (!employee) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
@@ -184,6 +175,14 @@ export async function POST(request) {
  */
 export async function PATCH(request) {
   try {
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['OvertimeRequest', 'Attendance'])
+    if (!auth.success) {
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { OvertimeRequest, Attendance } = models
+
     const body = await request.json()
     const { attendanceId, checkOutTime } = body
 

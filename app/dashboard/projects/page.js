@@ -14,7 +14,7 @@ import {
 import { 
   FaPlus, FaSearch, FaFilter, FaProjectDiagram, FaCalendarAlt,
   FaCheckCircle, FaClock, FaExclamationTriangle, FaArchive,
-  FaEye, FaUsers, FaTasks, FaChartLine, FaClipboardCheck
+  FaEye, FaUsers, FaTasks, FaChartLine, FaClipboardCheck, FaTimes, FaCheck
 } from 'react-icons/fa'
 import { playNotificationSound, NotificationSoundTypes } from '@/lib/notificationSounds'
 
@@ -56,6 +56,7 @@ export default function ProjectsPage() {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('active')
   const [user, setUser] = useState(null)
+  const [respondingTo, setRespondingTo] = useState(null) // Track which project is being responded to
   const [stats, setStats] = useState({
     total: 0,
     active: 0,
@@ -155,6 +156,40 @@ export default function ProjectsPage() {
   // All users can create projects
   const canCreateProject = () => {
     return true
+  }
+
+  // Handle accept/reject project invitation
+  const handleRespondToInvitation = async (projectId, action, e) => {
+    e.stopPropagation() // Prevent navigating to project
+    
+    try {
+      setRespondingTo({ projectId, action })
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/projects/${projectId}/respond`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action })
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        toast.success(action === 'accept' ? 'Project invitation accepted!' : 'Project invitation declined')
+        // Refresh projects list
+        fetchProjects(true)
+        playNotificationSound(NotificationSoundTypes.SUCCESS)
+      } else {
+        toast.error(data.message || 'Failed to respond to invitation')
+      }
+    } catch (error) {
+      console.error('Error responding to invitation:', error)
+      toast.error('Failed to respond to invitation')
+    } finally {
+      setRespondingTo(null)
+    }
   }
 
   const formatDate = (date) => {
@@ -333,9 +368,12 @@ export default function ProjectsPage() {
           {filteredProjects.map((project) => {
             const daysRemaining = getDaysRemaining(project.endDate)
             const isOverdue = daysRemaining < 0 && !['completed', 'approved', 'archived'].includes(project.status)
+            const isPendingInvitation = project.userInvitationStatus === 'invited'
             
             // Get status-based border color
             const getStatusBorderColor = () => {
+              // Pending invitation takes priority
+              if (isPendingInvitation) return 'border-yellow-400 bg-yellow-50/30'
               if (isOverdue) return 'border-red-300 bg-red-50/30'
               
               switch(project.status) {
@@ -458,7 +496,7 @@ export default function ProjectsPage() {
                 </div>
 
                 {/* Days Remaining Footer */}
-                {!['completed', 'approved', 'archived'].includes(project.status) && (
+                {!['completed', 'approved', 'archived'].includes(project.status) && project.userInvitationStatus !== 'invited' && (
                   <div className={`px-5 py-3 ${isOverdue ? 'bg-red-50' : 'bg-gray-50'}`}>
                     <p className={`text-sm ${isOverdue ? 'text-red-600' : 'text-gray-600'}`}>
                       {isOverdue 
@@ -468,6 +506,31 @@ export default function ProjectsPage() {
                           : `${daysRemaining} days remaining`
                       }
                     </p>
+                  </div>
+                )}
+
+                {/* Pending Invitation Banner */}
+                {project.userInvitationStatus === 'invited' && (
+                  <div className="px-5 py-3 bg-yellow-50 border-t border-yellow-200">
+                    <p className="text-sm text-yellow-700 font-medium mb-2">You've been invited to this project</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={(e) => handleRespondToInvitation(project._id, 'accept', e)}
+                        disabled={respondingTo?.projectId === project._id}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-green-500 text-white text-sm font-medium rounded-lg hover:bg-green-600 disabled:opacity-50 transition-colors"
+                      >
+                        <FaCheck className="w-3 h-3" />
+                        {respondingTo?.projectId === project._id && respondingTo?.action === 'accept' ? 'Accepting...' : 'Accept'}
+                      </button>
+                      <button
+                        onClick={(e) => handleRespondToInvitation(project._id, 'reject', e)}
+                        disabled={respondingTo?.projectId === project._id}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-red-500 text-white text-sm font-medium rounded-lg hover:bg-red-600 disabled:opacity-50 transition-colors"
+                      >
+                        <FaTimes className="w-3 h-3" />
+                        {respondingTo?.projectId === project._id && respondingTo?.action === 'reject' ? 'Declining...' : 'Decline'}
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

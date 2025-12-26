@@ -16,7 +16,7 @@ export async function POST(request, { params }) {
     }
 
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'Task', 'User', 'Employee', 'ProjectApprovalRequest'])
+    const auth = await getAuthAndModels(request, ['Project', 'Task', 'User', 'Employee', 'ProjectApprovalRequest', 'ProjectTimelineEvent'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
@@ -83,7 +83,7 @@ export async function POST(request, { params }) {
       }
     })
 
-    // Create a timeline event for deletion request (non-blocking)
+    // Create a timeline event for deletion request (non-blocking) - pass models for multi-tenant
     createTimelineEvent({
       project: projectId,
       type: 'task_deletion_requested',
@@ -96,7 +96,7 @@ export async function POST(request, { params }) {
         requestedBy: user.employeeId,
         requesterName: `${requester.firstName} ${requester.lastName}`
       }
-    }).catch(console.error)
+    }, models).catch(console.error)
 
     return NextResponse.json({
       success: true,

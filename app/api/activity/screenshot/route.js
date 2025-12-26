@@ -3,12 +3,8 @@ import { getAuthAndModels } from '@/lib/auth'
 import { jwtVerify } from 'jose';
 import { mkdir, writeFile, access, constants, unlink } from 'fs/promises';
 import path from 'path';
-;
 import { uploadScreenshot, getScreenshot } from '@/lib/gridfs';
 import { uploadImageToImageKit, getImageKitFolder, generateEmployeeFolderName } from '@/lib/imagekit';
-import Screenshot from '@/models/Screenshot';
-;
-;
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
@@ -73,12 +69,12 @@ export async function POST(request) {
     }
 
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User', 'Employee']);
+    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Activity']);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
     const { models } = auth;
-    const { User, Employee } = models;
+    const { User, Employee, Activity: Screenshot } = models;
 
     // Get form data
     const formData = await request.formData();

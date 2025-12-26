@@ -16,7 +16,7 @@ export async function POST(request, { params }) {
     }
 
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'User', 'Employee'])
+    const auth = await getAuthAndModels(request, ['Project', 'User', 'Employee', 'ProjectTimelineEvent'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
@@ -85,7 +85,7 @@ export async function POST(request, { params }) {
         completerName: `${employee.firstName} ${employee.lastName}`,
         completionPercentage: project.completionPercentage
       }
-    })
+    }, models)
 
     return NextResponse.json({
       success: true,

@@ -22,7 +22,7 @@ export async function GET(request, { params }) {
     }
 
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'User', 'Employee', 'Chat'])
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'User', 'Employee', 'Chat', 'ProjectTimelineEvent'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
@@ -69,6 +69,14 @@ export async function POST(request, { params }) {
     if (!decoded) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
+
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'User', 'Employee', 'Chat', 'ProjectTimelineEvent'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Project, ProjectMember, User, Employee, Chat } = models
 
     const { projectId } = await params
 
@@ -163,7 +171,7 @@ export async function POST(request, { params }) {
           relatedMember: userIdToAdd,
           description: `${invitedEmployee.firstName} ${invitedEmployee.lastName} was invited to the project`,
           metadata: { role, isExternal }
-        })
+        }, models)
 
         // Send notification
         await notifyProjectInvitation(project, invitedEmployee, inviterEmployee)
@@ -211,6 +219,14 @@ export async function DELETE(request, { params }) {
     if (!decoded) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
+
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'User', 'Employee', 'Chat', 'ProjectTimelineEvent'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Project, ProjectMember, User, Employee, Chat } = models
 
     const { projectId } = await params
     const { searchParams } = new URL(request.url)
@@ -270,7 +286,7 @@ export async function DELETE(request, { params }) {
       relatedMember: membership.user._id,
       description: `${membership.user.firstName} ${membership.user.lastName} was removed from the project`,
       metadata: { removedBy: isSelf ? 'self' : 'admin' }
-    })
+    }, models)
 
     // Send notification if not self-removal
     if (!isSelf) {

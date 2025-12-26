@@ -14,12 +14,12 @@ export async function GET(request) {
     }
 
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'ProjectApprovalRequest', 'User', 'Employee'])
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectApprovalRequest', 'Task', 'User', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { models } = auth
-    const { Project, ProjectApprovalRequest, User, Employee } = models
+    const { Project, ProjectApprovalRequest, Task, User, Employee } = models
 
     const user = await User.findById(decoded.userId).select('employeeId role')
     if (!user || !user.employeeId) {

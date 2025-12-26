@@ -1,27 +1,57 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 export const dynamic = 'force-dynamic'
+
+// Helper: Count working days between two dates, respecting company working days and holidays
+function countWorkingDays(startDate, endDate, workingDays, holidayDates) {
+  const dayNameMap = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+  let count = 0
+  const current = new Date(startDate)
+  const end = new Date(endDate)
+  
+  while (current <= end) {
+    const dayName = dayNameMap[current.getDay()]
+    const dateStr = current.toISOString().split('T')[0]
+    
+    if (workingDays.includes(dayName) && !holidayDates.has(dateStr)) {
+      count++
+    }
+    current.setDate(current.getDate() + 1)
+  }
+  
+  return count
+}
+
+// Helper: Get employee's effective working days (respects joining date)
+function getEmployeeWorkingDays(employeeJoiningDate, periodStart, periodEnd, workingDays, holidayDates) {
+  const joiningDate = employeeJoiningDate ? new Date(employeeJoiningDate) : null
+  const start = new Date(periodStart)
+  const end = new Date(periodEnd)
+  
+  // If employee hasn't joined yet, return 0
+  if (joiningDate && joiningDate > end) {
+    return 0
+  }
+  
+  // Effective start is the later of period start or joining date
+  const effectiveStart = joiningDate && joiningDate > start ? joiningDate : start
+  
+  return countWorkingDays(effectiveStart, end, workingDays, holidayDates)
+}
 
 // GET - Calculate performance metrics based on reviews, projects, tasks, attendance, and goals
 export async function GET(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    const decoded = await verifyToken(token)
-    
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Employee', 'ProjectMember', 'TaskAssignee', 'Attendance', 'PerformanceGoal', 'DailyGoal'])
+    const auth = await getAuthAndModels(request, ['Employee', 'ProjectMember', 'TaskAssignee', 'Attendance', 'PerformanceGoal', 'DailyGoal', 'CompanySettings', 'Holiday'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Employee, ProjectMember, TaskAssignee, Attendance, PerformanceGoal, DailyGoal } = models
+    const { Employee, ProjectMember, TaskAssignee, Attendance, PerformanceGoal, DailyGoal, CompanySettings, Holiday } = models
 
     const { searchParams } = new URL(request.url)
-    const employeeId = searchParams.get('employeeId')
+    const employeeIdParam = searchParams.get('employeeId')
     const startDateStr = searchParams.get('startDate')
     const endDateStr = searchParams.get('endDate')
 
@@ -29,49 +59,66 @@ export async function GET(request) {
     const startDate = startDateStr ? new Date(startDateStr) : new Date(new Date().setDate(new Date().getDate() - 30)) // Default last 30 days
     const endDate = endDateStr ? new Date(endDateStr) : new Date()
 
-    // Calculate expected business days for attendance denominator
-    function getBusinessDaysCount(startDate, endDate) {
-      let count = 0;
-      const curDate = new Date(startDate.getTime());
-      while (curDate <= endDate) {
-        const dayOfWeek = curDate.getDay();
-        if(dayOfWeek !== 0 && dayOfWeek !== 6) count++;
-        curDate.setDate(curDate.getDate() + 1);
-      }
-      return count;
-    }
-    const businessDays = getBusinessDaysCount(startDate, endDate) || 1;
+    // Fetch company settings for working days
+    const companySettings = await CompanySettings.findOne().lean()
+    const workingDays = companySettings?.workingDays || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+    
+    // Fetch holidays in the date range
+    const holidays = await Holiday.find({
+      date: { $gte: startDate, $lte: endDate }
+    }).lean()
+    const holidayDates = new Set(holidays.map(h => new Date(h.date).toISOString().split('T')[0]))
+
+    // Get employeeId - could be object or string
+    const currentEmployeeId = user.employeeId?._id || user.employeeId
 
     // Build query based on role
     let employeeQuery = { status: 'active' }
     
-    if (decoded.role === 'employee') {
-      employeeQuery._id = decoded.employeeId
-    } else if (decoded.role === 'manager') {
+    if (user.role === 'employee') {
+      employeeQuery._id = currentEmployeeId
+    } else if (user.role === 'manager') {
       const teamMembers = await Employee.find({ 
-        reportingManager: decoded.employeeId,
+        reportingManager: currentEmployeeId,
         status: 'active'
       }).select('_id')
       
       const teamMemberIds = teamMembers.map(member => member._id)
-      employeeQuery._id = { $in: [...teamMemberIds, decoded.employeeId] }
+      employeeQuery._id = { $in: [...teamMemberIds, currentEmployeeId] }
     }
     // Admin and HR can see all employees
 
-    if (employeeId) {
-      employeeQuery._id = employeeId
+    if (employeeIdParam) {
+      employeeQuery._id = employeeIdParam
     }
 
-    // Fetch employees
+    // Fetch employees (include dateOfJoining for proper calculations)
     const employees = await Employee.find(employeeQuery)
-      .populate('reviews.reviewedBy', 'firstName lastName')
-      .populate('department', 'name')
-      .select('firstName lastName employeeCode department reviews designation profilePicture')
+      .populate({
+        path: 'reviews.reviewedBy',
+        select: 'firstName lastName',
+        options: { strictPopulate: false }
+      })
+      .populate({
+        path: 'department',
+        select: 'name',
+        options: { strictPopulate: false }
+      })
+      .select('firstName lastName employeeCode department reviews designation profilePicture dateOfJoining')
       .lean()
 
     // Calculate performance metrics for each employee
     const performanceMetrics = await Promise.all(employees.map(async (employee) => {
       const empId = employee._id
+      
+      // Calculate this employee's expected working days (respects joining date)
+      const employeeWorkingDays = getEmployeeWorkingDays(
+        employee.dateOfJoining,
+        startDate,
+        endDate,
+        workingDays,
+        holidayDates
+      ) || 1 // Avoid division by zero
 
       // 1. Reviews & Ratings
       let reviews = employee.reviews || []
@@ -117,10 +164,11 @@ export async function GET(request) {
       const presentDays = attendanceRecords.filter(a => ['present', 'half-day', 'late'].includes(a.status)).length
       const lateDays = attendanceRecords.filter(a => a.checkInStatus === 'late').length
       
-      // Attendance Score: (Present Days / Business Days) * 100
+      // Attendance Score: (Present Days / Employee's Expected Working Days) * 100
       // Penalize late days slightly (0.25 day penalty)
+      // Uses employeeWorkingDays which respects their joining date, company working days, and holidays
       const adjustedPresentDays = Math.max(0, presentDays - (lateDays * 0.25));
-      const attendanceScore = Math.min(100, Math.round((adjustedPresentDays / businessDays) * 100));
+      const attendanceScore = Math.min(100, Math.round((adjustedPresentDays / employeeWorkingDays) * 100));
 
       // 5. Goals (Performance Goals + Daily Goals)
       const perfGoals = await PerformanceGoal.find({

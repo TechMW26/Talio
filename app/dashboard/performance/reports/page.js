@@ -92,8 +92,8 @@ export default function PerformanceReportsPage() {
         deptFilter = `&department=${selectedDepartment}`
       }
 
-      // Fetch all necessary data
-      const [performanceRes, reviewsRes, goalsRes, projectsRes, employeesRes] = await Promise.all([
+      // Fetch all necessary data including company settings and holidays
+      const [performanceRes, reviewsRes, goalsRes, projectsRes, employeesRes, companyRes, holidaysRes] = await Promise.all([
         fetch(`/api/performance/calculate?populate=true${deptFilter}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
@@ -108,6 +108,12 @@ export default function PerformanceReportsPage() {
         }),
         fetch(`/api/employees?limit=1000&status=active&populate=true${deptFilter}`, {
           headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch(`/api/settings/company`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch(`/api/holidays?year=${selectedPeriod}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
         })
       ])
 
@@ -116,12 +122,16 @@ export default function PerformanceReportsPage() {
       const goalsData = await goalsRes.json()
       const projectsData = await projectsRes.json()
       const employeesData = await employeesRes.json()
+      const companyData = await companyRes.json()
+      const holidaysData = await holidaysRes.json()
 
       const performanceMetrics = performanceData.success ? performanceData.data : []
       const reviews = reviewsData.success ? reviewsData.data : []
       const goals = goalsData.success ? goalsData.data : []
       const projects = projectsData.success ? projectsData.data : []
       const employees = employeesData.success ? employeesData.data : []
+      const companySettings = companyData.success ? companyData.data : null
+      const holidays = holidaysData.success ? (holidaysData.data || []) : []
 
       // Client-side filter for department heads (extra security layer)
       let filteredEmployees = employees
@@ -150,8 +160,8 @@ export default function PerformanceReportsPage() {
         )
       }
 
-      // Calculate comprehensive KPIs
-      const kpis = calculateComprehensiveKPIs(filteredPerformanceMetrics, filteredReviews, filteredGoals, filteredProjects, filteredEmployees)
+      // Calculate comprehensive KPIs with company settings and holidays for proper working day calculations
+      const kpis = calculateComprehensiveKPIs(filteredPerformanceMetrics, filteredReviews, filteredGoals, filteredProjects, filteredEmployees, companySettings, holidays)
       setReportData(kpis)
     } catch (error) {
       console.error('Fetch report data error:', error)
@@ -161,7 +171,48 @@ export default function PerformanceReportsPage() {
     }
   }
 
-  const calculateComprehensiveKPIs = (performanceMetrics, reviews, goals, projects, employees) => {
+  // Helper function to count working days between two dates
+  const countWorkingDays = (startDate, endDate, workingDays, holidays) => {
+    const dayNameMap = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+    const holidayDates = new Set(holidays.map(h => new Date(h.date).toISOString().split('T')[0]))
+    
+    let count = 0
+    const current = new Date(startDate)
+    const end = new Date(endDate)
+    
+    while (current <= end) {
+      const dayName = dayNameMap[current.getDay()]
+      const dateStr = current.toISOString().split('T')[0]
+      
+      if (workingDays.includes(dayName) && !holidayDates.has(dateStr)) {
+        count++
+      }
+      current.setDate(current.getDate() + 1)
+    }
+    
+    return count
+  }
+
+  // Helper function to get employee's working days (respects joining date)
+  const getEmployeeWorkingDays = (employee, periodStart, periodEnd, workingDays, holidays) => {
+    const joiningDate = employee.dateOfJoining ? new Date(employee.dateOfJoining) : null
+    const start = new Date(periodStart)
+    const end = new Date(periodEnd)
+    
+    // If employee hasn't joined yet, return 0
+    if (joiningDate && joiningDate > end) {
+      return 0
+    }
+    
+    // Effective start is the later of period start or joining date
+    const effectiveStart = joiningDate && joiningDate > start ? joiningDate : start
+    
+    return countWorkingDays(effectiveStart, end, workingDays, holidays)
+  }
+
+  const calculateComprehensiveKPIs = (performanceMetrics, reviews, goals, projects, employees, companySettings = null, holidays = []) => {
+    // Get working days from company settings (default to Mon-Fri)
+    const workingDays = companySettings?.workingDays || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
     // Department Performance Analysis
     const deptMap = {}
     

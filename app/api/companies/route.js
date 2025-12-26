@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { uploadImageToImageKit, getImageKitFolder } from '@/lib/imagekit'
 
 // Check if ImageKit is configured
@@ -23,7 +23,11 @@ export async function GET(request) {
     const { Company } = models
 
     const companies = await Company.find({ isActive: true })
-      .populate('createdBy', 'email')
+      .populate({
+        path: 'createdBy',
+        select: 'email',
+        options: { strictPopulate: false }
+      })
       .sort({ name: 1 })
       .lean()
 
@@ -43,28 +47,17 @@ export async function GET(request) {
 // POST - Create new company
 export async function POST(request) {
   try {
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      )
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Company'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-
-    const token = authHeader.split(' ')[1]
-    const decoded = await verifyToken(token)
-
-    if (!decoded) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid token' },
-        { status: 401 }
-      )
-    }
+    const { user, models } = auth
+    const { Company } = models
 
     // Check role - only admin or hr can create companies
     const allowedRoles = ['admin', 'hr']
-    if (!allowedRoles.includes(decoded.role)) {
+    if (!allowedRoles.includes(user.role)) {
       return NextResponse.json(
         { success: false, message: 'You do not have permission to create companies' },
         { status: 403 }
@@ -149,7 +142,7 @@ export async function POST(request) {
         fullDayHours: 8,
         workingDays: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
       },
-      createdBy: decoded.userId
+      createdBy: user._id
     })
 
     return NextResponse.json({

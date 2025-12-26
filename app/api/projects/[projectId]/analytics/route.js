@@ -47,7 +47,7 @@ export async function GET(request, { params }) {
     // Check access
     const isAdmin = ['admin', 'hr'].includes(user.role)
     if (!isAdmin) {
-      const { hasAccess } = await checkProjectAccess(projectId, user.employeeId, 'view')
+      const { hasAccess } = await checkProjectAccess(projectId, user.employeeId, 'view', models)
       if (!hasAccess) {
         return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
       }
@@ -122,27 +122,25 @@ export async function GET(request, { params }) {
 // POST - Get AI-powered insights for the project
 export async function POST(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['User'])
+    if (!auth.success) {
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
+    const { user, models } = auth
+    const { User } = models
 
     const { projectId } = await params
     const { analyticsData } = await request.json()
 
-    const user = await User.findById(decoded.userId).select('employeeId role')
-    if (!user) {
+    const userDoc = await User.findById(user._id).select('employeeId role')
+    if (!userDoc) {
       return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
     }
 
     // Generate AI insights using Gemini
     try {
-      const insights = await generateAIInsights(analyticsData, decoded.userId)
+      const insights = await generateAIInsights(analyticsData, user._id)
       return NextResponse.json({
         success: true,
         insights

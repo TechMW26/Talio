@@ -26,9 +26,13 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
+    // Extract employee ID properly (handle both populated object and raw ObjectId)
+    const employeeId = user.employeeId._id || user.employeeId
+    const employeeIdStr = employeeId.toString()
+
     // Fetch all chats where user is a participant
     const chats = await Chat.find({
-      participants: user.employeeId
+      participants: employeeId
     })
       .populate('participants', 'firstName lastName profilePicture employeeCode')
       .populate('admin', 'firstName lastName')
@@ -38,7 +42,7 @@ export async function GET(request) {
     return NextResponse.json({
       success: true,
       data: chats,
-      currentUserId: user.employeeId.toString()
+      currentUserId: employeeIdStr
     })
   } catch (error) {
     console.error('Get chats error:', error)
@@ -62,7 +66,9 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
+    // Extract employee ID properly (handle both populated object and raw ObjectId)
     const employeeId = user.employeeId._id || user.employeeId
+    const employeeIdStr = employeeId.toString()
 
     const body = await request.json()
     const { isGroup, participants, name } = body

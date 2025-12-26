@@ -3,12 +3,6 @@ import { getAuthAndModels } from '@/lib/auth'
 import { jwtVerify } from 'jose';
 import { readdir, stat } from 'fs/promises';
 import path from 'path';
-;
-;
-;
-;
-;
-import Screenshot from '@/models/Screenshot';
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
@@ -18,8 +12,9 @@ const ADMIN_ROLES = ['admin', 'hr'];
 /**
  * Check if a user is a department head
  * Returns the department IDs they are head of
+ * @param {Object} Department - Tenant Department model
  */
-async function getDepartmentsWhereUserIsHead(employeeId) {
+async function getDepartmentsWhereUserIsHead(employeeId, Department) {
   if (!employeeId) return [];
   
   const departments = await Department.find({
@@ -35,8 +30,10 @@ async function getDepartmentsWhereUserIsHead(employeeId) {
 
 /**
  * Get all employees in a department (including sub-departments)
+ * @param {Object} Department - Tenant Department model
+ * @param {Object} Employee - Tenant Employee model
  */
-async function getEmployeesInDepartments(departmentIds) {
+async function getEmployeesInDepartments(departmentIds, Department, Employee) {
   if (!departmentIds || departmentIds.length === 0) return [];
   
   // Get sub-departments recursively
@@ -90,14 +87,12 @@ export async function GET(request) {
     const currentUserRole = decoded.payload.role;
 
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department', 'ProductivitySession'])
+    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department', 'ProductivitySession', 'Activity'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { User, Employee, Department, ProductivitySession } = models
-
-    ;
+    const { User, Employee, Department, ProductivitySession, Activity: Screenshot } = models
 
     const { searchParams } = new URL(request.url);
     const targetUserId = searchParams.get('userId') || currentUserId;
@@ -122,7 +117,7 @@ export async function GET(request) {
         }
         
         // Get departments where current user is head
-        const headOfDepartments = await getDepartmentsWhereUserIsHead(currentUser.employeeId._id);
+        const headOfDepartments = await getDepartmentsWhereUserIsHead(currentUser.employeeId._id, Department);
         
         if (headOfDepartments.length === 0) {
           return NextResponse.json(

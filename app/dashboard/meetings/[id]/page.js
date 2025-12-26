@@ -89,7 +89,7 @@ export default function MeetingDetailPage({ params }) {
   }
 
   const handleCancelMeeting = async () => {
-    if (!confirm('Are you sure you want to cancel this meeting?')) return
+    if (!confirm('Are you sure you want to cancel this meeting? All invitees will be notified.')) return
 
     try {
       const token = localStorage.getItem('token')
@@ -108,6 +108,29 @@ export default function MeetingDetailPage({ params }) {
     } catch (error) {
       console.error('Error cancelling meeting:', error)
       toast.error('Failed to cancel meeting')
+    }
+  }
+
+  const handleDeleteMeeting = async () => {
+    if (!confirm('Are you sure you want to permanently delete this meeting? This action cannot be undone.')) return
+
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/meetings/${id}?permanent=true`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        toast.success('Meeting permanently deleted')
+        router.push('/dashboard/meetings')
+      } else {
+        toast.error(data.message || 'Failed to delete meeting')
+      }
+    } catch (error) {
+      console.error('Error deleting meeting:', error)
+      toast.error('Failed to delete meeting')
     }
   }
 
@@ -204,6 +227,18 @@ export default function MeetingDetailPage({ params }) {
               </button>
             </div>
           )}
+
+          {meeting.isOrganizer && meeting.status === 'cancelled' && (
+            <div className="flex gap-2">
+              <button
+                onClick={handleDeleteMeeting}
+                className="flex items-center gap-2 px-4 py-2 text-red-600 bg-red-50 border border-red-600 rounded-lg hover:bg-red-100"
+              >
+                <HiOutlineTrash className="w-4 h-4" />
+                Delete Permanently
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Main Content */}
@@ -242,7 +277,7 @@ export default function MeetingDetailPage({ params }) {
             {meeting.status !== 'cancelled' && (
               <div className="mt-6 flex flex-wrap gap-3">
                 {/* Join button for online meetings */}
-                {meeting.type === 'online' && (isNow || isUpcoming) && meeting.myInviteStatus === 'accepted' && (
+                {meeting.type === 'online' && (isNow || isUpcoming) && (meeting.isOrganizer || meeting.myInviteStatus === 'accepted') && (
                   <Link
                     href={`/dashboard/meetings/room/${meeting.roomId}`}
                     className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 transition-colors"

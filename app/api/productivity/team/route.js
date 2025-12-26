@@ -1,13 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth'
-import { jwtVerify } from 'jose';
-;
-;
-;
-;
-;
-
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
+import { getAuthAndModels } from '@/lib/auth';
 
 /**
  * GET /api/productivity/team
@@ -15,45 +7,23 @@ const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
  */
 export async function GET(request) {
   try {
-    // Verify JWT token
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    const token = authHeader.substring(7);
-    let decoded;
-    try {
-      decoded = await jwtVerify(token, JWT_SECRET);
-    } catch {
-      return NextResponse.json(
-        { success: false, error: 'Invalid token' },
-        { status: 401 }
-      );
-    }
-
-    const currentUserId = decoded.payload.userId;
-    const currentUserRole = decoded.payload.role;
-    
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['ProductivitySession', 'User', 'Employee', 'Department'])
+    const auth = await getAuthAndModels(request, ['ProductivitySession', 'User', 'Employee', 'Department']);
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
+      return NextResponse.json({ message: auth.message }, { status: 401 });
     }
-    const { user, models } = auth
-    const { ProductivitySession, User, Employee, Department } = models
+    const { user, models } = auth;
+    const { ProductivitySession, User, Employee, Department } = models;
 
-    ;
+    const currentUserId = user._id.toString();
+    const currentUserRole = user.role;
     
     const { searchParams } = new URL(request.url);
     const dateParam = searchParams.get('date') || new Date().toISOString().split('T')[0];
     const date = new Date(dateParam);
     const dateEnd = new Date(date.getTime() + 24 * 60 * 60 * 1000);
     
-    // Get current user
+    // Get current user with employee info
     const currentUser = await User.findById(currentUserId).populate('employeeId');
     
     const isAdminOrHR = ['admin', 'hr'].includes(currentUserRole);

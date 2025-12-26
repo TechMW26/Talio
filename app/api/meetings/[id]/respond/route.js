@@ -56,7 +56,14 @@ export async function POST(request, { params }) {
     }
 
     const meeting = await Meeting.findById(id)
-      .populate('organizer', 'firstName lastName user')
+      .populate({
+        path: 'organizer',
+        select: 'firstName lastName userId email',
+        populate: {
+          path: 'userId',
+          select: 'email'
+        }
+      })
 
     if (!meeting) {
       return NextResponse.json({ success: false, message: 'Meeting not found' }, { status: 404 })
@@ -85,9 +92,8 @@ export async function POST(request, { params }) {
     await meeting.save()
 
     // Notify organizer about the response
-    if (meeting.organizer?.user) {
-      const organizerUserId = meeting.organizer.user._id || meeting.organizer.user
-      
+    const organizerUserId = meeting.organizer?.userId?._id || meeting.organizer?.userId
+    if (organizerUserId) {
       const statusEmoji = response === 'accepted' ? '✅' : response === 'rejected' ? '❌' : '❓'
       const statusText = response === 'accepted' ? 'accepted' : response === 'rejected' ? 'declined' : 'marked as maybe for'
 
@@ -104,12 +110,8 @@ export async function POST(request, { params }) {
         }
       }).catch(console.error)
 
-      // Send email to organizer about response
-      const organizerEmployee = await Employee.findById(meeting.organizer._id)
-        .populate('user', 'email')
-        .lean()
-      
-      const organizerEmail = organizerEmployee?.email || organizerEmployee?.user?.email
+      // Get organizer's email for notification
+      const organizerEmail = meeting.organizer?.email || meeting.organizer?.userId?.email
       if (organizerEmail) {
         sendMeetingResponseEmail({
           to: organizerEmail,

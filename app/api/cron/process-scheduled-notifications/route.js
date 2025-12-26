@@ -1,39 +1,29 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import ScheduledNotification from '@/models/ScheduledNotification'
-import RecurringNotification from '@/models/RecurringNotification'
-import Notification from '@/models/Notification'
-import User from '@/models/User'
-import Employee from '@/models/Employee'
-import Department from '@/models/Department'
+import { connectSuperadminDB } from '@/lib/superadminDb'
+import getTenantCompanyModel from '@/models/TenantCompany'
+import { getTenantModels } from '@/lib/tenantModels'
 import { sendPushToUsers } from '@/lib/pushNotification'
 
-export async function GET(request) {
+export const dynamic = 'force-dynamic'
+export const maxDuration = 60
+
+/**
+ * Process scheduled and recurring notifications for a single tenant
+ */
+async function processNotificationsForTenant(tenant, now) {
+  const results = {
+    tenantName: tenant.name,
+    tenantSlug: tenant.slug,
+    scheduled: { total: 0, processed: 0, failed: 0 },
+    recurring: { total: 0, processed: 0, failed: 0 }
+  }
+
   try {
-    // Verify cron secret
-    const authHeader = request.headers.get('authorization')
-    const cronSecret = process.env.CRON_SECRET
-
-    if (!cronSecret) {
-      console.error('[Cron] CRON_SECRET not configured')
-      return NextResponse.json(
-        { success: false, message: 'Cron secret not configured' },
-        { status: 500 }
-      )
-    }
-
-    if (!authHeader || authHeader !== `Bearer ${cronSecret}`) {
-      console.error('[Cron] Unauthorized access attempt')
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    await connectDB()
-
-    const now = new Date()
-    console.log(`[Cron] Processing notifications at ${now.toISOString()}`)
+    // Get tenant-specific models
+    const models = await getTenantModels(tenant.databaseName, [
+      'ScheduledNotification', 'RecurringNotification', 'Notification', 'User', 'Employee', 'Department'
+    ])
+    const { ScheduledNotification, RecurringNotification, Notification, User, Employee } = models
 
     // ========== PROCESS SCHEDULED NOTIFICATIONS ==========
     const dueNotifications = await ScheduledNotification.find({
@@ -41,15 +31,10 @@ export async function GET(request) {
       scheduledFor: { $lte: now }
     }).populate('targetDepartment')
 
-    console.log(`[Cron] Found ${dueNotifications.length} due scheduled notifications`)
-
-    let processedCount = 0
-    let failedCount = 0
+    results.scheduled.total = dueNotifications.length
 
     for (const scheduledNotif of dueNotifications) {
       try {
-        console.log(`[Cron] Processing notification: ${scheduledNotif._id}`)
-
         // Determine target user IDs based on targetType
         let userIds = []
 
@@ -61,7 +46,6 @@ export async function GET(request) {
             department: scheduledNotif.targetDepartment,
             status: 'active'
           }).select('_id')
-
           const employeeIds = deptEmployees.map(e => e._id)
           const users = await User.find({ employeeId: { $in: employeeIds } }).select('_id')
           userIds = users.map(u => u._id.toString())
@@ -75,15 +59,12 @@ export async function GET(request) {
         }
 
         if (userIds.length === 0) {
-          console.warn(`[Cron] No users found for notification ${scheduledNotif._id}`)
           scheduledNotif.status = 'failed'
           scheduledNotif.failureReason = 'No users found matching criteria'
           await scheduledNotif.save()
-          failedCount++
+          results.scheduled.failed++
           continue
         }
-
-        console.log(`[Cron] Sending to ${userIds.length} users`)
 
         // Create notification records in database for each user
         const notificationRecords = []
@@ -113,9 +94,8 @@ export async function GET(request) {
         let savedNotifications = []
         try {
           savedNotifications = await Notification.insertMany(notificationRecords)
-          console.log(`[Cron] Saved ${savedNotifications.length} notification records to database`)
         } catch (dbError) {
-          console.error('[Cron] Error saving notifications:', dbError)
+          console.error(`[Cron] Error saving notifications for tenant ${tenant.slug}:`, dbError)
         }
 
         // Send Firebase push notification
@@ -147,10 +127,8 @@ export async function GET(request) {
               }
             )
           }
-
-          console.log(`[Cron] Push notification result:`, pushResult.success ? 'success' : 'failed')
         } catch (firebaseError) {
-          console.error('[Cron] Firebase error:', firebaseError)
+          console.error(`[Cron] Firebase error for tenant ${tenant.slug}:`, firebaseError)
         }
 
         // Update scheduled notification status
@@ -165,30 +143,23 @@ export async function GET(request) {
         await scheduledNotif.save()
 
         if (scheduledNotif.status === 'sent') {
-          processedCount++
+          results.scheduled.processed++
         } else {
-          failedCount++
+          results.scheduled.failed++
         }
 
       } catch (notifError) {
-        console.error(`[Cron] Error processing notification ${scheduledNotif._id}:`, notifError)
-
+        console.error(`[Cron] Error processing notification for tenant ${tenant.slug}:`, notifError)
         try {
           scheduledNotif.status = 'failed'
           scheduledNotif.failureReason = notifError.message
           await scheduledNotif.save()
-        } catch (saveError) {
-          console.error('[Cron] Failed to update notification status:', saveError)
-        }
-
-        failedCount++
+        } catch (saveError) {}
+        results.scheduled.failed++
       }
     }
 
     // ========== PROCESS RECURRING NOTIFICATIONS ==========
-    let recurringProcessed = 0
-    let recurringFailed = 0
-
     const dueRecurring = await RecurringNotification.find({
       isActive: true,
       nextScheduledAt: { $lte: now },
@@ -198,12 +169,10 @@ export async function GET(request) {
       ]
     }).populate('targetDepartment')
 
-    console.log(`[Cron] Found ${dueRecurring.length} due recurring notifications`)
+    results.recurring.total = dueRecurring.length
 
     for (const recurringNotif of dueRecurring) {
       try {
-        console.log(`[Cron] Processing recurring notification: ${recurringNotif._id}`)
-
         // Determine target user IDs
         let userIds = []
 
@@ -215,7 +184,6 @@ export async function GET(request) {
             department: recurringNotif.targetDepartment,
             status: 'active'
           }).select('_id')
-
           const employeeIds = deptEmployees.map(e => e._id)
           const users = await User.find({ employeeId: { $in: employeeIds } }).select('_id')
           userIds = users.map(u => u._id.toString())
@@ -229,15 +197,12 @@ export async function GET(request) {
         }
 
         if (userIds.length === 0) {
-          console.warn(`[Cron] No users found for recurring notification ${recurringNotif._id}`)
           recurringNotif.totalFailure = (recurringNotif.totalFailure || 0) + 1
           recurringNotif.nextScheduledAt = recurringNotif.calculateNextSchedule()
           await recurringNotif.save()
-          recurringFailed++
+          results.recurring.failed++
           continue
         }
-
-        console.log(`[Cron] Sending recurring to ${userIds.length} users`)
 
         // Create notification records
         const notificationRecords = []
@@ -268,9 +233,8 @@ export async function GET(request) {
         let savedNotifications = []
         try {
           savedNotifications = await Notification.insertMany(notificationRecords)
-          console.log(`[Cron] Saved ${savedNotifications.length} recurring notification records`)
         } catch (dbError) {
-          console.error('[Cron] Error saving recurring notifications:', dbError)
+          console.error(`[Cron] Error saving recurring notifications for tenant ${tenant.slug}:`, dbError)
         }
 
         // Send push notification
@@ -304,7 +268,7 @@ export async function GET(request) {
             )
           }
         } catch (firebaseError) {
-          console.error('[Cron] Firebase error for recurring:', firebaseError)
+          console.error(`[Cron] Firebase error for recurring in tenant ${tenant.slug}:`, firebaseError)
         }
 
         // Update recurring notification stats
@@ -313,10 +277,10 @@ export async function GET(request) {
 
         if (pushResult.success || savedNotifications.length > 0) {
           recurringNotif.totalSuccess = (recurringNotif.totalSuccess || 0) + 1
-          recurringProcessed++
+          results.recurring.processed++
         } else {
           recurringNotif.totalFailure = (recurringNotif.totalFailure || 0) + 1
-          recurringFailed++
+          results.recurring.failed++
         }
 
         // Calculate next scheduled time
@@ -330,26 +294,86 @@ export async function GET(request) {
         await recurringNotif.save()
 
       } catch (recurringError) {
-        console.error(`[Cron] Error processing recurring ${recurringNotif._id}:`, recurringError)
-        recurringFailed++
+        console.error(`[Cron] Error processing recurring for tenant ${tenant.slug}:`, recurringError)
+        results.recurring.failed++
       }
     }
 
+    return results
+
+  } catch (error) {
+    console.error(`[Cron] Error processing tenant ${tenant.slug}:`, error)
+    return { ...results, error: error.message }
+  }
+}
+
+/**
+ * GET /api/cron/process-scheduled-notifications
+ * 
+ * MULTI-TENANT: Iterates over ALL active tenants and processes scheduled notifications
+ */
+export async function GET(request) {
+  try {
+    // Verify cron secret
+    const authHeader = request.headers.get('authorization')
+    const cronSecret = process.env.CRON_SECRET
+
+    if (!cronSecret) {
+      console.error('[Cron] CRON_SECRET not configured')
+      return NextResponse.json(
+        { success: false, message: 'Cron secret not configured' },
+        { status: 500 }
+      )
+    }
+
+    if (!authHeader || authHeader !== `Bearer ${cronSecret}`) {
+      console.error('[Cron] Unauthorized access attempt')
+      return NextResponse.json(
+        { success: false, message: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    const now = new Date()
+    console.log(`[Cron] Starting multi-tenant notification processing at ${now.toISOString()}`)
+
+    // Connect to superadmin DB and get all active tenants
+    await connectSuperadminDB()
+    const TenantCompany = await getTenantCompanyModel()
+
+    const activeTenants = await TenantCompany.find({
+      isActive: true,
+      serviceStatus: { $in: ['active', 'trial'] },
+      isSetupComplete: true
+    }).lean()
+
+    console.log(`[Cron] Found ${activeTenants.length} active tenants to process`)
+
+    const allResults = {
+      tenantsProcessed: activeTenants.length,
+      totalScheduled: { processed: 0, failed: 0 },
+      totalRecurring: { processed: 0, failed: 0 },
+      tenantResults: []
+    }
+
+    // Process each tenant
+    for (const tenant of activeTenants) {
+      console.log(`[Cron] Processing notifications for tenant: ${tenant.name}`)
+      const tenantResult = await processNotificationsForTenant(tenant, now)
+      allResults.tenantResults.push(tenantResult)
+      
+      allResults.totalScheduled.processed += tenantResult.scheduled.processed
+      allResults.totalScheduled.failed += tenantResult.scheduled.failed
+      allResults.totalRecurring.processed += tenantResult.recurring.processed
+      allResults.totalRecurring.failed += tenantResult.recurring.failed
+    }
+
+    console.log(`[Cron] Completed. Scheduled: ${allResults.totalScheduled.processed} processed, ${allResults.totalScheduled.failed} failed. Recurring: ${allResults.totalRecurring.processed} processed, ${allResults.totalRecurring.failed} failed.`)
+
     return NextResponse.json({
       success: true,
-      message: `Processed ${processedCount} scheduled, ${recurringProcessed} recurring. Failed: ${failedCount} scheduled, ${recurringFailed} recurring`,
-      data: {
-        scheduled: {
-          total: dueNotifications.length,
-          processed: processedCount,
-          failed: failedCount
-        },
-        recurring: {
-          total: dueRecurring.length,
-          processed: recurringProcessed,
-          failed: recurringFailed
-        }
-      }
+      message: `Processed ${allResults.totalScheduled.processed} scheduled, ${allResults.totalRecurring.processed} recurring. Failed: ${allResults.totalScheduled.failed} scheduled, ${allResults.totalRecurring.failed} recurring`,
+      data: allResults
     })
   } catch (error) {
     console.error('[Cron] Process scheduled notifications error:', error)

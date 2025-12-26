@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { calculateEffectiveWorkHours, determineAttendanceStatus } from '@/lib/attendanceShrinkage'
 import queryCache from '@/lib/queryCache'
 
@@ -26,9 +26,14 @@ export const dynamic = 'force-dynamic'
  *            workHours < 4h = absent
  */
 
-// Helper to check if user can approve corrections
-async function canApproveCorrections(userId, targetEmployeeId) {
-  const user = await User.findById(userId).populate('employeeId').lean()
+// Helper to check if user can approve corrections (tenant-aware version)
+async function canApproveCorrections(userId, targetEmployeeId, models) {
+  const { User, Employee, Department } = models
+  
+  const user = await User.findById(userId).populate({
+    path: 'employeeId',
+    options: { strictPopulate: false }
+  }).lean()
   if (!user) return { canApprove: false, reason: 'User not found' }
 
   const role = user.role
@@ -66,22 +71,12 @@ async function canApproveCorrections(userId, targetEmployeeId) {
 // GET - List attendance corrections
 export async function GET(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['AttendanceCorrection', 'Attendance', 'Employee', 'Department', 'User', 'CompanySettings'])
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { AttendanceCorrection, Attendance, Employee, Department, User, CompanySettings } = models
 
     const { searchParams } = new URL(request.url)
@@ -98,17 +93,18 @@ export async function GET(request) {
       query.employee = userEmployeeId
     } else if (type === 'pending') {
       // Get pending requests for approval (for admins/HRs/dept heads)
-      const canApprove = await canApproveCorrections(decoded.userId, null)
+      const canApprove = await canApproveCorrections(user._id, null, models)
 
       if (['admin', 'hr'].includes(user?.role)) {
         // Can see all pending
         query.status = 'pending'
       } else if (user?.employeeId) {
         // Department head - get pending for their department
+        const userEmpId = user.employeeId._id || user.employeeId
         const departments = await Department.find({
           $or: [
-            { head: user.employeeId._id },
-            { heads: user.employeeId._id }
+            { head: userEmpId },
+            { heads: userEmpId }
           ]
         }).lean()
 
@@ -128,9 +124,21 @@ export async function GET(request) {
     }
 
     const corrections = await AttendanceCorrection.find(query)
-      .populate('employee', 'firstName lastName employeeCode profilePicture')
-      .populate('attendance', 'date checkIn checkOut status workHours')
-      .populate('reviewedBy', 'firstName lastName')
+      .populate({
+        path: 'employee',
+        select: 'firstName lastName employeeCode profilePicture',
+        options: { strictPopulate: false }
+      })
+      .populate({
+        path: 'attendance',
+        select: 'date checkIn checkOut status workHours',
+        options: { strictPopulate: false }
+      })
+      .populate({
+        path: 'reviewedBy',
+        select: 'firstName lastName',
+        options: { strictPopulate: false }
+      })
       .sort({ createdAt: -1 })
       .lean()
 
@@ -150,15 +158,13 @@ export async function GET(request) {
 // POST - Create attendance correction request
 export async function POST(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['User', 'Attendance', 'AttendanceCorrection'])
+    if (!auth.success) {
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
+    const { user, models } = auth
+    const { User, Attendance, AttendanceCorrection } = models
 
     const data = await request.json()
     const {
@@ -172,12 +178,15 @@ export async function POST(request) {
       attachments
     } = data
 
-    const user = await User.findById(decoded.userId).populate('employeeId').lean()
-    if (!user?.employeeId) {
+    const fullUser = await User.findById(user._id).populate({
+      path: 'employeeId',
+      options: { strictPopulate: false }
+    }).lean()
+    if (!fullUser?.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
-    const employeeId = user.employeeId._id
+    const employeeId = fullUser.employeeId._id
 
     // Find or validate attendance record
     let attendance
@@ -262,15 +271,13 @@ export async function POST(request) {
 // PATCH - Approve/Reject correction request
 export async function PATCH(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department', 'Attendance', 'AttendanceCorrection', 'CompanySettings'])
+    if (!auth.success) {
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
+    const { user, models } = auth
+    const { User, Employee, Department, Attendance, AttendanceCorrection, CompanySettings } = models
 
     const data = await request.json()
     const { correctionId, action, reviewerComments } = data
@@ -292,13 +299,16 @@ export async function PATCH(request) {
     }
 
     // Check permissions
-    const { canApprove, reason } = await canApproveCorrections(decoded.userId, correction.employee)
+    const { canApprove, reason } = await canApproveCorrections(user._id, correction.employee, models)
     if (!canApprove) {
       return NextResponse.json({ success: false, message: reason || 'Unauthorized' }, { status: 403 })
     }
 
-    const user = await User.findById(decoded.userId).populate('employeeId').lean()
-    const reviewerEmployeeId = user?.employeeId?._id
+    const fullUser = await User.findById(user._id).populate({
+      path: 'employeeId',
+      options: { strictPopulate: false }
+    }).lean()
+    const reviewerEmployeeId = fullUser?.employeeId?._id
 
     if (action === 'approve') {
       // =====================================================
@@ -395,7 +405,7 @@ export async function PATCH(request) {
       attendance.createdBySystem = false
 
       // Set correction audit fields
-      attendance.lastModifiedBy = decoded.userId
+      attendance.lastModifiedBy = user._id
       attendance.approvedBy = reviewerEmployeeId
 
       // Save the attendance record

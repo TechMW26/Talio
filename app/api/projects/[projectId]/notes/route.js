@@ -16,12 +16,12 @@ export async function GET(request, { params }) {
     }
 
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'ProjectNote', 'User', 'Employee'])
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'ProjectNote', 'Task', 'User', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { models } = auth
-    const { Project, ProjectMember, ProjectNote, User, Employee } = models
+    const { Project, ProjectMember, ProjectNote, Task, User, Employee } = models
 
     const { projectId } = await params
 
@@ -33,7 +33,7 @@ export async function GET(request, { params }) {
     // Check project access
     const isAdmin = ['admin', 'hr'].includes(user.role)
     if (!isAdmin) {
-      const { hasAccess } = await checkProjectAccess(projectId, user.employeeId, 'view')
+      const { hasAccess } = await checkProjectAccess(projectId, user.employeeId, 'view', models)
       if (!hasAccess) {
         return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
       }
@@ -75,6 +75,14 @@ export async function POST(request, { params }) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'ProjectNote', 'Task', 'User', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Project, ProjectNote, Task, User, Employee } = models
+
     const { projectId } = await params
 
     const user = await User.findById(decoded.userId).select('employeeId role')
@@ -85,7 +93,7 @@ export async function POST(request, { params }) {
     // Check if user can participate in project
     const isAdmin = ['admin'].includes(user.role)
     if (!isAdmin) {
-      const { hasAccess } = await checkProjectAccess(projectId, user.employeeId, 'participate')
+      const { hasAccess } = await checkProjectAccess(projectId, user.employeeId, 'participate', models)
       if (!hasAccess) {
         return NextResponse.json({ 
           success: false, 

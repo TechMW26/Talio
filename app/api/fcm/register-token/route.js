@@ -75,14 +75,13 @@ export async function POST(request) {
  */
 export async function DELETE(request) {
   try {
-    // Get session
-    const session = await getServerSession(authOptions)
-    if (!session) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      )
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['User']);
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 });
     }
+    const { user: authUser, models } = auth;
+    const { User } = models;
 
     // Parse request body
     const { token } = await request.json()
@@ -94,10 +93,9 @@ export async function DELETE(request) {
       )
     }
 
-    // Connect to database
     // Find user and remove token
-    const user = await User.findOne({ email: session.user.email })
-    if (!user) {
+    const userRecord = await User.findById(authUser._id)
+    if (!userRecord) {
       return NextResponse.json(
         { success: false, message: 'User not found' },
         { status: 404 }
@@ -105,10 +103,10 @@ export async function DELETE(request) {
     }
 
     // Remove token
-    user.fcmTokens = user.fcmTokens?.filter(t => t.token !== token) || []
-    await user.save()
+    userRecord.fcmTokens = userRecord.fcmTokens?.filter(t => t.token !== token) || []
+    await userRecord.save()
 
-    console.log(`[FCM] Token removed for user ${user.email}`)
+    console.log(`[FCM] Token removed for user ${userRecord.email}`)
 
     return NextResponse.json({
       success: true,

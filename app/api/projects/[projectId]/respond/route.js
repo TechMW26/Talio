@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { verifyToken, getAuthAndModels } from '@/lib/auth'
-import { respondToInvitation, createTimelineEvent } from '@/lib/projectService'
+import { respondToInvitation } from '@/lib/projectService'
 import {
   notifyProjectInvitationAccepted,
   notifyProjectInvitationRejected
@@ -20,7 +20,7 @@ export async function POST(request, { params }) {
     }
 
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'User', 'Employee', 'Chat'])
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'User', 'Employee', 'Chat', 'ProjectTimelineEvent'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
@@ -54,11 +54,11 @@ export async function POST(request, { params }) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
-    // Use the service to handle the response
+    // Use the service to handle the response - pass models for multi-tenant support
     const accept = action === 'accept'
     
     try {
-      await respondToInvitation(projectId, user.employeeId, accept, reason)
+      await respondToInvitation(projectId, user.employeeId, accept, reason, models)
     } catch (err) {
       return NextResponse.json({ success: false, message: err.message }, { status: 400 })
     }

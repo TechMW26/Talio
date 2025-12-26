@@ -10,7 +10,7 @@ export async function GET(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Department, Employee, Leave } = models
 
     // Get user's employee ID from auth
@@ -75,25 +75,23 @@ export async function GET(request) {
 // POST - Approve or reject leave request
 export async function POST(request) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Department', 'Employee', 'Leave', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
+    const { user, models } = auth
+    const { Department, Employee, Leave, User } = models
 
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
-    // Get user's employee ID
-    const user = await User.findById(decoded.userId).select('employeeId')
-    if (!user || !user.employeeId) {
+    // Get user's employee ID from auth
+    const employeeId = user?.employeeId?._id || user?.employeeId
+    if (!employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
     // Check if user is a department head
     const department = await Department.findOne({ 
-      head: user.employeeId,
+      head: employeeId,
       isActive: true 
     })
 
@@ -141,7 +139,7 @@ export async function POST(request) {
 
     // Update leave status
     leave.status = action
-    leave.approvedBy = user.employeeId
+    leave.approvedBy = employeeId
     leave.approvedAt = new Date()
 
     // Update approval workflow
@@ -163,7 +161,7 @@ export async function POST(request) {
 
     // Log activity for leave approval/rejection
     await logActivity({
-      employeeId: user.employeeId,
+      employeeId: employeeId,
       type: action === 'approved' ? 'leave_approve' : 'leave_reject',
       action: action === 'approved' ? 'Approved leave request' : 'Rejected leave request',
       details: `${updatedLeave.employee.firstName} ${updatedLeave.employee.lastName}'s leave request`,

@@ -28,7 +28,8 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
     description: '',
     type: 'online',
     scheduledStart: '',
-    scheduledEnd: '',
+    scheduledEnd: '', // Calculated from scheduledStart + duration
+    duration: 60, // Duration in minutes (default 1 hour)
     location: '',
     priority: 'medium',
     agenda: []
@@ -68,7 +69,26 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
   }
 
   const handleInputChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value }
+      
+      // Auto-calculate end time from start time + duration
+      if (field === 'scheduledStart' && value) {
+        const startDate = new Date(value)
+        const endDate = new Date(startDate.getTime() + prev.duration * 60 * 1000)
+        // Format for datetime-local input (YYYY-MM-DDTHH:MM)
+        updated.scheduledEnd = endDate.toISOString().slice(0, 16)
+      }
+      
+      // Recalculate end time when duration changes
+      if (field === 'duration' && prev.scheduledStart) {
+        const startDate = new Date(prev.scheduledStart)
+        const endDate = new Date(startDate.getTime() + value * 60 * 1000)
+        updated.scheduledEnd = endDate.toISOString().slice(0, 16)
+      }
+      
+      return updated
+    })
   }
 
   const toggleDepartmentExpand = (deptId) => {
@@ -126,12 +146,12 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
       toast.error('Please enter a meeting title')
       return false
     }
-    if (!formData.scheduledStart || !formData.scheduledEnd) {
-      toast.error('Please select start and end times')
+    if (!formData.scheduledStart) {
+      toast.error('Please select start date and time')
       return false
     }
-    if (new Date(formData.scheduledStart) >= new Date(formData.scheduledEnd)) {
-      toast.error('End time must be after start time')
+    if (!formData.duration || formData.duration < 5) {
+      toast.error('Please enter a valid duration (minimum 5 minutes)')
       return false
     }
     if (formData.type === 'offline' && !formData.location.trim()) {
@@ -349,15 +369,26 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    End Date & Time *
+                    Duration *
                   </label>
-                  <input
-                    type="datetime-local"
-                    min={formData.scheduledStart || new Date(new Date().getTime() - (new Date().getTimezoneOffset() * 60000)).toISOString().slice(0, 16)}
-                    value={formData.scheduledEnd}
-                    onChange={(e) => handleInputChange('scheduledEnd', e.target.value)}
+                  <select
+                    value={formData.duration}
+                    onChange={(e) => handleInputChange('duration', parseInt(e.target.value))}
                     className="w-full px-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  />
+                  >
+                    <option value={15}>15 minutes</option>
+                    <option value={30}>30 minutes</option>
+                    <option value={45}>45 minutes</option>
+                    <option value={60}>1 hour</option>
+                    <option value={90}>1.5 hours</option>
+                    <option value={120}>2 hours</option>
+                    <option value={150}>2.5 hours</option>
+                    <option value={180}>3 hours</option>
+                    <option value={240}>4 hours</option>
+                    <option value={300}>5 hours</option>
+                    <option value={360}>6 hours</option>
+                    <option value={480}>8 hours</option>
+                  </select>
                 </div>
               </div>
 
@@ -640,6 +671,12 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                     {new Date(formData.scheduledStart).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                     {' - '}
                     {new Date(formData.scheduledEnd).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                    {' '}
+                    <span className="text-gray-500">
+                      ({formData.duration >= 60 
+                        ? `${Math.floor(formData.duration / 60)}${formData.duration % 60 ? `.${formData.duration % 60}` : ''} hour${Math.floor(formData.duration / 60) > 1 ? 's' : ''}`
+                        : `${formData.duration} min`})
+                    </span>
                   </span>
                 </div>
 

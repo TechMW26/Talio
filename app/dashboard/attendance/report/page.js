@@ -105,25 +105,35 @@ export default function AttendanceReportPage() {
         return
       }
 
-      // Fetch all necessary data
-      const [attendanceRes, employeesRes] = await Promise.all([
+      // Fetch all necessary data including company settings and holidays
+      const [attendanceRes, employeesRes, companyRes, holidaysRes] = await Promise.all([
         fetch(`/api/attendance?startDate=${startDate}&endDate=${endDate}${selectedDepartment !== 'all' ? `&department=${selectedDepartment}` : ''}&populate=true`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
         fetch(`/api/employees?limit=1000&status=active&populate=true${selectedDepartment !== 'all' ? `&department=${selectedDepartment}` : ''}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch(`/api/settings/company`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch(`/api/holidays?startDate=${startDate}&endDate=${endDate}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         })
       ])
 
       const attendanceData = await attendanceRes.json()
       const employeesData = await employeesRes.json()
+      const companyData = await companyRes.json()
+      const holidaysData = await holidaysRes.json()
 
       if (attendanceData.success && employeesData.success) {
         const attendance = attendanceData.data || []
         const employees = employeesData.data || []
+        const companySettings = companyData.success ? companyData.data : null
+        const holidays = holidaysData.success ? (holidaysData.data || []) : []
         
-        // Calculate comprehensive KPIs
-        const kpis = calculateKPIs(attendance, employees, startDate, endDate)
+        // Calculate comprehensive KPIs with proper working day calculations
+        const kpis = calculateKPIs(attendance, employees, startDate, endDate, companySettings, holidays)
         setReportData(kpis)
       }
     } catch (error) {
@@ -134,11 +144,64 @@ export default function AttendanceReportPage() {
     }
   }
 
-  const calculateKPIs = (attendance, employees, startDate, endDate) => {
+  // Helper function to count working days between two dates
+  const countWorkingDays = (startDate, endDate, workingDays, holidays) => {
+    const dayNameMap = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+    const holidayDates = new Set(holidays.map(h => new Date(h.date).toISOString().split('T')[0]))
+    
+    let count = 0
+    const current = new Date(startDate)
+    const end = new Date(endDate)
+    
+    while (current <= end) {
+      const dayName = dayNameMap[current.getDay()]
+      const dateStr = current.toISOString().split('T')[0]
+      
+      if (workingDays.includes(dayName) && !holidayDates.has(dateStr)) {
+        count++
+      }
+      current.setDate(current.getDate() + 1)
+    }
+    
+    return count
+  }
+
+  // Helper function to count working days for a specific employee (respects joining date)
+  const countEmployeeWorkingDays = (employee, startDate, endDate, workingDays, holidays) => {
+    const joiningDate = employee.dateOfJoining ? new Date(employee.dateOfJoining) : null
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    
+    // If employee hasn't joined yet, they have 0 expected days
+    if (joiningDate && joiningDate > end) {
+      return 0
+    }
+    
+    // Effective start date is the later of period start or joining date
+    const effectiveStart = joiningDate && joiningDate > start ? joiningDate : start
+    
+    return countWorkingDays(effectiveStart, end, workingDays, holidays)
+  }
+
+  const calculateKPIs = (attendance, employees, startDate, endDate, companySettings, holidays) => {
     const totalEmployees = employees.length
     const start = new Date(startDate)
     const end = new Date(endDate)
     const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1
+    
+    // Get working days from company settings (workingDays is at root level, not under workingHours)
+    const workingDays = companySettings?.workingDays || 
+                        ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+    const fullDayHours = companySettings?.fullDayHours || 8
+    
+    // Calculate total working days in the period (for overview)
+    const totalWorkingDaysInPeriod = countWorkingDays(start, end, workingDays, holidays)
+    
+    // Calculate expected attendance per employee (respecting their joining dates)
+    let totalExpectedAttendance = 0
+    employees.forEach(emp => {
+      totalExpectedAttendance += countEmployeeWorkingDays(emp, startDate, endDate, workingDays, holidays)
+    })
     
     // Group attendance by employee
     const employeeAttendance = {}
@@ -150,7 +213,7 @@ export default function AttendanceReportPage() {
       employeeAttendance[empId].push(record)
     })
 
-    // Calculate status counts
+    // Calculate status counts from actual attendance records only
     const statusCounts = {
       present: 0,
       absent: 0,
@@ -161,7 +224,6 @@ export default function AttendanceReportPage() {
     }
 
     let totalWorkHours = 0
-    let totalScheduledHours = daysDiff * totalEmployees * 8 // Assuming 8-hour workday
     let lateArrivals = 0
     let earlyDepartures = 0
     
@@ -175,31 +237,42 @@ export default function AttendanceReportPage() {
       if (record.status === 'late') {
         lateArrivals++
       }
-      // Check for early departure (less than 7 hours on a present day)
-      if (record.status === 'present' && record.workHours && record.workHours < 7) {
+      // Check for early departure (less than 90% of full day hours on a present day)
+      if (record.status === 'present' && record.workHours && record.workHours < (fullDayHours * 0.9)) {
         earlyDepartures++
       }
     })
 
+    // Calculate scheduled hours based on actual expected attendance
+    const totalScheduledHours = totalExpectedAttendance * fullDayHours
+    
     // Calculate shrinkage metrics
-    const totalPossibleWorkHours = totalScheduledHours
-    const productiveHours = statusCounts.present * 8 + statusCounts['half-day'] * 4
-    const shrinkageHours = totalScheduledHours - totalWorkHours
-    const shrinkagePercentage = ((shrinkageHours / totalScheduledHours) * 100).toFixed(2)
+    const shrinkageHours = Math.max(0, totalScheduledHours - totalWorkHours)
+    const shrinkagePercentage = totalScheduledHours > 0 
+      ? ((shrinkageHours / totalScheduledHours) * 100).toFixed(2) 
+      : '0.00'
     
-    // Attendance rate
-    const expectedAttendance = totalEmployees * daysDiff
-    const actualAttendance = statusCounts.present + statusCounts['half-day'] * 0.5
-    const attendanceRate = ((actualAttendance / expectedAttendance) * 100).toFixed(2)
+    // Attendance rate: (present + half-day*0.5 + in-progress) / expected attendance
+    const actualAttendanceValue = statusCounts.present + (statusCounts['half-day'] * 0.5) + statusCounts['in-progress']
+    const attendanceRate = totalExpectedAttendance > 0 
+      ? ((actualAttendanceValue / totalExpectedAttendance) * 100).toFixed(2) 
+      : '0.00'
     
-    // Absenteeism rate
-    const absenteeismRate = ((statusCounts.absent / expectedAttendance) * 100).toFixed(2)
+    // Absenteeism rate: absent / expected attendance
+    const absenteeismRate = totalExpectedAttendance > 0 
+      ? ((statusCounts.absent / totalExpectedAttendance) * 100).toFixed(2) 
+      : '0.00'
     
-    // Punctuality rate
-    const punctualityRate = (((statusCounts.present - lateArrivals) / (statusCounts.present || 1)) * 100).toFixed(2)
+    // Punctuality rate: non-late present / total present
+    const totalPresentAndLate = statusCounts.present + lateArrivals
+    const punctualityRate = totalPresentAndLate > 0 
+      ? (((statusCounts.present) / totalPresentAndLate) * 100).toFixed(2) 
+      : '100.00'
     
-    // Average work hours per employee
-    const avgWorkHours = (totalWorkHours / (totalEmployees * daysDiff)).toFixed(2)
+    // Average work hours per expected attendance
+    const avgWorkHours = totalExpectedAttendance > 0 
+      ? (totalWorkHours / totalExpectedAttendance).toFixed(2) 
+      : '0.00'
 
     // Department breakdown
     const departmentStats = {}
@@ -233,11 +306,17 @@ export default function AttendanceReportPage() {
     // Individual employee metrics
     const employeeMetrics = employees.map(emp => {
       const empRecords = employeeAttendance[emp._id] || []
-      const empPresent = empRecords.filter(r => r.status === 'present').length
+      const empPresent = empRecords.filter(r => r.status === 'present' || r.status === 'in-progress').length
       const empAbsent = empRecords.filter(r => r.status === 'absent').length
       const empLate = empRecords.filter(r => r.status === 'late').length
       const empHalfDay = empRecords.filter(r => r.status === 'half-day').length
       const empWorkHours = empRecords.reduce((sum, r) => sum + (r.workHours || 0), 0)
+      
+      // Calculate expected days for this employee
+      const empExpectedDays = countEmployeeWorkingDays(emp, startDate, endDate, workingDays, holidays)
+      const empAttendanceRate = empExpectedDays > 0 
+        ? (((empPresent + empHalfDay * 0.5) / empExpectedDays) * 100).toFixed(1) 
+        : '0.0'
       
       return {
         id: emp._id,
@@ -252,18 +331,19 @@ export default function AttendanceReportPage() {
         late: empLate,
         halfDay: empHalfDay,
         totalHours: empWorkHours.toFixed(2),
-        avgHours: (empWorkHours / daysDiff).toFixed(2),
-        attendanceRate: ((empPresent / daysDiff) * 100).toFixed(1),
+        avgHours: empExpectedDays > 0 ? (empWorkHours / empExpectedDays).toFixed(2) : '0.00',
+        attendanceRate: empAttendanceRate,
+        expectedDays: empExpectedDays,
         records: empRecords
       }
     }).sort((a, b) => parseFloat(b.attendanceRate) - parseFloat(a.attendanceRate))
 
     return {
-      period: { startDate, endDate, days: daysDiff },
+      period: { startDate, endDate, days: daysDiff, workingDays: totalWorkingDaysInPeriod },
       overview: {
         totalEmployees,
-        expectedAttendance,
-        actualAttendance: actualAttendance.toFixed(1),
+        expectedAttendance: totalExpectedAttendance,
+        actualAttendance: actualAttendanceValue.toFixed(1),
         attendanceRate,
         absenteeismRate,
         punctualityRate,
@@ -273,18 +353,18 @@ export default function AttendanceReportPage() {
       workHours: {
         total: totalWorkHours.toFixed(2),
         scheduled: totalScheduledHours.toFixed(2),
-        productive: productiveHours.toFixed(2),
+        productive: ((statusCounts.present * fullDayHours) + (statusCounts['half-day'] * fullDayHours * 0.5)).toFixed(2),
         average: avgWorkHours
       },
       shrinkage: {
         totalHours: shrinkageHours.toFixed(2),
         percentage: shrinkagePercentage,
         breakdown: {
-          absent: statusCounts.absent * 8,
-          halfDay: statusCounts['half-day'] * 4,
+          absent: statusCounts.absent * fullDayHours,
+          halfDay: statusCounts['half-day'] * (fullDayHours * 0.5),
           late: lateArrivals,
           earlyDeparture: earlyDepartures,
-          unproductive: (shrinkageHours - (statusCounts.absent * 8 + statusCounts['half-day'] * 4)).toFixed(2)
+          unproductive: Math.max(0, shrinkageHours - (statusCounts.absent * fullDayHours + statusCounts['half-day'] * (fullDayHours * 0.5))).toFixed(2)
         }
       },
       performance: {

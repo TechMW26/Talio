@@ -1,11 +1,7 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Attendance from '@/models/Attendance'
-import Employee from '@/models/Employee'
-import Leave from '@/models/Leave'
-import Holiday from '@/models/Holiday'
-import CompanySettings from '@/models/CompanySettings'
-import Company from '@/models/Company'
+import { connectSuperadminDB } from '@/lib/superadminDb'
+import getTenantCompanyModel from '@/models/TenantCompany'
+import { getTenantModels } from '@/lib/tenantModels'
 import { sendPushToUser } from '@/lib/pushNotification'
 
 export const dynamic = 'force-dynamic'
@@ -50,18 +46,204 @@ function isHoliday(date, holidays) {
 }
 
 /**
+ * Process mark-absent for a single tenant
+ */
+async function processMarkAbsentForTenant(tenant, targetDate) {
+    const results = {
+        tenantName: tenant.name,
+        tenantSlug: tenant.slug,
+        success: true,
+        skipped: false,
+        skipReason: null,
+        marked: 0,
+        notificationsSent: 0,
+        notificationsFailed: 0,
+        errors: 0,
+        details: []
+    }
+
+    try {
+        // Get tenant-specific models
+        const models = await getTenantModels(tenant.databaseName, [
+            'Attendance', 'Employee', 'Leave', 'Holiday', 'Company', 'CompanySettings'
+        ])
+        const { Attendance, Employee, Leave, Holiday, Company, CompanySettings } = models
+
+        // Get working days from database - prioritize Company model
+        let workingDays = null
+
+        const company = await Company.findOne().lean()
+        if (company?.workingHours?.workingDays && company.workingHours.workingDays.length > 0) {
+            workingDays = company.workingHours.workingDays
+        }
+
+        // Fallback to CompanySettings if Company doesn't have workingDays
+        if (!workingDays || workingDays.length === 0) {
+            const companySettings = await CompanySettings.findOne().lean()
+            if (companySettings?.workingDays && companySettings.workingDays.length > 0) {
+                workingDays = companySettings.workingDays
+            }
+        }
+
+        // Final fallback to default Monday-Friday
+        if (!workingDays || workingDays.length === 0) {
+            workingDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+        }
+
+        // Check if target date was a working day
+        if (!isWorkingDay(targetDate, workingDays)) {
+            results.skipped = true
+            results.skipReason = 'weekend'
+            return results
+        }
+
+        const targetDateEnd = new Date(targetDate)
+        targetDateEnd.setDate(targetDateEnd.getDate() + 1)
+
+        // Check for holidays
+        const holidays = await Holiday.find({
+            isActive: true,
+            $or: [
+                { date: { $gte: targetDate, $lt: targetDateEnd } },
+                { date: { $lte: targetDate }, endDate: { $gte: targetDate } }
+            ]
+        }).lean()
+
+        const holidayOnDay = isHoliday(targetDate, holidays)
+        if (holidayOnDay) {
+            results.skipped = true
+            results.skipReason = `holiday: ${holidayOnDay.name}`
+            return results
+        }
+
+        // Get all active employees
+        const allEmployees = await Employee.find({
+            status: 'active'
+        }).populate('userId', '_id email firstName lastName').lean()
+
+        // Get employees on approved leave for target date
+        const leavesForDay = await Leave.find({
+            status: 'approved',
+            startDate: { $lte: targetDateEnd },
+            endDate: { $gte: targetDate }
+        }).select('employee').lean()
+
+        const onLeaveIds = new Set(leavesForDay.map(l => l.employee.toString()))
+
+        // Get all attendance records for target date
+        const dayAttendance = await Attendance.find({
+            date: { $gte: targetDate, $lt: targetDateEnd }
+        }).lean()
+
+        const employeesWithAttendance = new Set(dayAttendance.map(a => a.employee.toString()))
+
+        // Find employees who need to be marked absent
+        const employeesToMarkAbsent = allEmployees.filter(emp => {
+            const empId = emp._id.toString()
+
+            // Skip if already has attendance record
+            if (employeesWithAttendance.has(empId)) return false
+
+            // Skip if on approved leave
+            if (onLeaveIds.has(empId)) return false
+
+            // Skip employees who hadn't joined yet
+            if (emp.dateOfJoining) {
+                const joiningDate = new Date(emp.dateOfJoining)
+                joiningDate.setHours(0, 0, 0, 0)
+                if (targetDate < joiningDate) return false
+            }
+
+            // Only process employees with user accounts
+            return emp.userId
+        })
+
+        // Mark each employee as absent
+        for (const employee of employeesToMarkAbsent) {
+            try {
+                // Create absent attendance record
+                const absentRecord = new Attendance({
+                    employee: employee._id,
+                    date: targetDate,
+                    status: 'absent',
+                    workHours: 0,
+                    totalLoggedHours: 0,
+                    breakMinutes: 0,
+                    shrinkagePercentage: 0,
+                    statusReason: 'No check-in recorded',
+                    remarks: 'System auto-marked absent - Daily cron job',
+                    isManualEntry: false,
+                    // Audit fields
+                    source: 'system_auto_absent',
+                    createdBySystem: true
+                })
+
+                await absentRecord.save()
+                results.marked++
+
+                // Send push notification
+                if (employee.userId) {
+                    try {
+                        await sendPushToUser(
+                            employee.userId._id,
+                            {
+                                title: '❌ Marked Absent',
+                                body: `You have been marked absent for ${targetDate.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' })} as no attendance was recorded. If this is incorrect, please raise a correction request.`,
+                            },
+                            {
+                                eventType: 'markedAbsent',
+                                clickAction: '/dashboard/attendance',
+                                icon: '/icons/icon-192x192.png',
+                                data: {
+                                    type: 'marked-absent',
+                                    date: targetDate.toISOString(),
+                                    note: 'Raise correction request if this is incorrect',
+                                },
+                            }
+                        )
+                        results.notificationsSent++
+                    } catch (notifyErr) {
+                        results.notificationsFailed++
+                    }
+                }
+
+                results.details.push({
+                    employeeId: employee._id.toString(),
+                    name: `${employee.firstName} ${employee.lastName}`,
+                    status: 'marked_absent'
+                })
+
+            } catch (err) {
+                // Handle duplicate key error
+                if (err.code === 11000) {
+                    continue
+                }
+                results.errors++
+                results.details.push({
+                    employeeId: employee._id.toString(),
+                    name: `${employee.firstName} ${employee.lastName}`,
+                    status: 'error',
+                    error: err.message
+                })
+            }
+        }
+
+        return results
+
+    } catch (error) {
+        results.success = false
+        results.error = error.message
+        return results
+    }
+}
+
+/**
  * GET /api/cron/mark-absent
  * 
  * Daily cron job to mark employees as absent who didn't check in on the previous working day.
  * This should be scheduled to run daily (preferably early morning, e.g., 12:30 AM IST).
  * 
- * The job will:
- * 1. Process yesterday's date (or previous working day)
- * 2. Skip weekends and holidays
- * 3. Skip employees who are on approved leave
- * 4. Skip employees who haven't joined yet
- * 5. Create absent attendance records with audit trail
- * 6. Send push notifications to affected employees
+ * MULTI-TENANT: Iterates over ALL active tenants and processes each one.
  * 
  * Security: Protected by CRON_SECRET
  */
@@ -89,235 +271,72 @@ export async function GET(request) {
             )
         }
 
-        await connectDB()
-
         const now = new Date()
-        console.log(`[Cron MarkAbsent] Starting at ${now.toISOString()}`)
-
-        // Get working days from database - prioritize Company model (companies collection)
-        // Based on the actual database structure where workingHours.workingDays is stored in Company
-        let workingDays = null
-
-        // First check Company model (this is where the data is actually stored)
-        const company = await Company.findOne().lean()
-        if (company?.workingHours?.workingDays && company.workingHours.workingDays.length > 0) {
-            workingDays = company.workingHours.workingDays
-            console.log('[Cron MarkAbsent] Using workingDays from Company.workingHours:', workingDays)
-        }
-
-        // Fallback to CompanySettings if Company doesn't have workingDays
-        if (!workingDays || workingDays.length === 0) {
-            const companySettings = await CompanySettings.findOne().lean()
-            if (companySettings?.workingDays && companySettings.workingDays.length > 0) {
-                workingDays = companySettings.workingDays
-                console.log('[Cron MarkAbsent] Using workingDays from CompanySettings:', workingDays)
-            }
-        }
-
-        // Final fallback to default Monday-Friday
-        if (!workingDays || workingDays.length === 0) {
-            workingDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
-            console.log('[Cron MarkAbsent] Using default workingDays (Mon-Fri)')
-        }
+        console.log(`[Cron MarkAbsent] Starting multi-tenant processing at ${now.toISOString()}`)
 
         // Process yesterday
         const yesterday = new Date()
         yesterday.setDate(yesterday.getDate() - 1)
         yesterday.setHours(0, 0, 0, 0)
 
-        const yesterdayEnd = new Date(yesterday)
-        yesterdayEnd.setDate(yesterdayEnd.getDate() + 1)
+        // Connect to superadmin DB and get all active tenants
+        await connectSuperadminDB()
+        const TenantCompany = await getTenantCompanyModel()
 
-        // Check if yesterday was a working day
-        if (!isWorkingDay(yesterday, workingDays)) {
-            console.log(`[Cron MarkAbsent] Yesterday (${yesterday.toISOString().split('T')[0]}) was not a working day, skipping`)
-            return NextResponse.json({
-                success: true,
-                message: 'Yesterday was not a working day (weekend)',
-                data: {
-                    date: yesterday.toISOString().split('T')[0],
-                    dayOfWeek: DAY_INDEX_TO_NAME[yesterday.getDay()],
-                    skipped: true,
-                    reason: 'weekend',
-                    configuredWorkingDays: workingDays
-                }
-            })
-        }
-
-        // Check for holidays
-        const holidays = await Holiday.find({
+        const activeTenants = await TenantCompany.find({
             isActive: true,
-            $or: [
-                { date: { $gte: yesterday, $lt: yesterdayEnd } },
-                { date: { $lte: yesterday }, endDate: { $gte: yesterday } }
-            ]
+            serviceStatus: { $in: ['active', 'trial'] },
+            isSetupComplete: true
         }).lean()
 
-        const holidayOnDay = isHoliday(yesterday, holidays)
-        if (holidayOnDay) {
-            console.log(`[Cron MarkAbsent] Yesterday was a holiday (${holidayOnDay.name}), skipping`)
-            return NextResponse.json({
-                success: true,
-                message: `Yesterday was a holiday: ${holidayOnDay.name}`,
-                data: {
-                    date: yesterday.toISOString().split('T')[0],
-                    skipped: true,
-                    reason: 'holiday',
-                    holiday: holidayOnDay.name
-                }
-            })
-        }
+        console.log(`[Cron MarkAbsent] Found ${activeTenants.length} active tenants to process`)
 
-        // Get all active employees
-        const allEmployees = await Employee.find({
-            status: 'active'
-        }).populate('userId', '_id email firstName lastName').lean()
-
-        console.log(`[Cron MarkAbsent] Found ${allEmployees.length} active employees`)
-
-        // Get employees on approved leave for yesterday
-        const leavesForDay = await Leave.find({
-            status: 'approved',
-            startDate: { $lte: yesterdayEnd },
-            endDate: { $gte: yesterday }
-        }).select('employee').lean()
-
-        const onLeaveIds = new Set(leavesForDay.map(l => l.employee.toString()))
-        console.log(`[Cron MarkAbsent] ${onLeaveIds.size} employees on approved leave`)
-
-        // Get all attendance records for yesterday
-        const dayAttendance = await Attendance.find({
-            date: { $gte: yesterday, $lt: yesterdayEnd }
-        }).lean()
-
-        const employeesWithAttendance = new Set(dayAttendance.map(a => a.employee.toString()))
-        console.log(`[Cron MarkAbsent] ${employeesWithAttendance.size} employees already have attendance records`)
-
-        // Find employees who need to be marked absent
-        const employeesToMarkAbsent = allEmployees.filter(emp => {
-            const empId = emp._id.toString()
-
-            // Skip if already has attendance record
-            if (employeesWithAttendance.has(empId)) return false
-
-            // Skip if on approved leave
-            if (onLeaveIds.has(empId)) return false
-
-            // Skip employees who hadn't joined yet
-            if (emp.dateOfJoining) {
-                const joiningDate = new Date(emp.dateOfJoining)
-                joiningDate.setHours(0, 0, 0, 0)
-                if (yesterday < joiningDate) return false
-            }
-
-            // Only process employees with user accounts
-            return emp.userId
-        })
-
-        console.log(`[Cron MarkAbsent] ${employeesToMarkAbsent.length} employees to mark as absent`)
-
-        const results = {
+        const allResults = {
             date: yesterday.toISOString().split('T')[0],
             dayOfWeek: DAY_INDEX_TO_NAME[yesterday.getDay()],
-            totalEmployees: allEmployees.length,
-            onLeave: onLeaveIds.size,
-            alreadyHadAttendance: employeesWithAttendance.size,
-            marked: 0,
-            notificationsSent: 0,
-            notificationsFailed: 0,
-            errors: 0,
-            details: []
+            tenantsProcessed: 0,
+            tenantsSkipped: 0,
+            totalMarked: 0,
+            totalNotificationsSent: 0,
+            totalNotificationsFailed: 0,
+            totalErrors: 0,
+            tenantResults: []
         }
 
-        // Mark each employee as absent
-        for (const employee of employeesToMarkAbsent) {
-            try {
-                // Create absent attendance record
-                const absentRecord = new Attendance({
-                    employee: employee._id,
-                    date: yesterday,
-                    status: 'absent',
-                    workHours: 0,
-                    totalLoggedHours: 0,
-                    breakMinutes: 0,
-                    shrinkagePercentage: 0,
-                    statusReason: 'No check-in recorded',
-                    remarks: 'System auto-marked absent - Daily cron job',
-                    isManualEntry: false,
-                    // Audit fields
-                    source: 'system_auto_absent',
-                    createdBySystem: true
-                })
+        // Process each tenant
+        for (const tenant of activeTenants) {
+            console.log(`[Cron MarkAbsent] Processing tenant: ${tenant.name} (${tenant.slug})`)
 
-                await absentRecord.save()
-                results.marked++
+            const tenantResult = await processMarkAbsentForTenant(tenant, yesterday)
+            allResults.tenantResults.push(tenantResult)
 
-                // Send push notification
-                if (employee.userId) {
-                    try {
-                        await sendPushToUser(
-                            employee.userId._id,
-                            {
-                                title: '❌ Marked Absent',
-                                body: `You have been marked absent for ${yesterday.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'short' })} as no attendance was recorded. If this is incorrect, please raise a correction request.`,
-                            },
-                            {
-                                eventType: 'markedAbsent',
-                                clickAction: '/dashboard/attendance',
-                                icon: '/icons/icon-192x192.png',
-                                data: {
-                                    type: 'marked-absent',
-                                    date: yesterday.toISOString(),
-                                    note: 'Raise correction request if this is incorrect',
-                                },
-                            }
-                        )
-                        results.notificationsSent++
-                    } catch (notifyErr) {
-                        console.error(`[Cron MarkAbsent] Failed to notify ${employee._id}:`, notifyErr.message)
-                        results.notificationsFailed++
-                    }
-                }
-
-                results.details.push({
-                    employeeId: employee._id.toString(),
-                    name: `${employee.firstName} ${employee.lastName}`,
-                    status: 'marked_absent'
-                })
-
-            } catch (err) {
-                // Handle duplicate key error (shouldn't happen but just in case)
-                if (err.code === 11000) {
-                    console.log(`[Cron MarkAbsent] Duplicate record for ${employee._id}, skipping`)
-                    continue
-                }
-                console.error(`[Cron MarkAbsent] Error marking ${employee._id}:`, err.message)
-                results.errors++
-                results.details.push({
-                    employeeId: employee._id.toString(),
-                    name: `${employee.firstName} ${employee.lastName}`,
-                    status: 'error',
-                    error: err.message
-                })
+            if (tenantResult.skipped) {
+                allResults.tenantsSkipped++
+            } else {
+                allResults.tenantsProcessed++
+                allResults.totalMarked += tenantResult.marked
+                allResults.totalNotificationsSent += tenantResult.notificationsSent
+                allResults.totalNotificationsFailed += tenantResult.notificationsFailed
+                allResults.totalErrors += tenantResult.errors
             }
         }
 
         const duration = Date.now() - startTime
-        console.log(`[Cron MarkAbsent] Completed in ${duration}ms. Marked ${results.marked} employees as absent.`)
+        console.log(`[Cron MarkAbsent] Completed in ${duration}ms. Processed ${allResults.tenantsProcessed} tenants, marked ${allResults.totalMarked} employees as absent.`)
 
         // Emit socket event for real-time dashboard update
-        if (global.io && results.marked > 0) {
+        if (global.io && allResults.totalMarked > 0) {
             global.io.emit('attendance:auto-absent', {
-                date: results.date,
-                count: results.marked,
+                date: allResults.date,
+                count: allResults.totalMarked,
                 timestamp: new Date().toISOString()
             })
         }
 
         return NextResponse.json({
             success: true,
-            message: `Marked ${results.marked} employees as absent for ${results.date}`,
-            data: results,
+            message: `Processed ${allResults.tenantsProcessed} tenants, marked ${allResults.totalMarked} employees as absent for ${allResults.date}`,
+            data: allResults,
             duration: `${duration}ms`
         })
 
@@ -335,9 +354,10 @@ export async function GET(request) {
  * POST /api/cron/mark-absent
  * 
  * Manual trigger for absent marking (admin only)
- * Allows processing a specific date or date range
+ * Can process a specific tenant or all tenants
  * 
  * Body: {
+ *   tenantSlug?: string,     // Specific tenant (optional, defaults to all)
  *   date?: string,           // Single date (YYYY-MM-DD)
  *   startDate?: string,      // Range start (YYYY-MM-DD)  
  *   endDate?: string,        // Range end (YYYY-MM-DD)
@@ -369,9 +389,16 @@ export async function POST(request) {
             try {
                 const { payload } = await jwtVerify(token, secret)
 
-                await connectDB()
-                const { default: User } = await import('@/models/User')
-                const user = await User.findById(payload.userId).select('role')
+                // Connect to tenant DB to verify user role
+                if (!payload.databaseName) {
+                    return NextResponse.json(
+                        { success: false, message: 'Invalid session - please log in again' },
+                        { status: 401 }
+                    )
+                }
+
+                const models = await getTenantModels(payload.databaseName, ['User'])
+                const user = await models.User.findById(payload.userId).select('role')
 
                 if (!user || !['admin', 'hr'].includes(user.role)) {
                     return NextResponse.json(
@@ -388,7 +415,7 @@ export async function POST(request) {
         }
 
         const body = await request.json().catch(() => ({}))
-        const { date, startDate, endDate, sendNotifications = true, dryRun = false } = body
+        const { date, startDate, endDate, sendNotifications = true, dryRun = false, tenantSlug } = body
 
         // Forward to the mark-absent API with the cron secret
         const markAbsentUrl = new URL('/api/attendance/mark-absent', request.url)
@@ -399,7 +426,7 @@ export async function POST(request) {
                 'Content-Type': 'application/json',
                 'x-cron-secret': process.env.CRON_SECRET || 'internal'
             },
-            body: JSON.stringify({ date, startDate, endDate, sendNotifications, dryRun })
+            body: JSON.stringify({ date, startDate, endDate, sendNotifications, dryRun, tenantSlug })
         })
 
         const result = await response.json()

@@ -16,7 +16,7 @@ export async function POST(request, { params }) {
     }
 
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'Task', 'ProjectApprovalRequest', 'User', 'Employee'])
+    const auth = await getAuthAndModels(request, ['Project', 'Task', 'ProjectApprovalRequest', 'User', 'Employee', 'ProjectTimelineEvent'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
@@ -89,11 +89,11 @@ export async function POST(request, { params }) {
             approvedBy: user.employeeId,
             approverName: `${employee.firstName} ${employee.lastName}`
           }
-        })
+        }, models)
 
         // Recalculate project completion percentage
         const { calculateCompletionPercentage } = await import('@/lib/projectService')
-        await calculateCompletionPercentage(project._id)
+        await calculateCompletionPercentage(project._id, models)
       }
 
       return NextResponse.json({
@@ -128,7 +128,7 @@ export async function POST(request, { params }) {
             rejectorName: `${employee.firstName} ${employee.lastName}`,
             reason: comment || 'No reason provided'
           }
-        })
+        }, models)
       }
 
       return NextResponse.json({

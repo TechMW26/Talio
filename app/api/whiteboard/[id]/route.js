@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth'
 import { jwtVerify } from 'jose';
-;
-;
 import { uploadImageToImageKit, deleteFromImageKit, getImageKitFolder } from '@/lib/imagekit';
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key');
@@ -47,49 +45,58 @@ export async function GET(request, { params }) {
     const { id } = await params;
 
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Whiteboard'])
+    const auth = await getAuthAndModels(request, ['Whiteboard', 'User', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { models } = auth
-    const { Whiteboard } = models
+    const { Whiteboard, User, Employee } = models
 
-    ;
+    // Get employee ID from user
+    const userRecord = await User.findById(user.id).select('employeeId').lean()
+    let employeeId = userRecord?.employeeId
+    
+    if (!employeeId) {
+      const employee = await Employee.findOne({ userId: user.id }).select('_id').lean()
+      employeeId = employee?._id
+    }
 
     const whiteboard = await Whiteboard.findById(id)
-      .populate('owner', 'name email avatar')
-      .populate('sharing.userId', 'name email avatar')
-      .populate('lastModifiedBy', 'name email avatar');
+      .populate('createdBy', 'firstName lastName email profilePicture')
+      .populate('sharedWith', 'firstName lastName email profilePicture');
 
     if (!whiteboard) {
       return NextResponse.json({ error: 'Whiteboard not found' }, { status: 404 });
     }
 
-    // Get owner ID (handle both populated and non-populated cases)
-    const ownerId = whiteboard.owner?._id?.toString() || whiteboard.owner?.toString();
-    const userId = user.id?.toString();
+    // Get creator ID (handle both populated and non-populated cases)
+    const creatorId = whiteboard.createdBy?._id?.toString() || whiteboard.createdBy?.toString();
+    const empId = employeeId?.toString();
 
     // Check if user is owner
-    const isOwner = ownerId === userId;
+    const isOwner = creatorId === empId;
 
     // Check if user has sharing access
-    const shareEntry = whiteboard.sharing?.find(s => {
-      const shareUserId = s.userId?._id?.toString() || s.userId?.toString();
-      return shareUserId === userId;
+    const isShared = whiteboard.sharedWith?.some(s => {
+      const sharedId = s._id?.toString() || s.toString();
+      return sharedId === empId;
     });
 
-    // For now, allow all authenticated users to view boards (for team collaboration)
     // Determine permission level
     let permission = 'view_only';
     if (isOwner) {
       permission = 'owner';
-    } else if (shareEntry) {
-      permission = shareEntry.permission;
+    } else if (isShared) {
+      permission = 'editor';
     }
-    // All authenticated users can at least view boards in the organization
+
+    // Return whiteboard with normalized fields for UI compatibility
+    const whiteboardData = whiteboard.toObject();
+    whiteboardData.title = whiteboardData.name;
+    whiteboardData.owner = whiteboardData.createdBy;
 
     return NextResponse.json({
-      whiteboard: whiteboard.toObject(),
+      whiteboard: whiteboardData,
       permission
     });
   } catch (error) {
@@ -107,58 +114,63 @@ export async function PUT(request, { params }) {
     }
 
     const { id } = await params;
-    ;
+
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Whiteboard', 'User', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ error: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Whiteboard, User, Employee } = models
+
+    // Get employee ID from user
+    const userRecord = await User.findById(user.id).select('employeeId').lean()
+    let employeeId = userRecord?.employeeId
+    
+    if (!employeeId) {
+      const employee = await Employee.findOne({ userId: user.id }).select('_id').lean()
+      employeeId = employee?._id
+    }
 
     const whiteboard = await Whiteboard.findById(id);
     if (!whiteboard) {
       return NextResponse.json({ error: 'Whiteboard not found' }, { status: 404 });
     }
 
-    // Get owner ID (handle both populated and non-populated cases)
-    const ownerId = whiteboard.owner?._id?.toString() || whiteboard.owner?.toString();
-    const userId = user.id?.toString();
+    // Get creator ID (handle both populated and non-populated cases)
+    const creatorId = whiteboard.createdBy?._id?.toString() || whiteboard.createdBy?.toString();
+    const empId = employeeId?.toString();
 
-    // Check if user is owner or has editor permission
-    const isOwner = ownerId === userId;
-    const shareEntry = whiteboard.sharing?.find(s => {
-      const shareUserId = s.userId?._id?.toString() || s.userId?.toString();
-      return shareUserId === userId;
+    // Check if user is owner or has shared access
+    const isOwner = creatorId === empId;
+    const isShared = whiteboard.sharedWith?.some(s => {
+      const sharedId = s._id?.toString() || s.toString();
+      return sharedId === empId;
     });
-    const isEditor = shareEntry?.permission === 'editor';
 
-    // Allow owner and editors to update
-    if (!isOwner && !isEditor) {
+    // Allow owner and shared users to update
+    if (!isOwner && !isShared) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
 
     const body = await request.json();
-    const { title, description, pages, theme, showGrid, currentPageIndex, thumbnail, tags, aiAnalysis } = body;
+    const { title, name, description, data, thumbnail, isPublic, sharedWith } = body;
 
     // Update fields if provided
-    if (title !== undefined) whiteboard.title = title;
+    if (name !== undefined) whiteboard.name = name;
+    if (title !== undefined) whiteboard.name = title; // Handle title for UI compatibility
     if (description !== undefined) whiteboard.description = description;
-    if (pages !== undefined) whiteboard.pages = pages;
-    if (theme !== undefined) whiteboard.theme = theme;
-    if (showGrid !== undefined) whiteboard.showGrid = showGrid;
-    if (currentPageIndex !== undefined) whiteboard.currentPageIndex = currentPageIndex;
-    if (tags !== undefined) whiteboard.tags = tags;
-    if (aiAnalysis !== undefined) whiteboard.aiAnalysis = aiAnalysis;
-
-    // Handle thumbnail - upload to ImageKit if it's base64
+    if (data !== undefined) whiteboard.data = data;
+    if (isPublic !== undefined) whiteboard.isPublic = isPublic;
+    if (sharedWith !== undefined) whiteboard.sharedWith = sharedWith;
+    
+    // Handle thumbnail upload
     if (thumbnail !== undefined) {
-      if (thumbnail && thumbnail.startsWith('data:image/') && isImageKitConfigured()) {
+      // Check if thumbnail is base64 and ImageKit is configured
+      if (thumbnail && thumbnail.startsWith('data:') && isImageKitConfigured()) {
         try {
-          // Delete old thumbnail from ImageKit if exists
-          if (whiteboard.thumbnailFileId) {
-            await deleteFromImageKit(whiteboard.thumbnailFileId).catch(() => { });
-          }
-
-          // Get folder path with whiteboard ID
-          const imagekitFolder = getImageKitFolder('whiteboard', { whiteboardId: id });
-
-          // Upload new thumbnail to ImageKit
-          const imagekitResult = await uploadImageToImageKit(thumbnail, {
-            fileName: `whiteboard_${id}_thumb_${Date.now()}.webp`,
+          const imagekitFolder = getImageKitFolder('whiteboards');
+          const imagekitResult = await uploadImageToImageKit(thumbnail, `whiteboard-${id}-thumbnail`, {
             folder: imagekitFolder,
             tags: ['whiteboard', 'thumbnail'],
             customMetadata: {
@@ -180,7 +192,7 @@ export async function PUT(request, { params }) {
       }
     }
 
-    whiteboard.lastModifiedBy = user.id;
+    whiteboard.lastModifiedBy = employeeId;
     whiteboard.lastModified = new Date();
 
     await whiteboard.save();
@@ -198,7 +210,7 @@ export async function PUT(request, { params }) {
       success: true,
       whiteboard: {
         _id: whiteboard._id,
-        title: whiteboard.title,
+        title: whiteboard.name, // Return name as title for UI compatibility
         lastModified: whiteboard.lastModified
       }
     });
@@ -217,16 +229,45 @@ export async function DELETE(request, { params }) {
     }
 
     const { id } = await params;
-    ;
+
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Whiteboard', 'User', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ error: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Whiteboard, User, Employee } = models
+
+    // Get employee ID from user
+    const userRecord = await User.findById(user.id).select('employeeId').lean()
+    let employeeId = userRecord?.employeeId
+    
+    if (!employeeId) {
+      const employee = await Employee.findOne({ userId: user.id }).select('_id').lean()
+      employeeId = employee?._id
+    }
 
     const whiteboard = await Whiteboard.findById(id);
     if (!whiteboard) {
       return NextResponse.json({ error: 'Whiteboard not found' }, { status: 404 });
     }
 
+    // Get creator ID (handle both populated and non-populated cases)
+    const creatorId = whiteboard.createdBy?._id?.toString() || whiteboard.createdBy?.toString();
+    const empId = employeeId?.toString();
+
     // Only owner can delete
-    if (whiteboard.owner.toString() !== user.id) {
+    if (creatorId !== empId) {
       return NextResponse.json({ error: 'Only the owner can delete this whiteboard' }, { status: 403 });
+    }
+
+    // Delete thumbnail from ImageKit if exists
+    if (whiteboard.thumbnailFileId && isImageKitConfigured()) {
+      try {
+        await deleteFromImageKit(whiteboard.thumbnailFileId);
+      } catch (imgError) {
+        console.error('[Whiteboard] Failed to delete thumbnail from ImageKit:', imgError.message);
+      }
     }
 
     await Whiteboard.findByIdAndDelete(id);

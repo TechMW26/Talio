@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { verifyToken, getAuthAndModels } from '@/lib/auth'
-import ProjectCompletionApproval from '@/models/ProjectCompletionApproval'
 import { 
   requestCompletionApproval, 
   respondToCompletionApproval,
@@ -27,12 +26,12 @@ export async function GET(request, { params }) {
     }
 
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'User', 'Employee'])
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'User', 'Employee', 'ProjectCompletionApproval'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { models } = auth
-    const { Project, ProjectMember, User, Employee } = models
+    const { Project, ProjectMember, User, Employee, ProjectCompletionApproval } = models
 
     const { projectId } = await params
 
@@ -76,6 +75,14 @@ export async function POST(request, { params }) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'User', 'Employee', 'ProjectCompletionApproval', 'Task', 'ProjectTimelineEvent'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Project, ProjectMember, User, Employee } = models
+
     const { projectId } = await params
 
     const user = await User.findById(decoded.userId).select('employeeId role')
@@ -109,7 +116,7 @@ export async function POST(request, { params }) {
     const employee = await Employee.findById(user.employeeId)
 
     try {
-      const approval = await requestCompletionApproval(projectId, employee, remark)
+      const approval = await requestCompletionApproval(projectId, employee, remark, models)
       
       // Notify project head
       await notifyProjectCompletionRequested(project, employee)
@@ -140,6 +147,14 @@ export async function PUT(request, { params }) {
     if (!decoded) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
+
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'User', 'Employee', 'ProjectCompletionApproval', 'Task', 'ProjectTimelineEvent'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Project, User, Employee } = models
 
     const { projectId } = await params
 
@@ -182,10 +197,10 @@ export async function PUT(request, { params }) {
     const approve = action === 'approve'
 
     try {
-      const result = await respondToCompletionApproval(approvalId, employee, approve, remark, unmarkSubtasks)
+      const result = await respondToCompletionApproval(approvalId, employee, approve, remark, unmarkSubtasks, models)
       
       // Get all accepted members for notification
-      const memberUserIds = await getProjectMemberUserIds(projectId)
+      const memberUserIds = await getProjectMemberUserIds(projectId, null, models)
 
       if (approve) {
         await notifyProjectApproved(project, employee, memberUserIds, remark)

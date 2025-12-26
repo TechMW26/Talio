@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { uploadImageToImageKit, deleteFromImageKit, getImageKitFolder } from '@/lib/imagekit'
 
 // Check if ImageKit is configured
@@ -24,7 +24,11 @@ export async function GET(request, { params }) {
     const { Company } = models
 
     const company = await Company.findById(id)
-      .populate('createdBy', 'email')
+      .populate({
+        path: 'createdBy',
+        select: 'email',
+        options: { strictPopulate: false }
+      })
       .lean()
 
     if (!company) {
@@ -51,28 +55,17 @@ export async function GET(request, { params }) {
 export async function PUT(request, { params }) {
   try {
     const { id } = await params
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      )
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Company'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-
-    const token = authHeader.split(' ')[1]
-    const decoded = await verifyToken(token)
-
-    if (!decoded) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid token' },
-        { status: 401 }
-      )
-    }
+    const { user, models } = auth
+    const { Company } = models
 
     // Check role - only admin or hr can update companies
     const allowedRoles = ['admin', 'hr']
-    if (!allowedRoles.includes(decoded.role)) {
+    if (!allowedRoles.includes(user.role)) {
       return NextResponse.json(
         { success: false, message: 'You do not have permission to update companies' },
         { status: 403 }
@@ -187,28 +180,17 @@ export async function PUT(request, { params }) {
 export async function DELETE(request, { params }) {
   try {
     const { id } = await params
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      )
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Company'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-
-    const token = authHeader.split(' ')[1]
-    const decoded = await verifyToken(token)
-
-    if (!decoded) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid token' },
-        { status: 401 }
-      )
-    }
+    const { user, models } = auth
+    const { Company } = models
 
     // Check role - only admin or hr can delete companies
     const allowedRoles = ['admin', 'hr']
-    if (!allowedRoles.includes(decoded.role)) {
+    if (!allowedRoles.includes(user.role)) {
       return NextResponse.json(
         { success: false, message: 'You do not have permission to delete companies' },
         { status: 403 }

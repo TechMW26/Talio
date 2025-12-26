@@ -84,12 +84,12 @@ export async function GET(request, context) {
 export async function POST(request, context) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Chat', 'Employee'])
+    const auth = await getAuthAndModels(request, ['Chat', 'Employee', 'User', 'Notification'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Chat, Employee } = models
+    const { Chat, Employee, User, Notification } = models
 
     const params = await context.params
     const { chatId } = params
@@ -101,7 +101,9 @@ export async function POST(request, context) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
+    // Extract employee ID properly (handle both populated object and raw ObjectId)
     const employeeId = user.employeeId._id || user.employeeId
+    const employeeIdStr = employeeId.toString()
 
     // Get employee details
     const employee = await Employee.findById(employeeId)
@@ -115,8 +117,8 @@ export async function POST(request, context) {
       return NextResponse.json({ success: false, message: 'Chat not found' }, { status: 404 })
     }
 
-    // Check if user is a participant
-    const isParticipant = chat.participants.some(p => p.toString() === employee._id.toString())
+    // Check if user is a participant (compare Employee IDs)
+    const isParticipant = chat.participants.some(p => p.toString() === employeeIdStr)
     if (!isParticipant) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 403 })
     }
@@ -149,6 +151,7 @@ export async function POST(request, context) {
 
     // Add message to chat
     chat.messages.push(message)
+    // lastMessage is a string with the message content preview
     chat.lastMessage = content || fileName || 'File'
     chat.lastMessageAt = new Date()
 
@@ -176,7 +179,6 @@ export async function POST(request, context) {
 
     // Broadcast message via WebSocket (server-side)
     try {
-      // Get the Socket.IO instance from the global scope
       const io = global.io
 
       if (io) {
@@ -184,25 +186,31 @@ export async function POST(request, context) {
         io.to(`chat:${chatId}`).emit('new-message', {
           chatId,
           message: newMessage,
-          senderId: user._id.toString()
+          senderId: employeeIdStr  // Use Employee ID for consistency
         })
 
-        // ALSO broadcast to each participant's personal room (for notifications and unread counts)
-        // This ensures users receive the message even if they're not actively viewing the chat
-        chat.participants.forEach(participantId => {
-          const participantIdStr = participantId.toString()
+        // Get User IDs for WebSocket rooms (socket rooms use User._id)
+        const participantEmployeeIds = chat.participants.map(p => p.toString())
+        const participantUsers = await User.find({
+          employeeId: { $in: participantEmployeeIds }
+        }).select('_id employeeId')
+
+        // Broadcast to each participant's personal room (for notifications and unread counts)
+        participantUsers.forEach(participantUser => {
+          const participantEmployeeIdStr = participantUser.employeeId.toString()
           // Don't send to the sender's personal room (they already have the message)
-          if (participantIdStr !== user._id.toString()) {
-            io.to(`user:${participantIdStr}`).emit('new-message', {
+          if (participantEmployeeIdStr !== employeeIdStr) {
+            // Socket rooms use User._id, not Employee._id
+            io.to(`user:${participantUser._id.toString()}`).emit('new-message', {
               chatId,
               message: newMessage,
-              senderId: user._id.toString()
+              senderId: employeeIdStr
             })
-            console.log(`💬 [WebSocket] Sent message to user:${participantIdStr}`)
+            console.log(`💬 [WebSocket] Sent message to user:${participantUser._id.toString()} (employee: ${participantEmployeeIdStr})`)
           }
         })
 
-        console.log(`💬 [WebSocket] Broadcasted message to chat:${chatId} and ${chat.participants.length - 1} participant(s)`)
+        console.log(`💬 [WebSocket] Broadcasted message to chat:${chatId} and ${participantUsers.length - 1} participant(s)`)
       } else {
         console.warn('⚠️ [WebSocket] Socket.IO instance not available')
       }
@@ -212,13 +220,17 @@ export async function POST(request, context) {
 
     // Send push notifications to other participants (not the sender)
     try {
-      const otherParticipants = chat.participants.filter(p => p.toString() !== user._id.toString())
-      console.log(`[Chat Notification] Other participants count: ${otherParticipants.length}`)
+      // Filter out sender from participants (compare Employee IDs)
+      const otherParticipantIds = chat.participants
+        .map(p => p.toString())
+        .filter(pId => pId !== employeeIdStr)
+      
+      console.log(`[Chat Notification] Other participants count: ${otherParticipantIds.length}`)
 
-      if (otherParticipants.length > 0) {
+      if (otherParticipantIds.length > 0) {
         // Get User IDs from Employee IDs
         const recipientUsers = await User.find({
-          employeeId: { $in: otherParticipants }
+          employeeId: { $in: otherParticipantIds }
         }).select('_id')
 
         const recipientUserIds = recipientUsers.map(u => u._id.toString())
@@ -228,10 +240,11 @@ export async function POST(request, context) {
           // Send Firebase notification to each recipient
           for (const recipientId of recipientUserIds) {
             await sendMessageNotification({
-              senderId: decoded.userId,
+              senderId: user._id.toString(),  // User._id for notification system
               recipientId,
               message: content || fileName || 'Sent a file',
-              chatId
+              chatId,
+              models: { User, Employee, Notification }
             })
           }
 

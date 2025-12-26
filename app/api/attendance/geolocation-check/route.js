@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-import { jwtVerify } from 'jose'
 import { calculateEffectiveWorkHours, determineAttendanceStatus } from '@/lib/attendanceShrinkage'
 import { sendPushToUser } from '@/lib/pushNotification'
-
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET)
 
 // Calculate distance between two coordinates (Haversine formula)
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -28,25 +25,13 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
  */
 export async function POST(request) {
   try {
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    const token = authHeader.substring(7)
-    const { payload } = await jwtVerify(token, JWT_SECRET)
-    
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Attendance', 'Employee', 'CompanySettings', 'GeofenceLocation', 'OvertimeRequest'])
+    const auth = await getAuthAndModels(request, ['Attendance', 'Employee', 'CompanySettings', 'GeofenceLocation', 'OvertimeRequest', 'User', 'Notification'])
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Attendance, Employee, CompanySettings, GeofenceLocation, OvertimeRequest } = models
+    const { Attendance, Employee, CompanySettings, GeofenceLocation, OvertimeRequest, User, Notification } = models
 
     const { latitude, longitude } = await request.json()
 
@@ -58,7 +43,10 @@ export async function POST(request) {
     }
 
     // Get the user's employee record
-    const employee = await Employee.findOne({ user: payload.userId }).populate('department')
+    const employee = await Employee.findOne({ user: user._id }).populate({
+      path: 'department',
+      options: { strictPopulate: false }
+    })
     if (!employee) {
       return NextResponse.json(
         { success: false, message: 'Employee not found' },
@@ -225,6 +213,7 @@ export async function POST(request) {
             workHours: attendance.workHours,
             status: attendance.status
           },
+          models: { User, Notification }
         }
       )
     } catch (pushError) {

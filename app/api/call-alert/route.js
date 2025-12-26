@@ -1,11 +1,5 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth'
-import { jwtVerify } from 'jose';
-;
-;
-;
-;
-;
 import { 
   generateSpeechBase64, 
   processMessageTemplate, 
@@ -26,23 +20,8 @@ export async function POST(request) {
     const { user, models } = auth
     const { User, Employee, Department, CallAlert } = models
 
-    ;
-
-    // Verify authentication
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    const token = authHeader.substring(7);
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET);
-    const { payload: decoded } = await jwtVerify(token, secret);
-
-    // Get sender user and employee data
-    const senderUser = await User.findById(decoded.userId);
+    // Get sender user and employee data from auth
+    const senderUser = await User.findById(user._id);
     if (!senderUser || !senderUser.isActive) {
       return NextResponse.json(
         { success: false, message: 'User not found or inactive' },
@@ -51,7 +30,11 @@ export async function POST(request) {
     }
 
     const senderEmployee = await Employee.findById(senderUser.employeeId)
-      .populate('department', 'name');
+      .populate({
+        path: 'department',
+        select: 'name',
+        options: { strictPopulate: false }
+      });
     
     if (!senderEmployee) {
       return NextResponse.json(
@@ -123,7 +106,12 @@ export async function POST(request) {
       isActive: true
     }).populate({
       path: 'employeeId',
-      populate: { path: 'department', select: 'name' }
+      populate: { 
+        path: 'department', 
+        select: 'name',
+        options: { strictPopulate: false }
+      },
+      options: { strictPopulate: false }
     });
 
     if (targetUsers.length === 0) {
@@ -336,27 +324,20 @@ export async function POST(request) {
  */
 export async function GET(request) {
   try {
-    ;
-
-    // Verify authentication
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      );
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['CallAlert'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-
-    const token = authHeader.substring(7);
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET);
-    const { payload: decoded } = await jwtVerify(token, secret);
+    const { user, models } = auth
+    const { CallAlert } = models
 
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type') || 'received'; // 'sent', 'received', or 'logs'
     const limit = parseInt(searchParams.get('limit') || '20');
     const skip = parseInt(searchParams.get('skip') || '0');
 
-    const isAdmin = ['admin'].includes(decoded.role);
+    const isAdmin = ['admin'].includes(user.role);
 
     let alerts;
 
@@ -365,14 +346,18 @@ export async function GET(request) {
       alerts = await CallAlert.getAlertLogs({ limit, skip });
     } else if (type === 'sent') {
       // Get alerts sent by user
-      alerts = await CallAlert.find({ sender: decoded.userId })
-        .populate('receivers.employee', 'firstName lastName employeeCode')
+      alerts = await CallAlert.find({ sender: user._id })
+        .populate({
+          path: 'receivers.employee',
+          select: 'firstName lastName employeeCode',
+          options: { strictPopulate: false }
+        })
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit);
     } else {
       // Get alerts received by user
-      alerts = await CallAlert.getAlertsForUser(decoded.userId, { limit, skip });
+      alerts = await CallAlert.getAlertsForUser(user._id, { limit, skip });
     }
 
     return NextResponse.json({

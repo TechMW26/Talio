@@ -40,10 +40,10 @@ export async function GET(request, { params }) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
-    // Check access
+    // Check access - pass models for multi-tenant
     const isAdmin = ['admin', 'hr'].includes(user.role)
     if (!isAdmin) {
-      const { hasAccess } = await checkProjectAccess(projectId, user.employeeId, 'view')
+      const { hasAccess } = await checkProjectAccess(projectId, user.employeeId, 'view', models)
       if (!hasAccess) {
         return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
       }
@@ -107,6 +107,14 @@ export async function POST(request, { params }) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
 
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'Task', 'TaskAssignee', 'User', 'Employee', 'ProjectTimelineEvent'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Project, ProjectMember, Task, TaskAssignee, User, Employee } = models
+
     const { projectId } = await params
 
     const user = await User.findById(decoded.userId).select('employeeId role')
@@ -119,10 +127,10 @@ export async function POST(request, { params }) {
       return NextResponse.json({ success: false, message: 'Project not found' }, { status: 404 })
     }
 
-    // Check if user can create tasks (must be accepted member)
+    // Check if user can create tasks (must be accepted member) - pass models for multi-tenant
     const isAdmin = ['admin'].includes(user.role)
     if (!isAdmin) {
-      const { hasAccess } = await checkProjectAccess(projectId, user.employeeId, 'participate')
+      const { hasAccess } = await checkProjectAccess(projectId, user.employeeId, 'participate', models)
       if (!hasAccess) {
         return NextResponse.json({ 
           success: false, 
@@ -199,7 +207,7 @@ export async function POST(request, { params }) {
 
     const creatorEmployee = await Employee.findById(user.employeeId)
 
-    // Create task_created timeline event
+    // Create task_created timeline event - pass models for multi-tenant
     const taskDescription = estimatedHours && assigneeIds.includes(user.employeeId.toString())
       ? `Task "${title}" was created with ${estimatedHours}h ETA (Due: ${calculatedDueDate.toLocaleDateString()})`
       : `Task "${title}" was created`
@@ -211,7 +219,7 @@ export async function POST(request, { params }) {
       relatedTask: task._id,
       description: taskDescription,
       metadata: { taskTitle: title, priority, estimatedHours }
-    })
+    }, models)
 
     // Assign to users
     const assignedNames = []
@@ -239,7 +247,7 @@ export async function POST(request, { params }) {
       const assigneeEmployee = await Employee.findById(assigneeIdStr)
       assignedNames.push(`${assigneeEmployee.firstName} ${assigneeEmployee.lastName}`)
 
-      // Create task_assigned timeline event
+      // Create task_assigned timeline event - pass models for multi-tenant
       await createTimelineEvent({
         project: projectId,
         type: 'task_assigned',
@@ -248,7 +256,7 @@ export async function POST(request, { params }) {
         relatedMember: assigneeIdStr,
         description: `Task "${title}" was assigned to ${assigneeEmployee.firstName} ${assigneeEmployee.lastName}`,
         metadata: { taskTitle: title, assigneeName: `${assigneeEmployee.firstName} ${assigneeEmployee.lastName}` }
-      })
+      }, models)
 
       // Send notification if not self-assignment
       if (assigneeIdStr !== user.employeeId.toString()) {
@@ -256,8 +264,8 @@ export async function POST(request, { params }) {
       }
     }
 
-    // Recalculate project completion percentage
-    await calculateCompletionPercentage(projectId)
+    // Recalculate project completion percentage - pass models for multi-tenant
+    await calculateCompletionPercentage(projectId, models)
 
     // Fetch populated task
     const populatedTask = await Task.findById(task._id)
@@ -269,7 +277,7 @@ export async function POST(request, { params }) {
 
     // Emit real-time task creation to all project members
     try {
-      const memberUserIds = await getProjectMemberUserIds(projectId)
+      const memberUserIds = await getProjectMemberUserIds(projectId, null, models)
       
       emitTaskUpdate(
         {

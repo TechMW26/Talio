@@ -20,7 +20,7 @@ export async function POST(request, { params }) {
     }
 
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'Task', 'TaskAssignee', 'User', 'Employee'])
+    const auth = await getAuthAndModels(request, ['Project', 'Task', 'TaskAssignee', 'User', 'Employee', 'ProjectTimelineEvent'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
@@ -126,7 +126,7 @@ export async function POST(request, { params }) {
         rejectionReason: reason,
         estimatedHours: estimatedHours
       }
-    })
+    }, models)
 
     // Notify task creator and project head (non-blocking - don't await)
     const notifyEmployeeIds = [task.createdBy, project.projectHead]

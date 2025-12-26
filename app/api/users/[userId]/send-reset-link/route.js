@@ -1,10 +1,17 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { jwtVerify } from 'jose'
-import PasswordResetToken from '@/models/PasswordResetToken'
 import { sendPasswordResetEmail } from '@/lib/mailer'
+import crypto from 'crypto'
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key')
+
+// Helper functions for token generation (same as in model)
+function generateToken() {
+  const token = crypto.randomBytes(32).toString('base64url')
+  const tokenHash = crypto.createHash('sha256').update(token).digest('hex')
+  return { token, tokenHash }
+}
 
 /**
  * POST - Admin/HR send password reset link to user
@@ -38,12 +45,12 @@ export async function POST(request, { params }) {
     }
 
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User', 'Employee'])
+    const auth = await getAuthAndModels(request, ['User', 'Employee', 'PasswordResetToken'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { User, Employee } = models
+    const { User, Employee, PasswordResetToken } = models
 
     // Verify requesting user is admin or HR
     const requestingUser = await User.findById(payload.userId).select('role')
@@ -86,7 +93,7 @@ export async function POST(request, { params }) {
     )
 
     // Generate new token
-    const { token: resetToken, tokenHash } = PasswordResetToken.generateToken()
+    const { token: resetToken, tokenHash } = generateToken()
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours for admin-initiated
 
     // Save token to database

@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-import { jwtVerify } from 'jose'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,22 +9,16 @@ export async function GET(request) {
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Attendance', 'Employee', 'User', 'Leave', 'CompanySettings'])
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
     const { Attendance, Employee, User, Leave, CompanySettings } = models
 
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
-    }
-
-    const token = authHeader.split(' ')[1]
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET)
-    const { payload } = await jwtVerify(token, secret)
-
-    // Get the requesting user
-    const requestingUser = await User.findById(payload.id).populate('employeeId').lean()
+    // Get the requesting user with employee info
+    const requestingUser = await User.findById(user._id).populate({
+      path: 'employeeId',
+      options: { strictPopulate: false }
+    }).lean()
     if (!requestingUser) {
       return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
     }
