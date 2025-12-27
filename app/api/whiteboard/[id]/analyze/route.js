@@ -264,7 +264,7 @@ export async function POST(request, { params }) {
     }
     
     // Check permission
-    const permission = whiteboard.getUserPermission(user.userId);
+    const permission = whiteboard.getUserPermission(user._id || user.userId);
     if (!permission) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
@@ -312,7 +312,7 @@ Be genuinely helpful and insightful rather than just describing what you see. Sh
       } else {
         // Use Smart Content for text-only analysis to get better human-like responses
         summary = await generateSmartContent(prompt, {
-          userId: user.userId,
+          userId: user._id || user.userId,
           feature: 'whiteboard-analyze',
           metadata: { whiteboardId: id },
           skipRefinement: true // Prompt is already highly structured
@@ -373,7 +373,7 @@ ${hasScreenshot ? 'I can see your canvas now. ' : ''}Respond helpfully and natur
       } else {
         // Use Smart Content for chat to handle crude user inputs better
         response = await generateSmartContent(message, {
-          userId: user.userId,
+          userId: user._id || user.userId,
           feature: 'whiteboard-chat',
           systemInstruction: context,
           metadata: { whiteboardId: id }
@@ -635,7 +635,7 @@ Return ONLY this JSON structure (no markdown, no explanation):
 
       try {
         const aiResponse = await generateSmartContent(generatePrompt, { 
-          userId: user.userId, 
+          userId: user._id || user.userId, 
           feature: 'whiteboard-generate',
           skipRefinement: true // Prompt is already highly structured
         });
@@ -888,7 +888,7 @@ Return ONLY valid JSON:
 
       try {
         const aiResponse = await generateSmartContent(continuePrompt, {
-          userId: user.userId,
+          userId: user._id || user.userId,
           feature: 'whiteboard-continue',
           skipRefinement: true
         });
@@ -1061,7 +1061,7 @@ Return ONLY valid JSON array. No explanations.`;
 
       try {
         const aiResponse = await generateSmartContent(restructurePrompt, {
-          userId: user.userId,
+          userId: user._id || user.userId,
           feature: 'whiteboard-restructure',
           skipRefinement: true
         });
