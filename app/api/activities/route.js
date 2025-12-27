@@ -1,19 +1,9 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 
 // GET - Fetch activities
 export async function GET(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Activity', 'User'])
     if (!auth.success) {
@@ -22,7 +12,7 @@ export async function GET(request) {
     const { user, models } = auth
     const { Activity, User } = models
 
-    const currentUser = await User.findById(decoded.userId).select('employeeId role')
+    const currentUser = await User.findById(user._id || user.userId).select('employeeId role')
     const employeeId = currentUser?.employeeId
 
     const { searchParams } = new URL(request.url)
@@ -85,17 +75,16 @@ export async function GET(request) {
 // POST - Create activity (for manual logging)
 export async function POST(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Activity', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
+    const { user, models } = auth
+    const { Activity, User } = models
 
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
-    const currentUser = await User.findById(decoded.userId).select('employeeId')
+    const userId = user._id || user.userId
+    const currentUser = await User.findById(userId).select('employeeId')
     const employeeId = currentUser?.employeeId
 
     const body = await request.json()

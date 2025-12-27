@@ -72,6 +72,14 @@ export async function PUT(request, { params }) {
 // DELETE - Delete announcement
 export async function DELETE(request, { params }) {
   try {
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Announcement'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Announcement } = models
+
     const announcement = await Announcement.findByIdAndDelete(params.id)
 
     if (!announcement) {

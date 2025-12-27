@@ -1,19 +1,9 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 
 // POST - Save push subscription
 export async function POST(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['PushSubscription'])
     if (!auth.success) {
@@ -22,6 +12,7 @@ export async function POST(request) {
     const { user, models } = auth
     const { PushSubscription } = models
 
+    const userId = user._id || user.userId
     const { subscription, deviceInfo } = await request.json()
 
     if (!subscription || !subscription.endpoint) {
@@ -33,7 +24,7 @@ export async function POST(request) {
 
     // Check if subscription already exists
     const existingSubscription = await PushSubscription.findOne({
-      user: decoded.userId,
+      user: userId,
       endpoint: subscription.endpoint
     })
 
@@ -53,7 +44,7 @@ export async function POST(request) {
 
     // Create new subscription
     const newSubscription = new PushSubscription({
-      user: decoded.userId,
+      user: userId,
       endpoint: subscription.endpoint,
       keys: subscription.keys,
       deviceInfo: deviceInfo || {},
@@ -81,17 +72,16 @@ export async function POST(request) {
 // GET - Get user's push subscriptions
 export async function GET(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['PushSubscription'])
+    if (!auth.success) {
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
+    const { user, models } = auth
+    const { PushSubscription } = models
 
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
-    const subscriptions = await PushSubscription.find({ user: decoded.userId })
+    const userId = user._id || user.userId
+    const subscriptions = await PushSubscription.find({ user: userId })
       .sort({ lastUsed: -1 })
 
     return NextResponse.json({
@@ -111,16 +101,15 @@ export async function GET(request) {
 // DELETE - Remove push subscription
 export async function DELETE(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['PushSubscription'])
+    if (!auth.success) {
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
+    const { user, models } = auth
+    const { PushSubscription } = models
 
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
+    const userId = user._id || user.userId
     const { endpoint } = await request.json()
 
     if (!endpoint) {
@@ -131,7 +120,7 @@ export async function DELETE(request) {
     }
 
     const result = await PushSubscription.findOneAndDelete({
-      user: decoded.userId,
+      user: userId,
       endpoint
     })
 

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { generateSmartContent } from '@/lib/promptEngine'
 
 export const dynamic = 'force-dynamic'
@@ -7,18 +7,18 @@ export const dynamic = 'force-dynamic'
 // POST - Generate AI insights for performance data using Gemini API
 export async function POST(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    const decoded = await verifyToken(token)
-    
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
+    const auth = await getAuthAndModels(request, [])
+    if (!auth.success) {
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
+    const { user } = auth
+    const token = request.headers.get('authorization')?.replace('Bearer ', '')
 
     // Allow access for admins, HR, managers, and check if user is a department head
     const allowedRoles = ['admin', 'hr', 'department_head', 'manager']
     
     // Always allow if user has an allowed role
-    if (!allowedRoles.includes(decoded.role)) {
+    if (!allowedRoles.includes(user.role)) {
       // For other roles, check if they are a department head
       try {
         const checkHeadRes = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/team/check-head`, {
@@ -74,7 +74,7 @@ Provide detailed, actionable insights for leadership.`
 
     try {
       const text = await generateSmartContent(performanceSummary, {
-        userId: decoded.userId || decoded._id,
+        userId: user._id || user.userId,
         feature: 'performance-insights',
         skipRefinement: true, // Structured prompt
         skipGuardrails: true // We want JSON

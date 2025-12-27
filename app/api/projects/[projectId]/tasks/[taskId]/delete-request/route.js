@@ -1,32 +1,22 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { createTimelineEvent } from '@/lib/projectService'
 
 // POST - Request task deletion (for non-project heads)
 export async function POST(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Project', 'Task', 'User', 'Employee', 'ProjectApprovalRequest', 'ProjectTimelineEvent'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Project, Task, User, Employee, ProjectApprovalRequest } = models
 
     const { projectId, taskId } = await params
 
-    const user = await User.findById(decoded.userId).select('employeeId role')
-    if (!user || !user.employeeId) {
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId role')
+    if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -66,13 +56,13 @@ export async function POST(request, { params }) {
     }
 
     // Get requester info
-    const requester = await Employee.findById(user.employeeId).select('firstName lastName')
+    const requester = await Employee.findById(userRecord.employeeId).select('firstName lastName')
 
     // Create an approval request
     await ProjectApprovalRequest.create({
       project: projectId,
       type: 'task_deletion',
-      requestedBy: user.employeeId,
+      requestedBy: userRecord.employeeId,
       relatedTask: taskId,
       reason: reason.trim(),
       metadata: {
@@ -87,13 +77,13 @@ export async function POST(request, { params }) {
     createTimelineEvent({
       project: projectId,
       type: 'task_deletion_requested',
-      createdBy: user.employeeId,
+      createdBy: userRecord.employeeId,
       relatedTask: taskId,
       description: `${requester.firstName} ${requester.lastName} requested deletion of task "${task.title}"`,
       metadata: { 
         taskTitle: task.title, 
         reason,
-        requestedBy: user.employeeId,
+        requestedBy: userRecord.employeeId,
         requesterName: `${requester.firstName} ${requester.lastName}`
       }
     }, models).catch(console.error)

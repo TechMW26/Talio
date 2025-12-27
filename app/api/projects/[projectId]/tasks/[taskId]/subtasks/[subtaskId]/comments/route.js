@@ -1,21 +1,11 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import mongoose from 'mongoose'
 import { createTimelineEvent } from '@/lib/projectService'
 
 // GET - Get all comments for a subtask
 export async function GET(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Task', 'TaskAssignee', 'User', 'Employee', 'Project'])
     if (!auth.success) {
@@ -67,15 +57,13 @@ export async function GET(request, { params }) {
 // POST - Add a comment to a subtask
 export async function POST(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Task', 'TaskAssignee', 'User', 'Employee', 'Project'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
+    const { user, models } = auth
+    const { Task, TaskAssignee, User, Employee, Project } = models
 
     const { projectId, taskId, subtaskId } = await params
     const body = await request.json()
@@ -89,8 +77,8 @@ export async function POST(request, { params }) {
       return NextResponse.json({ success: false, message: 'Comment cannot exceed 500 characters' }, { status: 400 })
     }
 
-    const user = await User.findById(decoded.userId).select('employeeId role')
-    if (!user || !user.employeeId) {
+    const userDoc = await User.findById(user._id || user.userId).select('employeeId role')
+    if (!userDoc || !userDoc.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -108,11 +96,11 @@ export async function POST(request, { params }) {
     // Check permissions - assignee, creator, assignedBy, project head, or admin can comment
     const isAssignee = await TaskAssignee.findOne({
       task: taskId,
-      user: user.employeeId,
+      user: userDoc.employeeId,
       assignmentStatus: 'accepted'
     })
-    const isCreator = task.createdBy && task.createdBy.toString() === user.employeeId.toString()
-    const isAssigner = task.assignedBy && task.assignedBy.toString() === user.employeeId.toString()
+    const isCreator = task.createdBy && task.createdBy.toString() === userDoc.employeeId.toString()
+    const isAssigner = task.assignedBy && task.assignedBy.toString() === userDoc.employeeId.toString()
     
     // Safely get project head IDs
     let projectHeadIds = []
@@ -123,8 +111,8 @@ export async function POST(request, { params }) {
         projectHeadIds = [task.project.projectHead.toString()]
       }
     }
-    const isProjectHead = projectHeadIds.includes(user.employeeId.toString())
-    const isAdmin = ['admin'].includes(user.role)
+    const isProjectHead = projectHeadIds.includes(userDoc.employeeId.toString())
+    const isAdmin = ['admin'].includes(userDoc.role)
 
     if (!isAssignee && !isCreator && !isAssigner && !isProjectHead && !isAdmin) {
       return NextResponse.json({ 
@@ -149,7 +137,7 @@ export async function POST(request, { params }) {
     const newComment = {
       _id: new mongoose.Types.ObjectId(),
       text: text.trim(),
-      author: user.employeeId,
+      author: userDoc.employeeId,
       authorRole,
       createdAt: new Date()
     }
@@ -168,7 +156,7 @@ export async function POST(request, { params }) {
     }
 
     // Get author details for response
-    const author = await Employee.findById(user.employeeId)
+    const author = await Employee.findById(userDoc.employeeId)
       .select('firstName lastName profilePicture')
 
     // Create timeline event
@@ -178,7 +166,7 @@ export async function POST(request, { params }) {
     createTimelineEvent({
       project: projectIdForTimeline,
       type: 'subtask_comment_added',
-      createdBy: user.employeeId,
+      createdBy: userDoc.employeeId,
       relatedTask: taskId,
       description: `${author?.firstName || 'User'} commented on subtask "${subtaskTitle}": "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`,
       metadata: {
@@ -196,7 +184,7 @@ export async function POST(request, { params }) {
       data: {
         ...newComment,
         author: {
-          _id: author?._id || user.employeeId,
+          _id: author?._id || userDoc.employeeId,
           firstName: author?.firstName || 'Unknown',
           lastName: author?.lastName || 'User',
           profilePicture: author?.profilePicture
@@ -212,15 +200,13 @@ export async function POST(request, { params }) {
 // DELETE - Delete a comment from a subtask
 export async function DELETE(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Task', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
+    const { user, models } = auth
+    const { Task, User } = models
 
     const { taskId, subtaskId } = await params
     const { searchParams } = new URL(request.url)
@@ -230,8 +216,8 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ success: false, message: 'Comment ID is required' }, { status: 400 })
     }
 
-    const user = await User.findById(decoded.userId).select('employeeId role')
-    if (!user || !user.employeeId) {
+    const userDoc = await User.findById(user._id || user.userId).select('employeeId role')
+    if (!userDoc || !userDoc.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -251,8 +237,8 @@ export async function DELETE(request, { params }) {
     }
 
     // Check permissions - only comment author, project head, or admin can delete
-    const isCommentAuthor = comment.author.toString() === user.employeeId.toString()
-    const isAdmin = ['admin'].includes(user.role)
+    const isCommentAuthor = comment.author.toString() === userDoc.employeeId.toString()
+    const isAdmin = ['admin'].includes(userDoc.role)
     
     let projectHeadIds = []
     if (task.project && typeof task.project === 'object') {
@@ -262,7 +248,7 @@ export async function DELETE(request, { params }) {
         projectHeadIds = [task.project.projectHead.toString()]
       }
     }
-    const isProjectHead = projectHeadIds.includes(user.employeeId.toString())
+    const isProjectHead = projectHeadIds.includes(userDoc.employeeId.toString())
 
     if (!isCommentAuthor && !isAdmin && !isProjectHead) {
       return NextResponse.json({ 

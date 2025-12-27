@@ -1,30 +1,14 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 // POST - Register/Update FCM Token
 export async function POST(request) {
     try {
-        const token = request.headers.get('authorization')?.split(' ')[1]
-        if (!token) {
-            return NextResponse.json(
-                { success: false, message: 'No token provided' },
-                { status: 401 }
-            )
-        }
-
-        const decoded = await verifyToken(token)
-        if (!decoded) {
-            return NextResponse.json(
-                { success: false, message: 'Invalid token' },
-                { status: 401 }
-            )
-        }
-
         // Get authenticated user and tenant-specific models
         const auth = await getAuthAndModels(request, ['User']);
         if (!auth.success) {
             return NextResponse.json({ message: auth.message }, { status: 401 });
         }
-        const { models } = auth;
+        const { user, models } = auth;
         const { User } = models;
 
         const { fcmToken, deviceInfo } = await request.json();
@@ -37,7 +21,8 @@ export async function POST(request) {
         }
 
         // Find user
-        const userRecord = await User.findById(decoded.userId);
+        const userId = user._id || user.userId;
+        const userRecord = await User.findById(userId);
         if (!userRecord) {
             return NextResponse.json(
                 { success: false, message: 'User not found' },
@@ -100,28 +85,12 @@ export async function POST(request) {
 // DELETE - Remove FCM Token
 export async function DELETE(request) {
     try {
-        const token = request.headers.get('authorization')?.split(' ')[1];
-        if (!token) {
-            return NextResponse.json(
-                { success: false, message: 'No token provided' },
-                { status: 401 }
-            );
-        }
-
-        const decoded = await verifyToken(token);
-        if (!decoded) {
-            return NextResponse.json(
-                { success: false, message: 'Invalid token' },
-                { status: 401 }
-            );
-        }
-
         // Get authenticated user and tenant-specific models
         const auth = await getAuthAndModels(request, ['User']);
         if (!auth.success) {
             return NextResponse.json({ message: auth.message }, { status: 401 });
         }
-        const { models } = auth;
+        const { user, models } = auth;
         const { User } = models;
 
         const { fcmToken } = await request.json();
@@ -134,7 +103,8 @@ export async function DELETE(request) {
         }
 
         // Find user and remove token
-        const userRecord = await User.findById(decoded.userId);
+        const userId = user._id || user.userId;
+        const userRecord = await User.findById(userId);
         if (!userRecord) {
             return NextResponse.json(
                 { success: false, message: 'User not found' },
@@ -163,28 +133,12 @@ export async function DELETE(request) {
 // PUT - Update notification preferences
 export async function PUT(request) {
     try {
-        const token = request.headers.get('authorization')?.split(' ')[1];
-        if (!token) {
-            return NextResponse.json(
-                { success: false, message: 'No token provided' },
-                { status: 401 }
-            );
-        }
-
-        const decoded = await verifyToken(token);
-        if (!decoded) {
-            return NextResponse.json(
-                { success: false, message: 'Invalid token' },
-                { status: 401 }
-            );
-        }
-
         // Get authenticated user and tenant-specific models
         const auth = await getAuthAndModels(request, ['User']);
         if (!auth.success) {
             return NextResponse.json({ message: auth.message }, { status: 401 });
         }
-        const { models } = auth;
+        const { user, models } = auth;
         const { User } = models;
 
         const { preferences } = await request.json();
@@ -196,8 +150,9 @@ export async function PUT(request) {
             );
         }
 
+        const userId = user._id || user.userId;
         const userRecord = await User.findByIdAndUpdate(
-            decoded.userId,
+            userId,
             { notificationPreferences: preferences },
             { new: true }
         );

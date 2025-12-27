@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { writeFile, mkdir, unlink } from 'fs/promises'
 import path from 'path'
 import { existsSync } from 'fs'
@@ -37,15 +37,13 @@ const isImageKitConfigured = () => {
 
 export async function POST(request) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['User', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
+    const { user, models } = auth
+    const { User, Employee } = models
 
     const formData = await request.formData()
     const file = formData.get('file')
@@ -65,21 +63,14 @@ export async function POST(request) {
     }
 
     // Get employee info for folder structure
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User', 'Employee'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
-    const { models } = auth
-    const { User, Employee } = models
-
-    const user = await User.findById(decoded.userId).select('employeeId')
+    const userId = user._id || user.userId
+    const currentUser = await User.findById(userId).select('employeeId')
     let employee = null
-    if (user?.employeeId) {
-      employee = await Employee.findById(user.employeeId).select('firstName lastName employeeCode')
+    if (currentUser?.employeeId) {
+      employee = await Employee.findById(currentUser.employeeId).select('firstName lastName employeeCode')
     }
     if (!employee) {
-      employee = await Employee.findOne({ userId: decoded.userId }).select('firstName lastName employeeCode')
+      employee = await Employee.findOne({ userId: userId }).select('firstName lastName employeeCode')
     }
 
     // Convert file to buffer

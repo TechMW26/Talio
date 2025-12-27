@@ -1,32 +1,27 @@
 import { NextResponse } from 'next/server'
-import { verifyTokenFromRequest, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
 
 export async function GET(request) {
   try {
-    // Verify authentication
-    const authResult = await verifyTokenFromRequest(request)
-    if (!authResult.success) {
-      return NextResponse.json(
-        { message: authResult.message },
-        { status: 401 }
-      )
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
+    const { user, models } = auth
+    const { User } = models
 
     // Only admin can view all users
-    if (authResult.user.role !== 'admin') {
+    if (user.role !== 'admin') {
       return NextResponse.json(
         { message: 'Access denied. Admin only.' },
         { status: 403 }
       )
     }
 
-    // TODO: MIGRATION - Replace verifyTokenFromRequest with getAuthAndModels
-    // const { success, user, models, message } = await getAuthAndModels(request, ['User'])
-    // if (!success) return NextResponse.json({ message }, { status: 401 })
-    // const { User } = models
     // Fetch all users with passwords and populate employee data
     const users = await User.find({})
       .select('+password') // Include password field

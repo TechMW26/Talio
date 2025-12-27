@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { writeFile, mkdir } from 'fs/promises'
 import path from 'path'
 
@@ -10,23 +10,13 @@ export async function POST(request, { params }) {
   try {
     const { id } = await params
 
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Meeting', 'Employee', 'User']);
+    const auth = await getAuthAndModels(request, ['Meeting', 'Employee', 'User'])
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 });
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth;
-    const { Meeting, Employee, User } = models;
+    const { user, models } = auth
+    const { Meeting, Employee, User } = models
 
     const formData = await request.formData();
     const audioFile = formData.get('audio');
@@ -40,16 +30,16 @@ export async function POST(request, { params }) {
     }
 
     // Get current user's employee record - first check User.employeeId, then Employee.userId
-    const userRecord = await User.findById(decoded.userId).select('employeeId').lean();
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId').lean()
     
-    let employee = null;
+    let employee = null
     if (userRecord?.employeeId) {
-      employee = await Employee.findById(userRecord.employeeId).lean();
+      employee = await Employee.findById(userRecord.employeeId).lean()
     }
     
     // If user doesn't have employeeId directly, try to find employee by userId
     if (!employee) {
-      employee = await Employee.findOne({ userId: decoded.userId }).lean()
+      employee = await Employee.findOne({ userId: user._id || user.userId }).lean()
     }
 
     if (!employee) {
@@ -128,40 +118,30 @@ export async function POST(request, { params }) {
 // PUT - Update audio consent for offline meeting
 export async function PUT(request, { params }) {
   try {
-    const { id } = await params;
-
-    const token = request.headers.get('authorization')?.split(' ')[1];
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 });
-    }
-
-    const decoded = await verifyToken(token);
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 });
-    }
+    const { id } = await params
 
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Meeting', 'Employee', 'User']);
+    const auth = await getAuthAndModels(request, ['Meeting', 'Employee', 'User'])
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 });
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth;
-    const { Meeting, Employee, User } = models;
+    const { user, models } = auth
+    const { Meeting, Employee, User } = models
 
-    const data = await request.json();
-    const { consent } = data;
+    const data = await request.json()
+    const { consent } = data
 
     // Get current user's employee record - first check User.employeeId, then Employee.userId
-    const userRecord = await User.findById(decoded.userId).select('employeeId').lean();
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId').lean()
     
-    let employee = null;
+    let employee = null
     if (userRecord?.employeeId) {
-      employee = await Employee.findById(userRecord.employeeId).lean();
+      employee = await Employee.findById(userRecord.employeeId).lean()
     }
     
     // If user doesn't have employeeId directly, try to find employee by userId
     if (!employee) {
-      employee = await Employee.findOne({ userId: decoded.userId }).lean();
+      employee = await Employee.findOne({ userId: user._id || user.userId }).lean()
     }
 
     if (!employee) {

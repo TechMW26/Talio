@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-import jwt from 'jsonwebtoken'
+
 // POST - Mark all messages in a chat as read
 export async function POST(request, context) {
   try {
@@ -12,16 +12,8 @@ export async function POST(request, context) {
     const { user, models } = auth
     const { Chat, Employee, User } = models
 
-    // Get user from token
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET)
-
     // Get user to find employee ID
-    const userDoc = await User.findById(decoded.userId).select('employeeId')
+    const userDoc = await User.findById(user._id || user.userId).select('employeeId')
     if (!userDoc || !userDoc.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }

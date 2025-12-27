@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { verifyToken } from '@/lib/auth';
+import { getAuthAndModels } from '@/lib/auth';
 
 /**
  * POST /api/ideas/expand
@@ -7,16 +7,11 @@ import { verifyToken } from '@/lib/auth';
  */
 export async function POST(request) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+    const auth = await getAuthAndModels(request, []);
+    if (!auth.success) {
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 });
     }
-
-    const token = authHeader.substring(7);
-    const decoded = await verifyToken(token);
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 });
-    }
+    const { user } = auth;
 
     const body = await request.json();
     const { title, description, category } = body;

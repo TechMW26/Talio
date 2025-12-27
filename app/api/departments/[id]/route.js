@@ -40,6 +40,14 @@ export async function GET(request, { params }) {
 // PUT - Update department
 export async function PUT(request, { params }) {
   try {
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Department', 'User', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Department, User, Employee } = models
+
     const data = await request.json()
     
     // Get current department to compare heads
@@ -97,7 +105,7 @@ export async function PUT(request, { params }) {
     }
     
     // Sync department head status to User meta (fire and forget)
-    updateDepartmentHeadsForDepartment(params.id, previousHeads, newHeads)
+    updateDepartmentHeadsForDepartment(params.id, previousHeads, newHeads, { User, Employee, Department })
       .catch(err => console.error('Error syncing department heads:', err))
 
     return NextResponse.json({
@@ -117,6 +125,14 @@ export async function PUT(request, { params }) {
 // DELETE - Delete department
 export async function DELETE(request, { params }) {
   try {
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Department', 'User', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Department, User, Employee } = models
+
     // Get department to remove heads
     const department = await Department.findById(params.id).lean()
     if (!department) {
@@ -144,7 +160,7 @@ export async function DELETE(request, { params }) {
     
     // Sync department head status - remove this department from heads (fire and forget)
     if (previousHeads.length > 0) {
-      updateDepartmentHeadsForDepartment(params.id, previousHeads, [])
+      updateDepartmentHeadsForDepartment(params.id, previousHeads, [], { User, Employee, Department })
         .catch(err => console.error('Error syncing department heads:', err))
     }
 

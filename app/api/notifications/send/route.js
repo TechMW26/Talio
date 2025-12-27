@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-import { jwtVerify } from 'jose'
 import { sendPushToUsers } from '@/lib/pushNotification'
 
 export async function POST(request) {
@@ -12,26 +11,14 @@ export async function POST(request) {
     }
     const { user, models } = auth
     const { User, Employee, Department, Notification } = models
-
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    const token = authHeader.substring(7)
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET)
-    const { payload: decoded } = await jwtVerify(token, secret)
+    const userId = user._id || user.userId
 
     // Get current user's employee data to check if they're a department head
-    const currentUser = await User.findById(decoded.userId)
+    const currentUser = await User.findById(userId)
 
     console.log('[Notifications] Current user:', {
-      userId: decoded.userId,
-      role: decoded.role,
+      userId: userId,
+      role: user.role,
       hasEmployeeId: !!currentUser?.employeeId
     })
 
@@ -58,11 +45,11 @@ export async function POST(request) {
     }
 
     // Check if user has permission (admin, hr, admin, department_head role, or is a department head)
-    const hasPermission = ['admin', 'hr', 'department_head'].includes(decoded.role) ||
+    const hasPermission = ['admin', 'hr', 'department_head'].includes(user.role) ||
                          !!userDepartment
 
     console.log('[Notifications] Permission check:', {
-      role: decoded.role,
+      role: user.role,
       hasPermission,
       isDepartmentHead: !!userDepartment
     })
@@ -116,10 +103,10 @@ export async function POST(request) {
     }
 
     // Determine if user is department head (by role or by being head of a department)
-    const isDeptHead = decoded.role === 'department_head' || !!userDepartment
+    const isDeptHead = user.role === 'department_head' || !!userDepartment
 
     // Department heads need an employee record to send notifications
-    if (isDeptHead && !['admin', 'hr'].includes(decoded.role) && !currentEmployee) {
+    if (isDeptHead && !['admin', 'hr'].includes(user.role) && !currentEmployee) {
       return NextResponse.json(
         { success: false, message: 'Employee record not found. Please contact administrator.' },
         { status: 403 }
@@ -127,7 +114,7 @@ export async function POST(request) {
     }
 
     // Department heads (non-admin/hr/admin) cannot use 'department' or 'role' target types
-    if (isDeptHead && !['admin', 'hr'].includes(decoded.role)) {
+    if (isDeptHead && !['admin', 'hr'].includes(user.role)) {
       if (targetType === 'department') {
         return NextResponse.json(
           { success: false, message: 'Department heads can only send to their own department members' },
@@ -147,7 +134,7 @@ export async function POST(request) {
 
     if (targetType === 'all') {
       // Department heads can only send to their department
-      if (isDeptHead && !['admin', 'hr'].includes(decoded.role)) {
+      if (isDeptHead && !['admin', 'hr'].includes(user.role)) {
         const deptEmployees = await Employee.find({
           department: userDepartment._id,
           status: 'active'
@@ -164,7 +151,7 @@ export async function POST(request) {
     } else if (targetType === 'department') {
       // Department heads can only send to their own department
       let deptId = targetDepartment
-      if (isDeptHead && !['admin', 'hr'].includes(decoded.role)) {
+      if (isDeptHead && !['admin', 'hr'].includes(user.role)) {
         deptId = userDepartment._id
       }
 
@@ -185,7 +172,7 @@ export async function POST(request) {
       }
 
       // Department heads can only send to users in their department
-      if (isDeptHead && !['admin', 'hr'].includes(decoded.role)) {
+      if (isDeptHead && !['admin', 'hr'].includes(user.role)) {
         const deptEmployees = await Employee.find({
           department: userDepartment._id,
           status: 'active'
@@ -214,7 +201,7 @@ export async function POST(request) {
       }
 
       // Department heads can only send to users in their department
-      if (isDeptHead && !['admin', 'hr'].includes(decoded.role)) {
+      if (isDeptHead && !['admin', 'hr'].includes(user.role)) {
         const deptEmployees = await Employee.find({
           department: userDepartment._id,
           status: 'active'
@@ -261,12 +248,12 @@ export async function POST(request) {
         message,
         url: url || '/dashboard',
         targetType,
-        targetDepartment: targetType === 'department' ? (isDeptHead && !['admin', 'hr'].includes(decoded.role) && userDepartment ? userDepartment._id : targetDepartment) : null,
+        targetDepartment: targetType === 'department' ? (isDeptHead && !['admin', 'hr'].includes(user.role) && userDepartment ? userDepartment._id : targetDepartment) : null,
         targetUsers: targetType === 'specific' ? userIds : [],
         targetRoles: targetType === 'role' ? targetRoles : [],
         scheduledFor: new Date(scheduledFor),
-        createdBy: currentEmployee ? currentEmployee._id : decoded.userId,
-        createdByRole: decoded.role,
+        createdBy: currentEmployee ? currentEmployee._id : userId,
+        createdByRole: user.role,
         recipientCount: userIds.length
       })
 
@@ -281,19 +268,19 @@ export async function POST(request) {
     const notificationRecords = []
     const now = new Date()
 
-    for (const userId of userIds) {
+    for (const targetUserId of userIds) {
       const notificationData = {
-        user: userId,
+        user: targetUserId,
         title,
         message,
         url: url || '/dashboard',
         type: 'custom',
         priority: 'medium',
         data: {
-          sentBy: currentEmployee ? currentEmployee._id.toString() : decoded.userId
+          sentBy: currentEmployee ? currentEmployee._id.toString() : userId
         },
         sentBy: currentEmployee ? currentEmployee._id : null,
-        sentByRole: decoded.role,
+        sentByRole: user.role,
         deliveryStatus: {
           fcm: { sent: false }
         },
@@ -329,7 +316,7 @@ export async function POST(request) {
           {
             data: {
               type: 'custom',
-              sentBy: currentEmployee ? currentEmployee._id.toString() : decoded.userId,
+              sentBy: currentEmployee ? currentEmployee._id.toString() : userId,
               url: url || '/dashboard'
             },
             url: url || '/dashboard',
@@ -378,13 +365,13 @@ export async function POST(request) {
         message,
         url: url || '/dashboard',
         targetType,
-        targetDepartment: targetType === 'department' ? (isDeptHead && !['admin', 'hr'].includes(decoded.role) && userDepartment ? userDepartment._id : targetDepartment) : null,
+        targetDepartment: targetType === 'department' ? (isDeptHead && !['admin', 'hr'].includes(user.role) && userDepartment ? userDepartment._id : targetDepartment) : null,
         targetUsers: targetType === 'specific' ? userIds : [],
         targetRoles: targetType === 'role' ? targetRoles : [],
         scheduledFor: now,
         sentAt: now,
-        createdBy: currentEmployee ? currentEmployee._id : decoded.userId,
-        createdByRole: decoded.role,
+        createdBy: currentEmployee ? currentEmployee._id : userId,
+        createdByRole: user.role,
         recipientCount: userIds.length,
         status: 'sent'
       })

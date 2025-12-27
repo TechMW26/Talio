@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { sendPushToUser } from '@/lib/pushNotification'
 import { sendMeetingInviteEmail } from '@/lib/mailer'
 import crypto from 'crypto'
@@ -14,22 +14,12 @@ function generateRoomId() {
 // GET - List meetings
 export async function GET(request) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Meeting', 'Employee', 'Department', 'User'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Meeting, Employee, Department, User } = models
 
     const { searchParams } = new URL(request.url)
@@ -43,16 +33,16 @@ export async function GET(request) {
     const limit = parseInt(searchParams.get('limit') || '20')
 
     // Get employee ID from user - first check User.employeeId, then Employee.userId
-    const user = await User.findById(decoded.userId).select('employeeId').lean()
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId').lean()
     
     let employee = null
-    if (user?.employeeId) {
-      employee = await Employee.findById(user.employeeId).lean()
+    if (userRecord?.employeeId) {
+      employee = await Employee.findById(userRecord.employeeId).lean()
     }
     
     // If user doesn't have employeeId directly, try to find employee by userId
     if (!employee) {
-      employee = await Employee.findOne({ userId: decoded.userId }).lean()
+      employee = await Employee.findOne({ userId: user._id || user.userId }).lean()
     }
 
     if (!employee) {

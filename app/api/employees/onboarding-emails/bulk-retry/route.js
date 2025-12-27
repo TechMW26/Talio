@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { retryOnboardingEmail } from '@/lib/mailer'
 
 /**
@@ -7,31 +7,18 @@ import { retryOnboardingEmail } from '@/lib/mailer'
  */
 export async function POST(request) {
   try {
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
-    }
-    
-    const token = authHeader.split(' ')[1]
-    const payload = await verifyToken(token)
-    
-    if (!payload) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-    
-    // Only admin and HR can retry emails
-    if (!['admin', 'hr'].includes(payload.role)) {
-      return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
-    }
-    
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['OnboardingEmail'])
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
     const { OnboardingEmail } = models
+    
+    // Only admin and HR can retry emails
+    if (!['admin', 'hr'].includes(user.role)) {
+      return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
+    }
 
     const { emailIds } = await request.json()
     
@@ -55,7 +42,7 @@ export async function POST(request) {
     // Process emails sequentially to avoid overwhelming the email server
     for (const emailId of emailIds) {
       try {
-        const result = await retryOnboardingEmail(emailId, payload.userId)
+        const result = await retryOnboardingEmail(emailId, user._id || user.userId)
         
         if (result.success) {
           results.successful.push(emailId)

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import mongoose from 'mongoose'
 import { 
   checkProjectAccess, 
@@ -12,22 +12,12 @@ import { emitTaskUpdate } from '@/lib/realtimeEvents'
 // GET - Get tasks for a project
 export async function GET(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'Task', 'TaskAssignee', 'User', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Project, ProjectMember, Task, TaskAssignee, User, Employee } = models
 
     const { projectId } = await params
@@ -35,15 +25,15 @@ export async function GET(request, { params }) {
     const status = searchParams.get('status')
     const assignedTo = searchParams.get('assignedTo')
 
-    const user = await User.findById(decoded.userId).select('employeeId role')
-    if (!user || !user.employeeId) {
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId role')
+    if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
     // Check access - pass models for multi-tenant
-    const isAdmin = ['admin', 'hr'].includes(user.role)
+    const isAdmin = ['admin', 'hr'].includes(userRecord.role || user.role)
     if (!isAdmin) {
-      const { hasAccess } = await checkProjectAccess(projectId, user.employeeId, 'view', models)
+      const { hasAccess } = await checkProjectAccess(projectId, userRecord.employeeId, 'view', models)
       if (!hasAccess) {
         return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
       }
@@ -97,28 +87,18 @@ export async function GET(request, { params }) {
 // POST - Create a new task
 export async function POST(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'Task', 'TaskAssignee', 'User', 'Employee', 'ProjectTimelineEvent'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Project, ProjectMember, Task, TaskAssignee, User, Employee } = models
 
     const { projectId } = await params
 
-    const user = await User.findById(decoded.userId).select('employeeId role')
-    if (!user || !user.employeeId) {
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId role')
+    if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -128,9 +108,9 @@ export async function POST(request, { params }) {
     }
 
     // Check if user can create tasks (must be accepted member) - pass models for multi-tenant
-    const isAdmin = ['admin'].includes(user.role)
+    const isAdmin = ['admin'].includes(userRecord.role || user.role)
     if (!isAdmin) {
-      const { hasAccess } = await checkProjectAccess(projectId, user.employeeId, 'participate', models)
+      const { hasAccess } = await checkProjectAccess(projectId, userRecord.employeeId, 'participate', models)
       if (!hasAccess) {
         return NextResponse.json({ 
           success: false, 
@@ -179,7 +159,7 @@ export async function POST(request, { params }) {
     let calculatedStartDate = startDate ? new Date(startDate) : undefined
     let calculatedDueDate = dueDate ? new Date(dueDate) : undefined
     
-    if (estimatedHours && assigneeIds.includes(user.employeeId.toString())) {
+    if (estimatedHours && assigneeIds.includes(userRecord.employeeId.toString())) {
       calculatedStartDate = new Date()
       const workDays = Math.ceil(estimatedHours / 8)
       calculatedDueDate = new Date()
@@ -193,8 +173,8 @@ export async function POST(request, { params }) {
       description,
       status: 'todo',
       priority: priority || 'medium',
-      createdBy: user.employeeId,
-      assignedBy: assigneeIds.length > 0 ? user.employeeId : undefined,
+      createdBy: userRecord.employeeId,
+      assignedBy: assigneeIds.length > 0 ? userRecord.employeeId : undefined,
       dueDate: calculatedDueDate,
       startDate: calculatedStartDate,
       tags: tags || [],
@@ -205,7 +185,7 @@ export async function POST(request, { params }) {
       progressPercentage
     })
 
-    const creatorEmployee = await Employee.findById(user.employeeId)
+    const creatorEmployee = await Employee.findById(userRecord.employeeId)
 
     // Create task_created timeline event - pass models for multi-tenant
     const taskDescription = estimatedHours && assigneeIds.includes(user.employeeId.toString())

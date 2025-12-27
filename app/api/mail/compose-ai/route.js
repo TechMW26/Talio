@@ -1,27 +1,17 @@
 import { NextResponse } from 'next/server';
-import { jwtVerify } from 'jose';
+import { getAuthAndModels } from '@/lib/auth';
 import { generateSmartContent } from '@/lib/promptEngine';
 
 export const dynamic = 'force-dynamic';
 
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'fallback-secret-key');
-
 export async function POST(request) {
   try {
-    // Verify authentication
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, []);
+    if (!auth.success) {
+      return NextResponse.json({ success: false, error: auth.message }, { status: 401 });
     }
-
-    const token = authHeader.substring(7);
-    let payload;
-    try {
-      const verified = await jwtVerify(token, JWT_SECRET);
-      payload = verified.payload;
-    } catch (err) {
-      return NextResponse.json({ success: false, error: 'Invalid token' }, { status: 401 });
-    }
+    const { user } = auth;
 
     const { prompt, context, tone = 'professional', type = 'compose' } = await request.json();
 
@@ -61,7 +51,7 @@ EMAIL TOPIC/INSTRUCTIONS:
     }
 
     const content = await generateSmartContent(userMessage, {
-      userId: payload.userId,
+      userId: user._id || user.userId,
       feature: 'mail-compose',
       systemInstruction: systemPrompt,
       skipGuardrails: true // We want HTML format, not plain text human conversation

@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { sendAnnouncementNotification } from '@/lib/notificationService'
-import jwt from 'jsonwebtoken'
 import { emitDashboardRefresh, REALTIME_EVENTS } from '@/lib/realtimeEvents'
 
 // GET - List announcements
@@ -19,29 +18,26 @@ export async function GET(request) {
     const limit = parseInt(searchParams.get('limit')) || 10
     const status = searchParams.get('status') || 'published'
 
-    // Get user info from token to filter department announcements
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
+    // Get user info from auth to filter department announcements
     let userDepartment = null
     let userRole = null
 
-    if (token) {
-      try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET)
-        const user = await User.findById(decoded.userId).select('role')
-        const employee = await Employee.findOne({ userId: decoded.userId }).select('department')
-        
-        if (user) {
-          userRole = user.role
-        }
-        if (employee) {
-          userDepartment = employee.department
-        }
-
-        console.log('[Announcements GET] User role:', userRole)
-        console.log('[Announcements GET] User department:', userDepartment?.toString())
-      } catch (err) {
-        console.error('[Announcements GET] Token verification error:', err)
+    try {
+      const userId = auth.user._id || auth.user.userId
+      const userDoc = await User.findById(userId).select('role')
+      const employee = await Employee.findOne({ userId }).select('department')
+      
+      if (userDoc) {
+        userRole = userDoc.role
       }
+      if (employee) {
+        userDepartment = employee.department
+      }
+
+      console.log('[Announcements GET] User role:', userRole)
+      console.log('[Announcements GET] User department:', userDepartment?.toString())
+    } catch (err) {
+      console.error('[Announcements GET] Error getting user info:', err)
     }
 
     const query = { status }
@@ -106,106 +102,82 @@ export async function GET(request) {
 // POST - Create announcement
 export async function POST(request) {
   try {
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Announcement', 'User', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Announcement, User, Employee } = models
+
     const data = await request.json()
 
-    // Get user info from token
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    
-    if (!token) {
-      return NextResponse.json(
-        { success: false, message: 'Authorization token is required' },
-        { status: 401 }
-      )
-    }
-
-    let creatorRole = null
+    let creatorRole = user.role
     let creatorDepartment = null
     let creatorEmployeeId = null
 
-    try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET)
-      const user = await User.findById(decoded.userId).select('role employeeId')
-      
-      console.log('[Announcement] Token decoded:', { userId: decoded.userId })
-      console.log('[Announcement] User found:', user ? 'Yes' : 'No', user?.role)
-
-      if (!user) {
-        return NextResponse.json(
-          { success: false, message: 'User not found' },
-          { status: 404 }
-        )
-      }
-
-      // Get employee profile - try both userId and employeeId reference
-      let employee = await Employee.findOne({ userId: decoded.userId }).select('_id department')
-      
-      // If not found by userId, try using employeeId from User model
-      if (!employee && user.employeeId) {
-        employee = await Employee.findById(user.employeeId).select('_id department')
-      }
-
-      console.log('[Announcement] Employee found:', employee ? 'Yes' : 'No', employee?._id?.toString())
-
-      if (!employee) {
-        return NextResponse.json(
-          { success: false, message: 'Employee profile not found. Please ensure your employee profile is linked to your account.' },
-          { status: 404 }
-        )
-      }
-
-      creatorRole = user.role
-      creatorEmployeeId = employee._id
-      creatorDepartment = employee.department
-
-      // Set createdBy field (required by Announcement model)
-      data.createdBy = employee._id
-      
-      console.log('[Announcement] Setting createdBy to:', employee._id.toString())
-      console.log('[Announcement] Data before create:', { 
-        title: data.title, 
-        createdBy: data.createdBy?.toString(),
-        createdByRole: user.role,
-        department: employee.department?.toString()
-      })
-
-      // If user is department head, set department-specific fields
-      if (user.role === 'department_head') {
-        data.isDepartmentAnnouncement = true
-        data.departments = [creatorDepartment]
-        data.targetAudience = 'department'
-      }
-
-      // If user is manager, set team-specific fields
-      if (user.role === 'manager') {
-        data.isDepartmentAnnouncement = true
-        data.targetAudience = 'department'
-        // Department should already be set from frontend, but ensure it's set
-        if (!data.departments || data.departments.length === 0) {
-          data.departments = [creatorDepartment]
-        }
-      }
-
-      // Add creator role to announcement
-      data.createdByRole = creatorRole
-
-      // Set status to 'published' if not explicitly set
-      if (!data.status) {
-        data.status = 'published'
-      }
-
-      console.log('[Announcement] Final data:', {
-        title: data.title,
-        status: data.status,
-        targetAudience: data.targetAudience,
-        isDepartmentAnnouncement: data.isDepartmentAnnouncement
-      })
-    } catch (err) {
-      console.error('[Announcement] Token verification error:', err)
+    // Get employee profile from auth user
+    const employeeId = user.employeeId?._id || user.employeeId
+    if (!employeeId) {
       return NextResponse.json(
-        { success: false, message: 'Invalid or expired token' },
-        { status: 401 }
+        { success: false, message: 'Employee profile not found. Please ensure your employee profile is linked to your account.' },
+        { status: 404 }
       )
     }
+
+    const employee = await Employee.findById(employeeId).select('_id department')
+    if (!employee) {
+      return NextResponse.json(
+        { success: false, message: 'Employee profile not found.' },
+        { status: 404 }
+      )
+    }
+
+    creatorEmployeeId = employee._id
+    creatorDepartment = employee.department
+
+    // Set createdBy field (required by Announcement model)
+    data.createdBy = employee._id
+    
+    console.log('[Announcement] Setting createdBy to:', employee._id.toString())
+    console.log('[Announcement] Data before create:', { 
+      title: data.title, 
+      createdBy: data.createdBy?.toString(),
+      createdByRole: user.role,
+      department: employee.department?.toString()
+    })
+
+    // If user is department head, set department-specific fields
+    if (user.role === 'department_head') {
+      data.isDepartmentAnnouncement = true
+      data.departments = [creatorDepartment]
+      data.targetAudience = 'department'
+    }
+
+    // If user is manager, set team-specific fields
+    if (user.role === 'manager') {
+      data.isDepartmentAnnouncement = true
+      data.targetAudience = 'department'
+      // Department should already be set from frontend, but ensure it's set
+      if (!data.departments || data.departments.length === 0) {
+        data.departments = [creatorDepartment]
+      }
+    }
+
+    // Add creator role to announcement
+    data.createdByRole = creatorRole
+
+    // Set status to 'published' if not explicitly set
+    if (!data.status) {
+      data.status = 'published'
+    }
+
+    console.log('[Announcement] Final data:', {
+      title: data.title,
+      status: data.status,
+      targetAudience: data.targetAudience,
+      isDepartmentAnnouncement: data.isDepartmentAnnouncement
+    })
 
     const announcement = await Announcement.create(data)
 

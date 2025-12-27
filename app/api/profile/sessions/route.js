@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 
 // GET - List all active sessions for current user
 export async function GET(request) {
@@ -12,22 +12,12 @@ export async function GET(request) {
     const { user, models } = auth
     const { UserSession } = models
 
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const payload = await verifyToken(token)
-    if (!payload) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
-    }
-
     // Get current session's token ID if available
-    const currentTokenId = payload.tokenId || null
+    const currentTokenId = user.tokenId || null
 
     // Fetch all active sessions for this user
     const sessions = await UserSession.find({
-      user: payload.userId,
+      user: user._id || user.userId,
       isActive: true,
       expiresAt: { $gt: new Date() },
     })
@@ -70,21 +60,11 @@ export async function DELETE(request) {
     const { user, models } = auth
     const { UserSession } = models
 
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const payload = await verifyToken(token)
-    if (!payload) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
-    }
-
-    const currentTokenId = payload.tokenId || null
+    const currentTokenId = user.tokenId || null
 
     // Build query to revoke all sessions except current
     const query = {
-      user: payload.userId,
+      user: user._id || user.userId,
       isActive: true,
     }
 
@@ -99,7 +79,7 @@ export async function DELETE(request) {
       revokedReason: 'user_logout',
     })
 
-    console.log(`[sessions] Revoked ${result.modifiedCount} sessions for user ${payload.userId}`)
+    console.log(`[sessions] Revoked ${result.modifiedCount} sessions for user ${user._id || user.userId}`)
 
     return NextResponse.json({
       success: true,

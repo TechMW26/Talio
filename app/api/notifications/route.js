@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-import { jwtVerify } from 'jose'
 // GET - Fetch user's notifications
 export async function GET(request) {
   try {
@@ -11,19 +10,7 @@ export async function GET(request) {
     }
     const { user, models } = auth
     const { Notification } = models
-
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    const token = authHeader.substring(7)
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET)
-    const { payload: decoded } = await jwtVerify(token, secret)
+    const userId = user._id || user.userId
 
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
@@ -31,7 +18,7 @@ export async function GET(request) {
     const unreadOnly = searchParams.get('unreadOnly') === 'true'
 
     // Build query
-    const query = { user: decoded.userId }
+    const query = { user: userId }
     if (unreadOnly) {
       query.read = false
     }
@@ -49,7 +36,7 @@ export async function GET(request) {
 
     // Get unread count
     const unreadCount = await Notification.countDocuments({
-      user: decoded.userId,
+      user: userId,
       read: false
     })
 
@@ -76,18 +63,14 @@ export async function GET(request) {
 // PATCH - Mark notification(s) as read
 export async function PATCH(request) {
   try {
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      )
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Notification'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-
-    const token = authHeader.substring(7)
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET)
-    const { payload: decoded } = await jwtVerify(token, secret)
+    const { user, models } = auth
+    const { Notification } = models
+    const userId = user._id || user.userId
 
     const data = await request.json()
     const { notificationIds, markAllAsRead } = data
@@ -95,7 +78,7 @@ export async function PATCH(request) {
     if (markAllAsRead) {
       // Mark all notifications as read
       await Notification.updateMany(
-        { user: decoded.userId, read: false },
+        { user: userId, read: false },
         { read: true, readAt: new Date() }
       )
 
@@ -106,7 +89,7 @@ export async function PATCH(request) {
     } else if (notificationIds && Array.isArray(notificationIds)) {
       // Mark specific notifications as read
       await Notification.updateMany(
-        { _id: { $in: notificationIds }, user: decoded.userId },
+        { _id: { $in: notificationIds }, user: userId },
         { read: true, readAt: new Date() }
       )
 
@@ -132,18 +115,14 @@ export async function PATCH(request) {
 // DELETE - Delete notification(s)
 export async function DELETE(request) {
   try {
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      )
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Notification'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-
-    const token = authHeader.substring(7)
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET)
-    const { payload: decoded } = await jwtVerify(token, secret)
+    const { user, models } = auth
+    const { Notification } = models
+    const userId = user._id || user.userId
 
     const { searchParams } = new URL(request.url)
     const notificationId = searchParams.get('id')
@@ -152,7 +131,7 @@ export async function DELETE(request) {
     if (deleteAll) {
       // Delete all read notifications
       const result = await Notification.deleteMany({
-        user: decoded.userId,
+        user: userId,
         read: true
       })
 
@@ -164,7 +143,7 @@ export async function DELETE(request) {
       // Delete specific notification
       const result = await Notification.deleteOne({
         _id: notificationId,
-        user: decoded.userId
+        user: userId
       })
 
       if (result.deletedCount === 0) {

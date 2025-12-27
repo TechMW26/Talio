@@ -48,6 +48,14 @@ export async function GET(request) {
 // POST - Create expense
 export async function POST(request) {
   try {
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Expense', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Expense, User } = models
+
     const data = await request.json()
 
     // Set status to 'submitted' for approval instead of 'draft'

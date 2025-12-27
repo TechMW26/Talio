@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 
 // Calculate distance between two coordinates (Haversine formula)
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -119,22 +119,12 @@ async function checkMultipleGeofences(latitude, longitude, employeeId, departmen
 // POST - Log geofence event
 export async function POST(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['GeofenceLog', 'GeofenceLocation', 'Employee', 'User', 'CompanySettings']);
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 });
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 });
     }
-    const { models } = auth;
+    const { user, models } = auth;
     const { GeofenceLog, GeofenceLocation, Employee, User, CompanySettings } = models;
 
     const { latitude, longitude, accuracy, eventType, reason } = await request.json();
@@ -147,7 +137,8 @@ export async function POST(request) {
     }
 
     // Get user and employee data
-    const userRecord = await User.findById(decoded.userId).populate('employeeId');
+    const userId = user._id || user.userId;
+    const userRecord = await User.findById(userId).populate('employeeId');
     if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json(
         { success: false, message: 'Employee not found' },
@@ -288,22 +279,12 @@ export async function POST(request) {
 // GET - Get geofence logs (filtered by role and department)
 export async function GET(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '');
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 });
-    }
-
-    const decoded = await verifyToken(token);
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 });
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['GeofenceLog', 'Employee', 'User']);
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 });
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 });
     }
-    const { models } = auth;
+    const { user, models } = auth;
     const { GeofenceLog, Employee, User } = models;
 
     const { searchParams } = new URL(request.url);
@@ -312,7 +293,8 @@ export async function GET(request) {
     const limit = parseInt(searchParams.get('limit')) || 50;
 
     // Get user and employee data
-    const userRecord = await User.findById(decoded.userId).populate('employeeId');
+    const userId = user._id || user.userId;
+    const userRecord = await User.findById(userId).populate('employeeId');
     if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json(
         { success: false, message: 'Employee not found' },
@@ -325,12 +307,12 @@ export async function GET(request) {
     let query = {}
 
     // Role-based filtering
-    if (decoded.role === 'admin' || decoded.role === 'hr') {
+    if (user.role === 'admin' || user.role === 'hr') {
       // Admin and HR can see all logs
       if (employeeId) {
         query.employee = employeeId
       }
-    } else if (decoded.role === 'manager') {
+    } else if (user.role === 'manager') {
       // Managers can only see their department's logs
       query.department = employee.department
     } else {

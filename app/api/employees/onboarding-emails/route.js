@@ -1,36 +1,23 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 
 /**
  * GET - Fetch onboarding email history with filters
  */
 export async function GET(request) {
   try {
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
-    }
-    
-    const token = authHeader.split(' ')[1]
-    const payload = await verifyToken(token)
-    
-    if (!payload) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-    
-    // Only admin and HR can access this
-    if (!['admin', 'hr'].includes(payload.role)) {
-      return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
-    }
-    
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['OnboardingEmail', 'CompanySettings'])
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
     const { OnboardingEmail, CompanySettings } = models
+    
+    // Only admin and HR can access this
+    if (!['admin', 'hr'].includes(user.role)) {
+      return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
+    }
 
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page')) || 1
@@ -111,21 +98,16 @@ export async function GET(request) {
  */
 export async function PATCH(request) {
   try {
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['CompanySettings'])
+    if (!auth.success) {
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
-    
-    const token = authHeader.split(' ')[1]
-    const payload = await verifyToken(token)
-    
-    if (!payload) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
+    const { user, models } = auth
+    const { CompanySettings } = models
     
     // Only admin can toggle this setting
-    if (payload.role !== 'admin') {
+    if (user.role !== 'admin') {
       return NextResponse.json({ success: false, message: 'Only admin can change this setting' }, { status: 403 })
     }
     
@@ -146,7 +128,7 @@ export async function PATCH(request) {
       { new: true, upsert: true }
     )
     
-    console.log(`[Onboarding Emails] Auto-send ${enabled ? 'enabled' : 'disabled'} by ${payload.email}`)
+    console.log(`[Onboarding Emails] Auto-send ${enabled ? 'enabled' : 'disabled'} by ${user.email}`)
     
     return NextResponse.json({
       success: true,

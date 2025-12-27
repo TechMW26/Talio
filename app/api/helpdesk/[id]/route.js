@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { sendPushToUser } from '@/lib/pushNotification'
+
 // GET - Get single ticket
 export async function GET(request, { params }) {
   try {
@@ -39,6 +41,14 @@ export async function GET(request, { params }) {
 // PUT - Update ticket
 export async function PUT(request, { params }) {
   try {
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Helpdesk', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Helpdesk, Employee } = models
+
     const data = await request.json()
 
     const ticket = await Helpdesk.findByIdAndUpdate(
@@ -59,7 +69,6 @@ export async function PUT(request, { params }) {
     // Emit Socket.IO event for ticket updates
     try {
       const io = global.io
-      const { sendPushToUser } = require('@/lib/pushNotification')
 
       if (io) {
         // Notify employee who created the ticket
@@ -117,7 +126,6 @@ export async function PUT(request, { params }) {
 
         // Notify assigned agent
         if (data.assignedTo) {
-          const Employee = require('@/models/Employee').default
           const assignedDoc = await Employee.findById(data.assignedTo).select('userId')
           const assignedUserId = assignedDoc?.userId
 

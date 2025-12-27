@@ -1,19 +1,9 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 
 // POST - Send daily goal reminders
 export async function POST(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded || !['admin', 'hr', 'system'].includes(decoded.role)) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 403 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['DailyGoal', 'Employee'])
     if (!auth.success) {
@@ -21,6 +11,10 @@ export async function POST(request) {
     }
     const { user, models } = auth
     const { DailyGoal, Employee } = models
+
+    if (!['admin', 'hr', 'system'].includes(user.role)) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 403 })
+    }
 
     const { reminderType, employeeIds } = await request.json()
     
@@ -208,18 +202,17 @@ export async function POST(request) {
 // GET - Get reminder status for today
 export async function GET(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['DailyGoal'])
+    if (!auth.success) {
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
+    const { user, models } = auth
+    const { DailyGoal } = models
 
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
+    const userId = user._id || user.userId
     const { searchParams } = new URL(request.url)
-    const employeeId = searchParams.get('employeeId') || decoded.userId
+    const employeeId = searchParams.get('employeeId') || userId
 
     const today = new Date()
     const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate())

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { checkProjectAccess, createTimelineEvent } from '@/lib/projectService'
 import {
   notifyProjectInvitation,
@@ -11,28 +11,18 @@ import {
 // GET - Get project members
 export async function GET(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'User', 'Employee', 'Chat', 'ProjectTimelineEvent'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Project, ProjectMember, User, Employee, Chat } = models
 
     const { projectId } = await params
 
-    const user = await User.findById(decoded.userId).select('employeeId')
-    if (!user || !user.employeeId) {
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId')
+    if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -49,7 +39,7 @@ export async function GET(request, { params }) {
     return NextResponse.json({
       success: true,
       data: members,
-      currentEmployeeId: user.employeeId.toString()
+      currentEmployeeId: userRecord.employeeId.toString()
     })
   } catch (error) {
     console.error('Get members error:', error)
@@ -60,28 +50,18 @@ export async function GET(request, { params }) {
 // POST - Add/Invite member to project
 export async function POST(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'User', 'Employee', 'Chat', 'ProjectTimelineEvent'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Project, ProjectMember, User, Employee, Chat } = models
 
     const { projectId } = await params
 
-    const user = await User.findById(decoded.userId).select('employeeId role')
-    if (!user || !user.employeeId) {
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId role')
+    if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -91,14 +71,14 @@ export async function POST(request, { params }) {
     }
 
     // Check if user can invite members
-    const isAdmin = ['admin'].includes(user.role)
-    const isHead = project.projectHead.toString() === user.employeeId.toString()
-    const isCreator = project.createdBy.toString() === user.employeeId.toString()
+    const isAdmin = ['admin'].includes(userRecord.role || user.role)
+    const isHead = project.projectHead.toString() === userRecord.employeeId.toString()
+    const isCreator = project.createdBy.toString() === userRecord.employeeId.toString()
     
     // Check member permissions
     const currentMembership = await ProjectMember.findOne({
       project: projectId,
-      user: user.employeeId,
+      user: userRecord.employeeId,
       invitationStatus: 'accepted'
     })
     
@@ -150,7 +130,7 @@ export async function POST(request, { params }) {
           user: userIdToAdd,
           role,
           invitationStatus: 'invited',
-          invitedBy: user.employeeId,
+          invitedBy: userRecord.employeeId,
           isExternal,
           sourceDepartment: isExternal ? sourceDepartment : invitedEmployee.department
         })
@@ -210,22 +190,12 @@ export async function POST(request, { params }) {
 // DELETE - Remove member from project
 export async function DELETE(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'User', 'Employee', 'Chat', 'ProjectTimelineEvent'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Project, ProjectMember, User, Employee, Chat } = models
 
     const { projectId } = await params
@@ -236,8 +206,8 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ success: false, message: 'Member ID is required' }, { status: 400 })
     }
 
-    const user = await User.findById(decoded.userId).select('employeeId role')
-    if (!user || !user.employeeId) {
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId role')
+    if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -260,9 +230,9 @@ export async function DELETE(request, { params }) {
     }
 
     // Check permission to remove
-    const isAdmin = ['admin'].includes(user.role)
-    const isHead = project.projectHead.toString() === user.employeeId.toString()
-    const isSelf = membership.user._id.toString() === user.employeeId.toString()
+    const isAdmin = ['admin'].includes(userRecord.role || user.role)
+    const isHead = project.projectHead.toString() === userRecord.employeeId.toString()
+    const isSelf = membership.user._id.toString() === userRecord.employeeId.toString()
 
     if (!isAdmin && !isHead && !isSelf) {
       return NextResponse.json({ 
@@ -282,7 +252,7 @@ export async function DELETE(request, { params }) {
     await createTimelineEvent({
       project: projectId,
       type: 'member_removed',
-      createdBy: user.employeeId,
+      createdBy: userRecord.employeeId,
       relatedMember: membership.user._id,
       description: `${membership.user.firstName} ${membership.user.lastName} was removed from the project`,
       metadata: { removedBy: isSelf ? 'self' : 'admin' }
@@ -290,7 +260,7 @@ export async function DELETE(request, { params }) {
 
     // Send notification if not self-removal
     if (!isSelf) {
-      const removerEmployee = await Employee.findById(user.employeeId)
+      const removerEmployee = await Employee.findById(userRecord.employeeId)
       await notifyMemberRemoved(project, membership.user, removerEmployee)
     }
 

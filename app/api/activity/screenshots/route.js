@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth'
-import { jwtVerify } from 'jose';
-
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
 /**
  * Check if a user is a department head who can view another user's screenshots
@@ -71,28 +68,16 @@ async function canViewUserScreenshots(viewerId, targetUserId, viewerRole, models
  */
 export async function GET(request) {
   try {
-    // Verify JWT
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Unauthorized' 
-      }, { status: 401 });
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department', 'Activity'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
+    const { user, models } = auth
+    const { User, Employee, Department, Activity: Screenshot } = models
 
-    const token = authHeader.substring(7);
-    let decoded;
-    try {
-      decoded = await jwtVerify(token, JWT_SECRET);
-    } catch {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Invalid token' 
-      }, { status: 401 });
-    }
-
-    const viewerId = decoded.payload.userId;
-    const viewerRole = decoded.payload.role;
+    const viewerId = user._id || user.userId;
+    const viewerRole = user.role;
 
     const { searchParams } = new URL(request.url);
     const targetUserId = searchParams.get('userId') || viewerId;
@@ -101,14 +86,6 @@ export async function GET(request) {
     const endDate = searchParams.get('endDate');
     const limit = Math.min(parseInt(searchParams.get('limit')) || 100, 500);
     const skip = parseInt(searchParams.get('skip')) || 0;
-
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department', 'Activity'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
-    const { user, models } = auth
-    const { User, Employee, Department, Activity: Screenshot } = models
 
     // Check access permission
     const canView = await canViewUserScreenshots(viewerId, targetUserId, viewerRole, models);

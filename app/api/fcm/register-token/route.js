@@ -5,26 +5,13 @@
 
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-import { jwtVerify } from 'jose'
+
 /**
  * POST /api/fcm/register-token
  * Register user with OneSignal (backward compatible endpoint)
  */
 export async function POST(request) {
   try {
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    const token = authHeader.substring(7)
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET)
-    const { payload: decoded } = await jwtVerify(token, secret)
-
     // Parse request body
     const { token: oneSignalId, device = 'web' } = await request.json()
 
@@ -40,11 +27,11 @@ export async function POST(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
-    const { user: authUser, models } = auth;
+    const { user, models } = auth;
     const { User } = models;
 
     // Find user
-    const userRecord = await User.findById(decoded.userId);
+    const userRecord = await User.findById(user._id || user.userId);
     if (!userRecord) {
       return NextResponse.json(
         { success: false, message: 'User not found' },

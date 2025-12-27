@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { 
   requestCompletionApproval, 
   respondToCompletionApproval,
@@ -15,28 +15,18 @@ import {
 // GET - Get approval status for a project
 export async function GET(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'User', 'Employee', 'ProjectCompletionApproval'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Project, ProjectMember, User, Employee, ProjectCompletionApproval } = models
 
     const { projectId } = await params
 
-    const user = await User.findById(decoded.userId).select('employeeId')
-    if (!user || !user.employeeId) {
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId')
+    if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -65,28 +55,18 @@ export async function GET(request, { params }) {
 // POST - Request project completion approval
 export async function POST(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'User', 'Employee', 'ProjectCompletionApproval', 'Task', 'ProjectTimelineEvent'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Project, ProjectMember, User, Employee } = models
 
     const { projectId } = await params
 
-    const user = await User.findById(decoded.userId).select('employeeId role')
-    if (!user || !user.employeeId) {
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId role')
+    if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -96,10 +76,10 @@ export async function POST(request, { params }) {
     }
 
     // Check if user can request completion (must be accepted member)
-    const isAdmin = ['admin'].includes(user.role)
+    const isAdmin = ['admin'].includes(userRecord.role || user.role)
     const membership = await ProjectMember.findOne({
       project: projectId,
-      user: user.employeeId,
+      user: userRecord.employeeId,
       invitationStatus: 'accepted'
     })
 
@@ -113,7 +93,7 @@ export async function POST(request, { params }) {
     const body = await request.json()
     const { remark } = body
 
-    const employee = await Employee.findById(user.employeeId)
+    const employee = await Employee.findById(userRecord.employeeId)
 
     try {
       const approval = await requestCompletionApproval(projectId, employee, remark, models)
@@ -138,28 +118,18 @@ export async function POST(request, { params }) {
 // PUT - Respond to completion approval (approve/reject)
 export async function PUT(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'User', 'Employee', 'ProjectCompletionApproval', 'Task', 'ProjectTimelineEvent'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Project, User, Employee } = models
 
     const { projectId } = await params
 
-    const user = await User.findById(decoded.userId).select('employeeId role')
-    if (!user || !user.employeeId) {
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId role')
+    if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -169,8 +139,8 @@ export async function PUT(request, { params }) {
     }
 
     // Only project head can respond
-    const isProjectHead = project.projectHead.toString() === user.employeeId.toString()
-    const isAdmin = ['admin'].includes(user.role)
+    const isProjectHead = project.projectHead.toString() === userRecord.employeeId.toString()
+    const isAdmin = ['admin'].includes(userRecord.role || user.role)
 
     if (!isProjectHead && !isAdmin) {
       return NextResponse.json({ 
@@ -193,7 +163,7 @@ export async function PUT(request, { params }) {
       }, { status: 400 })
     }
 
-    const employee = await Employee.findById(user.employeeId)
+    const employee = await Employee.findById(userRecord.employeeId)
     const approve = action === 'approve'
 
     try {

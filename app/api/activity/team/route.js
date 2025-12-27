@@ -1,12 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth'
-import { jwtVerify } from 'jose';
-;
-;
-;
-;
-
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
+import { getAuthAndModels } from '@/lib/auth';
 
 // Roles that can view all team members
 const ADMIN_ROLES = ['admin', 'hr'];
@@ -21,22 +14,6 @@ const ADMIN_ROLES = ['admin', 'hr'];
  */
 export async function GET(request) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const token = authHeader.substring(7);
-    let decoded;
-    try {
-      decoded = await jwtVerify(token, JWT_SECRET);
-    } catch {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-    }
-
-    const currentUserId = decoded.payload.userId;
-    const currentUserRole = decoded.payload.role;
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department'])
     if (!auth.success) {
@@ -45,7 +22,8 @@ export async function GET(request) {
     const { user, models } = auth
     const { User, Employee, Department } = models
 
-    ;
+    const currentUserId = user._id || user.userId;
+    const currentUserRole = user.role;
 
     const { searchParams } = new URL(request.url);
     const departmentId = searchParams.get('departmentId');

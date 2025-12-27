@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -7,16 +7,6 @@ export const dynamic = 'force-dynamic'
 // GET - Get HR dashboard statistics
 export async function GET(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded || !['admin', 'hr'].includes(decoded.role)) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 403 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Employee', 'Leave', 'Attendance', 'Recruitment', 'Performance', 'Payroll'])
     if (!auth.success) {
@@ -24,6 +14,11 @@ export async function GET(request) {
     }
     const { user, models } = auth
     const { Employee, Leave, Attendance, Recruitment, Performance, Payroll } = models
+
+    // Check role authorization
+    if (!['admin', 'hr'].includes(user.role)) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 403 })
+    }
 
     // Date calculations
     const today = new Date()

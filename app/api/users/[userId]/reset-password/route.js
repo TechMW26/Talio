@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-import { jwtVerify } from 'jose'
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key')
 
 /**
  * POST - Admin/HR directly reset user password
@@ -15,30 +13,6 @@ const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secr
  */
 export async function POST(request, { params }) {
   try {
-    // Get token from Authorization header
-    const authHeader = request.headers.get('Authorization')
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    const token = authHeader.split(' ')[1]
-
-    // Verify the token
-    let payload
-    try {
-      const verified = await jwtVerify(token, JWT_SECRET)
-      payload = verified.payload
-    } catch (error) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid token' },
-        { status: 401 }
-      )
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['User', 'Employee'])
     if (!auth.success) {
@@ -48,9 +22,7 @@ export async function POST(request, { params }) {
     const { User, Employee } = models
 
     // Verify requesting user is admin or HR
-    const requestingUser = await User.findById(payload.userId).select('role')
-    
-    if (!requestingUser || !['admin', 'hr'].includes(requestingUser.role)) {
+    if (!['admin', 'hr'].includes(user.role)) {
       return NextResponse.json(
         { success: false, message: 'Only Admin or HR can reset passwords' },
         { status: 403 }

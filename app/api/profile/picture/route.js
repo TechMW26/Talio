@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { uploadImageToImageKit, deleteFromImageKit, getProfilePictureUrl, getImageKitFolder, generateEmployeeFolderName } from '@/lib/imagekit'
 import { optimizeImage, isValidImage } from '@/lib/imageOptimization'
 import path from 'path'
@@ -28,26 +28,15 @@ const isImageKitConfigured = () => {
  */
 export async function POST(request) {
     try {
-        // Verify authentication
-        const token = request.headers.get('authorization')?.split(' ')[1]
-        if (!token) {
-            return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-        }
-
-        const decoded = await verifyToken(token)
-        if (!decoded) {
-            return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-        }
-
         // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User', 'Employee'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
-    const { models } = auth
-    const { User, Employee } = models
+        const auth = await getAuthAndModels(request, ['User', 'Employee'])
+        if (!auth.success) {
+            return NextResponse.json({ message: auth.message }, { status: 401 })
+        }
+        const { user: authUser, models } = auth
+        const { User, Employee } = models
 
-    const user = await User.findById(decoded.userId).populate('employeeId')
+        const user = await User.findById(authUser._id || authUser.userId).populate('employeeId')
         if (!user) {
             return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
         }
@@ -129,7 +118,7 @@ export async function POST(request) {
         // Get employee info for folder structure
         let employee = user.employeeId
         if (!employee) {
-            employee = await Employee.findOne({ userId: decoded.userId }).select('firstName lastName employeeCode')
+            employee = await Employee.findOne({ userId: authUser._id || authUser.userId }).select('firstName lastName employeeCode')
         }
 
         // Generate filename with employee code for easy identification
@@ -204,7 +193,7 @@ export async function POST(request) {
         }
 
         // Also update User model if it has avatar field
-        await User.findByIdAndUpdate(decoded.userId, {
+        await User.findByIdAndUpdate(authUser._id || authUser.userId, {
             $set: {
                 avatar: fileUrl,
                 ...(fileId && { avatarFileId: fileId }),
@@ -258,17 +247,15 @@ export async function POST(request) {
  */
 export async function DELETE(request) {
     try {
-        const token = request.headers.get('authorization')?.split(' ')[1]
-        if (!token) {
-            return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
+        // Get authenticated user and tenant-specific models
+        const auth = await getAuthAndModels(request, ['User', 'Employee'])
+        if (!auth.success) {
+            return NextResponse.json({ message: auth.message }, { status: 401 })
         }
+        const { user: authUser, models } = auth
+        const { User, Employee } = models
 
-        const decoded = await verifyToken(token)
-        if (!decoded) {
-            return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-        }
-
-        const user = await User.findById(decoded.userId).populate('employeeId')
+        const user = await User.findById(authUser._id || authUser.userId).populate('employeeId')
         if (!user) {
             return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
         }
@@ -310,7 +297,7 @@ export async function DELETE(request) {
             })
         }
 
-        await User.findByIdAndUpdate(decoded.userId, {
+        await User.findByIdAndUpdate(authUser._id || authUser.userId, {
             $unset: {
                 avatar: 1,
                 avatarFileId: 1,

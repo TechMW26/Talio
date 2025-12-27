@@ -1,19 +1,9 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 
 // POST - Calculate health scores for all employees
 export async function POST(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded || !['admin', 'hr'].includes(decoded.role)) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 403 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['HealthScore', 'Employee', 'Attendance', 'Performance', 'Leave'])
     if (!auth.success) {
@@ -21,6 +11,10 @@ export async function POST(request) {
     }
     const { user, models } = auth
     const { HealthScore, Employee, Attendance, Performance, Leave } = models
+
+    if (!['admin', 'hr'].includes(user.role)) {
+      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 403 })
+    }
 
     // Get all active employees
     const employees = await Employee.find({ status: 'active' })

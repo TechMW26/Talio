@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import queryCache from '@/lib/queryCache'
 
 export const dynamic = 'force-dynamic'
@@ -8,23 +8,6 @@ export const dynamic = 'force-dynamic'
 // GET - Fetch all employees for chat
 export async function GET(request) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
-    // Check cache first (per user)
-    const cacheKey = queryCache.generateKey('employee-list', decoded.userId)
-    const cached = queryCache.get(cacheKey)
-    if (cached) {
-      return NextResponse.json(cached)
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Employee', 'User', 'Designation', 'Department'])
     if (!auth.success) {
@@ -33,8 +16,16 @@ export async function GET(request) {
     const { user, models } = auth
     const { Employee, User, Designation, Department } = models
 
+    // Check cache first (per user)
+    const userId = user._id || user.userId
+    const cacheKey = queryCache.generateKey('employee-list', userId)
+    const cached = queryCache.get(cacheKey)
+    if (cached) {
+      return NextResponse.json(cached)
+    }
+
     // Get current user
-    const currentUserDoc = await User.findById(decoded.userId).select('employeeId role').lean()
+    const currentUserDoc = await User.findById(userId).select('employeeId role').lean()
     if (!currentUserDoc || !currentUserDoc.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }

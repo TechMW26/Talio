@@ -1,49 +1,16 @@
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth'
-import { jwtVerify } from 'jose';
-;
-;
-;
-
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key');
-
-async function verifyAuth(request) {
-  try {
-    const token = request.cookies.get('token')?.value || 
-                  request.headers.get('authorization')?.replace('Bearer ', '');
-    
-    if (!token) {
-      return null;
-    }
-
-    const { payload } = await jwtVerify(token, JWT_SECRET);
-    return {
-      id: payload.userId || payload.id,
-      ...payload
-    };
-  } catch (error) {
-    console.error('Auth verification failed:', error);
-    return null;
-  }
-}
+import { getAuthAndModels } from '@/lib/auth';
 
 // GET /api/users/search - Search for users
 export async function GET(request) {
   try {
-    const user = await verifyAuth(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['User', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { User, Employee } = models
-
-    ;
 
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('q') || '';

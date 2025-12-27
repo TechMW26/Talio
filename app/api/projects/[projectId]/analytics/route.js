@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { checkProjectAccess, getProjectTaskStats } from '@/lib/projectService'
 import { generateSmartContent } from '@/lib/promptEngine'
 
@@ -9,28 +9,18 @@ export const maxDuration = 60 // Allow up to 60 seconds for AI processing
 // GET - Get comprehensive project analytics with AI insights
 export async function GET(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'Task', 'TaskAssignee', 'User', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Project, ProjectMember, Task, TaskAssignee, User, Employee } = models
 
     const { projectId } = await params
 
-    const user = await User.findById(decoded.userId).select('employeeId role')
-    if (!user || !user.employeeId) {
+    const userDoc = await User.findById(user._id || user.userId).select('employeeId role')
+    if (!userDoc || !userDoc.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -45,9 +35,9 @@ export async function GET(request, { params }) {
     }
 
     // Check access
-    const isAdmin = ['admin', 'hr'].includes(user.role)
+    const isAdmin = ['admin', 'hr'].includes(userDoc.role)
     if (!isAdmin) {
-      const { hasAccess } = await checkProjectAccess(projectId, user.employeeId, 'view', models)
+      const { hasAccess } = await checkProjectAccess(projectId, userDoc.employeeId, 'view', models)
       if (!hasAccess) {
         return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
       }

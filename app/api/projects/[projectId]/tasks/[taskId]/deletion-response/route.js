@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { 
   calculateCompletionPercentage,
   createTimelineEvent 
@@ -8,22 +8,12 @@ import {
 // POST - Respond to deletion request (approve/reject)
 export async function POST(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Project', 'Task', 'TaskAssignee', 'User'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Project, Task, TaskAssignee, User } = models
 
     const { projectId, taskId } = await params
@@ -33,8 +23,8 @@ export async function POST(request, { params }) {
       return NextResponse.json({ success: false, message: 'Invalid action' }, { status: 400 })
     }
 
-    const user = await User.findById(decoded.userId).select('employeeId role')
-    if (!user || !user.employeeId) {
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId role')
+    if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -57,7 +47,7 @@ export async function POST(request, { params }) {
     }
 
     // Check permissions - only project head, admins, or assignees can respond
-    const isAdmin = ['admin'].includes(user.role)
+    const isAdmin = ['admin'].includes(userRecord.role || user.role)
     
     // Build list of project head IDs (handle both array and single field)
     const projectHeadIds = []

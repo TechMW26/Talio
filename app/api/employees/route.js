@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs'
 import { sendAndLogOnboardingEmail } from '@/lib/mailer'
 import { syncUserToBackup } from '@/lib/backupDb'
 import { emitEmployeeUpdate, emitDashboardRefresh } from '@/lib/realtimeEvents'
-import { verifyTokenFromRequest, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { checkUserLimit, registerUserTenantMapping, getTenantCompanyByDbName } from '@/lib/tenantContext'
 
 // GET - List all employees with filters

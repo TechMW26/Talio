@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-import { jwtVerify } from 'jose'
+
 // GET - List recurring notifications
 export async function GET(request) {
   try {
@@ -11,21 +11,9 @@ export async function GET(request) {
     }
     const { user, models } = auth
     const { RecurringNotification, Employee, User } = models
+    const userId = user._id || user.userId
 
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    const token = authHeader.substring(7)
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET)
-    const { payload: decoded } = await jwtVerify(token, secret)
-
-    const currentUser = await User.findById(decoded.userId).populate('employeeId')
+    const currentUser = await User.findById(userId).populate('employeeId')
 
     // Find employee by reverse lookup
     let currentEmployee = null
@@ -33,10 +21,10 @@ export async function GET(request) {
       currentEmployee = await Employee.findById(currentUser.employeeId)
     }
 
-    const isDeptHead = decoded.role === 'department_head' || currentEmployee?.isDepartmentHead
+    const isDeptHead = user.role === 'department_head' || currentEmployee?.isDepartmentHead
 
     // Check if user has permission
-    if (!['admin', 'hr'].includes(decoded.role) && !isDeptHead) {
+    if (!['admin', 'hr'].includes(user.role) && !isDeptHead) {
       return NextResponse.json(
         { success: false, message: 'You do not have permission to view recurring notifications' },
         { status: 403 }
@@ -46,10 +34,10 @@ export async function GET(request) {
     // Build query based on role
     let query = {}
 
-    if (isDeptHead && !['admin', 'hr'].includes(decoded.role) && currentEmployee) {
+    if (isDeptHead && !['admin', 'hr'].includes(user.role) && currentEmployee) {
       // Department heads can only see their own recurring notifications
       query.createdBy = currentEmployee._id
-    } else if (decoded.role === 'hr' && currentEmployee) {
+    } else if (user.role === 'hr' && currentEmployee) {
       // HR can see their own and department-specific notifications
       query.$or = [
         { createdBy: currentEmployee._id },
@@ -79,21 +67,17 @@ export async function GET(request) {
 // POST - Create recurring notification
 export async function POST(request) {
   try {
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      )
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['RecurringNotification', 'Employee', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-
-    const token = authHeader.substring(7)
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET)
-    const { payload: decoded } = await jwtVerify(token, secret)
+    const { user, models } = auth
+    const { RecurringNotification, Employee, User } = models
+    const userId = user._id || user.userId
 
     const data = await request.json()
-    const currentUser = await User.findById(decoded.userId).populate('employeeId')
+    const currentUser = await User.findById(userId).populate('employeeId')
 
     // Find employee by reverse lookup
     let currentEmployee = null
@@ -101,10 +85,10 @@ export async function POST(request) {
       currentEmployee = await Employee.findById(currentUser.employeeId)
     }
 
-    const isDeptHead = decoded.role === 'department_head' || currentEmployee?.isDepartmentHead
+    const isDeptHead = user.role === 'department_head' || currentEmployee?.isDepartmentHead
 
     // Check if user has permission
-    if (!['admin', 'hr'].includes(decoded.role) && !isDeptHead) {
+    if (!['admin', 'hr'].includes(user.role) && !isDeptHead) {
       return NextResponse.json(
         { success: false, message: 'You do not have permission to create recurring notifications' },
         { status: 403 }
@@ -112,7 +96,7 @@ export async function POST(request) {
     }
 
     // Department heads (non-admin/hr) cannot use 'department' or 'role' target types
-    if (isDeptHead && !['admin', 'hr'].includes(decoded.role)) {
+    if (isDeptHead && !['admin', 'hr'].includes(user.role)) {
       if (data.targetType === 'department') {
         return NextResponse.json(
           { success: false, message: 'Department heads can only send to their own department members' },
@@ -184,8 +168,8 @@ export async function POST(request) {
     // Create recurring notification
     const recurringNotif = await RecurringNotification.create({
       ...data,
-      createdBy: currentEmployee ? currentEmployee._id : decoded.userId,
-      createdByRole: decoded.role
+      createdBy: currentEmployee ? currentEmployee._id : userId,
+      createdByRole: user.role
     })
 
     // Calculate next scheduled time
@@ -213,18 +197,14 @@ export async function POST(request) {
 // PUT - Update recurring notification
 export async function PUT(request) {
   try {
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      )
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['RecurringNotification', 'Employee', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-
-    const token = authHeader.substring(7)
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET)
-    const { payload: decoded } = await jwtVerify(token, secret)
+    const { user, models } = auth
+    const { RecurringNotification, Employee, User } = models
+    const userId = user._id || user.userId
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -247,7 +227,7 @@ export async function PUT(request) {
     }
 
     // Check permission
-    const currentUser = await User.findById(decoded.userId).populate('employeeId')
+    const currentUser = await User.findById(userId).populate('employeeId')
 
     // Find employee by reverse lookup
     let currentEmployee = null
@@ -255,9 +235,9 @@ export async function PUT(request) {
       currentEmployee = await Employee.findById(currentUser.employeeId)
     }
 
-    const isDeptHead = decoded.role === 'department_head' || currentEmployee?.isDepartmentHead
+    const isDeptHead = user.role === 'department_head' || currentEmployee?.isDepartmentHead
 
-    if (isDeptHead && !['admin', 'hr'].includes(decoded.role) && currentEmployee && notification.createdBy.toString() !== currentEmployee._id.toString()) {
+    if (isDeptHead && !['admin', 'hr'].includes(user.role) && currentEmployee && notification.createdBy.toString() !== currentEmployee._id.toString()) {
       return NextResponse.json(
         { success: false, message: 'You can only update your own recurring notifications' },
         { status: 403 }
@@ -295,18 +275,14 @@ export async function PUT(request) {
 // PATCH - Toggle active status
 export async function PATCH(request) {
   try {
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      )
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['RecurringNotification', 'Employee', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-
-    const token = authHeader.substring(7)
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET)
-    const { payload: decoded } = await jwtVerify(token, secret)
+    const { user, models } = auth
+    const { RecurringNotification, Employee, User } = models
+    const userId = user._id || user.userId
 
     const data = await request.json()
     const { id, isActive } = data
@@ -328,15 +304,15 @@ export async function PATCH(request) {
     }
 
     // Check permission
-    const currentUser = await User.findById(decoded.userId).populate('employeeId')
+    const currentUser = await User.findById(userId).populate('employeeId')
     let currentEmployee = null
     if (currentUser && currentUser.employeeId) {
       currentEmployee = await Employee.findById(currentUser.employeeId)
     }
 
-    const isDeptHead = decoded.role === 'department_head' || currentEmployee?.isDepartmentHead
+    const isDeptHead = user.role === 'department_head' || currentEmployee?.isDepartmentHead
 
-    if (isDeptHead && !['admin', 'hr'].includes(decoded.role) && currentEmployee && notification.createdBy.toString() !== currentEmployee._id.toString()) {
+    if (isDeptHead && !['admin', 'hr'].includes(user.role) && currentEmployee && notification.createdBy.toString() !== currentEmployee._id.toString()) {
       return NextResponse.json(
         { success: false, message: 'You can only update your own recurring notifications' },
         { status: 403 }
@@ -374,18 +350,14 @@ export async function PATCH(request) {
 // DELETE - Delete recurring notification
 export async function DELETE(request) {
   try {
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      )
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['RecurringNotification', 'Employee', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-
-    const token = authHeader.substring(7)
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET)
-    const { payload: decoded } = await jwtVerify(token, secret)
+    const { user, models } = auth
+    const { RecurringNotification, Employee, User } = models
+    const userId = user._id || user.userId
 
     const { searchParams } = new URL(request.url)
     const id = searchParams.get('id')
@@ -407,7 +379,7 @@ export async function DELETE(request) {
     }
 
     // Check permission
-    const currentUser = await User.findById(decoded.userId).populate('employeeId')
+    const currentUser = await User.findById(userId).populate('employeeId')
 
     // Find employee by reverse lookup
     let currentEmployee = null
@@ -415,9 +387,9 @@ export async function DELETE(request) {
       currentEmployee = await Employee.findById(currentUser.employeeId)
     }
 
-    const isDeptHead = decoded.role === 'department_head' || currentEmployee?.isDepartmentHead
+    const isDeptHead = user.role === 'department_head' || currentEmployee?.isDepartmentHead
 
-    if (isDeptHead && !['admin', 'hr'].includes(decoded.role) && currentEmployee && notification.createdBy.toString() !== currentEmployee._id.toString()) {
+    if (isDeptHead && !['admin', 'hr'].includes(user.role) && currentEmployee && notification.createdBy.toString() !== currentEmployee._id.toString()) {
       return NextResponse.json(
         { success: false, message: 'You can only delete your own recurring notifications' },
         { status: 403 }

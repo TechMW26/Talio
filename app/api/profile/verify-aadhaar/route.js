@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { generateVisionContent } from '@/lib/gemini'
 import fs from 'fs/promises'
 import path from 'path'
@@ -51,26 +51,15 @@ function getMimeType(url) {
  */
 export async function POST(request) {
   try {
-    // Verify authentication
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['User', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user: authUser, models } = auth
     const { User, Employee } = models
 
-    const user = await User.findById(decoded.userId)
+    const user = await User.findById(authUser._id || authUser.userId)
     if (!user) {
       return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
     }
@@ -176,7 +165,7 @@ Important:
       console.error('[OCR] Gemini Vision error:', error)
 
       // Update verification status to failed
-      await User.findByIdAndUpdate(decoded.userId, {
+      await User.findByIdAndUpdate(authUser._id || authUser.userId, {
         $set: {
           'profileCompletion.ocrVerification.status': 'failed',
           'profileCompletion.ocrVerification.verifiedAt': new Date(),
@@ -197,7 +186,7 @@ Important:
     if (!ocrResult.isValid) {
       const validationIssues = ocrResult.validationIssues || ['Document does not appear to be a valid Aadhaar card']
 
-      await User.findByIdAndUpdate(decoded.userId, {
+      await User.findByIdAndUpdate(authUser._id || authUser.userId, {
         $set: {
           'profileCompletion.ocrVerification.status': 'failed',
           'profileCompletion.ocrVerification.verifiedAt': new Date(),
@@ -285,7 +274,7 @@ Important:
       updateData['profileCompletion.status'] = 'partially_complete'
     }
 
-    await User.findByIdAndUpdate(decoded.userId, { $set: updateData })
+    await User.findByIdAndUpdate(authUser._id || authUser.userId, { $set: updateData })
 
     // Auto-fill address from Aadhaar OCR if employee address is missing
     let addressAutoFilled = false
@@ -443,17 +432,15 @@ function formatDateForComparison(date) {
  */
 export async function GET(request) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
+    const { user: authUser, models } = auth
+    const { User } = models
 
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
-    const user = await User.findById(decoded.userId)
+    const user = await User.findById(authUser._id || authUser.userId)
       .select('profileCompletion.ocrVerification')
       .lean()
 

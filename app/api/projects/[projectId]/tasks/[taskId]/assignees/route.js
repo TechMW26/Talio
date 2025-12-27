@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { createTimelineEvent } from '@/lib/projectService'
 import { 
   notifyTaskAssigned,
@@ -10,22 +10,12 @@ import {
 // GET - Get assignees for a task
 export async function GET(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'Task', 'TaskAssignee', 'User', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Project, ProjectMember, Task, TaskAssignee, User, Employee } = models
 
     const { projectId, taskId } = await params
@@ -48,20 +38,18 @@ export async function GET(request, { params }) {
 // POST - Assign task to users
 export async function POST(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'Task', 'TaskAssignee', 'User', 'Employee', 'ProjectTimelineEvent'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
+    const { user, models } = auth
+    const { Project, ProjectMember, Task, TaskAssignee, User, Employee } = models
 
     const { projectId, taskId } = await params
 
-    const user = await User.findById(decoded.userId).select('employeeId role')
-    if (!user || !user.employeeId) {
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId role')
+    if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -76,10 +64,10 @@ export async function POST(request, { params }) {
     }
 
     // Check if user can assign tasks
-    const isAdmin = ['admin'].includes(user.role)
+    const isAdmin = ['admin'].includes(userRecord.role || user.role)
     const membership = await ProjectMember.findOne({
       project: projectId,
-      user: user.employeeId,
+      user: userRecord.employeeId,
       invitationStatus: 'accepted'
     })
 
@@ -100,7 +88,7 @@ export async function POST(request, { params }) {
       }, { status: 400 })
     }
 
-    const assignerEmployee = await Employee.findById(user.employeeId)
+    const assignerEmployee = await Employee.findById(userRecord.employeeId)
     const createdAssignees = []
 
     for (const assigneeId of assigneeIds) {
@@ -123,15 +111,15 @@ export async function POST(request, { params }) {
         invitationStatus: 'accepted'
       })
 
-      if (!isMember && assigneeIdStr !== user.employeeId.toString()) {
+      if (!isMember && assigneeIdStr !== userRecord.employeeId.toString()) {
         continue // Skip non-members
       }
 
       const assignee = await TaskAssignee.create({
         task: taskId,
         user: assigneeIdStr,
-        assignedBy: user.employeeId,
-        assignmentStatus: assigneeIdStr === user.employeeId.toString() ? 'accepted' : 'pending'
+        assignedBy: userRecord.employeeId,
+        assignmentStatus: assigneeIdStr === userRecord.employeeId.toString() ? 'accepted' : 'pending'
       })
 
       const assigneeEmployee = await Employee.findById(assigneeIdStr)
@@ -140,7 +128,7 @@ export async function POST(request, { params }) {
       await createTimelineEvent({
         project: projectId,
         type: 'task_assigned',
-        createdBy: user.employeeId,
+        createdBy: userRecord.employeeId,
         relatedTask: taskId,
         relatedMember: assigneeIdStr,
         description: `Task "${task.title}" was assigned to ${assigneeEmployee.firstName} ${assigneeEmployee.lastName}`,
@@ -148,10 +136,10 @@ export async function POST(request, { params }) {
           taskTitle: task.title, 
           assigneeName: `${assigneeEmployee.firstName} ${assigneeEmployee.lastName}` 
         }
-      })
+      }, models)
 
       // Send notification if not self-assignment
-      if (assigneeIdStr !== user.employeeId.toString()) {
+      if (assigneeIdStr !== userRecord.employeeId.toString()) {
         await notifyTaskAssigned(project, task, assigneeEmployee, assignerEmployee)
       }
 
@@ -183,15 +171,13 @@ export async function POST(request, { params }) {
 // DELETE - Remove assignee from task
 export async function DELETE(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Project', 'Task', 'TaskAssignee', 'User', 'Employee', 'ProjectTimelineEvent'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
+    const { user, models } = auth
+    const { Project, Task, TaskAssignee, User, Employee } = models
 
     const { projectId, taskId } = await params
     const { searchParams } = new URL(request.url)
@@ -201,8 +187,8 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ success: false, message: 'Assignee ID is required' }, { status: 400 })
     }
 
-    const user = await User.findById(decoded.userId).select('employeeId role')
-    if (!user || !user.employeeId) {
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId role')
+    if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -222,11 +208,11 @@ export async function DELETE(request, { params }) {
     }
 
     // Check permission
-    const isAdmin = ['admin'].includes(user.role)
-    const isCreator = task.createdBy.toString() === user.employeeId.toString()
-    const isProjectHead = project.projectHead.toString() === user.employeeId.toString()
-    const isAssigner = assignment.assignedBy.toString() === user.employeeId.toString()
-    const isSelf = assignment.user._id.toString() === user.employeeId.toString()
+    const isAdmin = ['admin'].includes(userRecord.role || user.role)
+    const isCreator = task.createdBy.toString() === userRecord.employeeId.toString()
+    const isProjectHead = project.projectHead.toString() === userRecord.employeeId.toString()
+    const isAssigner = assignment.assignedBy.toString() === userRecord.employeeId.toString()
+    const isSelf = assignment.user._id.toString() === userRecord.employeeId.toString()
 
     if (!isAdmin && !isCreator && !isProjectHead && !isAssigner && !isSelf) {
       return NextResponse.json({ 
@@ -240,12 +226,12 @@ export async function DELETE(request, { params }) {
     await createTimelineEvent({
       project: projectId,
       type: 'task_assigned',
-      createdBy: user.employeeId,
+      createdBy: userRecord.employeeId,
       relatedTask: taskId,
       relatedMember: assignment.user._id,
       description: `${assignment.user.firstName} ${assignment.user.lastName} was unassigned from task "${task.title}"`,
       metadata: { taskTitle: task.title, action: 'unassigned' }
-    })
+    }, models)
 
     return NextResponse.json({
       success: true,

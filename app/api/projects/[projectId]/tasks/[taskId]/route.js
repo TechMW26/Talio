@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { 
   checkProjectAccess, 
   calculateCompletionPercentage,
@@ -15,28 +15,18 @@ import { emitTaskUpdate } from '@/lib/realtimeEvents'
 // GET - Get single task details
 export async function GET(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'Task', 'TaskAssignee', 'User', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Project, ProjectMember, Task, TaskAssignee, User, Employee } = models
 
     const { projectId, taskId } = await params
 
-    const user = await User.findById(decoded.userId).select('employeeId role')
-    if (!user || !user.employeeId) {
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId role')
+    if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -86,28 +76,18 @@ export async function GET(request, { params }) {
 // PUT - Update task
 export async function PUT(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'Task', 'TaskAssignee', 'User', 'Employee', 'ProjectTimelineEvent', 'ProjectApprovalRequest'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Project, ProjectMember, Task, TaskAssignee, User, Employee, ProjectApprovalRequest } = models
 
     const { projectId, taskId } = await params
 
-    const user = await User.findById(decoded.userId).select('employeeId role')
-    if (!user || !user.employeeId) {
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId role')
+    if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -122,14 +102,14 @@ export async function PUT(request, { params }) {
     }
 
     // Check permissions
-    const isAdmin = ['admin'].includes(user.role)
-    const isCreator = task.createdBy.toString() === user.employeeId.toString()
-    const isProjectHead = project.projectHead.toString() === user.employeeId.toString()
+    const isAdmin = ['admin'].includes(userRecord.role || user.role)
+    const isCreator = task.createdBy.toString() === userRecord.employeeId.toString()
+    const isProjectHead = project.projectHead.toString() === userRecord.employeeId.toString()
     
     // Check if user is an accepted assignee
     const userAssignment = await TaskAssignee.findOne({
       task: taskId,
-      user: user.employeeId,
+      user: userRecord.employeeId,
       assignmentStatus: 'accepted'
     })
     const isAssignedAndAccepted = !!userAssignment
@@ -439,22 +419,12 @@ export async function PUT(request, { params }) {
 // DELETE - Delete/Archive task (project head and admins delete immediately, others create deletion request)
 export async function DELETE(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Project', 'Task', 'TaskAssignee', 'User', 'Employee', 'ProjectTimelineEvent'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Project, Task, TaskAssignee, User, Employee } = models
 
     const { projectId, taskId } = await params
@@ -462,8 +432,8 @@ export async function DELETE(request, { params }) {
     const reason = searchParams.get('reason') || ''
     const forceDelete = searchParams.get('force') === 'true'
 
-    const user = await User.findById(decoded.userId).select('employeeId role')
-    if (!user || !user.employeeId) {
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId role')
+    if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -478,19 +448,19 @@ export async function DELETE(request, { params }) {
     }
 
     // Check permissions
-    const isAdmin = ['admin'].includes(user.role)
+    const isAdmin = ['admin'].includes(userRecord.role || user.role)
     const projectHeadIds = project.projectHeads && project.projectHeads.length > 0 
       ? project.projectHeads.map(h => h.toString())
       : project.projectHead 
         ? [project.projectHead.toString()] 
         : []
-    const isProjectHead = projectHeadIds.includes(user.employeeId.toString())
-    const isCreator = task.createdBy.toString() === user.employeeId.toString()
+    const isProjectHead = projectHeadIds.includes(userRecord.employeeId.toString())
+    const isCreator = task.createdBy.toString() === userRecord.employeeId.toString()
 
     // Check if user is an assignee
     const isAssignee = await TaskAssignee.findOne({
       task: taskId,
-      user: user.employeeId,
+      user: userRecord.employeeId,
       assignmentStatus: 'accepted'
     })
 
@@ -509,7 +479,7 @@ export async function DELETE(request, { params }) {
       createTimelineEvent({
         project: projectId,
         type: 'task_deleted',
-        createdBy: user.employeeId,
+        createdBy: userRecord.employeeId,
         description: `Task "${taskTitle}" was deleted`,
         metadata: { taskTitle }
       }, models).catch(console.error)
@@ -539,7 +509,7 @@ export async function DELETE(request, { params }) {
     // Create deletion request
     task.deletionRequest = {
       status: 'pending',
-      requestedBy: user.employeeId,
+      requestedBy: userRecord.employeeId,
       requestedAt: new Date(),
       reason: reason || 'No reason provided'
     }
@@ -549,7 +519,7 @@ export async function DELETE(request, { params }) {
     await createTimelineEvent({
       project: projectId,
       type: 'task_deletion_requested',
-      createdBy: user.employeeId,
+      createdBy: userRecord.employeeId,
       relatedTask: taskId,
       description: `Deletion requested for task "${task.title}"`,
       metadata: { taskTitle: task.title, reason }

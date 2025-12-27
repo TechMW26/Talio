@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import fs from 'fs'
 import path from 'path'
 
@@ -49,12 +49,12 @@ export async function GET(request) {
       })
     }
 
-    const token = authHeader.substring(7)
-    const decoded = await verifyToken(token)
-    
-    if (!decoded) {
+    // Get authenticated user using getAuthAndModels
+    const auth = await getAuthAndModels(request, [])
+    if (!auth.success) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
     }
+    const { user } = auth
 
     // Check if Firebase is configured (server-side keys)
     const firebaseProjectId = process.env.FIREBASE_PROJECT_ID
@@ -74,7 +74,7 @@ export async function GET(request) {
     )
 
     // Only admins can see the masked Firebase server config
-    if (decoded.role === 'admin') {
+    if (user.role === 'admin') {
       const maskedPrivateKey = firebasePrivateKey && firebasePrivateKey.includes('BEGIN PRIVATE KEY')
         ? '***CONFIGURED***'
         : ''
@@ -112,24 +112,18 @@ export async function GET(request) {
 // This endpoint is kept for compatibility but returns info message
 export async function POST(request) {
   try {
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // Get authenticated user using getAuthAndModels
+    const auth = await getAuthAndModels(request, [])
+    if (!auth.success) {
       return NextResponse.json(
         { success: false, message: 'Unauthorized' },
         { status: 401 }
       )
     }
-
-    const token = authHeader.substring(7)
-    const decoded = await verifyToken(token)
-    
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
-    }
+    const { user } = auth
 
     // Only admin can access configuration
-    if (decoded.role !== 'admin') {
+    if (user.role !== 'admin') {
       return NextResponse.json(
         { success: false, message: 'Only administrators can access configuration' },
         { status: 403 }

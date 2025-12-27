@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 
 // Mark this route as dynamic
 export const dynamic = 'force-dynamic'
@@ -7,21 +7,6 @@ export const dynamic = 'force-dynamic'
 // GET - Get employee check-ins for a specific date (Admin only)
 export async function GET(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
-    // Only admin can view all employee check-ins
-    if (decoded.role !== 'admin') {
-      return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Attendance', 'Employee'])
     if (!auth.success) {
@@ -29,6 +14,11 @@ export async function GET(request) {
     }
     const { user, models } = auth
     const { Attendance, Employee } = models
+
+    // Only admin can view all employee check-ins
+    if (user.role !== 'admin') {
+      return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
+    }
 
     const { searchParams } = new URL(request.url)
     const dateParam = searchParams.get('date')

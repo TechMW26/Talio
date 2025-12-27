@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth'
-import { jwtVerify } from 'jose';
 import { readdir, stat } from 'fs/promises';
 import path from 'path';
-
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
 // Roles that can view all captures
 const ADMIN_ROLES = ['admin', 'hr'];
@@ -69,23 +66,6 @@ async function getEmployeesInDepartments(departmentIds, Department, Employee) {
  */
 export async function GET(request) {
   try {
-    // Verify JWT
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const token = authHeader.substring(7);
-    let decoded;
-    try {
-      decoded = await jwtVerify(token, JWT_SECRET);
-    } catch {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
-    }
-
-    const currentUserId = decoded.payload.userId;
-    const currentUserRole = decoded.payload.role;
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department', 'ProductivitySession', 'Activity'])
     if (!auth.success) {
@@ -93,6 +73,9 @@ export async function GET(request) {
     }
     const { user, models } = auth
     const { User, Employee, Department, ProductivitySession, Activity: Screenshot } = models
+
+    const currentUserId = user._id || user.userId;
+    const currentUserRole = user.role;
 
     const { searchParams } = new URL(request.url);
     const targetUserId = searchParams.get('userId') || currentUserId;

@@ -1,19 +1,9 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 
 // GET - Get daily goals
 export async function GET(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['DailyGoal', 'Employee', 'User'])
     if (!auth.success) {
@@ -23,7 +13,7 @@ export async function GET(request) {
     const { DailyGoal, Employee, User } = models
 
     // Get current user's employee ID
-    const currentUser = await User.findById(decoded.userId).select('employeeId')
+    const currentUser = await User.findById(user._id || user.userId).select('employeeId')
     const currentEmployeeId = currentUser?.employeeId
 
     const { searchParams } = new URL(request.url)
@@ -35,11 +25,11 @@ export async function GET(request) {
     let query = {}
 
     // Role-based access control
-    if (decoded.role === 'employee') {
+    if (user.role === 'employee') {
       query.employee = currentEmployeeId
     } else if (employeeId) {
       query.employee = employeeId
-    } else if (decoded.role === 'manager') {
+    } else if (user.role === 'manager') {
       // Get team members for manager
       const teamMembers = await Employee.find({
         reportingManager: currentEmployeeId,
@@ -89,25 +79,23 @@ export async function GET(request) {
 // POST - Create or update daily goals
 export async function POST(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['DailyGoal', 'Employee', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
+    const { user, models } = auth
+    const { DailyGoal, Employee, User } = models
 
     // Get current user's employee ID
-    const currentUser = await User.findById(decoded.userId).select('employeeId')
+    const currentUser = await User.findById(user._id || user.userId).select('employeeId')
     const currentEmployeeId = currentUser?.employeeId
 
     const { date, goals, employeeId } = await request.json()
 
     // Determine target employee
     let targetEmployeeId = currentEmployeeId
-    if (employeeId && ['admin', 'hr', 'manager'].includes(decoded.role)) {
+    if (employeeId && ['admin', 'hr', 'manager'].includes(user.role)) {
       targetEmployeeId = employeeId
     }
 
@@ -138,7 +126,7 @@ export async function POST(request) {
     }
 
     // Check if goals can be edited
-    if (!dailyGoal.canEdit() && decoded.role === 'employee') {
+    if (!dailyGoal.canEdit() && user.role === 'employee') {
       return NextResponse.json(
         { success: false, message: 'Goals are locked and cannot be edited' },
         { status: 403 }
@@ -182,18 +170,16 @@ export async function POST(request) {
 // PUT - Update specific goal
 export async function PUT(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['DailyGoal', 'Employee', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
+    const { user, models } = auth
+    const { DailyGoal, Employee, User } = models
 
     // Get current user's employee ID
-    const currentUser = await User.findById(decoded.userId).select('employeeId')
+    const currentUser = await User.findById(user._id || user.userId).select('employeeId')
     const currentEmployeeId = currentUser?.employeeId
 
     const { dailyGoalId, goalId, updateData, managerReview } = await request.json()
@@ -205,7 +191,7 @@ export async function PUT(request) {
 
     // Check permissions
     const isOwner = dailyGoal.employee.toString() === currentEmployeeId?.toString()
-    const isManager = ['admin', 'hr', 'manager'].includes(decoded.role)
+    const isManager = ['admin', 'hr', 'manager'].includes(user.role)
 
     if (!isOwner && !isManager) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 403 })

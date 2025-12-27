@@ -1,31 +1,20 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-import jwt from 'jsonwebtoken'
 
 // PUT - Update asset
 export async function PUT(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Asset'])
+    const auth = await getAuthAndModels(request, ['Asset', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Asset } = models
+    const { Asset, Employee } = models
 
-    // Auth check
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
-    }
-
-    try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET)
-      if (!['admin', 'hr'].includes(decoded.role)) {
-        return NextResponse.json({ success: false, message: 'Forbidden: Only Admin and HR can update assets' }, { status: 403 })
-      }
-    } catch (err) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
+    // Role check
+    if (!['admin', 'hr'].includes(user.role)) {
+      return NextResponse.json({ success: false, message: 'Forbidden: Only Admin and HR can update assets' }, { status: 403 })
     }
 
     const data = await request.json()
@@ -47,7 +36,6 @@ export async function PUT(request, { params }) {
     try {
       const io = global.io
       if (io && data.assignedTo) {
-        const Employee = require('@/models/Employee').default
         const employeeDoc = await Employee.findById(data.assignedTo).select('userId')
         const employeeUserId = employeeDoc?.userId
 
@@ -110,19 +98,17 @@ export async function PUT(request, { params }) {
 // DELETE - Delete asset
 export async function DELETE(request, { params }) {
   try {
-    // Auth check
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Asset'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
+    const { user, models } = auth
+    const { Asset } = models
 
-    try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET)
-      if (!['admin', 'hr'].includes(decoded.role)) {
-        return NextResponse.json({ success: false, message: 'Forbidden: Only Admin and HR can delete assets' }, { status: 403 })
-      }
-    } catch (err) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
+    // Role check
+    if (!['admin', 'hr'].includes(user.role)) {
+      return NextResponse.json({ success: false, message: 'Forbidden: Only Admin and HR can delete assets' }, { status: 403 })
     }
 
     const asset = await Asset.findByIdAndDelete(params.id)

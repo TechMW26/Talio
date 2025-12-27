@@ -1,16 +1,9 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 
 // GET - Fetch performance goals
 export async function GET(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    const decoded = await verifyToken(token)
-    
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['PerformanceGoal', 'Employee'])
     if (!auth.success) {
@@ -54,17 +47,18 @@ export async function GET(request) {
     let query = {}
 
     // Role-based filtering
-    if (decoded.role === 'employee') {
+    const userId = user._id || user.userId
+    if (user.role === 'employee') {
       // Employees can only see their own goals
-      const employee = await Employee.findOne({ userId: decoded.userId }).select('_id')
+      const employee = await Employee.findOne({ userId }).select('_id')
       if (employee) {
         query.employee = employee._id
       } else {
         return NextResponse.json({ success: true, data: [], pagination: { currentPage: 1, totalPages: 0, totalItems: 0 } })
       }
-    } else if (decoded.role === 'manager' || decoded.role === 'department_head') {
+    } else if (user.role === 'manager' || user.role === 'department_head') {
       // Managers can see goals for their team members
-      const manager = await Employee.findOne({ userId: decoded.userId }).select('_id department')
+      const manager = await Employee.findOne({ userId }).select('_id department')
       if (manager && manager.department) {
         const teamMembers = await Employee.find({ 
           $or: [

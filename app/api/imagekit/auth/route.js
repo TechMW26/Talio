@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { getAuthenticationParameters } from '@/lib/imagekit'
 
 export const dynamic = 'force-dynamic'
@@ -14,14 +14,9 @@ export const dynamic = 'force-dynamic'
 export async function GET(request) {
     try {
         // Verify authentication
-        const token = request.headers.get('authorization')?.split(' ')[1]
-        if (!token) {
-            return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-        }
-
-        const decoded = await verifyToken(token)
-        if (!decoded) {
-            return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
+        const auth = await getAuthAndModels(request, [])
+        if (!auth.success) {
+            return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
         }
 
         // Check if ImageKit is configured

@@ -6,12 +6,12 @@ import { emitExpenseUpdate } from '@/lib/realtimeEvents'
 export async function PUT(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Expense', 'User'])
+    const auth = await getAuthAndModels(request, ['Expense', 'User', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Expense, User } = models
+    const { Expense, User, Employee } = models
 
     const data = await request.json()
 
@@ -33,7 +33,6 @@ export async function PUT(request, { params }) {
     // Emit Socket.IO event for realtime notification with sound
     try {
       if (data.status && (data.status === 'approved' || data.status === 'rejected')) {
-        const Employee = require('@/models/Employee').default
         const employeeDoc = await Employee.findById(expense.employee._id || expense.employee).select('userId')
         const employeeUserId = employeeDoc?.userId
 
@@ -113,6 +112,14 @@ export async function PUT(request, { params }) {
 // DELETE - Delete expense
 export async function DELETE(request, { params }) {
   try {
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Expense'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Expense } = models
+
     const expense = await Expense.findByIdAndDelete(params.id)
 
     if (!expense) {

@@ -1,12 +1,7 @@
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth'
-import { jwtVerify } from 'jose';
+import { getAuthAndModels } from '@/lib/auth';
 import { mkdir, access, constants } from 'fs/promises';
 import path from 'path';
-;
-;
-
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
 /**
  * Ensure user activity folder exists
@@ -36,49 +31,23 @@ async function ensureUserActivityFolder(userId) {
  */
 export async function GET(request) {
   try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ 
-        success: false, 
-        healthy: false,
-        error: 'Unauthorized' 
-      }, { status: 401 });
-    }
-
-    const token = authHeader.substring(7);
-    let decoded;
-    try {
-      decoded = await jwtVerify(token, JWT_SECRET);
-    } catch {
-      return NextResponse.json({ 
-        success: false, 
-        healthy: false,
-        error: 'Invalid token' 
-      }, { status: 401 });
-    }
-
-    const userId = decoded.payload.userId;
-    const userRole = decoded.payload.role;
-
-    // Ensure user's activity folder exists
-    const folderResult = await ensureUserActivityFolder(userId);
-
-    // Connect to DB to verify connection
-    let dbConnected = false;
-    try {
-      // Get authenticated user and tenant-specific models
+    // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['User'])
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
+      return NextResponse.json({ 
+        success: false, 
+        healthy: false,
+        error: auth.message || 'Unauthorized' 
+      }, { status: 401 })
     }
     const { user, models } = auth
     const { User } = models
 
-    ;
-      dbConnected = true;
-    } catch (error) {
-      console.error('[Health] DB connection error:', error.message);
-    }
+    const userId = user._id || user.userId;
+    const userRole = user.role;
+
+    // Ensure user's activity folder exists
+    const folderResult = await ensureUserActivityFolder(userId.toString());
 
     return NextResponse.json({
       success: true,
@@ -87,7 +56,7 @@ export async function GET(request) {
       userId,
       role: userRole,
       captureEnabled: !['admin'].includes(userRole),
-      database: dbConnected ? 'connected' : 'error',
+      database: 'connected',
       activityFolder: folderResult,
       server: {
         uptime: process.uptime(),

@@ -1,12 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth'
-import { jwtVerify } from 'jose';
 import { mkdir, writeFile, access, constants, unlink } from 'fs/promises';
 import path from 'path';
 import { uploadScreenshot, getScreenshot } from '@/lib/gridfs';
 import { uploadImageToImageKit, getImageKitFolder, generateEmployeeFolderName } from '@/lib/imagekit';
-
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
 // Check if ImageKit is configured
 const isImageKitConfigured = () => {
@@ -37,28 +34,16 @@ async function ensureDirectory(dirPath) {
  */
 export async function POST(request) {
   try {
-    // Verify JWT
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({
-        success: false,
-        error: 'Unauthorized'
-      }, { status: 401 });
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Activity']);
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 });
     }
+    const { user, models } = auth;
+    const { User, Employee, Activity: Screenshot } = models;
 
-    const token = authHeader.substring(7);
-    let decoded;
-    try {
-      decoded = await jwtVerify(token, JWT_SECRET);
-    } catch {
-      return NextResponse.json({
-        success: false,
-        error: 'Invalid token'
-      }, { status: 401 });
-    }
-
-    const userId = decoded.payload.userId;
-    const userRole = decoded.payload.role;
+    const userId = user._id || user.userId;
+    const userRole = user.role;
 
     // Skip for admin roles
     if (['admin'].includes(userRole)) {
@@ -67,14 +52,6 @@ export async function POST(request) {
         error: 'Screenshot capture not enabled for admin roles'
       }, { status: 400 });
     }
-
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Activity']);
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 });
-    }
-    const { models } = auth;
-    const { User, Employee, Activity: Screenshot } = models;
 
     // Get form data
     const formData = await request.formData();
@@ -257,25 +234,16 @@ export async function POST(request) {
  */
 export async function GET(request) {
   try {
-    // Verify JWT
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({
-        success: false,
-        error: 'Unauthorized'
-      }, { status: 401 });
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Activity']);
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 });
     }
+    const { user, models } = auth;
+    const { Activity: Screenshot } = models;
 
-    const token = authHeader.substring(7);
-    let decoded;
-    try {
-      decoded = await jwtVerify(token, JWT_SECRET);
-    } catch {
-      return NextResponse.json({
-        success: false,
-        error: 'Invalid token'
-      }, { status: 401 });
-    }
+    const userId = user._id || user.userId;
+    const userRole = user.role;
 
     const { searchParams } = new URL(request.url);
     const screenshotId = searchParams.get('id');
@@ -287,8 +255,6 @@ export async function GET(request) {
       }, { status: 400 });
     }
 
-    ;
-
     // Get screenshot metadata
     const screenshot = await Screenshot.findById(screenshotId);
     if (!screenshot) {
@@ -297,9 +263,6 @@ export async function GET(request) {
         error: 'Screenshot not found'
       }, { status: 404 });
     }
-
-    const userId = decoded.payload.userId;
-    const userRole = decoded.payload.role;
 
     // Access control
     if (!['admin', 'hr', 'manager'].includes(userRole)) {

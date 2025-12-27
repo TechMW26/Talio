@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -7,26 +7,16 @@ export const dynamic = 'force-dynamic'
 // GET - Get employee dashboard statistics
 export async function GET(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Attendance', 'LeaveBalance', 'LeaveType', 'Payroll', 'Employee', 'Designation', 'Department', 'User', 'Performance']);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
-    const { models } = auth;
+    const { user, models } = auth;
     const { Attendance, LeaveBalance, LeaveType, Payroll, Employee, Designation, Department, User, Performance } = models;
 
     // Find the user first to get the employeeId
-    const userWithEmployee = await User.findById(decoded.userId).populate({
+    const userWithEmployee = await User.findById(user._id || user.userId).populate({
       path: 'employeeId',
       populate: [
         { path: 'designation', select: 'title code levelName' },

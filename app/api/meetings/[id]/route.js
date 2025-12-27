@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { sendPushToUser } from '@/lib/pushNotification'
 
 export const dynamic = 'force-dynamic'
@@ -9,22 +9,12 @@ export async function GET(request, { params }) {
   try {
     const { id } = await params
 
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Meeting', 'Employee', 'User'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Meeting, Employee, User } = models
 
     const meeting = await Meeting.findById(id)
@@ -41,16 +31,16 @@ export async function GET(request, { params }) {
     }
 
     // Get current user's employee record - first check User.employeeId, then Employee.userId
-    const user = await User.findById(decoded.userId).select('employeeId').lean()
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId').lean()
     
     let employee = null
-    if (user?.employeeId) {
-      employee = await Employee.findById(user.employeeId).lean()
+    if (userRecord?.employeeId) {
+      employee = await Employee.findById(userRecord.employeeId).lean()
     }
     
     // If user doesn't have employeeId directly, try to find employee by userId
     if (!employee) {
-      employee = await Employee.findOne({ userId: decoded.userId }).lean()
+      employee = await Employee.findOne({ userId: user._id || user.userId }).lean()
     }
 
     // Check if user has access (organizer or invitee)
@@ -85,37 +75,27 @@ export async function PUT(request, { params }) {
   try {
     const { id } = await params
 
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Meeting', 'Employee', 'User'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Meeting, Employee, User } = models
 
     const data = await request.json()
 
     // Get current user's employee record - first check User.employeeId, then Employee.userId
-    const user = await User.findById(decoded.userId).select('employeeId').lean()
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId').lean()
     
     let employee = null
-    if (user?.employeeId) {
-      employee = await Employee.findById(user.employeeId).lean()
+    if (userRecord?.employeeId) {
+      employee = await Employee.findById(userRecord.employeeId).lean()
     }
     
     // If user doesn't have employeeId directly, try to find employee by userId
     if (!employee) {
-      employee = await Employee.findOne({ userId: decoded.userId }).lean()
+      employee = await Employee.findOne({ userId: user._id || user.userId }).lean()
     }
 
     if (!employee) {
@@ -215,16 +195,6 @@ export async function DELETE(request, { params }) {
   try {
     const { id } = await params
 
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     const { searchParams } = new URL(request.url)
     const reason = searchParams.get('reason') || 'Meeting cancelled'
     const permanentDelete = searchParams.get('permanent') === 'true'
@@ -234,19 +204,19 @@ export async function DELETE(request, { params }) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Meeting, Employee, User } = models
 
     // Get current user's employee record
-    const user = await User.findById(decoded.userId).select('employeeId').lean()
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId').lean()
     
     let employee = null
-    if (user?.employeeId) {
-      employee = await Employee.findById(user.employeeId).lean()
+    if (userRecord?.employeeId) {
+      employee = await Employee.findById(userRecord.employeeId).lean()
     }
     
     if (!employee) {
-      employee = await Employee.findOne({ userId: decoded.userId }).lean()
+      employee = await Employee.findOne({ userId: user._id || user.userId }).lean()
     }
 
     if (!employee) {

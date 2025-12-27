@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth'
-import { jwtVerify } from 'jose';
-;
-;
+import { getAuthAndModels } from '@/lib/auth';
 
 /**
  * POST /api/call-alert/[id]/acknowledge
@@ -18,22 +15,7 @@ export async function POST(request, { params }) {
     const { user, models } = auth
     const { CallAlert } = models
 
-    ;
-
     const { id } = await params;
-
-    // Verify authentication
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    const token = authHeader.substring(7);
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET);
-    const { payload: decoded } = await jwtVerify(token, secret);
 
     // Find the alert
     const alert = await CallAlert.findById(id);
@@ -46,7 +28,7 @@ export async function POST(request, { params }) {
 
     // Check if user is a receiver
     const receiver = alert.receivers.find(
-      r => r.user.toString() === decoded.userId
+      r => r.user.toString() === (user._id || user.userId).toString()
     );
 
     if (!receiver) {
@@ -60,12 +42,14 @@ export async function POST(request, { params }) {
     const body = await request.json().catch(() => ({}));
     const { platform = 'web' } = body;
 
+    const userId = user._id || user.userId;
+
     // Acknowledge the alert
-    await alert.acknowledgeAlert(decoded.userId);
+    await alert.acknowledgeAlert(userId);
 
     // Mark audio as played if provided
     if (body.audioPlayed && receiver.deliveryStatus[platform]) {
-      await alert.markAudioPlayed(decoded.userId, platform);
+      await alert.markAudioPlayed(userId, platform);
     }
 
     // Notify sender that alert was acknowledged
@@ -73,7 +57,7 @@ export async function POST(request, { params }) {
       global.io.to(`user:${alert.sender}`).emit('call-alert-acknowledged', {
         alertId: alert._id,
         acknowledgedBy: {
-          userId: decoded.userId,
+          userId: userId,
           name: receiver.name
         },
         acknowledgedAt: new Date().toISOString(),

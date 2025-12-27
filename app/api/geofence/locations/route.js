@@ -1,24 +1,14 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 // GET - List all geofence locations
 export async function GET(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['GeofenceLocation', 'User'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { GeofenceLocation, User } = models
 
     const { searchParams } = new URL(request.url)
@@ -50,26 +40,24 @@ export async function GET(request) {
 // POST - Create new geofence location
 export async function POST(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['GeofenceLocation', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
+    const { user, models } = auth
+    const { GeofenceLocation, User } = models
 
     // Check if user is admin or hr
-    if (decoded.role !== 'admin' && decoded.role !== 'hr') {
+    if (user.role !== 'admin' && user.role !== 'hr') {
       return NextResponse.json(
         { success: false, message: 'Only admin and HR can create geofence locations' },
         { status: 403 }
       )
     }
 
-    const user = await User.findById(decoded.userId).populate('employeeId')
-    const employeeId = user?.employeeId?._id
+    const userRecord = await User.findById(user._id || user.userId).populate('employeeId')
+    const employeeId = userRecord?.employeeId?._id
 
     const body = await request.json()
 

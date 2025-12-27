@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { retryOnboardingEmail } from '@/lib/mailer'
 
 /**
@@ -7,31 +7,18 @@ import { retryOnboardingEmail } from '@/lib/mailer'
  */
 export async function POST(request, { params }) {
   try {
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
-    }
-    
-    const token = authHeader.split(' ')[1]
-    const payload = await verifyToken(token)
-    
-    if (!payload) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-    
-    // Only admin and HR can retry emails
-    if (!['admin', 'hr'].includes(payload.role)) {
-      return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
-    }
-    
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['OnboardingEmail'])
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
     const { OnboardingEmail } = models
+    
+    // Only admin and HR can retry emails
+    if (!['admin', 'hr'].includes(user.role)) {
+      return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
+    }
 
     const { id } = await params
     
@@ -47,7 +34,7 @@ export async function POST(request, { params }) {
     }
     
     // Retry sending the email
-    const result = await retryOnboardingEmail(id, payload.userId)
+    const result = await retryOnboardingEmail(id, user._id || user.userId)
     
     // Get updated email log
     const updatedEmail = await OnboardingEmail.findById(id)
@@ -74,20 +61,15 @@ export async function POST(request, { params }) {
  */
 export async function GET(request, { params }) {
   try {
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['OnboardingEmail'])
+    if (!auth.success) {
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
+    const { user, models } = auth
+    const { OnboardingEmail } = models
     
-    const token = authHeader.split(' ')[1]
-    const payload = await verifyToken(token)
-    
-    if (!payload) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-    
-    if (!['admin', 'hr'].includes(payload.role)) {
+    if (!['admin', 'hr'].includes(user.role)) {
       return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
     }
     

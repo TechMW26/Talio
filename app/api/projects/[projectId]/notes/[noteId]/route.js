@@ -1,30 +1,20 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 // PUT - Update a note
 export async function PUT(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['ProjectNote', 'Project', 'Task', 'User'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { ProjectNote, Project, Task, User } = models
 
     const { projectId, noteId } = await params
 
-    const user = await User.findById(decoded.userId).select('employeeId role')
-    if (!user || !user.employeeId) {
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId role')
+    if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -35,9 +25,9 @@ export async function PUT(request, { params }) {
 
     // Check permissions - only creator, admin, or project head can update
     const project = await Project.findById(projectId)
-    const isCreator = note.createdBy.toString() === user.employeeId.toString()
-    const isProjectHead = project?.projectHead?.toString() === user.employeeId.toString()
-    const isAdmin = ['admin'].includes(user.role)
+    const isCreator = note.createdBy.toString() === userRecord.employeeId.toString()
+    const isProjectHead = project?.projectHead?.toString() === userRecord.employeeId.toString()
+    const isAdmin = ['admin'].includes(userRecord.role || user.role)
 
     if (!isCreator && !isProjectHead && !isAdmin) {
       return NextResponse.json({ 
@@ -77,28 +67,18 @@ export async function PUT(request, { params }) {
 // DELETE - Archive a note
 export async function DELETE(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['ProjectNote', 'Project', 'User'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { ProjectNote, Project, User } = models
 
     const { projectId, noteId } = await params
 
-    const user = await User.findById(decoded.userId).select('employeeId role')
-    if (!user || !user.employeeId) {
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId role')
+    if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -109,9 +89,9 @@ export async function DELETE(request, { params }) {
 
     // Check permissions
     const project = await Project.findById(projectId)
-    const isCreator = note.createdBy.toString() === user.employeeId.toString()
-    const isProjectHead = project?.projectHead?.toString() === user.employeeId.toString()
-    const isAdmin = ['admin'].includes(user.role)
+    const isCreator = note.createdBy.toString() === userRecord.employeeId.toString()
+    const isProjectHead = project?.projectHead?.toString() === userRecord.employeeId.toString()
+    const isAdmin = ['admin'].includes(userRecord.role || user.role)
 
     if (!isCreator && !isProjectHead && !isAdmin) {
       return NextResponse.json({ 

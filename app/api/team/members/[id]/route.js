@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 
 // GET - Get individual team member details
 export async function GET(request, { params }) {
@@ -9,32 +9,15 @@ export async function GET(request, { params }) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Employee, Department, Designation, User } = models
 
     const { id } = params
 
-    // Verify authentication
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid token' },
-        { status: 401 }
-      )
-    }
-
     // Get user to find employee ID
-    const user = await User.findById(decoded.userId).select('employeeId').lean()
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId').lean()
     
-    if (!user || !user.employeeId) {
+    if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json(
         { success: false, message: 'Employee not found' },
         { status: 404 }
@@ -43,7 +26,7 @@ export async function GET(request, { params }) {
 
     // Check if user is a department head
     const department = await Department.findOne({ 
-      head: user.employeeId,
+      head: userRecord.employeeId,
       isActive: true 
     }).lean()
 
@@ -95,24 +78,15 @@ export async function GET(request, { params }) {
 // POST - Add review/rating/remark for team member
 export async function POST(request, { params }) {
   try {
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Employee', 'Department', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Employee, Department, User } = models
+
     const { id } = params
-
-    // Verify authentication
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid token' },
-        { status: 401 }
-      )
-    }
 
     const body = await request.json()
     const { type, content, rating, category } = body
@@ -125,9 +99,9 @@ export async function POST(request, { params }) {
     }
 
     // Get user to find employee ID
-    const user = await User.findById(decoded.userId).select('employeeId').lean()
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId').lean()
     
-    if (!user || !user.employeeId) {
+    if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json(
         { success: false, message: 'Employee not found' },
         { status: 404 }
@@ -136,7 +110,7 @@ export async function POST(request, { params }) {
 
     // Check if user is a department head
     const department = await Department.findOne({ 
-      head: user.employeeId,
+      head: userRecord.employeeId,
       isActive: true 
     }).lean()
 
@@ -176,7 +150,7 @@ export async function POST(request, { params }) {
       content: content,
       rating: rating || null, // 1-5 rating (optional)
       category: category || 'general', // 'performance', 'behavior', 'skills', 'general'
-      reviewedBy: user.employeeId,
+      reviewedBy: userRecord.employeeId,
       createdAt: new Date()
     }
 

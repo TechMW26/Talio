@@ -1,19 +1,9 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 
 // GET - Get leave balances
 export async function GET(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['LeaveBalance', 'Employee', 'LeaveType'])
     if (!auth.success) {
@@ -40,7 +30,7 @@ export async function GET(request) {
     }
 
     // If no employeeId and user is admin/hr, get all balances
-    if (['admin', 'hr'].includes(decoded.role)) {
+    if (['admin', 'hr'].includes(user.role)) {
       const leaveBalances = await LeaveBalance.find({ year: year })
         .populate('employee', 'employeeCode firstName lastName email department')
         .populate('leaveType', 'name color code')
@@ -53,7 +43,7 @@ export async function GET(request) {
     }
 
     // For regular employees, get their own balance
-    const employee = await Employee.findOne({ _id: decoded.userId })
+    const employee = await Employee.findOne({ _id: user._id || user.userId })
     if (!employee) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
@@ -79,18 +69,16 @@ export async function GET(request) {
 // POST - Create/Update leave balance (Admin/HR only)
 export async function POST(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['LeaveBalance', 'Employee', 'LeaveType'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
+    const { user, models } = auth
+    const { LeaveBalance, Employee, LeaveType } = models
 
     // Only admin/hr can create/update leave balances
-    if (!['admin', 'hr'].includes(decoded.role)) {
+    if (!['admin', 'hr'].includes(user.role)) {
       return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
     }
 

@@ -1,9 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth'
-import { jwtVerify } from 'jose';
 import { triggerScheduledTasks, analyzeUserDay } from '@/lib/screenshotAnalysis';
-
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 
 /**
  * Check if viewer can access target user's analysis
@@ -61,35 +58,6 @@ export async function GET(request) {
     // Trigger scheduled tasks (cleanup, daily analysis)
     triggerScheduledTasks().catch(err => console.error('[Analysis] Scheduler error:', err));
 
-    // Verify JWT
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Unauthorized' 
-      }, { status: 401 });
-    }
-
-    const token = authHeader.substring(7);
-    let decoded;
-    try {
-      decoded = await jwtVerify(token, JWT_SECRET);
-    } catch {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Invalid token' 
-      }, { status: 401 });
-    }
-
-    const viewerId = decoded.payload.userId;
-    const viewerRole = decoded.payload.role;
-
-    const { searchParams } = new URL(request.url);
-    const targetUserId = searchParams.get('userId') || viewerId;
-    const date = searchParams.get('date');
-    const startDate = searchParams.get('startDate');
-    const endDate = searchParams.get('endDate');
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department', 'ScreenshotAnalysis'])
     if (!auth.success) {
@@ -97,6 +65,15 @@ export async function GET(request) {
     }
     const { user, models } = auth
     const { User, Employee, Department, ScreenshotAnalysis } = models
+
+    const viewerId = user._id || user.userId;
+    const viewerRole = user.role;
+
+    const { searchParams } = new URL(request.url);
+    const targetUserId = searchParams.get('userId') || viewerId;
+    const date = searchParams.get('date');
+    const startDate = searchParams.get('startDate');
+    const endDate = searchParams.get('endDate');
 
     // Check access
     const canView = await canViewAnalysis(viewerId, targetUserId, viewerRole, models);
@@ -191,28 +168,15 @@ export async function GET(request) {
  */
 export async function POST(request) {
   try {
-    // Verify JWT
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Unauthorized' 
-      }, { status: 401 });
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, []);
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 });
     }
+    const { user } = auth;
 
-    const token = authHeader.substring(7);
-    let decoded;
-    try {
-      decoded = await jwtVerify(token, JWT_SECRET);
-    } catch {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Invalid token' 
-      }, { status: 401 });
-    }
-
-    const viewerId = decoded.payload.userId;
-    const viewerRole = decoded.payload.role;
+    const viewerId = user._id || user.userId;
+    const viewerRole = user.role;
 
     // Only admins can trigger analysis manually
     if (!['admin', 'hr'].includes(viewerRole)) {

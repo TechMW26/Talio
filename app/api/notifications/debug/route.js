@@ -1,39 +1,26 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-import { jwtVerify } from 'jose'
+
 // GET - Debug endpoint to check notification status
 export async function GET(request) {
     try {
-        // Verify authentication
-        const authHeader = request.headers.get('authorization')
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return NextResponse.json(
-                { success: false, message: 'Unauthorized' },
-                { status: 401 }
-            )
+        // Get authenticated user and tenant-specific models
+        const auth = await getAuthAndModels(request, ['ScheduledNotification', 'RecurringNotification'])
+        if (!auth.success) {
+            return NextResponse.json({ message: auth.message }, { status: 401 })
         }
-
-        const token = authHeader.substring(7)
-        const secret = new TextEncoder().encode(process.env.JWT_SECRET)
-        const { payload: decoded } = await jwtVerify(token, secret)
+        const { user, models } = auth
+        const { ScheduledNotification, RecurringNotification } = models
 
         // Only admins can access debug info
-        if (!['admin', 'hr'].includes(decoded.role)) {
+        if (!['admin', 'hr'].includes(user.role)) {
             return NextResponse.json(
                 { success: false, message: 'Access denied' },
                 { status: 403 }
             )
         }
 
-        // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['ScheduledNotification', 'RecurringNotification'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
-    const { user, models } = auth
-    const { ScheduledNotification, RecurringNotification } = models
-
-    const now = new Date()
+        const now = new Date()
 
         // Get scheduled notifications summary
         const scheduledPending = await ScheduledNotification.find({ status: 'pending' })
@@ -133,21 +120,15 @@ export async function GET(request) {
 // POST - Manually trigger notification processing (for testing)
 export async function POST(request) {
     try {
-        // Verify authentication
-        const authHeader = request.headers.get('authorization')
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return NextResponse.json(
-                { success: false, message: 'Unauthorized' },
-                { status: 401 }
-            )
+        // Get authenticated user and tenant-specific models
+        const auth = await getAuthAndModels(request, [])
+        if (!auth.success) {
+            return NextResponse.json({ message: auth.message }, { status: 401 })
         }
-
-        const token = authHeader.substring(7)
-        const secret = new TextEncoder().encode(process.env.JWT_SECRET)
-        const { payload: decoded } = await jwtVerify(token, secret)
+        const { user } = auth
 
         // Only admins can manually trigger
-        if (!['admin'].includes(decoded.role)) {
+        if (!['admin'].includes(user.role)) {
             return NextResponse.json(
                 { success: false, message: 'Access denied - admin only' },
                 { status: 403 }

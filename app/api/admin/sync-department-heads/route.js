@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth'
-import { jwtVerify } from 'jose';
-;
-;
+import { getAuthAndModels } from '@/lib/auth';
 import { syncDepartmentHeadStatus, getAllDepartmentHeads } from '@/lib/departmentHeadSync';
 
 /**
@@ -17,46 +14,22 @@ import { syncDepartmentHeadStatus, getAllDepartmentHeads } from '@/lib/departmen
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User'])
+    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { User } = models
-
-    ;
-
-    // Verify authentication
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    const token = authHeader.substring(7);
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET);
-    const { payload: decoded } = await jwtVerify(token, secret);
-
-    // Get current user
-    const currentUser = await User.findById(decoded.userId);
-    if (!currentUser || !currentUser.isActive) {
-      return NextResponse.json(
-        { success: false, message: 'User not found' },
-        { status: 404 }
-      );
-    }
+    const { User, Employee, Department } = models
 
     // Only admin can access
-    if (!['admin'].includes(currentUser.role)) {
+    if (!['admin'].includes(user.role)) {
       return NextResponse.json(
         { success: false, message: 'Access denied' },
         { status: 403 }
       );
     }
 
-    const result = await getAllDepartmentHeads();
+    const result = await getAllDepartmentHeads({ User });
     return NextResponse.json(result);
 
   } catch (error) {
@@ -70,41 +43,25 @@ export async function GET(request) {
 
 export async function POST(request) {
   try {
-    ;
-
-    // Verify authentication
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      );
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-
-    const token = authHeader.substring(7);
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET);
-    const { payload: decoded } = await jwtVerify(token, secret);
-
-    // Get current user
-    const currentUser = await User.findById(decoded.userId);
-    if (!currentUser || !currentUser.isActive) {
-      return NextResponse.json(
-        { success: false, message: 'User not found' },
-        { status: 404 }
-      );
-    }
+    const { user, models } = auth
+    const { User, Employee, Department } = models
 
     // Only admin can trigger sync
-    if (!['admin'].includes(currentUser.role)) {
+    if (!['admin'].includes(user.role)) {
       return NextResponse.json(
         { success: false, message: 'Access denied' },
         { status: 403 }
       );
     }
 
-    console.log(`[SyncDepartmentHeads] Manual sync triggered by ${currentUser.email}`);
+    console.log(`[SyncDepartmentHeads] Manual sync triggered by ${user.email}`);
 
-    const result = await syncDepartmentHeadStatus();
+    const result = await syncDepartmentHeadStatus(null, { User, Employee, Department });
     
     return NextResponse.json({
       success: result.success,

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 
 // DELETE - Revoke a specific session
 export async function DELETE(request, { params }) {
@@ -11,16 +11,6 @@ export async function DELETE(request, { params }) {
     }
     const { user, models } = auth
     const { UserSession } = models
-
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const payload = await verifyToken(token)
-    if (!payload) {
-      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
-    }
 
     const { id } = await params
 
@@ -34,7 +24,7 @@ export async function DELETE(request, { params }) {
     // Find the session and ensure it belongs to the current user
     const session = await UserSession.findOne({
       _id: id,
-      user: payload.userId,
+      user: user._id || user.userId,
     })
 
     if (!session) {
@@ -52,7 +42,7 @@ export async function DELETE(request, { params }) {
     }
 
     // Check if trying to revoke current session
-    const currentTokenId = payload.tokenId || null
+    const currentTokenId = user.tokenId || null
     if (currentTokenId && session.tokenId === currentTokenId) {
       return NextResponse.json(
         { error: 'Cannot revoke your current session. Use logout instead.' },
@@ -66,7 +56,7 @@ export async function DELETE(request, { params }) {
     session.revokedReason = 'user_logout'
     await session.save()
 
-    console.log(`[sessions] Revoked session ${id} for user ${payload.userId}`)
+    console.log(`[sessions] Revoked session ${id} for user ${user._id || user.userId}`)
 
     return NextResponse.json({
       success: true,

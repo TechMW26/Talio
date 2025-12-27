@@ -1,26 +1,16 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { checkProjectAccess, createTimelineEvent } from '@/lib/projectService'
 import { notifyCommentAdded, getProjectMemberUserIds } from '@/lib/projectNotifications'
 // GET - Get project timeline/activity feed
 export async function GET(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'ProjectTimelineEvent', 'Task', 'User', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Project, ProjectMember, ProjectTimelineEvent, Task, User, Employee } = models
 
     const { projectId } = await params
@@ -29,15 +19,15 @@ export async function GET(request, { params }) {
     const offset = parseInt(searchParams.get('offset')) || 0
     const type = searchParams.get('type')
 
-    const user = await User.findById(decoded.userId).select('employeeId role')
-    if (!user || !user.employeeId) {
+    const userDoc = await User.findById(user._id || user.userId).select('employeeId role')
+    if (!userDoc || !userDoc.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
     // Check access
-    const isAdmin = ['admin', 'hr'].includes(user.role)
+    const isAdmin = ['admin', 'hr'].includes(userDoc.role)
     if (!isAdmin) {
-      const { hasAccess } = await checkProjectAccess(projectId, user.employeeId, 'view', models)
+      const { hasAccess } = await checkProjectAccess(projectId, userDoc.employeeId, 'view', models)
       if (!hasAccess) {
         return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
       }
@@ -78,28 +68,18 @@ export async function GET(request, { params }) {
 // POST - Add a comment/update to the timeline
 export async function POST(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'ProjectTimelineEvent', 'Task', 'User', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Project, ProjectTimelineEvent, Task, User, Employee } = models
 
     const { projectId } = await params
 
-    const user = await User.findById(decoded.userId).select('employeeId role')
-    if (!user || !user.employeeId) {
+    const userDoc = await User.findById(user._id || user.userId).select('employeeId role')
+    if (!userDoc || !userDoc.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -109,9 +89,9 @@ export async function POST(request, { params }) {
     }
 
     // Check if user can add comments (must be accepted member)
-    const isAdmin = ['admin'].includes(user.role)
+    const isAdmin = ['admin'].includes(userDoc.role)
     if (!isAdmin) {
-      const { hasAccess } = await checkProjectAccess(projectId, user.employeeId, 'participate', models)
+      const { hasAccess } = await checkProjectAccess(projectId, userDoc.employeeId, 'participate', models)
       if (!hasAccess) {
         return NextResponse.json({ 
           success: false, 
@@ -127,13 +107,13 @@ export async function POST(request, { params }) {
       return NextResponse.json({ success: false, message: 'Comment content is required' }, { status: 400 })
     }
 
-    const employee = await Employee.findById(user.employeeId)
+    const employee = await Employee.findById(userDoc.employeeId)
 
     // Create the comment as a timeline event
     const event = await createTimelineEvent({
       project: projectId,
       type: 'comment_added',
-      createdBy: user.employeeId,
+      createdBy: userDoc.employeeId,
       relatedTask: taskId || undefined,
       description: `${employee.firstName} ${employee.lastName} added a comment`,
       commentContent: content.trim(),
@@ -147,7 +127,7 @@ export async function POST(request, { params }) {
     const lastCommentByUser = await ProjectTimelineEvent.findOne({
       project: projectId,
       type: 'comment_added',
-      createdBy: user.employeeId,
+      createdBy: userDoc.employeeId,
       _id: { $ne: event._id }
     }).sort({ createdAt: -1 })
 
@@ -155,7 +135,7 @@ export async function POST(request, { params }) {
       (new Date() - lastCommentByUser.createdAt) > 5 * 60 * 1000 // 5 minutes
 
     if (shouldNotify) {
-      const memberUserIds = await getProjectMemberUserIds(projectId, user.employeeId, models)
+      const memberUserIds = await getProjectMemberUserIds(projectId, userDoc.employeeId, models)
       await notifyCommentAdded(project, employee, memberUserIds, content)
     }
 

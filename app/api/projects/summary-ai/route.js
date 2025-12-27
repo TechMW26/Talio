@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyTokenFromRequest } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { getEmployeeProjectSummaryForMaya } from '@/lib/projectPerformance'
 import { generateSmartContent } from '@/lib/promptEngine'
 
@@ -7,13 +7,15 @@ export const dynamic = 'force-dynamic'
 
 export async function GET(request) {
   try {
-    const user = await verifyTokenFromRequest(request)
-    if (!user) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'Task', 'TaskAssignee'])
+    if (!auth.success) {
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
+    const { user, models } = auth
 
     const employeeId = user.employeeId?._id || user.employeeId || user._id
-    const summary = await getEmployeeProjectSummaryForMaya(employeeId)
+    const summary = await getEmployeeProjectSummaryForMaya(employeeId, models)
 
     // Use AI to generate a natural language summary
     const prompt = `

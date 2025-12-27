@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { sendPushToUser } from '@/lib/pushNotification'
+
 // GET - Get single payroll
 export async function GET(request, { params }) {
   try {
@@ -44,6 +46,14 @@ export async function GET(request, { params }) {
 // PUT - Update payroll
 export async function PUT(request, { params }) {
   try {
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Payroll', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Payroll, Employee } = models
+
     const data = await request.json()
 
     const payroll = await Payroll.findByIdAndUpdate(
@@ -63,7 +73,6 @@ export async function PUT(request, { params }) {
     try {
       const io = global.io
       if (io && data.status) {
-        const Employee = require('@/models/Employee').default
         const employeeDoc = await Employee.findById(payroll.employee._id || payroll.employee).select('userId')
         const employeeUserId = employeeDoc?.userId
 

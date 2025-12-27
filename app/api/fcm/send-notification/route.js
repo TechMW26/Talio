@@ -5,7 +5,6 @@
 
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-import { jwtVerify } from 'jose'
 import { sendPushToUsers } from '@/lib/pushNotification'
 
 /**
@@ -14,18 +13,13 @@ import { sendPushToUsers } from '@/lib/pushNotification'
  */
 export async function POST(request) {
   try {
-    // Verify authentication
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      )
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['User', 'Notification'])
+    if (!auth.success) {
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
-
-    const token = authHeader.substring(7)
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET)
-    await jwtVerify(token, secret)
+    const { user, models } = auth
+    const { User, Notification } = models
 
     // Parse request body
     const { userId, title, body, data = {}, imageUrl = null, deviceType = null } = await request.json()
@@ -36,15 +30,6 @@ export async function POST(request) {
         { status: 400 }
       )
     }
-
-    // Connect to database
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User', 'Notification'])
-    if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
-    }
-    const { user, models } = auth
-    const { User, Notification } = models
 
     // Find target user (or use current user if no userId provided)
     const targetUser = userId

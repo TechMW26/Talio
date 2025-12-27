@@ -1,26 +1,23 @@
 import { NextResponse } from 'next/server'
-import { jwtVerify } from 'jose'
+import { getAuthAndModels } from '@/lib/auth'
 
 // Note: This endpoint provides status info only
 // The actual scheduler runs in server.js using node-schedule
 
 export async function GET(request) {
     try {
-        // Verify authentication
-        const authHeader = request.headers.get('authorization')
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        // Get authenticated user
+        const auth = await getAuthAndModels(request, [])
+        if (!auth.success) {
             return NextResponse.json(
-                { success: false, message: 'Unauthorized' },
+                { success: false, message: auth.message },
                 { status: 401 }
             )
         }
-
-        const token = authHeader.substring(7)
-        const secret = new TextEncoder().encode(process.env.JWT_SECRET)
-        const { payload: decoded } = await jwtVerify(token, secret)
+        const { user } = auth
 
         // Only admins can view scheduler status
-        if (!['admin', 'hr'].includes(decoded.role)) {
+        if (!['admin', 'hr'].includes(user.role)) {
             return NextResponse.json(
                 { success: false, message: 'Access denied' },
                 { status: 403 }

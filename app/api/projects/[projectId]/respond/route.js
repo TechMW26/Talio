@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { respondToInvitation } from '@/lib/projectService'
 import {
   notifyProjectInvitationAccepted,
@@ -9,28 +9,18 @@ import {
 // POST - Respond to project invitation (accept/reject)
 export async function POST(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'User', 'Employee', 'Chat', 'ProjectTimelineEvent'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Project, ProjectMember, User, Employee, Chat } = models
 
     const { projectId } = await params
 
-    const user = await User.findById(decoded.userId).select('employeeId')
-    if (!user || !user.employeeId) {
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId')
+    if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -49,7 +39,7 @@ export async function POST(request, { params }) {
       return NextResponse.json({ success: false, message: 'Project not found' }, { status: 404 })
     }
 
-    const employee = await Employee.findById(user.employeeId)
+    const employee = await Employee.findById(userRecord.employeeId)
     if (!employee) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
@@ -58,14 +48,14 @@ export async function POST(request, { params }) {
     const accept = action === 'accept'
     
     try {
-      await respondToInvitation(projectId, user.employeeId, accept, reason, models)
+      await respondToInvitation(projectId, userRecord.employeeId, accept, reason, models)
     } catch (err) {
       return NextResponse.json({ success: false, message: err.message }, { status: 400 })
     }
 
     // Get creator and head user IDs for notification
     const notifyEmployeeIds = [project.createdBy, project.projectHead]
-      .filter(id => id.toString() !== user.employeeId.toString())
+      .filter(id => id.toString() !== userRecord.employeeId.toString())
     
     const notifyUsers = await User.find({ 
       employeeId: { $in: notifyEmployeeIds } 

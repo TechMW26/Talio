@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { sendPushToUser } from '@/lib/pushNotification'
+
 // GET - List payroll records
 export async function GET(request) {
   try {
@@ -47,6 +49,14 @@ export async function GET(request) {
 // POST - Generate payroll
 export async function POST(request) {
   try {
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Payroll', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Payroll, Employee } = models
+
     const data = await request.json()
 
     // Check if payroll already exists for this employee and month
@@ -99,7 +109,6 @@ export async function POST(request) {
     try {
       const io = global.io
       if (io) {
-        const Employee = require('@/models/Employee').default
         const employeeDoc = await Employee.findById(data.employee).select('userId')
         const employeeUserId = employeeDoc?.userId
 
@@ -118,7 +127,6 @@ export async function POST(request) {
 
           // FCM push notification
           try {
-            const { sendPushToUser } = require('@/lib/pushNotification')
             await sendPushToUser(
               employeeUserId,
               {

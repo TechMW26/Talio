@@ -1,27 +1,17 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { sendPushToUser } from '@/lib/pushNotification'
 import { getIO } from '@/lib/socket'
 
 // POST - Approve or reject out-of-premises request
 export async function POST(request) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['GeofenceLog', 'Employee', 'User']);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
-    const { models } = auth;
+    const { user, models } = auth;
     const { GeofenceLog, Employee, User } = models;
 
     const { logId, action, comments } = await request.json();
@@ -41,7 +31,7 @@ export async function POST(request) {
     }
 
     // Get user and employee data
-    const userRecord = await User.findById(decoded.userId).populate('employeeId');
+    const userRecord = await User.findById(user._id || user.userId).populate('employeeId');
     if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json(
         { success: false, message: 'Employee not found' },
@@ -66,9 +56,9 @@ export async function POST(request) {
     // Check if user has permission to approve/reject
     // Only managers, department heads, admin, and HR can approve
     const canApprove = 
-      decoded.role === 'admin' ||
-      decoded.role === 'hr' ||
-      (decoded.role === 'manager' && log.reportingManager?.toString() === reviewer._id.toString())
+      user.role === 'admin' ||
+      user.role === 'hr' ||
+      (user.role === 'manager' && log.reportingManager?.toString() === reviewer._id.toString())
 
     if (!canApprove) {
       return NextResponse.json(

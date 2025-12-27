@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server';
-;
-;
-;
-import { verifyToken, getAuthAndModels } from '@/lib/auth';
+import { getAuthAndModels } from '@/lib/auth';
 
 /**
  * POST /api/ideas/[id]/vote
@@ -18,21 +15,8 @@ export async function POST(request, { params }) {
     const { user, models } = auth
     const { Suggestion, User } = models
 
-    ;
-
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
-    }
-
-    const token = authHeader.substring(7);
-    const decoded = await verifyToken(token);
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 });
-    }
-
     // Get employeeId from User
-    const currentUser = await User.findById(decoded.userId).select('employeeId');
+    const currentUser = await User.findById(user._id || user.userId).select('employeeId');
     if (!currentUser || !currentUser.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 });
     }

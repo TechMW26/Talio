@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server';
-;
-;
-;
-import { verifyToken, getAuthAndModels } from '@/lib/auth';
+import { getAuthAndModels } from '@/lib/auth';
 
 /**
  * GET /api/ideas/[id]
@@ -17,19 +14,6 @@ export async function GET(request, { params }) {
     }
     const { user, models } = auth
     const { Suggestion, User } = models
-
-    ;
-
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
-    }
-
-    const token = authHeader.substring(7);
-    const decoded = await verifyToken(token);
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 });
-    }
 
     const { id } = await params;
 
@@ -69,21 +53,16 @@ export async function GET(request, { params }) {
  */
 export async function PUT(request, { params }) {
   try {
-    ;
-
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Suggestion', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-
-    const token = authHeader.substring(7);
-    const decoded = await verifyToken(token);
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 });
-    }
+    const { user, models } = auth
+    const { Suggestion, User } = models
 
     // Get employeeId and role from User
-    const currentUser = await User.findById(decoded.userId).select('employeeId role');
+    const currentUser = await User.findById(user._id || user.userId).select('employeeId role');
     if (!currentUser) {
       return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 });
     }
@@ -171,21 +150,16 @@ export async function PUT(request, { params }) {
  */
 export async function DELETE(request, { params }) {
   try {
-    ;
-
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Suggestion', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-
-    const token = authHeader.substring(7);
-    const decoded = await verifyToken(token);
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 });
-    }
+    const { user, models } = auth
+    const { Suggestion, User } = models
 
     // Get employeeId and role from User
-    const currentUser = await User.findById(decoded.userId).select('employeeId role');
+    const currentUser = await User.findById(user._id || user.userId).select('employeeId role');
     if (!currentUser) {
       return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 });
     }

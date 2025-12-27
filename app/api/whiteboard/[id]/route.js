@@ -1,9 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth'
-import { jwtVerify } from 'jose';
 import { uploadImageToImageKit, deleteFromImageKit, getImageKitFolder } from '@/lib/imagekit';
-
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key');
 
 // Check if ImageKit is configured
 const isImageKitConfigured = () => {
@@ -14,34 +11,9 @@ const isImageKitConfigured = () => {
   )
 }
 
-async function verifyAuth(request) {
-  try {
-    const token = request.cookies.get('token')?.value ||
-      request.headers.get('authorization')?.replace('Bearer ', '');
-
-    if (!token) {
-      return null;
-    }
-
-    const { payload } = await jwtVerify(token, JWT_SECRET);
-    return {
-      id: payload.userId || payload.id,
-      ...payload
-    };
-  } catch (error) {
-    console.error('Auth verification failed:', error);
-    return null;
-  }
-}
-
 // GET /api/whiteboard/[id] - Get single whiteboard
 export async function GET(request, { params }) {
   try {
-    const user = await verifyAuth(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const { id } = await params;
 
     // Get authenticated user and tenant-specific models
@@ -49,15 +21,15 @@ export async function GET(request, { params }) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Whiteboard, User, Employee } = models
 
     // Get employee ID from user
-    const userRecord = await User.findById(user.id).select('employeeId').lean()
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId').lean()
     let employeeId = userRecord?.employeeId
     
     if (!employeeId) {
-      const employee = await Employee.findOne({ userId: user.id }).select('_id').lean()
+      const employee = await Employee.findOne({ userId: user._id || user.userId }).select('_id').lean()
       employeeId = employee?._id
     }
 
@@ -108,11 +80,6 @@ export async function GET(request, { params }) {
 // PUT /api/whiteboard/[id] - Update whiteboard
 export async function PUT(request, { params }) {
   try {
-    const user = await verifyAuth(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const { id } = await params;
 
     // Get authenticated user and tenant-specific models
@@ -120,15 +87,15 @@ export async function PUT(request, { params }) {
     if (!auth.success) {
       return NextResponse.json({ error: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Whiteboard, User, Employee } = models
 
     // Get employee ID from user
-    const userRecord = await User.findById(user.id).select('employeeId').lean()
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId').lean()
     let employeeId = userRecord?.employeeId
     
     if (!employeeId) {
-      const employee = await Employee.findOne({ userId: user.id }).select('_id').lean()
+      const employee = await Employee.findOne({ userId: user._id || user.userId }).select('_id').lean()
       employeeId = employee?._id
     }
 
@@ -175,7 +142,7 @@ export async function PUT(request, { params }) {
             tags: ['whiteboard', 'thumbnail'],
             customMetadata: {
               whiteboardId: id,
-              userId: user.id,
+              userId: user._id || user.userId,
             },
           });
 
@@ -201,7 +168,7 @@ export async function PUT(request, { params }) {
     if (global.io) {
       global.io.to(`whiteboard:${id}`).emit('whiteboard:updated', {
         whiteboardId: id,
-        updatedBy: user.id,
+        updatedBy: user._id || user.userId,
         timestamp: Date.now()
       });
     }
@@ -223,11 +190,6 @@ export async function PUT(request, { params }) {
 // DELETE /api/whiteboard/[id] - Delete whiteboard
 export async function DELETE(request, { params }) {
   try {
-    const user = await verifyAuth(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     const { id } = await params;
 
     // Get authenticated user and tenant-specific models
@@ -235,15 +197,15 @@ export async function DELETE(request, { params }) {
     if (!auth.success) {
       return NextResponse.json({ error: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Whiteboard, User, Employee } = models
 
     // Get employee ID from user
-    const userRecord = await User.findById(user.id).select('employeeId').lean()
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId').lean()
     let employeeId = userRecord?.employeeId
     
     if (!employeeId) {
-      const employee = await Employee.findOne({ userId: user.id }).select('_id').lean()
+      const employee = await Employee.findOne({ userId: user._id || user.userId }).select('_id').lean()
       employeeId = employee?._id
     }
 

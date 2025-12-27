@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 export const dynamic = 'force-dynamic'
 
 /**
@@ -8,16 +8,6 @@ export const dynamic = 'force-dynamic'
  */
 export async function POST(request) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['User'])
     if (!auth.success) {
@@ -27,7 +17,7 @@ export async function POST(request) {
     const { User } = models
 
     // Verify admin/HR role
-    const adminUser = await User.findById(decoded.userId).select('role')
+    const adminUser = await User.findById(user._id || user.userId).select('role')
     if (!adminUser || !['admin', 'hr'].includes(adminUser.role)) {
       return NextResponse.json({
         success: false,
@@ -79,7 +69,7 @@ export async function POST(request) {
     await User.findByIdAndUpdate(userId, { $set: updateData })
 
     // Log the action
-    console.log(`[Admin] User ${userToReactivate.email} reactivated by ${adminUser.role} (ID: ${decoded.userId})`)
+    console.log(`[Admin] User ${userToReactivate.email} reactivated by ${adminUser.role} (ID: ${user._id || user.userId})`)
 
     return NextResponse.json({
       success: true,
@@ -106,18 +96,16 @@ export async function POST(request) {
  */
 export async function GET(request) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
+    const { user, models } = auth
+    const { User } = models
 
     // Verify admin/HR role
-    const adminUser = await User.findById(decoded.userId).select('role')
+    const adminUser = await User.findById(user._id || user.userId).select('role')
     if (!adminUser || !['admin', 'hr'].includes(adminUser.role)) {
       return NextResponse.json({
         success: false,
@@ -141,17 +129,17 @@ export async function GET(request) {
       success: true,
       data: {
         count: suspendedUsers.length,
-        users: suspendedUsers.map(user => ({
-          _id: user._id,
-          email: user.email,
-          name: user.employeeId 
-            ? `${user.employeeId.firstName} ${user.employeeId.lastName}` 
+        users: suspendedUsers.map(userRec => ({
+          _id: userRec._id,
+          email: userRec.email,
+          name: userRec.employeeId 
+            ? `${userRec.employeeId.firstName} ${userRec.employeeId.lastName}` 
             : 'N/A',
-          employeeCode: user.employeeId?.employeeCode || 'N/A',
-          suspendedAt: user.suspendedAt,
-          profileStatus: user.profileCompletion?.status,
-          firstLoginAt: user.profileCompletion?.firstLoginAt,
-          originalDeadline: user.profileCompletion?.profileCompletionDeadline
+          employeeCode: userRec.employeeId?.employeeCode || 'N/A',
+          suspendedAt: userRec.suspendedAt,
+          profileStatus: userRec.profileCompletion?.status,
+          firstLoginAt: userRec.profileCompletion?.firstLoginAt,
+          originalDeadline: userRec.profileCompletion?.profileCompletionDeadline
         }))
       }
     })

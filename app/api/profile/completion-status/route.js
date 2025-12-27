@@ -195,17 +195,15 @@ export async function GET(request) {
  */
 export async function POST(request) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['User', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
+    const { user: authUser, models } = auth
+    const { User, Employee } = models
 
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
-    const user = await User.findById(decoded.userId)
+    const user = await User.findById(authUser._id || authUser.userId)
     if (!user) {
       return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
     }
@@ -264,7 +262,7 @@ export async function POST(request) {
         updateData['profileCompletion.status'] = 'partially_complete'
       }
 
-      await User.findByIdAndUpdate(decoded.userId, { $set: updateData })
+      await User.findByIdAndUpdate(authUser._id || authUser.userId, { $set: updateData })
 
       return NextResponse.json({
         success: true,

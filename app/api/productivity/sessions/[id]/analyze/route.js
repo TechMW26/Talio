@@ -1,14 +1,9 @@
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth';
 import { readFile } from 'fs/promises';
 import path from 'path';
-import { jwtVerify } from 'jose';
-;
-;
-;
 import { generateVisionContent, generateContent } from '@/lib/gemini';
 
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
 const MAX_IMAGES_PER_ANALYSIS = 10; // Limit images to avoid API limits
 
 /**
@@ -19,38 +14,16 @@ export async function POST(request, { params }) {
   try {
     const { id: sessionId } = await params;
     
-    // Verify JWT token
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    const token = authHeader.substring(7);
-    let decoded;
-    try {
-      decoded = await jwtVerify(token, JWT_SECRET);
-    } catch {
-      return NextResponse.json(
-        { success: false, error: 'Invalid token' },
-        { status: 401 }
-      );
-    }
-
-    const currentUserId = decoded.payload.userId;
-    const currentUserRole = decoded.payload.role;
-    
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['ProductivitySession', 'User'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { ProductivitySession, User } = models
 
-    ;
+    const currentUserId = user._id || user.userId;
+    const currentUserRole = user.role;
     
     // Get session
     const session = await ProductivitySession.findById(sessionId);
@@ -62,7 +35,7 @@ export async function POST(request, { params }) {
     }
     
     // Permission check
-    const isOwner = session.user.toString() === currentUserId;
+    const isOwner = session.user.toString() === currentUserId.toString();
     const isAdminOrHR = ['admin', 'hr'].includes(currentUserRole);
     
     if (!isOwner && !isAdminOrHR) {
@@ -83,9 +56,9 @@ export async function POST(request, { params }) {
     }
     
     // Get user info for context
-    const user = await User.findById(session.user).populate('employeeId');
-    const employeeName = user?.employeeId 
-      ? `${user.employeeId.firstName} ${user.employeeId.lastName}`
+    const userRecord = await User.findById(session.user).populate('employeeId');
+    const employeeName = userRecord?.employeeId 
+      ? `${userRecord.employeeId.firstName} ${userRecord.employeeId.lastName}`
       : 'Employee';
     
     // Prepare images for analysis
@@ -283,26 +256,13 @@ export async function GET(request, { params }) {
   try {
     const { id: sessionId } = await params;
     
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
-        { status: 401 }
-      );
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['ProductivitySession'])
+    if (!auth.success) {
+      return NextResponse.json({ success: false, error: auth.message }, { status: 401 })
     }
-
-    const token = authHeader.substring(7);
-    let decoded;
-    try {
-      decoded = await jwtVerify(token, JWT_SECRET);
-    } catch {
-      return NextResponse.json(
-        { success: false, error: 'Invalid token' },
-        { status: 401 }
-      );
-    }
-
-    ;
+    const { user, models } = auth
+    const { ProductivitySession } = models
     
     const session = await ProductivitySession.findById(sessionId);
     if (!session) {

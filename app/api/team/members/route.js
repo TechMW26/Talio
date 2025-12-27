@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,30 +12,13 @@ export async function GET(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Employee, Department, Designation, User } = models
 
-    // Verify authentication
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json(
-        { success: false, message: 'Invalid token' },
-        { status: 401 }
-      )
-    }
-
     // Get user to find employee ID
-    const user = await User.findById(decoded.userId).select('employeeId').lean()
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId').lean()
 
-    if (!user || !user.employeeId) {
+    if (!userRecord || !userRecord.employeeId) {
       // Return empty data for users without employee records
       return NextResponse.json({
         success: true,
@@ -49,9 +32,8 @@ export async function GET(request) {
       })
     }
 
-    // Get user role
-    const userDoc = await User.findById(decoded.userId).select('role').lean()
-    const userRole = userDoc?.role
+    // Get user role from auth
+    const userRole = user.role
 
     let teamMembers = []
     let department = null
@@ -59,14 +41,14 @@ export async function GET(request) {
 
     // Check if user is a department head (by Department.head reference OR by role)
     department = await Department.findOne({
-      head: user.employeeId,
+      head: userRecord.employeeId,
       isActive: true
     }).lean()
 
     // Also check if user has department_head role
     if (!department && (userRole === 'department_head' || userRole === 'manager')) {
       // Get the user's department
-      const userEmployee = await Employee.findById(user.employeeId).select('department').lean()
+      const userEmployee = await Employee.findById(userRecord.employeeId).select('department').lean()
       if (userEmployee?.department) {
         department = await Department.findById(userEmployee.department).lean()
       }
@@ -87,7 +69,7 @@ export async function GET(request) {
     } else if (userRole === 'manager') {
       // User is manager - get direct reports
       teamMembers = await Employee.find({
-        reportingManager: user.employeeId,
+        reportingManager: userRecord.employeeId,
         status: 'active'
       })
         .populate('designation', 'title level levelName')
@@ -97,7 +79,7 @@ export async function GET(request) {
         .lean()
 
       // Get manager's department for context
-      const managerEmployee = await Employee.findById(user.employeeId).select('department').populate('department', 'name').lean()
+      const managerEmployee = await Employee.findById(userRecord.employeeId).select('department').populate('department', 'name').lean()
       department = managerEmployee?.department
     } else {
       return NextResponse.json(

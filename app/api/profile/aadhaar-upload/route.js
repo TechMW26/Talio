@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import path from 'path'
 import fs from 'fs/promises'
 import { deleteFromImageKit, getImageKitFolder, generateEmployeeFolderName } from '@/lib/imagekit'
@@ -24,26 +24,15 @@ const isImageKitConfigured = () => {
  */
 export async function POST(request) {
   try {
-    // Verify authentication
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['User', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user: authUser, models } = auth
     const { User, Employee } = models
 
-    const user = await User.findById(decoded.userId)
+    const user = await User.findById(authUser._id || authUser.userId)
     if (!user) {
       return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
     }
@@ -102,7 +91,7 @@ export async function POST(request) {
       employee = await Employee.findById(user.employeeId).select('firstName lastName employeeCode')
     }
     if (!employee) {
-      employee = await Employee.findOne({ userId: decoded.userId }).select('firstName lastName employeeCode')
+      employee = await Employee.findOne({ userId: authUser._id || authUser.userId }).select('firstName lastName employeeCode')
     }
 
     // Generate secure filename with employee code
@@ -186,7 +175,7 @@ export async function POST(request) {
       }
     }
 
-    await User.findByIdAndUpdate(decoded.userId, {
+    await User.findByIdAndUpdate(authUser._id || authUser.userId, {
       $set: updateData
     })
 

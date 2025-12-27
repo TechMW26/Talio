@@ -1,13 +1,9 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-import { jwtVerify } from 'jose'
 import Fuse from 'fuse.js'
 import { getMenuItemsForRole } from '@/utils/roleBasedMenus'
 
 export const dynamic = 'force-dynamic'
-
-
-const secret = new TextEncoder().encode(process.env.JWT_SECRET)
 
 // Synonym dictionary for better word matching
 const synonyms = {
@@ -91,21 +87,15 @@ function buildSearchablePagesFromMenu(menuItems) {
 
 export async function GET(request) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
-    }
-
-    const { payload: decoded } = await jwtVerify(token, secret)
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['User', 'Employee', 'Leave', 'Attendance', 'Department', 'Designation', 'Document', 'Asset', 'Announcement', 'Policy'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user: authUser, models } = auth
     const { User, Employee, Leave, Attendance, Department, Designation, Document, Asset, Announcement, Policy } = models
 
-    const user = await User.findById(decoded.userId).populate('employeeId')
+    const user = await User.findById(authUser._id || authUser.userId).populate('employeeId')
     if (!user || !user.employeeId) {
       return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
     }

@@ -1,10 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAuthAndModels } from '@/lib/auth'
-import { jwtVerify } from 'jose';
-;
-;
-;
-;
+import { getAuthAndModels } from '@/lib/auth';
 
 /**
  * GET /api/call-alert/recipients
@@ -27,23 +22,8 @@ export async function GET(request) {
     const { user, models } = auth
     const { User, Employee, Department } = models
 
-    ;
-
-    // Verify authentication
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      );
-    }
-
-    const token = authHeader.substring(7);
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET);
-    const { payload: decoded } = await jwtVerify(token, secret);
-
     // Get current user with department head fields
-    const currentUser = await User.findById(decoded.userId);
+    const currentUser = await User.findById(user._id || user.userId);
     if (!currentUser || !currentUser.isActive) {
       return NextResponse.json(
         { success: false, message: 'User not found' },
@@ -144,19 +124,19 @@ export async function GET(request) {
     // Build recipients list
     const recipients = employees
       .map(emp => {
-        const user = userMap.get(emp._id.toString());
-        if (!user) return null;
+        const userEmp = userMap.get(emp._id.toString());
+        if (!userEmp) return null;
 
         // Don't include self
-        if (user._id.toString() === decoded.userId) return null;
+        if (userEmp._id.toString() === (user._id || user.userId).toString()) return null;
 
         return {
-          userId: user._id,
+          userId: userEmp._id,
           employeeId: emp._id,
           name: `${emp.firstName} ${emp.lastName}`,
-          email: user.email,
+          email: userEmp.email,
           employeeCode: emp.employeeCode,
-          role: user.role,
+          role: userEmp.role,
           department: emp.department?.name || 'No Department',
           departmentId: emp.department?._id,
           designation: emp.designation?.title || 'No Designation',

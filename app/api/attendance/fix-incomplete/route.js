@@ -1,11 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-import { jwtVerify } from 'jose'
 import { processPastDayIncompleteAttendance } from '@/lib/attendanceNotificationScheduler'
 
 export const dynamic = 'force-dynamic'
-
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key')
 
 /**
  * POST - Manually trigger fix for past-day incomplete attendance records
@@ -13,22 +10,10 @@ const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secr
  */
 export async function POST(request) {
   try {
-    // Verify authorization
-    const authHeader = request.headers.get('authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json(
-        { success: false, message: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
-
-    const token = authHeader.split(' ')[1]
-    const { payload } = await jwtVerify(token, JWT_SECRET)
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['User'])
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
     const { User } = models

@@ -1,8 +1,5 @@
 import { NextResponse } from 'next/server';
-;
-;
-;
-import { verifyToken, getAuthAndModels } from '@/lib/auth';
+import { getAuthAndModels } from '@/lib/auth';
 
 /**
  * GET /api/ideas/[id]/comments
@@ -16,20 +13,7 @@ export async function GET(request, { params }) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Suggestion, User } = models
-
-    ;
-
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
-    }
-
-    const token = authHeader.substring(7);
-    const decoded = await verifyToken(token);
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 });
-    }
+    const { Suggestion } = models
 
     const { id } = await params;
 
@@ -65,21 +49,16 @@ export async function GET(request, { params }) {
  */
 export async function POST(request, { params }) {
   try {
-    ;
-
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Suggestion', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-
-    const token = authHeader.substring(7);
-    const decoded = await verifyToken(token);
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 });
-    }
+    const { user, models } = auth
+    const { Suggestion, User } = models
 
     // Get employeeId from User
-    const currentUser = await User.findById(decoded.userId).select('employeeId');
+    const currentUser = await User.findById(user._id || user.userId).select('employeeId');
     if (!currentUser || !currentUser.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 });
     }

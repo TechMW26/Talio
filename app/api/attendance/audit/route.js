@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyTokenFromRequest, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,27 +20,25 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET(request) {
     try {
-        // Verify admin/HR access
-        const authResult = await verifyTokenFromRequest(request)
-        if (!authResult.success) {
+        // Get authenticated user and tenant-specific models
+        const auth = await getAuthAndModels(request, ['Attendance', 'Employee', 'User'])
+        if (!auth.success) {
             return NextResponse.json(
-                { success: false, message: authResult.message },
+                { success: false, message: auth.message },
                 { status: 401 }
             )
         }
+        const { user, models } = auth
+        const { Attendance, Employee, User } = models
 
-        if (!['admin', 'hr', 'manager'].includes(authResult.user.role)) {
+        if (!['admin', 'hr', 'manager'].includes(user.role)) {
             return NextResponse.json(
                 { success: false, message: 'Admin, HR, or Manager access required' },
                 { status: 403 }
             )
         }
 
-        // TODO: MIGRATION - Replace verifyTokenFromRequest with getAuthAndModels
-    // const { success, user, models, message } = await getAuthAndModels(request, ['Attendance', 'Employee'])
-    // if (!success) return NextResponse.json({ message }, { status: 401 })
-    // const { Attendance, Employee } = models
-    const { searchParams } = new URL(request.url)
+        const { searchParams } = new URL(request.url)
         const date = searchParams.get('date')
         const startDate = searchParams.get('startDate')
         const endDate = searchParams.get('endDate')

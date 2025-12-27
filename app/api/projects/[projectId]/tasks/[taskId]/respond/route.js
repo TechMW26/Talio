@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { createTimelineEvent } from '@/lib/projectService'
 import { 
   notifyTaskAssignmentAccepted,
@@ -9,28 +9,18 @@ import {
 // POST - Respond to task assignment (accept/reject)
 export async function POST(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Project', 'Task', 'TaskAssignee', 'User', 'Employee', 'ProjectTimelineEvent'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Project, Task, TaskAssignee, User, Employee } = models
 
     const { projectId, taskId } = await params
 
-    const user = await User.findById(decoded.userId).select('employeeId')
-    if (!user || !user.employeeId) {
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId')
+    if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -57,7 +47,7 @@ export async function POST(request, { params }) {
     // Find the assignment for current user
     const assignment = await TaskAssignee.findOne({
       task: taskId,
-      user: user.employeeId
+      user: userRecord.employeeId
     })
 
     if (!assignment) {
@@ -110,13 +100,13 @@ export async function POST(request, { params }) {
       }
     }
 
-    const employee = await Employee.findById(user.employeeId)
+    const employee = await Employee.findById(userRecord.employeeId)
 
     // Create timeline event
     await createTimelineEvent({
       project: projectId,
       type: accept ? 'task_assignment_accepted' : 'task_assignment_rejected',
-      createdBy: user.employeeId,
+      createdBy: userRecord.employeeId,
       relatedTask: taskId,
       description: accept 
         ? `${employee.firstName} ${employee.lastName} accepted task "${task.title}"${estimatedHours ? ` (ETA: ${estimatedHours}h)` : ''}`

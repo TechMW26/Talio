@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import fs from 'fs/promises'
 import path from 'path'
 
@@ -15,16 +15,6 @@ export async function GET(request, context) {
     // In Next.js 15, params is a Promise and needs to be awaited
     const { path: pathSegments } = await context.params
     
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['User'])
     if (!auth.success) {
@@ -41,8 +31,11 @@ export async function GET(request, context) {
     // Expected format: [userId, filename]
     const [requestedUserId, filename] = pathSegments
 
+    // Get the user ID from auth
+    const userId = (user._id || user.userId)?.toString()
+
     // Verify access permissions
-    const requestingUser = await User.findById(decoded.userId).select('role')
+    const requestingUser = await User.findById(userId).select('role')
     if (!requestingUser) {
       return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
     }
@@ -50,7 +43,7 @@ export async function GET(request, context) {
     // Allow access only if:
     // 1. User is requesting their own documents
     // 2. User is admin/HR
-    const isOwnDocument = decoded.userId === requestedUserId
+    const isOwnDocument = userId === requestedUserId
     const isAuthorized = ['admin', 'hr'].includes(requestingUser.role)
 
     if (!isOwnDocument && !isAuthorized) {

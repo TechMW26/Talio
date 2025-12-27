@@ -1,19 +1,12 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 // GET - Fetch employee reviews/remarks
 export async function GET(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    const decoded = await verifyToken(token)
-    
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Employee'])
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
     const { Employee } = models
@@ -21,7 +14,7 @@ export async function GET(request, { params }) {
     const { id } = params
     
     // Check if user has permission to view reviews
-    if (decoded.role === 'employee' && decoded.employeeId !== id) {
+    if (user.role === 'employee' && user.employeeId !== id) {
       return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
     }
 
@@ -56,15 +49,16 @@ export async function GET(request, { params }) {
 // POST - Add review/remark to employee
 export async function POST(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    const decoded = await verifyToken(token)
-    
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
+    const { user, models } = auth
+    const { Employee } = models
 
     // Only managers, hr, and admin can add reviews
-    if (!['admin', 'hr', 'manager'].includes(decoded.role)) {
+    if (!['admin', 'hr', 'manager'].includes(user.role)) {
       return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
     }
 
@@ -101,7 +95,7 @@ export async function POST(request, { params }) {
       content,
       rating: rating || null,
       category: category || 'general',
-      reviewedBy: decoded.employeeId,
+      reviewedBy: user.employeeId,
       createdAt: new Date()
     }
 
@@ -132,15 +126,16 @@ export async function POST(request, { params }) {
 // DELETE - Delete a review/remark
 export async function DELETE(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    const decoded = await verifyToken(token)
-    
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
+    const { user, models } = auth
+    const { Employee } = models
 
     // Only admin and hr can delete reviews
-    if (!['admin', 'hr'].includes(decoded.role)) {
+    if (!['admin', 'hr'].includes(user.role)) {
       return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
     }
 

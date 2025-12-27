@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { sendPushToUser } from '@/lib/pushNotification'
+
 // GET - Get single document
 export async function GET(request, { params }) {
   try {
@@ -38,6 +40,14 @@ export async function GET(request, { params }) {
 // PUT - Update document
 export async function PUT(request, { params }) {
   try {
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Document', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Document, Employee } = models
+
     const data = await request.json()
 
     const document = await Document.findByIdAndUpdate(
@@ -59,7 +69,6 @@ export async function PUT(request, { params }) {
     try {
       const io = global.io
       if (io && (data.status === 'approved' || data.status === 'rejected')) {
-        const Employee = require('@/models/Employee').default
         const employeeDoc = await Employee.findById(document.employee._id || document.employee).select('userId')
         const employeeUserId = employeeDoc?.userId
 
@@ -77,7 +86,6 @@ export async function PUT(request, { params }) {
 
           // FCM push notification
           try {
-            const { sendPushToUser } = require('@/lib/pushNotification')
             await sendPushToUser(
               employeeUserId,
               {

@@ -53,6 +53,14 @@ export async function GET(request) {
 // POST - Create new department
 export async function POST(request) {
   try {
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Department', 'User', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Department, User, Employee } = models
+
     const data = await request.json()
 
     // Handle multiple heads - ensure backwards compatibility
@@ -68,7 +76,7 @@ export async function POST(request) {
 
     // Sync department head status to User meta (fire and forget)
     if (data.heads && data.heads.length > 0) {
-      updateDepartmentHeadsForDepartment(department._id.toString(), [], data.heads)
+      updateDepartmentHeadsForDepartment(department._id.toString(), [], data.heads, { User, Employee, Department })
         .catch(err => console.error('Error syncing department heads:', err));
     }
 

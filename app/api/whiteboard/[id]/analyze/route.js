@@ -1,24 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth'
-import { jwtVerify } from 'jose';
 import { generateContent, generateVisionContent } from '@/lib/gemini';
 import { generateSmartContent } from '@/lib/promptEngine';
-
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key');
-// GEMINI_API_KEY handled in lib/gemini.js
-
-async function verifyToken(request) {
-  try {
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) return null;
-    
-    const token = authHeader.substring(7);
-    const { payload } = await jwtVerify(token, JWT_SECRET);
-    return payload;
-  } catch (error) {
-    return null;
-  }
-}
 
 // Convert canvas objects to a text description for AI
 function describeCanvasObjects(pages) {
@@ -263,21 +246,14 @@ function cleanAIResponse(text) {
 // POST - Analyze canvas or continue chat
 export async function POST(request, { params }) {
   try {
-    const user = await verifyToken(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Whiteboard'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Whiteboard } = models
 
-    ;
-    
     const { id } = await params;
     const body = await request.json();
     const { action, message, canvasScreenshot } = body;
@@ -1170,17 +1146,12 @@ Return ONLY valid JSON array. No explanations.`;
 // GET - Retrieve saved AI analysis
 export async function GET(request, { params }) {
   try {
-    const user = await verifyToken(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Whiteboard'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Whiteboard } = models
     
     const { id } = await params;
@@ -1190,7 +1161,7 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Whiteboard not found' }, { status: 404 });
     }
     
-    const permission = whiteboard.getUserPermission(user.userId);
+    const permission = whiteboard.getUserPermission(user._id || user.userId);
     if (!permission) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }

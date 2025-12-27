@@ -1,52 +1,23 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth'
-import { jwtVerify } from 'jose';
-
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET || 'your-secret-key');
-
-async function verifyAuth(request) {
-  try {
-    const token = request.cookies.get('token')?.value || 
-                  request.headers.get('authorization')?.replace('Bearer ', '');
-    
-    if (!token) {
-      return null;
-    }
-
-    const { payload } = await jwtVerify(token, JWT_SECRET);
-    // Return normalized user object with id field
-    return {
-      id: payload.userId || payload.id,
-      ...payload
-    };
-  } catch (error) {
-    console.error('Auth verification failed:', error);
-    return null;
-  }
-}
 
 // GET /api/whiteboard - List all whiteboards for user
 export async function GET(request) {
   try {
-    const user = await verifyAuth(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Whiteboard', 'User', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Whiteboard, User, Employee } = models
 
     // Get employee ID from user
-    const userRecord = await User.findById(user.id).select('employeeId').lean()
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId').lean()
     let employeeId = userRecord?.employeeId
     
     if (!employeeId) {
-      const employee = await Employee.findOne({ userId: user.id }).select('_id').lean()
+      const employee = await Employee.findOne({ userId: user._id || user.userId }).select('_id').lean()
       employeeId = employee?._id
     }
 
@@ -121,25 +92,20 @@ export async function GET(request) {
 // POST /api/whiteboard - Create new whiteboard
 export async function POST(request) {
   try {
-    const user = await verifyAuth(request);
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Whiteboard', 'User', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ error: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Whiteboard, User, Employee } = models
 
     // Get employee ID from user
-    const userRecord = await User.findById(user.id).select('employeeId').lean()
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId').lean()
     let employeeId = userRecord?.employeeId
     
     if (!employeeId) {
-      const employee = await Employee.findOne({ userId: user.id }).select('_id').lean()
+      const employee = await Employee.findOne({ userId: user._id || user.userId }).select('_id').lean()
       employeeId = employee?._id
     }
 

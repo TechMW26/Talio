@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 
 export async function POST(request, { params }) {
   try {
@@ -10,16 +10,6 @@ export async function POST(request, { params }) {
     }
     const { user, models } = auth
     const { Chat } = models
-
-    const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    if (!token) {
-      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const decoded = verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, error: 'Invalid token' }, { status: 401 })
-    }
 
     const { chatId, messageId } = params
     const { reaction } = await request.json()
@@ -45,9 +35,11 @@ export async function POST(request, { params }) {
       message.reactions = []
     }
 
+    const userId = user._id || user.userId
+
     // Check if user already reacted with this emoji
     const existingReactionIndex = message.reactions.findIndex(
-      r => r.user.toString() === decoded.userId && r.reaction === reaction
+      r => r.user.toString() === userId.toString() && r.reaction === reaction
     )
 
     if (existingReactionIndex > -1) {
@@ -56,11 +48,11 @@ export async function POST(request, { params }) {
     } else {
       // Remove any other reaction from this user first
       message.reactions = message.reactions.filter(
-        r => r.user.toString() !== decoded.userId
+        r => r.user.toString() !== userId.toString()
       )
       // Add new reaction
       message.reactions.push({
-        user: decoded.userId,
+        user: userId,
         reaction,
         createdAt: new Date()
       })

@@ -1,34 +1,24 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { createTimelineEvent } from '@/lib/projectService'
 
 // POST - Approve or reject task completion
 export async function POST(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Project', 'Task', 'ProjectApprovalRequest', 'User', 'Employee', 'ProjectTimelineEvent'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Project, Task, ProjectApprovalRequest, User, Employee } = models
 
     const { requestId } = await params
     const body = await request.json()
     const { action, comment } = body // action: 'approve' or 'reject'
 
-    const user = await User.findById(decoded.userId).select('employeeId role')
-    if (!user || !user.employeeId) {
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId role')
+    if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -53,19 +43,19 @@ export async function POST(request, { params }) {
         ? [project.projectHead.toString()] 
         : []
 
-    const isProjectHead = projectHeadIds.includes(user.employeeId.toString())
-    const isAdmin = ['admin'].includes(user.role)
+    const isProjectHead = projectHeadIds.includes(userRecord.employeeId.toString())
+    const isAdmin = ['admin'].includes(userRecord.role || user.role)
 
     if (!isProjectHead && !isAdmin) {
       return NextResponse.json({ success: false, message: 'Only project heads can approve this request' }, { status: 403 })
     }
 
-    const employee = await Employee.findById(user.employeeId)
+    const employee = await Employee.findById(userRecord.employeeId)
 
     if (action === 'approve') {
       // Approve the task completion
       approvalRequest.status = 'approved'
-      approvalRequest.reviewedBy = user.employeeId
+      approvalRequest.reviewedBy = userRecord.employeeId
       approvalRequest.reviewedAt = new Date()
       approvalRequest.reviewerComment = comment || ''
       await approvalRequest.save()
@@ -81,12 +71,12 @@ export async function POST(request, { params }) {
         await createTimelineEvent({
           project: project._id,
           type: 'task_completed',
-          createdBy: user.employeeId,
+          createdBy: userRecord.employeeId,
           relatedTask: task._id,
           description: `Task "${task.title}" approved as completed by ${employee.firstName} ${employee.lastName}`,
           metadata: { 
             taskTitle: task.title,
-            approvedBy: user.employeeId,
+            approvedBy: userRecord.employeeId,
             approverName: `${employee.firstName} ${employee.lastName}`
           }
         }, models)
@@ -119,12 +109,12 @@ export async function POST(request, { params }) {
         await createTimelineEvent({
           project: project._id,
           type: 'task_completion_rejected',
-          createdBy: user.employeeId,
+          createdBy: userRecord.employeeId,
           relatedTask: task._id,
           description: `Task "${task.title}" completion rejected by ${employee.firstName} ${employee.lastName}`,
           metadata: { 
             taskTitle: task.title,
-            rejectedBy: user.employeeId,
+            rejectedBy: userRecord.employeeId,
             rejectorName: `${employee.firstName} ${employee.lastName}`,
             reason: comment || 'No reason provided'
           }

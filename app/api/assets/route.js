@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-import jwt from 'jsonwebtoken'
 
 // GET - List assets
 export async function GET(request) {
@@ -47,19 +46,17 @@ export async function GET(request) {
 // POST - Create asset
 export async function POST(request) {
   try {
-    // Auth check
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Asset'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
+    const { user, models } = auth
+    const { Asset } = models
 
-    try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET)
-      if (!['admin', 'hr'].includes(decoded.role)) {
-        return NextResponse.json({ success: false, message: 'Forbidden: Only Admin and HR can add assets' }, { status: 403 })
-      }
-    } catch (err) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
+    // Check if user has permission
+    if (!['admin', 'hr'].includes(user.role)) {
+      return NextResponse.json({ success: false, message: 'Forbidden: Only Admin and HR can add assets' }, { status: 403 })
     }
 
     const data = await request.json()

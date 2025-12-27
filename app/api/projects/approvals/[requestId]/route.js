@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { createTimelineEvent, calculateCompletionPercentage } from '@/lib/projectService'
 import { notifyTaskReviewRejected } from '@/lib/projectNotifications'
 import { sendEmail, emailTemplates } from '@/lib/mailer'
@@ -7,28 +7,18 @@ import { sendEmail, emailTemplates } from '@/lib/mailer'
 // PUT - Approve or reject a request
 export async function PUT(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Project', 'Task', 'TaskAssignee', 'ProjectApprovalRequest', 'User', 'Employee', 'ProjectTimelineEvent'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Project, Task, TaskAssignee, ProjectApprovalRequest, User, Employee } = models
 
     const { requestId } = await params
 
-    const user = await User.findById(decoded.userId).select('employeeId role')
-    if (!user || !user.employeeId) {
+    const userDoc = await User.findById(user._id || user.userId).select('employeeId role')
+    if (!userDoc || !userDoc.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -52,13 +42,13 @@ export async function PUT(request, { params }) {
     }
 
     // Only project head(s) or admin can approve
-    const isAdmin = ['admin'].includes(user.role)
+    const isAdmin = ['admin'].includes(userDoc.role)
     const projectHeadIds = project.projectHeads && project.projectHeads.length > 0 
       ? project.projectHeads.map(h => h.toString())
       : project.projectHead 
         ? [project.projectHead.toString()] 
         : []
-    const isProjectHead = projectHeadIds.includes(user.employeeId.toString())
+    const isProjectHead = projectHeadIds.includes(userDoc.employeeId.toString())
 
     if (!isAdmin && !isProjectHead) {
       return NextResponse.json({ 
@@ -88,7 +78,7 @@ export async function PUT(request, { params }) {
 
     // Update the request
     approvalRequest.status = isApproved ? 'approved' : 'rejected'
-    approvalRequest.reviewedBy = user.employeeId
+    approvalRequest.reviewedBy = userDoc.employeeId
     approvalRequest.reviewedAt = new Date()
     approvalRequest.reviewerComment = comment || ''
     await approvalRequest.save()
@@ -114,10 +104,10 @@ export async function PUT(request, { params }) {
             createTimelineEvent({
               project: approvalRequest.project,
               type: 'task_completed',
-              createdBy: user.employeeId,
+              createdBy: userDoc.employeeId,
               relatedTask: taskId,
               description: `Task "${taskTitle}" completion approved`,
-              metadata: { taskTitle, approvedBy: user.employeeId }
+              metadata: { taskTitle, approvedBy: userDoc.employeeId }
             }, models).catch(console.error)
           }
           break
@@ -138,9 +128,9 @@ export async function PUT(request, { params }) {
             createTimelineEvent({
               project: approvalRequest.project,
               type: 'task_deleted',
-              createdBy: user.employeeId,
+              createdBy: userDoc.employeeId,
               description: `Task "${taskTitle}" was deleted (approved by project head)`,
-              metadata: { taskTitle, approvedBy: user.employeeId }
+              metadata: { taskTitle, approvedBy: userDoc.employeeId }
             }, models).catch(console.error)
           }
           break
@@ -155,9 +145,9 @@ export async function PUT(request, { params }) {
           createTimelineEvent({
             project: approvalRequest.project,
             type: 'project_approved',
-            createdBy: user.employeeId,
+            createdBy: userDoc.employeeId,
             description: 'Project completion approved',
-            metadata: { approvedBy: user.employeeId }
+            metadata: { approvedBy: userDoc.employeeId }
           }, models).catch(console.error)
           break
           
@@ -180,10 +170,10 @@ export async function PUT(request, { params }) {
             createTimelineEvent({
               project: approvalRequest.project,
               type: 'task_completed',
-              createdBy: user.employeeId,
+              createdBy: userDoc.employeeId,
               relatedTask: taskId,
               description: `Task "${taskTitle}" review approved and marked complete`,
-              metadata: { taskTitle, approvedBy: user.employeeId }
+              metadata: { taskTitle, approvedBy: userDoc.employeeId }
             }, models).catch(console.error)
           }
           break
@@ -213,7 +203,7 @@ export async function PUT(request, { params }) {
           
           // Track rejection details
           task.lastRejectedAt = new Date()
-          task.lastRejectedBy = user.employeeId
+          task.lastRejectedBy = userDoc.employeeId
           task.rejectionCount = (task.rejectionCount || 0) + 1
           task.lastRejectionReason = comment || ''
           
@@ -233,7 +223,7 @@ export async function PUT(request, { params }) {
                   if (subtaskComments && subtaskComments[st._id.toString()]) {
                     st.rejectionComment = subtaskComments[st._id.toString()]
                     st.rejectedAt = new Date()
-                    st.rejectedBy = user.employeeId
+                    st.rejectedBy = userDoc.employeeId
                   }
                 }
               })
@@ -289,7 +279,7 @@ export async function PUT(request, { params }) {
           }).select('_id email')
           
           // Get rejector employee details
-          const rejectorEmployee = await Employee.findById(user.employeeId).select('firstName lastName')
+          const rejectorEmployee = await Employee.findById(userDoc.employeeId).select('firstName lastName')
           
           // Send push notifications to assignees
           if (assigneeUserIds.length > 0) {
@@ -356,7 +346,7 @@ export async function PUT(request, { params }) {
           createTimelineEvent({
             project: approvalRequest.project,
             type: 'task_rejected',
-            createdBy: user.employeeId,
+            createdBy: userDoc.employeeId,
             relatedTask: task._id,
             description: `Task "${task.title}" review rejected${comment ? `: ${comment}` : ''}`,
             metadata: { 
@@ -387,20 +377,18 @@ export async function PUT(request, { params }) {
 // DELETE - Cancel a request (by requester)
 export async function DELETE(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectApprovalRequest', 'User'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
+    const { user, models } = auth
+    const { Project, ProjectApprovalRequest, User } = models
 
     const { requestId } = await params
 
-    const user = await User.findById(decoded.userId).select('employeeId role')
-    if (!user || !user.employeeId) {
+    const userDoc = await User.findById(user._id || user.userId).select('employeeId role')
+    if (!userDoc || !userDoc.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
@@ -410,11 +398,11 @@ export async function DELETE(request, { params }) {
     }
 
     // Only requester, project head, or admin can cancel
-    const isRequester = approvalRequest.requestedBy.toString() === user.employeeId.toString()
-    const isAdmin = ['admin'].includes(user.role)
+    const isRequester = approvalRequest.requestedBy.toString() === userDoc.employeeId.toString()
+    const isAdmin = ['admin'].includes(userDoc.role)
     
     const project = await Project.findById(approvalRequest.project)
-    const isProjectHead = project && project.projectHead.toString() === user.employeeId.toString()
+    const isProjectHead = project && project.projectHead.toString() === userDoc.employeeId.toString()
 
     if (!isRequester && !isAdmin && !isProjectHead) {
       return NextResponse.json({ 

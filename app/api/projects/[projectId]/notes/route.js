@@ -1,39 +1,29 @@
 import { NextResponse } from 'next/server'
-import { verifyToken, getAuthAndModels } from '@/lib/auth'
+import { getAuthAndModels } from '@/lib/auth'
 import { checkProjectAccess } from '@/lib/projectService'
 
 // GET - Get all notes for a project
 export async function GET(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'ProjectNote', 'Task', 'User', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Project, ProjectMember, ProjectNote, Task, User, Employee } = models
 
     const { projectId } = await params
 
-    const user = await User.findById(decoded.userId).select('employeeId role')
-    if (!user || !user.employeeId) {
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId role')
+    if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
     // Check project access
-    const isAdmin = ['admin', 'hr'].includes(user.role)
+    const isAdmin = ['admin', 'hr'].includes(userRecord.role || user.role)
     if (!isAdmin) {
-      const { hasAccess } = await checkProjectAccess(projectId, user.employeeId, 'view', models)
+      const { hasAccess } = await checkProjectAccess(projectId, userRecord.employeeId, 'view', models)
       if (!hasAccess) {
         return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
       }
@@ -45,7 +35,7 @@ export async function GET(request, { params }) {
       isArchived: false,
       $or: [
         { visibility: 'team' },
-        { visibility: 'personal', createdBy: user.employeeId }
+        { visibility: 'personal', createdBy: userRecord.employeeId }
       ]
     })
       .populate('createdBy', 'firstName lastName profilePicture')
@@ -65,35 +55,25 @@ export async function GET(request, { params }) {
 // POST - Create a new note
 export async function POST(request, { params }) {
   try {
-    const token = request.headers.get('authorization')?.split(' ')[1]
-    if (!token) {
-      return NextResponse.json({ success: false, message: 'No token provided' }, { status: 401 })
-    }
-
-    const decoded = await verifyToken(token)
-    if (!decoded) {
-      return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
-    }
-
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'ProjectNote', 'Task', 'User', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Project, ProjectNote, Task, User, Employee } = models
 
     const { projectId } = await params
 
-    const user = await User.findById(decoded.userId).select('employeeId role')
-    if (!user || !user.employeeId) {
+    const userRecord = await User.findById(user._id || user.userId).select('employeeId role')
+    if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
     // Check if user can participate in project
-    const isAdmin = ['admin'].includes(user.role)
+    const isAdmin = ['admin'].includes(userRecord.role || user.role)
     if (!isAdmin) {
-      const { hasAccess } = await checkProjectAccess(projectId, user.employeeId, 'participate', models)
+      const { hasAccess } = await checkProjectAccess(projectId, userRecord.employeeId, 'participate', models)
       if (!hasAccess) {
         return NextResponse.json({ 
           success: false, 
@@ -111,7 +91,7 @@ export async function POST(request, { params }) {
 
     const note = await ProjectNote.create({
       project: projectId,
-      createdBy: user.employeeId,
+      createdBy: userRecord.employeeId,
       title: title?.trim(),
       content: content.trim(),
       color: color || 'yellow',
