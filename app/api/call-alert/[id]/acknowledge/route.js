@@ -26,23 +26,33 @@ export async function POST(request, { params }) {
       );
     }
 
-    // Check if user is a receiver
-    const receiver = alert.receivers.find(
-      r => r.user.toString() === (user._id || user.userId).toString()
+    // Parse body for platform info - do this first to avoid consuming request body twice
+    const body = await request.json().catch(() => ({}));
+    const { platform = 'web' } = body;
+
+    // Get user ID safely - ensure it's a string for comparison
+    const userId = (user._id || user.userId || '').toString();
+
+    if (!userId) {
+      console.error('[CallAlert] No valid user ID found in auth context');
+      return NextResponse.json(
+        { success: false, message: 'User identification failed' },
+        { status: 401 }
+      );
+    }
+
+    // Check if user is a receiver - safely compare IDs
+    const receiver = alert.receivers?.find(
+      r => r.user && r.user.toString() === userId
     );
 
     if (!receiver) {
+      console.log('[CallAlert] User not in receivers list:', { userId, alertReceivers: alert.receivers?.map(r => r.user?.toString()) });
       return NextResponse.json(
         { success: false, message: 'You are not a recipient of this alert' },
         { status: 403 }
       );
     }
-
-    // Parse body for platform info
-    const body = await request.json().catch(() => ({}));
-    const { platform = 'web' } = body;
-
-    const userId = user._id || user.userId;
 
     // Acknowledge the alert
     await alert.acknowledgeAlert(userId);

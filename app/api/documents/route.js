@@ -46,6 +46,14 @@ export async function GET(request) {
 // POST - Upload document
 export async function POST(request) {
   try {
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Document'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Document } = models
+
     const data = await request.json()
 
     const document = await Document.create(data)

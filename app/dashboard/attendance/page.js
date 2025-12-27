@@ -62,8 +62,78 @@ export default function AttendancePage() {
   const [selectedHoliday, setSelectedHoliday] = useState(null)
   const [showHolidayModal, setShowHolidayModal] = useState(false)
 
+  // Company working days (0=Sunday, 1=Monday, etc.)
+  const [workingDays, setWorkingDays] = useState([1, 2, 3, 4, 5]) // Default Mon-Fri
+
+  // Employee joining date (to not mark absent before joining)
+  const [employeeJoiningDate, setEmployeeJoiningDate] = useState(null)
+
   // Details modal state (for viewing attendance record details)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
+
+  // Helper function to safely get employeeId - defined early for use in useEffects
+  const getEmployeeId = (userObj) => {
+    if (!userObj) return null
+    // Check if employeeId._id exists and is valid
+    if (userObj.employeeId?._id && userObj.employeeId._id !== 'undefined') {
+      return userObj.employeeId._id
+    }
+    // Check if employeeId is a direct string and is valid
+    if (userObj.employeeId && typeof userObj.employeeId === 'string' && userObj.employeeId !== 'undefined') {
+      return userObj.employeeId
+    }
+    // Fallback to user._id
+    if (userObj._id && userObj._id !== 'undefined') {
+      return userObj._id
+    }
+    // Fallback to user.id
+    if (userObj.id && userObj.id !== 'undefined') {
+      return userObj.id
+    }
+    return null
+  }
+
+  // Fetch company settings (working days)
+  useEffect(() => {
+    const fetchCompanySettings = async () => {
+      try {
+        const token = localStorage.getItem('token')
+        const response = await fetch('/api/company/settings', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+        const data = await response.json()
+        if (data.success && data.data?.workingHours?.workingDays) {
+          setWorkingDays(data.data.workingHours.workingDays)
+        }
+      } catch (error) {
+        console.error('Error fetching company settings:', error)
+      }
+    }
+    fetchCompanySettings()
+  }, [])
+
+  // Fetch employee details (joining date)
+  useEffect(() => {
+    const fetchEmployeeDetails = async () => {
+      if (!user) return
+      const empId = getEmployeeId(user)
+      if (!empId) return
+
+      try {
+        const token = localStorage.getItem('token')
+        const response = await fetch(`/api/employees/${empId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+        const data = await response.json()
+        if (data.success && data.data?.joiningDate) {
+          setEmployeeJoiningDate(new Date(data.data.joiningDate))
+        }
+      } catch (error) {
+        console.error('Error fetching employee details:', error)
+      }
+    }
+    fetchEmployeeDetails()
+  }, [user])
 
   // Fetch holidays
   useEffect(() => {
@@ -97,28 +167,6 @@ export default function AttendancePage() {
       setViewMode('list')
     }
   }, [])
-
-  // Helper function to safely get employeeId
-  const getEmployeeId = (userObj) => {
-    if (!userObj) return null
-    // Check if employeeId._id exists and is valid
-    if (userObj.employeeId?._id && userObj.employeeId._id !== 'undefined') {
-      return userObj.employeeId._id
-    }
-    // Check if employeeId is a direct string and is valid
-    if (userObj.employeeId && typeof userObj.employeeId === 'string' && userObj.employeeId !== 'undefined') {
-      return userObj.employeeId
-    }
-    // Fallback to user._id
-    if (userObj._id && userObj._id !== 'undefined') {
-      return userObj._id
-    }
-    // Fallback to user.id
-    if (userObj.id && userObj.id !== 'undefined') {
-      return userObj.id
-    }
-    return null
-  }
 
   useEffect(() => {
     const userData = localStorage.getItem('user')
@@ -1151,12 +1199,26 @@ export default function AttendancePage() {
                 {calendarData.map((dayData, index) => {
                   const pendingCorrection = dayData.day ? getPendingCorrectionForDay(dayData) : null
                   const hasPending = !!pendingCorrection
-                  const isWeekend = dayData.date ? (dayData.date.getDay() === 0 || dayData.date.getDay() === 6) : false
+                  // Use company working days setting (0=Sunday, 6=Saturday)
+                  const dayOfWeek = dayData.date ? dayData.date.getDay() : null
+                  const isWorkingDay = dayOfWeek !== null ? workingDays.includes(dayOfWeek) : false
+                  const isWeekend = !isWorkingDay
                   const isHoliday = dayData.record?.status === 'holiday' || dayData.holiday
                   const holidayName = dayData.holiday?.name || (dayData.record?.status === 'holiday' ? 'Holiday' : '')
 
+                  // Check if this is a past working day without a record (should show as absent)
+                  const today = new Date()
+                  today.setHours(0, 0, 0, 0)
+                  const dayDate = dayData.date ? new Date(dayData.date) : null
+                  if (dayDate) dayDate.setHours(0, 0, 0, 0)
+                  const isPastDay = dayDate && dayDate < today
+                  const isAfterJoining = !employeeJoiningDate || (dayDate && dayDate >= employeeJoiningDate)
+                  const shouldShowAsAbsent = dayData.isCurrentMonth && isPastDay && isWorkingDay && !isHoliday && !dayData.record && isAfterJoining
+
                   // Determine status color
                   let statusColor = 'bg-gray-50'
+                  let displayStatus = dayData.record?.status
+
                   if (dayData.record) {
                     if (dayData.record.status === 'present') statusColor = 'bg-green-50 border-green-100'
                     else if (dayData.record.status === 'absent') statusColor = 'bg-red-50 border-red-100'
@@ -1166,6 +1228,10 @@ export default function AttendancePage() {
                     else if (dayData.record.status === 'holiday') statusColor = 'bg-purple-50 border-purple-100'
                   } else if (isHoliday) {
                     statusColor = 'bg-purple-50 border-purple-100'
+                  } else if (shouldShowAsAbsent) {
+                    // Past working day without record = show as absent
+                    statusColor = 'bg-red-50 border-red-200'
+                    displayStatus = 'absent'
                   }
 
                   return (
@@ -1201,15 +1267,15 @@ export default function AttendancePage() {
                         </span>
                       </div>
 
-                      {/* Status badge */}
-                      {dayData.record?.status && (
+                      {/* Status badge - show for records OR for computed absent status */}
+                      {(dayData.record?.status || displayStatus) && (
                         <div className="mb-1">
                           <span className={`
                           inline-block text-[9px] sm:text-[10px] px-1 py-0.5 rounded border font-medium uppercase tracking-tight leading-tight
-                          ${getStatusBadgeColor(dayData.record.status)}
+                          ${getStatusBadgeColor(displayStatus || dayData.record?.status)}
                           break-words max-w-full
                         `} style={{ wordBreak: 'break-word', hyphens: 'auto' }}>
-                            {dayData.record.status}
+                            {displayStatus || dayData.record?.status}
                           </span>
                         </div>
                       )}
@@ -1237,8 +1303,8 @@ export default function AttendancePage() {
                         </div>
                       )}
 
-                      {/* Add button for missing entry - show on hover for past dates without records */}
-                      {dayData.isCurrentMonth && !dayData.record && !isWeekend && !isHoliday && dayData.date && new Date(dayData.date) < new Date() && (
+                      {/* Add button for missing entry - show on hover for past working dates without records */}
+                      {shouldShowAsAbsent && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation()

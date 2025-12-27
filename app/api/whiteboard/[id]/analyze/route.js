@@ -6,80 +6,99 @@ import { generateSmartContent } from '@/lib/promptEngine';
 // Convert canvas objects to a text description for AI
 function describeCanvasObjects(pages) {
   const descriptions = [];
-  
+
+  // Safe check for pages array
+  if (!pages || !Array.isArray(pages) || pages.length === 0) {
+    return '';
+  }
+
   pages.forEach((page, pageIndex) => {
-    if (!page.objects || page.objects.length === 0) return;
-    
+    // Safe check for page objects
+    if (!page || !page.objects || !Array.isArray(page.objects) || page.objects.length === 0) return;
+
     descriptions.push(`\n--- Page ${pageIndex + 1} ---`);
-    
+
     page.objects.forEach((obj, index) => {
+      if (!obj || !obj.type) return;
+
       let desc = '';
-      
+
+      // Safe accessors for coordinates with defaults
+      const safeX = Math.round(obj.x ?? 0);
+      const safeY = Math.round(obj.y ?? 0);
+      const safeWidth = Math.round(obj.width ?? 0);
+      const safeHeight = Math.round(obj.height ?? 0);
+
       switch (obj.type) {
         case 'text':
-          desc = `Text: "${obj.text || ''}" at position (${Math.round(obj.x)}, ${Math.round(obj.y)})`;
+          desc = `Text: "${obj.text || ''}" at position (${safeX}, ${safeY})`;
           break;
         case 'sticky':
-          desc = `Sticky Note: "${obj.text || ''}" - Color: ${obj.fillColor || 'yellow'} at (${Math.round(obj.x)}, ${Math.round(obj.y)}), size: ${Math.round(obj.width || 200)}x${Math.round(obj.height || 200)}`;
+          desc = `Sticky Note: "${obj.text || ''}" - Color: ${obj.fillColor || 'yellow'} at (${safeX}, ${safeY}), size: ${obj.width ? Math.round(obj.width) : 200}x${obj.height ? Math.round(obj.height) : 200}`;
           break;
         case 'rect':
-          desc = `Rectangle at (${Math.round(obj.x)}, ${Math.round(obj.y)}), size: ${Math.round(obj.width)}x${Math.round(obj.height)}, fill: ${obj.fillColor || 'none'}`;
+          desc = `Rectangle at (${safeX}, ${safeY}), size: ${safeWidth}x${safeHeight}, fill: ${obj.fillColor || 'none'}`;
           break;
         case 'ellipse':
-          desc = `Ellipse/Circle at (${Math.round(obj.x)}, ${Math.round(obj.y)}), size: ${Math.round(obj.width)}x${Math.round(obj.height)}`;
+          desc = `Ellipse/Circle at (${safeX}, ${safeY}), size: ${safeWidth}x${safeHeight}`;
           break;
         case 'diamond':
-          desc = `Diamond shape at (${Math.round(obj.x)}, ${Math.round(obj.y)})`;
+          desc = `Diamond shape at (${safeX}, ${safeY})`;
           break;
         case 'triangle':
-          desc = `Triangle at (${Math.round(obj.x)}, ${Math.round(obj.y)})`;
+          desc = `Triangle at (${safeX}, ${safeY})`;
           break;
         case 'star':
-          desc = `Star shape at (${Math.round(obj.x)}, ${Math.round(obj.y)})`;
+          desc = `Star shape at (${safeX}, ${safeY})`;
           break;
         case 'hexagon':
-          desc = `Hexagon at (${Math.round(obj.x)}, ${Math.round(obj.y)})`;
+          desc = `Hexagon at (${safeX}, ${safeY})`;
           break;
         case 'pentagon':
-          desc = `Pentagon at (${Math.round(obj.x)}, ${Math.round(obj.y)})`;
+          desc = `Pentagon at (${safeX}, ${safeY})`;
           break;
         case 'line':
-          if (obj.points && obj.points.length >= 2) {
-            desc = `Line from (${Math.round(obj.points[0].x)}, ${Math.round(obj.points[0].y)}) to (${Math.round(obj.points[obj.points.length-1].x)}, ${Math.round(obj.points[obj.points.length-1].y)})`;
+          if (obj.points && Array.isArray(obj.points) && obj.points.length >= 2) {
+            const startPoint = obj.points[0] || { x: 0, y: 0 };
+            const endPoint = obj.points[obj.points.length - 1] || { x: 0, y: 0 };
+            desc = `Line from (${Math.round(startPoint.x ?? 0)}, ${Math.round(startPoint.y ?? 0)}) to (${Math.round(endPoint.x ?? 0)}, ${Math.round(endPoint.y ?? 0)})`;
           }
           break;
         case 'arrow':
-          if (obj.points && obj.points.length >= 2) {
-            desc = `Arrow pointing from (${Math.round(obj.points[0].x)}, ${Math.round(obj.points[0].y)}) to (${Math.round(obj.points[obj.points.length-1].x)}, ${Math.round(obj.points[obj.points.length-1].y)})`;
+          if (obj.points && Array.isArray(obj.points) && obj.points.length >= 2) {
+            const startPoint = obj.points[0] || { x: 0, y: 0 };
+            const endPoint = obj.points[obj.points.length - 1] || { x: 0, y: 0 };
+            desc = `Arrow pointing from (${Math.round(startPoint.x ?? 0)}, ${Math.round(startPoint.y ?? 0)}) to (${Math.round(endPoint.x ?? 0)}, ${Math.round(endPoint.y ?? 0)})`;
           }
           break;
         case 'pencil':
         case 'highlighter':
-          if (obj.points && obj.points.length > 0) {
+          if (obj.points && Array.isArray(obj.points) && obj.points.length > 0) {
             desc = `${obj.type === 'highlighter' ? 'Highlighted' : 'Drawn'} path with ${obj.points.length} points, color: ${obj.strokeColor || 'black'}`;
           }
           break;
         case 'image':
-          desc = `Image at (${Math.round(obj.x)}, ${Math.round(obj.y)}), size: ${Math.round(obj.width)}x${Math.round(obj.height)}`;
+          desc = `Image at (${safeX}, ${safeY}), size: ${safeWidth}x${safeHeight}`;
           break;
         default:
-          desc = `${obj.type} element at (${Math.round(obj.x || 0)}, ${Math.round(obj.y || 0)})`;
+          desc = `${obj.type} element at (${safeX}, ${safeY})`;
       }
-      
+
       if (desc) {
         descriptions.push(`  ${index + 1}. ${desc}`);
       }
     });
   });
-  
+
   return descriptions.join('\n');
 }
 
 // Analyze layout patterns from existing objects
 function analyzeLayout(objects) {
-  if (!objects || objects.length === 0) {
-    return { 
-      hasContent: false, 
+  // Safe check for objects array
+  if (!objects || !Array.isArray(objects) || objects.length === 0) {
+    return {
+      hasContent: false,
       pattern: 'empty',
       bounds: { minX: 100, minY: 100, maxX: 100, maxY: 100 },
       gridInfo: null,
@@ -88,17 +107,19 @@ function analyzeLayout(objects) {
       spacing: { horizontal: 60, vertical: 50 }
     };
   }
-  
+
   // Calculate bounds
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   const positions = [];
   const colors = new Set();
   let totalWidth = 0, totalHeight = 0, shapeCount = 0;
-  
+
   objects.forEach(obj => {
+    if (!obj) return;
+
     if (obj.fillColor && obj.fillColor !== 'transparent') colors.add(obj.fillColor);
     if (obj.strokeColor) colors.add(obj.strokeColor);
-    
+
     if (obj.x !== undefined && obj.y !== undefined) {
       const w = obj.width || 100;
       const h = obj.height || 100;
@@ -106,7 +127,7 @@ function analyzeLayout(objects) {
       minY = Math.min(minY, obj.y);
       maxX = Math.max(maxX, obj.x + w);
       maxY = Math.max(maxY, obj.y + h);
-      positions.push({ x: obj.x, y: obj.y, cx: obj.x + w/2, cy: obj.y + h/2, w, h, type: obj.type });
+      positions.push({ x: obj.x, y: obj.y, cx: obj.x + w / 2, cy: obj.y + h / 2, w, h, type: obj.type });
       totalWidth += w;
       totalHeight += h;
       shapeCount++;
@@ -120,22 +141,22 @@ function analyzeLayout(objects) {
       });
     }
   });
-  
+
   if (minX === Infinity) minX = 100;
   if (minY === Infinity) minY = 100;
   if (maxX === -Infinity) maxX = 500;
   if (maxY === -Infinity) maxY = 500;
-  
+
   // Detect layout pattern
   let pattern = 'freeform';
   const xCoords = positions.map(p => p.cx).sort((a, b) => a - b);
   const yCoords = positions.map(p => p.cy).sort((a, b) => a - b);
-  
+
   // Check for columns (similar x values)
   const xGroups = [];
   let currentGroup = [xCoords[0]];
   for (let i = 1; i < xCoords.length; i++) {
-    if (Math.abs(xCoords[i] - xCoords[i-1]) < 80) {
+    if (Math.abs(xCoords[i] - xCoords[i - 1]) < 80) {
       currentGroup.push(xCoords[i]);
     } else {
       if (currentGroup.length > 1) xGroups.push(currentGroup);
@@ -143,12 +164,12 @@ function analyzeLayout(objects) {
     }
   }
   if (currentGroup.length > 1) xGroups.push(currentGroup);
-  
+
   // Check for rows (similar y values)
   const yGroups = [];
   currentGroup = [yCoords[0]];
   for (let i = 1; i < yCoords.length; i++) {
-    if (Math.abs(yCoords[i] - yCoords[i-1]) < 60) {
+    if (Math.abs(yCoords[i] - yCoords[i - 1]) < 60) {
       currentGroup.push(yCoords[i]);
     } else {
       if (currentGroup.length > 1) yGroups.push(currentGroup);
@@ -156,7 +177,7 @@ function analyzeLayout(objects) {
     }
   }
   if (currentGroup.length > 1) yGroups.push(currentGroup);
-  
+
   // Determine pattern
   if (xGroups.length >= 2 && yGroups.length >= 2) {
     pattern = 'grid';
@@ -168,14 +189,14 @@ function analyzeLayout(objects) {
     // Check for radial/mindmap pattern
     const centerX = (maxX + minX) / 2;
     const centerY = (maxY + minY) / 2;
-    const centerCount = positions.filter(p => 
+    const centerCount = positions.filter(p =>
       Math.abs(p.cx - centerX) < 150 && Math.abs(p.cy - centerY) < 150
     ).length;
     if (centerCount >= 1 && positions.length > centerCount) {
       pattern = 'radial';
     }
   }
-  
+
   // Calculate common spacing
   let avgHGap = 0, avgVGap = 0, gapCount = 0;
   for (let i = 0; i < positions.length; i++) {
@@ -193,7 +214,7 @@ function analyzeLayout(objects) {
     avgHGap = 40;
     avgVGap = 40;
   }
-  
+
   return {
     hasContent: true,
     pattern,
@@ -257,36 +278,36 @@ export async function POST(request, { params }) {
     const { id } = await params;
     const body = await request.json();
     const { action, message, canvasScreenshot } = body;
-    
+
     const whiteboard = await Whiteboard.findById(id);
     if (!whiteboard) {
       return NextResponse.json({ error: 'Whiteboard not found' }, { status: 404 });
     }
-    
+
     // Check permission
     const permission = whiteboard.getUserPermission(user._id || user.userId);
     if (!permission) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
-    
+
     // Initialize aiAnalysis if not exists
     if (!whiteboard.aiAnalysis) {
       whiteboard.aiAnalysis = { summary: '', messages: [], notes: [], keyPoints: [] };
     }
-    
+
     if (action === 'analyze') {
       // Generate canvas description
       const canvasDescription = describeCanvasObjects(whiteboard.pages);
-      
+
       if (!canvasDescription || canvasDescription.trim() === '') {
-        return NextResponse.json({ 
-          error: 'Canvas is empty. Add some content to analyze.' 
+        return NextResponse.json({
+          error: 'Canvas is empty. Add some content to analyze.'
         }, { status: 400 });
       }
-      
+
       // Use vision API if screenshot is provided for deeper visual understanding
       const hasScreenshot = canvasScreenshot && canvasScreenshot.length > 100;
-      
+
       const prompt = `You are MAYA, an insightful AI assistant analyzing a collaborative whiteboard. ${hasScreenshot ? 'You can see the actual canvas screenshot for visual context.' : ''} Look at the canvas contents and provide genuine, thoughtful analysis like a knowledgeable colleague would.
 
 Canvas Elements:
@@ -319,7 +340,7 @@ Be genuinely helpful and insightful rather than just describing what you see. Sh
         });
       }
       summary = cleanAIResponse(summary);
-      
+
       // Update the whiteboard with the new analysis
       whiteboard.aiAnalysis.summary = summary;
       whiteboard.aiAnalysis.lastAnalyzedAt = new Date();
@@ -327,30 +348,30 @@ Be genuinely helpful and insightful rather than just describing what you see. Sh
         { role: 'user', content: 'Analyze this canvas', timestamp: new Date() },
         { role: 'assistant', content: summary, timestamp: new Date() }
       );
-      
+
       await whiteboard.save();
-      
+
       return NextResponse.json({
         success: true,
         summary,
         aiAnalysis: whiteboard.aiAnalysis
       });
-      
+
     } else if (action === 'chat') {
       // Continue conversation with context
       if (!message || !message.trim()) {
         return NextResponse.json({ error: 'Message is required' }, { status: 400 });
       }
-      
+
       // Build conversation context
       const canvasDescription = describeCanvasObjects(whiteboard.pages);
-      const previousMessages = whiteboard.aiAnalysis.messages.slice(-10).map(m => 
+      const previousMessages = whiteboard.aiAnalysis.messages.slice(-10).map(m =>
         `${m.role === 'user' ? 'User' : 'MAYA'}: ${m.content}`
       ).join('\n\n');
-      
+
       // Check if screenshot was provided for visual context
       const hasScreenshot = canvasScreenshot && canvasScreenshot.length > 100;
-      
+
       const context = `You are MAYA, an insightful AI assistant helping with a collaborative whiteboard. ${hasScreenshot ? 'You can see the actual canvas screenshot for visual understanding.' : ''} Respond naturally without any markdown formatting, bullet points, asterisks, dashes, numbered lists, emojis, or special characters. Write in flowing prose like a helpful colleague.
 
 Canvas Contents:
@@ -380,13 +401,13 @@ ${hasScreenshot ? 'I can see your canvas now. ' : ''}Respond helpfully and natur
         });
       }
       response = cleanAIResponse(response);
-      
+
       // Save the new messages
       whiteboard.aiAnalysis.messages.push(
         { role: 'user', content: message, timestamp: new Date() },
         { role: 'assistant', content: response, timestamp: new Date() }
       );
-      
+
       // Extract notes/key points if requested
       if (message.toLowerCase().includes('note') || message.toLowerCase().includes('point') || message.toLowerCase().includes('key')) {
         // Try to extract sentences as key points
@@ -400,43 +421,43 @@ ${hasScreenshot ? 'I can see your canvas now. ' : ''}Respond helpfully and natur
           ].slice(0, 20); // Keep max 20 points
         }
       }
-      
+
       await whiteboard.save();
-      
+
       return NextResponse.json({
         success: true,
         response,
         aiAnalysis: whiteboard.aiAnalysis
       });
-      
+
     } else if (action === 'clear') {
       // Clear AI analysis history
       whiteboard.aiAnalysis = { summary: '', messages: [], notes: [], keyPoints: [] };
       await whiteboard.save();
-      
+
       return NextResponse.json({
         success: true,
         message: 'AI analysis cleared',
         aiAnalysis: whiteboard.aiAnalysis
       });
-      
+
     } else if (action === 'generate') {
       // Agent mode - generate canvas objects based on user request
       if (!message || !message.trim()) {
         return NextResponse.json({ error: 'Content description is required' }, { status: 400 });
       }
-      
+
       // Get existing canvas content for deep context analysis
       const existingObjects = whiteboard.pages[0]?.objects || [];
       const layout = analyzeLayout(existingObjects);
       const existingCanvasDescription = describeCanvasObjects(whiteboard.pages);
-      
+
       // Check conversation history for continuation context
       const recentMessages = whiteboard.aiAnalysis.messages.slice(-6);
-      const isContination = message.toLowerCase().includes('continue') || 
-                           message.toLowerCase().includes('more') ||
-                           message.toLowerCase().includes('next');
-      
+      const isContination = message.toLowerCase().includes('continue') ||
+        message.toLowerCase().includes('more') ||
+        message.toLowerCase().includes('next');
+
       // Build a rich context about the existing design
       let designContext = '';
       if (layout.hasContent) {
@@ -453,11 +474,11 @@ LAYOUT ANALYSIS:
       } else {
         designContext = 'The canvas is EMPTY. Start fresh at position (100, 100).';
       }
-      
+
       // Dynamically calculate safe starting position
       const safeStartX = Math.round(layout.bounds.maxX ? layout.bounds.maxX + 80 : 100);
       const safeStartY = Math.round(layout.bounds.minY || 100);
-      
+
       // Extract any structured content from the user's message (lists, sections, etc.)
       const contentAnalysis = `
 USER REQUEST: "${message}"
@@ -472,7 +493,7 @@ POSITIONING STRATEGY:
       // Check if this is a template-based generation
       const templateType = body.templateType || null;
       let templateInstructions = '';
-      
+
       if (templateType === 'mindmap') {
         templateInstructions = `
 🧠 MINDMAP TEMPLATE - CREATE A RADIAL THOUGHT MAP:
@@ -634,27 +655,27 @@ Return ONLY this JSON structure (no markdown, no explanation):
 }`;
 
       try {
-        const aiResponse = await generateSmartContent(generatePrompt, { 
-          userId: user._id || user.userId, 
+        const aiResponse = await generateSmartContent(generatePrompt, {
+          userId: user._id || user.userId,
           feature: 'whiteboard-generate',
           skipRefinement: true // Prompt is already highly structured
         });
-        
+
         // Extract JSON from response - more robust parsing
         let jsonStr = aiResponse.trim();
-        
+
         // Remove markdown code blocks
         if (jsonStr.startsWith('```json')) jsonStr = jsonStr.slice(7);
         else if (jsonStr.startsWith('```')) jsonStr = jsonStr.slice(3);
         if (jsonStr.endsWith('```')) jsonStr = jsonStr.slice(0, -3);
         jsonStr = jsonStr.trim();
-        
+
         // Try to find JSON object in the response
         const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           jsonStr = jsonMatch[0];
         }
-        
+
         let parsed;
         try {
           parsed = JSON.parse(jsonStr);
@@ -677,16 +698,16 @@ Return ONLY this JSON structure (no markdown, no explanation):
             throw new Error('Could not parse AI response as JSON');
           }
         }
-        
+
         const generatedElements = Array.isArray(parsed) ? parsed : (parsed.elements || parsed);
         const hasMore = parsed.hasMore || false;
         const nextPrompt = parsed.nextPrompt || '';
         const summary = parsed.summary || `Generated ${generatedElements?.length || 0} elements`;
-        
+
         if (!Array.isArray(generatedElements) || generatedElements.length === 0) {
           throw new Error('No elements were generated');
         }
-        
+
         // Normalize type values (AI sometimes returns wrong casing)
         const normalizeType = (type) => {
           if (!type) return null;
@@ -727,15 +748,15 @@ Return ONLY this JSON structure (no markdown, no explanation):
           };
           return typeMap[type] || type.toLowerCase();
         };
-        
+
         // Add IDs and apply consistent styling
         const validObjects = generatedElements.map((obj, index) => {
           const id = `ai-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 5)}`;
           const normalizedType = normalizeType(obj.type);
           const baseObj = { id, opacity: 1, ...obj, type: normalizedType };
-          
+
           if (!baseObj.type) return null;
-          
+
           switch (baseObj.type) {
             case 'sticky':
               return {
@@ -782,23 +803,23 @@ Return ONLY this JSON structure (no markdown, no explanation):
               };
           }
         }).filter(obj => obj !== null);
-        
+
         // Add to current page
         const currentPage = whiteboard.pages[0] || { objects: [] };
         currentPage.objects = [...(currentPage.objects || []), ...validObjects];
         whiteboard.pages[0] = currentPage;
-        
+
         // Context-aware response
         let responseMsg = `Created ${validObjects.length} elements. ${summary}`;
         if (hasMore && nextPrompt) {
           responseMsg += ` More content available: "${nextPrompt}"`;
         }
-        
+
         whiteboard.aiAnalysis.messages.push(
           { role: 'user', content: `Create: ${message}`, timestamp: new Date() },
           { role: 'assistant', content: responseMsg, timestamp: new Date() }
         );
-        
+
         // Store continuation info
         if (hasMore && nextPrompt) {
           whiteboard.aiAnalysis.pendingGeneration = {
@@ -809,9 +830,9 @@ Return ONLY this JSON structure (no markdown, no explanation):
         } else {
           whiteboard.aiAnalysis.pendingGeneration = null;
         }
-        
+
         await whiteboard.save();
-        
+
         return NextResponse.json({
           success: true,
           generatedObjects: validObjects,
@@ -822,25 +843,25 @@ Return ONLY this JSON structure (no markdown, no explanation):
           nextPrompt,
           summary
         });
-        
+
       } catch (parseError) {
         console.error('Failed to parse AI generated objects:', parseError);
-        return NextResponse.json({ 
-          error: 'Failed to generate content. Try being more specific about what you want to create.' 
+        return NextResponse.json({
+          error: 'Failed to generate content. Try being more specific about what you want to create.'
         }, { status: 400 });
       }
-      
+
     } else if (action === 'continue') {
       // Continue generating from where we left off
       const pendingGen = whiteboard.aiAnalysis.pendingGeneration;
       const existingObjects = whiteboard.pages[0]?.objects || [];
       const layout = analyzeLayout(existingObjects);
       const existingCanvasDescription = describeCanvasObjects(whiteboard.pages);
-      
+
       // Calculate safe positions for new content
       const safeStartY = Math.round((layout.bounds.maxY || 100) + 60);
       const safeStartX = Math.round(layout.bounds.minX || 100);
-      
+
       // Build continuation prompt
       const continuePrompt = `You are MAYA, continuing to build a professional whiteboard visualization.
 
@@ -892,19 +913,19 @@ Return ONLY valid JSON:
           feature: 'whiteboard-continue',
           skipRefinement: true
         });
-        
+
         let jsonStr = aiResponse.trim();
         if (jsonStr.startsWith('```json')) jsonStr = jsonStr.slice(7);
         else if (jsonStr.startsWith('```')) jsonStr = jsonStr.slice(3);
         if (jsonStr.endsWith('```')) jsonStr = jsonStr.slice(0, -3);
         jsonStr = jsonStr.trim();
-        
+
         // Try to find JSON object
         const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
         if (jsonMatch) {
           jsonStr = jsonMatch[0];
         }
-        
+
         let parsed;
         try {
           parsed = JSON.parse(jsonStr);
@@ -920,16 +941,16 @@ Return ONLY valid JSON:
             throw new Error('No valid JSON found in continuation response');
           }
         }
-        
+
         const generatedElements = Array.isArray(parsed) ? parsed : (parsed.elements || parsed);
         const hasMore = parsed.hasMore || false;
         const nextPrompt = parsed.nextPrompt || '';
         const summary = parsed.summary || `Added ${generatedElements?.length || 0} elements`;
-        
+
         if (!Array.isArray(generatedElements) || generatedElements.length === 0) {
           throw new Error('No elements generated in continuation');
         }
-        
+
         // Normalize types
         const normalizeType = (type) => {
           if (!type) return null;
@@ -946,15 +967,15 @@ Return ONLY valid JSON:
           };
           return typeMap[type] || type.toLowerCase();
         };
-        
+
         // Process elements
         const validObjects = generatedElements.map((obj, index) => {
           const id = `ai-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 5)}`;
           const normalizedType = normalizeType(obj.type);
           const baseObj = { id, opacity: 1, ...obj, type: normalizedType };
-          
+
           if (!baseObj.type) return null;
-          
+
           if (baseObj.type === 'sticky') {
             return {
               ...baseObj,
@@ -973,28 +994,28 @@ Return ONLY valid JSON:
             return { ...baseObj, strokeColor: baseObj.strokeColor || '#94A3B8', strokeWidth: baseObj.strokeWidth || 2, fillColor: baseObj.fillColor || 'transparent', borderRadius: baseObj.borderRadius || 8 };
           }
         }).filter(obj => obj !== null);
-        
+
         // Add to page
         const currentPage = whiteboard.pages[0] || { objects: [] };
         currentPage.objects = [...(currentPage.objects || []), ...validObjects];
         whiteboard.pages[0] = currentPage;
-        
+
         let responseMsg = `Added ${validObjects.length} more elements. ${summary}`;
         if (hasMore) responseMsg += ` Still more to add.`;
-        
+
         whiteboard.aiAnalysis.messages.push(
           { role: 'user', content: 'Continue generating', timestamp: new Date() },
           { role: 'assistant', content: responseMsg, timestamp: new Date() }
         );
-        
+
         if (hasMore && nextPrompt) {
           whiteboard.aiAnalysis.pendingGeneration = { nextPrompt, originalRequest: pendingGen?.originalRequest, timestamp: new Date() };
         } else {
           whiteboard.aiAnalysis.pendingGeneration = null;
         }
-        
+
         await whiteboard.save();
-        
+
         return NextResponse.json({
           success: true,
           generatedObjects: validObjects,
@@ -1005,7 +1026,7 @@ Return ONLY valid JSON:
           nextPrompt,
           summary
         });
-        
+
       } catch (parseError) {
         console.error('Failed to continue generation:', parseError);
         whiteboard.aiAnalysis.pendingGeneration = null;
@@ -1015,16 +1036,16 @@ Return ONLY valid JSON:
     } else if (action === 'restructure') {
       // Restructure/cleanup existing canvas - straighten lines, align elements, fix spacing
       const existingObjects = whiteboard.pages[0]?.objects || [];
-      
+
       if (existingObjects.length === 0) {
-        return NextResponse.json({ 
-          error: 'Canvas is empty. Add some content first before restructuring.' 
+        return NextResponse.json({
+          error: 'Canvas is empty. Add some content first before restructuring.'
         }, { status: 400 });
       }
-      
+
       const layout = analyzeLayout(existingObjects);
       const existingCanvasDescription = describeCanvasObjects(whiteboard.pages);
-      
+
       const restructurePrompt = `You are MAYA, an expert at cleaning up and professionalizing whiteboard diagrams.
 
 CURRENT CANVAS STATE:
@@ -1065,25 +1086,25 @@ Return ONLY valid JSON array. No explanations.`;
           feature: 'whiteboard-restructure',
           skipRefinement: true
         });
-        
+
         let jsonStr = aiResponse.trim();
         if (jsonStr.startsWith('```json')) jsonStr = jsonStr.slice(7);
         else if (jsonStr.startsWith('```')) jsonStr = jsonStr.slice(3);
         if (jsonStr.endsWith('```')) jsonStr = jsonStr.slice(0, -3);
         jsonStr = jsonStr.trim();
-        
+
         const restructuredObjects = JSON.parse(jsonStr);
-        
+
         if (!Array.isArray(restructuredObjects)) {
           throw new Error('Restructured content is not an array');
         }
-        
+
         // Validate and ensure all objects have required properties
         const validObjects = restructuredObjects.map((obj, index) => {
           // Preserve original ID or generate new one
           const id = obj.id || `restructured-${Date.now()}-${index}`;
           const baseObj = { ...obj, id, opacity: obj.opacity || 1 };
-          
+
           // Apply professional styling defaults
           if (baseObj.type === 'sticky') {
             baseObj.borderRadius = baseObj.borderRadius || 12;
@@ -1096,27 +1117,27 @@ Return ONLY valid JSON array. No explanations.`;
           } else if (baseObj.type === 'arrow' || baseObj.type === 'line') {
             baseObj.strokeColor = baseObj.strokeColor || '#64748B';
           }
-          
+
           // Snap positions to grid (20px)
           if (baseObj.x !== undefined) baseObj.x = Math.round(baseObj.x / 20) * 20;
           if (baseObj.y !== undefined) baseObj.y = Math.round(baseObj.y / 20) * 20;
-          
+
           return baseObj;
         }).filter(obj => obj && obj.type);
-        
+
         // Replace all objects with restructured version
-        whiteboard.pages[0] = { 
-          ...whiteboard.pages[0], 
-          objects: validObjects 
+        whiteboard.pages[0] = {
+          ...whiteboard.pages[0],
+          objects: validObjects
         };
-        
+
         whiteboard.aiAnalysis.messages.push(
           { role: 'user', content: 'Restructure and clean up the canvas', timestamp: new Date() },
           { role: 'assistant', content: `I've restructured your diagram: aligned ${validObjects.length} elements to a clean grid, standardized spacing, straightened connections, and applied professional styling. The logical structure and all your content has been preserved.`, timestamp: new Date() }
         );
-        
+
         await whiteboard.save();
-        
+
         return NextResponse.json({
           success: true,
           restructuredObjects: validObjects,
@@ -1124,21 +1145,21 @@ Return ONLY valid JSON array. No explanations.`;
           pages: whiteboard.pages,
           aiAnalysis: whiteboard.aiAnalysis
         });
-        
+
       } catch (parseError) {
         console.error('Failed to restructure canvas:', parseError);
-        return NextResponse.json({ 
-          error: 'Failed to restructure the canvas. Try selecting fewer elements or simplifying the layout first.' 
+        return NextResponse.json({
+          error: 'Failed to restructure the canvas. Try selecting fewer elements or simplifying the layout first.'
         }, { status: 400 });
       }
     }
-    
+
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
-    
+
   } catch (error) {
     console.error('AI Analysis error:', error);
-    return NextResponse.json({ 
-      error: error.message || 'Failed to analyze canvas' 
+    return NextResponse.json({
+      error: error.message || 'Failed to analyze canvas'
     }, { status: 500 });
   }
 }
@@ -1153,24 +1174,24 @@ export async function GET(request, { params }) {
     }
     const { user, models } = auth
     const { Whiteboard } = models
-    
+
     const { id } = await params;
     const whiteboard = await Whiteboard.findById(id);
-    
+
     if (!whiteboard) {
       return NextResponse.json({ error: 'Whiteboard not found' }, { status: 404 });
     }
-    
+
     const permission = whiteboard.getUserPermission(user._id || user.userId);
     if (!permission) {
       return NextResponse.json({ error: 'Access denied' }, { status: 403 });
     }
-    
+
     return NextResponse.json({
       success: true,
       aiAnalysis: whiteboard.aiAnalysis || { summary: '', messages: [], notes: [], keyPoints: [] }
     });
-    
+
   } catch (error) {
     console.error('Get AI Analysis error:', error);
     return NextResponse.json({ error: 'Failed to get analysis' }, { status: 500 });

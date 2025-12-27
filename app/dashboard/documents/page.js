@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import toast from '@/utils/toast'
-import { FaPlus, FaFile, FaDownload, FaEye, FaTrash, FaTimes } from 'react-icons/fa'
+import { FaPlus, FaFile, FaDownload, FaEye, FaTrash, FaTimes, FaSpinner, FaUpload } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
 import ModalPortal from '@/components/ui/ModalPortal'
 
@@ -10,13 +10,22 @@ export default function DocumentsPage() {
   const [documents, setDocuments] = useState([])
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState(null)
+  const [employeeId, setEmployeeId] = useState(null)
   const [showModal, setShowModal] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadForm, setUploadForm] = useState({
+    fileName: '',
+    category: '',
+  })
+  const [selectedFile, setSelectedFile] = useState(null)
+  const fileInputRef = useRef(null)
 
   useEffect(() => {
     const parsedUser = getCurrentUser()
     if (parsedUser) {
       setUser(parsedUser)
       const empId = getEmployeeId(parsedUser)
+      setEmployeeId(empId)
       if (empId) {
         fetchDocuments(empId)
       } else {
@@ -44,6 +53,130 @@ export default function DocumentsPage() {
       toast.error('Failed to fetch documents')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setSelectedFile(file)
+      // Auto-fill filename if empty
+      if (!uploadForm.fileName) {
+        setUploadForm(prev => ({
+          ...prev,
+          fileName: file.name.replace(/\.[^/.]+$/, '') // Remove extension
+        }))
+      }
+    }
+  }
+
+  const resetUploadForm = () => {
+    setUploadForm({ fileName: '', category: '' })
+    setSelectedFile(null)
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  const handleUpload = async (e) => {
+    e.preventDefault()
+
+    if (!selectedFile) {
+      toast.error('Please select a file to upload')
+      return
+    }
+
+    if (!uploadForm.fileName.trim()) {
+      toast.error('Please enter a document name')
+      return
+    }
+
+    if (!uploadForm.category) {
+      toast.error('Please select a category')
+      return
+    }
+
+    setUploading(true)
+
+    try {
+      const token = localStorage.getItem('token')
+
+      // First, upload the file to ImageKit via the upload API
+      const formData = new FormData()
+      formData.append('file', selectedFile)
+      formData.append('folder', 'documents')
+
+      const uploadResponse = await fetch('/api/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      })
+
+      const uploadData = await uploadResponse.json()
+
+      if (!uploadData.success) {
+        throw new Error(uploadData.message || 'Failed to upload file')
+      }
+
+      // Now create the document record
+      const docResponse = await fetch('/api/documents', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          fileName: uploadForm.fileName.trim(),
+          category: uploadForm.category,
+          fileUrl: uploadData.data.fileUrl,
+          fileId: uploadData.data.fileId,
+          fileType: uploadData.data.fileType || selectedFile.type,
+          fileSize: uploadData.data.fileSize || selectedFile.size,
+          employee: employeeId,
+          uploadedBy: employeeId,
+        }),
+      })
+
+      const docData = await docResponse.json()
+
+      if (docData.success) {
+        toast.success('Document uploaded successfully')
+        setDocuments(prev => [docData.data, ...prev])
+        setShowModal(false)
+        resetUploadForm()
+      } else {
+        throw new Error(docData.message || 'Failed to save document')
+      }
+    } catch (error) {
+      console.error('Upload document error:', error)
+      toast.error(error.message || 'Failed to upload document')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleDelete = async (docId) => {
+    if (!confirm('Are you sure you want to delete this document?')) return
+
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/documents/${docId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        toast.success('Document deleted successfully')
+        setDocuments(prev => prev.filter(doc => doc._id !== docId))
+      } else {
+        toast.error(data.message || 'Failed to delete document')
+      }
+    } catch (error) {
+      console.error('Delete document error:', error)
+      toast.error('Failed to delete document')
     }
   }
 
@@ -163,18 +296,22 @@ export default function DocumentsPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex space-x-2">
                           <button
+                            onClick={() => window.open(doc.fileUrl, '_blank')}
                             className="text-blue-600 hover:text-blue-900"
                             title="View"
                           >
                             <FaEye />
                           </button>
-                          <button
+                          <a
+                            href={doc.fileUrl}
+                            download={doc.fileName}
                             className="text-green-600 hover:text-green-900"
                             title="Download"
                           >
                             <FaDownload />
-                          </button>
+                          </a>
                           <button
+                            onClick={() => handleDelete(doc._id)}
                             className="text-red-600 hover:text-red-900"
                             title="Delete"
                           >
@@ -193,33 +330,52 @@ export default function DocumentsPage() {
 
       {/* Upload Modal */}
       <ModalPortal isOpen={showModal}>
-        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setShowModal(false)}>
+        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && !uploading && setShowModal(false)}>
           <div className="modal-backdrop" />
           <div className="modal-container modal-md">
             <div className="modal-header">
               <h2 className="modal-title">Upload Document</h2>
-              <button onClick={() => setShowModal(false)} className="modal-close-btn">
+              <button
+                onClick={() => {
+                  if (!uploading) {
+                    setShowModal(false)
+                    resetUploadForm()
+                  }
+                }}
+                className="modal-close-btn"
+                disabled={uploading}
+              >
                 <FaTimes className="w-5 h-5" />
               </button>
             </div>
-            <form>
+            <form onSubmit={handleUpload}>
               <div className="modal-body space-y-4">
                 <div>
                   <label className="modal-label">
-                    Document Name
+                    Document Name *
                   </label>
                   <input
                     type="text"
                     className="modal-input"
                     placeholder="Enter document name"
+                    value={uploadForm.fileName}
+                    onChange={(e) => setUploadForm(prev => ({ ...prev, fileName: e.target.value }))}
+                    disabled={uploading}
+                    required
                   />
                 </div>
 
                 <div>
                   <label className="modal-label">
-                    Category
+                    Category *
                   </label>
-                  <select className="modal-select">
+                  <select
+                    className="modal-select"
+                    value={uploadForm.category}
+                    onChange={(e) => setUploadForm(prev => ({ ...prev, category: e.target.value }))}
+                    disabled={uploading}
+                    required
+                  >
                     <option value="">Select Category</option>
                     <option value="personal">Personal</option>
                     <option value="employment">Employment</option>
@@ -230,25 +386,59 @@ export default function DocumentsPage() {
 
                 <div>
                   <label className="modal-label">
-                    File
+                    File *
                   </label>
-                  <input
-                    type="file"
-                    className="modal-input"
-                  />
+                  <div className="relative">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      className="modal-input file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
+                      onChange={handleFileSelect}
+                      disabled={uploading}
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.xls,.xlsx,.txt"
+                    />
+                    {selectedFile && (
+                      <p className="text-sm text-gray-500 mt-1">
+                        Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
+                      </p>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Supported: PDF, DOC, DOCX, Images, Excel, TXT (Max 10MB)
+                  </p>
                 </div>
               </div>
 
               <div className="modal-footer">
                 <button
                   type="button"
-                  onClick={() => setShowModal(false)}
+                  onClick={() => {
+                    if (!uploading) {
+                      setShowModal(false)
+                      resetUploadForm()
+                    }
+                  }}
                   className="modal-btn modal-btn-secondary"
+                  disabled={uploading}
                 >
                   Cancel
                 </button>
-                <button type="submit" className="modal-btn modal-btn-primary">
-                  Upload
+                <button
+                  type="submit"
+                  className="modal-btn modal-btn-primary flex items-center gap-2"
+                  disabled={uploading || !selectedFile}
+                >
+                  {uploading ? (
+                    <>
+                      <FaSpinner className="animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    <>
+                      <FaUpload />
+                      Upload
+                    </>
+                  )}
                 </button>
               </div>
             </form>

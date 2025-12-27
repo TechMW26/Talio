@@ -1,10 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import AdminDashboard from '@/components/dashboards/AdminDashboard'
-import HRDashboard from '@/components/dashboards/HRDashboard'
-import ManagerDashboard from '@/components/dashboards/ManagerDashboard'
-import EmployeeDashboard from '@/components/dashboards/EmployeeDashboard'
+import UnifiedDashboard from '@/components/dashboards/UnifiedDashboard'
 
 // Lightweight skeleton for faster perceived loading
 function DashboardSkeleton() {
@@ -15,35 +12,19 @@ function DashboardSkeleton() {
         <div className="h-16 bg-white rounded-xl shadow-sm"></div>
         {/* KPI cards skeleton */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[1,2,3,4].map(i => (
+          {[1, 2, 3, 4].map(i => (
             <div key={i} className="h-24 bg-white rounded-xl shadow-sm"></div>
           ))}
         </div>
         {/* Widget grid skeleton */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1,2,3,4,5,6].map(i => (
+          {[1, 2, 3, 4, 5, 6].map(i => (
             <div key={i} className="h-48 bg-white rounded-xl shadow-sm"></div>
           ))}
         </div>
       </div>
     </div>
   )
-}
-
-// Helper function to render role-based dashboard
-const renderDashboardByRole = (user) => {
-  switch (user?.role) {
-    case 'admin':
-    case 'department_head':
-      return <AdminDashboard user={user} />
-    case 'hr':
-      return <HRDashboard user={user} />
-    case 'manager':
-      return <ManagerDashboard user={user} />
-    case 'employee':
-    default:
-      return <EmployeeDashboard user={user} />
-  }
 }
 
 export default function DashboardPage() {
@@ -87,6 +68,7 @@ export default function DashboardPage() {
     return <DashboardSkeleton />
   }
 
-  return renderDashboardByRole(user)
+  // Single unified dashboard that adapts to user's role
+  return <UnifiedDashboard user={user} />
 }
 

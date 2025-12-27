@@ -37,7 +37,8 @@ export async function middleware(request) {
     '/api/setup/create-admin',
     '/api/setup/tenant', // Tenant setup with setup code
     '/api/test-imagekit', // Test route for ImageKit debugging
-    '/api/cron/' // Cron routes use CRON_SECRET for auth
+    '/api/cron/', // Cron routes use CRON_SECRET for auth
+    '/api/notifications/config' // Firebase config for service worker (public=true)
   ]
 
   // Routes allowed during forced password change

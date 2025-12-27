@@ -28,23 +28,29 @@ async function initializeFirebase() {
         // Try to fetch config from the app if not already set
         if (!firebaseConfig.apiKey) {
             try {
-                const response = await fetch('/api/notifications/config');
+                // Use public=true parameter to get config without authentication
+                const response = await fetch('/api/notifications/config?public=true');
                 if (response.ok) {
-                    const config = await response.json();
-                    if (config.success && config.config) {
+                    const data = await response.json();
+                    if (data.success && data.config) {
                         Object.assign(firebaseConfig, {
-                            apiKey: config.config.apiKey,
-                            authDomain: config.config.authDomain,
-                            projectId: config.config.projectId,
-                            storageBucket: config.config.storageBucket,
-                            messagingSenderId: config.config.messagingSenderId,
-                            appId: config.config.appId,
-                            measurementId: config.config.measurementId
+                            apiKey: data.config.apiKey || '',
+                            authDomain: data.config.authDomain || '',
+                            projectId: data.config.projectId || '',
+                            storageBucket: data.config.storageBucket || '',
+                            messagingSenderId: data.config.messagingSenderId || '',
+                            appId: data.config.appId || '',
+                            measurementId: data.config.measurementId || ''
                         });
+                        console.log('[Firebase SW] Config fetched successfully from API');
+                    } else {
+                        console.warn('[Firebase SW] API returned but config not available:', data);
                     }
+                } else {
+                    console.warn('[Firebase SW] Config API returned status:', response.status);
                 }
             } catch (fetchError) {
-                console.warn('[Firebase SW] Could not fetch config:', fetchError);
+                console.warn('[Firebase SW] Could not fetch config:', fetchError.message);
             }
         }
 

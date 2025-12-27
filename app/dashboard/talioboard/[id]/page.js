@@ -31,6 +31,9 @@ export default function WhiteboardEditorPage() {
   const [isFilePickerOpen, setIsFilePickerOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Safe array length check helper
+  const safeArrayLength = (arr) => Array.isArray(arr) ? arr.length : 0;
+
   // Enter fullscreen
   const enterFullscreen = useCallback(async () => {
     try {
@@ -477,20 +480,20 @@ export default function WhiteboardEditorPage() {
                       searchUsers(e.target.value);
                     }}
                     onFocus={() => {
-                      if (userResults.length === 0) searchUsers('');
+                      if (safeArrayLength(userResults) === 0) searchUsers('');
                     }}
                     placeholder="Search for users..."
                     className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-gray-50 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
                   />
 
-                  {(userSearch || userResults.length > 0) && (
+                  {(userSearch || safeArrayLength(userResults) > 0) && (
                     <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 max-h-64 overflow-y-auto z-10">
                       {loadingUsers ? (
                         <div className="p-4 text-center text-gray-500">
                           <div className="w-5 h-5 border-2 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
                           Searching...
                         </div>
-                      ) : userResults.length === 0 ? (
+                      ) : safeArrayLength(userResults) === 0 ? (
                         <div className="p-4 text-center text-gray-500 text-sm">
                           No users found
                         </div>
@@ -538,7 +541,7 @@ export default function WhiteboardEditorPage() {
                 </div>
               </div>
 
-              {sharing.length > 0 && (
+              {safeArrayLength(sharing) > 0 && (
                 <div className="border-t border-gray-100 pt-6">
                   <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-4">Shared with</h3>
                   <div className="space-y-3">
