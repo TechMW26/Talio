@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import toast from '@/utils/toast'
+import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaMoneyBillWave, FaCheckCircle, FaClock, FaTimesCircle } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
 
@@ -17,6 +18,30 @@ export default function ExpensesPage() {
     description: '',
     expenseCode: ''
   })
+
+  // Real-time updates
+  const { socket, isConnected, onExpenseStatusUpdate, subscribe } = useSocket()
+
+  // Subscribe to real-time expense updates
+  useEffect(() => {
+    if (!socket || !isConnected || !user) return
+
+    const empId = getEmployeeId(user)
+    if (!empId) return
+
+    const handleExpenseUpdate = (data) => {
+      console.log('🔄 [Expenses] Real-time update received:', data)
+      fetchExpenses(empId)
+    }
+
+    const unsub1 = onExpenseStatusUpdate?.(handleExpenseUpdate)
+    const unsub2 = subscribe?.(REALTIME_EVENTS.EXPENSE_SUBMITTED, handleExpenseUpdate)
+
+    return () => {
+      unsub1?.()
+      unsub2?.()
+    }
+  }, [socket, isConnected, user])
 
   useEffect(() => {
     const parsedUser = getCurrentUser()

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import toast from '@/utils/toast'
+import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaEdit, FaTrash, FaBuilding, FaUsers, FaTimes, FaUserTie, FaSearch } from 'react-icons/fa'
 
 export default function DepartmentsPage() {
@@ -22,6 +23,9 @@ export default function DepartmentsPage() {
   const [showHeadDropdown, setShowHeadDropdown] = useState(false)
   const dropdownRef = useRef(null)
 
+  // Real-time updates
+  const { socket, isConnected, subscribe } = useSocket()
+
   useEffect(() => {
     const userData = localStorage.getItem('user')
     if (userData) {
@@ -40,6 +44,22 @@ export default function DepartmentsPage() {
       }
     }
   }, [])
+
+  // Subscribe to real-time department updates
+  useEffect(() => {
+    if (!socket || !isConnected) return
+
+    const handleDepartmentUpdate = (data) => {
+      console.log('🔄 [Departments] Real-time update received:', data)
+      fetchDepartments()
+    }
+
+    const unsub = subscribe?.(REALTIME_EVENTS.DEPARTMENT_UPDATED, handleDepartmentUpdate)
+
+    return () => {
+      unsub?.()
+    }
+  }, [socket, isConnected])
 
   // Close dropdown when clicking outside
   useEffect(() => {

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { sendPolicyNotification } from '@/lib/notificationService'
+import { emitPolicyUpdate } from '@/lib/realtimeEvents'
 
 // GET - List policies
 export async function GET(request) {
@@ -42,6 +43,14 @@ export async function GET(request) {
 // POST - Create policy
 export async function POST(request) {
   try {
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Policy', 'User', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Policy, User, Employee } = models
+
     const data = await request.json()
 
     const policy = await Policy.create(data)
@@ -99,6 +108,9 @@ export async function POST(request) {
       console.error('Failed to send policy notification:', notifError)
       // Don't fail the request if notification fails
     }
+
+    // Emit real-time event for policy updates
+    emitPolicyUpdate(populatedPolicy.toObject ? populatedPolicy.toObject() : populatedPolicy, { action: 'create' })
 
     return NextResponse.json({
       success: true,

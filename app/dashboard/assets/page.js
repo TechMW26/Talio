@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import toast from '@/utils/toast'
+import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaLaptop, FaCheckCircle, FaClock, FaTools, FaTimes, FaBox } from 'react-icons/fa'
 import { getCurrentUser } from '@/utils/userHelper'
 
@@ -28,6 +29,9 @@ export default function AssetsPage() {
   // Check if user is admin or HR (can manage all assets)
   const isAdmin = ['admin', 'hr', 'super_admin'].includes(userRole)
 
+  // Real-time updates
+  const { socket, isConnected, subscribe } = useSocket()
+
   useEffect(() => {
     const user = getCurrentUser()
     if (user) {
@@ -37,6 +41,22 @@ export default function AssetsPage() {
     fetchAssets()
     fetchEmployees()
   }, [])
+
+  // Subscribe to real-time asset updates
+  useEffect(() => {
+    if (!socket || !isConnected) return
+
+    const handleAssetUpdate = (data) => {
+      console.log('🔄 [Assets] Real-time update received:', data)
+      fetchAssets()
+    }
+
+    const unsub = subscribe?.(REALTIME_EVENTS.ASSET_UPDATE, handleAssetUpdate)
+
+    return () => {
+      unsub?.()
+    }
+  }, [socket, isConnected])
 
   const fetchEmployees = async () => {
     try {

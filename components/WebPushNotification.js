@@ -77,7 +77,7 @@ export function WebPushPrompt({ onClose }) {
                     </div>
 
                     {/* Title */}
-                    <h3 className="text-xl font-semibold text-slate-800 dark:text-white mb-3 tracking-tight">
+                    <h3 className="text-xl font-semibold text-slate-800 mb-3 tracking-tight">
                         Stay Updated
                     </h3>
 

@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
+import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { 
   FaDownload, FaEye, FaMoneyBillWave, FaPlus, FaFilter, 
   FaCheckCircle, FaClock, FaExclamationTriangle, FaUsers,
@@ -35,6 +36,9 @@ export default function PayrollPage() {
   const [showBankSheetModal, setShowBankSheetModal] = useState(false)
   const [selectedBank, setSelectedBank] = useState('')
 
+  // Real-time updates
+  const { socket, isConnected, subscribe, onPayrollUpdate } = useSocket()
+
   useEffect(() => {
     const parsedUser = getCurrentUser()
     if (parsedUser) {
@@ -59,6 +63,29 @@ export default function PayrollPage() {
       setLoading(false)
     }
   }, [selectedMonth, selectedYear])
+
+  // Subscribe to real-time payroll updates
+  useEffect(() => {
+    if (!socket || !isConnected || !user) return
+
+    const handlePayrollUpdate = (data) => {
+      console.log('🔄 [Payroll] Real-time update received:', data)
+      if (isAdmin) {
+        fetchAllPayrolls()
+      } else {
+        const empId = getEmployeeId(user)
+        if (empId) fetchPayrolls(empId)
+      }
+    }
+
+    const unsub1 = onPayrollUpdate?.(handlePayrollUpdate)
+    const unsub2 = subscribe?.(REALTIME_EVENTS.PAYROLL_UPDATE, handlePayrollUpdate)
+
+    return () => {
+      unsub1?.()
+      unsub2?.()
+    }
+  }, [socket, isConnected, user, isAdmin, selectedMonth, selectedYear])
 
   const fetchAllPayrolls = async () => {
     try {

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { emitAssetUpdate } from '@/lib/realtimeEvents'
 
 // GET - List assets
 export async function GET(request) {
@@ -65,6 +66,9 @@ export async function POST(request) {
 
     const populatedAsset = await Asset.findById(asset._id)
       .populate('assignedTo', 'firstName lastName employeeCode')
+
+    // Emit real-time event
+    emitAssetUpdate(populatedAsset, [], { action: 'create', broadcast: true })
 
     return NextResponse.json({
       success: true,

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import toast from '@/utils/toast'
 import {
   FaChartLine, FaUsers, FaPlus, FaEye, FaEdit, FaAward,
@@ -23,6 +24,9 @@ export default function PerformancePage() {
     }
   })
 
+  // Real-time updates
+  const { socket, isConnected, subscribe, onPerformanceReview } = useSocket()
+
   useEffect(() => {
     const userData = localStorage.getItem('user')
     if (userData) {
@@ -31,6 +35,26 @@ export default function PerformancePage() {
       fetchPerformanceData()
     }
   }, [])
+
+  // Subscribe to real-time performance updates
+  useEffect(() => {
+    if (!socket || !isConnected) return
+
+    const handlePerformanceUpdate = (data) => {
+      console.log('🔄 [Performance] Real-time update received:', data)
+      fetchPerformanceData()
+    }
+
+    const unsub1 = onPerformanceReview?.(handlePerformanceUpdate)
+    const unsub2 = subscribe?.(REALTIME_EVENTS.PERFORMANCE_REVIEW, handlePerformanceUpdate)
+    const unsub3 = subscribe?.(REALTIME_EVENTS.DAILY_GOAL_UPDATED, handlePerformanceUpdate)
+
+    return () => {
+      unsub1?.()
+      unsub2?.()
+      unsub3?.()
+    }
+  }, [socket, isConnected])
 
   const fetchPerformanceData = async () => {
     try {

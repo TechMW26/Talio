@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
+import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { 
   FaPlus, FaSearch, FaEdit, FaTrash, FaEye, FaFilter, FaSortAmountDown, FaSortAmountUp, 
   FaExclamationTriangle, FaCheckSquare, FaSquare, FaTimes, FaBuilding, FaBriefcase, 
@@ -70,7 +71,30 @@ export default function EmployeesPage() {
   const [bulkUpdating, setBulkUpdating] = useState(false)
   const [managers, setManagers] = useState([])
 
+  // Real-time updates
+  const { socket, isConnected, onEmployeeCreated, onEmployeeUpdated, subscribe } = useSocket()
+
   const getLevelName = getLevelNameFromNumber
+
+  // Subscribe to real-time employee updates
+  useEffect(() => {
+    if (!socket || !isConnected) return
+
+    const handleEmployeeUpdate = (data) => {
+      console.log('🔄 [Employees] Real-time update received:', data)
+      fetchEmployees()
+    }
+
+    const unsub1 = onEmployeeCreated?.(handleEmployeeUpdate)
+    const unsub2 = onEmployeeUpdated?.(handleEmployeeUpdate)
+    const unsub3 = subscribe?.(REALTIME_EVENTS.EMPLOYEE_DELETED, handleEmployeeUpdate)
+
+    return () => {
+      unsub1?.()
+      unsub2?.()
+      unsub3?.()
+    }
+  }, [socket, isConnected])
 
   useEffect(() => {
     const userData = localStorage.getItem('user')

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { updateDepartmentHeadsForDepartment } from '@/lib/departmentHeadSync'
+import { emitDepartmentUpdate } from '@/lib/realtimeEvents'
 
 // GET - List all departments
 export async function GET(request) {
@@ -79,6 +80,9 @@ export async function POST(request) {
       updateDepartmentHeadsForDepartment(department._id.toString(), [], data.heads, { User, Employee, Department })
         .catch(err => console.error('Error syncing department heads:', err));
     }
+
+    // Emit real-time event for department updates
+    emitDepartmentUpdate(department.toObject ? department.toObject() : department, { action: 'create' })
 
     return NextResponse.json({
       success: true,

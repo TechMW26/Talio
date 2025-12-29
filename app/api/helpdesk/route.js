@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { emitHelpdeskUpdate } from '@/lib/realtimeEvents'
+
 // GET - List helpdesk tickets
 export async function GET(request) {
   try {
@@ -51,6 +53,14 @@ export async function GET(request) {
 // POST - Create helpdesk ticket
 export async function POST(request) {
   try {
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Helpdesk'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Helpdesk } = models
+
     const data = await request.json()
 
     const ticket = await Helpdesk.create({
@@ -61,6 +71,9 @@ export async function POST(request) {
 
     const populatedTicket = await Helpdesk.findById(ticket._id)
       .populate('createdBy', 'firstName lastName employeeCode')
+
+    // Emit real-time event
+    emitHelpdeskUpdate(populatedTicket, [], { isNew: true, broadcast: true })
 
     return NextResponse.json({
       success: true,

@@ -2,15 +2,35 @@
 
 import { useState, useEffect } from 'react'
 import toast from '@/utils/toast'
+import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaBriefcase, FaMapMarkerAlt, FaClock } from 'react-icons/fa'
 
 export default function RecruitmentPage() {
   const [jobs, setJobs] = useState([])
   const [loading, setLoading] = useState(true)
 
+  // Real-time updates
+  const { socket, isConnected, subscribe } = useSocket()
+
   useEffect(() => {
     fetchJobs()
   }, [])
+
+  // Subscribe to real-time recruitment updates
+  useEffect(() => {
+    if (!socket || !isConnected) return
+
+    const handleRecruitmentUpdate = (data) => {
+      console.log('🔄 [Recruitment] Real-time update received:', data)
+      fetchJobs()
+    }
+
+    const unsub = subscribe?.(REALTIME_EVENTS.RECRUITMENT_UPDATE, handleRecruitmentUpdate)
+
+    return () => {
+      unsub?.()
+    }
+  }, [socket, isConnected])
 
   const fetchJobs = async () => {
     try {

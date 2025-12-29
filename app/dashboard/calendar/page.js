@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import {
   FaChevronLeft,
   FaChevronRight,
@@ -21,9 +22,36 @@ export default function CalendarPage() {
   const [birthdays, setBirthdays] = useState([])
   const [announcements, setAnnouncements] = useState([])
 
+  // Real-time updates
+  const { socket, isConnected, subscribe, onHolidayUpdate, onAnnouncementUpdate } = useSocket()
+
   useEffect(() => {
     fetchAllData()
   }, [])
+
+  // Subscribe to real-time calendar updates
+  useEffect(() => {
+    if (!socket || !isConnected) return
+
+    const handleUpdate = (data) => {
+      console.log('🔄 [Calendar] Real-time update received:', data)
+      fetchAllData()
+    }
+
+    const unsub1 = onHolidayUpdate?.(handleUpdate)
+    const unsub2 = onAnnouncementUpdate?.(handleUpdate)
+    const unsub3 = subscribe?.(REALTIME_EVENTS.HOLIDAY_UPDATE, handleUpdate)
+    const unsub4 = subscribe?.(REALTIME_EVENTS.ANNOUNCEMENT_CREATED, handleUpdate)
+    const unsub5 = subscribe?.(REALTIME_EVENTS.ANNOUNCEMENT_UPDATED, handleUpdate)
+
+    return () => {
+      unsub1?.()
+      unsub2?.()
+      unsub3?.()
+      unsub4?.()
+      unsub5?.()
+    }
+  }, [socket, isConnected])
 
   // Auto-switch to list view on mobile
   useEffect(() => {

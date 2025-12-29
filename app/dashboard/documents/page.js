@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import toast from '@/utils/toast'
+import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaFile, FaDownload, FaEye, FaTrash, FaTimes, FaSpinner, FaUpload } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
 import ModalPortal from '@/components/ui/ModalPortal'
@@ -20,6 +21,9 @@ export default function DocumentsPage() {
   const [selectedFile, setSelectedFile] = useState(null)
   const fileInputRef = useRef(null)
 
+  // Real-time updates
+  const { socket, isConnected, subscribe, onDocumentUpdate } = useSocket()
+
   useEffect(() => {
     const parsedUser = getCurrentUser()
     if (parsedUser) {
@@ -36,6 +40,24 @@ export default function DocumentsPage() {
       setLoading(false)
     }
   }, [])
+
+  // Subscribe to real-time document updates
+  useEffect(() => {
+    if (!socket || !isConnected || !employeeId) return
+
+    const handleDocumentUpdate = (data) => {
+      console.log('🔄 [Documents] Real-time update received:', data)
+      fetchDocuments(employeeId)
+    }
+
+    const unsub1 = onDocumentUpdate?.(handleDocumentUpdate)
+    const unsub2 = subscribe?.(REALTIME_EVENTS.DOCUMENT_UPDATE, handleDocumentUpdate)
+
+    return () => {
+      unsub1?.()
+      unsub2?.()
+    }
+  }, [socket, isConnected, employeeId])
 
   const fetchDocuments = async (employeeId) => {
     try {

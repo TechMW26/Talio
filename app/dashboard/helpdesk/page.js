@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
+import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaTicketAlt, FaCheckCircle, FaClock, FaExclamationCircle, FaTimes, FaCog } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
 import ModalPortal from '@/components/ui/ModalPortal'
@@ -20,6 +21,32 @@ export default function HelpdeskPage() {
     priority: 'medium',
     description: ''
   })
+
+  // Real-time updates
+  const { socket, isConnected, onHelpdeskTicket, subscribe } = useSocket()
+
+  // Subscribe to real-time helpdesk updates
+  useEffect(() => {
+    if (!socket || !isConnected || !user) return
+
+    const empId = getEmployeeId(user)
+    if (!empId) return
+
+    const handleHelpdeskUpdate = (data) => {
+      console.log('🔄 [Helpdesk] Real-time update received:', data)
+      fetchTickets(empId)
+    }
+
+    const unsub1 = onHelpdeskTicket?.(handleHelpdeskUpdate)
+    const unsub2 = subscribe?.(REALTIME_EVENTS.HELPDESK_TICKET, handleHelpdeskUpdate)
+    const unsub3 = subscribe?.(REALTIME_EVENTS.HELPDESK_TICKET_UPDATED, handleHelpdeskUpdate)
+
+    return () => {
+      unsub1?.()
+      unsub2?.()
+      unsub3?.()
+    }
+  }, [socket, isConnected, user])
 
   useEffect(() => {
     const parsedUser = getCurrentUser()

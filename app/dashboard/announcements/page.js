@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
+import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaBullhorn, FaCalendarAlt, FaExclamationTriangle, FaUsers, FaEdit, FaTrash } from 'react-icons/fa'
 
 export default function AnnouncementsPage() {
@@ -10,6 +11,29 @@ export default function AnnouncementsPage() {
   const [announcements, setAnnouncements] = useState([])
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState(null)
+
+  // Real-time updates
+  const { socket, isConnected, onAnnouncementUpdate, subscribe } = useSocket()
+
+  // Subscribe to real-time announcement updates
+  useEffect(() => {
+    if (!socket || !isConnected) return
+
+    const handleAnnouncementUpdate = (data) => {
+      console.log('🔄 [Announcements] Real-time update received:', data)
+      fetchAnnouncements()
+    }
+
+    const unsub1 = onAnnouncementUpdate?.(handleAnnouncementUpdate)
+    const unsub2 = subscribe?.(REALTIME_EVENTS.ANNOUNCEMENT_CREATED, handleAnnouncementUpdate)
+    const unsub3 = subscribe?.(REALTIME_EVENTS.ANNOUNCEMENT_UPDATED, handleAnnouncementUpdate)
+
+    return () => {
+      unsub1?.()
+      unsub2?.()
+      unsub3?.()
+    }
+  }, [socket, isConnected])
 
   useEffect(() => {
     const userData = localStorage.getItem('user')

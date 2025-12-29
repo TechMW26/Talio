@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import toast from '@/utils/toast'
+import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { 
   FaPlus, FaEdit, FaTrash, FaCalendarAlt, FaSync, FaRobot, 
   FaList, FaTh, FaChevronLeft, FaChevronRight 
@@ -45,9 +46,30 @@ export default function HolidaysPage() {
     'India', 'USA', 'UK', 'Canada', 'Australia', 'UAE', 'Singapore', 'Germany', 'France', 'Japan'
   ]
 
+  // Real-time updates
+  const { socket, isConnected, subscribe, onHolidayUpdate } = useSocket()
+
   useEffect(() => {
     fetchHolidays()
   }, [])
+
+  // Subscribe to real-time holiday updates
+  useEffect(() => {
+    if (!socket || !isConnected) return
+
+    const handleHolidayUpdate = (data) => {
+      console.log('🔄 [Holidays] Real-time update received:', data)
+      fetchHolidays()
+    }
+
+    const unsub1 = onHolidayUpdate?.(handleHolidayUpdate)
+    const unsub2 = subscribe?.(REALTIME_EVENTS.HOLIDAY_UPDATE, handleHolidayUpdate)
+
+    return () => {
+      unsub1?.()
+      unsub2?.()
+    }
+  }, [socket, isConnected])
 
   // Auto-switch to list view on mobile
   useEffect(() => {

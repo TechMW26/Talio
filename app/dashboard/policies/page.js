@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import toast from '@/utils/toast'
+import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaFileAlt, FaEdit, FaTrash, FaCheckCircle, FaExclamationCircle } from 'react-icons/fa'
 import ModalPortal from '@/components/ModalPortal'
 
@@ -25,6 +26,9 @@ export default function PoliciesPage() {
     applicableTo: 'all'
   })
 
+  // Real-time updates
+  const { socket, isConnected, subscribe } = useSocket()
+
   useEffect(() => {
     const userData = localStorage.getItem('user')
     if (userData) {
@@ -33,6 +37,22 @@ export default function PoliciesPage() {
     }
     fetchPolicies()
   }, [])
+
+  // Subscribe to real-time policy updates
+  useEffect(() => {
+    if (!socket || !isConnected) return
+
+    const handlePolicyUpdate = (data) => {
+      console.log('🔄 [Policies] Real-time update received:', data)
+      fetchPolicies()
+    }
+
+    const unsub = subscribe?.(REALTIME_EVENTS.POLICY_UPDATE, handlePolicyUpdate)
+
+    return () => {
+      unsub?.()
+    }
+  }, [socket, isConnected])
 
   useEffect(() => {
     if (currentUser && policies.length > 0) {

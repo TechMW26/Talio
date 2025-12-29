@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { emitDocumentUpdate } from '@/lib/realtimeEvents'
 // GET - List documents
 export async function GET(request) {
   try {
@@ -61,6 +62,9 @@ export async function POST(request) {
     const populatedDocument = await Document.findById(document._id)
       .populate('employee', 'firstName lastName employeeCode')
       .populate('uploadedBy', 'firstName lastName')
+
+    // Emit real-time event
+    emitDocumentUpdate(populatedDocument.toObject ? populatedDocument.toObject() : populatedDocument, [], { action: 'create', broadcast: true })
 
     return NextResponse.json({
       success: true,

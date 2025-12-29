@@ -15,7 +15,7 @@ export async function GET(request) {
     const { user, models } = auth;
     const { ProductivitySession, User, Employee, Department } = models;
 
-    const currentUserId = user._id.toString();
+    const currentUserId = (user._id || user.userId).toString();
     const currentUserRole = user.role;
     
     const { searchParams } = new URL(request.url);

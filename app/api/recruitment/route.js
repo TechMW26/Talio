@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { emitRecruitmentUpdate } from '@/lib/realtimeEvents'
+
 // GET - List job postings
 export async function GET(request) {
   try {
@@ -41,6 +43,14 @@ export async function GET(request) {
 // POST - Create job posting
 export async function POST(request) {
   try {
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Recruitment'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Recruitment } = models
+
     const data = await request.json()
 
     const job = await Recruitment.create(data)
@@ -48,6 +58,9 @@ export async function POST(request) {
     const populatedJob = await Recruitment.findById(job._id)
       .populate('department', 'name')
       .populate('hiringManager', 'firstName lastName')
+
+    // Emit real-time event for recruitment updates
+    emitRecruitmentUpdate(populatedJob.toObject ? populatedJob.toObject() : populatedJob, { action: 'create' })
 
     return NextResponse.json({
       success: true,

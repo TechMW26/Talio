@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { sendPushToUser } from '@/lib/pushNotification'
+import { emitPayrollUpdate, REALTIME_EVENTS } from '@/lib/realtimeEvents'
 
 // GET - List payroll records
 export async function GET(request) {
@@ -124,6 +125,9 @@ export async function POST(request) {
             timestamp: new Date()
           })
           console.log(`✅ [Socket.IO] Payroll generation sent to user:${employeeUserId}`)
+
+          // Emit standardized real-time event for dashboard updates
+          emitPayrollUpdate(populatedPayroll.toObject ? populatedPayroll.toObject() : populatedPayroll, [employeeUserId], { action: 'create' })
 
           // FCM push notification
           try {

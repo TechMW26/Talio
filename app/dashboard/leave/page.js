@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import toast from '@/utils/toast'
+import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaCalendarAlt, FaCheckCircle, FaTimesCircle, FaClock } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
 
@@ -20,6 +21,30 @@ export default function LeavePage() {
     reason: '',
     isHalfDay: false,
   })
+
+  // Real-time updates
+  const { socket, isConnected, onLeaveStatusUpdate, onLeaveRequest, subscribe } = useSocket()
+
+  // Subscribe to real-time leave updates
+  useEffect(() => {
+    if (!socket || !isConnected || !employeeId) return
+
+    const handleLeaveUpdate = (data) => {
+      console.log('🔄 [Leave] Real-time update received:', data)
+      fetchLeaves(employeeId)
+      fetchLeaveBalance(employeeId)
+    }
+
+    const unsub1 = onLeaveStatusUpdate?.(handleLeaveUpdate)
+    const unsub2 = onLeaveRequest?.(handleLeaveUpdate)
+    const unsub3 = subscribe?.(REALTIME_EVENTS.LEAVE_CANCELLED, handleLeaveUpdate)
+
+    return () => {
+      unsub1?.()
+      unsub2?.()
+      unsub3?.()
+    }
+  }, [socket, isConnected, employeeId])
 
   useEffect(() => {
     const parsedUser = getCurrentUser()

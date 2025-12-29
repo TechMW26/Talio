@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { sendPushToUser } from '@/lib/pushNotification'
 import { sendMeetingInviteEmail } from '@/lib/mailer'
+import { emitMeetingUpdate } from '@/lib/realtimeEvents'
 import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
@@ -396,6 +397,9 @@ export async function POST(request) {
         }
       }
     }
+
+    // Emit standardized real-time event for dashboard updates
+    emitMeetingUpdate(meeting.toObject(), [], { isNew: true, broadcast: true })
 
     return NextResponse.json({
       success: true,

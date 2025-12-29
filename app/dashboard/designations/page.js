@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import toast from '@/utils/toast'
+import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaEdit, FaTrash, FaBriefcase } from 'react-icons/fa'
 
 export default function DesignationsPage() {
@@ -15,9 +16,29 @@ export default function DesignationsPage() {
     description: '',
   })
 
+  // Real-time updates
+  const { socket, isConnected, subscribe } = useSocket()
+
   useEffect(() => {
     fetchDesignations()
   }, [])
+
+  // Subscribe to real-time designation updates
+  useEffect(() => {
+    if (!socket || !isConnected) return
+
+    const handleDesignationUpdate = (data) => {
+      console.log('🔄 [Designations] Real-time update received:', data)
+      fetchDesignations()
+    }
+
+    // Listen for generic dashboard refresh or designation-specific events
+    const unsub = subscribe?.('designation-updated', handleDesignationUpdate)
+
+    return () => {
+      unsub?.()
+    }
+  }, [socket, isConnected])
 
   const fetchDesignations = async () => {
     try {
