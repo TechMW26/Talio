@@ -273,6 +273,7 @@ export const roleBasedMenus = {
         { name: 'Leave Approvals', path: '/dashboard/leave/approvals' },
       ]
     },
+    { name: 'Payslips', icon: HiOutlineBanknotes, path: '/dashboard/payroll/payslips' },
     { name: 'Documents', icon: HiOutlineDocumentText, path: '/dashboard/documents' },
     { name: 'Assets', icon: HiOutlineCube, path: '/dashboard/assets' },
     { 
@@ -402,6 +403,7 @@ export const roleBasedMenus = {
         { name: 'Leave Approvals', path: '/dashboard/leave/approvals' },
       ]
     },
+    { name: 'Payslips', icon: HiOutlineBanknotes, path: '/dashboard/payroll/payslips' },
     { name: 'Documents', icon: HiOutlineDocumentText, path: '/dashboard/documents' },
     { name: 'Assets', icon: HiOutlineCube, path: '/dashboard/assets' },
     { 

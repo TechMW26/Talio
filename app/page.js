@@ -2,6 +2,28 @@
 
 import { useEffect, useState } from 'react'
 
+/**
+ * Check if running in Electron/desktop app environment
+ * Multiple detection methods for reliability
+ */
+function isDesktopApp() {
+  if (typeof window === 'undefined') return false
+  
+  // Method 1: Check talioDesktop API from preload
+  if (window.talioDesktop?.isDesktopApp) return true
+  
+  // Method 2: Check user agent for Electron
+  if (navigator.userAgent.toLowerCase().includes('electron')) return true
+  
+  // Method 3: Check for Electron-specific objects
+  if (window.process?.type === 'renderer') return true
+  
+  // Method 4: Check if window.require exists (Electron context)
+  if (typeof window.require === 'function') return true
+  
+  return false
+}
+
 export default function Home() {
   const [showClearOption, setShowClearOption] = useState(false)
 
@@ -41,11 +63,16 @@ export default function Home() {
         console.error('[Session Check] Error:', error)
         // On error, try to redirect to login
         // If setup check failed, login page will handle it
-        try {
-          localStorage.clear()
-          sessionStorage.clear()
-        } catch (e) {
-          console.error('[Session Check] Failed to clear storage:', e)
+        // CRITICAL: Don't clear storage in desktop app - causes white screen
+        if (!isDesktopApp()) {
+          try {
+            localStorage.clear()
+            sessionStorage.clear()
+          } catch (e) {
+            console.error('[Session Check] Failed to clear storage:', e)
+          }
+        } else {
+          console.log('[Session Check] Desktop app detected, skipping storage clear')
         }
         window.location.replace('/login')
       }
@@ -55,13 +82,23 @@ export default function Home() {
 
     // Set a timeout to show clear cache option if stuck
     const stuckTimer = setTimeout(() => {
-      setShowClearOption(true)
+      // Don't show clear cache option in desktop app - it causes issues
+      if (!isDesktopApp()) {
+        setShowClearOption(true)
+      }
     }, 3000) // Show option after 3 seconds (increased for setup check)
 
     return () => clearTimeout(stuckTimer)
   }, [])
 
   const clearCacheAndRedirect = () => {
+    // CRITICAL: Don't clear storage in desktop app
+    if (isDesktopApp()) {
+      console.log('[Session Check] Desktop app detected, redirecting without cache clear')
+      window.location.replace('/login')
+      return
+    }
+    
     // Clear all storage
     try {
       localStorage.clear()

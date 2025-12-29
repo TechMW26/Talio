@@ -136,12 +136,25 @@ const AttendanceSchema = new mongoose.Schema({
   // Audit fields for tracking system-generated records
   source: {
     type: String,
-    enum: ['user_checkin', 'manual_entry', 'system_auto_absent', 'system_backfill', 'correction', 'import'],
+    enum: ['user_checkin', 'manual_entry', 'system_auto_absent', 'system_backfill', 'correction', 'import', 'auto_checkout'],
     default: 'user_checkin',
   },
   createdBySystem: {
     type: Boolean,
     default: false,
+  },
+  // Auto-checkout tracking
+  autoCheckedOut: {
+    type: Boolean,
+    default: false,
+  },
+  autoCheckoutReason: {
+    type: String,
+    enum: ['midnight_cutoff', 'geofence_exit', 'overtime_timeout', null],
+    default: null,
+  },
+  autoCheckoutAt: {
+    type: Date,
   },
   // For tracking who made manual entries
   createdBy: {

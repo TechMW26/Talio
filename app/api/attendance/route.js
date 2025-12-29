@@ -158,11 +158,11 @@ export async function GET(request) {
 
     // Optimized: Use lean() and select only needed fields (including location for display)
     const attendance = await TenantAttendance.find(query)
-      .select('employee date checkIn checkOut checkInStatus checkOutStatus status workHours overtime totalLoggedHours breakMinutes shrinkagePercentage location source createdBySystem isManualEntry statusReason remarks')
+      .select('employee date checkIn checkOut checkInStatus checkOutStatus status workHours overtime totalLoggedHours breakMinutes shrinkagePercentage location source createdBySystem isManualEntry statusReason remarks autoCheckedOut autoCheckoutReason autoCheckoutAt')
       .populate({
         path: 'employee',
         select: 'firstName lastName employeeCode company',
-        populate: { path: 'company', select: 'timezone' },
+        populate: { path: 'company', select: 'timezone workingHours' },
         options: { lean: true }
       })
       .sort({ date: -1 })
@@ -198,10 +198,64 @@ export async function GET(request) {
         return { ...record, status: correctedStatus }
       }
 
-      // Case 2: Past day, has checkIn but no checkOut - mark as incomplete (will be handled by scheduler)
+      // Case 2: Past day, has checkIn but no checkOut - perform fallback auto-checkout
       if (isPastDay && record.status === 'in-progress' && record.checkIn && !record.checkOut) {
-        // This will be fixed by the scheduler, but flag it in the response
-        return { ...record, _needsAutoCorrection: true }
+        // Perform fallback auto-checkout with company's checkout time
+        const companyCheckoutTime = record.employee?.company?.workingHours?.checkOutTime || '18:00'
+        const fullDayHours = record.employee?.company?.workingHours?.fullDayHours || 8
+        
+        // Create checkout datetime using company's checkout time on the record's date
+        const recordDate = new Date(record.date)
+        const [checkOutHour, checkOutMin] = companyCheckoutTime.split(':').map(Number)
+        const checkoutDateTime = new Date(recordDate)
+        checkoutDateTime.setHours(checkOutHour, checkOutMin, 0, 0)
+        
+        // If check-in was after checkout time, use check-in + 1 minute
+        let finalCheckoutTime = checkoutDateTime
+        const checkInTime = new Date(record.checkIn)
+        if (checkInTime > checkoutDateTime) {
+          finalCheckoutTime = new Date(checkInTime.getTime() + 60000) // 1 minute after check-in
+        }
+        
+        // Calculate work hours
+        const totalMinutes = (finalCheckoutTime - checkInTime) / (1000 * 60)
+        const workHours = parseFloat((totalMinutes / 60).toFixed(2))
+        
+        // Determine status
+        const presentThreshold = fullDayHours * 0.9
+        const halfDayThreshold = fullDayHours * 0.5
+        let autoStatus = 'absent'
+        if (workHours >= presentThreshold) {
+          autoStatus = 'present'
+        } else if (workHours >= halfDayThreshold) {
+          autoStatus = 'half-day'
+        }
+        
+        // Update the database in background (non-blocking)
+        TenantAttendance.updateOne(
+          { _id: record._id },
+          { 
+            checkOut: finalCheckoutTime,
+            checkOutStatus: 'auto-checkout',
+            workHours: workHours,
+            status: autoStatus,
+            statusReason: `Fallback auto-checkout: ${autoStatus} (${workHours.toFixed(2)}h worked)`,
+            autoCheckedOut: true,
+            autoCheckoutReason: 'midnight_cutoff',
+            autoCheckoutAt: new Date(),
+            remarks: (record.remarks || '') + ` | Fallback auto-checkout on access. Checkout set to ${companyCheckoutTime}.`
+          }
+        ).exec().catch(err => console.error('Fallback auto-checkout error:', err))
+        
+        return { 
+          ...record, 
+          checkOut: finalCheckoutTime,
+          checkOutStatus: 'auto-checkout',
+          workHours: workHours,
+          status: autoStatus,
+          autoCheckedOut: true,
+          _autoCheckedOutOnAccess: true 
+        }
       }
 
       return record

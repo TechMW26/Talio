@@ -1,6 +1,34 @@
 // Cache management utilities
 
+/**
+ * Check if running in Electron/desktop app environment
+ * Multiple detection methods for reliability
+ */
+function isDesktopApp() {
+  if (typeof window === 'undefined') return false
+  
+  // Method 1: Check talioDesktop API from preload
+  if (window.talioDesktop?.isDesktopApp) return true
+  
+  // Method 2: Check user agent for Electron
+  if (navigator.userAgent.toLowerCase().includes('electron')) return true
+  
+  // Method 3: Check for Electron-specific objects
+  if (window.process?.type === 'renderer') return true
+  
+  // Method 4: Check if window.require exists (Electron context)
+  if (typeof window.require === 'function') return true
+  
+  return false
+}
+
 export const clearAllCache = () => {
+  // CRITICAL: Don't clear cache or reload in desktop app - causes white screen
+  if (isDesktopApp()) {
+    console.log('[Cache] Desktop app detected, skipping cache clear and reload')
+    return
+  }
+  
   try {
     // Clear localStorage except for essential items
     const essentialKeys = ['token', 'user']
