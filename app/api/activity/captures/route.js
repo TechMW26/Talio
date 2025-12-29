@@ -67,12 +67,12 @@ async function getEmployeesInDepartments(departmentIds, Department, Employee) {
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department', 'ProductivitySession', 'Activity'])
+    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department', 'ProductivitySession', 'Screenshot'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { User, Employee, Department, ProductivitySession, Activity: Screenshot } = models
+    const { User, Employee, Department, ProductivitySession, Screenshot } = models
 
     const currentUserId = user._id || user.userId;
     const currentUserRole = user.role;

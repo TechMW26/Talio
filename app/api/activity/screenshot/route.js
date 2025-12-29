@@ -35,12 +35,12 @@ async function ensureDirectory(dirPath) {
 export async function POST(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Activity']);
+    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Screenshot']);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
     const { user, models } = auth;
-    const { User, Employee, Activity: Screenshot } = models;
+    const { User, Employee, Screenshot } = models;
 
     const userId = user._id || user.userId;
     const userRole = user.role;
@@ -235,12 +235,12 @@ export async function POST(request) {
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Activity']);
+    const auth = await getAuthAndModels(request, ['Screenshot']);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
     const { user, models } = auth;
-    const { Activity: Screenshot } = models;
+    const { Screenshot } = models;
 
     const userId = user._id || user.userId;
     const userRole = user.role;

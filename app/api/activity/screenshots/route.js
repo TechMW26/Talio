@@ -69,12 +69,12 @@ async function canViewUserScreenshots(viewerId, targetUserId, viewerRole, models
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department', 'Activity'])
+    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department', 'Screenshot'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { User, Employee, Department, Activity: Screenshot } = models
+    const { User, Employee, Department, Screenshot } = models
 
     const viewerId = user._id || user.userId;
     const viewerRole = user.role;

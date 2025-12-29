@@ -44,33 +44,6 @@ export default function MeetingsPage() {
   // Real-time updates
   const { socket, isConnected, onMeetingUpdate, subscribe } = useSocket()
 
-  // Subscribe to real-time meeting updates
-  useEffect(() => {
-    if (!socket || !isConnected) return
-
-    const handleMeetingUpdate = (data) => {
-      console.log('🔄 [Meetings] Real-time update received:', data)
-      fetchMeetings()
-    }
-
-    const unsub1 = onMeetingUpdate?.(handleMeetingUpdate)
-    const unsub2 = subscribe?.(REALTIME_EVENTS.MEETING_CREATED, handleMeetingUpdate)
-    const unsub3 = subscribe?.(REALTIME_EVENTS.MEETING_UPDATED, handleMeetingUpdate)
-    const unsub4 = subscribe?.(REALTIME_EVENTS.MEETING_CANCELLED, handleMeetingUpdate)
-    // Also listen for meeting-invite events
-    const unsub5 = subscribe?.('meeting-invite', handleMeetingUpdate)
-    const unsub6 = subscribe?.('meeting-response', handleMeetingUpdate)
-
-    return () => {
-      unsub1?.()
-      unsub2?.()
-      unsub3?.()
-      unsub4?.()
-      unsub5?.()
-      unsub6?.()
-    }
-  }, [socket, isConnected, fetchMeetings])
-
   const fetchMeetings = useCallback(async () => {
     try {
       setLoading(true)
@@ -109,6 +82,33 @@ export default function MeetingsPage() {
       setLoading(false)
     }
   }, [filter, pagination.page, pagination.limit])
+
+  // Subscribe to real-time meeting updates
+  useEffect(() => {
+    if (!socket || !isConnected) return
+
+    const handleMeetingUpdate = (data) => {
+      console.log('🔄 [Meetings] Real-time update received:', data)
+      fetchMeetings()
+    }
+
+    const unsub1 = onMeetingUpdate?.(handleMeetingUpdate)
+    const unsub2 = subscribe?.(REALTIME_EVENTS.MEETING_CREATED, handleMeetingUpdate)
+    const unsub3 = subscribe?.(REALTIME_EVENTS.MEETING_UPDATED, handleMeetingUpdate)
+    const unsub4 = subscribe?.(REALTIME_EVENTS.MEETING_CANCELLED, handleMeetingUpdate)
+    // Also listen for meeting-invite events
+    const unsub5 = subscribe?.('meeting-invite', handleMeetingUpdate)
+    const unsub6 = subscribe?.('meeting-response', handleMeetingUpdate)
+
+    return () => {
+      unsub1?.()
+      unsub2?.()
+      unsub3?.()
+      unsub4?.()
+      unsub5?.()
+      unsub6?.()
+    }
+  }, [socket, isConnected, fetchMeetings, onMeetingUpdate, subscribe])
 
   useEffect(() => {
     fetchMeetings()

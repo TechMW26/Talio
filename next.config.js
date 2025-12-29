@@ -56,76 +56,38 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
 
-  // Headers for caching and security
+  // Headers for NO CACHING (to prevent white screen issues)
   async headers() {
     return [
       {
-        // Static assets caching (images, fonts, etc)
-        source: '/:path*.(png|jpg|jpeg|gif|webp|svg|ico|woff|woff2|ttf|eot)',
+        // ALL routes - NO CACHING
+        source: '/:path*',
         headers: [
           {
             key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
+            value: 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+          },
+          {
+            key: 'Pragma',
+            value: 'no-cache',
+          },
+          {
+            key: 'Expires',
+            value: '0',
+          },
+          {
+            key: 'X-DNS-Prefetch-Control',
+            value: 'on',
           },
         ],
       },
       {
-        // Sound files caching
-        source: '/sounds/:path*',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
-        ],
-      },
-      {
-        // JSON files (like animations)
-        source: '/:path*.json',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=86400, stale-while-revalidate=604800',
-          },
-        ],
-      },
-      {
-        // Next.js static files
-        source: '/_next/static/:path*',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
-        ],
-      },
-      {
-        // JS and CSS bundles
-        source: '/_next/:path*.(js|css)',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
-        ],
-      },
-      {
-        // API routes - no caching
+        // API routes - explicit no caching
         source: '/api/:path*',
         headers: [
           {
             key: 'Cache-Control',
             value: 'no-store, no-cache, must-revalidate',
-          },
-        ],
-      },
-      {
-        // HTML pages - short cache with revalidation
-        source: '/:path*',
-        headers: [
-          {
-            key: 'X-DNS-Prefetch-Control',
-            value: 'on',
           },
         ],
       },

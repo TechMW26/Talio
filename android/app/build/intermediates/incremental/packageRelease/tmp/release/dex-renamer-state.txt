@@ -1,7 +1,7 @@
-#Thu Dec 18 15:09:36 IST 2025
-base.1=/Users/apple/Desktop/Talio/android/app/build/intermediates/dex/release/mergeDexRelease/classes2.dex
+#Mon Dec 29 16:07:21 IST 2025
+base.1=/Users/avirajsharma/Desktop/Talio/android/app/build/intermediates/dex/release/mergeDexRelease/classes2.dex
 path.1=classes2.dex
-base.0=/Users/apple/Desktop/Talio/android/app/build/intermediates/dex/release/mergeDexRelease/classes.dex
+base.0=/Users/avirajsharma/Desktop/Talio/android/app/build/intermediates/dex/release/mergeDexRelease/classes.dex
 renamed.1=classes2.dex
 renamed.0=classes.dex
 path.0=classes.dex

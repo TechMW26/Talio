@@ -6,7 +6,7 @@
     mergedManifest="build/intermediates/merged_manifest/release/AndroidManifest.xml"
     proguardFiles="build/intermediates/default_proguard_files/global/proguard-android-optimize.txt-8.2.2:proguard-rules.pro"
     partialResultsDir="build/intermediates/lint_vital_partial_results/release/out"
-    desugaredMethodsFiles="/Users/apple/.gradle/caches/transforms-3/4b832eaa297b192b4900893e906358d6/transformed/D8BackportedDesugaredMethods.txt">
+    desugaredMethodsFiles="/Users/avirajsharma/.gradle/caches/transforms-3/4b832eaa297b192b4900893e906358d6/transformed/D8BackportedDesugaredMethods.txt">
   <buildFeatures
       viewBinding="true"
       namespacing="REQUIRED"/>
@@ -27,6 +27,6 @@
       applicationId="sbs.zenova.twa"
       generatedSourceFolders="build/generated/ap_generated_sources/release/out:build/generated/source/buildConfig/release:build/generated/data_binding_base_class_source_out/release/out"
       generatedResourceFolders="build/generated/res/resValues/release"
-      desugaredMethodsFiles="/Users/apple/.gradle/caches/transforms-3/4b832eaa297b192b4900893e906358d6/transformed/D8BackportedDesugaredMethods.txt">
+      desugaredMethodsFiles="/Users/avirajsharma/.gradle/caches/transforms-3/4b832eaa297b192b4900893e906358d6/transformed/D8BackportedDesugaredMethods.txt">
   </artifact>
 </variant>

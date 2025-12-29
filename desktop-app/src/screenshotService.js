@@ -1,5 +1,5 @@
 /**
- * Screenshot Service v3.0.0
+ * Screenshot Service v3.1.0 - FIXED
  * 
  * Simple, direct upload to MongoDB GridFS
  * - Captures at 1080p resolution
@@ -33,6 +33,14 @@ class ScreenshotService {
       activeApp: '',
       isIdle: false
     };
+    
+    // Bind methods to ensure 'this' context is correct
+    this.captureAndUpload = this.captureAndUpload.bind(this);
+    this.captureScreen = this.captureScreen.bind(this);
+    this.uploadScreenshot = this.uploadScreenshot.bind(this);
+    this.isOnline = this.isOnline.bind(this);
+    this.start = this.start.bind(this);
+    this.stop = this.stop.bind(this);
   }
 
   /**
@@ -71,11 +79,15 @@ class ScreenshotService {
    */
   async captureScreen() {
     try {
+      debugLogger.log('debug', 'ScreenshotService', 'Starting screen capture...');
+      
       // Get all sources
       const sources = await desktopCapturer.getSources({
         types: ['screen'],
         thumbnailSize: { width: 1920, height: 1080 }
       });
+
+      debugLogger.log('debug', 'ScreenshotService', `Found ${sources.length} screen sources`);
 
       if (!sources || sources.length === 0) {
         throw new Error('No screen sources available');
@@ -93,6 +105,8 @@ class ScreenshotService {
         }
       }
 
+      debugLogger.log('debug', 'ScreenshotService', `Using source: ${source.name}`);
+
       // Get thumbnail as PNG buffer
       const thumbnail = source.thumbnail;
       
@@ -104,7 +118,7 @@ class ScreenshotService {
       const resized = thumbnail.resize({ width: 1920, height: 1080, quality: 'best' });
       const pngBuffer = resized.toPNG();
 
-      debugLogger.log('debug', 'ScreenshotService', `Captured screen: ${pngBuffer.length} bytes`);
+      debugLogger.log('info', 'ScreenshotService', `Captured screen: ${pngBuffer.length} bytes`);
 
       return {
         buffer: pngBuffer,
@@ -125,6 +139,8 @@ class ScreenshotService {
    */
   async uploadScreenshot(screenshotData) {
     try {
+      debugLogger.log('debug', 'ScreenshotService', 'Uploading screenshot...');
+      
       const formData = new FormData();
       
       // Create blob from buffer
@@ -146,10 +162,10 @@ class ScreenshotService {
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || `Upload failed: ${response.status}`);
+        throw new Error(result.error || result.message || `Upload failed: ${response.status}`);
       }
 
-      debugLogger.log('info', 'ScreenshotService', `Uploaded screenshot: ${result.screenshotId}`);
+      debugLogger.log('info', 'ScreenshotService', `Uploaded screenshot: ${result.screenshotId || 'success'}`);
       
       return result;
 
@@ -163,12 +179,16 @@ class ScreenshotService {
    * Perform a single capture and upload cycle
    */
   async captureAndUpload() {
+    debugLogger.log('debug', 'ScreenshotService', 'Starting capture cycle...');
+    
     // Check if we should capture
     if (!this.isCapturing) {
+      debugLogger.log('debug', 'ScreenshotService', 'Skipping - not capturing');
       return { skipped: true, reason: 'not_capturing' };
     }
 
     if (!this.serverUrl || !this.authToken) {
+      debugLogger.log('debug', 'ScreenshotService', 'Skipping - not initialized');
       return { skipped: true, reason: 'not_initialized' };
     }
 
@@ -186,8 +206,8 @@ class ScreenshotService {
       // Capture screen
       const screenshotData = await this.captureScreen();
 
-      // Upload to server
-      const result = await uploadScreenshot(screenshotData);
+      // Upload to server - FIXED: using this.uploadScreenshot
+      const result = await this.uploadScreenshot(screenshotData);
 
       this.captureCount++;
       this.lastCaptureTime = new Date();
@@ -206,6 +226,8 @@ class ScreenshotService {
           captureCount: this.captureCount
         });
       }
+
+      debugLogger.log('info', 'ScreenshotService', `Capture cycle complete. Total: ${this.captureCount}`);
 
       return {
         success: true,
@@ -228,7 +250,7 @@ class ScreenshotService {
   }
 
   /**
-   * Start automatic capture at 1-minute intervals
+   * Start automatic capture at intervals
    */
   start() {
     if (this.isCapturing) {
@@ -242,7 +264,7 @@ class ScreenshotService {
     }
 
     this.isCapturing = true;
-    debugLogger.log('info', 'ScreenshotService', 'Starting capture service');
+    debugLogger.log('info', 'ScreenshotService', `Starting capture service (interval: ${this.intervalMs}ms)`);
 
     // Capture immediately
     this.captureAndUpload();
@@ -296,6 +318,21 @@ class ScreenshotService {
   }
 
   /**
+   * Set capture interval in milliseconds
+   */
+  setInterval(intervalMs) {
+    this.intervalMs = intervalMs;
+    debugLogger.log('info', 'ScreenshotService', `Capture interval set to ${intervalMs}ms`);
+    
+    // If already capturing, restart with new interval
+    if (this.isCapturing) {
+      this.stop();
+      this.isCapturing = true;
+      this.start();
+    }
+  }
+
+  /**
    * Set callback for successful captures
    */
   onCapture(callback) {
@@ -338,75 +375,5 @@ class ScreenshotService {
   }
 }
 
-// Fix: The uploadScreenshot should call this.uploadScreenshot
-// Let's create a properly bound instance
-const instance = new ScreenshotService();
-
-// Override captureAndUpload to use bound method
-const originalCaptureAndUpload = instance.captureAndUpload.bind(instance);
-instance.captureAndUpload = async function() {
-  // Check if we should capture
-  if (!this.isCapturing) {
-    return { skipped: true, reason: 'not_capturing' };
-  }
-
-  if (!this.serverUrl || !this.authToken) {
-    return { skipped: true, reason: 'not_initialized' };
-  }
-
-  // Check if online
-  const online = await this.isOnline();
-  if (!online) {
-    debugLogger.log('warn', 'ScreenshotService', 'Offline - skipping capture');
-    if (this.onErrorCallback) {
-      this.onErrorCallback({ type: 'offline', message: 'No internet connection' });
-    }
-    return { skipped: true, reason: 'offline' };
-  }
-
-  try {
-    // Capture screen
-    const screenshotData = await this.captureScreen();
-
-    // Upload to server
-    const result = await this.uploadScreenshot(screenshotData);
-
-    this.captureCount++;
-    this.lastCaptureTime = new Date();
-
-    // Reset activity counters after successful capture
-    this.activityData.keystrokes = 0;
-    this.activityData.mouseClicks = 0;
-    this.activityData.mouseMovements = 0;
-
-    // Notify success
-    if (this.onCaptureCallback) {
-      this.onCaptureCallback({
-        success: true,
-        screenshotId: result.screenshotId,
-        timestamp: this.lastCaptureTime,
-        captureCount: this.captureCount
-      });
-    }
-
-    return {
-      success: true,
-      screenshotId: result.screenshotId,
-      captureCount: this.captureCount
-    };
-
-  } catch (error) {
-    debugLogger.log('error', 'ScreenshotService', `Capture cycle failed: ${error.message}`);
-    
-    if (this.onErrorCallback) {
-      this.onErrorCallback({ type: 'capture_failed', message: error.message });
-    }
-
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-}.bind(instance);
-
-module.exports = instance;
+// Export singleton instance
+module.exports = new ScreenshotService();
