@@ -481,23 +481,59 @@ export default function UnifiedDashboard({ user: userProp }) {
     }, [isCountingDown, remainingTime])
 
     // Handle check-in
-    const handleCheckIn = useCallback(async (locationData) => {
+    const handleCheckIn = useCallback(async () => {
         try {
             setAttendanceLoading(true)
             const token = localStorage.getItem('token')
 
-            const payload = {
-                employeeId: employeeIdStr,
-                ...(locationData && { location: locationData })
+            // Get user's location
+            let latitude = null
+            let longitude = null
+            let address = 'Location not available'
+
+            if (navigator.geolocation) {
+                try {
+                    const position = await new Promise((resolve, reject) => {
+                        navigator.geolocation.getCurrentPosition(resolve, reject, {
+                            enableHighAccuracy: true,
+                            timeout: 10000,
+                            maximumAge: 0
+                        })
+                    })
+
+                    latitude = position.coords.latitude
+                    longitude = position.coords.longitude
+
+                    // Try to get address from coordinates
+                    try {
+                        const geocodeResponse = await fetch(
+                            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+                        )
+                        const geocodeData = await geocodeResponse.json()
+                        address = geocodeData.display_name || 'Location detected'
+                    } catch (geocodeError) {
+                        console.warn('Geocoding failed:', geocodeError)
+                        address = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
+                    }
+                } catch (geoError) {
+                    console.warn('Geolocation error:', geoError)
+                    toast.error('Location access denied. Please enable location services.')
+                }
             }
 
-            const response = await fetch('/api/attendance/checkin', {
+            const response = await fetch('/api/attendance', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({
+                    employeeId: employeeIdStr,
+                    type: 'clock-in',
+                    latitude,
+                    longitude,
+                    address
+                })
             })
 
             const data = await response.json()
@@ -516,23 +552,58 @@ export default function UnifiedDashboard({ user: userProp }) {
     }, [employeeIdStr])
 
     // Handle check-out
-    const handleCheckOut = useCallback(async (locationData) => {
+    const handleCheckOut = useCallback(async () => {
         try {
             setAttendanceLoading(true)
             const token = localStorage.getItem('token')
 
-            const payload = {
-                employeeId: employeeIdStr,
-                ...(locationData && { location: locationData })
+            // Get user's location
+            let latitude = null
+            let longitude = null
+            let address = 'Location not available'
+
+            if (navigator.geolocation) {
+                try {
+                    const position = await new Promise((resolve, reject) => {
+                        navigator.geolocation.getCurrentPosition(resolve, reject, {
+                            enableHighAccuracy: true,
+                            timeout: 10000,
+                            maximumAge: 0
+                        })
+                    })
+
+                    latitude = position.coords.latitude
+                    longitude = position.coords.longitude
+
+                    // Try to get address from coordinates
+                    try {
+                        const geocodeResponse = await fetch(
+                            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+                        )
+                        const geocodeData = await geocodeResponse.json()
+                        address = geocodeData.display_name || 'Location detected'
+                    } catch (geocodeError) {
+                        console.warn('Geocoding failed:', geocodeError)
+                        address = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
+                    }
+                } catch (geoError) {
+                    console.warn('Geolocation error:', geoError)
+                }
             }
 
-            const response = await fetch('/api/attendance/checkout', {
+            const response = await fetch('/api/attendance', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify(payload)
+                body: JSON.stringify({
+                    employeeId: employeeIdStr,
+                    type: 'clock-out',
+                    latitude,
+                    longitude,
+                    address
+                })
             })
 
             const data = await response.json()

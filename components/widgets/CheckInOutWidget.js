@@ -56,7 +56,7 @@ export default function CheckInOutWidget({
               </div>
             )}
           </div>
-          
+
           {/* User Info */}
           <div className="flex-1 min-w-0">
             {/* Status Badge with Animation */}
@@ -64,13 +64,13 @@ export default function CheckInOutWidget({
               <StatusIcon className={`w-3 h-3 ${status.color} ${status.pulse ? 'animate-pulse' : ''}`} />
               <span className={`text-xs font-semibold ${status.color}`}>{status.text}</span>
             </div>
-            
+
             {/* Name */}
             <h2 className="text-xl sm:text-2xl font-bold tracking-wide leading-tight truncate drop-shadow-sm">
               {employeeData ? `${employeeData.firstName || ''} ${employeeData.lastName || ''}`.trim() :
                 (user?.firstName && user?.lastName ? `${user.firstName} ${user.lastName}` : 'User')}
             </h2>
-            
+
             {/* Employee Code */}
             <p className="text-xs font-medium text-white/60 mt-1">
               {employeeData?.employeeCode || user?.employeeCode || user?.employeeNumber || '---'}
@@ -89,7 +89,7 @@ export default function CheckInOutWidget({
       {/* Action Buttons */}
       <div className="relative z-10 flex gap-3 mt-5">
         <button
-          onClick={onClockIn}
+          onClick={() => onClockIn()}
           disabled={attendanceLoading || (todayAttendance && todayAttendance.checkIn)}
           className="disabled:opacity-40 disabled:cursor-not-allowed px-5 py-3.5 rounded-full font-bold text-sm shadow-lg transition-all duration-200 flex items-center justify-center flex-1 gap-2 bg-blue-500/30 hover:bg-blue-500/40 hover:shadow-xl active:scale-[0.98] text-white"
         >
@@ -97,7 +97,7 @@ export default function CheckInOutWidget({
           <span>Check In</span>
         </button>
         <button
-          onClick={onClockOut}
+          onClick={() => onClockOut()}
           disabled={attendanceLoading || !todayAttendance || !todayAttendance.checkIn || todayAttendance.checkOut}
           className="disabled:opacity-40 disabled:cursor-not-allowed px-5 py-3.5 rounded-full font-bold text-sm shadow-lg transition-all duration-200 flex items-center justify-center flex-1 gap-2 bg-white text-blue-600 hover:bg-gray-50 hover:shadow-xl active:scale-[0.98]"
         >

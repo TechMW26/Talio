@@ -44,7 +44,6 @@ function MobileSkeleton() {
 export default function DashboardPage() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [dashboardData, setDashboardData] = useState(null)
 
   useEffect(() => {
     // Immediately try to get user from localStorage
@@ -79,33 +78,6 @@ export default function DashboardPage() {
     }
   }, [])
 
-  // Fetch dashboard data for mobile view
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        const token = localStorage.getItem('token')
-        const [attendanceRes, statsRes] = await Promise.all([
-          fetch('/api/attendance/today', { headers: { Authorization: `Bearer ${token}` } }),
-          fetch('/api/dashboard/stats', { headers: { Authorization: `Bearer ${token}` } })
-        ])
-        
-        const attendanceData = await attendanceRes.json()
-        const statsData = await statsRes.json()
-        
-        setDashboardData({
-          todayAttendance: attendanceData.success ? attendanceData.data : null,
-          stats: statsData.success ? statsData.data : null
-        })
-      } catch (err) {
-        console.error('[Dashboard] Failed to fetch mobile data:', err)
-      }
-    }
-    
-    if (user) {
-      fetchDashboardData()
-    }
-  }, [user])
-
   if (loading) {
     return (
       <MobileViewWrapper
@@ -116,15 +88,10 @@ export default function DashboardPage() {
   }
 
   // Render with mobile/desktop conditional
+  // MobileHome fetches its own data internally
   return (
     <MobileViewWrapper
-      mobileContent={
-        <MobileHome 
-          user={user} 
-          attendance={dashboardData?.todayAttendance}
-          stats={dashboardData?.stats}
-        />
-      }
+      mobileContent={<MobileHome user={user} />}
       desktopContent={<UnifiedDashboard user={user} />}
     />
   )

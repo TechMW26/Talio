@@ -4,22 +4,93 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import MobileLayout from '../components/MobileLayout';
 import '@/components/MobileApp/styles/mobile.css';
+import { getEmployeeId } from '@/utils/userHelper';
 
 /**
  * Mobile Home Page
  * Dashboard view optimized for mobile devices
  */
-export default function MobileHome({ user, employee, attendance, recentActivity }) {
+export default function MobileHome({ user, employee, attendance: attendanceProp, recentActivity }) {
   const router = useRouter();
   const [workTimer, setWorkTimer] = useState('00:00:00');
   const [isCheckedIn, setIsCheckedIn] = useState(false);
+  const [attendance, setAttendance] = useState(attendanceProp || null);
+  const [employeeData, setEmployeeData] = useState(employee || null);
+  const [loading, setLoading] = useState(!attendanceProp);
+
+  // Fetch attendance data if not provided
+  useEffect(() => {
+    const fetchData = async () => {
+      if (attendanceProp) {
+        setAttendance(attendanceProp);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const token = localStorage.getItem('token');
+        const employeeId = getEmployeeId(user);
+
+        if (!employeeId) {
+          setLoading(false);
+          return;
+        }
+
+        const today = new Date().toISOString().split('T')[0];
+        const response = await fetch(`/api/attendance?employeeId=${employeeId}&date=${today}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        const data = await response.json();
+        if (data.success && data.data.length > 0) {
+          setAttendance(data.data[0]);
+        }
+      } catch (error) {
+        console.error('[MobileHome] Failed to fetch attendance:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [user, attendanceProp]);
+
+  // Fetch employee data if not provided
+  useEffect(() => {
+    const fetchEmployee = async () => {
+      if (employee) {
+        setEmployeeData(employee);
+        return;
+      }
+
+      try {
+        const token = localStorage.getItem('token');
+        const employeeId = getEmployeeId(user);
+
+        if (!employeeId) return;
+
+        const response = await fetch(`/api/employees/${employeeId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        const data = await response.json();
+        if (data.success) {
+          setEmployeeData(data.data);
+        }
+      } catch (error) {
+        console.error('[MobileHome] Failed to fetch employee:', error);
+      }
+    };
+
+    fetchEmployee();
+  }, [user, employee]);
 
   // Calculate work timer from check-in time
   useEffect(() => {
     if (attendance?.checkIn && !attendance?.checkOut) {
       setIsCheckedIn(true);
       const checkInTime = new Date(attendance.checkIn);
-      
+
       const updateTimer = () => {
         const now = new Date();
         const diff = now - checkInTime;
@@ -30,7 +101,7 @@ export default function MobileHome({ user, employee, attendance, recentActivity 
           `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
         );
       };
-      
+
       updateTimer();
       const interval = setInterval(updateTimer, 1000);
       return () => clearInterval(interval);
@@ -49,14 +120,14 @@ export default function MobileHome({ user, employee, attendance, recentActivity 
 
   // Get user initials
   const getUserInitials = () => {
-    if (!employee?.firstName) return user?.email?.substring(0, 2).toUpperCase() || 'U';
-    return `${employee.firstName[0]}${employee.lastName?.[0] || ''}`.toUpperCase();
+    if (!employeeData?.firstName) return user?.email?.substring(0, 2).toUpperCase() || 'U';
+    return `${employeeData.firstName[0]}${employeeData.lastName?.[0] || ''}`.toUpperCase();
   };
 
   // Get full name
   const getFullName = () => {
-    if (employee?.firstName) {
-      return `${employee.firstName} ${employee.lastName || ''}`.trim();
+    if (employeeData?.firstName) {
+      return `${employeeData.firstName} ${employeeData.lastName || ''}`.trim();
     }
     return user?.email?.split('@')[0] || 'User';
   };
@@ -173,9 +244,9 @@ export default function MobileHome({ user, employee, attendance, recentActivity 
                 </p>
               </div>
             </div>
-            
+
             <div className="mobile-grid-2">
-              <button 
+              <button
                 onClick={handleCheckIn}
                 disabled={isCheckedIn}
                 className="mobile-btn mobile-btn-ghost mobile-btn-full"
@@ -184,12 +255,12 @@ export default function MobileHome({ user, employee, attendance, recentActivity 
                 <span className="material-icons-round" style={{ fontSize: '18px' }}>login</span>
                 Check In
               </button>
-              <button 
+              <button
                 onClick={handleCheckOut}
                 disabled={!isCheckedIn}
                 className="mobile-btn mobile-btn-full"
-                style={{ 
-                  background: 'white', 
+                style={{
+                  background: 'white',
                   color: '#3B82F6',
                   opacity: !isCheckedIn ? 0.5 : 1,
                   cursor: !isCheckedIn ? 'not-allowed' : 'pointer'
@@ -221,7 +292,7 @@ export default function MobileHome({ user, employee, attendance, recentActivity 
               {workTimer}
             </span>
           </div>
-          
+
           <div className="mobile-grid-2">
             <div className="mobile-stat-card">
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
@@ -237,7 +308,7 @@ export default function MobileHome({ user, employee, attendance, recentActivity 
                 </p>
               )}
             </div>
-            
+
             <div className="mobile-stat-card">
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                 <div className="mobile-stat-icon" style={{ background: 'var(--mobile-red-50)', color: 'var(--mobile-red-500)' }}>
@@ -252,7 +323,7 @@ export default function MobileHome({ user, employee, attendance, recentActivity 
                 {attendance?.checkOut ? 'Completed' : 'Pending'}
               </p>
             </div>
-            
+
             <div className="mobile-stat-card">
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                 <div className="mobile-stat-icon" style={{ background: 'var(--mobile-primary-50)', color: 'var(--mobile-primary)' }}>
@@ -262,7 +333,7 @@ export default function MobileHome({ user, employee, attendance, recentActivity 
               </div>
               <p className="mobile-stat-value">{getBreakTime()}</p>
             </div>
-            
+
             <div className="mobile-stat-card">
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
                 <div className="mobile-stat-icon" style={{ background: 'var(--mobile-purple-50)', color: 'var(--mobile-purple-500)' }}>
@@ -271,9 +342,9 @@ export default function MobileHome({ user, employee, attendance, recentActivity 
                 <span className="mobile-stat-label">Status</span>
               </div>
               <p className="mobile-stat-value" style={{ color: 'var(--mobile-green-500)' }}>
-                {attendance?.status === 'present' ? 'Present' : 
-                 attendance?.status === 'half-day' ? 'Half Day' : 
-                 attendance?.status === 'absent' ? 'Absent' : 'In Progress'}
+                {attendance?.status === 'present' ? 'Present' :
+                  attendance?.status === 'half-day' ? 'Half Day' :
+                    attendance?.status === 'absent' ? 'Absent' : 'In Progress'}
               </p>
             </div>
           </div>
@@ -283,14 +354,14 @@ export default function MobileHome({ user, employee, attendance, recentActivity 
         <div>
           <div className="mobile-section-header">
             <h3 className="mobile-section-title">Recent Activity</h3>
-            <button 
+            <button
               className="mobile-section-link"
               onClick={() => router.push('/dashboard/attendance')}
             >
               View All
             </button>
           </div>
-          
+
           {recentActivity && recentActivity.length > 0 ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {recentActivity.slice(0, 3).map((activity, idx) => (
@@ -299,8 +370,8 @@ export default function MobileHome({ user, employee, attendance, recentActivity 
                     <div className="mobile-activity-icon">
                       <span className="material-icons-round">
                         {activity.type === 'attendance' ? 'event_available' :
-                         activity.type === 'leave' ? 'beach_access' :
-                         activity.type === 'task' ? 'task_alt' : 'notifications'}
+                          activity.type === 'leave' ? 'beach_access' :
+                            activity.type === 'task' ? 'task_alt' : 'notifications'}
                       </span>
                     </div>
                     <div>
@@ -308,11 +379,10 @@ export default function MobileHome({ user, employee, attendance, recentActivity 
                       <p className="mobile-activity-time">{activity.time}</p>
                     </div>
                   </div>
-                  <span className={`mobile-badge mobile-badge-pill ${
-                    activity.status === 'approved' ? 'mobile-badge-green' :
-                    activity.status === 'pending' ? 'mobile-badge-yellow' :
-                    activity.status === 'rejected' ? 'mobile-badge-red' : 'mobile-badge-blue'
-                  }`}>
+                  <span className={`mobile-badge mobile-badge-pill ${activity.status === 'approved' ? 'mobile-badge-green' :
+                      activity.status === 'pending' ? 'mobile-badge-yellow' :
+                        activity.status === 'rejected' ? 'mobile-badge-red' : 'mobile-badge-blue'
+                    }`}>
                     {activity.status}
                   </span>
                 </div>
