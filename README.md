@@ -150,6 +150,21 @@ npm run start # Runs 'node server.js'
 *   **Engagement**: Announcements, Helpdesk, Policies.
 *   **AI**: MAYA Assistant (Full Capabilities).
 *   **Monitoring**: Desktop Apps (Win/Mac), Real-time tracking.
+*   **📍 Google Maps Geolocation**: Enterprise-grade location tracking for check-in/check-out.
+
+### 📍 Google Maps Geolocation (NEW)
+
+**Precise location tracking for attendance check-in/check-out:**
+
+*   **Backend Integration**: Google Maps Geocoding API with OpenStreetMap fallback
+*   **Enhanced Address Resolution**: Building, unit, street, area, city, state, pincode, country
+*   **Multi-Platform**: Works across Web, Desktop (Electron), Mobile (APK)
+*   **Security**: Backend-only API key (never exposed to client)
+*   **Cost**: $0 for typical usage (within $200/month free tier)
+
+**Setup**: See `docs/GOOGLE_MAPS_QUICKSTART.md` for 5-minute setup guide.
+
+**Full Documentation**: See `docs/GOOGLE_MAPS_SETUP.md` for comprehensive guide.
 
 ### 🔄 In Progress / Roadmap
 *   Mobile App (React Native)

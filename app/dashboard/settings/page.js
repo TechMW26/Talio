@@ -7,6 +7,8 @@ import { HiOutlineOfficeBuilding, HiOutlineCog, HiOutlineArrowLeft } from 'react
 import { toast } from '@/utils/toast'
 import dynamic from 'next/dynamic'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useIsMobile } from '@/components/MobileApp'
+import MobileSettings from '@/components/MobileApp/pages/MobileSettings'
 
 // Dynamically import map component (client-side only)
 const GeofenceMap = dynamic(() => import('@/components/GeofenceMap'), { ssr: false })
@@ -97,15 +99,18 @@ function CompanySelector({ companies, selectedCompany, onSelect, onBack, loading
 }
 
 export default function SettingsPage() {
+  const { isMobile, mounted } = useIsMobile()
   const [activeTab, setActiveTab] = useState('company')
   const [userRole, setUserRole] = useState('')
   const [isDepartmentHead, setIsDepartmentHead] = useState(false)
+  const [user, setUser] = useState(null)
 
   useEffect(() => {
     const userData = localStorage.getItem('user')
     if (userData) {
-      const user = JSON.parse(userData)
-      setUserRole(user.role)
+      const parsedUser = JSON.parse(userData)
+      setUserRole(parsedUser.role)
+      setUser(parsedUser)
     }
     checkDepartmentHead()
   }, [])
@@ -172,6 +177,20 @@ export default function SettingsPage() {
     }
   }, [userRole, isDepartmentHead])
 
+  // Show loading state while detecting device
+  if (!mounted) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+
+  // Show mobile settings on mobile devices
+  if (isMobile) {
+    return <MobileSettings user={user} />
+  }
+
   return (
     <div className="page-container">
       {/* Header */}
@@ -195,11 +214,10 @@ export default function SettingsPage() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center space-x-2 px-4 py-2.5 rounded-lg font-medium text-sm whitespace-nowrap transition-all ${
-                    activeTab === tab.id
+                  className={`flex items-center space-x-2 px-4 py-2.5 rounded-lg font-medium text-sm whitespace-nowrap transition-all ${activeTab === tab.id
                       ? 'bg-indigo-600 text-white shadow-sm'
                       : 'text-gray-600 hover:bg-gray-100'
-                  }`}
+                    }`}
                 >
                   <Icon className="w-4 h-4" />
                   <span>{tab.name}</span>
@@ -418,10 +436,10 @@ function CompanySettingsTab() {
       }
 
       const token = localStorage.getItem('token')
-      const url = editingCompany 
-        ? `/api/companies/${editingCompany._id}` 
+      const url = editingCompany
+        ? `/api/companies/${editingCompany._id}`
         : '/api/companies'
-      
+
       console.log('Sending request to:', url, 'with data:', submitData)
       const response = await fetch(url, {
         method: editingCompany ? 'PUT' : 'POST',
@@ -494,7 +512,7 @@ function CompanySettingsTab() {
   const handleWorkingDaysChange = (day, checked) => {
     setFormData(prev => {
       const currentDays = prev.workingHours.workingDays || []
-      const newDays = checked 
+      const newDays = checked
         ? [...currentDays, day]
         : currentDays.filter(d => d !== day)
       return {
@@ -561,7 +579,7 @@ function CompanySettingsTab() {
                     <FaBuilding className="w-8 h-8 text-gray-400" />
                   )}
                 </div>
-                
+
                 {/* Company Info */}
                 <div className="flex-1 min-w-0">
                   <h3 className="font-semibold text-lg truncate text-gray-800">{company.name}</h3>
@@ -632,288 +650,288 @@ function CompanySettingsTab() {
 
             <form onSubmit={handleSubmit}>
               <div className="modal-body space-y-6 overflow-y-auto max-h-[70vh]">
-              {/* Company Logo */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="text-base font-semibold mb-4 flex items-center gap-2 text-gray-800">
-                  <FaImage className="text-indigo-600" />
-                  <span>Company Logo</span>
-                </div>
-                <div className="flex items-center gap-6">
-                  <div className="w-24 h-24 border-2 border-gray-200 rounded-lg overflow-hidden bg-white flex items-center justify-center">
-                    {logoPreview ? (
-                      <img src={logoPreview} alt="Company Logo" className="max-w-full max-h-full object-contain" />
-                    ) : (
-                      <FaBuilding className="w-8 h-8 text-gray-400" />
-                    )}
+                {/* Company Logo */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="text-base font-semibold mb-4 flex items-center gap-2 text-gray-800">
+                    <FaImage className="text-indigo-600" />
+                    <span>Company Logo</span>
                   </div>
-                  <div className="flex-1">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleLogoChange}
-                      className="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
-                    />
-                    <p className="text-xs text-gray-500 mt-2">Recommended: Square image, max 10MB</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Company Basic Info */}
-              <div>
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
-                  <FaBuilding className="text-indigo-600" />
-                  <span>Company Information</span>
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold mb-2 text-gray-700">Company Name *</label>
-                    <input
-                      type="text"
-                      value={formData.name}
-                      onChange={(e) => handleInputChange('name', e.target.value)}
-                      required
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
-                      placeholder="Enter company name"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold mb-2 text-gray-700">Company Code *</label>
-                    <input
-                      type="text"
-                      value={formData.code}
-                      onChange={(e) => handleInputChange('code', e.target.value.toUpperCase())}
-                      required
-                      maxLength={10}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 uppercase text-gray-800"
-                      placeholder="e.g., ACME"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-semibold mb-2 text-gray-700">Description</label>
-                    <textarea
-                      value={formData.description}
-                      onChange={(e) => handleInputChange('description', e.target.value)}
-                      rows={2}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
-                      placeholder="Brief description of the company"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold mb-2 text-gray-700">Email</label>
-                    <input
-                      type="email"
-                      value={formData.email}
-                      onChange={(e) => handleInputChange('email', e.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
-                      placeholder="company@example.com"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold mb-2 text-gray-700">Phone</label>
-                    <input
-                      type="tel"
-                      value={formData.phone}
-                      onChange={(e) => handleInputChange('phone', e.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
-                      placeholder="+1 (555) 123-4567"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-semibold mb-2 text-gray-700">Website</label>
-                    <input
-                      type="url"
-                      value={formData.website}
-                      onChange={(e) => handleInputChange('website', e.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
-                      placeholder="https://www.example.com"
-                    />
-                  </div>
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-semibold mb-2 text-gray-700">Timezone *</label>
-                    <select
-                      value={formData.timezone || 'Asia/Kolkata'}
-                      onChange={(e) => {
-                        console.log('Timezone changed to:', e.target.value);
-                        handleInputChange('timezone', e.target.value);
-                      }}
-                      required
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
-                    >
-                      {(typeof Intl !== 'undefined' && Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : ['UTC', 'Asia/Kolkata', 'America/New_York', 'Europe/London']).map((tz) => (
-                        <option key={tz} value={tz}>{tz}</option>
-                      ))}
-                    </select>
-                    <p className="text-xs text-gray-500 mt-1">All attendance records and notifications will use this timezone.</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Company Address */}
-              <div>
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
-                  <FaMapMarkerAlt className="text-indigo-600" />
-                  <span>Company Address</span>
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-semibold mb-2 text-gray-700">Street Address</label>
-                    <input
-                      type="text"
-                      value={formData.address.street}
-                      onChange={(e) => handleAddressChange('street', e.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
-                      placeholder="123 Main Street"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold mb-2 text-gray-700">City</label>
-                    <input
-                      type="text"
-                      value={formData.address.city}
-                      onChange={(e) => handleAddressChange('city', e.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
-                      placeholder="New York"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold mb-2 text-gray-700">State / Province</label>
-                    <input
-                      type="text"
-                      value={formData.address.state}
-                      onChange={(e) => handleAddressChange('state', e.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
-                      placeholder="NY"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold mb-2 text-gray-700">Country</label>
-                    <input
-                      type="text"
-                      value={formData.address.country}
-                      onChange={(e) => handleAddressChange('country', e.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
-                      placeholder="United States"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold mb-2 text-gray-700">Zip / Postal Code</label>
-                    <input
-                      type="text"
-                      value={formData.address.zipCode}
-                      onChange={(e) => handleAddressChange('zipCode', e.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
-                      placeholder="10001"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Working Hours & Attendance Settings */}
-              <div>
-                <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
-                  <FaClock className="text-indigo-600" />
-                  <span>Working Hours & Attendance Settings</span>
-                </h3>
-
-                {/* Check-in/Check-out Times */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                  <div>
-                    <label className="block text-sm font-semibold mb-2 text-gray-700">Check-in Time *</label>
-                    <input
-                      type="time"
-                      value={formData.workingHours.checkInTime}
-                      onChange={(e) => handleWorkingHoursChange('checkInTime', e.target.value)}
-                      required
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Official start time for the workday</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold mb-2 text-gray-700">Check-out Time *</label>
-                    <input
-                      type="time"
-                      value={formData.workingHours.checkOutTime}
-                      onChange={(e) => handleWorkingHoursChange('checkOutTime', e.target.value)}
-                      required
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Official end time for the workday</p>
+                  <div className="flex items-center gap-6">
+                    <div className="w-24 h-24 border-2 border-gray-200 rounded-lg overflow-hidden bg-white flex items-center justify-center">
+                      {logoPreview ? (
+                        <img src={logoPreview} alt="Company Logo" className="max-w-full max-h-full object-contain" />
+                      ) : (
+                        <FaBuilding className="w-8 h-8 text-gray-400" />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleLogoChange}
+                        className="block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"
+                      />
+                      <p className="text-xs text-gray-500 mt-2">Recommended: Square image, max 10MB</p>
+                    </div>
                   </div>
                 </div>
 
-                {/* Attendance Thresholds */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                  <div>
-                    <label className="block text-sm font-semibold mb-2 text-gray-700">Late Threshold (min)</label>
-                    <input
-                      type="number"
-                      value={formData.workingHours.lateThresholdMinutes}
-                      onChange={(e) => handleWorkingHoursChange('lateThresholdMinutes', parseInt(e.target.value) || 15)}
-                      min="0"
-                      max="120"
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Grace period</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold mb-2 text-gray-700">Absent Threshold (min)</label>
-                    <input
-                      type="number"
-                      value={formData.workingHours.absentThresholdMinutes}
-                      onChange={(e) => handleWorkingHoursChange('absentThresholdMinutes', parseInt(e.target.value) || 60)}
-                      min="15"
-                      max="480"
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Auto-mark absent</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold mb-2 text-gray-700">Half Day Hours</label>
-                    <input
-                      type="number"
-                      value={formData.workingHours.halfDayHours}
-                      onChange={(e) => handleWorkingHoursChange('halfDayHours', parseFloat(e.target.value) || 4)}
-                      min="1"
-                      max="12"
-                      step="0.5"
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Min hours</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold mb-2 text-gray-700">Full Day Hours</label>
-                    <input
-                      type="number"
-                      value={formData.workingHours.fullDayHours}
-                      onChange={(e) => handleWorkingHoursChange('fullDayHours', parseFloat(e.target.value) || 8)}
-                      min="1"
-                      max="24"
-                      step="0.5"
-                      className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Min hours</p>
-                  </div>
-                </div>
-
-                {/* Working Days */}
+                {/* Company Basic Info */}
                 <div>
-                  <label className="block text-sm font-semibold mb-3 text-gray-700">Working Days *</label>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => (
-                      <label key={day} className="flex items-center space-x-2 cursor-pointer group">
-                        <input
-                          type="checkbox"
-                          checked={formData.workingHours.workingDays?.includes(day)}
-                          onChange={(e) => handleWorkingDaysChange(day, e.target.checked)}
-                          className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 focus:ring-2 cursor-pointer"
-                        />
-                        <span className="text-sm font-medium capitalize text-gray-700 group-hover:text-indigo-600 transition-colors">{day}</span>
-                      </label>
-                    ))}
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
+                    <FaBuilding className="text-indigo-600" />
+                    <span>Company Information</span>
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Company Name *</label>
+                      <input
+                        type="text"
+                        value={formData.name}
+                        onChange={(e) => handleInputChange('name', e.target.value)}
+                        required
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
+                        placeholder="Enter company name"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Company Code *</label>
+                      <input
+                        type="text"
+                        value={formData.code}
+                        onChange={(e) => handleInputChange('code', e.target.value.toUpperCase())}
+                        required
+                        maxLength={10}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 uppercase text-gray-800"
+                        placeholder="e.g., ACME"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Description</label>
+                      <textarea
+                        value={formData.description}
+                        onChange={(e) => handleInputChange('description', e.target.value)}
+                        rows={2}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
+                        placeholder="Brief description of the company"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Email</label>
+                      <input
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => handleInputChange('email', e.target.value)}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
+                        placeholder="company@example.com"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Phone</label>
+                      <input
+                        type="tel"
+                        value={formData.phone}
+                        onChange={(e) => handleInputChange('phone', e.target.value)}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
+                        placeholder="+1 (555) 123-4567"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Website</label>
+                      <input
+                        type="url"
+                        value={formData.website}
+                        onChange={(e) => handleInputChange('website', e.target.value)}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
+                        placeholder="https://www.example.com"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Timezone *</label>
+                      <select
+                        value={formData.timezone || 'Asia/Kolkata'}
+                        onChange={(e) => {
+                          console.log('Timezone changed to:', e.target.value);
+                          handleInputChange('timezone', e.target.value);
+                        }}
+                        required
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
+                      >
+                        {(typeof Intl !== 'undefined' && Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : ['UTC', 'Asia/Kolkata', 'America/New_York', 'Europe/London']).map((tz) => (
+                          <option key={tz} value={tz}>{tz}</option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-gray-500 mt-1">All attendance records and notifications will use this timezone.</p>
+                    </div>
                   </div>
-                  <p className="text-xs text-gray-500 mt-2">Select the days employees are expected to work</p>
                 </div>
-              </div>
+
+                {/* Company Address */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
+                    <FaMapMarkerAlt className="text-indigo-600" />
+                    <span>Company Address</span>
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Street Address</label>
+                      <input
+                        type="text"
+                        value={formData.address.street}
+                        onChange={(e) => handleAddressChange('street', e.target.value)}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
+                        placeholder="123 Main Street"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">City</label>
+                      <input
+                        type="text"
+                        value={formData.address.city}
+                        onChange={(e) => handleAddressChange('city', e.target.value)}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
+                        placeholder="New York"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">State / Province</label>
+                      <input
+                        type="text"
+                        value={formData.address.state}
+                        onChange={(e) => handleAddressChange('state', e.target.value)}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
+                        placeholder="NY"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Country</label>
+                      <input
+                        type="text"
+                        value={formData.address.country}
+                        onChange={(e) => handleAddressChange('country', e.target.value)}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
+                        placeholder="United States"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Zip / Postal Code</label>
+                      <input
+                        type="text"
+                        value={formData.address.zipCode}
+                        onChange={(e) => handleAddressChange('zipCode', e.target.value)}
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
+                        placeholder="10001"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Working Hours & Attendance Settings */}
+                <div>
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2 text-gray-800">
+                    <FaClock className="text-indigo-600" />
+                    <span>Working Hours & Attendance Settings</span>
+                  </h3>
+
+                  {/* Check-in/Check-out Times */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Check-in Time *</label>
+                      <input
+                        type="time"
+                        value={formData.workingHours.checkInTime}
+                        onChange={(e) => handleWorkingHoursChange('checkInTime', e.target.value)}
+                        required
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Official start time for the workday</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Check-out Time *</label>
+                      <input
+                        type="time"
+                        value={formData.workingHours.checkOutTime}
+                        onChange={(e) => handleWorkingHoursChange('checkOutTime', e.target.value)}
+                        required
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Official end time for the workday</p>
+                    </div>
+                  </div>
+
+                  {/* Attendance Thresholds */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Late Threshold (min)</label>
+                      <input
+                        type="number"
+                        value={formData.workingHours.lateThresholdMinutes}
+                        onChange={(e) => handleWorkingHoursChange('lateThresholdMinutes', parseInt(e.target.value) || 15)}
+                        min="0"
+                        max="120"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Grace period</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Absent Threshold (min)</label>
+                      <input
+                        type="number"
+                        value={formData.workingHours.absentThresholdMinutes}
+                        onChange={(e) => handleWorkingHoursChange('absentThresholdMinutes', parseInt(e.target.value) || 60)}
+                        min="15"
+                        max="480"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Auto-mark absent</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Half Day Hours</label>
+                      <input
+                        type="number"
+                        value={formData.workingHours.halfDayHours}
+                        onChange={(e) => handleWorkingHoursChange('halfDayHours', parseFloat(e.target.value) || 4)}
+                        min="1"
+                        max="12"
+                        step="0.5"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Min hours</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold mb-2 text-gray-700">Full Day Hours</label>
+                      <input
+                        type="number"
+                        value={formData.workingHours.fullDayHours}
+                        onChange={(e) => handleWorkingHoursChange('fullDayHours', parseFloat(e.target.value) || 8)}
+                        min="1"
+                        max="24"
+                        step="0.5"
+                        className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Min hours</p>
+                    </div>
+                  </div>
+
+                  {/* Working Days */}
+                  <div>
+                    <label className="block text-sm font-semibold mb-3 text-gray-700">Working Days *</label>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => (
+                        <label key={day} className="flex items-center space-x-2 cursor-pointer group">
+                          <input
+                            type="checkbox"
+                            checked={formData.workingHours.workingDays?.includes(day)}
+                            onChange={(e) => handleWorkingDaysChange(day, e.target.checked)}
+                            className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 focus:ring-2 cursor-pointer"
+                          />
+                          <span className="text-sm font-medium capitalize text-gray-700 group-hover:text-indigo-600 transition-colors">{day}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">Select the days employees are expected to work</p>
+                  </div>
+                </div>
               </div>
 
               {/* Form Actions */}
@@ -1238,9 +1256,8 @@ function GeofenceLocationsManager() {
           {locations.map((location) => (
             <div
               key={location._id}
-              className={`border-2 rounded-lg p-4 ${
-                location.isPrimary ? 'border-yellow-400 bg-yellow-50' : 'border-gray-200 bg-white'
-              } hover:shadow-md transition-shadow`}
+              className={`border-2 rounded-lg p-4 ${location.isPrimary ? 'border-yellow-400 bg-yellow-50' : 'border-gray-200 bg-white'
+                } hover:shadow-md transition-shadow`}
             >
               <div className="flex justify-between items-start mb-3">
                 <div className="flex items-center gap-2">
@@ -1816,7 +1833,7 @@ function GeofencingTab() {
                         onChange={(e) => updateBreakTiming(index, 'startTime', e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
                       />
-                                       </div>
+                    </div>
                     <div>
                       <label className="block text-xs text-gray-600 mb-1.5">End Time</label>
                       <input
@@ -1836,11 +1853,10 @@ function GeofencingTab() {
                           key={day}
                           type="button"
                           onClick={() => toggleBreakDay(index, day)}
-                          className={`px-3 py-1 text-xs rounded-lg transition-colors ${
-                            breakTiming.days?.includes(day)
+                          className={`px-3 py-1 text-xs rounded-lg transition-colors ${breakTiming.days?.includes(day)
                               ? 'bg-blue-600 text-white'
                               : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                          }`}
+                            }`}
                         >
                           {day.charAt(0).toUpperCase() + day.slice(1, 3)}
                         </button>
@@ -2302,36 +2318,36 @@ function PayrollSettingsTab() {
 
     try {
       const formData = new FormData(e.target)
-      
+
       const payrollSettings = {
         payroll: {
           workingDaysPerMonth: parseInt(formData.get('workingDaysPerMonth')) || 26,
-          
+
           lateDeduction: {
             enabled: formData.get('lateDeductionEnabled') === 'on',
             type: formData.get('lateDeductionType') || 'fixed',
             value: parseFloat(formData.get('lateDeductionValue')) || 100,
             graceLatesPerMonth: parseInt(formData.get('graceLatesPerMonth')) || 3,
           },
-          
+
           halfDayDeduction: {
             enabled: formData.get('halfDayDeductionEnabled') === 'on',
             type: formData.get('halfDayDeductionType') || 'half-day-salary',
             value: parseFloat(formData.get('halfDayDeductionValue')) || 50,
           },
-          
+
           absentDeduction: {
             enabled: formData.get('absentDeductionEnabled') === 'on',
             type: formData.get('absentDeductionType') || 'full-day-salary',
             value: parseFloat(formData.get('absentDeductionValue')) || 100,
           },
-          
+
           overtime: {
             enabled: formData.get('overtimeEnabled') === 'on',
             rateMultiplier: parseFloat(formData.get('overtimeRateMultiplier')) || 1.5,
             minHoursForOvertime: parseFloat(formData.get('minHoursForOvertime')) || 1,
           },
-          
+
           pfEnabled: formData.get('pfEnabled') === 'on',
           pfPercentage: parseFloat(formData.get('pfPercentage')) || 12,
           esiEnabled: formData.get('esiEnabled') === 'on',
@@ -3118,16 +3134,14 @@ function NotificationsTab() {
                   checked={emailNotificationsEnabled}
                   onChange={handleGlobalEmailToggleChange}
                 />
-                <div className={`relative w-11 h-6 rounded-full transition-all duration-500 ease-in-out ${
-                  emailNotificationsEnabled
+                <div className={`relative w-11 h-6 rounded-full transition-all duration-500 ease-in-out ${emailNotificationsEnabled
                     ? 'bg-blue-600'
                     : 'bg-gray-300'
-                }`}>
-                  <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-500 ease-in-out ${
-                    emailNotificationsEnabled
+                  }`}>
+                  <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-500 ease-in-out ${emailNotificationsEnabled
                       ? 'translate-x-5'
                       : 'translate-x-0.5'
-                  }`} />
+                    }`} />
                 </div>
               </label>
             </div>
@@ -3159,18 +3173,16 @@ function NotificationsTab() {
                         onChange={handleEmailToggleChange(event.key)}
                         disabled={!canToggle}
                       />
-                      <div className={`relative w-11 h-6 rounded-full transition-all duration-500 ease-in-out ${
-                        !canToggle
+                      <div className={`relative w-11 h-6 rounded-full transition-all duration-500 ease-in-out ${!canToggle
                           ? 'bg-gray-200 opacity-50'
                           : isEnabled
                             ? 'bg-blue-600'
                             : 'bg-gray-300'
-                      }`}>
-                        <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-500 ease-in-out ${
-                          isEnabled
+                        }`}>
+                        <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-500 ease-in-out ${isEnabled
                             ? 'translate-x-5'
                             : 'translate-x-0.5'
-                        }`} />
+                          }`} />
                       </div>
                     </label>
                   </div>
@@ -3204,18 +3216,16 @@ function NotificationsTab() {
                         onChange={handleEmailToggleChange(event.key)}
                         disabled={!canToggle}
                       />
-                      <div className={`relative w-11 h-6 rounded-full transition-all duration-500 ease-in-out ${
-                        !canToggle
+                      <div className={`relative w-11 h-6 rounded-full transition-all duration-500 ease-in-out ${!canToggle
                           ? 'bg-gray-200 opacity-50'
                           : isEnabled
                             ? 'bg-blue-600'
                             : 'bg-gray-300'
-                      }`}>
-                        <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-500 ease-in-out ${
-                          isEnabled
+                        }`}>
+                        <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-500 ease-in-out ${isEnabled
                             ? 'translate-x-5'
                             : 'translate-x-0.5'
-                        }`} />
+                          }`} />
                       </div>
                     </label>
                   </div>
@@ -3243,18 +3253,16 @@ function NotificationsTab() {
                         onChange={handleEmailToggleChange(event.key)}
                         disabled={!canToggle}
                       />
-                      <div className={`relative w-11 h-6 rounded-full transition-all duration-500 ease-in-out ${
-                        !canToggle
+                      <div className={`relative w-11 h-6 rounded-full transition-all duration-500 ease-in-out ${!canToggle
                           ? 'bg-gray-200 opacity-50'
                           : isEnabled
                             ? 'bg-blue-600'
                             : 'bg-gray-300'
-                      }`}>
-                        <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-500 ease-in-out ${
-                          isEnabled
+                        }`}>
+                        <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-500 ease-in-out ${isEnabled
                             ? 'translate-x-5'
                             : 'translate-x-0.5'
-                        }`} />
+                          }`} />
                       </div>
                     </label>
                   </div>

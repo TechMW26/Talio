@@ -73,6 +73,13 @@ const AttendanceSchema = new mongoose.Schema({
         country: String,
         pincode: String,
         fullAddress: String,
+        // Enhanced Google Maps fields
+        houseNumber: String,     // Street number (e.g., "123")
+        building: String,        // Building/premise name (e.g., "ABC Apartments")
+        unit: String,           // Unit/flat number (e.g., "Flat 302")
+        road: String,           // Street/road name (e.g., "MG Road")
+        neighborhood: String,    // Neighborhood/area (e.g., "Connaught Place")
+        source: String,         // 'google_maps', 'openstreetmap', 'coordinates_only'
       },
       capturedAt: Date, // Timestamp when location was captured
       accuracy: Number, // GPS accuracy in meters
@@ -93,6 +100,13 @@ const AttendanceSchema = new mongoose.Schema({
         country: String,
         pincode: String,
         fullAddress: String,
+        // Enhanced Google Maps fields
+        houseNumber: String,     // Street number (e.g., "123")
+        building: String,        // Building/premise name (e.g., "ABC Apartments")
+        unit: String,           // Unit/flat number (e.g., "Flat 302")
+        road: String,           // Street/road name (e.g., "MG Road")
+        neighborhood: String,    // Neighborhood/area (e.g., "Connaught Place")
+        source: String,         // 'google_maps', 'openstreetmap', 'coordinates_only'
       },
       capturedAt: Date, // Timestamp when location was captured
       accuracy: Number, // GPS accuracy in meters

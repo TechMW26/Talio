@@ -3,13 +3,21 @@
 import { useState, useEffect } from 'react'
 import { FaTrophy, FaDownload, FaShare, FaCalendar, FaClock, FaAward, FaMedal } from 'react-icons/fa'
 import toast from '@/utils/toast'
+import { useIsMobile } from '@/components/MobileApp'
+import MobileCertificates from '@/components/MobileApp/pages/MobileCertificates'
 
 export default function CertificatesPage() {
+  const { isMobile, mounted } = useIsMobile()
   const [certificates, setCertificates] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedCertificate, setSelectedCertificate] = useState(null)
+  const [user, setUser] = useState(null)
 
   useEffect(() => {
+    const userData = localStorage.getItem('user')
+    if (userData) {
+      setUser(JSON.parse(userData))
+    }
     fetchCertificates()
   }, [])
 
@@ -86,6 +94,20 @@ export default function CertificatesPage() {
       ? Math.round(certificates.reduce((sum, c) => sum + c.score, 0) / certificates.length)
       : 0,
     totalHours: certificates.reduce((sum, c) => sum + parseInt(c.duration), 0)
+  }
+
+  // Show loading state while detecting device
+  if (!mounted) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+
+  // Show mobile certificates on mobile devices
+  if (isMobile) {
+    return <MobileCertificates user={user} certificates={certificates} />
   }
 
   return (

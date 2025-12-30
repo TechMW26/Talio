@@ -489,7 +489,7 @@ export default function UnifiedDashboard({ user: userProp }) {
             // Get user's location
             let latitude = null
             let longitude = null
-            let address = 'Location not available'
+            let accuracy = null
 
             if (navigator.geolocation) {
                 try {
@@ -503,24 +503,16 @@ export default function UnifiedDashboard({ user: userProp }) {
 
                     latitude = position.coords.latitude
                     longitude = position.coords.longitude
+                    accuracy = position.coords.accuracy
 
-                    // Try to get address from coordinates
-                    try {
-                        const geocodeResponse = await fetch(
-                            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
-                        )
-                        const geocodeData = await geocodeResponse.json()
-                        address = geocodeData.display_name || 'Location detected'
-                    } catch (geocodeError) {
-                        console.warn('Geocoding failed:', geocodeError)
-                        address = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
-                    }
+                    console.log(`📍 Location captured: ${latitude}, ${longitude} (accuracy: ${accuracy}m)`)
                 } catch (geoError) {
                     console.warn('Geolocation error:', geoError)
                     toast.error('Location access denied. Please enable location services.')
                 }
             }
 
+            // Send coordinates to backend - it will handle geocoding with Google Maps
             const response = await fetch('/api/attendance', {
                 method: 'POST',
                 headers: {
@@ -532,7 +524,7 @@ export default function UnifiedDashboard({ user: userProp }) {
                     type: 'clock-in',
                     latitude,
                     longitude,
-                    address
+                    accuracy
                 })
             })
 
@@ -560,7 +552,7 @@ export default function UnifiedDashboard({ user: userProp }) {
             // Get user's location
             let latitude = null
             let longitude = null
-            let address = 'Location not available'
+            let accuracy = null
 
             if (navigator.geolocation) {
                 try {
@@ -574,23 +566,15 @@ export default function UnifiedDashboard({ user: userProp }) {
 
                     latitude = position.coords.latitude
                     longitude = position.coords.longitude
+                    accuracy = position.coords.accuracy
 
-                    // Try to get address from coordinates
-                    try {
-                        const geocodeResponse = await fetch(
-                            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
-                        )
-                        const geocodeData = await geocodeResponse.json()
-                        address = geocodeData.display_name || 'Location detected'
-                    } catch (geocodeError) {
-                        console.warn('Geocoding failed:', geocodeError)
-                        address = `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
-                    }
+                    console.log(`📍 Location captured: ${latitude}, ${longitude} (accuracy: ${accuracy}m)`)
                 } catch (geoError) {
                     console.warn('Geolocation error:', geoError)
                 }
             }
 
+            // Send coordinates to backend - it will handle geocoding with Google Maps
             const response = await fetch('/api/attendance', {
                 method: 'POST',
                 headers: {
@@ -602,7 +586,7 @@ export default function UnifiedDashboard({ user: userProp }) {
                     type: 'clock-out',
                     latitude,
                     longitude,
-                    address
+                    accuracy
                 })
             })
 

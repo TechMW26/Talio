@@ -19,3 +19,4 @@ export { default as MobileTrainings } from './pages/MobileTrainings';
 export { default as MobileCertificates } from './pages/MobileCertificates';
 export { default as MobileIdeas } from './pages/MobileIdeas';
 export { default as MobileCreateProject } from './pages/MobileCreateProject';
+export { default as MobileSettings } from './pages/MobileSettings';

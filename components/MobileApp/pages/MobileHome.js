@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import MobileLayout from '../components/MobileLayout';
 import '@/components/MobileApp/styles/mobile.css';
 import { getEmployeeId } from '@/utils/userHelper';
+import { formatDesignation } from '@/lib/formatters';
 
 /**
  * Mobile Home Page
@@ -240,7 +241,7 @@ export default function MobileHome({ user, employee, attendance: attendanceProp,
                 </div>
                 <h2 style={{ fontSize: '20px', fontWeight: 700 }}>{getFullName()}</h2>
                 <p style={{ color: 'rgba(191, 219, 254, 1)', fontSize: '12px', fontWeight: 500 }}>
-                  {employee?.employeeId || ''} • {employee?.designation?.name || user?.role || 'Employee'}
+                  {employeeData?.employeeId || ''} • {formatDesignation(employeeData?.designation, employeeData) || user?.role || 'Employee'}
                 </p>
               </div>
             </div>
@@ -380,8 +381,8 @@ export default function MobileHome({ user, employee, attendance: attendanceProp,
                     </div>
                   </div>
                   <span className={`mobile-badge mobile-badge-pill ${activity.status === 'approved' ? 'mobile-badge-green' :
-                      activity.status === 'pending' ? 'mobile-badge-yellow' :
-                        activity.status === 'rejected' ? 'mobile-badge-red' : 'mobile-badge-blue'
+                    activity.status === 'pending' ? 'mobile-badge-yellow' :
+                      activity.status === 'rejected' ? 'mobile-badge-red' : 'mobile-badge-blue'
                     }`}>
                     {activity.status}
                   </span>

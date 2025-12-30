@@ -18,10 +18,10 @@ export default function MobileLayout({ children, title, user, showHeader = true 
   // Get page title from pathname if not provided
   const getPageTitle = () => {
     if (title) return title;
-    
+
     const pathParts = pathname.split('/').filter(Boolean);
     const lastPart = pathParts[pathParts.length - 1];
-    
+
     if (lastPart === 'dashboard') return 'Home';
     return lastPart?.replace(/-/g, ' ') || 'Home';
   };
@@ -38,40 +38,119 @@ export default function MobileLayout({ children, title, user, showHeader = true 
   };
 
   return (
-    <div className="mobile-layout">
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: '100vh',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        zIndex: 100,
+        background: '#F8FAFC',
+        overflow: 'hidden',
+      }}
+    >
       {/* Sidebar */}
-      <MobileSidebar 
-        isOpen={isSidebarOpen} 
+      <MobileSidebar
+        isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
         user={user}
       />
 
       {/* Header */}
       {showHeader && (
-        <header className="mobile-header">
-          <button 
-            onClick={() => setIsSidebarOpen(true)} 
-            className="mobile-header-btn"
+        <header
+          style={{
+            padding: '16px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            position: 'sticky',
+            top: 0,
+            zIndex: 30,
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.05)',
+            flexShrink: 0,
+          }}
+        >
+          <button
+            onClick={() => setIsSidebarOpen(true)}
+            style={{
+              padding: '8px',
+              margin: '-8px',
+              borderRadius: '50%',
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
           >
-            <span className="material-icons-round" style={{ fontSize: '24px', color: 'var(--mobile-gray-500)' }}>
+            <span className="material-icons-round" style={{ fontSize: '24px', color: '#6B7280' }}>
               grid_view
             </span>
           </button>
-          
-          <h1 className="mobile-header-title">{getPageTitle()}</h1>
-          
+
+          <h1
+            style={{
+              fontSize: '18px',
+              fontWeight: '700',
+              textTransform: 'capitalize',
+              color: '#111827',
+              margin: 0,
+            }}
+          >
+            {getPageTitle()}
+          </h1>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <button className="mobile-header-btn">
-              <span className="material-icons-round" style={{ fontSize: '24px', color: 'var(--mobile-gray-500)' }}>
+            <button
+              style={{
+                padding: '8px',
+                margin: '-8px',
+                borderRadius: '50%',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <span className="material-icons-round" style={{ fontSize: '24px', color: '#6B7280' }}>
                 search
               </span>
             </button>
-            <div 
+            <div
               onClick={() => router.push('/dashboard/profile')}
-              className="mobile-header-avatar"
+              style={{
+                height: '36px',
+                width: '36px',
+                background: '#3B82F6',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontWeight: '600',
+                fontSize: '14px',
+                boxShadow: '0 4px 6px rgba(59, 130, 246, 0.3)',
+                cursor: 'pointer',
+                overflow: 'hidden',
+              }}
             >
               {user?.avatar ? (
-                <img src={user.avatar} alt={user.name || 'User'} />
+                <img
+                  src={user.avatar}
+                  alt={user.name || 'User'}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
               ) : (
                 getUserInitials()
               )}
@@ -81,7 +160,14 @@ export default function MobileLayout({ children, title, user, showHeader = true 
       )}
 
       {/* Main Content */}
-      <main className="mobile-main">
+      <main
+        style={{
+          flex: 1,
+          overflowY: 'auto',
+          paddingBottom: '100px',
+          WebkitOverflowScrolling: 'touch',
+        }}
+      >
         {children}
       </main>
     </div>

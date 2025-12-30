@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { 
+import {
   HiOutlineLightBulb,
   HiOutlinePlus,
   HiOutlineMagnifyingGlass,
@@ -23,8 +23,10 @@ import { FaSpinner, FaThumbtack, FaUserSecret, FaPaperPlane } from 'react-icons/
 import toast from '@/utils/toast'
 import CreateIdeaModal from './components/CreateIdeaModal'
 import IdeaCard from './components/IdeaCard'
+import { useIsMobile, MobileIdeas } from '@/components/MobileApp'
 
 export default function SandboxPage() {
+  const { isMobile, mounted } = useIsMobile()
   const [ideas, setIdeas] = useState([])
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -55,7 +57,7 @@ export default function SandboxPage() {
     try {
       setLoading(true)
       const token = localStorage.getItem('token')
-      
+
       const params = new URLSearchParams({
         page: pagination.page.toString(),
         limit: pagination.limit.toString()
@@ -125,8 +127,8 @@ export default function SandboxPage() {
 
       const data = await res.json()
       if (data.success) {
-        setIdeas(prev => prev.map(idea => 
-          idea._id === ideaId 
+        setIdeas(prev => prev.map(idea =>
+          idea._id === ideaId
             ? { ...idea, likes: data.data.likes, dislikes: data.data.dislikes, userVote: data.data.userVote }
             : idea
         ))
@@ -164,7 +166,7 @@ export default function SandboxPage() {
 
   const handleDelete = async (ideaId) => {
     if (!confirm('Are you sure you want to delete this idea?')) return
-    
+
     try {
       const token = localStorage.getItem('token')
       const res = await fetch(`/api/ideas/${ideaId}`, {
@@ -191,6 +193,28 @@ export default function SandboxPage() {
   const totalVotes = ideas.reduce((sum, i) => sum + (i.likes || 0), 0)
 
   const isAdmin = user?.role === 'admin' || user?.role === 'hr' || user?.role === 'department_head'
+
+  // Mobile view
+  if (mounted && isMobile) {
+    return (
+      <MobileIdeas
+        user={user}
+        ideas={ideas}
+        myIdeas={myIdeas}
+      />
+    )
+  }
+
+  // Prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <div className="page-container">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="page-container">
@@ -286,21 +310,19 @@ export default function SandboxPage() {
             <div className="flex bg-white border border-gray-300 rounded-lg overflow-hidden">
               <button
                 onClick={() => setFilter(prev => ({ ...prev, tab: 'all' }))}
-                className={`px-4 py-2.5 text-sm font-medium transition-colors ${
-                  filter.tab === 'all'
+                className={`px-4 py-2.5 text-sm font-medium transition-colors ${filter.tab === 'all'
                     ? 'bg-blue-600 text-white'
                     : 'bg-white text-gray-900 hover:bg-gray-50'
-                }`}
+                  }`}
               >
                 All Ideas
               </button>
               <button
                 onClick={() => setFilter(prev => ({ ...prev, tab: 'my' }))}
-                className={`px-4 py-2.5 text-sm font-medium transition-colors ${
-                  filter.tab === 'my'
+                className={`px-4 py-2.5 text-sm font-medium transition-colors ${filter.tab === 'my'
                     ? 'bg-blue-600 text-white'
                     : 'bg-white text-gray-900 hover:bg-gray-50'
-                }`}
+                  }`}
               >
                 My Ideas
               </button>
@@ -308,11 +330,10 @@ export default function SandboxPage() {
 
             <button
               onClick={() => setFilter(prev => ({ ...prev, pinned: !prev.pinned }))}
-              className={`px-4 py-2.5 border rounded-lg flex items-center gap-2 transition-colors ${
-                filter.pinned 
-                  ? 'bg-blue-600 border-blue-600 text-white' 
+              className={`px-4 py-2.5 border rounded-lg flex items-center gap-2 transition-colors ${filter.pinned
+                  ? 'bg-blue-600 border-blue-600 text-white'
                   : 'border-gray-300 bg-white text-gray-900 hover:bg-gray-50'
-              }`}
+                }`}
             >
               <HiOutlineFunnel className="w-4 h-4" />
               Filters
@@ -326,7 +347,7 @@ export default function SandboxPage() {
         <h2 className="text-lg font-semibold text-gray-800 mb-3">
           {filter.tab === 'my' ? 'My Ideas' : 'All Ideas'}
         </h2>
-        
+
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[...Array(6)].map((_, i) => (
@@ -357,8 +378,8 @@ export default function SandboxPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {ideas.map(idea => (
-              <IdeaCard 
-                key={idea._id} 
+              <IdeaCard
+                key={idea._id}
                 idea={idea}
                 onVote={handleVote}
                 onPin={handlePin}

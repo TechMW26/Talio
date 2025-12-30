@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
-import { 
+import {
   HiOutlineClipboardDocumentList,
   HiOutlineClock,
   HiOutlineCheckCircle,
@@ -18,7 +18,7 @@ import {
   HiOutlineTrash,
   HiOutlineChatBubbleLeftRight
 } from 'react-icons/hi2'
-import { 
+import {
   FaTasks, FaCalendarAlt, FaFilter, FaSearch, FaProjectDiagram,
   FaCheck, FaPlay, FaEye, FaClock, FaExclamationTriangle,
   FaChevronDown, FaCheckCircle, FaTimes, FaSpinner, FaPlus,
@@ -26,6 +26,7 @@ import {
 } from 'react-icons/fa'
 import { playNotificationSound, NotificationSoundTypes } from '@/lib/notificationSounds'
 import Portal from '@/components/ui/Portal'
+import { useIsMobile, MobileTasks } from '@/components/MobileApp'
 
 const statusColors = {
   'todo': 'bg-gray-100 text-gray-700 border-gray-200',
@@ -73,6 +74,8 @@ const getProjectColor = (projectId) => {
 
 export default function MyTasksPage() {
   const router = useRouter()
+  const { isMobile, mounted } = useIsMobile()
+  const [user, setUser] = useState(null)
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState({
@@ -95,7 +98,7 @@ export default function MyTasksPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [taskToDelete, setTaskToDelete] = useState(null)
   const [deleting, setDeleting] = useState(false)
-  
+
   // Auto-refresh refs
   const refreshIntervalRef = useRef(null)
   const lastFetchRef = useRef(Date.now())
@@ -105,7 +108,7 @@ export default function MyTasksPage() {
       if (!silent) setLoading(true)
       const token = localStorage.getItem('token')
       const params = new URLSearchParams()
-      
+
       if (filters.status !== 'all') params.append('status', filters.status)
       if (filters.priority !== 'all') params.append('priority', filters.priority)
       if (filters.period !== 'all') params.append('period', filters.period)
@@ -123,7 +126,7 @@ export default function MyTasksPage() {
           }
           return prev
         })
-        
+
         // Extract unique projects for filter dropdown
         const uniqueProjects = []
         const projectIds = new Set()
@@ -153,10 +156,18 @@ export default function MyTasksPage() {
     fetchTasks()
   }, [fetchTasks])
 
+  // Load user from localStorage
+  useEffect(() => {
+    const userData = localStorage.getItem('user')
+    if (userData) {
+      setUser(JSON.parse(userData))
+    }
+  }, [])
+
   // Auto-refresh every 10 seconds for real-time sync
   useEffect(() => {
     refreshIntervalRef.current = setInterval(() => fetchTasks(true), 10000)
-    
+
     // Also refresh on window focus
     const handleFocus = () => {
       if (Date.now() - lastFetchRef.current > 5000) {
@@ -164,7 +175,7 @@ export default function MyTasksPage() {
       }
     }
     window.addEventListener('focus', handleFocus)
-    
+
     return () => {
       if (refreshIntervalRef.current) {
         clearInterval(refreshIntervalRef.current)
@@ -177,7 +188,7 @@ export default function MyTasksPage() {
     try {
       setRespondingTo(task._id)
       const token = localStorage.getItem('token')
-      
+
       // Calculate total estimated hours from days and hours
       let totalEstimatedHours = null
       if (estimatedDays !== null || estimatedHours !== null) {
@@ -185,14 +196,14 @@ export default function MyTasksPage() {
         const hours = parseFloat(estimatedHours) || 0
         totalEstimatedHours = (days * 8) + hours // Assuming 8 work hours per day
       }
-      
+
       const response = await fetch(`/api/projects/${task.project._id}/tasks/${task._id}/respond`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           action,
           reason: action === 'reject' ? rejectRemark : undefined,
           estimatedHours: totalEstimatedHours
@@ -225,37 +236,37 @@ export default function MyTasksPage() {
 
   const handleAcceptWithEta = async () => {
     if (!taskForEta) return
-    
+
     const hasSubtasks = taskForEta.subtasks && taskForEta.subtasks.length > 0
-    
+
     if (hasSubtasks) {
       // Validate all subtask ETAs
       let allValid = true
       let totalHours = 0
-      
+
       for (const st of taskForEta.subtasks) {
         const stEta = subtaskEtas[st._id] || {}
         const days = parseInt(stEta.days) || 0
         const hours = parseInt(stEta.hours) || 0
-        
+
         if (days === 0 && hours === 0) {
           allValid = false
           break
         }
         totalHours += (days * 8) + hours
       }
-      
+
       if (!allValid) {
         toast.error('Please provide ETA for all subtasks')
         return
       }
-      
+
       // First update subtask ETAs, then accept the task
       try {
         setRespondingTo(taskForEta._id)
         const token = localStorage.getItem('token')
         const projectId = taskForEta.project?._id || taskForEta.project
-        
+
         // Update each subtask with its ETA
         for (const st of taskForEta.subtasks) {
           const stEta = subtaskEtas[st._id] || {}
@@ -272,7 +283,7 @@ export default function MyTasksPage() {
             })
           })
         }
-        
+
         // Now accept the task (total hours will be calculated server-side)
         handleRespondToAssignment(taskForEta, 'accept', 0, totalHours)
       } catch (error) {
@@ -285,15 +296,15 @@ export default function MyTasksPage() {
       // No subtasks - use main task ETA
       const days = parseFloat(eta.days) || 0
       const hours = parseFloat(eta.hours) || 0
-      
+
       if (days === 0 && hours === 0) {
         toast.error('Please provide an estimated time')
         return
       }
-      
+
       handleRespondToAssignment(taskForEta, 'accept', days, hours)
     }
-    
+
     setShowEtaModal(false)
     setTaskForEta(null)
     setEta({ days: '', hours: '' })
@@ -302,7 +313,7 @@ export default function MyTasksPage() {
 
   const handleDeleteTask = async () => {
     if (!taskToDelete) return
-    
+
     try {
       setDeleting(true)
       const token = localStorage.getItem('token')
@@ -395,7 +406,7 @@ export default function MyTasksPage() {
     if (filters.project !== 'all' && task.project?._id !== filters.project) {
       return false
     }
-    
+
     // Search filter
     if (!searchQuery) return true
     const query = searchQuery.toLowerCase()
@@ -418,7 +429,31 @@ export default function MyTasksPage() {
     inProgress: tasks.filter(t => t.status === 'in-progress').length,
     completed: tasks.filter(t => t.status === 'completed').length,
     overdue: tasks.filter(t => isOverdue(t)).length,
-    pendingAcceptance: tasks.filter(t => t.assignmentStatus === 'pending').length
+    pendingAcceptance: tasks.filter(t => t.assignmentStatus === 'pending').length,
+    pending: tasks.filter(t => t.assignmentStatus === 'pending' || t.status === 'todo').length
+  }
+
+  // Mobile view
+  if (mounted && isMobile) {
+    return (
+      <MobileTasks
+        user={user}
+        tasks={tasks}
+        taskStats={stats}
+        projects={projects}
+      />
+    )
+  }
+
+  // Prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <div className="page-container">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+        </div>
+      </div>
+    )
   }
 
   if (loading) {
@@ -603,22 +638,22 @@ export default function MyTasksPage() {
               <TaskCard
                 key={task._id}
                 task={task}
-                onAccept={() => { 
+                onAccept={() => {
                   setTaskForEta(task)
                   // Initialize subtask ETAs if task has subtasks
                   if (task.subtasks && task.subtasks.length > 0) {
                     const initialEtas = {}
                     task.subtasks.forEach(st => {
-                      initialEtas[st._id] = { 
-                        days: st.estimatedDays || '', 
-                        hours: st.estimatedHours || '' 
+                      initialEtas[st._id] = {
+                        days: st.estimatedDays || '',
+                        hours: st.estimatedHours || ''
                       }
                     })
                     setSubtaskEtas(initialEtas)
                   } else {
                     setSubtaskEtas({})
                   }
-                  setShowEtaModal(true) 
+                  setShowEtaModal(true)
                 }}
                 onReject={() => { setSelectedTask(task); setShowRejectModal(true) }}
                 onStatusChange={handleUpdateStatus}
@@ -712,244 +747,244 @@ export default function MyTasksPage() {
 
       {/* Reject Modal */}
       {showRejectModal && selectedTask && (
-      <Portal>
-        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && (setShowRejectModal(false), setSelectedTask(null), setRejectRemark(''))}>
-          <div className="modal-backdrop" />
-          <div className="modal-container modal-lg">
-            <div className="modal-header">
-              <h3 className="modal-title">Reject Assignment</h3>
-              <button
-                onClick={() => { setShowRejectModal(false); setSelectedTask(null); setRejectRemark('') }}
-                className="modal-close-btn"
-              >
-                <FaTimes />
-              </button>
-            </div>
-            <div className="modal-body">
-              <p className="text-gray-600 mb-4">
-                Please provide a reason for rejecting this task assignment.
-              </p>
-              <textarea
-                value={rejectRemark}
-                onChange={(e) => setRejectRemark(e.target.value)}
-                placeholder="Reason for rejection..."
-                rows={3}
-                className="modal-textarea"
-              />
-            </div>
-            <div className="modal-footer">
-              <button
-                onClick={() => { setShowRejectModal(false); setSelectedTask(null); setRejectRemark('') }}
-                className="modal-btn modal-btn-secondary"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleRespondToAssignment(selectedTask, 'reject')}
-                disabled={respondingTo === selectedTask._id}
-                className="modal-btn modal-btn-danger"
-              >
-                {respondingTo === selectedTask._id ? 'Rejecting...' : 'Reject'}
-              </button>
+        <Portal>
+          <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && (setShowRejectModal(false), setSelectedTask(null), setRejectRemark(''))}>
+            <div className="modal-backdrop" />
+            <div className="modal-container modal-lg">
+              <div className="modal-header">
+                <h3 className="modal-title">Reject Assignment</h3>
+                <button
+                  onClick={() => { setShowRejectModal(false); setSelectedTask(null); setRejectRemark('') }}
+                  className="modal-close-btn"
+                >
+                  <FaTimes />
+                </button>
+              </div>
+              <div className="modal-body">
+                <p className="text-gray-600 mb-4">
+                  Please provide a reason for rejecting this task assignment.
+                </p>
+                <textarea
+                  value={rejectRemark}
+                  onChange={(e) => setRejectRemark(e.target.value)}
+                  placeholder="Reason for rejection..."
+                  rows={3}
+                  className="modal-textarea"
+                />
+              </div>
+              <div className="modal-footer">
+                <button
+                  onClick={() => { setShowRejectModal(false); setSelectedTask(null); setRejectRemark('') }}
+                  className="modal-btn modal-btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleRespondToAssignment(selectedTask, 'reject')}
+                  disabled={respondingTo === selectedTask._id}
+                  className="modal-btn modal-btn-danger"
+                >
+                  {respondingTo === selectedTask._id ? 'Rejecting...' : 'Reject'}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      </Portal>
+        </Portal>
       )}
 
       {/* ETA Modal */}
       {showEtaModal && taskForEta && (
-      <Portal>
-        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && (setShowEtaModal(false), setTaskForEta(null), setEta({ days: '', hours: '' }), setSubtaskEtas({}))}>
-          <div className="modal-backdrop" />
-          <div className="modal-container modal-2xl">
-            <div className="modal-header">
-              <h3 className="modal-title">Set Estimated Time</h3>
-              <button
-                onClick={() => { setShowEtaModal(false); setTaskForEta(null); setEta({ days: '', hours: '' }); setSubtaskEtas({}) }}
-                className="modal-close-btn"
-              >
-                <FaTimes />
-              </button>
-            </div>
-            <div className="modal-body">
-              <div className="mb-4">
-                <p className="font-medium text-gray-800 mb-1">{taskForEta.title}</p>
-                {taskForEta.description && (
-                  <p className="text-sm text-gray-500">{taskForEta.description}</p>
-                )}
+        <Portal>
+          <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && (setShowEtaModal(false), setTaskForEta(null), setEta({ days: '', hours: '' }), setSubtaskEtas({}))}>
+            <div className="modal-backdrop" />
+            <div className="modal-container modal-2xl">
+              <div className="modal-header">
+                <h3 className="modal-title">Set Estimated Time</h3>
+                <button
+                  onClick={() => { setShowEtaModal(false); setTaskForEta(null); setEta({ days: '', hours: '' }); setSubtaskEtas({}) }}
+                  className="modal-close-btn"
+                >
+                  <FaTimes />
+                </button>
               </div>
-              
-              {taskForEta.subtasks && taskForEta.subtasks.length > 0 ? (
-                <>
-                  <p className="text-gray-600 mb-4">
-                    Please provide an ETA for each subtask. The total task time will be calculated automatically.
-                  </p>
-                  <div className="space-y-4">
-                    {taskForEta.subtasks.map((st, index) => (
-                      <div key={st._id} className="p-3 bg-gray-50 rounded-lg">
-                        <p className="text-sm font-medium text-gray-700 mb-2">
-                          {index + 1}. {st.title}
-                        </p>
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="number"
-                              min="0"
-                              value={subtaskEtas[st._id]?.days || ''}
-                              onChange={(e) => setSubtaskEtas(prev => ({
-                                ...prev,
-                                [st._id]: { ...prev[st._id], days: e.target.value }
-                              }))}
-                              placeholder="0"
-                              className="modal-input w-16"
-                            />
-                            <span className="text-xs text-gray-500">days</span>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="number"
-                              min="0"
-                              max="23"
-                              value={subtaskEtas[st._id]?.hours || ''}
-                              onChange={(e) => setSubtaskEtas(prev => ({
-                                ...prev,
-                                [st._id]: { ...prev[st._id], hours: e.target.value }
-                              }))}
-                              placeholder="0"
-                              className="modal-input w-16"
-                            />
-                            <span className="text-xs text-gray-500">hours</span>
+              <div className="modal-body">
+                <div className="mb-4">
+                  <p className="font-medium text-gray-800 mb-1">{taskForEta.title}</p>
+                  {taskForEta.description && (
+                    <p className="text-sm text-gray-500">{taskForEta.description}</p>
+                  )}
+                </div>
+
+                {taskForEta.subtasks && taskForEta.subtasks.length > 0 ? (
+                  <>
+                    <p className="text-gray-600 mb-4">
+                      Please provide an ETA for each subtask. The total task time will be calculated automatically.
+                    </p>
+                    <div className="space-y-4">
+                      {taskForEta.subtasks.map((st, index) => (
+                        <div key={st._id} className="p-3 bg-gray-50 rounded-lg">
+                          <p className="text-sm font-medium text-gray-700 mb-2">
+                            {index + 1}. {st.title}
+                          </p>
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="number"
+                                min="0"
+                                value={subtaskEtas[st._id]?.days || ''}
+                                onChange={(e) => setSubtaskEtas(prev => ({
+                                  ...prev,
+                                  [st._id]: { ...prev[st._id], days: e.target.value }
+                                }))}
+                                placeholder="0"
+                                className="modal-input w-16"
+                              />
+                              <span className="text-xs text-gray-500">days</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="number"
+                                min="0"
+                                max="23"
+                                value={subtaskEtas[st._id]?.hours || ''}
+                                onChange={(e) => setSubtaskEtas(prev => ({
+                                  ...prev,
+                                  [st._id]: { ...prev[st._id], hours: e.target.value }
+                                }))}
+                                placeholder="0"
+                                className="modal-input w-16"
+                              />
+                              <span className="text-xs text-gray-500">hours</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                    <p className="text-sm text-blue-700 font-medium">
-                      Total Estimated Time: {(() => {
-                        let total = 0
-                        taskForEta.subtasks.forEach(st => {
-                          const stEta = subtaskEtas[st._id] || {}
-                          total += ((parseInt(stEta.days) || 0) * 8) + (parseInt(stEta.hours) || 0)
-                        })
-                        const days = Math.floor(total / 8)
-                        const hours = total % 8
-                        return `${days > 0 ? `${days}d ` : ''}${hours}h (${total} hours)`
-                      })()}
-                    </p>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <p className="text-gray-600 mb-4">
-                    How long do you estimate this task will take to complete?
-                  </p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="modal-label">
-                        Days
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="1"
-                        value={eta.days}
-                        onChange={(e) => setEta({ ...eta, days: e.target.value })}
-                        placeholder="0"
-                        className="modal-input"
-                      />
+                      ))}
                     </div>
-                    <div>
-                      <label className="modal-label">
-                        Hours
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        max="24"
-                        step="0.5"
-                        value={eta.hours}
-                        onChange={(e) => setEta({ ...eta, hours: e.target.value })}
-                        placeholder="0"
-                        className="modal-input"
-                      />
+                    <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                      <p className="text-sm text-blue-700 font-medium">
+                        Total Estimated Time: {(() => {
+                          let total = 0
+                          taskForEta.subtasks.forEach(st => {
+                            const stEta = subtaskEtas[st._id] || {}
+                            total += ((parseInt(stEta.days) || 0) * 8) + (parseInt(stEta.hours) || 0)
+                          })
+                          const days = Math.floor(total / 8)
+                          const hours = total % 8
+                          return `${days > 0 ? `${days}d ` : ''}${hours}h (${total} hours)`
+                        })()}
+                      </p>
                     </div>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    Total: {((parseFloat(eta.days) || 0) * 8 + (parseFloat(eta.hours) || 0)).toFixed(1)} hours
-                  </p>
-                </>
-              )}
-            </div>
-            <div className="modal-footer">
-              <button
-                onClick={handleAcceptWithEta}
-                disabled={respondingTo === taskForEta._id}
-                className="modal-btn modal-btn-success"
-              >
-                {respondingTo === taskForEta._id ? (
-                  <><FaSpinner className="animate-spin" /> Accepting...</>
+                  </>
                 ) : (
-                  <><FaCheck /> Accept Task</>
+                  <>
+                    <p className="text-gray-600 mb-4">
+                      How long do you estimate this task will take to complete?
+                    </p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="modal-label">
+                          Days
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="1"
+                          value={eta.days}
+                          onChange={(e) => setEta({ ...eta, days: e.target.value })}
+                          placeholder="0"
+                          className="modal-input"
+                        />
+                      </div>
+                      <div>
+                        <label className="modal-label">
+                          Hours
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          max="24"
+                          step="0.5"
+                          value={eta.hours}
+                          onChange={(e) => setEta({ ...eta, hours: e.target.value })}
+                          placeholder="0"
+                          className="modal-input"
+                        />
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Total: {((parseFloat(eta.days) || 0) * 8 + (parseFloat(eta.hours) || 0)).toFixed(1)} hours
+                    </p>
+                  </>
                 )}
-              </button>
+              </div>
+              <div className="modal-footer">
+                <button
+                  onClick={handleAcceptWithEta}
+                  disabled={respondingTo === taskForEta._id}
+                  className="modal-btn modal-btn-success"
+                >
+                  {respondingTo === taskForEta._id ? (
+                    <><FaSpinner className="animate-spin" /> Accepting...</>
+                  ) : (
+                    <><FaCheck /> Accept Task</>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      </Portal>
+        </Portal>
       )}
 
       {/* Delete Task Confirmation Modal */}
       {showDeleteModal && taskToDelete && (
-      <Portal>
-        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && (setShowDeleteModal(false), setTaskToDelete(null))}>
-          <div className="modal-backdrop" />
-          <div className="modal-container modal-lg">
-            <div className="modal-header">
-              <h3 className="modal-title">Delete Task</h3>
-              <button
-                onClick={() => { setShowDeleteModal(false); setTaskToDelete(null) }}
-                className="modal-close-btn"
-              >
-                <FaTimes />
-              </button>
-            </div>
-            <div className="modal-body">
-              <div className="flex items-center gap-3 mb-4 p-3 bg-red-50 rounded-lg">
-                <FaExclamationTriangle className="text-red-500 text-xl flex-shrink-0" />
-                <p className="text-red-700">
-                  This action cannot be undone. The task and all its subtasks will be permanently deleted.
-                </p>
+        <Portal>
+          <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && (setShowDeleteModal(false), setTaskToDelete(null))}>
+            <div className="modal-backdrop" />
+            <div className="modal-container modal-lg">
+              <div className="modal-header">
+                <h3 className="modal-title">Delete Task</h3>
+                <button
+                  onClick={() => { setShowDeleteModal(false); setTaskToDelete(null) }}
+                  className="modal-close-btn"
+                >
+                  <FaTimes />
+                </button>
               </div>
-              <p className="text-gray-600 mb-2">Are you sure you want to delete this task?</p>
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <p className="font-medium text-gray-800">{taskToDelete.title}</p>
-                <p className="text-sm text-gray-500 mt-1">Project: {taskToDelete.project?.name}</p>
+              <div className="modal-body">
+                <div className="flex items-center gap-3 mb-4 p-3 bg-red-50 rounded-lg">
+                  <FaExclamationTriangle className="text-red-500 text-xl flex-shrink-0" />
+                  <p className="text-red-700">
+                    This action cannot be undone. The task and all its subtasks will be permanently deleted.
+                  </p>
+                </div>
+                <p className="text-gray-600 mb-2">Are you sure you want to delete this task?</p>
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="font-medium text-gray-800">{taskToDelete.title}</p>
+                  <p className="text-sm text-gray-500 mt-1">Project: {taskToDelete.project?.name}</p>
+                </div>
               </div>
-            </div>
-            <div className="modal-footer">
-              <button
-                onClick={() => { setShowDeleteModal(false); setTaskToDelete(null) }}
-                className="modal-btn modal-btn-secondary"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteTask}
-                disabled={deleting}
-                className="modal-btn modal-btn-danger"
-              >
-                {deleting ? (
-                  <><FaSpinner className="animate-spin" /> Deleting...</>
-                ) : (
-                  <><FaTrash /> Delete Task</>
-                )}
-              </button>
+              <div className="modal-footer">
+                <button
+                  onClick={() => { setShowDeleteModal(false); setTaskToDelete(null) }}
+                  className="modal-btn modal-btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteTask}
+                  disabled={deleting}
+                  className="modal-btn modal-btn-danger"
+                >
+                  {deleting ? (
+                    <><FaSpinner className="animate-spin" /> Deleting...</>
+                  ) : (
+                    <><FaTrash /> Delete Task</>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      </Portal>
+        </Portal>
       )}
     </div>
   )
@@ -989,14 +1024,14 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
       toast.error('Please provide an ETA for this subtask')
       return
     }
-    
+
     // Handle both populated and unpopulated project field
     const projectId = task.project?._id || task.project
     if (!projectId) {
       toast.error('Project not found')
       return
     }
-    
+
     try {
       setAddingSubtask(true)
       const token = localStorage.getItem('token')
@@ -1006,7 +1041,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           title: newSubtaskTitle.trim(),
           estimatedDays: days,
           estimatedHours: hours
@@ -1043,33 +1078,33 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
       toast.error('Subtask ID is missing')
       return
     }
-    
+
     // Handle both populated and unpopulated project field
     const projectId = task.project?._id || task.project
-    
+
     try {
       setUpdatingSubtaskId(subtaskId)
       const token = localStorage.getItem('token')
-      
+
       // Convert subtaskId to string if it's an ObjectId
-      const idToSend = typeof subtaskId === 'object' && subtaskId._id ? subtaskId._id.toString() : 
-                       subtaskId.toString ? subtaskId.toString() : String(subtaskId)
-      
+      const idToSend = typeof subtaskId === 'object' && subtaskId._id ? subtaskId._id.toString() :
+        subtaskId.toString ? subtaskId.toString() : String(subtaskId)
+
       const response = await fetch(`/api/projects/${projectId}/tasks/${task._id}/subtasks`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ 
-          subtaskId: idToSend, 
-          completed: !currentCompleted 
+        body: JSON.stringify({
+          subtaskId: idToSend,
+          completed: !currentCompleted
         })
       })
 
       const data = await response.json()
       if (data.success) {
-        setSubtasks(prevSubtasks => prevSubtasks.map(st => 
+        setSubtasks(prevSubtasks => prevSubtasks.map(st =>
           (st._id?.toString() || st._id) === (subtaskId?.toString() || subtaskId)
             ? { ...st, completed: !currentCompleted, completedAt: !currentCompleted ? new Date() : null }
             : st
@@ -1103,15 +1138,15 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
       toast.error('Subtask ID is missing')
       return
     }
-    
+
     try {
       const token = localStorage.getItem('token')
-      const idToSend = typeof subtaskId === 'object' && subtaskId._id ? subtaskId._id.toString() : 
-                       subtaskId.toString ? subtaskId.toString() : String(subtaskId)
-      
+      const idToSend = typeof subtaskId === 'object' && subtaskId._id ? subtaskId._id.toString() :
+        subtaskId.toString ? subtaskId.toString() : String(subtaskId)
+
       // Handle both populated and unpopulated project field
       const projectId = task.project?._id || task.project
-      
+
       const response = await fetch(`/api/projects/${projectId}/tasks/${task._id}/subtasks?subtaskId=${idToSend}`, {
         method: 'DELETE',
         headers: {
@@ -1121,7 +1156,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
 
       const data = await response.json()
       if (data.success) {
-        setSubtasks(prevSubtasks => (prevSubtasks || []).filter(st => 
+        setSubtasks(prevSubtasks => (prevSubtasks || []).filter(st =>
           (st._id?.toString() || st._id) !== (subtaskId?.toString() || subtaskId)
         ))
         if (task && data.data) {
@@ -1143,9 +1178,9 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
       toast.error('Comment text is required')
       return
     }
-    
+
     const projectId = task.project?._id || task.project
-    
+
     try {
       const token = localStorage.getItem('token')
       const response = await fetch(`/api/projects/${projectId}/tasks/${task._id}/subtasks/${subtaskId}/comments`, {
@@ -1184,8 +1219,8 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
     if (isOverdue) return 'border-red-300 bg-red-50/30'
     if (isPendingAcceptance) return 'border-yellow-300 bg-yellow-50/30'
     if (isCompleted) return 'border-green-300 bg-green-50/30'
-    
-    switch(task.status) {
+
+    switch (task.status) {
       case 'todo':
         return 'border-gray-300 bg-gray-50/30'
       case 'in-progress':
@@ -1258,11 +1293,10 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-1.5">
                     <div
-                      className={`h-1.5 rounded-full transition-all ${
-                        progressPercentage === 100 ? 'bg-green-500' :
-                        progressPercentage >= 50 ? 'bg-blue-500' :
-                        'bg-orange-500'
-                      }`}
+                      className={`h-1.5 rounded-full transition-all ${progressPercentage === 100 ? 'bg-green-500' :
+                          progressPercentage >= 50 ? 'bg-blue-500' :
+                            'bg-orange-500'
+                        }`}
                       style={{ width: `${progressPercentage}%` }}
                     />
                   </div>
@@ -1331,7 +1365,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                   </>
                 )}
               </button>
-              
+
               {showStatusMenu && (
                 <div className="absolute right-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
                   {['todo', 'in-progress', 'review', 'completed'].map(status => (
@@ -1342,9 +1376,8 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                         setShowStatusMenu(false)
                       }}
                       disabled={task.status === status}
-                      className={`w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 ${
-                        task.status === status ? 'font-medium text-gray-900' : ''
-                      }`}
+                      className={`w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 ${task.status === status ? 'font-medium text-gray-900' : ''
+                        }`}
                     >
                       {status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                     </button>
@@ -1391,7 +1424,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                         return 'bg-gray-100 border-l-4 border-gray-400 text-gray-700'
                     }
                   }
-                  
+
                   const getRoleBadge = (authorRole) => {
                     switch (authorRole) {
                       case 'project_head':
@@ -1406,7 +1439,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                         return null
                     }
                   }
-                  
+
                   return (
                     <div key={subtask._id} className="bg-white rounded-lg p-3 border border-gray-200">
                       <div className="flex items-center gap-3 group">
@@ -1418,11 +1451,10 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                           className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 cursor-pointer disabled:opacity-50"
                         />
                         <span
-                          className={`flex-1 text-sm ${
-                            subtask.completed
+                          className={`flex-1 text-sm ${subtask.completed
                               ? 'line-through text-gray-400'
                               : 'text-gray-700'
-                          }`}
+                            }`}
                         >
                           {subtask.title}
                         </span>
@@ -1445,7 +1477,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                           </button>
                         )}
                       </div>
-                      
+
                       {/* Subtask Comments */}
                       {subtask.comments && subtask.comments.length > 0 && (
                         <div className="mt-2 space-y-1.5 pl-7">
@@ -1465,7 +1497,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                           ))}
                         </div>
                       )}
-                      
+
                       {/* Add Comment Button */}
                       {!isPendingAcceptance && (
                         <div className="mt-2 pl-7">

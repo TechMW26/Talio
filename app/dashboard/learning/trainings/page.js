@@ -3,13 +3,21 @@
 import { useState, useEffect } from 'react'
 import { FaPlay, FaCheckCircle, FaClock, FaTrophy, FaBook, FaChartLine } from 'react-icons/fa'
 import toast from '@/utils/toast'
+import { useIsMobile } from '@/components/MobileApp'
+import MobileTrainings from '@/components/MobileApp/pages/MobileTrainings'
 
 export default function TrainingsPage() {
+  const { isMobile, mounted } = useIsMobile()
   const [trainings, setTrainings] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all') // all, in-progress, completed
+  const [user, setUser] = useState(null)
 
   useEffect(() => {
+    const userData = localStorage.getItem('user')
+    if (userData) {
+      setUser(JSON.parse(userData))
+    }
     fetchTrainings()
   }, [])
 
@@ -108,6 +116,20 @@ export default function TrainingsPage() {
     // Navigate to certificate view
   }
 
+  // Show loading state while detecting device
+  if (!mounted) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    )
+  }
+
+  // Show mobile trainings on mobile devices
+  if (isMobile) {
+    return <MobileTrainings user={user} trainings={trainings} stats={stats} />
+  }
+
   return (
     <div className="p-3 sm:p-6 pb-20 md:pb-6">
       {/* Header */}
@@ -166,41 +188,38 @@ export default function TrainingsPage() {
 
       {/* Filter Tabs */}
       <div className="bg-white rounded-lg shadow-md p-3 sm:p-4 mb-6">
-  <div className="flex gap-2 overflow-x-auto scrollbar-hide sm:flex-wrap">
-    <button
-      onClick={() => setFilter('all')}
-      className={`flex-shrink-0 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${
-        filter === 'all'
-          ? 'bg-blue-600 text-white'
-          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-      }`}
-    >
-      All ({stats.total})
-    </button>
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide sm:flex-wrap">
+          <button
+            onClick={() => setFilter('all')}
+            className={`flex-shrink-0 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${filter === 'all'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+          >
+            All ({stats.total})
+          </button>
 
-    <button
-      onClick={() => setFilter('in-progress')}
-      className={`flex-shrink-0 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${
-        filter === 'in-progress'
-          ? 'bg-blue-600 text-white'
-          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-      }`}
-    >
-      In Progress ({stats.inProgress})
-    </button>
+          <button
+            onClick={() => setFilter('in-progress')}
+            className={`flex-shrink-0 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${filter === 'in-progress'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+          >
+            In Progress ({stats.inProgress})
+          </button>
 
-    <button
-      onClick={() => setFilter('completed')}
-      className={`flex-shrink-0 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${
-        filter === 'completed'
-          ? 'bg-blue-600 text-white'
-          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-      }`}
-    >
-      Completed ({stats.completed})
-    </button>
-  </div>
-</div>
+          <button
+            onClick={() => setFilter('completed')}
+            className={`flex-shrink-0 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-sm sm:text-base font-medium transition-colors ${filter === 'completed'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+          >
+            Completed ({stats.completed})
+          </button>
+        </div>
+      </div>
 
 
       {/* Trainings List */}
@@ -214,7 +233,7 @@ export default function TrainingsPage() {
           <FaBook className="text-6xl text-gray-300 mx-auto mb-4" />
           <p className="text-gray-600 text-lg">No trainings found</p>
           <p className="text-gray-500 text-sm mt-2">
-            {filter === 'all' 
+            {filter === 'all'
               ? 'Browse the course library to enroll in new courses'
               : `You don't have any ${filter.replace('-', ' ')} trainings`
             }
@@ -236,7 +255,7 @@ export default function TrainingsPage() {
                       </span>
                     )}
                   </div>
-                  
+
                   <p className="text-sm text-gray-600 mb-3">
                     Instructor: <span className="font-medium">{training.instructor}</span>
                   </p>
@@ -259,7 +278,7 @@ export default function TrainingsPage() {
                         {training.status === 'completed' ? 'Completed:' : 'Last Active:'}
                       </span>
                       <p className="font-medium">
-                        {training.status === 'completed' 
+                        {training.status === 'completed'
                           ? new Date(training.completedDate).toLocaleDateString()
                           : training.lastAccessed
                         }
@@ -275,9 +294,8 @@ export default function TrainingsPage() {
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div
-                        className={`h-2 rounded-full ${
-                          training.progress === 100 ? 'bg-green-500' : 'bg-blue-600'
-                        }`}
+                        className={`h-2 rounded-full ${training.progress === 100 ? 'bg-green-500' : 'bg-blue-600'
+                          }`}
                         style={{ width: `${training.progress}%` }}
                       />
                     </div>
