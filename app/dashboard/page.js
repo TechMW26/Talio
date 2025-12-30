@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import UnifiedDashboard from '@/components/dashboards/UnifiedDashboard'
+import { MobileViewWrapper, MobileHome } from '@/components/MobileApp'
 
 // Lightweight skeleton for faster perceived loading
 function DashboardSkeleton() {
@@ -27,9 +28,23 @@ function DashboardSkeleton() {
   )
 }
 
+// Mobile skeleton
+function MobileSkeleton() {
+  return (
+    <div style={{ minHeight: '100vh', background: '#f5f5f5', padding: '16px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        <div style={{ height: '120px', background: 'white', borderRadius: '20px' }}></div>
+        <div style={{ height: '80px', background: 'white', borderRadius: '16px' }}></div>
+        <div style={{ height: '200px', background: 'white', borderRadius: '20px' }}></div>
+      </div>
+    </div>
+  )
+}
+
 export default function DashboardPage() {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [dashboardData, setDashboardData] = useState(null)
 
   useEffect(() => {
     // Immediately try to get user from localStorage
@@ -64,11 +79,54 @@ export default function DashboardPage() {
     }
   }, [])
 
+  // Fetch dashboard data for mobile view
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const token = localStorage.getItem('token')
+        const [attendanceRes, statsRes] = await Promise.all([
+          fetch('/api/attendance/today', { headers: { Authorization: `Bearer ${token}` } }),
+          fetch('/api/dashboard/stats', { headers: { Authorization: `Bearer ${token}` } })
+        ])
+        
+        const attendanceData = await attendanceRes.json()
+        const statsData = await statsRes.json()
+        
+        setDashboardData({
+          todayAttendance: attendanceData.success ? attendanceData.data : null,
+          stats: statsData.success ? statsData.data : null
+        })
+      } catch (err) {
+        console.error('[Dashboard] Failed to fetch mobile data:', err)
+      }
+    }
+    
+    if (user) {
+      fetchDashboardData()
+    }
+  }, [user])
+
   if (loading) {
-    return <DashboardSkeleton />
+    return (
+      <MobileViewWrapper
+        mobileContent={<MobileSkeleton />}
+        desktopContent={<DashboardSkeleton />}
+      />
+    )
   }
 
-  // Single unified dashboard that adapts to user's role
-  return <UnifiedDashboard user={user} />
+  // Render with mobile/desktop conditional
+  return (
+    <MobileViewWrapper
+      mobileContent={
+        <MobileHome 
+          user={user} 
+          attendance={dashboardData?.todayAttendance}
+          stats={dashboardData?.stats}
+        />
+      }
+      desktopContent={<UnifiedDashboard user={user} />}
+    />
+  )
 }
 

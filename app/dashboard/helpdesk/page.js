@@ -7,8 +7,11 @@ import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaTicketAlt, FaCheckCircle, FaClock, FaExclamationCircle, FaTimes, FaCog } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
 import ModalPortal from '@/components/ui/ModalPortal'
+import { useIsMobile } from '@/components/MobileApp'
+import MobileHelpdesk from '@/components/MobileApp/pages/MobileHelpdesk'
 
 export default function HelpdeskPage() {
+  const { isMobile, mounted } = useIsMobile()
   const router = useRouter()
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
@@ -167,6 +170,34 @@ export default function HelpdeskPage() {
       iconColor: 'text-green-600'
     }
   ]
+
+  // Mobile view
+  if (mounted && isMobile) {
+    return (
+      <MobileHelpdesk
+        user={user}
+        tickets={tickets}
+        stats={{
+          open: tickets.filter(t => t.status === 'open').length,
+          inProgress: tickets.filter(t => t.status === 'in-progress').length,
+          resolved: tickets.filter(t => t.status === 'resolved').length,
+          total: tickets.length
+        }}
+      />
+    )
+  }
+
+  // Prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <div className="space-y-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-10 bg-gray-200 rounded w-1/4"></div>
+          <div className="h-32 bg-gray-200 rounded"></div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

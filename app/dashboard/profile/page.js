@@ -28,6 +28,8 @@ import TiltWrapper from "@/components/TiltWrapper";
 import dynamic from 'next/dynamic'
 import AadhaarVerificationSection from '@/components/AadhaarVerificationSection'
 import ActiveSessionsSection from '@/components/ActiveSessionsSection'
+import { useIsMobile } from '@/components/MobileApp'
+import MobileProfile from '@/components/MobileApp/pages/MobileProfile'
 
 // Dynamically import Lanyard with no SSR and error boundary
 const Lanyard = dynamic(() => import('@/src/component/Lanyard').catch((error) => {
@@ -47,6 +49,7 @@ const Lanyard = dynamic(() => import('@/src/component/Lanyard').catch((error) =>
 
 
 export default function ProfilePage() {
+  const { isMobile, mounted } = useIsMobile()
   const searchParams = useSearchParams()
   const [user, setUser] = useState(null)
   const [employee, setEmployee] = useState(null)
@@ -839,6 +842,28 @@ export default function ProfilePage() {
           </div>
         )}
       </section>
+    )
+  }
+
+  // Mobile view
+  if (mounted && isMobile) {
+    return (
+      <MobileProfile
+        user={user}
+        employee={employee}
+      />
+    )
+  }
+
+  // Prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <div className="page-container pb-24 md:pb-6 px-2 sm:px-4 lg:px-8">
+        <div className="animate-pulse space-y-4">
+          <div className="h-10 bg-gray-200 rounded w-1/4"></div>
+          <div className="h-64 bg-gray-200 rounded"></div>
+        </div>
+      </div>
     )
   }
 

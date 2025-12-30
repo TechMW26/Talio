@@ -5,8 +5,11 @@ import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaCalendarAlt, FaCheckCircle, FaTimesCircle, FaClock } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
+import { useIsMobile } from '@/components/MobileApp'
+import MobileLeave from '@/components/MobileApp/pages/MobileLeave'
 
 export default function LeavePage() {
+  const { isMobile, mounted } = useIsMobile()
   const [leaves, setLeaves] = useState([])
   const [leaveBalance, setLeaveBalance] = useState([])
   const [leaveTypes, setLeaveTypes] = useState([])
@@ -169,6 +172,30 @@ export default function LeavePage() {
       month: 'short',
       day: 'numeric',
     })
+  }
+
+  // Mobile view
+  if (mounted && isMobile) {
+    return (
+      <MobileLeave
+        user={user}
+        leaveBalance={leaveBalance}
+        leaves={leaves}
+        leaveTypes={leaveTypes}
+      />
+    )
+  }
+
+  // Prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <div className="page-container pb-24 md:pb-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-10 bg-gray-200 rounded w-1/4"></div>
+          <div className="h-32 bg-gray-200 rounded"></div>
+        </div>
+      </div>
+    )
   }
 
   return (

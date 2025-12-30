@@ -71,12 +71,31 @@
   overflow-x: hidden;
 }
 
-/* Mobile Layout */
+/* Mobile Layout - Full screen overlay to replace desktop layout */
 .mobile-layout {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
   overflow: hidden;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  background: var(--mobile-background);
+}
+
+/* Hide desktop layout elements when mobile layout is present */
+@media (max-width: 767px) {
+  /* Target the existing layout container */
+  body:has(.mobile-layout) header:not(.mobile-header),
+  body:has(.mobile-layout) aside,
+  body:has(.mobile-layout) nav:not(.mobile-sidebar),
+  body:has(.mobile-layout) .gradient-fade,
+  body:has(.mobile-layout) [class*="ChatWidget"] {
+    display: none !important;
+  }
 }
 
 /* Mobile Header */

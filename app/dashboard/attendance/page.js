@@ -7,8 +7,12 @@ import OvertimePrompt, { useOvertimeCheck } from '@/components/OvertimePrompt'
 import ModalPortal from '@/components/ui/ModalPortal'
 import useLocationCapture from '@/hooks/useLocationCapture'
 import { useSocket } from '@/contexts/SocketContext'
+import { useIsMobile } from '@/components/MobileApp'
+import MobileAttendance from '@/components/MobileApp/pages/MobileAttendance'
+import MobileAttendanceList from '@/components/MobileApp/pages/MobileAttendanceList'
 
 export default function AttendancePage() {
+  const { isMobile, mounted } = useIsMobile()
   const [loading, setLoading] = useState(false)
   const [attendance, setAttendance] = useState([])
   const [todayAttendance, setTodayAttendance] = useState(null)
@@ -885,6 +889,32 @@ export default function AttendancePage() {
     }
 
     return workHours
+  }
+
+  // Mobile view - show mobile attendance component
+  if (mounted && isMobile) {
+    return (
+      <MobileAttendance
+        user={user}
+        todayAttendance={todayAttendance}
+        onCheckIn={handleCheckIn}
+        onCheckOut={handleCheckOut}
+        loading={loading}
+      />
+    )
+  }
+
+  // Prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <div className="page-container">
+        <div className="animate-pulse space-y-4">
+          <div className="h-10 bg-gray-200 rounded w-1/4"></div>
+          <div className="h-32 bg-gray-200 rounded"></div>
+          <div className="h-64 bg-gray-200 rounded"></div>
+        </div>
+      </div>
+    )
   }
 
   return (

@@ -6,8 +6,11 @@ import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaFile, FaDownload, FaEye, FaTrash, FaTimes, FaSpinner, FaUpload } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
 import ModalPortal from '@/components/ui/ModalPortal'
+import { useIsMobile } from '@/components/MobileApp'
+import MobileDocuments from '@/components/MobileApp/pages/MobileDocuments'
 
 export default function DocumentsPage() {
+  const { isMobile, mounted } = useIsMobile()
   const [documents, setDocuments] = useState([])
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState(null)
@@ -216,6 +219,30 @@ export default function DocumentsPage() {
       month: 'short',
       day: 'numeric',
     })
+  }
+
+  // Mobile view
+  if (mounted && isMobile) {
+    return (
+      <MobileDocuments
+        user={user}
+        documents={documents}
+      />
+    )
+  }
+
+  // Prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <div className="p-6">
+        <div className="animate-pulse space-y-4">
+          <div className="h-10 bg-gray-200 rounded w-1/4"></div>
+          <div className="grid grid-cols-4 gap-4">
+            {[1,2,3,4].map(i => <div key={i} className="h-24 bg-gray-200 rounded"></div>)}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
