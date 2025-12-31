@@ -28,8 +28,6 @@ import TiltWrapper from "@/components/TiltWrapper";
 import dynamic from 'next/dynamic'
 import AadhaarVerificationSection from '@/components/AadhaarVerificationSection'
 import ActiveSessionsSection from '@/components/ActiveSessionsSection'
-import { useIsMobile } from '@/components/MobileApp'
-import MobileProfile from '@/components/MobileApp/pages/MobileProfile'
 
 // Dynamically import Lanyard with no SSR and error boundary
 const Lanyard = dynamic(() => import('@/src/component/Lanyard').catch((error) => {
@@ -49,8 +47,12 @@ const Lanyard = dynamic(() => import('@/src/component/Lanyard').catch((error) =>
 
 
 export default function ProfilePage() {
-  const { isMobile, mounted } = useIsMobile()
+  const [mounted, setMounted] = useState(false)
   const searchParams = useSearchParams()
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
   const [user, setUser] = useState(null)
   const [employee, setEmployee] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -842,16 +844,6 @@ export default function ProfilePage() {
           </div>
         )}
       </section>
-    )
-  }
-
-  // Mobile view
-  if (mounted && isMobile) {
-    return (
-      <MobileProfile
-        user={user}
-        employee={employee}
-      />
     )
   }
 

@@ -23,11 +23,14 @@ import { FaSpinner, FaThumbtack, FaUserSecret, FaPaperPlane } from 'react-icons/
 import toast from '@/utils/toast'
 import CreateIdeaModal from './components/CreateIdeaModal'
 import IdeaCard from './components/IdeaCard'
-import { useIsMobile, MobileIdeas } from '@/components/MobileApp'
 
 export default function SandboxPage() {
-  const { isMobile, mounted } = useIsMobile()
+  const [mounted, setMounted] = useState(false)
   const [ideas, setIdeas] = useState([])
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [filter, setFilter] = useState({
@@ -193,17 +196,6 @@ export default function SandboxPage() {
   const totalVotes = ideas.reduce((sum, i) => sum + (i.likes || 0), 0)
 
   const isAdmin = user?.role === 'admin' || user?.role === 'hr' || user?.role === 'department_head'
-
-  // Mobile view
-  if (mounted && isMobile) {
-    return (
-      <MobileIdeas
-        user={user}
-        ideas={ideas}
-        myIdeas={myIdeas}
-      />
-    )
-  }
 
   // Prevent hydration mismatch
   if (!mounted) {

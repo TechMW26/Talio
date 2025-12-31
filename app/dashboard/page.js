@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import UnifiedDashboard from '@/components/dashboards/UnifiedDashboard'
-import { MobileViewWrapper, MobileHome } from '@/components/MobileApp'
 
 // Lightweight skeleton for faster perceived loading
 function DashboardSkeleton() {
@@ -23,19 +22,6 @@ function DashboardSkeleton() {
             <div key={i} className="h-48 bg-white rounded-xl shadow-sm"></div>
           ))}
         </div>
-      </div>
-    </div>
-  )
-}
-
-// Mobile skeleton
-function MobileSkeleton() {
-  return (
-    <div style={{ minHeight: '100vh', background: '#f5f5f5', padding: '16px' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <div style={{ height: '120px', background: 'white', borderRadius: '20px' }}></div>
-        <div style={{ height: '80px', background: 'white', borderRadius: '16px' }}></div>
-        <div style={{ height: '200px', background: 'white', borderRadius: '20px' }}></div>
       </div>
     </div>
   )
@@ -79,21 +65,9 @@ export default function DashboardPage() {
   }, [])
 
   if (loading) {
-    return (
-      <MobileViewWrapper
-        mobileContent={<MobileSkeleton />}
-        desktopContent={<DashboardSkeleton />}
-      />
-    )
+    return <DashboardSkeleton />
   }
 
-  // Render with mobile/desktop conditional
-  // MobileHome fetches its own data internally
-  return (
-    <MobileViewWrapper
-      mobileContent={<MobileHome user={user} />}
-      desktopContent={<UnifiedDashboard user={user} />}
-    />
-  )
+  return <UnifiedDashboard user={user} />
 }
 

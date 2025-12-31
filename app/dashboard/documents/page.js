@@ -6,11 +6,13 @@ import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaFile, FaDownload, FaEye, FaTrash, FaTimes, FaSpinner, FaUpload } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
 import ModalPortal from '@/components/ui/ModalPortal'
-import { useIsMobile } from '@/components/MobileApp'
-import MobileDocuments from '@/components/MobileApp/pages/MobileDocuments'
 
 export default function DocumentsPage() {
-  const { isMobile, mounted } = useIsMobile()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
   const [documents, setDocuments] = useState([])
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState(null)
@@ -219,16 +221,6 @@ export default function DocumentsPage() {
       month: 'short',
       day: 'numeric',
     })
-  }
-
-  // Mobile view
-  if (mounted && isMobile) {
-    return (
-      <MobileDocuments
-        user={user}
-        documents={documents}
-      />
-    )
   }
 
   // Prevent hydration mismatch

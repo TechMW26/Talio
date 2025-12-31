@@ -7,12 +7,9 @@ import OvertimePrompt, { useOvertimeCheck } from '@/components/OvertimePrompt'
 import ModalPortal from '@/components/ui/ModalPortal'
 import useLocationCapture from '@/hooks/useLocationCapture'
 import { useSocket } from '@/contexts/SocketContext'
-import { useIsMobile } from '@/components/MobileApp'
-import MobileAttendance from '@/components/MobileApp/pages/MobileAttendance'
-import MobileAttendanceList from '@/components/MobileApp/pages/MobileAttendanceList'
 
 export default function AttendancePage() {
-  const { isMobile, mounted } = useIsMobile()
+  const [mounted, setMounted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [attendance, setAttendance] = useState([])
   const [todayAttendance, setTodayAttendance] = useState(null)
@@ -96,6 +93,11 @@ export default function AttendancePage() {
     }
     return null
   }
+
+  // Set mounted state for hydration
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Fetch company settings (working days)
   useEffect(() => {
@@ -889,19 +891,6 @@ export default function AttendancePage() {
     }
 
     return workHours
-  }
-
-  // Mobile view - show mobile attendance component
-  if (mounted && isMobile) {
-    return (
-      <MobileAttendance
-        user={user}
-        todayAttendance={todayAttendance}
-        onCheckIn={handleCheckIn}
-        onCheckOut={handleCheckOut}
-        loading={loading}
-      />
-    )
   }
 
   // Prevent hydration mismatch

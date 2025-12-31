@@ -312,12 +312,12 @@ TenantCompanySchema.methods.generateApiKey = function () {
 };
 
 // Index for efficient queries
-TenantCompanySchema.index({ slug: 1 });
+// Note: slug and setupCode.code already have unique: true in schema, which auto-creates indexes
+// Only add additional indexes for non-unique fields
 TenantCompanySchema.index({ 'primaryContact.email': 1 });
 TenantCompanySchema.index({ serviceStatus: 1, isActive: 1 });
 TenantCompanySchema.index({ 'subscription.status': 1 });
 TenantCompanySchema.index({ 'subscription.endDate': 1 });
-TenantCompanySchema.index({ 'setupCode.code': 1 }, { sparse: true });
 TenantCompanySchema.index({ tags: 1 });
 
 let TenantCompanyModel = null;

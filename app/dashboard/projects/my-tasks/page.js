@@ -26,7 +26,6 @@ import {
 } from 'react-icons/fa'
 import { playNotificationSound, NotificationSoundTypes } from '@/lib/notificationSounds'
 import Portal from '@/components/ui/Portal'
-import { useIsMobile, MobileTasks } from '@/components/MobileApp'
 
 const statusColors = {
   'todo': 'bg-gray-100 text-gray-700 border-gray-200',
@@ -74,8 +73,12 @@ const getProjectColor = (projectId) => {
 
 export default function MyTasksPage() {
   const router = useRouter()
-  const { isMobile, mounted } = useIsMobile()
+  const [mounted, setMounted] = useState(false)
   const [user, setUser] = useState(null)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState({
@@ -431,18 +434,6 @@ export default function MyTasksPage() {
     overdue: tasks.filter(t => isOverdue(t)).length,
     pendingAcceptance: tasks.filter(t => t.assignmentStatus === 'pending').length,
     pending: tasks.filter(t => t.assignmentStatus === 'pending' || t.status === 'todo').length
-  }
-
-  // Mobile view
-  if (mounted && isMobile) {
-    return (
-      <MobileTasks
-        user={user}
-        tasks={tasks}
-        taskStats={stats}
-        projects={projects}
-      />
-    )
   }
 
   // Prevent hydration mismatch

@@ -51,7 +51,7 @@ const UserTenantMappingSchema = new mongoose.Schema({
 });
 
 // Indexes for fast lookup
-UserTenantMappingSchema.index({ email: 1 });
+// Note: email already has unique: true in schema, which auto-creates an index
 UserTenantMappingSchema.index({ tenantCompanyId: 1 });
 UserTenantMappingSchema.index({ databaseName: 1 });
 

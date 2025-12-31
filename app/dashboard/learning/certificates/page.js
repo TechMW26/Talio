@@ -3,12 +3,14 @@
 import { useState, useEffect } from 'react'
 import { FaTrophy, FaDownload, FaShare, FaCalendar, FaClock, FaAward, FaMedal } from 'react-icons/fa'
 import toast from '@/utils/toast'
-import { useIsMobile } from '@/components/MobileApp'
-import MobileCertificates from '@/components/MobileApp/pages/MobileCertificates'
 
 export default function CertificatesPage() {
-  const { isMobile, mounted } = useIsMobile()
+  const [mounted, setMounted] = useState(false)
   const [certificates, setCertificates] = useState([])
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
   const [loading, setLoading] = useState(true)
   const [selectedCertificate, setSelectedCertificate] = useState(null)
   const [user, setUser] = useState(null)
@@ -103,11 +105,6 @@ export default function CertificatesPage() {
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
     )
-  }
-
-  // Show mobile certificates on mobile devices
-  if (isMobile) {
-    return <MobileCertificates user={user} certificates={certificates} />
   }
 
   return (

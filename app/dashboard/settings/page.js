@@ -7,8 +7,6 @@ import { HiOutlineOfficeBuilding, HiOutlineCog, HiOutlineArrowLeft } from 'react
 import { toast } from '@/utils/toast'
 import dynamic from 'next/dynamic'
 import { useTheme } from '@/contexts/ThemeContext'
-import { useIsMobile } from '@/components/MobileApp'
-import MobileSettings from '@/components/MobileApp/pages/MobileSettings'
 
 // Dynamically import map component (client-side only)
 const GeofenceMap = dynamic(() => import('@/components/GeofenceMap'), { ssr: false })
@@ -99,8 +97,12 @@ function CompanySelector({ companies, selectedCompany, onSelect, onBack, loading
 }
 
 export default function SettingsPage() {
-  const { isMobile, mounted } = useIsMobile()
+  const [mounted, setMounted] = useState(false)
   const [activeTab, setActiveTab] = useState('company')
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
   const [userRole, setUserRole] = useState('')
   const [isDepartmentHead, setIsDepartmentHead] = useState(false)
   const [user, setUser] = useState(null)
@@ -184,11 +186,6 @@ export default function SettingsPage() {
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
     )
-  }
-
-  // Show mobile settings on mobile devices
-  if (isMobile) {
-    return <MobileSettings user={user} />
   }
 
   return (

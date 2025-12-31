@@ -3,12 +3,14 @@
 import { useState, useEffect } from 'react'
 import { FaPlay, FaCheckCircle, FaClock, FaTrophy, FaBook, FaChartLine } from 'react-icons/fa'
 import toast from '@/utils/toast'
-import { useIsMobile } from '@/components/MobileApp'
-import MobileTrainings from '@/components/MobileApp/pages/MobileTrainings'
 
 export default function TrainingsPage() {
-  const { isMobile, mounted } = useIsMobile()
+  const [mounted, setMounted] = useState(false)
   const [trainings, setTrainings] = useState([])
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all') // all, in-progress, completed
   const [user, setUser] = useState(null)
@@ -123,11 +125,6 @@ export default function TrainingsPage() {
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
       </div>
     )
-  }
-
-  // Show mobile trainings on mobile devices
-  if (isMobile) {
-    return <MobileTrainings user={user} trainings={trainings} stats={stats} />
   }
 
   return (
