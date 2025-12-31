@@ -32,8 +32,8 @@ export async function GET(request) {
     const limit = parseInt(searchParams.get('limit') || '20');
     const skip = (page - 1) * limit;
 
-    // Build query
-    let query = { type: 'idea' };
+    // Build query - Suggestion schema doesn't have 'type' field, all are ideas
+    let query = {};
 
     // Filter by user's ideas
     if (tab === 'my') {
@@ -45,14 +45,14 @@ export async function GET(request) {
       query.$or = [
         { title: { $regex: search, $options: 'i' } },
         { description: { $regex: search, $options: 'i' } },
-        { 'tags': { $regex: search, $options: 'i' } }
+        { category: { $regex: search, $options: 'i' } }
       ];
     }
 
     // Filter by department
     if (department) {
       // Get employees from this department
-      const deptEmployees = await Employee.find({ 
+      const deptEmployees = await Employee.find({
         $or: [
           { department: department },
           { departments: department }
@@ -67,10 +67,7 @@ export async function GET(request) {
       query.status = status;
     }
 
-    // Filter pinned
-    if (pinned) {
-      query.isPinned = true;
-    }
+    // Note: isPinned field doesn't exist in Suggestion schema - skipping pinned filter
 
     // Get ideas with population
     const ideas = await Suggestion.find(query)
@@ -82,7 +79,7 @@ export async function GET(request) {
           select: 'name'
         }
       })
-      .sort({ isPinned: -1, createdAt: -1 })
+      .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean();
@@ -97,32 +94,31 @@ export async function GET(request) {
       .lean();
 
     // Format ideas for response
+    // Note: votes structure is [{ employee, vote: 1 or -1, votedAt }]
     const formattedIdeas = ideas.map(idea => {
-      const userVote = employeeId 
-        ? idea.votes?.find(v => v.voter?.toString() === employeeId.toString())?.type || null
+      // Find user's vote (vote is 1 for upvote, -1 for downvote)
+      const userVoteObj = employeeId
+        ? idea.votes?.find(v => v.employee?.toString() === employeeId.toString())
         : null;
-      
+      const userVote = userVoteObj ? (userVoteObj.vote === 1 ? 'upvote' : 'downvote') : null;
+
       return {
         _id: idea._id,
         title: idea.title,
         description: idea.description,
-        summary: idea.summary,
         category: idea.category,
         status: idea.status,
-        priority: idea.priority,
-        isAnonymous: idea.isAnonymous,
-        isPinned: idea.isPinned || false,
-        author: idea.isAnonymous ? null : {
+        author: {
           _id: idea.submittedBy?._id,
           name: `${idea.submittedBy?.firstName || ''} ${idea.submittedBy?.lastName || ''}`.trim() || 'Unknown',
           profilePicture: idea.submittedBy?.profilePicture,
           department: idea.submittedBy?.department?.name || 'Unknown'
         },
-        likes: idea.votes?.filter(v => v.type === 'upvote').length || 0,
-        dislikes: idea.votes?.filter(v => v.type === 'downvote').length || 0,
+        likes: idea.votes?.filter(v => v.vote === 1).length || 0,
+        dislikes: idea.votes?.filter(v => v.vote === -1).length || 0,
+        voteCount: idea.voteCount || 0,
         userVote,
         commentsCount: idea.comments?.length || 0,
-        tags: idea.tags || [],
         createdAt: idea.createdAt,
         updatedAt: idea.updatedAt,
         isOwner: idea.submittedBy?._id?.toString() === employeeId?.toString()
@@ -157,21 +153,32 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Suggestion', 'User'])
+    const auth = await getAuthAndModels(request, ['Suggestion', 'Employee', 'User'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Suggestion, User } = models
+    const { Suggestion, Employee, User } = models
+
+    console.log('[Ideas POST] User data:', { userId: user.userId || user._id, employeeId: user.employeeId })
 
     // Get user to find employeeId
-    const currentUser = await User.findById(user._id || user.userId).select('employeeId');
-    if (!currentUser || !currentUser.employeeId) {
+    const userId = user.userId || user._id
+    const currentUser = await User.findById(userId).select('employeeId');
+    if (!currentUser) {
+      console.error('[Ideas POST] User not found:', userId)
+      return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 });
+    }
+
+    if (!currentUser.employeeId) {
+      console.error('[Ideas POST] Employee profile not found for user:', userId)
       return NextResponse.json({ success: false, message: 'Employee profile not found' }, { status: 404 });
     }
 
     const body = await request.json();
     const { title, description, category, isAnonymous, tags, aiExpanded } = body;
+
+    console.log('[Ideas POST] Request body:', { title, category, isAnonymous, tagsCount: tags?.length })
 
     if (!title || !description) {
       return NextResponse.json(
@@ -181,23 +188,20 @@ export async function POST(request) {
     }
 
     // Create idea using Suggestion model
+    // Note: status enum values are: 'pending', 'under-review', 'approved', 'rejected', 'implemented'
     const idea = new Suggestion({
       title: title.trim(),
       description: description.trim(),
-      summary: description.substring(0, 200),
       category: category || 'other',
-      type: 'idea',
       submittedBy: currentUser.employeeId,
-      isAnonymous: isAnonymous || false,
-      status: 'submitted',
-      priority: 'medium',
-      tags: tags || [],
-      aiExpanded: aiExpanded || false,
+      status: 'pending',  // Use 'pending' not 'submitted'
       votes: [],
+      voteCount: 0,
       comments: []
     });
 
     await idea.save();
+    console.log('[Ideas POST] Idea created:', idea._id)
 
     // Populate for response
     await idea.populate({
@@ -220,7 +224,7 @@ export async function POST(request) {
         status: idea.status,
         isAnonymous: idea.isAnonymous,
         author: idea.isAnonymous ? null : {
-          name: `${idea.submittedBy?.firstName} ${idea.submittedBy?.lastName}`,
+          name: `${idea.submittedBy?.firstName || ''} ${idea.submittedBy?.lastName || ''}`.trim() || 'Unknown',
           profilePicture: idea.submittedBy?.profilePicture,
           department: idea.submittedBy?.department?.name
         },
@@ -230,6 +234,7 @@ export async function POST(request) {
 
   } catch (error) {
     console.error('[Ideas] POST error:', error);
+    console.error('[Ideas] POST error stack:', error.stack);
     return NextResponse.json(
       { success: false, message: 'Failed to create idea', error: error.message },
       { status: 500 }

@@ -45,6 +45,17 @@ export function useDashboardWidgets(userId = 'default', userRole = 'employee') {
           }
         })
 
+        // IMPORTANT: Check for new default widgets that were added to the registry
+        // and automatically enable them for existing users
+        const defaultWidgets = getDefaultWidgetsForRole(effectiveRole)
+        defaultWidgets.forEach(widget => {
+          if (!validEnabled.includes(widget.id)) {
+            // This is a new default widget - add it automatically
+            validEnabled.push(widget.id)
+            validOrder.push(widget.id)
+          }
+        })
+
         setEnabledWidgets(validEnabled)
         setWidgetOrder(validOrder)
       } else {

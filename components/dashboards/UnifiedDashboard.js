@@ -34,7 +34,8 @@ import {
     MyAssetsWidget,
     MyExpensesWidget,
     MyHelpdeskWidget,
-    PoliciesWidget
+    PoliciesWidget,
+    RoleNewsWidget
 } from '@/components/widgets'
 
 /**
@@ -57,6 +58,7 @@ const ROLE_PERMISSIONS = {
         myExpenses: true,
         myHelpdesk: true,
         policies: true,
+        roleNews: true,
         // Management widgets
         kpiStats: true,
         leaveRequests: true,
@@ -82,6 +84,7 @@ const ROLE_PERMISSIONS = {
         myExpenses: true,
         myHelpdesk: true,
         policies: true,
+        roleNews: true,
         kpiStats: true,
         leaveRequests: true,
         teamAttendance: true,
@@ -105,6 +108,7 @@ const ROLE_PERMISSIONS = {
         myExpenses: false,
         myHelpdesk: false,
         policies: false,
+        roleNews: true,
         kpiStats: true,
         leaveRequests: true,
         teamAttendance: true,
@@ -128,6 +132,7 @@ const ROLE_PERMISSIONS = {
         myExpenses: true,
         myHelpdesk: true,
         policies: true,
+        roleNews: true,
         kpiStats: true,
         leaveRequests: true,
         teamAttendance: true,
@@ -151,6 +156,7 @@ const ROLE_PERMISSIONS = {
         myExpenses: true,
         myHelpdesk: true,
         policies: true,
+        roleNews: true,
         kpiStats: false,
         leaveRequests: false,
         teamAttendance: false,
@@ -806,6 +812,11 @@ export default function UnifiedDashboard({ user: userProp }) {
         }
 
         // === INFORMATIONAL WIDGETS ===
+
+        // Role News Widget - AI-generated news based on role and designation
+        if (permissions.roleNews) {
+            components['role-news'] = <RoleNewsWidget />
+        }
 
         // Announcements Widget
         if (permissions.announcements) {

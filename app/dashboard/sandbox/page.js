@@ -311,8 +311,8 @@ export default function SandboxPage() {
               <button
                 onClick={() => setFilter(prev => ({ ...prev, tab: 'all' }))}
                 className={`px-4 py-2.5 text-sm font-medium transition-colors ${filter.tab === 'all'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white text-gray-900 hover:bg-gray-50'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-900 hover:bg-gray-50'
                   }`}
               >
                 All Ideas
@@ -320,8 +320,8 @@ export default function SandboxPage() {
               <button
                 onClick={() => setFilter(prev => ({ ...prev, tab: 'my' }))}
                 className={`px-4 py-2.5 text-sm font-medium transition-colors ${filter.tab === 'my'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white text-gray-900 hover:bg-gray-50'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-900 hover:bg-gray-50'
                   }`}
               >
                 My Ideas
@@ -331,8 +331,8 @@ export default function SandboxPage() {
             <button
               onClick={() => setFilter(prev => ({ ...prev, pinned: !prev.pinned }))}
               className={`px-4 py-2.5 border rounded-lg flex items-center gap-2 transition-colors ${filter.pinned
-                  ? 'bg-blue-600 border-blue-600 text-white'
-                  : 'border-gray-300 bg-white text-gray-900 hover:bg-gray-50'
+                ? 'bg-blue-600 border-blue-600 text-white'
+                : 'border-gray-300 bg-white text-gray-900 hover:bg-gray-50'
                 }`}
             >
               <HiOutlineFunnel className="w-4 h-4" />
@@ -385,6 +385,11 @@ export default function SandboxPage() {
                 onPin={handlePin}
                 onDelete={handleDelete}
                 isAdmin={isAdmin}
+                onCommentAdded={(ideaId, newCount) => {
+                  setIdeas(prev => prev.map(i =>
+                    i._id === ideaId ? { ...i, commentsCount: newCount } : i
+                  ))
+                }}
               />
             ))}
           </div>

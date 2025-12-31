@@ -65,7 +65,7 @@ export async function POST(request, { params }) {
 
     const { id } = await params;
     const body = await request.json();
-    const { content, isAnonymous = false } = body;
+    const { content } = body;
 
     if (!content?.trim()) {
       return NextResponse.json(
@@ -84,10 +84,11 @@ export async function POST(request, { params }) {
       idea.comments = [];
     }
 
+    // Schema: comments: [{ content: String, author: ObjectId, createdAt: Date }]
+    // Note: isAnonymous is NOT in the schema
     const newComment = {
       author: currentUser.employeeId,
       content: content.trim(),
-      isAnonymous,
       createdAt: new Date()
     };
 
@@ -105,7 +106,8 @@ export async function POST(request, { params }) {
 
     return NextResponse.json({
       success: true,
-      data: addedComment
+      data: addedComment,
+      commentsCount: idea.comments.length
     });
 
   } catch (error) {

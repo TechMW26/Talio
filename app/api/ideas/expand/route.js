@@ -16,6 +16,8 @@ export async function POST(request) {
     const body = await request.json();
     const { title, description, category } = body;
 
+    console.log('[Ideas Expand] Request:', { title, category, hasDescription: !!description })
+
     if (!title?.trim()) {
       return NextResponse.json(
         { success: false, message: 'Title is required for AI expansion' },
@@ -48,11 +50,12 @@ Please respond in the following JSON format:
 
     // Try Gemini first, then fall back to OpenAI
     let expansion = null;
-    
-    // Try Gemini
-    const geminiKey = process.env.GEMINI_API_KEY;
+
+    // Try Gemini - use both possible env var names
+    const geminiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
     if (geminiKey) {
       try {
+        console.log('[Ideas Expand] Trying Gemini...')
         const geminiResponse = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
           {
@@ -71,17 +74,24 @@ Please respond in the following JSON format:
         if (geminiResponse.ok) {
           const geminiData = await geminiResponse.json();
           const text = geminiData.candidates?.[0]?.content?.parts?.[0]?.text;
+          console.log('[Ideas Expand] Gemini response received')
           if (text) {
             // Extract JSON from response
             const jsonMatch = text.match(/\{[\s\S]*\}/);
             if (jsonMatch) {
               expansion = JSON.parse(jsonMatch[0]);
+              console.log('[Ideas Expand] Successfully parsed Gemini response')
             }
           }
+        } else {
+          const errorText = await geminiResponse.text();
+          console.log('[Ideas Expand] Gemini error:', geminiResponse.status, errorText);
         }
       } catch (geminiError) {
-        console.log('[Ideas] Gemini expansion failed, trying OpenAI:', geminiError.message);
+        console.log('[Ideas Expand] Gemini expansion failed:', geminiError.message);
       }
+    } else {
+      console.log('[Ideas Expand] No Gemini API key found')
     }
 
     // Fall back to OpenAI if Gemini failed
@@ -89,6 +99,7 @@ Please respond in the following JSON format:
       const openaiKey = process.env.OPENAI_API_KEY;
       if (openaiKey) {
         try {
+          console.log('[Ideas Expand] Trying OpenAI...')
           const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -109,26 +120,35 @@ Please respond in the following JSON format:
           if (openaiResponse.ok) {
             const openaiData = await openaiResponse.json();
             const text = openaiData.choices?.[0]?.message?.content;
+            console.log('[Ideas Expand] OpenAI response received')
             if (text) {
               const jsonMatch = text.match(/\{[\s\S]*\}/);
               if (jsonMatch) {
                 expansion = JSON.parse(jsonMatch[0]);
+                console.log('[Ideas Expand] Successfully parsed OpenAI response')
               }
             }
+          } else {
+            const errorText = await openaiResponse.text();
+            console.log('[Ideas Expand] OpenAI error:', openaiResponse.status, errorText);
           }
         } catch (openaiError) {
-          console.log('[Ideas] OpenAI expansion failed:', openaiError.message);
+          console.log('[Ideas Expand] OpenAI expansion failed:', openaiError.message);
         }
+      } else {
+        console.log('[Ideas Expand] No OpenAI API key found')
       }
     }
 
     if (!expansion) {
+      console.log('[Ideas Expand] All AI services unavailable')
       return NextResponse.json(
-        { success: false, message: 'AI service unavailable. Please try again later.' },
+        { success: false, message: 'AI service unavailable. Please ensure GEMINI_API_KEY or OPENAI_API_KEY is configured.' },
         { status: 503 }
       );
     }
 
+    console.log('[Ideas Expand] Successfully expanded idea')
     return NextResponse.json({
       success: true,
       data: expansion
@@ -136,6 +156,7 @@ Please respond in the following JSON format:
 
   } catch (error) {
     console.error('[Ideas] AI expand error:', error);
+    console.error('[Ideas] AI expand error stack:', error.stack);
     return NextResponse.json(
       { success: false, message: 'Failed to expand idea', error: error.message },
       { status: 500 }

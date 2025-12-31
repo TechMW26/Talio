@@ -1,23 +1,71 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import MobileLayout from '../components/MobileLayout';
+import toast from '@/utils/toast';
 import '@/components/MobileApp/styles/mobile.css';
 
 /**
  * Mobile Ideas Page
  * Ideas sandbox / suggestion box for mobile
  */
-export default function MobileIdeas({ 
-  user, 
-  ideas = [],
-  myIdeas = []
+export default function MobileIdeas({
+  user,
+  ideas: initialIdeas = [],
+  myIdeas: initialMyIdeas = [],
+  onRefresh
 }) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('all');
   const [showNewIdea, setShowNewIdea] = useState(false);
   const [newIdea, setNewIdea] = useState({ title: '', description: '', category: '' });
+  const [submitting, setSubmitting] = useState(false);
+  const [ideas, setIdeas] = useState(initialIdeas);
+  const [myIdeas, setMyIdeas] = useState(initialMyIdeas);
+  const [loading, setLoading] = useState(false);
+
+  // Fetch ideas from API
+  const fetchIdeas = useCallback(async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+
+      // Fetch all ideas
+      const allRes = await fetch('/api/ideas?tab=all', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const allData = await allRes.json();
+
+      // Fetch my ideas
+      const myRes = await fetch('/api/ideas?tab=my', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const myData = await myRes.json();
+
+      if (allData.success) {
+        setIdeas(allData.data || []);
+      }
+      if (myData.success) {
+        setMyIdeas(myData.data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching ideas:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Initial fetch on mount
+  useEffect(() => {
+    fetchIdeas();
+  }, [fetchIdeas]);
+
+  // Update from props when they change
+  useEffect(() => {
+    if (initialIdeas.length > 0) setIdeas(initialIdeas);
+    if (initialMyIdeas.length > 0) setMyIdeas(initialMyIdeas);
+  }, [initialIdeas, initialMyIdeas]);
 
   // Filter ideas
   const displayedIdeas = activeTab === 'mine' ? myIdeas : ideas;
@@ -43,7 +91,7 @@ export default function MobileIdeas({
     const now = new Date();
     const diffMs = now - d;
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays < 1) return 'Today';
     if (diffDays === 1) return 'Yesterday';
     if (diffDays < 7) return `${diffDays}d ago`;
@@ -52,7 +100,7 @@ export default function MobileIdeas({
 
   // Get status color
   const getStatusColor = (status) => {
-    switch(status?.toLowerCase()) {
+    switch (status?.toLowerCase()) {
       case 'approved': return 'green';
       case 'reviewing':
       case 'under-review': return 'blue';
@@ -63,12 +111,51 @@ export default function MobileIdeas({
   };
 
   // Handle submit new idea
-  const handleSubmitIdea = () => {
-    if (!newIdea.title.trim()) return;
-    // In real app, call API
-    console.log('Submitting idea:', newIdea);
-    setShowNewIdea(false);
-    setNewIdea({ title: '', description: '', category: '' });
+  const handleSubmitIdea = async () => {
+    if (!newIdea.title.trim()) {
+      toast.error('Please enter a title for your idea');
+      return;
+    }
+    if (!newIdea.description.trim()) {
+      toast.error('Please enter a description for your idea');
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      const token = localStorage.getItem('token');
+
+      const response = await fetch('/api/ideas', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          title: newIdea.title.trim(),
+          description: newIdea.description.trim(),
+          category: newIdea.category || 'other'
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Idea submitted successfully!');
+        setShowNewIdea(false);
+        setNewIdea({ title: '', description: '', category: '' });
+        // Refresh the ideas list
+        fetchIdeas();
+        if (onRefresh) onRefresh();
+      } else {
+        toast.error(data.message || 'Failed to submit idea');
+      }
+    } catch (error) {
+      console.error('Error submitting idea:', error);
+      toast.error('Failed to submit idea');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   // New Idea Form
@@ -108,19 +195,19 @@ export default function MobileIdeas({
                     transition: 'all 0.2s'
                   }}
                 >
-                  <span 
-                    className="material-icons-round" 
-                    style={{ 
-                      fontSize: '24px', 
-                      color: newIdea.category === cat.id ? `var(--mobile-${cat.color}-500)` : 'var(--mobile-gray-400)' 
+                  <span
+                    className="material-icons-round"
+                    style={{
+                      fontSize: '24px',
+                      color: newIdea.category === cat.id ? `var(--mobile-${cat.color}-500)` : 'var(--mobile-gray-400)'
                     }}
                   >
                     {cat.icon}
                   </span>
-                  <span style={{ 
-                    fontSize: '11px', 
-                    fontWeight: 600, 
-                    color: newIdea.category === cat.id ? `var(--mobile-${cat.color}-600)` : 'var(--mobile-gray-500)' 
+                  <span style={{
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    color: newIdea.category === cat.id ? `var(--mobile-${cat.color}-600)` : 'var(--mobile-gray-500)'
                   }}>
                     {cat.label}
                   </span>
@@ -179,19 +266,28 @@ export default function MobileIdeas({
           </div>
 
           {/* Submit Button */}
-          <button 
+          <button
             className="mobile-btn mobile-btn-primary mobile-btn-full mobile-btn-rounded"
             onClick={handleSubmitIdea}
-            disabled={!newIdea.title.trim()}
-            style={{ 
+            disabled={!newIdea.title.trim() || submitting}
+            style={{
               padding: '20px 24px',
               fontSize: '14px',
               fontWeight: 700,
-              opacity: !newIdea.title.trim() ? 0.5 : 1
+              opacity: (!newIdea.title.trim() || submitting) ? 0.5 : 1
             }}
           >
-            <span className="material-icons-round" style={{ fontSize: '20px' }}>send</span>
-            Submit Idea
+            {submitting ? (
+              <>
+                <span className="material-icons-round" style={{ fontSize: '20px', animation: 'spin 1s linear infinite' }}>sync</span>
+                Submitting...
+              </>
+            ) : (
+              <>
+                <span className="material-icons-round" style={{ fontSize: '20px' }}>send</span>
+                Submit Idea
+              </>
+            )}
           </button>
         </div>
       </MobileLayout>
@@ -213,10 +309,10 @@ export default function MobileIdeas({
         </div>
 
         {/* New Idea Button */}
-        <button 
+        <button
           className="mobile-btn mobile-btn-primary mobile-btn-full mobile-btn-rounded mobile-mb-6"
           onClick={() => setShowNewIdea(true)}
-          style={{ 
+          style={{
             padding: '20px 24px',
             fontSize: '12px',
             fontWeight: 900,
@@ -230,13 +326,13 @@ export default function MobileIdeas({
 
         {/* Filter Tabs */}
         <div className="mobile-tabs mobile-mb-6">
-          <button 
+          <button
             className={`mobile-tab ${activeTab === 'all' ? 'mobile-tab-active' : ''}`}
             onClick={() => setActiveTab('all')}
           >
             All Ideas
           </button>
-          <button 
+          <button
             className={`mobile-tab ${activeTab === 'mine' ? 'mobile-tab-active' : ''}`}
             onClick={() => setActiveTab('mine')}
           >
@@ -244,20 +340,27 @@ export default function MobileIdeas({
           </button>
         </div>
 
+        {/* Loading State */}
+        {loading && (
+          <div style={{ display: 'flex', justifyContent: 'center', padding: '32px' }}>
+            <span className="material-icons-round" style={{ fontSize: '32px', color: 'var(--mobile-primary-500)', animation: 'spin 1s linear infinite' }}>sync</span>
+          </div>
+        )}
+
         {/* Ideas List */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+        {!loading && <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {displayedIdeas.map((idea, idx) => {
             const catInfo = getCategoryInfo(idea.category);
             return (
-              <div 
+              <div
                 key={idea._id || idx}
                 className="mobile-card mobile-card-soft"
-                style={{ 
+                style={{
                   padding: '20px',
                   borderRadius: '20px',
                   cursor: 'pointer'
                 }}
-                onClick={() => router.push(`/dashboard/ideas/${idea._id}`)}
+                onClick={() => router.push(`/dashboard/sandbox/${idea._id}`)}
               >
                 {/* Header */}
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px', marginBottom: '12px' }}>
@@ -285,10 +388,10 @@ export default function MobileIdeas({
                 </div>
 
                 {/* Description */}
-                <p style={{ 
-                  fontSize: '14px', 
-                  fontWeight: 500, 
-                  color: 'var(--mobile-gray-500)', 
+                <p style={{
+                  fontSize: '14px',
+                  fontWeight: 500,
+                  color: 'var(--mobile-gray-500)',
                   marginBottom: '16px',
                   display: '-webkit-box',
                   WebkitLineClamp: 2,
@@ -304,12 +407,12 @@ export default function MobileIdeas({
                     {/* Upvotes */}
                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '14px', fontWeight: 600, color: 'var(--mobile-gray-500)' }}>
                       <span className="material-icons-round" style={{ fontSize: '18px' }}>thumb_up</span>
-                      {idea.upvotes || 0}
+                      {idea.likes || 0}
                     </span>
                     {/* Comments */}
                     <span style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '14px', fontWeight: 600, color: 'var(--mobile-gray-500)' }}>
                       <span className="material-icons-round" style={{ fontSize: '18px' }}>chat_bubble_outline</span>
-                      {idea.comments?.length || 0}
+                      {idea.commentsCount || 0}
                     </span>
                   </div>
                   {idea.status && (
@@ -321,10 +424,10 @@ export default function MobileIdeas({
               </div>
             );
           })}
-        </div>
+        </div>}
 
         {/* Empty State */}
-        {displayedIdeas.length === 0 && (
+        {!loading && displayedIdeas.length === 0 && (
           <div className="mobile-empty">
             <div className="mobile-empty-icon">
               <span className="material-icons-outlined">lightbulb</span>
@@ -333,11 +436,11 @@ export default function MobileIdeas({
               {activeTab === 'mine' ? 'No ideas yet' : 'No ideas shared'}
             </h4>
             <p className="mobile-empty-text">
-              {activeTab === 'mine' 
-                ? 'Share your first idea to make a difference' 
+              {activeTab === 'mine'
+                ? 'Share your first idea to make a difference'
                 : 'Be the first to share an innovative idea'}
             </p>
-            <button 
+            <button
               className="mobile-btn mobile-btn-primary mobile-btn-rounded"
               onClick={() => setShowNewIdea(true)}
               style={{ marginTop: '16px', padding: '12px 24px' }}

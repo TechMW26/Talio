@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { 
+import {
   HiOutlineChatBubbleLeft,
   HiOutlineHandThumbUp,
   HiOutlineHandThumbDown,
@@ -57,12 +57,13 @@ const STATUS_LABELS = {
   'cancelled': 'Cancelled'
 }
 
-export default function IdeaCard({ idea, onVote, onPin, onDelete, isAdmin }) {
+export default function IdeaCard({ idea, onVote, onPin, onDelete, isAdmin, onCommentAdded }) {
   const [expanded, setExpanded] = useState(false)
   const [comments, setComments] = useState([])
   const [loadingComments, setLoadingComments] = useState(false)
   const [newComment, setNewComment] = useState('')
   const [submittingComment, setSubmittingComment] = useState(false)
+  const [localCommentsCount, setLocalCommentsCount] = useState(idea.commentsCount || 0)
 
   const categoryInfo = CATEGORIES[idea.category] || CATEGORIES.other
   const statusStyle = STATUS_STYLES[idea.status] || STATUS_STYLES.submitted
@@ -74,7 +75,7 @@ export default function IdeaCard({ idea, onVote, onPin, onDelete, isAdmin }) {
     const now = new Date()
     const diff = now - d
     const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-    
+
     if (days === 0) return 'Today'
     if (days === 1) return 'Yesterday'
     if (days < 7) return `${days} days ago`
@@ -84,7 +85,7 @@ export default function IdeaCard({ idea, onVote, onPin, onDelete, isAdmin }) {
 
   const loadComments = async () => {
     if (comments.length > 0 || loadingComments) return
-    
+
     setLoadingComments(true)
     try {
       const token = localStorage.getItem('token')
@@ -111,7 +112,7 @@ export default function IdeaCard({ idea, onVote, onPin, onDelete, isAdmin }) {
 
   const handleAddComment = async () => {
     if (!newComment.trim()) return
-    
+
     setSubmittingComment(true)
     try {
       const token = localStorage.getItem('token')
@@ -128,6 +129,12 @@ export default function IdeaCard({ idea, onVote, onPin, onDelete, isAdmin }) {
       if (data.success) {
         setComments(prev => [...prev, data.data])
         setNewComment('')
+        // Update local comments count
+        setLocalCommentsCount(data.commentsCount || (localCommentsCount + 1))
+        // Notify parent if callback provided
+        if (onCommentAdded) {
+          onCommentAdded(idea._id, data.commentsCount)
+        }
         toast.success('Comment added!')
       } else {
         toast.error(data.message || 'Failed to add comment')
@@ -143,11 +150,10 @@ export default function IdeaCard({ idea, onVote, onPin, onDelete, isAdmin }) {
   const voteScore = (idea.likes || 0) - (idea.dislikes || 0)
 
   return (
-    <div className={`bg-white rounded-xl shadow-sm border transition-all ${
-      idea.isPinned 
-        ? 'border-amber-300 ring-1 ring-amber-200' 
+    <div className={`bg-white rounded-xl shadow-sm border transition-all ${idea.isPinned
+        ? 'border-amber-300 ring-1 ring-amber-200'
         : 'border-gray-100 hover:shadow-md'
-    }`}>
+      }`}>
       {/* Pinned Badge */}
       {idea.isPinned && (
         <div className="bg-amber-50 px-4 py-2 rounded-t-xl border-b border-amber-200 flex items-center gap-2">
@@ -155,7 +161,7 @@ export default function IdeaCard({ idea, onVote, onPin, onDelete, isAdmin }) {
           <span className="text-xs font-medium text-amber-700">Pinned</span>
         </div>
       )}
-      
+
       <div className="p-4">
         {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-3">
@@ -183,11 +189,10 @@ export default function IdeaCard({ idea, onVote, onPin, onDelete, isAdmin }) {
             {isAdmin && (
               <button
                 onClick={() => onPin(idea._id)}
-                className={`p-1.5 rounded-lg transition-colors ${
-                  idea.isPinned
+                className={`p-1.5 rounded-lg transition-colors ${idea.isPinned
                     ? 'text-amber-600 bg-amber-50'
                     : 'text-gray-400 hover:text-amber-600 hover:bg-amber-50'
-                }`}
+                  }`}
                 title={idea.isPinned ? 'Unpin' : 'Pin'}
               >
                 <FaThumbtack className="w-3.5 h-3.5" />
@@ -244,26 +249,23 @@ export default function IdeaCard({ idea, onVote, onPin, onDelete, isAdmin }) {
           <div className="flex items-center gap-1 bg-gray-50 rounded-full px-1 py-0.5">
             <button
               onClick={() => onVote(idea._id, idea.userVote === 'upvote' ? 'remove' : 'upvote')}
-              className={`p-1.5 rounded-full transition-colors ${
-                idea.userVote === 'upvote'
+              className={`p-1.5 rounded-full transition-colors ${idea.userVote === 'upvote'
                   ? 'bg-green-100 text-green-600'
                   : 'hover:bg-gray-200 text-gray-500'
-              }`}
+                }`}
             >
               <HiOutlineHandThumbUp className="w-4 h-4" />
             </button>
-            <span className={`text-sm font-medium min-w-[20px] text-center ${
-              voteScore > 0 ? 'text-green-600' : voteScore < 0 ? 'text-red-600' : 'text-gray-600'
-            }`}>
+            <span className={`text-sm font-medium min-w-[20px] text-center ${voteScore > 0 ? 'text-green-600' : voteScore < 0 ? 'text-red-600' : 'text-gray-600'
+              }`}>
               {voteScore}
             </span>
             <button
               onClick={() => onVote(idea._id, idea.userVote === 'downvote' ? 'remove' : 'downvote')}
-              className={`p-1.5 rounded-full transition-colors ${
-                idea.userVote === 'downvote'
+              className={`p-1.5 rounded-full transition-colors ${idea.userVote === 'downvote'
                   ? 'bg-red-100 text-red-600'
                   : 'hover:bg-gray-200 text-gray-500'
-              }`}
+                }`}
             >
               <HiOutlineHandThumbDown className="w-4 h-4" />
             </button>
@@ -276,7 +278,7 @@ export default function IdeaCard({ idea, onVote, onPin, onDelete, isAdmin }) {
               className="flex items-center gap-1 text-gray-500 hover:text-blue-600 transition-colors"
             >
               <HiOutlineChatBubbleLeft className="w-4 h-4" />
-              <span className="text-sm">{idea.commentsCount || 0}</span>
+              <span className="text-sm">{localCommentsCount}</span>
             </button>
 
             <button
@@ -298,7 +300,7 @@ export default function IdeaCard({ idea, onVote, onPin, onDelete, isAdmin }) {
             <h4 className="font-medium text-gray-800 mb-3 text-sm">
               Comments ({comments.length})
             </h4>
-            
+
             {/* Comment List */}
             <div className="space-y-2 mb-3 max-h-48 overflow-y-auto">
               {loadingComments ? (
@@ -324,7 +326,7 @@ export default function IdeaCard({ idea, onVote, onPin, onDelete, isAdmin }) {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
                         <span className="text-xs font-medium text-gray-800">
-                          {comment.isAnonymous ? 'Anonymous' : 
+                          {comment.isAnonymous ? 'Anonymous' :
                             comment.author ? `${comment.author.firstName} ${comment.author.lastName}` : 'Unknown'}
                         </span>
                         <span className="text-xs text-gray-400">
