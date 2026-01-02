@@ -41,16 +41,18 @@ export async function GET(request) {
         
         const storageUsedMB = Math.round((stats.dataSize + stats.indexSize) / (1024 * 1024) * 100) / 100;
         const documentCount = stats.objects || 0;
+        const maxStorageGB = company.subscription?.maxStorageGB || 1;
+        const maxStorageMB = maxStorageGB * 1024; // Convert GB to MB for comparison
 
         storageData.push({
           companyId: company._id,
           name: company.name,
           slug: company.slug,
           storageUsedMB,
-          maxStorageMB: company.subscription?.maxStorageMB || 500,
+          maxStorageGB,
           documentCount,
-          usagePercent: company.subscription?.maxStorageMB 
-            ? Math.round((storageUsedMB / company.subscription.maxStorageMB) * 100)
+          usagePercent: maxStorageMB > 0
+            ? Math.round((storageUsedMB / maxStorageMB) * 100)
             : 0,
           serviceStatus: company.serviceStatus,
           plan: company.subscription?.plan,
@@ -78,7 +80,7 @@ export async function GET(request) {
           name: company.name,
           slug: company.slug,
           storageUsedMB: company.analytics?.storageUsedMB || 0,
-          maxStorageMB: company.subscription?.maxStorageMB || 500,
+          maxStorageGB: company.subscription?.maxStorageGB || 1,
           documentCount: company.analytics?.documentCount || 0,
           usagePercent: 0,
           serviceStatus: company.serviceStatus,

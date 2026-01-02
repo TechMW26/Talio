@@ -149,11 +149,11 @@ export async function POST(request) {
       );
     }
 
-    // Validate slug format
-    const slugRegex = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
-    if (slug.length < 3 || !slugRegex.test(slug)) {
+    // Validate slug format (allow lowercase letters, numbers, hyphens; no leading/trailing hyphens)
+    const slugRegex = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+    if (slug.length < 2 || !slugRegex.test(slug)) {
       return NextResponse.json(
-        { success: false, message: 'Slug must be at least 3 characters, lowercase, and can only contain letters, numbers, and hyphens' },
+        { success: false, message: 'Slug must be at least 2 characters, lowercase, and can only contain letters, numbers, and hyphens (no leading/trailing hyphens)' },
         { status: 400 }
       );
     }
@@ -199,7 +199,7 @@ export async function POST(request) {
         billingCycle: subscription?.billingCycle || 'monthly',
         amount: subscription?.amount || 0,
         maxUsers: subscription?.maxUsers || 10,
-        maxStorageMB: subscription?.maxStorageMB || 500,
+        maxStorageGB: subscription?.maxStorageGB || 1,
       },
       onboarding: {
         amount: onboarding?.amount || 0,

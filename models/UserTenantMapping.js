@@ -56,16 +56,18 @@ UserTenantMappingSchema.index({ tenantCompanyId: 1 });
 UserTenantMappingSchema.index({ databaseName: 1 });
 
 let UserTenantMappingModel = null;
+let lastConnection = null;
 
 /**
  * Get the UserTenantMapping model connected to the superadmin database
  */
 export async function getUserTenantMappingModel() {
-  if (UserTenantMappingModel) {
+  const connection = await connectSuperadminDB();
+  
+  // Check if we need to refresh the model (connection changed or stale)
+  if (UserTenantMappingModel && lastConnection === connection && connection.readyState === 1) {
     return UserTenantMappingModel;
   }
-  
-  const connection = await connectSuperadminDB();
   
   // Check if model already exists on this connection
   if (connection.models.UserTenantMapping) {
@@ -74,6 +76,7 @@ export async function getUserTenantMappingModel() {
     UserTenantMappingModel = connection.model('UserTenantMapping', UserTenantMappingSchema);
   }
   
+  lastConnection = connection;
   return UserTenantMappingModel;
 }
 

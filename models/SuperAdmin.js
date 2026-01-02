@@ -73,16 +73,18 @@ SuperAdminSchema.statics.getModel = async function () {
 
 // We need to get the model from the superadmin connection
 let SuperAdminModel = null;
+let lastConnection = null;
 
 /**
  * Get the SuperAdmin model connected to the superadmin database
  */
 export async function getSuperAdminModel() {
-  if (SuperAdminModel) {
+  const connection = await connectSuperadminDB();
+  
+  // Check if we need to refresh the model (connection changed or stale)
+  if (SuperAdminModel && lastConnection === connection && connection.readyState === 1) {
     return SuperAdminModel;
   }
-  
-  const connection = await connectSuperadminDB();
   
   // Check if model already exists on this connection
   if (connection.models.SuperAdmin) {
@@ -91,6 +93,7 @@ export async function getSuperAdminModel() {
     SuperAdminModel = connection.model('SuperAdmin', SuperAdminSchema);
   }
   
+  lastConnection = connection;
   return SuperAdminModel;
 }
 

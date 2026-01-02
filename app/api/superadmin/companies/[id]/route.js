@@ -9,7 +9,7 @@ import { NextResponse } from 'next/server';
 import { verifySuperAdmin } from '@/lib/superadminAuth';
 import getTenantCompanyModel from '@/models/TenantCompany';
 import getUserTenantMappingModel from '@/models/UserTenantMapping';
-import { getTenantConnection } from '@/lib/tenantDb';
+import { getTenantConnection, dropTenantDatabase } from '@/lib/tenantDb';
 
 /**
  * GET - Get company details
@@ -170,7 +170,10 @@ export async function PATCH(request, { params }) {
 }
 
 /**
- * DELETE - Soft delete company
+ * DELETE - Delete company (soft or hard delete)
+ * Query params:
+ *   - permanent=true: Hard delete - drops the database and removes all records
+ *   - permanent=false (default): Soft delete - marks as inactive
  */
 export async function DELETE(request, { params }) {
   try {
@@ -190,8 +193,10 @@ export async function DELETE(request, { params }) {
     }
 
     const { id } = await params;
+    const { searchParams } = new URL(request.url);
+    const isPermanent = searchParams.get('permanent') === 'true';
+    
     const TenantCompany = await getTenantCompanyModel();
-
     const company = await TenantCompany.findById(id);
 
     if (!company) {
@@ -201,24 +206,59 @@ export async function DELETE(request, { params }) {
       );
     }
 
-    // Soft delete - mark as inactive
-    company.isActive = false;
-    company.serviceStatus = 'terminated';
-    company.servicePausedAt = new Date();
-    company.servicePausedReason = 'Company deleted by superadmin';
-    await company.save();
-
-    // Also deactivate all user mappings for this company
     const UserTenantMapping = await getUserTenantMappingModel();
-    await UserTenantMapping.updateMany(
-      { tenantCompanyId: company._id },
-      { $set: { isActive: false } }
-    );
 
-    return NextResponse.json({
-      success: true,
-      message: 'Company deleted successfully',
-    });
+    if (isPermanent) {
+      // Hard delete - drop database and remove all records
+      console.log(`🗑️ [SuperAdmin] Hard deleting company: ${company.name} (${company.slug})`);
+      
+      // 1. Drop the tenant database
+      if (company.databaseName) {
+        const dropResult = await dropTenantDatabase(company.databaseName);
+        if (!dropResult.success) {
+          console.error(`Failed to drop database: ${dropResult.message}`);
+          // Continue with deletion even if database drop fails
+        } else {
+          console.log(`✅ Dropped database: ${company.databaseName}`);
+        }
+      }
+
+      // 2. Delete all user tenant mappings for this company
+      const mappingDeleteResult = await UserTenantMapping.deleteMany({ tenantCompanyId: company._id });
+      console.log(`✅ Deleted ${mappingDeleteResult.deletedCount} user mappings`);
+
+      // 3. Permanently delete the company record
+      await TenantCompany.findByIdAndDelete(id);
+      console.log(`✅ Deleted company record: ${company.name}`);
+
+      return NextResponse.json({
+        success: true,
+        message: `Company "${company.name}" and all its data have been permanently deleted`,
+        deleted: {
+          company: company.name,
+          databaseDropped: company.databaseName,
+          userMappingsDeleted: mappingDeleteResult.deletedCount,
+        },
+      });
+    } else {
+      // Soft delete - mark as inactive
+      company.isActive = false;
+      company.serviceStatus = 'terminated';
+      company.servicePausedAt = new Date();
+      company.servicePausedReason = 'Company deleted by superadmin';
+      await company.save();
+
+      // Also deactivate all user mappings for this company
+      await UserTenantMapping.updateMany(
+        { tenantCompanyId: company._id },
+        { $set: { isActive: false } }
+      );
+
+      return NextResponse.json({
+        success: true,
+        message: 'Company soft deleted successfully (data preserved)',
+      });
+    }
 
   } catch (error) {
     console.error('[SuperAdmin Company DELETE] Error:', error);

@@ -50,7 +50,7 @@ async function setupTenant(databaseName, companyName, companySlug) {
         tenureDays: Number,
         amount: Number,
         maxUsers: { type: Number, default: 100 },
-        maxStorageMB: { type: Number, default: 5000 },
+        maxStorageGB: { type: Number, default: 5 },
       },
       primaryContact: {
         name: String,
@@ -102,7 +102,7 @@ async function setupTenant(databaseName, companyName, companySlug) {
           endDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), // 1 year
           tenureDays: 365,
           maxUsers: 100,
-          maxStorageMB: 5000,
+          maxStorageGB: 5,
         },
       });
       console.log('✅ Created TenantCompany record');

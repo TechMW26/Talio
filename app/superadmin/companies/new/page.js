@@ -48,7 +48,7 @@ export default function NewCompanyPage() {
       tenureDays: 30,
       amount: 0,
       maxUsers: 10,
-      maxStorageMB: 500,
+      maxStorageGB: 1,
       startDate: new Date().toISOString().split('T')[0],
     },
     
@@ -228,8 +228,9 @@ export default function NewCompanyPage() {
                   onChange={handleChange}
                   className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white"
                   placeholder="acme-corp"
-                  pattern="[a-z0-9][a-z0-9-]*[a-z0-9]"
-                  title="Lowercase letters, numbers, and hyphens only"
+                  pattern="[a-z0-9]+[a-z0-9-]*[a-z0-9]+|[a-z0-9]+"
+                  title="Lowercase letters, numbers, and hyphens only (min 2 chars, no leading/trailing hyphens)"
+                  minLength={2}
                   required
                 />
                 <button
@@ -602,14 +603,14 @@ export default function NewCompanyPage() {
                   <p className="text-xs text-gray-500 mt-1">Company cannot add more users beyond this limit</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Max Storage (MB)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Max Storage (GB)</label>
                   <input
                     type="number"
-                    name="subscription.maxStorageMB"
-                    value={formData.subscription.maxStorageMB}
+                    name="subscription.maxStorageGB"
+                    value={formData.subscription.maxStorageGB}
                     onChange={handleChange}
-                    min="100"
-                    step="100"
+                    min="1"
+                    step="1"
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
                   <p className="text-xs text-gray-500 mt-1">Storage limit for uploads and data</p>

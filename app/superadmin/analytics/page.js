@@ -196,7 +196,7 @@ export default function AnalyticsPage() {
                 </div>
                 <div className="ml-4 text-right">
                   <p className="text-sm font-semibold text-gray-900">{item.storageUsedMB.toFixed(1)} MB</p>
-                  <p className="text-xs text-gray-500">/ {item.maxStorageMB} MB</p>
+                  <p className="text-xs text-gray-500">/ {item.maxStorageGB} GB</p>
                 </div>
               </div>
             ))}
@@ -244,7 +244,7 @@ export default function AnalyticsPage() {
                   </td>
                   <td className="py-4 px-6">
                     <span className="font-medium text-gray-900">{item.storageUsedMB.toFixed(2)} MB</span>
-                    <span className="text-gray-400"> / {item.maxStorageMB} MB</span>
+                    <span className="text-gray-400"> / {item.maxStorageGB} GB</span>
                   </td>
                   <td className="py-4 px-6 text-gray-700">
                     {item.documentCount.toLocaleString()}

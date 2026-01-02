@@ -123,7 +123,7 @@ const TenantCompanySchema = new mongoose.Schema({
     currency: { type: String, default: 'INR' },
     // Limits (manually set)
     maxUsers: { type: Number, default: 10 },
-    maxStorageMB: { type: Number, default: 500 }, // Max storage in MB
+    maxStorageGB: { type: Number, default: 1 }, // Max storage in GB
     currentUserCount: { type: Number, default: 0 },
     // Reminder tracking
     remindersSent: {
@@ -289,9 +289,9 @@ TenantCompanySchema.methods.generateSetupCode = function (expiresInDays = 7) {
   return code;
 };
 
-// Generate database name from slug
-TenantCompanySchema.pre('save', function (next) {
-  if (this.isModified('slug') || !this.databaseName) {
+// Generate database name from slug BEFORE validation
+TenantCompanySchema.pre('validate', function (next) {
+  if (this.slug && (!this.databaseName || this.isModified('slug'))) {
     // Sanitize slug for database name
     const sanitizedSlug = this.slug
       .toLowerCase()
@@ -321,16 +321,18 @@ TenantCompanySchema.index({ 'subscription.endDate': 1 });
 TenantCompanySchema.index({ tags: 1 });
 
 let TenantCompanyModel = null;
+let lastConnection = null;
 
 /**
  * Get the TenantCompany model connected to the superadmin database
  */
 export async function getTenantCompanyModel() {
-  if (TenantCompanyModel) {
+  const connection = await connectSuperadminDB();
+  
+  // Check if we need to refresh the model (connection changed or stale)
+  if (TenantCompanyModel && lastConnection === connection && connection.readyState === 1) {
     return TenantCompanyModel;
   }
-  
-  const connection = await connectSuperadminDB();
   
   // Check if model already exists on this connection
   if (connection.models.TenantCompany) {
@@ -339,6 +341,7 @@ export async function getTenantCompanyModel() {
     TenantCompanyModel = connection.model('TenantCompany', TenantCompanySchema);
   }
   
+  lastConnection = connection;
   return TenantCompanyModel;
 }
 

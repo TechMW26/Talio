@@ -26,6 +26,11 @@ export default function CompanyDetailPage({ params }) {
   const [creatingAdmin, setCreatingAdmin] = useState(false)
   const [resettingPassword, setResettingPassword] = useState(null)
   const [newPassword, setNewPassword] = useState('')
+  // Delete company state
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [deleteType, setDeleteType] = useState('soft') // 'soft' or 'permanent'
 
   useEffect(() => {
     fetchCompany()
@@ -39,7 +44,7 @@ export default function CompanyDetailPage({ params }) {
         tenureDays: company.subscription.tenureDays || 30,
         amount: company.subscription.amount || 0,
         maxUsers: company.subscription.maxUsers || 10,
-        maxStorageMB: company.subscription.maxStorageMB || 500,
+        maxStorageGB: company.subscription.maxStorageGB || 1,
         startDate: company.subscription.startDate ? new Date(company.subscription.startDate).toISOString().split('T')[0] : '',
         status: company.subscription.status || 'active',
       })
@@ -356,6 +361,39 @@ export default function CompanyDetailPage({ params }) {
     }
   }
 
+  // Delete company function
+  const deleteCompany = async (permanent = false) => {
+    if (permanent && deleteConfirmText !== company?.slug) {
+      toast.error('Please type the company slug to confirm permanent deletion')
+      return
+    }
+    try {
+      setDeleting(true)
+      const token = localStorage.getItem('superadmin_token')
+      const url = permanent 
+        ? `/api/superadmin/companies/${id}?permanent=true`
+        : `/api/superadmin/companies/${id}`
+      
+      const res = await fetch(url, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(data.message)
+        router.push('/superadmin/companies')
+      } else {
+        toast.error(data.message)
+      }
+    } catch (error) {
+      toast.error('Failed to delete company')
+    } finally {
+      setDeleting(false)
+      setShowDeleteModal(false)
+      setDeleteConfirmText('')
+    }
+  }
+
   const copySetupUrl = () => {
     if (company?.setupUrl) {
       navigator.clipboard.writeText(company.setupUrl)
@@ -461,6 +499,15 @@ export default function CompanyDetailPage({ params }) {
             className="px-4 py-2 bg-red-100 text-red-700 rounded-xl hover:bg-red-200 transition-colors"
           >
             Suspend
+          </button>
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-red-100 hover:text-red-700 transition-colors flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Delete
           </button>
         </div>
       </div>
@@ -975,11 +1022,13 @@ export default function CompanyDetailPage({ params }) {
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Max Storage (MB)</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Max Storage (GB)</label>
                       <input
                         type="number"
-                        value={subscriptionForm.maxStorageMB}
-                        onChange={(e) => setSubscriptionForm({ ...subscriptionForm, maxStorageMB: Number(e.target.value) })}
+                        value={subscriptionForm.maxStorageGB}
+                        onChange={(e) => setSubscriptionForm({ ...subscriptionForm, maxStorageGB: Number(e.target.value) })}
+                        min="1"
+                        step="1"
                         className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
                       />
                     </div>
@@ -1029,7 +1078,7 @@ export default function CompanyDetailPage({ params }) {
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Max Storage</p>
-                    <p className="text-gray-900">{company.subscription?.maxStorageMB ? `${company.subscription.maxStorageMB} MB` : 'Unlimited'}</p>
+                    <p className="text-gray-900">{company.subscription?.maxStorageGB ? `${company.subscription.maxStorageGB} GB` : 'Unlimited'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">Tenure</p>
@@ -1528,6 +1577,149 @@ export default function CompanyDetailPage({ params }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Company Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full">
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-gray-900">Delete Company</h2>
+                <button
+                  onClick={() => {
+                    setShowDeleteModal(false)
+                    setDeleteConfirmText('')
+                    setDeleteType('soft')
+                  }}
+                  className="p-2 text-gray-400 hover:text-gray-600 rounded-lg"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div className="p-6 space-y-4">
+              {/* Delete Type Selection */}
+              <div className="space-y-3">
+                <label className="flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-colors hover:bg-gray-50"
+                  style={{ borderColor: deleteType === 'soft' ? '#9333ea' : '#e5e7eb' }}
+                >
+                  <input
+                    type="radio"
+                    name="deleteType"
+                    value="soft"
+                    checked={deleteType === 'soft'}
+                    onChange={() => setDeleteType('soft')}
+                    className="mt-1 text-purple-600 focus:ring-purple-500"
+                  />
+                  <div>
+                    <p className="font-medium text-gray-900">Soft Delete (Deactivate)</p>
+                    <p className="text-sm text-gray-500">Company will be marked as inactive. Data is preserved and can be reactivated later.</p>
+                  </div>
+                </label>
+                <label className="flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-colors hover:bg-red-50"
+                  style={{ borderColor: deleteType === 'permanent' ? '#dc2626' : '#e5e7eb' }}
+                >
+                  <input
+                    type="radio"
+                    name="deleteType"
+                    value="permanent"
+                    checked={deleteType === 'permanent'}
+                    onChange={() => setDeleteType('permanent')}
+                    className="mt-1 text-red-600 focus:ring-red-500"
+                  />
+                  <div>
+                    <p className="font-medium text-red-700">Permanent Delete (Drop Database)</p>
+                    <p className="text-sm text-red-600">⚠️ This will permanently delete the company and DROP the entire database. This action CANNOT be undone!</p>
+                  </div>
+                </label>
+              </div>
+
+              {/* Warning for permanent delete */}
+              {deleteType === 'permanent' && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-4 space-y-3">
+                  <div className="flex items-start gap-2">
+                    <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <div>
+                      <p className="text-red-800 font-medium">This will permanently delete:</p>
+                      <ul className="text-red-700 text-sm mt-1 list-disc list-inside">
+                        <li>Company record from superadmin database</li>
+                        <li>Entire tenant database ({company?.databaseName})</li>
+                        <li>All employees, attendance, leaves, projects, and other data</li>
+                        <li>All user-tenant mappings</li>
+                      </ul>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-red-800 mb-2">
+                      Type <span className="font-mono bg-red-100 px-1 rounded">{company?.slug}</span> to confirm:
+                    </label>
+                    <input
+                      type="text"
+                      value={deleteConfirmText}
+                      onChange={(e) => setDeleteConfirmText(e.target.value)}
+                      placeholder={company?.slug}
+                      className="w-full px-4 py-2 bg-white border border-red-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowDeleteModal(false)
+                    setDeleteConfirmText('')
+                    setDeleteType('soft')
+                  }}
+                  className="px-6 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors"
+                  disabled={deleting}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => deleteCompany(deleteType === 'permanent')}
+                  disabled={deleting || (deleteType === 'permanent' && deleteConfirmText !== company?.slug)}
+                  className={`px-6 py-2 rounded-xl transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ${
+                    deleteType === 'permanent' 
+                      ? 'bg-red-600 text-white hover:bg-red-700'
+                      : 'bg-yellow-600 text-white hover:bg-yellow-700'
+                  }`}
+                >
+                  {deleting ? (
+                    <>
+                      <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Deleting...
+                    </>
+                  ) : deleteType === 'permanent' ? (
+                    <>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      Permanently Delete
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                      </svg>
+                      Deactivate Company
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
