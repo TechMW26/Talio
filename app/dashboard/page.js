@@ -32,16 +32,35 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // Clear the login redirect flag on successful dashboard load
+    sessionStorage.removeItem('__login_redirecting')
+
+    // Remove _auth param from URL (cleanup)
+    if (typeof window !== 'undefined' && window.location.search.includes('_auth=local')) {
+      const url = new URL(window.location.href)
+      url.searchParams.delete('_auth')
+      window.history.replaceState({}, '', url.pathname)
+    }
+
     // Immediately try to get user from localStorage
     try {
       const userData = localStorage.getItem('user')
-      if (userData) {
+      const token = localStorage.getItem('token')
+
+      if (userData && token) {
         setUser(JSON.parse(userData))
+        setLoading(false)
+      } else {
+        // No auth data, redirect to login
+        console.log('[Dashboard] No auth data found, redirecting to login...')
+        window.location.href = '/login'
+        return
       }
     } catch (e) {
       console.error('[Dashboard] Failed to parse user data:', e)
+      window.location.href = '/login'
+      return
     }
-    setLoading(false)
 
     // Play login success sound if coming from fresh login (defer to not block render)
     try {

@@ -96,7 +96,17 @@ export async function middleware(request) {
   }
 
   // For page routes, redirect to login if no token
+  // BUT: Allow /dashboard through without token check - dashboard handles its own auth
+  // This prevents redirect loops when cookies aren't working properly (e.g., VS Code Simple Browser)
   if (!token && request.nextUrl.pathname.startsWith('/dashboard')) {
+    // Check for special bypass param (set by login page when redirecting)
+    const bypassAuth = request.nextUrl.searchParams.get('_auth') === 'local'
+    if (bypassAuth) {
+      // Allow through - dashboard will verify localStorage auth
+      console.log('[Middleware] Allowing dashboard access with _auth=local bypass')
+      return NextResponse.next()
+    }
+
     return NextResponse.redirect(new URL('/login', request.url))
   }
 

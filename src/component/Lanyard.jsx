@@ -256,22 +256,27 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
       animationFrameId = requestAnimationFrame(animate);
     }
 
-    function updateLanyardLogos(ax, ay, cx, cy, bx, by) {
-      lanyardLogos.innerHTML = '';
+    // Create cached image elements once (not on every frame)
+    const cachedLogoImages = [];
+    const numLogos = 3;
+    for (let i = 1; i < numLogos; i++) {
+      const image = document.createElementNS('http://www.w3.org/2000/svg', 'image');
+      image.setAttribute('href', '/assets/fox.png');
+      image.setAttribute('width', '20');
+      image.setAttribute('height', '20');
+      lanyardLogos.appendChild(image);
+      cachedLogoImages.push(image);
+    }
 
-      const numLogos = 3;
-      for (let i = 1; i < numLogos; i++) {
-        const t = i / numLogos;
+    function updateLanyardLogos(ax, ay, cx, cy, bx, by) {
+      // Update positions of cached images instead of recreating them
+      for (let i = 0; i < cachedLogoImages.length; i++) {
+        const t = (i + 1) / numLogos;
         const x = Math.pow(1 - t, 2) * ax + 2 * (1 - t) * t * cx + Math.pow(t, 2) * bx;
         const y = Math.pow(1 - t, 2) * ay + 2 * (1 - t) * t * cy + Math.pow(t, 2) * by;
 
-        const image = document.createElementNS('http://www.w3.org/2000/svg', 'image');
-        image.setAttribute('href', '/assets/fox.png');
-        image.setAttribute('x', x - 10);
-        image.setAttribute('y', y - 10);
-        image.setAttribute('width', '20');
-        image.setAttribute('height', '20');
-        lanyardLogos.appendChild(image);
+        cachedLogoImages[i].setAttribute('x', x - 10);
+        cachedLogoImages[i].setAttribute('y', y - 10);
       }
     }
 

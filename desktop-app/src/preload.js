@@ -9,64 +9,65 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('talioDesktop', {
   // Identify as desktop app
   isDesktopApp: true,
-  
+
   // Platform info
   platform: process.platform,
-  
+
   // Auth token management
   getAuthToken: () => ipcRenderer.invoke('get-auth-token'),
   setAuthToken: (token) => ipcRenderer.invoke('set-auth-token', token),
   clearAuthToken: () => ipcRenderer.invoke('clear-auth-token'),
   checkAuthToken: () => ipcRenderer.invoke('check-auth-token'),
-  
-  // App version
+
+  // App version and info
   getVersion: () => ipcRenderer.invoke('get-app-version'),
-  
+  getAppInfo: () => ipcRenderer.invoke('get-app-info'),
+
   // Capture status and controls
   getCaptureStatus: () => ipcRenderer.invoke('get-capture-status'),
   forceCapture: () => ipcRenderer.invoke('force-capture'),
-  
+
   // Permission management
   getPermissionStatus: () => ipcRenderer.invoke('get-permission-status'),
   grantAllPermissions: () => ipcRenderer.invoke('grant-all-permissions'),
   checkPermissions: () => ipcRenderer.invoke('check-permissions'),
   retryPermissions: () => ipcRenderer.invoke('retry-permissions'),
   openSystemPreferences: (section) => ipcRenderer.invoke('open-system-preferences', section),
-  
+
   // Location services
   requestLocationPermission: () => ipcRenderer.invoke('request-location-permission'),
   getCurrentLocation: () => ipcRenderer.invoke('get-current-location'),
-  
+
   // Google OAuth via system browser
   openGoogleOAuth: () => ipcRenderer.invoke('open-google-oauth'),
-  
+
   // Open external URL in system browser (for OAuth)
   openExternal: (url) => ipcRenderer.invoke('open-external-url', url),
-  
+
   // Storage info
   getStoragePaths: () => ipcRenderer.invoke('get-storage-paths'),
-  
+
   // Event listeners
   onCaptureComplete: (callback) => {
     ipcRenderer.on('capture-complete', (event, data) => callback(data));
     return () => ipcRenderer.removeAllListeners('capture-complete');
   },
-  
+
   onUploadComplete: (callback) => {
     ipcRenderer.on('upload-complete', (event, data) => callback(data));
     return () => ipcRenderer.removeAllListeners('upload-complete');
   },
-  
+
   onPermissionBlocked: (callback) => {
     ipcRenderer.on('permission-blocked', (event, data) => callback(data));
     return () => ipcRenderer.removeAllListeners('permission-blocked');
   },
-  
+
   onPermissionsGranted: (callback) => {
     ipcRenderer.on('permissions-granted', (event, data) => callback(data));
     return () => ipcRenderer.removeAllListeners('permissions-granted');
   },
-  
+
   // Listen for auth token from deep link
   onAuthReceived: (callback) => {
     ipcRenderer.on('auth-token-received', (event, data) => callback(data));
@@ -89,27 +90,27 @@ if (typeof window !== 'undefined') {
   window.addEventListener('DOMContentLoaded', () => {
     // Override localStorage.setItem
     const originalSetItem = localStorage.setItem.bind(localStorage);
-    localStorage.setItem = function(key, value) {
+    localStorage.setItem = function (key, value) {
       originalSetItem(key, value);
-      
+
       // Sync token to main process
       if (key === 'token') {
         console.log('[Talio] Token set, syncing to desktop app');
         ipcRenderer.invoke('set-auth-token', value);
       }
     };
-    
+
     // Override localStorage.removeItem for logout
     const originalRemoveItem = localStorage.removeItem.bind(localStorage);
-    localStorage.removeItem = function(key) {
+    localStorage.removeItem = function (key) {
       originalRemoveItem(key);
-      
+
       if (key === 'token') {
         console.log('[Talio] Token removed, clearing from desktop app');
         ipcRenderer.invoke('clear-auth-token');
       }
     };
-    
+
     // Sync existing token if present
     const existingToken = localStorage.getItem('token');
     if (existingToken) {

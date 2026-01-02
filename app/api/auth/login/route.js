@@ -26,11 +26,11 @@ export async function POST(request) {
     // Look up which tenant database this user belongs to
     let tenantInfo = null;
     let TenantUser, TenantEmployee, TenantDepartment, TenantDesignation, TenantUserSession, TenantCompanySettings;
-    
+
     // Retry logic for transient network errors (e.g., DNS timeouts)
     const MAX_RETRIES = 2;
     let lastError = null;
-    
+
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
         tenantInfo = await getTenantByEmail(email);
@@ -38,18 +38,18 @@ export async function POST(request) {
       } catch (tenantError) {
         lastError = tenantError;
         console.error(`[Login] Tenant lookup attempt ${attempt}/${MAX_RETRIES} failed:`, tenantError.message);
-        
+
         // Check if it's a transient error worth retrying
-        const isTransient = tenantError.message.includes('ETIMEOUT') || 
-                           tenantError.message.includes('ECONNREFUSED') ||
-                           tenantError.message.includes('querySrv');
-        
+        const isTransient = tenantError.message.includes('ETIMEOUT') ||
+          tenantError.message.includes('ECONNREFUSED') ||
+          tenantError.message.includes('querySrv');
+
         if (isTransient && attempt < MAX_RETRIES) {
           // Wait before retry (exponential backoff)
           await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
           continue;
         }
-        
+
         // Non-transient error or max retries reached
         console.error('[Login] Tenant lookup failed after retries:', tenantError.message);
         return NextResponse.json(
@@ -58,7 +58,7 @@ export async function POST(request) {
         );
       }
     }
-    
+
     if (!tenantInfo) {
       // SECURITY: No tenant mapping = no access
       console.warn(`[Login] No tenant mapping found for ${email} - access denied`);
@@ -67,7 +67,7 @@ export async function POST(request) {
         { status: 401 }
       );
     }
-    
+
     // Check if tenant service is active
     const serviceCheck = await checkServiceStatus(tenantInfo.databaseName);
     if (!serviceCheck.active) {
@@ -76,14 +76,14 @@ export async function POST(request) {
         { status: 403 }
       );
     }
-    
+
     console.log(`[Login] User ${email} belongs to tenant: ${tenantInfo.companySlug} (${tenantInfo.databaseName})`);
-    
+
     // Get models bound to tenant database
     const tenantModels = await getTenantModels(tenantInfo.databaseName, [
       'User', 'Employee', 'Department', 'Designation', 'UserSession', 'CompanySettings'
     ]);
-    
+
     TenantUser = tenantModels.User;
     TenantEmployee = tenantModels.Employee;
     TenantDepartment = tenantModels.Department;
@@ -136,28 +136,28 @@ export async function POST(request) {
     const lastLogin = new Date()
     try {
       const updateData = { lastLogin }
-      
+
       // Set firstLoginAt and profileCompletionDeadline on first login (after password change)
       if (!user.forcePasswordChange && !user.profileCompletion?.firstLoginAt) {
         const deadline = new Date()
         deadline.setDate(deadline.getDate() + 7) // 7 days from now
-        
+
         updateData['profileCompletion.firstLoginAt'] = lastLogin
         updateData['profileCompletion.profileCompletionDeadline'] = deadline
-        
+
         console.log('[Login] Setting first login and profile completion deadline:', deadline)
       }
-      
+
       await TenantUser.updateOne(
         { _id: user._id },
         { $set: updateData },
         { timestamps: false }
       )
       user.lastLogin = lastLogin
-      
+
       // Update tenant login stats (fire and forget)
       if (tenantInfo) {
-        updateUserLoginStats(email).catch(err => 
+        updateUserLoginStats(email).catch(err =>
           console.warn('[Login] Failed to update tenant login stats:', err.message)
         );
       }
@@ -201,29 +201,29 @@ export async function POST(request) {
     const forwarded = request.headers.get('x-forwarded-for')
     const ipAddress = forwarded ? forwarded.split(',')[0].trim() : request.headers.get('x-real-ip') || 'Unknown'
 
-    // Create UserSession record (fire and forget)
-    ;(async () => {
-      try {
-        const deviceInfo = TenantUserSession.parseUserAgent ? 
-          TenantUserSession.parseUserAgent(userAgent) : 
-          { browser: 'Unknown', isMobile: false, device: 'Unknown' }
-        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+      // Create UserSession record (fire and forget)
+      ; (async () => {
+        try {
+          const deviceInfo = TenantUserSession.parseUserAgent ?
+            TenantUserSession.parseUserAgent(userAgent) :
+            { browser: 'Unknown', isMobile: false, device: 'Unknown' }
+          const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
 
-        await TenantUserSession.create({
-          user: user._id,
-          tokenId,
-          deviceInfo,
-          userAgent,
-          ipAddress,
-          expiresAt,
-          lastActivityAt: new Date(),
-        })
+          await TenantUserSession.create({
+            user: user._id,
+            tokenId,
+            deviceInfo,
+            userAgent,
+            ipAddress,
+            expiresAt,
+            lastActivityAt: new Date(),
+          })
 
-        console.log(`[Login] Session created for user ${user._id} with tokenId ${tokenId}`)
-      } catch (sessionError) {
-        console.error('Failed to create user session:', sessionError)
-      }
-    })()
+          console.log(`[Login] Session created for user ${user._id} with tokenId ${tokenId}`)
+        } catch (sessionError) {
+          console.error('Failed to create user session:', sessionError)
+        }
+      })()
 
     // Fetch full employee data if employeeId exists
     let employeeData = null
@@ -322,11 +322,11 @@ export async function POST(request) {
 
     // Return user data without password, including employee details
     // IMPORTANT: employeeId is stored as an object with _id for frontend compatibility
-    
+
     // Get department head info from user meta (or check departments if not synced)
     let isDepartmentHead = user.isDepartmentHead || false;
     let headOfDepartments = user.headOfDepartments || [];
-    
+
     // If not in user meta, check Department model (fallback for existing data)
     if (!isDepartmentHead && user.employeeId) {
       try {
@@ -337,11 +337,11 @@ export async function POST(request) {
             { heads: user.employeeId }
           ]
         }).select('_id name').lean();
-        
+
         if (deptHeadCheck.length > 0) {
           isDepartmentHead = true;
           headOfDepartments = deptHeadCheck.map(d => d._id);
-          
+
           // Sync to user meta (fire and forget)
           TenantUser.updateOne(
             { _id: user._id },
@@ -352,7 +352,7 @@ export async function POST(request) {
         console.error('Error checking department head status:', error);
       }
     }
-    
+
     const userData = {
       id: user._id.toString(),
       _id: user._id.toString(),
@@ -434,12 +434,25 @@ export async function POST(request) {
       })
     }
 
-    return NextResponse.json({
+    // Create response with Set-Cookie header for reliable cookie setting
+    // This ensures the middleware can read the token on subsequent requests
+    const response = NextResponse.json({
       success: true,
       message: 'Login successful',
       token,
       user: userData,
     })
+
+    // Set token cookie from server - more reliable than client-side document.cookie
+    response.cookies.set('token', token, {
+      httpOnly: false, // Allow client-side access for logout/reading
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60 // 7 days
+    })
+
+    return response
 
   } catch (error) {
     console.error('Login error:', error)

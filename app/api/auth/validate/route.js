@@ -8,7 +8,7 @@ export async function GET(request) {
   try {
     // Get token from Authorization header
     const authHeader = request.headers.get('Authorization')
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json(
         { valid: false, message: 'No token provided' },
@@ -38,7 +38,7 @@ export async function GET(request) {
 
     // Get tenant-specific User model
     const User = await getTenantModel(payload.databaseName, 'User')
-    
+
     // Check if user still exists and is active
     const user = await User.findById(payload.userId).select('isActive email forcePasswordChange')
 
@@ -56,15 +56,31 @@ export async function GET(request) {
       )
     }
 
-    return NextResponse.json({
+    // Create response
+    const response = NextResponse.json({
       valid: true,
       userId: payload.userId,
       forcePasswordChange: user.forcePasswordChange === true
     })
 
+    // Ensure cookie is set from server side (fixes loop when client cookie not set properly)
+    // Check if cookie exists in request
+    const existingCookie = request.cookies.get('token')?.value
+    if (!existingCookie && token) {
+      response.cookies.set('token', token, {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 7 * 24 * 60 * 60 // 7 days
+      })
+    }
+
+    return response
+
   } catch (error) {
     console.error('[Auth Validate] Error:', error.message)
-    
+
     // Token expired or invalid
     if (error.code === 'ERR_JWT_EXPIRED') {
       return NextResponse.json(

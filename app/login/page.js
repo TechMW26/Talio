@@ -15,15 +15,40 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [checking, setChecking] = useState(true)
+  const [isRedirecting, setIsRedirecting] = useState(false)
+
+  // Check if running in Electron/desktop app
+  const isDesktopApp = () => {
+    if (typeof window === 'undefined') return false
+    if (window.talioDesktop?.isDesktopApp) return true
+    if (navigator.userAgent.toLowerCase().includes('electron')) return true
+    return false
+  }
 
   // Check if user is already logged in
   useEffect(() => {
+    // Check if we're already in the process of redirecting (prevents loop)
+    if (sessionStorage.getItem('__login_redirecting')) {
+      console.log('[Login Page] Already redirecting, skipping check...')
+      return
+    }
+
+    // Prevent multiple executions during redirect
+    if (isRedirecting) return
+
+    let hasStarted = false
+
     const checkSession = async () => {
+      // Prevent double execution
+      if (hasStarted) return
+      hasStarted = true
+
       console.log('[Login Page] Checking session...')
-      
+      console.log('[Login Page] Is Desktop App:', isDesktopApp())
+
       // Multi-tenant: No setup check needed - admin accounts are created by superadmin
       // Login uses dynamic tenant detection based on user email
-      
+
       const token = localStorage.getItem('token')
       const user = localStorage.getItem('user')
 
@@ -31,31 +56,42 @@ export default function LoginPage() {
       console.log('[Login Page] User exists:', !!user)
 
       if (token && user) {
+        // For desktop app, add timeout to validation to prevent hanging
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+
         // Validate the token before redirecting
         try {
           const response = await fetch('/api/auth/validate', {
             headers: {
               'Authorization': `Bearer ${token}`
-            }
+            },
+            signal: controller.signal
           })
-          
+          clearTimeout(timeoutId)
+
           if (response.ok) {
             const data = await response.json()
-            
+
             // CRITICAL: Ensure cookie is set before redirecting
-            // This fixes the loop where localStorage has token but cookie is missing
-            document.cookie = `token=${token}; path=/; max-age=${7 * 24 * 60 * 60}` // 7 days
-            
+            document.cookie = `token=${token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax` // 7 days
+
+            // Set redirecting flag to prevent re-execution
+            setIsRedirecting(true)
+            // Also set sessionStorage flag to survive page reloads
+            sessionStorage.setItem('__login_redirecting', 'true')
+
             // Check if user needs to change password
             if (data.forcePasswordChange) {
               console.log('[Login Page] User needs to change password, redirecting...')
               window.location.href = '/auth/change-password'
               return
             }
-            
+
             // Token is valid, redirect to dashboard
             console.log('[Login Page] Token valid, redirecting to dashboard...')
-            window.location.href = '/dashboard'
+            // Use _auth=local to bypass middleware cookie check (for environments where cookies don't work)
+            window.location.href = '/dashboard?_auth=local'
             return // Keep showing loading while redirecting
           } else {
             // Token is invalid, clear storage and show login
@@ -67,9 +103,18 @@ export default function LoginPage() {
             setChecking(false)
           }
         } catch (error) {
+          clearTimeout(timeoutId)
           console.error('[Login Page] Token validation error:', error)
+
+          // For desktop app, if validation times out, show login form (don't clear storage)
+          // The user may be offline and we don't want to lock them out
+          if (isDesktopApp() && error.name === 'AbortError') {
+            console.log('[Login Page] Desktop app validation timeout, showing login form...')
+            setChecking(false)
+            return
+          }
+
           // Network error - clear invalid session and show login form
-          // Do NOT redirect to dashboard as token may be invalid
           console.log('[Login Page] Network error during validation, clearing session...')
           localStorage.removeItem('token')
           localStorage.removeItem('user')
@@ -78,6 +123,9 @@ export default function LoginPage() {
           setChecking(false)
         }
       } else {
+        // Clear redirect flag since there's no session
+        sessionStorage.removeItem('__login_redirecting')
+
         // Check for error in URL params
         const urlParams = new URLSearchParams(window.location.search)
         const error = urlParams.get('error')
@@ -97,17 +145,20 @@ export default function LoginPage() {
     }
 
     // Add a safety timeout to prevent infinite "Checking session..."
+    // Reduced timeout for desktop app
+    const timeoutMs = isDesktopApp() ? 3000 : 5000
     const safetyTimeout = setTimeout(() => {
       console.log('[Login Page] Safety timeout triggered, showing login form...')
+      sessionStorage.removeItem('__login_redirecting')
       setChecking(false)
-    }, 5000) // 5 second timeout
+    }, timeoutMs)
 
     checkSession().finally(() => {
       clearTimeout(safetyTimeout)
     })
 
     return () => clearTimeout(safetyTimeout)
-  }, [])
+  }, [isRedirecting]) // Re-run if redirect state changes
 
   const handleChange = (e) => {
     setFormData({
@@ -134,7 +185,7 @@ export default function LoginPage() {
       if (response.ok) {
         // Set flag for dashboard to play login success sound
         sessionStorage.setItem('playLoginSound', 'true')
-        
+
         toast.success('Login successful!')
         // Store in localStorage
         localStorage.setItem('token', data.token)
@@ -212,7 +263,7 @@ export default function LoginPage() {
       <div className="min-h-screen flex items-center justify-center px-4 py-8">
         <div className="w-full max-w-md">
           {/* Clean card with subtle shadow */}
-          <div 
+          <div
             className="rounded-3xl shadow-xl overflow-hidden bg-white border border-gray-100"
           >
             <div className="p-8 md:p-10">

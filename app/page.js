@@ -8,19 +8,19 @@ import { useEffect, useState } from 'react'
  */
 function isDesktopApp() {
   if (typeof window === 'undefined') return false
-  
+
   // Method 1: Check talioDesktop API from preload
   if (window.talioDesktop?.isDesktopApp) return true
-  
+
   // Method 2: Check user agent for Electron
   if (navigator.userAgent.toLowerCase().includes('electron')) return true
-  
+
   // Method 3: Check for Electron-specific objects
   if (window.process?.type === 'renderer') return true
-  
+
   // Method 4: Check if window.require exists (Electron context)
   if (typeof window.require === 'function') return true
-  
+
   return false
 }
 
@@ -28,22 +28,20 @@ export default function Home() {
   const [showClearOption, setShowClearOption] = useState(false)
 
   useEffect(() => {
-    // Check if initial setup is needed first
+    // Use a ref-like approach with a flag to prevent double execution
+    let hasStarted = false
+
     const checkSetupAndSession = async () => {
+      // Prevent double execution within same render cycle
+      if (hasStarted) return
+      hasStarted = true
+
       try {
         console.log('[Session Check] Starting...')
-        
-        // First, check if setup is needed (no admin users)
-        const setupResponse = await fetch('/api/setup/check')
-        const setupData = await setupResponse.json()
-        
-        if (setupData.success && setupData.needsSetup) {
-          console.log('[Session Check] Initial setup needed, redirecting to setup...')
-          window.location.replace('/setup')
-          return
-        }
+        console.log('[Session Check] Is Desktop App:', isDesktopApp())
 
-        // If setup is complete, check for existing session
+        // First, check for existing session in localStorage
+        // This is faster than API call and prevents loops
         const token = localStorage.getItem('token')
         const user = localStorage.getItem('user')
 
@@ -53,43 +51,66 @@ export default function Home() {
         if (token && user) {
           // User is logged in, redirect to dashboard
           console.log('[Session Check] Redirecting to dashboard...')
-          window.location.replace('/dashboard')
-        } else {
-          // No session, redirect to login page
-          console.log('[Session Check] Redirecting to login...')
-          window.location.replace('/login')
+          window.location.href = '/dashboard'
+          return
         }
+
+        // For desktop app, skip setup check (handled by superadmin)
+        // Just redirect to login directly
+        if (isDesktopApp()) {
+          console.log('[Session Check] Desktop app - redirecting to login...')
+          window.location.href = '/login'
+          return
+        }
+
+        // For web app, check if setup is needed (with timeout)
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 3000) // 3 second timeout
+
+        try {
+          const setupResponse = await fetch('/api/setup/check', { signal: controller.signal })
+          clearTimeout(timeoutId)
+          const setupData = await setupResponse.json()
+
+          if (setupData.success && setupData.needsSetup) {
+            console.log('[Session Check] Initial setup needed, redirecting to setup...')
+            window.location.href = '/setup'
+            return
+          }
+        } catch (fetchError) {
+          clearTimeout(timeoutId)
+          console.log('[Session Check] Setup check failed/timeout, proceeding to login...')
+        }
+
+        // No session, redirect to login page
+        console.log('[Session Check] Redirecting to login...')
+        window.location.href = '/login'
+
       } catch (error) {
         console.error('[Session Check] Error:', error)
-        // On error, try to redirect to login
-        // If setup check failed, login page will handle it
-        // CRITICAL: Don't clear storage in desktop app - causes white screen
-        if (!isDesktopApp()) {
-          try {
-            localStorage.clear()
-            sessionStorage.clear()
-          } catch (e) {
-            console.error('[Session Check] Failed to clear storage:', e)
-          }
-        } else {
-          console.log('[Session Check] Desktop app detected, skipping storage clear')
-        }
-        window.location.replace('/login')
+        // On error, redirect to login
+        console.log('[Session Check] Error occurred, redirecting to login...')
+        window.location.href = '/login'
       }
     }
 
     checkSetupAndSession()
 
-    // Set a timeout to show clear cache option if stuck
+    // Set a timeout to show clear cache option if stuck (only for web browser)
     const stuckTimer = setTimeout(() => {
-      // Don't show clear cache option in desktop app - it causes issues
       if (!isDesktopApp()) {
         setShowClearOption(true)
+      } else {
+        // For desktop app, try login redirect if stuck
+        console.log('[Session Check] Desktop app stuck, forcing login redirect...')
+        window.location.href = '/login'
       }
-    }, 3000) // Show option after 3 seconds (increased for setup check)
+    }, 5000) // Show option after 5 seconds
 
-    return () => clearTimeout(stuckTimer)
-  }, [])
+    return () => {
+      clearTimeout(stuckTimer)
+    }
+  }, []) // Empty dependency array - run only once
 
   const clearCacheAndRedirect = () => {
     // CRITICAL: Don't clear storage in desktop app
@@ -98,7 +119,7 @@ export default function Home() {
       window.location.replace('/login')
       return
     }
-    
+
     // Clear all storage
     try {
       localStorage.clear()

@@ -17,10 +17,27 @@ const screenshotService = require('./screenshotService');
 const debugLogger = require('./debugLogger');
 const { PermissionHandler } = require('./permissionHandler');
 
-// Constants
-const APP_URL = 'https://app.talio.in';
+// Constants - Support environment variable for development/testing
+// In production builds, defaults to https://app.talio.in
+// For development: set TALIO_APP_URL environment variable
+const APP_URL = process.env.TALIO_APP_URL || 'https://app.talio.in';
 const PROTOCOL_NAME = 'talio';
 const store = new Store();
+
+// Log the app URL being used
+console.log(`[Talio] Using APP_URL: ${APP_URL}`);
+
+// Fix GPU/render process crashes on Windows
+// Disable hardware acceleration if it causes issues
+app.disableHardwareAcceleration();
+
+// Additional flags to prevent render crashes
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('disable-software-rasterizer');
+app.commandLine.appendSwitch('disable-gpu-compositing');
+app.commandLine.appendSwitch('disable-gpu-sandbox');
+app.commandLine.appendSwitch('no-sandbox');
+app.commandLine.appendSwitch('ignore-certificate-errors');
 
 // Global references
 let mainWindow = null;
@@ -72,7 +89,7 @@ app.on('second-instance', (event, commandLine) => {
     debugLogger.log('info', 'DeepLink', `Received from second instance: ${url}`);
     handleDeepLink(url);
   }
-  
+
   if (mainWindow) {
     if (mainWindow.isMinimized()) mainWindow.restore();
     mainWindow.show();
@@ -87,14 +104,14 @@ function handleDeepLink(url) {
   try {
     const parsedUrl = new URL(url);
     const action = parsedUrl.hostname || parsedUrl.pathname.replace(/^\/+/, '');
-    
+
     debugLogger.log('info', 'DeepLink', `Action: ${action}`);
-    
+
     if (action === 'auth' || action === 'callback') {
       // OAuth callback
       const token = parsedUrl.searchParams.get('token');
       const error = parsedUrl.searchParams.get('error');
-      
+
       if (error) {
         debugLogger.log('error', 'DeepLink', `OAuth error: ${error}`);
         if (mainWindow) {
@@ -104,16 +121,16 @@ function handleDeepLink(url) {
         }
         return;
       }
-      
+
       if (token) {
         debugLogger.log('info', 'DeepLink', 'OAuth token received, storing...');
         store.set('authToken', token);
-        
+
         // Inject token into the web app
         if (mainWindow) {
           mainWindow.show();
           mainWindow.focus();
-          
+
           // Store token and reload to authenticated state
           mainWindow.webContents.executeJavaScript(`
             localStorage.setItem('token', '${token}');
@@ -160,7 +177,7 @@ function createTrayIcon(state) {
     if (!icon.isEmpty()) {
       return icon.resize({ width: 16, height: 16 });
     }
-  } catch {}
+  } catch { }
 
   // Fallback to default icon
   const defaultPath = path.join(__dirname, '..', 'build', 'tray-icon.png');
@@ -169,7 +186,7 @@ function createTrayIcon(state) {
     if (!icon.isEmpty()) {
       return icon.resize({ width: 16, height: 16 });
     }
-  } catch {}
+  } catch { }
 
   return nativeImage.createEmpty();
 }
@@ -202,11 +219,11 @@ function setTrayState(state) {
  */
 function flashTrayCapture() {
   if (!tray) return;
-  
+
   // Quick visual feedback - no text notification
   const originalState = currentTrayState;
   setTrayState(TRAY_STATES.HEALTHY);
-  
+
   setTimeout(() => {
     // Return to original or appropriate state
     setTrayState(originalState);
@@ -253,16 +270,16 @@ async function checkScreenPermission() {
  */
 async function requestLocationPermission() {
   debugLogger.log('info', 'Permission', 'Requesting location permission...');
-  
+
   if (process.platform === 'darwin') {
     // macOS: Check and request location permission
     const status = systemPreferences.getMediaAccessStatus('location');
     debugLogger.log('info', 'Permission', `Location permission status: ${status}`);
-    
+
     if (status === 'granted') {
       return { granted: true };
     }
-    
+
     if (status === 'denied') {
       // Show dialog to open settings
       const result = await dialog.showMessageBox({
@@ -273,19 +290,19 @@ async function requestLocationPermission() {
         buttons: ['Open System Settings', 'Cancel'],
         defaultId: 0
       });
-      
+
       if (result.response === 0) {
         shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_LocationServices');
       }
-      
+
       return { granted: false, reason: 'denied' };
     }
-    
+
     // Status is 'not-determined' - need to trigger the native prompt
     // On macOS, we trigger location request via the renderer process
     return { granted: false, reason: 'not-determined', needsPrompt: true };
   }
-  
+
   // Windows: Location permission is handled by the OS when geolocation is requested
   // We'll let the renderer handle it via navigator.geolocation
   return { granted: true, platform: 'windows' };
@@ -301,7 +318,7 @@ async function getCurrentLocation() {
       resolve({ error: 'No window available' });
       return;
     }
-    
+
     // Use renderer process to get location (has access to navigator.geolocation)
     mainWindow.webContents.executeJavaScript(`
       new Promise((resolve) => {
@@ -340,12 +357,12 @@ function openGoogleOAuth() {
   // Build OAuth URL that will redirect back to our deep link
   const callbackUrl = encodeURIComponent(`${APP_URL}/api/auth/desktop-callback`);
   const oauthUrl = `${APP_URL}/api/auth/google?desktop=true&callback=${callbackUrl}`;
-  
+
   debugLogger.log('info', 'OAuth', `Opening Google OAuth in browser: ${oauthUrl}`);
-  
+
   // Open in system default browser
   shell.openExternal(oauthUrl);
-  
+
   return { opened: true };
 }
 
@@ -456,6 +473,7 @@ function showOfflinePage() {
         .status { margin-top: 24px; font-size: 14px; color: #888; }
         .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #ff6b6b; margin-right: 8px; animation: blink 2s infinite; }
         .dot.checking { background: #ffa500; }
+        .url { font-size: 12px; color: #999; margin-top: 16px; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
       </style>
     </head>
@@ -467,6 +485,7 @@ function showOfflinePage() {
       <p>Please check your network. Talio will reconnect automatically.</p>
       <button id="retryBtn" onclick="retryConnection()">Try Again</button>
       <div class="status"><span class="dot" id="statusDot"></span><span id="statusText">Waiting for connection...</span></div>
+      <div class="url">Connecting to: ` + APP_URL + `</div>
       <script>
         async function retryConnection() {
           const btn = document.getElementById('retryBtn');
@@ -479,11 +498,11 @@ function showOfflinePage() {
           statusText.textContent = 'Checking connection...';
           
           try {
-            const response = await fetch('${APP_URL}/api/health', { method: 'HEAD', cache: 'no-cache' });
+            const response = await fetch('` + APP_URL + `/api/health', { method: 'HEAD', cache: 'no-cache' });
             if (response.ok) {
               statusText.textContent = 'Connected! Redirecting...';
               dot.style.background = '#10b981';
-              window.location.href = '${APP_URL}';
+              window.location.href = '` + APP_URL + `';
             } else {
               throw new Error('Server not responding');
             }
@@ -499,7 +518,82 @@ function showOfflinePage() {
     </html>
   `;
 
-  mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(offlineHTML)}`);
+  mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(offlineHTML));
+}
+
+/**
+ * Show error page with details (for non-network errors)
+ */
+function showErrorPage(errorCode, errorDescription, url) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+
+  setTrayState(TRAY_STATES.ERROR);
+
+  const errorHTML = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          background: #1a1a2e;
+          height: 100vh;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          color: #fff;
+          padding: 40px;
+        }
+        .icon { width: 80px; height: 80px; margin-bottom: 24px; color: #ef4444; }
+        h1 { font-size: 24px; margin-bottom: 12px; }
+        p { font-size: 16px; color: #a0a0a0; margin-bottom: 24px; text-align: center; max-width: 500px; }
+        .error-box {
+          background: rgba(255,255,255,0.1);
+          border-radius: 8px;
+          padding: 16px 24px;
+          margin-bottom: 24px;
+          font-family: monospace;
+          font-size: 14px;
+          max-width: 600px;
+          word-break: break-all;
+        }
+        .error-code { color: #ef4444; font-weight: bold; }
+        .error-url { color: #60a5fa; }
+        button {
+          padding: 12px 32px;
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer;
+          transition: transform 0.2s, opacity 0.2s;
+          margin: 8px;
+        }
+        button:hover { transform: translateY(-2px); }
+        button.secondary { background: rgba(255,255,255,0.2); }
+        .btn-group { display: flex; gap: 12px; }
+      </style>
+    </head>
+    <body>
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+      <h1>Something went wrong</h1>
+      <p>The application encountered an error while loading. This could be due to network issues, SSL certificate problems, or server unavailability.</p>
+      <div class="error-box">
+        <div><span class="error-code">Error ` + errorCode + `</span>: ` + (errorDescription || 'Unknown error') + `</div>
+        <div style="margin-top: 8px;">URL: <span class="error-url">` + (url || 'Unknown') + `</span></div>
+      </div>
+      <div class="btn-group">
+        <button onclick="window.location.href='` + APP_URL + `'">Retry</button>
+        <button class="secondary" onclick="window.location.href='` + APP_URL + `/login'">Go to Login</button>
+      </div>
+    </body>
+    </html>
+  `;
+
+  mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(errorHTML));
 }
 
 /**
@@ -519,7 +613,7 @@ function startNetworkRetry() {
           setTrayState(TRAY_STATES.IDLE);
         }
       }
-    } catch {}
+    } catch { }
   }, 5000);
 }
 
@@ -528,7 +622,7 @@ function startNetworkRetry() {
  */
 function createWindow() {
   debugLogger.log('info', 'App', 'Creating main window...');
-  
+
   const loadingWindow = createLoadingWindow();
 
   mainWindow = new BrowserWindow({
@@ -548,9 +642,15 @@ function createWindow() {
       partition: 'persist:talio',
       webSecurity: true,
       backgroundThrottling: false,
-      // Disable features that can cause white screen
+      // Disable features that can cause crashes
       spellcheck: false,
-      enableWebSQL: false
+      enableWebSQL: false,
+      // Sandbox settings to prevent crashes
+      sandbox: false,
+      // GPU settings
+      offscreen: false,
+      // Allow insecure content (if HTTPS has issues)
+      allowRunningInsecureContent: false
     },
     icon: path.join(__dirname, '..', 'build', 'icon.png')
   });
@@ -578,19 +678,65 @@ function createWindow() {
   }, 3000);
 
   // Handle load failures
-  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
     clearTimeout(showTimeout);
-    debugLogger.log('error', 'Window', `Load failed: ${errorCode} - ${errorDescription}`);
-    if ([-106, -105, -102, -118].includes(errorCode)) {
+    debugLogger.log('error', 'Window', `Load failed: ${errorCode} - ${errorDescription} (URL: ${validatedURL})`);
+
+    // Network-related errors: show offline page
+    if ([-106, -105, -102, -118, -137, -3, -2].includes(errorCode)) {
       showOfflinePage();
       startNetworkRetry();
+    } else {
+      // Other errors: show error page with details
+      showErrorPage(errorCode, errorDescription, validatedURL);
     }
+  });
+
+  // Handle render process crashes
+  let crashCount = 0;
+  const MAX_CRASH_RETRIES = 3;
+
+  mainWindow.webContents.on('render-process-gone', (event, details) => {
+    debugLogger.log('error', 'Window', `Render process gone: ${details.reason}`);
+    crashCount++;
+
+    if (crashCount <= MAX_CRASH_RETRIES) {
+      debugLogger.log('info', 'Window', `Attempting recovery (${crashCount}/${MAX_CRASH_RETRIES})...`);
+      // Try to reload after a short delay
+      setTimeout(() => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.loadURL(APP_URL);
+        }
+      }, 2000);
+    } else {
+      showErrorPage(-1, `Render process crashed: ${details.reason}. Please restart the application.`, APP_URL);
+    }
+  });
+
+  // Reset crash count on successful load
+  mainWindow.webContents.on('did-finish-load', () => {
+    crashCount = 0;
+  });
+
+  // Handle unresponsive page
+  mainWindow.webContents.on('unresponsive', () => {
+    debugLogger.log('warn', 'Window', 'Page became unresponsive');
+  });
+
+  // Log when page starts loading
+  mainWindow.webContents.on('did-start-loading', () => {
+    debugLogger.log('info', 'Window', `Started loading: ${APP_URL}`);
+  });
+
+  // Log navigation events
+  mainWindow.webContents.on('did-navigate', (event, url) => {
+    debugLogger.log('info', 'Window', `Navigated to: ${url}`);
   });
 
   // When page loads, check permissions (window already shown via ready-to-show)
   mainWindow.webContents.on('did-finish-load', async () => {
     debugLogger.log('info', 'Window', 'Page finished loading');
-    
+
     // Ensure window is visible (in case ready-to-show didn't fire)
     if (!mainWindow.isVisible()) {
       mainWindow.show();
@@ -602,36 +748,36 @@ function createWindow() {
       startLoginDetection();
       return;
     }
-    
+
     // macOS: Initialize permission handler and check permissions
     if (!permissionHandler) {
       permissionHandler = new PermissionHandler(mainWindow);
-      
+
       // Set callback for when permissions are granted (from setup screen)
       permissionHandler.setOnPermissionsGranted(() => {
         debugLogger.log('info', 'Permissions', 'All permissions granted via setup screen, starting login detection');
         // Don't start login detection here - it will be triggered after the app reloads
       });
     }
-    
+
     // Check if we're on a permission setup screen (data: URL)
     const currentUrl = mainWindow.webContents.getURL();
     if (currentUrl.startsWith('data:')) {
       debugLogger.log('info', 'Permissions', 'On permission setup screen, skipping login detection');
       return;
     }
-    
+
     // Check if all permissions are already granted
     await permissionHandler.checkAllPermissions();
     const allGranted = permissionHandler.areAllPermissionsGranted();
-    
+
     if (allGranted) {
       debugLogger.log('info', 'Permissions', 'All permissions granted, starting login detection');
       startLoginDetection();
     } else {
       // Request all permissions - will show setup screen if any are missing
       const granted = await permissionHandler.requestAllPermissions();
-      
+
       if (granted) {
         debugLogger.log('info', 'Permissions', 'Permissions granted, starting login detection');
         startLoginDetection();
@@ -663,6 +809,7 @@ function createWindow() {
   // Load the app
   mainWindow.loadURL(APP_URL);
 }
+
 
 /**
  * Create system tray
@@ -853,7 +1000,7 @@ async function startCaptureService(authToken, userId, userRole) {
 
   screenshotService.onError((error) => {
     debugLogger.log('error', 'Capture', `Error: ${error.message}`);
-    
+
     if (error.type === 'offline') {
       setTrayState(TRAY_STATES.WARNING);
       updateTrayStatus('Capture: Offline');
@@ -974,7 +1121,7 @@ app.on('before-quit', () => {
 
   // Stop services
   screenshotService.stop();
-  
+
   // Stop permission monitoring
   if (permissionHandler) {
     permissionHandler.stopPermissionMonitoring();
@@ -1004,6 +1151,19 @@ ipcMain.handle('get-capture-status', () => {
   return screenshotService.getStatus();
 });
 
+ipcMain.handle('get-app-info', () => {
+  return {
+    appUrl: APP_URL,
+    version: app.getVersion(),
+    platform: process.platform,
+    arch: process.arch
+  };
+});
+
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion();
+});
+
 ipcMain.handle('get-health', async () => {
   return screenshotService.healthCheck();
 });
@@ -1031,7 +1191,7 @@ ipcMain.handle('open-external-url', async (event, url) => {
   if (!url || typeof url !== 'string') {
     return { opened: false, error: 'Invalid URL' };
   }
-  
+
   debugLogger.log('info', 'External', `Opening URL: ${url}`);
   await shell.openExternal(url);
   return { opened: true };
