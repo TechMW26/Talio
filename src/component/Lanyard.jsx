@@ -10,16 +10,16 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
   const lanyardPathRef = useRef(null);
   const lanyardPathBorderRef = useRef(null);
   const lanyardLogosRef = useRef(null);
-  
+
   // Memoize company data to ensure it updates when employee changes
   const { companyLogo, companyName, hasCompanyLogo } = useMemo(() => {
     const logo = employee?.company?.logo || employee?.companyLogo || null;
     const name = employee?.company?.name || employee?.companyName || "Talio";
-    console.log('🔄 Lanyard useMemo - company data:', { 
-      rawCompany: employee?.company, 
-      logo, 
+    console.log('🔄 Lanyard useMemo - company data:', {
+      rawCompany: employee?.company,
+      logo,
       name,
-      hasLogo: !!logo 
+      hasLogo: !!logo
     });
     return { companyLogo: logo, companyName: name, hasCompanyLogo: !!logo };
   }, [employee?.company, employee?.companyLogo, employee?.companyName]);
@@ -37,7 +37,7 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
     // Responsive card dimensions based on viewport width - elegant compact sizes
     const isMobile = window.innerWidth <= 480;
     const isTablet = window.innerWidth <= 768 && window.innerWidth > 480;
-    
+
     const CARD_W = isMobile ? 260 : isTablet ? 280 : 280;
     const CARD_H = isMobile ? 390 : isTablet ? 420 : 420;
     const CLIP_HEIGHT = 14;
@@ -84,7 +84,7 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
       if (e.target.closest('.avatar-camera-btn')) {
         return;
       }
-      
+
       dragging = true;
       wasDragged = false;
       cardOuter.classList.add("dragging");
@@ -114,7 +114,7 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
       if (e.target.closest('.avatar-camera-btn')) {
         return;
       }
-      
+
       if (!dragging) return;
       dragging = false;
       cardOuter.classList.remove("dragging");
@@ -437,8 +437,8 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
               {/* Company Logo or Company Name */}
               <div className="back-logo-container">
                 {hasCompanyLogo ? (
-                  <img 
-                    src={companyLogo} 
+                  <img
+                    src={companyLogo}
                     alt={companyName}
                     className="company-logo-img"
                   />
