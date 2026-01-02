@@ -307,13 +307,31 @@ export default function DashboardLayout({ children }) {
 
                 {/* Main Content Area - Scrollable */}
                 <main className={`z-0 flex-1 overflow-y-auto ${isChatPage ? 'bg-white md:bg-transparent' : ''}`}>
-                  <div className={`min-h-full ${isChatPage ? 'sm:pb-16 px-0 md:px-4 lg:px-8' : 'px-0 sm:px-6 lg:px-8 py-6'}`}>
+                  <div className={`min-h-full ${isChatPage ? 'sm:pb-16 px-0 md:px-4 lg:px-8' : 'px-0 sm:px-6 lg:px-8 pt-2 pb-6 sm:py-6'}`}>
                     {children}
                   </div>
 
+                  {/* Bottom padding for mobile nav */}
+                  <div className={`w-full flex-shrink-0 md:hidden ${shouldShowFade ? 'h-20' : 'h-16'}`}></div>
                   {/* Bottom padding for desktop */}
-                  <div className="w-full flex-shrink-0 h-4"></div>
+                  <div className="w-full flex-shrink-0 hidden md:block h-4"></div>
                 </main>
+
+                {/* Gradient above bottom nav - Mobile only */}
+                {shouldShowFade && (
+                  <div
+                    className="md:hidden fixed left-0 right-0 h-[124px] pointer-events-none z-[39]"
+                    style={{
+                      bottom: '68px',
+                      background: `linear-gradient(179.13deg, rgba(249, 250, 251, 0) 0%, var(--color-bg-main) 71.18%)`,
+                      opacity: 1,
+                      transition: 'opacity 0.6s ease-in-out'
+                    }}
+                  />
+                )}
+
+                {/* Bottom Navigation for Mobile */}
+                <BottomNav />
               </div>
 
               {/* Out of Premises Popup */}

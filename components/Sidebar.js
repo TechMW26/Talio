@@ -248,10 +248,10 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
           ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
           w-full lg:w-[17rem]
           ${isDesktop && isCollapsed ? 'lg:!w-[4.5rem]' : ''}
+          transition-transform duration-300 ease-in-out lg:transition-[width] lg:duration-300
         `}
         style={{ 
           backgroundColor: 'var(--color-bg-sidebar)',
-          transition: 'width 0.3s ease-in-out'
         }}
       >
         {/* Sticky Logo Section - Height matched with header */}

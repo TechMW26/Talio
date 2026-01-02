@@ -197,35 +197,23 @@ export default function LoginPage() {
   // Show loading screen while checking session
   if (checking) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#1a0a2e]">
+      <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500"></div>
-          <p className="mt-4 text-gray-300">Checking session...</p>
+          <p className="mt-4 text-gray-600">Checking session...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#1a0a2e] relative overflow-hidden">
-      {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[#1a0a2e] via-[#2d1b4e] to-[#1a0a2e]">
-        {/* Animated gradient orbs */}
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-600/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-      </div>
-
+    <div className="min-h-screen bg-white">
       {/* Login Form - Centered */}
-      <div className="relative z-20 min-h-screen flex items-center justify-center px-4 py-8">
+      <div className="min-h-screen flex items-center justify-center px-4 py-8">
         <div className="w-full max-w-md">
-          {/* Glass morphism card with solid white background for readability */}
+          {/* Clean card with subtle shadow */}
           <div 
-            className="rounded-3xl shadow-2xl overflow-hidden"
-            style={{
-              background: 'rgba(255, 255, 255, 0.95)',
-              backdropFilter: 'blur(20px)',
-              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)'
-            }}
+            className="rounded-3xl shadow-xl overflow-hidden bg-white border border-gray-100"
           >
             <div className="p-8 md:p-10">
               {/* Logo and Title */}
@@ -338,11 +326,6 @@ export default function LoginPage() {
             <div className="px-8 py-4 bg-gray-50 border-t border-gray-100">
               <p className="text-center text-gray-500 text-xs">
                 Powered by <span className="text-purple-600 font-medium">Talio</span>
-              </p>
-              <p className="text-center text-gray-400 text-xs mt-2">
-                <Link href="/superadmin/login" className="hover:text-purple-600 transition-colors">
-                  SuperAdmin Portal →
-                </Link>
               </p>
             </div>
           </div>

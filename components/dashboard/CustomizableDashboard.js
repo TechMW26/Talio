@@ -32,6 +32,17 @@ export default function CustomizableDashboard({
   const [showAddModal, setShowAddModal] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
   const [columnLayout, setColumnLayout] = useState(2) // Default to 2 columns for desktop
+  const [isDesktop, setIsDesktop] = useState(false) // Track if on desktop for height matching
+
+  // Check if on desktop (md breakpoint = 768px)
+  useEffect(() => {
+    const checkDesktop = () => {
+      setIsDesktop(window.innerWidth >= 768)
+    }
+    checkDesktop()
+    window.addEventListener('resize', checkDesktop)
+    return () => window.removeEventListener('resize', checkDesktop)
+  }, [])
 
   // Load saved column layout
   useEffect(() => {
@@ -223,7 +234,7 @@ export default function CustomizableDashboard({
             items={orderedWidgets.map(w => w.id)}
             strategy={rectSortingStrategy}
           >
-            <div className={`${columnLayout === 2 ? 'grid md:grid-cols-2 gap-5' : className}`} style={columnLayout === 2 ? { gridAutoRows: '1fr' } : {}}>
+            <div className={`${columnLayout === 2 ? 'grid md:grid-cols-2 gap-5' : className}`} style={columnLayout === 2 && isDesktop ? { gridAutoRows: '1fr' } : {}}>
               {orderedWidgets.map((widget, index) => {
                 const WidgetContent = widgetComponents[widget.id]
 
