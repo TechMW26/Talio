@@ -6,9 +6,6 @@ import { sendAndLogOnboardingEmail } from '@/lib/mailer'
 import { generateContent } from '@/lib/gemini'
 import { syncUserToBackup } from '@/lib/backupDb'
 
-// Ensure models are registered
-const _ensureModels = { Department, Designation, Company }
-
 /**
  * Smart level detection based on designation/job title
  * Levels: 1=Entry, 2=Junior, 3=Mid, 4=Senior, 5=Lead, 6=Manager, 7=Director, 8=Executive
@@ -814,7 +811,7 @@ function generateDesignationCode(title) {
 /**
  * Create or find department with fuzzy matching
  */
-async function getOrCreateDepartment(name, allDepartments) {
+async function getOrCreateDepartment(name, allDepartments, DepartmentModel) {
   if (!name) return { departmentId: null, created: false, matched: null }
   
   const match = findBestMatchingDepartment(name, allDepartments)
@@ -840,7 +837,7 @@ async function getOrCreateDepartment(name, allDepartments) {
     counter++
   }
   
-  const newDept = await Department.create({
+  const newDept = await DepartmentModel.create({
     name: name.trim(),
     code: uniqueCode,
     description: `Department for ${name.trim()} operations`,
@@ -856,7 +853,7 @@ async function getOrCreateDepartment(name, allDepartments) {
 /**
  * Create or find designation with fuzzy matching
  */
-async function getOrCreateDesignation(title, allDesignations) {
+async function getOrCreateDesignation(title, allDesignations, DesignationModel) {
   if (!title) return { designationId: null, created: false, matched: null }
   
   const match = findBestMatchingDesignation(title, allDesignations)
@@ -885,7 +882,7 @@ async function getOrCreateDesignation(title, allDesignations) {
   // Detect appropriate level based on title
   const detectedLevel = detectLevelFromTitle(title)
   
-  const newDesig = await Designation.create({
+  const newDesig = await DesignationModel.create({
     title: title.trim(),
     code: uniqueCode,
     description: `${title.trim()} position`,
@@ -934,44 +931,36 @@ function findBestMatchingCompany(searchName, companies, threshold = 0.75) {
 }
 
 /**
- * Generate company code and description using AI
+ * Generate company code and description (fast, no AI)
+ * Uses acronym/abbreviation logic for instant code generation
  */
-async function generateCompanyCodeAndDescription(companyName) {
-  try {
-    const prompt = `Given the company name "${companyName}", generate:
-1. A short unique code (2-6 uppercase letters/numbers, like stock ticker)
-2. A brief professional description (1 sentence, max 100 chars)
-
-Respond in JSON format only:
-{"code": "ABC", "description": "Brief description here"}`
-
-    const response = await generateContent(prompt, 'You are a helpful assistant that generates company codes and descriptions. Respond only with valid JSON.')
-    
-    // Parse the JSON response
-    const jsonMatch = response.match(/\{[\s\S]*\}/)
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0])
-      return {
-        code: (parsed.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 6),
-        description: (parsed.description || '').substring(0, 200)
-      }
-    }
-  } catch (error) {
-    console.error('[Bulk Import] AI company generation failed:', error.message)
-  }
+function generateCompanyCodeAndDescription(companyName) {
+  const name = companyName.trim()
+  const words = name.split(/\s+/).filter(w => w.length > 0)
   
-  // Fallback: generate code from name
-  const words = companyName.trim().split(/\s+/)
   let code
   if (words.length === 1) {
+    // Single word: take first 4 characters
     code = words[0].substring(0, 4).toUpperCase()
+  } else if (words.length === 2) {
+    // Two words: first 2 chars of each
+    code = (words[0].substring(0, 2) + words[1].substring(0, 2)).toUpperCase()
   } else {
+    // Multiple words: take first letter of each (up to 6)
     code = words.map(w => w[0]).join('').toUpperCase().substring(0, 6)
+  }
+  
+  // Remove any non-alphanumeric characters
+  code = code.replace(/[^A-Z0-9]/g, '')
+  
+  // Ensure minimum length of 2
+  if (code.length < 2) {
+    code = name.replace(/[^A-Za-z0-9]/g, '').substring(0, 4).toUpperCase() || 'COMP'
   }
   
   return {
     code,
-    description: `${companyName.trim()} - Imported via bulk import`
+    description: `${name} - Business entity`
   }
 }
 
@@ -979,7 +968,7 @@ Respond in JSON format only:
  * Create or find company with fuzzy matching
  * Similar to department/designation handling, but uses AI for code/description
  */
-async function getOrCreateCompany(name, allCompanies, companyMap) {
+async function getOrCreateCompany(name, allCompanies, companyMap, CompanyModel) {
   if (!name) return { companyId: null, created: false, matched: null }
   
   const match = findBestMatchingCompany(name, allCompanies)
@@ -994,8 +983,8 @@ async function getOrCreateCompany(name, allCompanies, companyMap) {
     }
   }
   
-  // Generate code and description using AI
-  const { code: generatedCode, description } = await generateCompanyCodeAndDescription(name)
+  // Generate code and description (fast, no AI)
+  const { code: generatedCode, description } = generateCompanyCodeAndDescription(name)
   
   let uniqueCode = generatedCode
   let counter = 1
@@ -1007,7 +996,7 @@ async function getOrCreateCompany(name, allCompanies, companyMap) {
   }
   
   // Create new company with defaults (similar to admin dashboard creation)
-  const newCompany = await Company.create({
+  const newCompany = await CompanyModel.create({
     name: name.trim(),
     code: uniqueCode,
     description: description,
@@ -1036,7 +1025,8 @@ async function getOrCreateCompany(name, allCompanies, companyMap) {
  * Helper function to create or update a single employee and user account
  * Now supports upsert by email
  */
-async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignations, allCompanies, companyMap) {
+async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignations, allCompanies, companyMap, models) {
+  const { Employee, User, Department, Designation, Company, OnboardingEmail, CompanySettings } = models
   const warnings = []
   
   // Email is required for deduplication
@@ -1053,7 +1043,7 @@ async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignatio
   // Handle department with fuzzy matching
   let departmentResult = { departmentId: null, created: false }
   if (data.department && typeof data.department === 'string') {
-    departmentResult = await getOrCreateDepartment(data.department, allDepartments)
+    departmentResult = await getOrCreateDepartment(data.department, allDepartments, Department)
     if (departmentResult.created) {
       warnings.push(`Created new department: "${departmentResult.matched}"`)
     } else if (!departmentResult.isExact && departmentResult.similarity < 1) {
@@ -1064,7 +1054,7 @@ async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignatio
   // Handle designation with fuzzy matching
   let designationResult = { designationId: null, created: false }
   if (data.designation && typeof data.designation === 'string') {
-    designationResult = await getOrCreateDesignation(data.designation, allDesignations)
+    designationResult = await getOrCreateDesignation(data.designation, allDesignations, Designation)
     if (designationResult.created) {
       warnings.push(`Created new designation: "${designationResult.matched}"`)
     } else if (!designationResult.isExact && designationResult.similarity < 1) {
@@ -1075,7 +1065,7 @@ async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignatio
   // Handle company with fuzzy matching and auto-creation
   let companyResult = { companyId: null, created: false }
   if (data.company && typeof data.company === 'string') {
-    companyResult = await getOrCreateCompany(data.company, allCompanies, companyMap)
+    companyResult = await getOrCreateCompany(data.company, allCompanies, companyMap, Company)
     if (companyResult.created) {
       warnings.push(`Created new company: "${companyResult.matched}" (code: ${companyResult.code})`)
     } else if (!companyResult.isExact && companyResult.similarity < 1) {
@@ -1279,6 +1269,7 @@ async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignatio
         department: departmentName,
         dateOfJoining: employeeData.dateOfJoining,
         triggeredBy: 'bulk_import',
+        models: { OnboardingEmail, CompanySettings },
       }).catch(err => {
         console.error(`[Bulk Import] Failed to send onboarding email to ${email}:`, err)
       })
@@ -1448,12 +1439,12 @@ function parseExcelRow(row, headers) {
 export async function POST(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Employee', 'User', 'Department', 'Designation', 'Company'])
+    const auth = await getAuthAndModels(request, ['Employee', 'User', 'Department', 'Designation', 'Company', 'OnboardingEmail', 'CompanySettings'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Employee, User, Department, Designation, Company } = models
+    const { Employee, User, Department, Designation, Company, OnboardingEmail, CompanySettings } = models
 
     // Parse form data
     const formData = await request.formData()
@@ -1578,15 +1569,16 @@ export async function POST(request) {
           continue
         }
 
-        // Apply AI spell-check for departments, designations, roles, companies
-        employeeData = await correctSpellingWithAI(employeeData, allDepartments, allDesignations, allCompanies)
+        // NOTE: AI spell-check removed for performance - imports are now instant
+        // Departments, designations, and companies use fuzzy matching instead
 
         const result = await createOrUpdateEmployeeAndUser(
           employeeData,
           allDepartments,
           allDesignations,
           allCompanies,
-          companyMap
+          companyMap,
+          models
         )
 
         if (result.success) {
