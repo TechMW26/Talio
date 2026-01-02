@@ -6,17 +6,30 @@ import { emitHelpdeskUpdate } from '@/lib/realtimeEvents'
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Helpdesk'])
+    // Include Employee model for population
+    const auth = await getAuthAndModels(request, ['Helpdesk', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
-    const { Helpdesk } = models
+
+    // Defensive check for models
+    if (!auth.models) {
+      console.error('[Helpdesk GET] No models returned from auth');
+      return NextResponse.json({ success: false, message: 'Failed to load database models' }, { status: 500 });
+    }
+
+    const { Helpdesk, Employee } = auth.models
+
+    if (!Helpdesk) {
+      console.error('[Helpdesk GET] Helpdesk model not loaded');
+      return NextResponse.json({ success: false, message: 'Failed to load Helpdesk model' }, { status: 500 });
+    }
 
     const { searchParams } = new URL(request.url)
     const employeeId = searchParams.get('employeeId')
     const status = searchParams.get('status')
     const priority = searchParams.get('priority')
+    const limit = searchParams.get('limit')
 
     const query = {}
 
@@ -32,19 +45,29 @@ export async function GET(request) {
       query.priority = priority
     }
 
-    const tickets = await Helpdesk.find(query)
+    let ticketsQuery = Helpdesk.find(query)
       .populate('createdBy', 'firstName lastName employeeCode')
       .populate('assignedTo', 'firstName lastName')
       .sort({ createdAt: -1 })
+
+    // Apply limit if provided
+    if (limit) {
+      const limitNum = parseInt(limit, 10)
+      if (!isNaN(limitNum) && limitNum > 0) {
+        ticketsQuery = ticketsQuery.limit(limitNum)
+      }
+    }
+
+    const tickets = await ticketsQuery
 
     return NextResponse.json({
       success: true,
       data: tickets,
     })
   } catch (error) {
-    console.error('Get helpdesk error:', error)
+    console.error('Get helpdesk error:', error.message, error.stack)
     return NextResponse.json(
-      { success: false, message: 'Failed to fetch helpdesk tickets' },
+      { success: false, message: 'Failed to fetch helpdesk tickets', error: error.message },
       { status: 500 }
     )
   }
@@ -54,7 +77,8 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Helpdesk'])
+    // Include Employee model for population
+    const auth = await getAuthAndModels(request, ['Helpdesk', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }

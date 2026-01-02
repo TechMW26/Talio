@@ -75,12 +75,28 @@ export async function GET(request) {
   try {
     // Get auth and tenant-aware models
     const auth = await getAuthAndModels(request, ['Attendance', 'Employee', 'User', 'Company']);
-    
+
     if (!auth.success) {
       return NextResponse.json({ message: auth.message || 'Unauthorized' }, { status: 401 });
     }
-    
-    const { models: { Attendance: TenantAttendance, Employee: TenantEmployee, User: TenantUser } } = auth;
+
+    // Defensive check for models
+    if (!auth.models) {
+      console.error('[Attendance GET] No models returned from auth');
+      return NextResponse.json({ success: false, message: 'Failed to load database models' }, { status: 500 });
+    }
+
+    const { Attendance: TenantAttendance, Employee: TenantEmployee, User: TenantUser, Company: TenantCompany } = auth.models;
+
+    if (!TenantAttendance || !TenantEmployee || !TenantUser) {
+      console.error('[Attendance GET] Missing required models:', {
+        hasAttendance: !!TenantAttendance,
+        hasEmployee: !!TenantEmployee,
+        hasUser: !!TenantUser,
+        hasCompany: !!TenantCompany
+      });
+      return NextResponse.json({ success: false, message: 'Failed to load required models' }, { status: 500 });
+    }
 
     const { searchParams } = new URL(request.url)
     const date = searchParams.get('date')
@@ -203,24 +219,24 @@ export async function GET(request) {
         // Perform fallback auto-checkout with company's checkout time
         const companyCheckoutTime = record.employee?.company?.workingHours?.checkOutTime || '18:00'
         const fullDayHours = record.employee?.company?.workingHours?.fullDayHours || 8
-        
+
         // Create checkout datetime using company's checkout time on the record's date
         const recordDate = new Date(record.date)
         const [checkOutHour, checkOutMin] = companyCheckoutTime.split(':').map(Number)
         const checkoutDateTime = new Date(recordDate)
         checkoutDateTime.setHours(checkOutHour, checkOutMin, 0, 0)
-        
+
         // If check-in was after checkout time, use check-in + 1 minute
         let finalCheckoutTime = checkoutDateTime
         const checkInTime = new Date(record.checkIn)
         if (checkInTime > checkoutDateTime) {
           finalCheckoutTime = new Date(checkInTime.getTime() + 60000) // 1 minute after check-in
         }
-        
+
         // Calculate work hours
         const totalMinutes = (finalCheckoutTime - checkInTime) / (1000 * 60)
         const workHours = parseFloat((totalMinutes / 60).toFixed(2))
-        
+
         // Determine status
         const presentThreshold = fullDayHours * 0.9
         const halfDayThreshold = fullDayHours * 0.5
@@ -230,11 +246,11 @@ export async function GET(request) {
         } else if (workHours >= halfDayThreshold) {
           autoStatus = 'half-day'
         }
-        
+
         // Update the database in background (non-blocking)
         TenantAttendance.updateOne(
           { _id: record._id },
-          { 
+          {
             checkOut: finalCheckoutTime,
             checkOutStatus: 'auto-checkout',
             workHours: workHours,
@@ -246,15 +262,15 @@ export async function GET(request) {
             remarks: (record.remarks || '') + ` | Fallback auto-checkout on access. Checkout set to ${companyCheckoutTime}.`
           }
         ).exec().catch(err => console.error('Fallback auto-checkout error:', err))
-        
-        return { 
-          ...record, 
+
+        return {
+          ...record,
           checkOut: finalCheckoutTime,
           checkOutStatus: 'auto-checkout',
           workHours: workHours,
           status: autoStatus,
           autoCheckedOut: true,
-          _autoCheckedOutOnAccess: true 
+          _autoCheckedOutOnAccess: true
         }
       }
 
@@ -271,9 +287,9 @@ export async function GET(request) {
 
     return NextResponse.json(response)
   } catch (error) {
-    console.error('Get attendance error:', error)
+    console.error('Get attendance error:', error.message, error.stack)
     return NextResponse.json(
-      { success: false, message: 'Failed to fetch attendance' },
+      { success: false, message: 'Failed to fetch attendance', error: error.message },
       { status: 500 }
     )
   }
@@ -284,11 +300,11 @@ export async function POST(request) {
   try {
     // Get auth and tenant-aware models
     const auth = await getAuthAndModels(request, ['Attendance', 'Employee', 'Leave', 'Company', 'CompanySettings', 'Holiday', 'User', 'GeofenceLocation', 'OvertimeRequest']);
-    
+
     if (!auth.success) {
       return NextResponse.json({ message: auth.message || 'Unauthorized' }, { status: 401 });
     }
-    
+
     const { models } = auth;
     const TenantAttendance = models.Attendance;
     const TenantEmployee = models.Employee;
