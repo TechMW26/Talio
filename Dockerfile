@@ -37,6 +37,11 @@ ENV SHARP_IGNORE_GLOBAL_LIBVIPS=0 \
 RUN npm ci --legacy-peer-deps --prefer-offline && \
     npm cache clean --force
 
+# Source stage - preserve source files for runtime
+FROM base AS source
+WORKDIR /app
+COPY . .
+
 # Builder stage
 FROM base AS builder
 WORKDIR /app
@@ -108,8 +113,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 COPY --from=builder --chown=nextjs:nodejs /app/server.js ./server.js
 COPY --from=builder --chown=nextjs:nodejs /app/next.config.js ./next.config.js
-COPY --from=builder --chown=nextjs:nodejs /app/lib ./lib
-COPY --from=builder --chown=nextjs:nodejs /app/models ./models
+# Copy source directories from source stage (preserved before build)
+COPY --from=source --chown=nextjs:nodejs /app/lib ./lib
+COPY --from=source --chown=nextjs:nodejs /app/models ./models
 
 # Create uploads directory with all subdirectories
 RUN mkdir -p /app/public/uploads/chat \
