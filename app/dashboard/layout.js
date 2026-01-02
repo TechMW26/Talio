@@ -267,12 +267,12 @@ export default function DashboardLayout({ children }) {
     return (
       <SocketProvider>
         <UnreadMessagesProvider>
-          <InAppNotificationProvider>
-            <ChatWidgetProvider>
+          <ChatWidgetProvider>
+            <InAppNotificationProvider>
               {children}
               <CallAlertReceiver />
-            </ChatWidgetProvider>
-          </InAppNotificationProvider>
+            </InAppNotificationProvider>
+          </ChatWidgetProvider>
         </UnreadMessagesProvider>
       </SocketProvider>
     )
@@ -281,8 +281,8 @@ export default function DashboardLayout({ children }) {
   return (
     <SocketProvider>
       <UnreadMessagesProvider>
-        <InAppNotificationProvider>
-          <ChatWidgetProvider>
+        <ChatWidgetProvider>
+          <InAppNotificationProvider>
             {/* Sync sidebar state to chat widget context */}
             <SidebarStateSync sidebarCollapsed={sidebarCollapsed} />
 
@@ -353,8 +353,8 @@ export default function DashboardLayout({ children }) {
               {/* Web Push Notification Prompt */}
               <WebPushPrompt />
             </div>
-          </ChatWidgetProvider>
-        </InAppNotificationProvider>
+          </InAppNotificationProvider>
+        </ChatWidgetProvider>
       </UnreadMessagesProvider>
     </SocketProvider>
   )

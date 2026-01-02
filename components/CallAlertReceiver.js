@@ -428,11 +428,21 @@ export default function CallAlertReceiver() {
     }
 
     console.log('[CallAlert] ✅ Subscribing to call-alert socket events');
-    socket.on('call-alert', handleIncomingAlert);
+
+    // Wrap handler in try-catch to prevent crashes
+    const safeHandler = (alert) => {
+      try {
+        handleIncomingAlert(alert);
+      } catch (error) {
+        console.error('[CallAlert] Error handling incoming alert:', error);
+      }
+    };
+
+    socket.on('call-alert', safeHandler);
 
     return () => {
       console.log('[CallAlert] Unsubscribing from call-alert events');
-      socket.off('call-alert', handleIncomingAlert);
+      socket.off('call-alert', safeHandler);
     };
   }, [socket, isConnected, handleIncomingAlert]);
 

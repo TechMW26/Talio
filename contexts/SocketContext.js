@@ -61,17 +61,21 @@ export function SocketProvider({ children }) {
     const userData = localStorage.getItem('user')
     let userId = null
     if (userData) {
-      const user = JSON.parse(userData)
-      // Use the User's _id (not employeeId) for socket authentication
-      // This matches how notifications are stored in the database
-      userId = user.userId || user._id || user.id
-      // Ensure it's a string
-      if (typeof userId === 'object' && userId._id) {
-        userId = userId._id
+      try {
+        const user = JSON.parse(userData)
+        // Use the User's _id (not employeeId) for socket authentication
+        // This matches how notifications are stored in the database
+        userId = user.userId || user._id || user.id
+        // Ensure it's a string
+        if (typeof userId === 'object' && userId._id) {
+          userId = userId._id
+        }
+        userId = userId?.toString()
+        setCurrentUserId(userId)
+        console.log('🔑 [Socket.IO Client] User ID for notifications:', userId)
+      } catch (parseError) {
+        console.error('[Socket.IO Client] Error parsing user data:', parseError)
       }
-      userId = userId?.toString()
-      setCurrentUserId(userId)
-      console.log('🔑 [Socket.IO Client] User ID for notifications:', userId)
     }
 
     // Initialize Socket.IO connection
@@ -125,47 +129,56 @@ export function SocketProvider({ children }) {
     })
 
     // Handle new-notification events from scheduled/recurring notifications
+    // CRITICAL: Wrapped in try-catch to prevent app crashes
     socketInstance.on('new-notification', (data) => {
-      console.log('🔔 [Socket.IO Client] New notification received:', data)
+      try {
+        console.log('🔔 [Socket.IO Client] New notification received:', data)
 
-      // Show toast notification
-      toast.custom((t) => (
-        <div
-          className={`${t.visible ? 'animate-enter' : 'animate-leave'
-            } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
-        >
-          <div className="flex-1 w-0 p-4">
-            <div className="flex items-start">
-              <div className="flex-shrink-0 pt-0.5">
-                <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center">
-                  <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                  </svg>
+        // Safely extract data with defaults
+        const title = data?.title || 'New Notification'
+        const message = data?.message || ''
+
+        // Show toast notification
+        toast.custom((t) => (
+          <div
+            className={`${t.visible ? 'animate-enter' : 'animate-leave'
+              } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
+          >
+            <div className="flex-1 w-0 p-4">
+              <div className="flex items-start">
+                <div className="flex-shrink-0 pt-0.5">
+                  <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center">
+                    <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="ml-3 flex-1">
+                  <p className="text-sm font-medium text-gray-900">
+                    {title}
+                  </p>
+                  <p className="mt-1 text-sm text-gray-500">
+                    {message}
+                  </p>
                 </div>
               </div>
-              <div className="ml-3 flex-1">
-                <p className="text-sm font-medium text-gray-900">
-                  {data.title || 'New Notification'}
-                </p>
-                <p className="mt-1 text-sm text-gray-500">
-                  {data.message || ''}
-                </p>
-              </div>
+            </div>
+            <div className="flex border-l border-gray-200">
+              <button
+                onClick={() => toast.dismiss(t.id)}
+                className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-blue-600 hover:text-blue-500 focus:outline-none"
+              >
+                Close
+              </button>
             </div>
           </div>
-          <div className="flex border-l border-gray-200">
-            <button
-              onClick={() => toast.dismiss(t.id)}
-              className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-blue-600 hover:text-blue-500 focus:outline-none"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      ), {
-        duration: 5000,
-        position: 'top-right',
-      })
+        ), {
+          duration: 5000,
+          position: 'top-right',
+        })
+      } catch (error) {
+        console.error('❌ [Socket.IO Client] Error handling notification:', error)
+      }
     })
 
     setSocket(socketInstance)
@@ -221,8 +234,15 @@ export function SocketProvider({ children }) {
   // Subscribe to task update events (for real-time sync when project head rejects/updates tasks)
   const onTaskUpdated = useCallback((callback) => {
     if (socket) {
-      socket.on('task_updated', callback)
-      return () => socket.off('task_updated', callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in task_updated callback:', error)
+        }
+      }
+      socket.on('task_updated', wrappedCallback)
+      return () => socket.off('task_updated', wrappedCallback)
     }
   }, [socket])
 
@@ -256,12 +276,17 @@ export function SocketProvider({ children }) {
   }, [socket, isConnected])
 
   // Subscribe to new messages
+  // CRITICAL: Callback is wrapped to prevent crashes from propagating
   const onNewMessage = useCallback((callback) => {
     if (socket && isConnected) {
       console.log('[SocketContext] Registering new-message listener, socket connected:', isConnected)
       const wrappedCallback = (data) => {
-        console.log('[SocketContext] new-message event received:', data)
-        callback(data)
+        try {
+          console.log('[SocketContext] new-message event received:', data)
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in new-message callback:', error)
+        }
       }
       socket.on('new-message', wrappedCallback)
       return () => {
@@ -271,318 +296,561 @@ export function SocketProvider({ children }) {
     } else {
       console.warn('[SocketContext] Socket not available for onNewMessage, connected:', isConnected)
       // Return a noop function to avoid cleanup errors
-      return () => {}
+      return () => { }
     }
   }, [socket, isConnected])
 
   // Subscribe to typing events
   const onUserTyping = useCallback((callback) => {
     if (socket) {
-      socket.on('user-typing', callback)
-      return () => socket.off('user-typing', callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in user-typing callback:', error)
+        }
+      }
+      socket.on('user-typing', wrappedCallback)
+      return () => socket.off('user-typing', wrappedCallback)
     }
-    return () => {}
+    return () => { }
   }, [socket])
 
   // Subscribe to stop typing events
   const onUserStopTyping = useCallback((callback) => {
     if (socket) {
-      socket.on('user-stop-typing', callback)
-      return () => socket.off('user-stop-typing', callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in user-stop-typing callback:', error)
+        }
+      }
+      socket.on('user-stop-typing', wrappedCallback)
+      return () => socket.off('user-stop-typing', wrappedCallback)
     }
-    return () => {}
+    return () => { }
   }, [socket])
 
   // Subscribe to user joined events
   const onUserJoined = useCallback((callback) => {
     if (socket) {
-      socket.on('user-joined', callback)
-      return () => socket.off('user-joined', callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in user-joined callback:', error)
+        }
+      }
+      socket.on('user-joined', wrappedCallback)
+      return () => socket.off('user-joined', wrappedCallback)
     }
-    return () => {}
+    return () => { }
   }, [socket])
 
   // Subscribe to user left events
   const onUserLeft = useCallback((callback) => {
     if (socket) {
-      socket.on('user-left', callback)
-      return () => socket.off('user-left', callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in user-left callback:', error)
+        }
+      }
+      socket.on('user-left', wrappedCallback)
+      return () => socket.off('user-left', wrappedCallback)
     }
-    return () => {}
+    return () => { }
   }, [socket])
 
   // Subscribe to message read events
   const onMessageRead = useCallback((callback) => {
     if (socket) {
-      socket.on('message-read', callback)
-      return () => socket.off('message-read', callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in message-read callback:', error)
+        }
+      }
+      socket.on('message-read', wrappedCallback)
+      return () => socket.off('message-read', wrappedCallback)
     }
-    return () => {}
+    return () => { }
   }, [socket])
 
   // Subscribe to task update events
   const onTaskUpdate = useCallback((callback) => {
     if (socket) {
-      socket.on('task-update', callback)
-      return () => socket.off('task-update', callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in task-update callback:', error)
+        }
+      }
+      socket.on('task-update', wrappedCallback)
+      return () => socket.off('task-update', wrappedCallback)
     }
   }, [socket])
 
   // Subscribe to announcement events
   const onAnnouncement = useCallback((callback) => {
     if (socket) {
-      socket.on('new-announcement', callback)
-      return () => socket.off('new-announcement', callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in announcement callback:', error)
+        }
+      }
+      socket.on('new-announcement', wrappedCallback)
+      return () => socket.off('new-announcement', wrappedCallback)
     }
   }, [socket])
 
   // Subscribe to message reaction events
   const onMessageReaction = useCallback((callback) => {
     if (socket) {
-      socket.on('message-reaction', callback)
-      return () => socket.off('message-reaction', callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in message-reaction callback:', error)
+        }
+      }
+      socket.on('message-reaction', wrappedCallback)
+      return () => socket.off('message-reaction', wrappedCallback)
     }
   }, [socket])
 
   // Subscribe to message deleted events
   const onMessageDeleted = useCallback((callback) => {
     if (socket) {
-      socket.on('message-deleted', callback)
-      return () => socket.off('message-deleted', callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in message-deleted callback:', error)
+        }
+      }
+      socket.on('message-deleted', wrappedCallback)
+      return () => socket.off('message-deleted', wrappedCallback)
     }
   }, [socket])
 
   // Subscribe to geofence approval events
   const onGeofenceApproval = useCallback((callback) => {
     if (socket) {
-      socket.on('geofence-approval', callback)
-      return () => socket.off('geofence-approval', callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in geofence-approval callback:', error)
+        }
+      }
+      socket.on('geofence-approval', wrappedCallback)
+      return () => socket.off('geofence-approval', wrappedCallback)
     }
   }, [socket])
 
   // Subscribe to leave status update events
   const onLeaveStatusUpdate = useCallback((callback) => {
     if (socket) {
-      socket.on('leave-status-update', callback)
-      return () => socket.off('leave-status-update', callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in leave-status-update callback:', error)
+        }
+      }
+      socket.on('leave-status-update', wrappedCallback)
+      return () => socket.off('leave-status-update', wrappedCallback)
     }
   }, [socket])
 
   // Subscribe to expense status update events
   const onExpenseStatusUpdate = useCallback((callback) => {
     if (socket) {
-      socket.on('expense-status-update', callback)
-      return () => socket.off('expense-status-update', callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in expense-status-update callback:', error)
+        }
+      }
+      socket.on('expense-status-update', wrappedCallback)
+      return () => socket.off('expense-status-update', wrappedCallback)
     }
   }, [socket])
 
   // Subscribe to travel status update events
   const onTravelStatusUpdate = useCallback((callback) => {
     if (socket) {
-      socket.on('travel-status-update', callback)
-      return () => socket.off('travel-status-update', callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in travel-status-update callback:', error)
+        }
+      }
+      socket.on('travel-status-update', wrappedCallback)
+      return () => socket.off('travel-status-update', wrappedCallback)
     }
   }, [socket])
 
   // Subscribe to project assignment events
   const onProjectAssignment = useCallback((callback) => {
     if (socket) {
-      socket.on('project-assignment', callback)
-      return () => socket.off('project-assignment', callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in project-assignment callback:', error)
+        }
+      }
+      socket.on('project-assignment', wrappedCallback)
+      return () => socket.off('project-assignment', wrappedCallback)
     }
   }, [socket])
 
   // Subscribe to performance review events
   const onPerformanceReview = useCallback((callback) => {
     if (socket) {
-      socket.on('performance-review', callback)
-      return () => socket.off('performance-review', callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in performance-review callback:', error)
+        }
+      }
+      socket.on('performance-review', wrappedCallback)
+      return () => socket.off('performance-review', wrappedCallback)
     }
   }, [socket])
 
   // Subscribe to helpdesk ticket events
   const onHelpdeskTicket = useCallback((callback) => {
     if (socket) {
-      socket.on('helpdesk-ticket', callback)
-      return () => socket.off('helpdesk-ticket', callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in helpdesk-ticket callback:', error)
+        }
+      }
+      socket.on('helpdesk-ticket', wrappedCallback)
+      return () => socket.off('helpdesk-ticket', wrappedCallback)
     }
   }, [socket])
 
   // Subscribe to document events
   const onDocumentUpdate = useCallback((callback) => {
     if (socket) {
-      socket.on('document-update', callback)
-      return () => socket.off('document-update', callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in document-update callback:', error)
+        }
+      }
+      socket.on('document-update', wrappedCallback)
+      return () => socket.off('document-update', wrappedCallback)
     }
   }, [socket])
 
   // Subscribe to asset events
   const onAssetUpdate = useCallback((callback) => {
     if (socket) {
-      socket.on('asset-update', callback)
-      return () => socket.off('asset-update', callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in asset-update callback:', error)
+        }
+      }
+      socket.on('asset-update', wrappedCallback)
+      return () => socket.off('asset-update', wrappedCallback)
     }
   }, [socket])
 
   // Subscribe to payroll events
   const onPayrollUpdate = useCallback((callback) => {
     if (socket) {
-      socket.on('payroll-update', callback)
-      return () => socket.off('payroll-update', callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in payroll-update callback:', error)
+        }
+      }
+      socket.on('payroll-update', wrappedCallback)
+      return () => socket.off('payroll-update', wrappedCallback)
     }
   }, [socket])
 
   // Subscribe to new notification events (for scheduled/recurring notifications)
   const onNewNotification = useCallback((callback) => {
     if (socket) {
-      socket.on('new-notification', callback)
-      return () => socket.off('new-notification', callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in new-notification callback:', error)
+        }
+      }
+      socket.on('new-notification', wrappedCallback)
+      return () => socket.off('new-notification', wrappedCallback)
     }
   }, [socket])
 
   // Subscribe to call alert events
   const onCallAlert = useCallback((callback) => {
     if (socket) {
-      socket.on('call-alert', callback)
-      return () => socket.off('call-alert', callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in call-alert callback:', error)
+        }
+      }
+      socket.on('call-alert', wrappedCallback)
+      return () => socket.off('call-alert', wrappedCallback)
     }
   }, [socket])
 
   // Subscribe to call alert acknowledged events
   const onCallAlertAcknowledged = useCallback((callback) => {
     if (socket) {
-      socket.on('call-alert-acknowledged', callback)
-      return () => socket.off('call-alert-acknowledged', callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in call-alert-acknowledged callback:', error)
+        }
+      }
+      socket.on('call-alert-acknowledged', wrappedCallback)
+      return () => socket.off('call-alert-acknowledged', wrappedCallback)
     }
   }, [socket])
 
   // Subscribe to attendance update events
   const onAttendanceUpdate = useCallback((callback) => {
     if (socket) {
-      socket.on(REALTIME_EVENTS.ATTENDANCE_UPDATE, callback)
-      return () => socket.off(REALTIME_EVENTS.ATTENDANCE_UPDATE, callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in attendance-update callback:', error)
+        }
+      }
+      socket.on(REALTIME_EVENTS.ATTENDANCE_UPDATE, wrappedCallback)
+      return () => socket.off(REALTIME_EVENTS.ATTENDANCE_UPDATE, wrappedCallback)
     }
-    return () => {}
+    return () => { }
   }, [socket])
 
   // Subscribe to leave request events
   const onLeaveRequest = useCallback((callback) => {
     if (socket) {
-      socket.on(REALTIME_EVENTS.LEAVE_REQUEST, callback)
-      return () => socket.off(REALTIME_EVENTS.LEAVE_REQUEST, callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in leave-request callback:', error)
+        }
+      }
+      socket.on(REALTIME_EVENTS.LEAVE_REQUEST, wrappedCallback)
+      return () => socket.off(REALTIME_EVENTS.LEAVE_REQUEST, wrappedCallback)
     }
-    return () => {}
+    return () => { }
   }, [socket])
 
   // Subscribe to project created events
   const onProjectCreated = useCallback((callback) => {
     if (socket) {
-      socket.on(REALTIME_EVENTS.PROJECT_CREATED, callback)
-      return () => socket.off(REALTIME_EVENTS.PROJECT_CREATED, callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in project-created callback:', error)
+        }
+      }
+      socket.on(REALTIME_EVENTS.PROJECT_CREATED, wrappedCallback)
+      return () => socket.off(REALTIME_EVENTS.PROJECT_CREATED, wrappedCallback)
     }
-    return () => {}
+    return () => { }
   }, [socket])
 
   // Subscribe to project updated events
   const onProjectUpdated = useCallback((callback) => {
     if (socket) {
-      socket.on(REALTIME_EVENTS.PROJECT_UPDATED, callback)
-      return () => socket.off(REALTIME_EVENTS.PROJECT_UPDATED, callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in project-updated callback:', error)
+        }
+      }
+      socket.on(REALTIME_EVENTS.PROJECT_UPDATED, wrappedCallback)
+      return () => socket.off(REALTIME_EVENTS.PROJECT_UPDATED, wrappedCallback)
     }
-    return () => {}
+    return () => { }
   }, [socket])
 
   // Subscribe to task created events
   const onTaskCreated = useCallback((callback) => {
     if (socket) {
-      socket.on(REALTIME_EVENTS.TASK_CREATED, callback)
-      return () => socket.off(REALTIME_EVENTS.TASK_CREATED, callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in task-created callback:', error)
+        }
+      }
+      socket.on(REALTIME_EVENTS.TASK_CREATED, wrappedCallback)
+      return () => socket.off(REALTIME_EVENTS.TASK_CREATED, wrappedCallback)
     }
-    return () => {}
+    return () => { }
   }, [socket])
 
   // Subscribe to task status changed events
   const onTaskStatusChanged = useCallback((callback) => {
     if (socket) {
-      socket.on(REALTIME_EVENTS.TASK_STATUS_CHANGED, callback)
-      return () => socket.off(REALTIME_EVENTS.TASK_STATUS_CHANGED, callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in task-status-changed callback:', error)
+        }
+      }
+      socket.on(REALTIME_EVENTS.TASK_STATUS_CHANGED, wrappedCallback)
+      return () => socket.off(REALTIME_EVENTS.TASK_STATUS_CHANGED, wrappedCallback)
     }
-    return () => {}
+    return () => { }
   }, [socket])
 
   // Subscribe to employee created events
   const onEmployeeCreated = useCallback((callback) => {
     if (socket) {
-      socket.on(REALTIME_EVENTS.EMPLOYEE_CREATED, callback)
-      return () => socket.off(REALTIME_EVENTS.EMPLOYEE_CREATED, callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in employee-created callback:', error)
+        }
+      }
+      socket.on(REALTIME_EVENTS.EMPLOYEE_CREATED, wrappedCallback)
+      return () => socket.off(REALTIME_EVENTS.EMPLOYEE_CREATED, wrappedCallback)
     }
-    return () => {}
+    return () => { }
   }, [socket])
 
   // Subscribe to employee updated events
   const onEmployeeUpdated = useCallback((callback) => {
     if (socket) {
-      socket.on(REALTIME_EVENTS.EMPLOYEE_UPDATED, callback)
-      return () => socket.off(REALTIME_EVENTS.EMPLOYEE_UPDATED, callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in employee-updated callback:', error)
+        }
+      }
+      socket.on(REALTIME_EVENTS.EMPLOYEE_UPDATED, wrappedCallback)
+      return () => socket.off(REALTIME_EVENTS.EMPLOYEE_UPDATED, wrappedCallback)
     }
-    return () => {}
+    return () => { }
   }, [socket])
 
   // Subscribe to dashboard refresh events
   const onDashboardRefresh = useCallback((callback) => {
     if (socket) {
-      socket.on(REALTIME_EVENTS.DASHBOARD_REFRESH, callback)
-      return () => socket.off(REALTIME_EVENTS.DASHBOARD_REFRESH, callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in dashboard-refresh callback:', error)
+        }
+      }
+      socket.on(REALTIME_EVENTS.DASHBOARD_REFRESH, wrappedCallback)
+      return () => socket.off(REALTIME_EVENTS.DASHBOARD_REFRESH, wrappedCallback)
     }
-    return () => {}
+    return () => { }
   }, [socket])
 
   // Subscribe to meeting events
   const onMeetingUpdate = useCallback((callback) => {
     if (socket) {
-      const handler = (data) => callback(data)
-      socket.on(REALTIME_EVENTS.MEETING_CREATED, handler)
-      socket.on(REALTIME_EVENTS.MEETING_UPDATED, handler)
-      socket.on(REALTIME_EVENTS.MEETING_CANCELLED, handler)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in meeting-update callback:', error)
+        }
+      }
+      socket.on(REALTIME_EVENTS.MEETING_CREATED, wrappedCallback)
+      socket.on(REALTIME_EVENTS.MEETING_UPDATED, wrappedCallback)
+      socket.on(REALTIME_EVENTS.MEETING_CANCELLED, wrappedCallback)
       return () => {
-        socket.off(REALTIME_EVENTS.MEETING_CREATED, handler)
-        socket.off(REALTIME_EVENTS.MEETING_UPDATED, handler)
-        socket.off(REALTIME_EVENTS.MEETING_CANCELLED, handler)
+        socket.off(REALTIME_EVENTS.MEETING_CREATED, wrappedCallback)
+        socket.off(REALTIME_EVENTS.MEETING_UPDATED, wrappedCallback)
+        socket.off(REALTIME_EVENTS.MEETING_CANCELLED, wrappedCallback)
       }
     }
-    return () => {}
+    return () => { }
   }, [socket])
 
   // Subscribe to announcement events
   const onAnnouncementUpdate = useCallback((callback) => {
     if (socket) {
-      const handler = (data) => callback(data)
-      socket.on(REALTIME_EVENTS.ANNOUNCEMENT_CREATED, handler)
-      socket.on(REALTIME_EVENTS.ANNOUNCEMENT_UPDATED, handler)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in announcement-update callback:', error)
+        }
+      }
+      socket.on(REALTIME_EVENTS.ANNOUNCEMENT_CREATED, wrappedCallback)
+      socket.on(REALTIME_EVENTS.ANNOUNCEMENT_UPDATED, wrappedCallback)
       return () => {
-        socket.off(REALTIME_EVENTS.ANNOUNCEMENT_CREATED, handler)
-        socket.off(REALTIME_EVENTS.ANNOUNCEMENT_UPDATED, handler)
+        socket.off(REALTIME_EVENTS.ANNOUNCEMENT_CREATED, wrappedCallback)
+        socket.off(REALTIME_EVENTS.ANNOUNCEMENT_UPDATED, wrappedCallback)
       }
     }
-    return () => {}
+    return () => { }
   }, [socket])
 
   // Subscribe to holiday update events
   const onHolidayUpdate = useCallback((callback) => {
     if (socket) {
-      socket.on(REALTIME_EVENTS.HOLIDAY_UPDATE, callback)
-      return () => socket.off(REALTIME_EVENTS.HOLIDAY_UPDATE, callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in holiday-update callback:', error)
+        }
+      }
+      socket.on(REALTIME_EVENTS.HOLIDAY_UPDATE, wrappedCallback)
+      return () => socket.off(REALTIME_EVENTS.HOLIDAY_UPDATE, wrappedCallback)
     }
-    return () => {}
+    return () => { }
   }, [socket])
 
   // Generic subscribe function for any event
   const subscribe = useCallback((eventName, callback) => {
     if (socket) {
-      socket.on(eventName, callback)
-      return () => socket.off(eventName, callback)
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error(`[SocketContext] Error in ${eventName} callback:`, error)
+        }
+      }
+      socket.on(eventName, wrappedCallback)
+      return () => socket.off(eventName, wrappedCallback)
     }
-    return () => {}
+    return () => { }
   }, [socket])
 
   const value = {

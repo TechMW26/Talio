@@ -211,29 +211,33 @@ export default function AttendancePage() {
     if (!socket || !isConnected || !user) return
 
     const handleAttendanceUpdate = (data) => {
-      console.log('📡 Real-time attendance update received:', data)
+      try {
+        console.log('📡 Real-time attendance update received:', data)
 
-      const empId = getEmployeeId(user)
+        const empId = getEmployeeId(user)
 
-      // Check if this update is for the current user
-      if (data.employeeId === empId) {
-        // Refresh attendance data
-        fetchTodayAttendance(empId)
-        fetchAttendance(empId)
-        fetchMyCorrections()
+        // Check if this update is for the current user
+        if (data.employeeId === empId) {
+          // Refresh attendance data
+          fetchTodayAttendance(empId)
+          fetchAttendance(empId)
+          fetchMyCorrections()
 
-        // Show toast notification
-        if (data.type === 'correction-approved') {
-          toast.success(data.message || 'Your attendance correction has been approved!', {
-            duration: 5000,
-            icon: '✅'
-          })
-        } else if (data.type === 'correction-rejected') {
-          toast.error(data.message || 'Your attendance correction has been rejected.', {
-            duration: 5000,
-            icon: '❌'
-          })
+          // Show toast notification
+          if (data.type === 'correction-approved') {
+            toast.success(data.message || 'Your attendance correction has been approved!', {
+              duration: 5000,
+              icon: '✅'
+            })
+          } else if (data.type === 'correction-rejected') {
+            toast.error(data.message || 'Your attendance correction has been rejected.', {
+              duration: 5000,
+              icon: '❌'
+            })
+          }
         }
+      } catch (error) {
+        console.error('[Attendance] Error handling attendance update:', error)
       }
     }
 

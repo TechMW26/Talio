@@ -94,58 +94,65 @@ export default function ChatPage() {
     console.log('[Chat Page] Setting up message listener for chat:', selectedChat._id)
 
     const unsubscribe = onNewMessage((data) => {
-      console.log('[Chat Page] Raw message data received:', data)
+      try {
+        console.log('[Chat Page] Raw message data received:', data)
 
-      const { chatId, message: newMessage } = data
+        // Safe property access
+        const chatId = data?.chatId
+        const newMessage = data?.message
 
-      if (!newMessage) {
-        console.warn('[Chat Page] No message in data')
-        return
-      }
+        if (!newMessage) {
+          console.warn('[Chat Page] No message in data')
+          return
+        }
 
-      // Only update if it's for the current chat
-      if (chatId === selectedChat._id) {
-        console.log('📨 [Chat Page] Received new message for current chat:', newMessage)
+        // Only update if it's for the current chat
+        if (chatId === selectedChat._id) {
+          console.log('📨 [Chat Page] Received new message for current chat:', newMessage)
 
-        // Add message to the list if it's not already there
-        setMessages(prev => {
-          const exists = prev.some(msg => msg._id === newMessage._id)
-          if (exists) {
-            console.log('[Chat Page] Message already exists, skipping')
-            return prev
-          }
+          // Add message to the list if it's not already there
+          setMessages(prev => {
+            const exists = prev.some(msg => msg._id === newMessage._id)
+            if (exists) {
+              console.log('[Chat Page] Message already exists, skipping')
+              return prev
+            }
 
-          // Play notification sound if message is from someone else
-          if (newMessage.sender._id !== currentUserId) {
-            console.log('[Chat Page] Playing notification sound')
-            playNotificationSound()
-          }
+            // Play notification sound if message is from someone else
+            const messageSenderId = newMessage?.sender?._id || newMessage?.sender
+            if (messageSenderId && messageSenderId !== currentUserId) {
+              console.log('[Chat Page] Playing notification sound')
+              playNotificationSound()
+            }
 
-          console.log('[Chat Page] Adding message to list')
-          return [...prev, newMessage]
+            console.log('[Chat Page] Adding message to list')
+            return [...prev, newMessage]
+          })
+        } else {
+          console.log('[Chat Page] Message is for different chat:', chatId, 'current:', selectedChat._id)
+        }
+
+        // Update chat list to show latest message and reorder
+        setChats(prev => {
+          const chatIndex = prev.findIndex(c => c._id === chatId)
+          if (chatIndex === -1) return prev
+
+          const updatedChats = [...prev]
+          const chat = { ...updatedChats[chatIndex] }
+
+          // Update last message info
+          chat.lastMessage = newMessage?.content || newMessage?.fileName || 'File'
+          chat.lastMessageAt = newMessage?.createdAt
+
+          // Move to top
+          updatedChats.splice(chatIndex, 1)
+          updatedChats.unshift(chat)
+
+          return updatedChats
         })
-      } else {
-        console.log('[Chat Page] Message is for different chat:', chatId, 'current:', selectedChat._id)
+      } catch (error) {
+        console.error('[Chat Page] Error handling new message:', error)
       }
-
-      // Update chat list to show latest message and reorder
-      setChats(prev => {
-        const chatIndex = prev.findIndex(c => c._id === chatId)
-        if (chatIndex === -1) return prev
-
-        const updatedChats = [...prev]
-        const chat = { ...updatedChats[chatIndex] }
-
-        // Update last message info
-        chat.lastMessage = newMessage.content || newMessage.fileName || 'File'
-        chat.lastMessageAt = newMessage.createdAt
-
-        // Move to top
-        updatedChats.splice(chatIndex, 1)
-        updatedChats.unshift(chat)
-
-        return updatedChats
-      })
     })
 
     return unsubscribe
@@ -479,14 +486,14 @@ export default function ChatPage() {
       const token = localStorage.getItem('token')
       const formData = new FormData()
       formData.append('file', file)
-      
+
       const uploadResponse = await fetch('/api/upload', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}` },
         body: formData
       })
       const uploadResult = await uploadResponse.json()
-      
+
       if (uploadResult.success) {
         const response = await fetch(`/api/chat/${selectedChat._id}/messages`, {
           method: 'POST',
@@ -620,10 +627,10 @@ export default function ChatPage() {
 
   const filteredEmployees = employeeSearchQuery.trim()
     ? employees.filter(emp =>
-        `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(employeeSearchQuery.toLowerCase()) ||
-        emp.email?.toLowerCase().includes(employeeSearchQuery.toLowerCase()) ||
-        emp.employeeCode?.toLowerCase().includes(employeeSearchQuery.toLowerCase())
-      )
+      `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(employeeSearchQuery.toLowerCase()) ||
+      emp.email?.toLowerCase().includes(employeeSearchQuery.toLowerCase()) ||
+      emp.employeeCode?.toLowerCase().includes(employeeSearchQuery.toLowerCase())
+    )
     : employees.slice(0, 10) // Show first 10 employees by default
 
   if (loading) {
@@ -661,14 +668,13 @@ export default function ChatPage() {
       </div>
 
       {/* Chat Container - Full screen edge-to-edge on mobile */}
-      <div className={`${
-        selectedChat
+      <div className={`${selectedChat
           ? 'fixed top-[60px] left-0 right-0 bottom-[72px] z-[60] md:relative md:top-auto md:left-auto md:right-auto md:bottom-auto md:rounded-2xl md:h-100%'
           : 'fixed top-[140px] left-0 right-0 bottom-[72px] z-[40] bg-white md:relative md:top-auto md:left-auto md:right-auto md:bottom-auto md:rounded-2xl md:shadow-md md:h-auto md:mt-0 px-4'
-      }`} style={{
-        height: 'auto',
-        maxHeight: 'none'
-      }}>
+        }`} style={{
+          height: 'auto',
+          maxHeight: 'none'
+        }}>
         <div className="grid grid-cols-1 md:grid-cols-3 h-full m-0 p-0">
           {/* Chat List - Hide on mobile when chat is selected */}
           <div className={`border-r border-gray-100 flex flex-col h-full m-0 p-0 ${selectedChat ? 'hidden md:flex' : 'flex'}`}>
@@ -684,9 +690,8 @@ export default function ChatPage() {
                     <div
                       key={chat._id}
                       onClick={() => setSelectedChat(chat)}
-                      className={`py-4 px-0 md:py-4 md:px-4 cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0 ${
-                        selectedChat?._id === chat._id ? 'bg-gray-50' : ''
-                      }`}
+                      className={`py-4 px-0 md:py-4 md:px-4 cursor-pointer hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0 ${selectedChat?._id === chat._id ? 'bg-gray-50' : ''
+                        }`}
                     >
                       <div className="flex items-center gap-3">
                         <div
@@ -1070,13 +1075,13 @@ export default function ChatPage() {
                       title="Send message"
                     >
                       {sending ? (
-                        <div 
+                        <div
                           className="animate-spin rounded-full h-5 w-5 border-2 border-t-transparent"
                           style={{ borderColor: themes[currentTheme]?.primary?.[600] || '#2563EB', borderTopColor: 'transparent' }}
                         ></div>
                       ) : (
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="w-6 h-6" fill="currentColor">
-                          <path d="M498.1 5.6c10.1 7 15.4 19.1 13.5 31.2l-64 416c-1.5 9.7-7.4 18.2-16 23s-18.9 5.4-28 1.6L284 427.7l-68.5 74.1c-8.9 9.7-22.9 12.9-35.2 8.1S160 493.3 160 480V392c0-8.5 3.4-16.6 9.4-22.6l208-208c6.2-6.2 6.2-16.4 0-22.6s-16.4-6.2-22.6 0L121.4 340.4l-96.4-40.2c-9.6-4-16.1-12.9-16.9-23.1s4.9-19.8 14.1-24.8l464-256c9.6-5.3 21.5-5.2 31 .5z"/>
+                          <path d="M498.1 5.6c10.1 7 15.4 19.1 13.5 31.2l-64 416c-1.5 9.7-7.4 18.2-16 23s-18.9 5.4-28 1.6L284 427.7l-68.5 74.1c-8.9 9.7-22.9 12.9-35.2 8.1S160 493.3 160 480V392c0-8.5 3.4-16.6 9.4-22.6l208-208c6.2-6.2 6.2-16.4 0-22.6s-16.4-6.2-22.6 0L121.4 340.4l-96.4-40.2c-9.6-4-16.1-12.9-16.9-23.1s4.9-19.8 14.1-24.8l464-256c9.6-5.3 21.5-5.2 31 .5z" />
                         </svg>
                       )}
                     </button>
@@ -1200,9 +1205,8 @@ export default function ChatPage() {
                             setSelectedEmployees([...selectedEmployees, emp._id])
                           }
                         }}
-                        className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer ${
-                          selectedEmployees.includes(emp._id) ? 'bg-blue-50 border-2 border-blue-500' : 'hover:bg-gray-50'
-                        }`}
+                        className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer ${selectedEmployees.includes(emp._id) ? 'bg-blue-50 border-2 border-blue-500' : 'hover:bg-gray-50'
+                          }`}
                       >
                         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center overflow-hidden">
                           {emp.profilePicture ? (
@@ -1273,7 +1277,7 @@ export default function ChatPage() {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[90] p-4">
           <div className="bg-white rounded-2xl max-w-md w-full max-h-[80vh] overflow-hidden shadow-2xl">
             {/* Modal Header */}
-            <div 
+            <div
               className="px-5 py-4 flex items-center justify-between border-b border-gray-100"
               style={{
                 background: `linear-gradient(135deg, ${themes[currentTheme]?.primary?.[600] || '#2563EB'} 0%, ${themes[currentTheme]?.primary?.[500] || '#3B82F6'} 100%)`
@@ -1288,19 +1292,19 @@ export default function ChatPage() {
                   <p className="text-white/80 text-xs">{selectedChat.participants?.length || 0} members</p>
                 </div>
               </div>
-              <button 
-                onClick={() => setShowMembersModal(false)} 
+              <button
+                onClick={() => setShowMembersModal(false)}
                 className="p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-colors"
               >
                 <FaTimes className="text-lg" />
               </button>
             </div>
-            
+
             {/* Search Bar */}
             <div className="px-4 pt-3 pb-2">
               <div className="relative">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2" fill="#9CA3AF">
-                  <path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352a144 144 0 1 0 0-288 144 144 0 1 0 0 288z"/>
+                  <path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352a144 144 0 1 0 0-288 144 144 0 1 0 0 288z" />
                 </svg>
                 <input
                   type="text"
@@ -1312,7 +1316,7 @@ export default function ChatPage() {
                 />
               </div>
             </div>
-            
+
             {/* Members List */}
             <div className="px-4 pb-4 overflow-y-auto max-h-[50vh] space-y-2">
               {selectedChat.participants?.filter((member) => {
@@ -1324,15 +1328,14 @@ export default function ChatPage() {
               }).map((member) => {
                 const isAdmin = selectedChat.admin?._id === member._id || selectedChat.admin === member._id
                 const isCurrentUser = member._id === currentUserId
-                
+
                 return (
                   <div
                     key={member._id}
-                    className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${
-                      isCurrentUser ? 'bg-blue-50' : 'hover:bg-gray-50'
-                    }`}
+                    className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${isCurrentUser ? 'bg-blue-50' : 'hover:bg-gray-50'
+                      }`}
                   >
-                    <div 
+                    <div
                       className="w-11 h-11 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0"
                       style={{
                         background: `linear-gradient(135deg, ${themes[currentTheme]?.primary?.[600] || '#2563EB'} 0%, ${themes[currentTheme]?.primary?.[500] || '#3B82F6'} 100%)`
@@ -1380,7 +1383,7 @@ export default function ChatPage() {
                         title={`Message ${member.firstName}`}
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="w-5 h-5" fill="currentColor">
-                          <path d="M498.1 5.6c10.1 7 15.4 19.1 13.5 31.2l-64 416c-1.5 9.7-7.4 18.2-16 23s-18.9 5.4-28 1.6L284 427.7l-68.5 74.1c-8.9 9.7-22.9 12.9-35.2 8.1S160 493.3 160 480V392c0-8.5 3.4-16.6 9.4-22.6l208-208c6.2-6.2 6.2-16.4 0-22.6s-16.4-6.2-22.6 0L121.4 340.4l-96.4-40.2c-9.6-4-16.1-12.9-16.9-23.1s4.9-19.8 14.1-24.8l464-256c9.6-5.3 21.5-5.2 31 .5z"/>
+                          <path d="M498.1 5.6c10.1 7 15.4 19.1 13.5 31.2l-64 416c-1.5 9.7-7.4 18.2-16 23s-18.9 5.4-28 1.6L284 427.7l-68.5 74.1c-8.9 9.7-22.9 12.9-35.2 8.1S160 493.3 160 480V392c0-8.5 3.4-16.6 9.4-22.6l208-208c6.2-6.2 6.2-16.4 0-22.6s-16.4-6.2-22.6 0L121.4 340.4l-96.4-40.2c-9.6-4-16.1-12.9-16.9-23.1s4.9-19.8 14.1-24.8l464-256c9.6-5.3 21.5-5.2 31 .5z" />
                         </svg>
                       </button>
                     )}
@@ -1388,7 +1391,7 @@ export default function ChatPage() {
                 )
               })}
             </div>
-            
+
             {/* Modal Footer */}
             <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
               <button

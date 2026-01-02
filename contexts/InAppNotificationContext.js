@@ -64,6 +64,7 @@ export function InAppNotificationProvider({ children }) {
   }, [])
 
   // Listen for new messages via Socket.IO
+  // CRITICAL: All message handling wrapped in try-catch to prevent crashes
   useEffect(() => {
     // Wait for socket to be connected
     if (!socket || !isConnected) {
@@ -79,82 +80,123 @@ export function InAppNotificationProvider({ children }) {
     console.log('[InAppNotification] Setting up message listener, socket connected:', isConnected)
 
     const unsubscribe = onNewMessage((data) => {
-      console.log('[InAppNotification] Raw message data received:', data)
+      try {
+        console.log('[InAppNotification] Raw message data received:', data)
 
-      const { chatId, message, senderId } = data
+        // Safely destructure with defaults
+        const chatId = data?.chatId
+        const message = data?.message
+        const senderId = data?.senderId
 
-      if (!message) {
-        console.warn('[InAppNotification] No message in data')
-        return
-      }
-
-      // Get current user ID
-      const userStr = localStorage.getItem('user')
-      if (!userStr) {
-        console.warn('[InAppNotification] No user in localStorage')
-        return
-      }
-
-      const user = JSON.parse(userStr)
-      const currentUserId = user.employeeId || user._id
-
-      // Normalize IDs to strings for comparison
-      const currentUserIdStr = typeof currentUserId === 'object' ? currentUserId._id || currentUserId.toString() : currentUserId.toString()
-      const messageSenderId = senderId || message?.sender?._id || message?.sender
-      const messageSenderIdStr = typeof messageSenderId === 'object' ? messageSenderId._id || messageSenderId.toString() : messageSenderId?.toString()
-
-      // Only show notification if:
-      // 1. Message is NOT from current user
-      // 2. User is NOT on the chat page OR not viewing this specific chat
-      const isOnChatPage = pathname?.startsWith('/dashboard/chat')
-      const isFromCurrentUser = messageSenderIdStr === currentUserIdStr
-      const shouldShowNotification = !isFromCurrentUser && !isOnChatPage
-
-      console.log('[InAppNotification] Message received:', {
-        chatId,
-        currentUserId: currentUserIdStr,
-        messageSenderId: messageSenderIdStr,
-        isFromCurrentUser,
-        isOnChatPage,
-        shouldShowNotification,
-        pathname
-      })
-
-      if (shouldShowNotification) {
-        const senderName = message.sender?.firstName
-          ? `${message.sender.firstName} ${message.sender.lastName || ''}`
-          : 'Someone'
-
-        // Build chat data for opening chat widget directly
-        const chatData = {
-          _id: chatId,
-          // Include participant info from sender for display
-          participants: message.sender ? [message.sender] : [],
-          senderInfo: message.sender || null
+        if (!message) {
+          console.warn('[InAppNotification] No message in data')
+          return
         }
 
-        const notificationData = {
-          title: `New message from ${senderName}`,
-          message: message.content || message.text || message.fileName || 'Sent a file',
-          url: `/dashboard/chat?chatId=${chatId}`,
-          type: 'message',
-          // Include chat data so clicking notification can open chat widget
-          chatId: chatId,
-          chatData: chatData,
-          senderInfo: message.sender || null
+        // Get current user ID
+        const userStr = localStorage.getItem('user')
+        if (!userStr) {
+          console.warn('[InAppNotification] No user in localStorage')
+          return
         }
 
-        console.log('[InAppNotification] Showing notification:', notificationData)
-        
-        // Play message notification sound (MP3 on desktop)
-        playMessageNotificationSound().catch((err) => {
-          console.warn('[InAppNotification] Message notification sound failed:', err)
+        let user
+        try {
+          user = JSON.parse(userStr)
+        } catch (parseError) {
+          console.error('[InAppNotification] Error parsing user data:', parseError)
+          return
+        }
+
+        const currentUserId = user?.employeeId || user?._id
+
+        if (!currentUserId) {
+          console.warn('[InAppNotification] No currentUserId found')
+          return
+        }
+
+        // Normalize IDs to strings for comparison - with safe access
+        let currentUserIdStr = ''
+        try {
+          currentUserIdStr = typeof currentUserId === 'object'
+            ? (currentUserId?._id || currentUserId?.toString?.() || '')
+            : String(currentUserId || '')
+        } catch (e) {
+          currentUserIdStr = ''
+        }
+
+        const messageSenderId = senderId || message?.sender?._id || message?.sender
+        let messageSenderIdStr = ''
+        try {
+          messageSenderIdStr = typeof messageSenderId === 'object'
+            ? (messageSenderId?._id || messageSenderId?.toString?.() || '')
+            : String(messageSenderId || '')
+        } catch (e) {
+          messageSenderIdStr = ''
+        }
+
+        // Only show notification if:
+        // 1. Message is NOT from current user
+        // 2. User is NOT on the chat page OR not viewing this specific chat
+        const isOnChatPage = pathname?.startsWith('/dashboard/chat') || false
+        const isFromCurrentUser = currentUserIdStr && messageSenderIdStr && (messageSenderIdStr === currentUserIdStr)
+        const shouldShowNotification = !isFromCurrentUser && !isOnChatPage
+
+        console.log('[InAppNotification] Message received:', {
+          chatId,
+          currentUserId: currentUserIdStr,
+          messageSenderId: messageSenderIdStr,
+          isFromCurrentUser,
+          isOnChatPage,
+          shouldShowNotification,
+          pathname
         })
-        
-        // Show notification without playing default sound (we just played the MP3)
-        showNotification(notificationData, false)
-      } else {
-        console.log('[InAppNotification] Not showing notification - conditions not met')
+
+        if (shouldShowNotification) {
+          // Safely get sender name
+          const senderFirstName = message?.sender?.firstName || ''
+          const senderLastName = message?.sender?.lastName || ''
+          const senderName = senderFirstName
+            ? `${senderFirstName} ${senderLastName}`.trim()
+            : 'Someone'
+
+          // Build chat data for opening chat widget directly
+          const chatData = {
+            _id: chatId,
+            // Include participant info from sender for display
+            participants: message?.sender ? [message.sender] : [],
+            senderInfo: message?.sender || null
+          }
+
+          // Safely get message content
+          const messageContent = message?.content || message?.text || message?.fileName || 'Sent a message'
+
+          const notificationData = {
+            title: `New message from ${senderName}`,
+            message: messageContent,
+            url: `/dashboard/chat?chatId=${chatId}`,
+            type: 'message',
+            // Include chat data so clicking notification can open chat widget
+            chatId: chatId,
+            chatData: chatData,
+            senderInfo: message?.sender || null
+          }
+
+          console.log('[InAppNotification] Showing notification:', notificationData)
+
+          // Play message notification sound (MP3 on desktop)
+          playMessageNotificationSound().catch((err) => {
+            console.warn('[InAppNotification] Message notification sound failed:', err)
+          })
+
+          // Show notification without playing default sound (we just played the MP3)
+          showNotification(notificationData, false)
+        } else {
+          console.log('[InAppNotification] Not showing notification - conditions not met')
+        }
+      } catch (error) {
+        // CRITICAL: Catch ALL errors to prevent app crash
+        console.error('[InAppNotification] Error handling message:', error)
       }
     })
 
@@ -166,47 +208,58 @@ export function InAppNotificationProvider({ children }) {
     if (!onTaskUpdate) return
 
     const unsubscribe = onTaskUpdate((data) => {
-      const { task, action } = data
+      try {
+        const { task, action } = data || {}
 
-      // Get current user ID
-      const userStr = localStorage.getItem('user')
-      if (!userStr) return
+        // Get current user ID
+        const userStr = localStorage.getItem('user')
+        if (!userStr) return
 
-      const user = JSON.parse(userStr)
-      const currentUserId = user.employeeId || user._id
-
-      // Only show notification if task update is relevant to current user
-      const isAssignedToMe = task?.assignedTo?._id === currentUserId || task?.assignedTo === currentUserId
-      const isCreatedByMe = task?.createdBy?._id === currentUserId || task?.createdBy === currentUserId
-
-      if (isAssignedToMe || isCreatedByMe) {
-        let title = 'Task Update'
-        let message = task?.title || 'A task has been updated'
-        let notificationType = 'task_status_update'
-
-        if (action === 'assigned') {
-          title = 'New Task Assigned'
-          message = `You have been assigned: ${task?.title}`
-          notificationType = 'task_assigned'
-        } else if (action === 'completed') {
-          title = 'Task Completed'
-          message = `Task completed: ${task?.title}`
-          notificationType = 'task_completed'
-        } else if (action === 'approved') {
-          title = 'Task Approved'
-          message = `Task approved: ${task?.title}`
-          notificationType = 'task_approved'
-        } else if (action === 'status_update') {
-          title = 'Task Status Updated'
-          message = `${task?.title} - Status: ${task?.status}`
+        let user
+        try {
+          user = JSON.parse(userStr)
+        } catch (e) {
+          console.error('[InAppNotification] Error parsing user data:', e)
+          return
         }
 
-        showNotification({
-          title,
-          message,
-          url: `/dashboard/tasks/my-tasks`,
-          type: notificationType
-        })
+        const currentUserId = user?.employeeId || user?._id
+
+        // Only show notification if task update is relevant to current user
+        const isAssignedToMe = task?.assignedTo?._id === currentUserId || task?.assignedTo === currentUserId
+        const isCreatedByMe = task?.createdBy?._id === currentUserId || task?.createdBy === currentUserId
+
+        if (isAssignedToMe || isCreatedByMe) {
+          let title = 'Task Update'
+          let message = task?.title || 'A task has been updated'
+          let notificationType = 'task_status_update'
+
+          if (action === 'assigned') {
+            title = 'New Task Assigned'
+            message = `You have been assigned: ${task?.title}`
+            notificationType = 'task_assigned'
+          } else if (action === 'completed') {
+            title = 'Task Completed'
+            message = `Task completed: ${task?.title}`
+            notificationType = 'task_completed'
+          } else if (action === 'approved') {
+            title = 'Task Approved'
+            message = `Task approved: ${task?.title}`
+            notificationType = 'task_approved'
+          } else if (action === 'status_update') {
+            title = 'Task Status Updated'
+            message = `${task?.title} - Status: ${task?.status}`
+          }
+
+          showNotification({
+            title,
+            message,
+            url: `/dashboard/tasks/my-tasks`,
+            type: notificationType
+          })
+        }
+      } catch (error) {
+        console.error('[InAppNotification] Error handling task update:', error)
       }
     })
 
@@ -218,14 +271,18 @@ export function InAppNotificationProvider({ children }) {
     if (!onAnnouncement) return
 
     const unsubscribe = onAnnouncement((data) => {
-      const { announcement } = data
+      try {
+        const { announcement } = data || {}
 
-      showNotification({
-        title: 'New Announcement',
-        message: announcement?.title || 'A new announcement has been posted',
-        url: `/dashboard/announcements`,
-        type: 'announcement'
-      })
+        showNotification({
+          title: 'New Announcement',
+          message: announcement?.title || 'A new announcement has been posted',
+          url: `/dashboard/announcements`,
+          type: 'announcement'
+        })
+      } catch (error) {
+        console.error('[InAppNotification] Error handling announcement:', error)
+      }
     })
 
     return unsubscribe
@@ -236,17 +293,21 @@ export function InAppNotificationProvider({ children }) {
     if (!onGeofenceApproval) return
 
     const unsubscribe = onGeofenceApproval((data) => {
-      const { action, log, notification } = data
+      try {
+        const { action, log, notification } = data || {}
 
-      const isApproved = action === 'approved'
-      const icon = isApproved ? '✅' : '❌'
+        const isApproved = action === 'approved'
+        const icon = isApproved ? '✅' : '❌'
 
-      showNotification({
-        title: `${icon} ${notification.title}`,
-        message: notification.body,
-        url: notification.url || '/dashboard/geofence',
-        type: 'geofence_approval'
-      })
+        showNotification({
+          title: `${icon} ${notification?.title || 'Geofence Update'}`,
+          message: notification?.body || 'Geofence status updated',
+          url: notification?.url || '/dashboard/geofence',
+          type: 'geofence_approval'
+        })
+      } catch (error) {
+        console.error('[InAppNotification] Error handling geofence:', error)
+      }
     })
 
     return unsubscribe
@@ -257,17 +318,21 @@ export function InAppNotificationProvider({ children }) {
     if (!onLeaveStatusUpdate) return
 
     const unsubscribe = onLeaveStatusUpdate((data) => {
-      const { leave, action } = data
+      try {
+        const { leave, action } = data || {}
 
-      const icon = action === 'approved' ? '✅' : action === 'rejected' ? '❌' : '📋'
-      const actionText = action === 'approved' ? 'Approved' : action === 'rejected' ? 'Rejected' : 'Updated'
+        const icon = action === 'approved' ? '✅' : action === 'rejected' ? '❌' : '📋'
+        const actionText = action === 'approved' ? 'Approved' : action === 'rejected' ? 'Rejected' : 'Updated'
 
-      showNotification({
-        title: `${icon} Leave ${actionText}`,
-        message: `Your leave request has been ${action}`,
-        url: '/dashboard/leave',
-        type: 'leave_status_update'
-      })
+        showNotification({
+          title: `${icon} Leave ${actionText}`,
+          message: `Your leave request has been ${action || 'updated'}`,
+          url: '/dashboard/leave',
+          type: 'leave_status_update'
+        })
+      } catch (error) {
+        console.error('[InAppNotification] Error handling leave status:', error)
+      }
     })
 
     return unsubscribe
@@ -278,17 +343,21 @@ export function InAppNotificationProvider({ children }) {
     if (!onExpenseStatusUpdate) return
 
     const unsubscribe = onExpenseStatusUpdate((data) => {
-      const { expense, action } = data
+      try {
+        const { expense, action } = data || {}
 
-      const icon = action === 'approved' ? '✅' : action === 'rejected' ? '❌' : '💰'
-      const actionText = action === 'approved' ? 'Approved' : action === 'rejected' ? 'Rejected' : 'Updated'
+        const icon = action === 'approved' ? '✅' : action === 'rejected' ? '❌' : '💰'
+        const actionText = action === 'approved' ? 'Approved' : action === 'rejected' ? 'Rejected' : 'Updated'
 
-      showNotification({
-        title: `${icon} Expense ${actionText}`,
-        message: `Your expense claim has been ${action}`,
-        url: '/dashboard/expenses',
-        type: 'expense_status_update'
-      })
+        showNotification({
+          title: `${icon} Expense ${actionText}`,
+          message: `Your expense claim has been ${action || 'updated'}`,
+          url: '/dashboard/expenses',
+          type: 'expense_status_update'
+        })
+      } catch (error) {
+        console.error('[InAppNotification] Error handling expense status:', error)
+      }
     })
 
     return unsubscribe
@@ -299,17 +368,21 @@ export function InAppNotificationProvider({ children }) {
     if (!onTravelStatusUpdate) return
 
     const unsubscribe = onTravelStatusUpdate((data) => {
-      const { travel, action } = data
+      try {
+        const { travel, action } = data || {}
 
-      const icon = action === 'approved' ? '✅' : action === 'rejected' ? '❌' : '✈️'
-      const actionText = action === 'approved' ? 'Approved' : action === 'rejected' ? 'Rejected' : 'Updated'
+        const icon = action === 'approved' ? '✅' : action === 'rejected' ? '❌' : '✈️'
+        const actionText = action === 'approved' ? 'Approved' : action === 'rejected' ? 'Rejected' : 'Updated'
 
-      showNotification({
-        title: `${icon} Travel ${actionText}`,
-        message: `Your travel request has been ${action}`,
-        url: '/dashboard/travel',
-        type: 'travel_status_update'
-      })
+        showNotification({
+          title: `${icon} Travel ${actionText}`,
+          message: `Your travel request has been ${action || 'updated'}`,
+          url: '/dashboard/travel',
+          type: 'travel_status_update'
+        })
+      } catch (error) {
+        console.error('[InAppNotification] Error handling travel status:', error)
+      }
     })
 
     return unsubscribe
@@ -320,36 +393,40 @@ export function InAppNotificationProvider({ children }) {
     if (!onProjectAssignment) return
 
     const unsubscribe = onProjectAssignment((data) => {
-      const { project, action, assignedBy } = data
+      try {
+        const { project, action, assignedBy } = data || {}
 
-      let title = '📊 Project Updated'
-      let notificationType = 'project_update'
-      
-      if (action === 'assigned') {
-        title = '📊 New Project Assigned'
-        notificationType = 'project_assignment'
-      } else if (action === 'completed') {
-        title = '🎉 Project Completed'
-        notificationType = 'project_completed'
-      } else if (action === 'approved') {
-        title = '✅ Project Approved'
-        notificationType = 'project_approved'
+        let title = '📊 Project Updated'
+        let notificationType = 'project_update'
+
+        if (action === 'assigned') {
+          title = '📊 New Project Assigned'
+          notificationType = 'project_assignment'
+        } else if (action === 'completed') {
+          title = '🎉 Project Completed'
+          notificationType = 'project_completed'
+        } else if (action === 'approved') {
+          title = '✅ Project Approved'
+          notificationType = 'project_approved'
+        }
+
+        const message = action === 'assigned'
+          ? `You have been assigned to project: ${project?.name || 'Untitled'}`
+          : action === 'completed'
+            ? `Project completed: ${project?.name || 'Untitled'}`
+            : action === 'approved'
+              ? `Project approved: ${project?.name || 'Untitled'}`
+              : `Project updated: ${project?.name || 'Untitled'}`
+
+        showNotification({
+          title,
+          message,
+          url: '/dashboard/projects',
+          type: notificationType
+        })
+      } catch (error) {
+        console.error('[InAppNotification] Error handling project assignment:', error)
       }
-
-      const message = action === 'assigned'
-        ? `You have been assigned to project: ${project.name || 'Untitled'}`
-        : action === 'completed'
-        ? `Project completed: ${project.name || 'Untitled'}`
-        : action === 'approved'
-        ? `Project approved: ${project.name || 'Untitled'}`
-        : `Project updated: ${project.name || 'Untitled'}`
-
-      showNotification({
-        title,
-        message,
-        url: '/dashboard/projects',
-        type: notificationType
-      })
     })
 
     return unsubscribe
@@ -360,17 +437,21 @@ export function InAppNotificationProvider({ children }) {
     if (!onPerformanceReview) return
 
     const unsubscribe = onPerformanceReview((data) => {
-      const { review, action } = data
+      try {
+        const { review, action } = data || {}
 
-      const icon = action === 'approved' ? '✅' : action === 'rejected' ? '❌' : '📈'
-      const actionText = action === 'new' ? 'New Review Created' : action === 'approved' ? 'Review Approved' : action === 'rejected' ? 'Review Rejected' : 'Review Updated'
+        const icon = action === 'approved' ? '✅' : action === 'rejected' ? '❌' : '📈'
+        const actionText = action === 'new' ? 'New Review Created' : action === 'approved' ? 'Review Approved' : action === 'rejected' ? 'Review Rejected' : 'Review Updated'
 
-      showNotification({
-        title: `${icon} Performance ${actionText}`,
-        message: data.message || 'Your performance review has been updated',
-        url: '/dashboard/performance',
-        type: 'performance_review'
-      })
+        showNotification({
+          title: `${icon} Performance ${actionText}`,
+          message: data?.message || 'Your performance review has been updated',
+          url: '/dashboard/performance',
+          type: 'performance_review'
+        })
+      } catch (error) {
+        console.error('[InAppNotification] Error handling performance review:', error)
+      }
     })
 
     return unsubscribe
@@ -381,17 +462,21 @@ export function InAppNotificationProvider({ children }) {
     if (!onHelpdeskTicket) return
 
     const unsubscribe = onHelpdeskTicket((data) => {
-      const { ticket, action } = data
+      try {
+        const { ticket, action } = data || {}
 
-      const icon = action === 'assigned' ? '🎫' : action === 'resolved' ? '✅' : action === 'closed' ? '🔒' : '📝'
-      const actionText = action === 'assigned' ? 'Ticket Assigned' : action === 'resolved' ? 'Ticket Resolved' : action === 'closed' ? 'Ticket Closed' : 'Ticket Updated'
+        const icon = action === 'assigned' ? '🎫' : action === 'resolved' ? '✅' : action === 'closed' ? '🔒' : '📝'
+        const actionText = action === 'assigned' ? 'Ticket Assigned' : action === 'resolved' ? 'Ticket Resolved' : action === 'closed' ? 'Ticket Closed' : 'Ticket Updated'
 
-      showNotification({
-        title: `${icon} ${actionText}`,
-        message: `Ticket #${ticket.ticketNumber || ticket._id}: ${ticket.subject || 'No subject'}`,
-        url: '/dashboard/helpdesk',
-        type: 'helpdesk_ticket'
-      })
+        showNotification({
+          title: `${icon} ${actionText}`,
+          message: `Ticket #${ticket?.ticketNumber || ticket?._id || 'Unknown'}: ${ticket?.subject || 'No subject'}`,
+          url: '/dashboard/helpdesk',
+          type: 'helpdesk_ticket'
+        })
+      } catch (error) {
+        console.error('[InAppNotification] Error handling helpdesk ticket:', error)
+      }
     })
 
     return unsubscribe
@@ -402,17 +487,21 @@ export function InAppNotificationProvider({ children }) {
     if (!onDocumentUpdate) return
 
     const unsubscribe = onDocumentUpdate((data) => {
-      const { document, action } = data
+      try {
+        const { document, action } = data || {}
 
-      const icon = action === 'approved' ? '✅' : action === 'rejected' ? '❌' : '📄'
-      const actionText = action === 'approved' ? 'Document Approved' : action === 'rejected' ? 'Document Rejected' : action === 'uploaded' ? 'New Document' : 'Document Updated'
+        const icon = action === 'approved' ? '✅' : action === 'rejected' ? '❌' : '📄'
+        const actionText = action === 'approved' ? 'Document Approved' : action === 'rejected' ? 'Document Rejected' : action === 'uploaded' ? 'New Document' : 'Document Updated'
 
-      showNotification({
-        title: `${icon} ${actionText}`,
-        message: document.name || 'Document has been updated',
-        url: '/dashboard/documents',
-        type: 'document_update'
-      })
+        showNotification({
+          title: `${icon} ${actionText}`,
+          message: document?.name || 'Document has been updated',
+          url: '/dashboard/documents',
+          type: 'document_update'
+        })
+      } catch (error) {
+        console.error('[InAppNotification] Error handling document update:', error)
+      }
     })
 
     return unsubscribe
@@ -423,17 +512,21 @@ export function InAppNotificationProvider({ children }) {
     if (!onAssetUpdate) return
 
     const unsubscribe = onAssetUpdate((data) => {
-      const { asset, action } = data
+      try {
+        const { asset, action } = data || {}
 
-      const icon = action === 'assigned' ? '🔧' : action === 'returned' ? '↩️' : '📦'
-      const actionText = action === 'assigned' ? 'Asset Assigned' : action === 'returned' ? 'Asset Returned' : 'Asset Updated'
+        const icon = action === 'assigned' ? '🔧' : action === 'returned' ? '↩️' : '📦'
+        const actionText = action === 'assigned' ? 'Asset Assigned' : action === 'returned' ? 'Asset Returned' : 'Asset Updated'
 
-      showNotification({
-        title: `${icon} ${actionText}`,
-        message: `${asset.name || 'Asset'} - ${asset.assetCode || ''}`,
-        url: '/dashboard/assets',
-        type: 'asset_update'
-      })
+        showNotification({
+          title: `${icon} ${actionText}`,
+          message: `${asset?.name || 'Asset'} - ${asset?.assetCode || ''}`,
+          url: '/dashboard/assets',
+          type: 'asset_update'
+        })
+      } catch (error) {
+        console.error('[InAppNotification] Error handling asset update:', error)
+      }
     })
 
     return unsubscribe
@@ -444,17 +537,21 @@ export function InAppNotificationProvider({ children }) {
     if (!onPayrollUpdate) return
 
     const unsubscribe = onPayrollUpdate((data) => {
-      const { payroll, action } = data
+      try {
+        const { payroll, action } = data || {}
 
-      const icon = action === 'generated' ? '💰' : action === 'processed' ? '✅' : '💵'
-      const actionText = action === 'generated' ? 'Payroll Generated' : action === 'processed' ? 'Payroll Processed' : 'Payroll Updated'
+        const icon = action === 'generated' ? '💰' : action === 'processed' ? '✅' : '💵'
+        const actionText = action === 'generated' ? 'Payroll Generated' : action === 'processed' ? 'Payroll Processed' : 'Payroll Updated'
 
-      showNotification({
-        title: `${icon} ${actionText}`,
-        message: data.message || 'Your payroll has been updated',
-        url: '/dashboard/payroll',
-        type: 'payroll_update'
-      })
+        showNotification({
+          title: `${icon} ${actionText}`,
+          message: data?.message || 'Your payroll has been updated',
+          url: '/dashboard/payroll',
+          type: 'payroll_update'
+        })
+      } catch (error) {
+        console.error('[InAppNotification] Error handling payroll update:', error)
+      }
     })
 
     return unsubscribe

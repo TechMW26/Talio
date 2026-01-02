@@ -1,12 +1,17 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Bell, BellOff, Check, X, Loader2, Smartphone, Monitor, AlertCircle } from 'lucide-react';
 import useWebPush from '@/hooks/useWebPush';
 
 /**
  * Web Push Notification Permission Component
  * Shows a banner/modal prompting users to enable web push notifications
+ * 
+ * FIXED:
+ * 1. Properly handles subscription state after enable
+ * 2. Shows success state briefly before closing
+ * 3. Handles errors gracefully without infinite loading
  */
 export function WebPushPrompt({ onClose }) {
     const {
@@ -15,10 +20,12 @@ export function WebPushPrompt({ onClose }) {
         isSubscribed,
         isLoading,
         error,
+        isInitialized,
         subscribe
     } = useWebPush();
 
     const [dismissed, setDismissed] = useState(false);
+    const [subscribeSuccess, setSubscribeSuccess] = useState(false);
 
     // Check if user has previously dismissed the prompt
     useEffect(() => {
@@ -32,21 +39,60 @@ export function WebPushPrompt({ onClose }) {
         }
     }, []);
 
-    const handleEnable = async () => {
-        const result = await subscribe();
-        if (result) {
-            onClose?.();
+    // Auto-close after successful subscription
+    useEffect(() => {
+        if (subscribeSuccess) {
+            const timer = setTimeout(() => {
+                onClose?.();
+            }, 1500); // Show success state for 1.5 seconds
+            return () => clearTimeout(timer);
         }
-    };
+    }, [subscribeSuccess, onClose]);
 
-    const handleDismiss = () => {
+    const handleEnable = useCallback(async () => {
+        try {
+            const result = await subscribe();
+            if (result) {
+                setSubscribeSuccess(true);
+            }
+        } catch (err) {
+            console.error('[WebPushPrompt] Error enabling notifications:', err);
+        }
+    }, [subscribe]);
+
+    const handleDismiss = useCallback(() => {
         localStorage.setItem('webpush_prompt_dismissed', Date.now().toString());
         setDismissed(true);
         onClose?.();
-    };
+    }, [onClose]);
 
     // Don't show if not supported, already subscribed, permission denied, or dismissed
-    if (!isSupported || isSubscribed || permission === 'denied' || dismissed) {
+    // Wait for initialization before deciding to show
+    if (!isInitialized || !isSupported || isSubscribed || permission === 'denied' || dismissed || subscribeSuccess) {
+        // Show success message briefly before disappearing
+        if (subscribeSuccess) {
+            return (
+                <div className="fixed bottom-20 md:bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-[420px] z-50 animate-in slide-in-from-bottom-4 duration-300">
+                    <div className="relative bg-white dark:bg-gray-800 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.3)] overflow-hidden">
+                        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-green-500 via-green-600 to-emerald-600"></div>
+                        <div className="px-8 py-10 text-center">
+                            <div className="relative inline-flex items-center justify-center mb-6">
+                                <div className="absolute inset-0 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl blur-lg opacity-30"></div>
+                                <div className="relative bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl p-4 shadow-lg">
+                                    <Check className="w-7 h-7 text-white" strokeWidth={2.5} />
+                                </div>
+                            </div>
+                            <h3 className="text-xl font-semibold text-slate-800 dark:text-white mb-3 tracking-tight">
+                                Notifications Enabled!
+                            </h3>
+                            <p className="text-sm text-slate-500 dark:text-gray-400">
+                                You'll now receive important updates.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
         return null;
     }
 
@@ -77,7 +123,7 @@ export function WebPushPrompt({ onClose }) {
                     </div>
 
                     {/* Title */}
-                    <h3 className="text-xl font-semibold text-slate-800 mb-3 tracking-tight">
+                    <h3 className="text-xl font-semibold text-slate-800 dark:text-white mb-3 tracking-tight">
                         Stay Updated
                     </h3>
 

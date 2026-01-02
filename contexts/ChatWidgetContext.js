@@ -19,24 +19,24 @@ export function ChatWidgetProvider({ children }) {
   useEffect(() => {
     const calculateMinimizedChats = () => {
       if (typeof window === 'undefined') return
-      
+
       const screenWidth = window.innerWidth
       const sidebarWidth = sidebarCollapsed ? 72 : 272 // 4.5rem or 17rem
       const widgetWidth = 340
       const chatWidth = 360
       const gap = 16
       const padding = 40
-      
+
       // Available width for chats (right of widget)
       const widgetStartX = triggerSource === 'sidebar' ? sidebarWidth + 16 : screenWidth - 88 - widgetWidth
       const availableWidth = screenWidth - widgetStartX - widgetWidth - gap - padding
-      
+
       // How many chats can fit without minimizing
       const maxChatsVisible = Math.max(1, Math.floor(availableWidth / (chatWidth + gap)))
-      
+
       // Check if there's a manually maximized chat (exempted from auto-minimize)
       const exemptChatId = window.__exemptChatId
-      
+
       // Auto-minimize older chats (first opened) when we exceed available space
       const newMinimized = new Set()
       if (openChats.length > maxChatsVisible) {
@@ -61,15 +61,15 @@ export function ChatWidgetProvider({ children }) {
           }
         }
       }
-      
+
       // Reset positions when minimization changes to trigger recalculation
       if (newMinimized.size !== minimizedChats.size) {
         setChatPositions({})
       }
-      
+
       setMinimizedChats(newMinimized)
     }
-    
+
     calculateMinimizedChats()
     window.addEventListener('resize', calculateMinimizedChats)
     return () => window.removeEventListener('resize', calculateMinimizedChats)
@@ -159,7 +159,7 @@ export function ChatWidgetProvider({ children }) {
     setFocusedChatId(chatId)
     zIndexCounter.current += 1
   }, [])
-  
+
   // Get z-index for a chat
   const getZIndex = useCallback((chatId) => {
     if (chatId === focusedChatId) {
@@ -215,7 +215,32 @@ export function ChatWidgetProvider({ children }) {
 export function useChatWidget() {
   const context = useContext(ChatWidgetContext)
   if (!context) {
-    throw new Error('useChatWidget must be used within a ChatWidgetProvider')
+    // Return safe defaults instead of throwing, to prevent crashes
+    // This can happen if the component is rendered outside the provider temporarily
+    console.warn('[ChatWidgetContext] useChatWidget called outside ChatWidgetProvider, returning safe defaults')
+    return {
+      isWidgetOpen: false,
+      openChats: [],
+      widgetPosition: { x: null, y: null },
+      chatPositions: {},
+      triggerSource: 'button',
+      focusedChatId: null,
+      sidebarCollapsed: true,
+      minimizedChats: new Set(),
+      toggleWidget: () => { },
+      openWidget: () => { },
+      closeWidget: () => { },
+      openChat: () => { },
+      closeChat: () => { },
+      closeAllChats: () => { },
+      updateWidgetPosition: () => { },
+      updateChatPosition: () => { },
+      bringToFront: () => { },
+      resetChatPositions: () => { },
+      getZIndex: () => 10000,
+      isAutoMinimized: () => false,
+      updateSidebarCollapsed: () => { }
+    }
   }
   return context
 }

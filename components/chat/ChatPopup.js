@@ -241,19 +241,24 @@ export default function ChatPopup({ chat, index }) {
     if (!chat._id || !onNewMessage) return
 
     const unsubscribe = onNewMessage((data) => {
-      const { chatId, message: newMessage } = data
-      if (chatId === chat._id && newMessage) {
-        setMessages(prev => {
-          if (prev.some(msg => msg._id === newMessage._id)) return prev
-          const senderId = (newMessage.sender?._id || newMessage.sender)?.toString()
-          const currentEmpId = currentEmployeeId?.toString()
-          // Only play sound if message is from someone else
-          if (senderId !== currentEmpId) {
-            playNotificationSound?.()
-          }
-          return [...prev, newMessage]
-        })
-        markChatAsRead?.(chat._id)
+      try {
+        const chatId = data?.chatId
+        const newMessage = data?.message
+        if (chatId === chat._id && newMessage) {
+          setMessages(prev => {
+            if (prev.some(msg => msg._id === newMessage._id)) return prev
+            const senderId = (newMessage.sender?._id || newMessage.sender)?.toString?.() || ''
+            const currentEmpId = currentEmployeeId?.toString?.() || ''
+            // Only play sound if message is from someone else
+            if (senderId && currentEmpId && senderId !== currentEmpId) {
+              playNotificationSound?.()
+            }
+            return [...prev, newMessage]
+          })
+          markChatAsRead?.(chat._id)
+        }
+      } catch (error) {
+        console.error('[ChatPopup] Error handling new message:', error)
       }
     })
 
@@ -689,16 +694,16 @@ export default function ChatPopup({ chat, index }) {
           onMouseDown={handleMouseDown}
         >
           <div className="flex items-center gap-2 text-white min-w-0">
-            <div 
+            <div
               className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 shadow-sm overflow-hidden"
               style={{ backgroundColor: getOtherParticipantPicture() ? 'transparent' : 'rgba(0, 0, 0, 0.3)' }}
             >
               {chat.isGroup ? (
                 <FaUsers className="w-4 h-4 text-white" />
               ) : getOtherParticipantPicture() ? (
-                <img 
-                  src={getOtherParticipantPicture()} 
-                  alt="" 
+                <img
+                  src={getOtherParticipantPicture()}
+                  alt=""
                   className="w-full h-full object-cover"
                 />
               ) : (
@@ -926,8 +931,8 @@ export default function ChatPopup({ chat, index }) {
                 <div key={msg._id || idx} className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
                   <div
                     className={`max-w-[75%] px-3.5 py-2.5 rounded-2xl ${isMine
-                        ? 'text-white rounded-br-md shadow-sm'
-                        : 'text-gray-800 rounded-bl-md shadow-sm'
+                      ? 'text-white rounded-br-md shadow-sm'
+                      : 'text-gray-800 rounded-bl-md shadow-sm'
                       }`}
                     style={isMine ? {
                       background: `linear-gradient(135deg, ${primaryColor}, ${primaryDark})`,

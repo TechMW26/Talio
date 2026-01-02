@@ -81,99 +81,132 @@ self.addEventListener('activate', (event) => {
 });
 
 // Handle background messages (when app is not in focus)
+// CRITICAL: Wrapped in try-catch to prevent crashes
 self.addEventListener('push', (event) => {
     console.log('[Firebase SW] Push event received:', event);
 
-    if (!event.data) {
-        console.warn('[Firebase SW] No data in push event');
-        return;
-    }
+    // Wrap everything in a try-catch to prevent unhandled errors
+    const handlePush = async () => {
+        try {
+            if (!event.data) {
+                console.warn('[Firebase SW] No data in push event');
+                return;
+            }
 
-    let payload;
-    try {
-        payload = event.data.json();
-    } catch (e) {
-        payload = { notification: { title: 'Talio', body: event.data.text() } };
-    }
+            let payload;
+            try {
+                payload = event.data.json();
+            } catch (e) {
+                // Fallback for non-JSON data
+                const text = event.data.text ? event.data.text() : 'New notification';
+                payload = { notification: { title: 'Talio', body: text } };
+            }
 
-    console.log('[Firebase SW] Push payload:', payload);
+            console.log('[Firebase SW] Push payload:', payload);
 
-    const notification = payload.notification || {};
-    const data = payload.data || {};
+            // Safely access notification and data with defaults
+            const notification = payload?.notification || {};
+            const data = payload?.data || {};
 
-    const title = notification.title || data.title || 'Talio HRMS';
-    const options = {
-        body: notification.body || data.body || data.message || '',
-        icon: notification.icon || data.icon || '/icons/icon-192x192.png',
-        badge: '/icons/icon-72x72.png',
-        tag: data.tag || `talio-${Date.now()}`,
-        data: {
-            url: data.url || data.click_action || '/dashboard',
-            type: data.type || 'notification',
-            ...data
-        },
-        vibrate: [100, 50, 100],
-        requireInteraction: data.requireInteraction === 'true' || false,
-        renotify: true,
-        actions: getNotificationActions(data.type)
+            const title = notification.title || data.title || 'Talio HRMS';
+            const options = {
+                body: notification.body || data.body || data.message || '',
+                icon: notification.icon || data.icon || '/icons/icon-192x192.png',
+                badge: '/icons/icon-72x72.png',
+                tag: data.tag || `talio-${Date.now()}`,
+                data: {
+                    url: data.url || data.click_action || '/dashboard',
+                    type: data.type || 'notification',
+                    ...data
+                },
+                vibrate: [100, 50, 100],
+                requireInteraction: data.requireInteraction === 'true' || false,
+                renotify: true,
+                actions: getNotificationActions(data.type)
+            };
+
+            // Add image if provided
+            if (notification.image || data.image) {
+                options.image = notification.image || data.image;
+            }
+
+            await self.registration.showNotification(title, options);
+        } catch (error) {
+            console.error('[Firebase SW] Error handling push event:', error);
+            // Show a fallback notification on error
+            try {
+                await self.registration.showNotification('Talio', {
+                    body: 'You have a new notification',
+                    icon: '/icons/icon-192x192.png'
+                });
+            } catch (fallbackError) {
+                console.error('[Firebase SW] Fallback notification also failed:', fallbackError);
+            }
+        }
     };
 
-    // Add image if provided
-    if (notification.image || data.image) {
-        options.image = notification.image || data.image;
-    }
-
-    event.waitUntil(
-        self.registration.showNotification(title, options)
-    );
+    event.waitUntil(handlePush());
 });
 
-// Handle notification click
+// Handle notification click - wrapped in try-catch
 self.addEventListener('notificationclick', (event) => {
     console.log('[Firebase SW] Notification clicked:', event.notification);
 
-    event.notification.close();
+    try {
+        event.notification.close();
 
-    const data = event.notification.data || {};
-    const url = data.url || '/dashboard';
+        const data = event.notification?.data || {};
+        const url = data.url || '/dashboard';
 
-    // Handle action buttons
-    if (event.action) {
-        console.log('[Firebase SW] Action clicked:', event.action);
-        // Handle specific actions based on notification type
-        switch (event.action) {
-            case 'view':
-                // Default - open the URL
-                break;
-            case 'dismiss':
-                // Just close the notification (already done above)
-                return;
-            case 'mark-read':
-                // Mark notification as read via API
-                event.waitUntil(markNotificationAsRead(data.notificationId));
-                return;
-            default:
-                break;
+        // Handle action buttons
+        if (event.action) {
+            console.log('[Firebase SW] Action clicked:', event.action);
+            // Handle specific actions based on notification type
+            switch (event.action) {
+                case 'view':
+                    // Default - open the URL
+                    break;
+                case 'dismiss':
+                    // Just close the notification (already done above)
+                    return;
+                case 'mark-read':
+                    // Mark notification as read via API
+                    event.waitUntil(markNotificationAsRead(data.notificationId));
+                    return;
+                default:
+                    break;
+            }
         }
-    }
 
-    // Open or focus the app window
-    event.waitUntil(
-        clients.matchAll({ type: 'window', includeUncontrolled: true })
-            .then((windowClients) => {
-                // Check if there's already a window/tab open
-                for (const client of windowClients) {
-                    if (client.url.includes(self.location.origin) && 'focus' in client) {
-                        // Navigate existing window to the target URL
-                        return client.navigate(url).then(() => client.focus());
+        // Open or focus the app window
+        event.waitUntil(
+            clients.matchAll({ type: 'window', includeUncontrolled: true })
+                .then((windowClients) => {
+                    // Check if there's already a window/tab open
+                    for (const client of windowClients) {
+                        if (client.url && client.url.includes(self.location.origin) && 'focus' in client) {
+                            // Navigate existing window to the target URL
+                            return client.navigate(url).then(() => client.focus()).catch(err => {
+                                console.warn('[Firebase SW] Navigation failed:', err);
+                                // Open new window as fallback
+                                if (clients.openWindow) {
+                                    return clients.openWindow(url);
+                                }
+                            });
+                        }
                     }
-                }
-                // Open new window if none exists
-                if (clients.openWindow) {
-                    return clients.openWindow(url);
-                }
-            })
-    );
+                    // Open new window if none exists
+                    if (clients.openWindow) {
+                        return clients.openWindow(url);
+                    }
+                })
+                .catch(err => {
+                    console.error('[Firebase SW] Error handling notification click:', err);
+                })
+        );
+    } catch (error) {
+        console.error('[Firebase SW] Error in notificationclick handler:', error);
+    }
 });
 
 // Handle notification close
@@ -182,41 +215,49 @@ self.addEventListener('notificationclose', (event) => {
     // Track notification dismissal if needed
 });
 
-// Get action buttons based on notification type
+// Get action buttons based on notification type - with error handling
 function getNotificationActions(type) {
-    const defaultActions = [
-        { action: 'view', title: '👀 View' },
-        { action: 'dismiss', title: '✖️ Dismiss' }
-    ];
+    try {
+        const defaultActions = [
+            { action: 'view', title: '👀 View' },
+            { action: 'dismiss', title: '✖️ Dismiss' }
+        ];
 
-    switch (type) {
-        case 'leave':
-            return [
-                { action: 'view', title: '📋 View Leave' },
-                { action: 'dismiss', title: '✖️ Dismiss' }
-            ];
-        case 'attendance':
-            return [
-                { action: 'view', title: '📍 View Attendance' },
-                { action: 'dismiss', title: '✖️ Dismiss' }
-            ];
-        case 'task':
-            return [
-                { action: 'view', title: '📝 View Task' },
-                { action: 'dismiss', title: '✖️ Dismiss' }
-            ];
-        case 'chat':
-            return [
-                { action: 'view', title: '💬 Reply' },
-                { action: 'dismiss', title: '✖️ Dismiss' }
-            ];
-        case 'approval':
-            return [
-                { action: 'view', title: '✅ Review' },
-                { action: 'dismiss', title: '✖️ Dismiss' }
-            ];
-        default:
-            return defaultActions;
+        switch (type) {
+            case 'leave':
+                return [
+                    { action: 'view', title: '📋 View Leave' },
+                    { action: 'dismiss', title: '✖️ Dismiss' }
+                ];
+            case 'attendance':
+                return [
+                    { action: 'view', title: '📍 View Attendance' },
+                    { action: 'dismiss', title: '✖️ Dismiss' }
+                ];
+            case 'task':
+                return [
+                    { action: 'view', title: '📝 View Task' },
+                    { action: 'dismiss', title: '✖️ Dismiss' }
+                ];
+            case 'chat':
+                return [
+                    { action: 'view', title: '💬 Reply' },
+                    { action: 'dismiss', title: '✖️ Dismiss' }
+                ];
+            case 'approval':
+                return [
+                    { action: 'view', title: '✅ Review' },
+                    { action: 'dismiss', title: '✖️ Dismiss' }
+                ];
+            default:
+                return defaultActions;
+        }
+    } catch (error) {
+        console.error('[Firebase SW] Error getting notification actions:', error);
+        return [
+            { action: 'view', title: '👀 View' },
+            { action: 'dismiss', title: '✖️ Dismiss' }
+        ];
     }
 }
 
@@ -236,18 +277,22 @@ async function markNotificationAsRead(notificationId) {
     }
 }
 
-// Listen for messages from the main app
+// Listen for messages from the main app - wrapped in try-catch
 self.addEventListener('message', (event) => {
-    console.log('[Firebase SW] Message received:', event.data);
+    try {
+        console.log('[Firebase SW] Message received:', event.data);
 
-    if (event.data && event.data.type === 'FIREBASE_CONFIG') {
-        // Update Firebase config from main app
-        Object.assign(firebaseConfig, event.data.config);
-        initializeFirebase();
-    }
+        if (event.data && event.data.type === 'FIREBASE_CONFIG') {
+            // Update Firebase config from main app
+            Object.assign(firebaseConfig, event.data.config);
+            initializeFirebase();
+        }
 
-    if (event.data && event.data.type === 'SKIP_WAITING') {
-        self.skipWaiting();
+        if (event.data && event.data.type === 'SKIP_WAITING') {
+            self.skipWaiting();
+        }
+    } catch (error) {
+        console.error('[Firebase SW] Error handling message:', error);
     }
 });
 
