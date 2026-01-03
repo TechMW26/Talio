@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx'
 import { sendAndLogOnboardingEmail } from '@/lib/mailer'
 import { generateContent } from '@/lib/gemini'
 import { syncUserToBackup } from '@/lib/backupDb'
+import { registerUserTenantMapping, getTenantCompanyByDbName } from '@/lib/tenantContext'
 
 /**
  * Smart level detection based on designation/job title
@@ -12,49 +13,49 @@ import { syncUserToBackup } from '@/lib/backupDb'
  */
 function detectLevelFromTitle(title) {
   if (!title) return 1
-  
+
   const normalizedTitle = title.toLowerCase().trim()
-  
+
   // Level 8: Executive/C-Suite
   if (/\b(ceo|cto|cfo|coo|cmo|cio|cpo|chief|president|founder|co-founder|owner|chairman|chairwoman|chairperson)\b/i.test(normalizedTitle)) {
     return 8
   }
-  
+
   // Level 7: Director
   if (/\b(director|vp|vice\s*president|head\s+of|global\s+head|regional\s+head|country\s+head|avp|associate\s+vice\s+president)\b/i.test(normalizedTitle)) {
     return 7
   }
-  
+
   // Level 6: Manager
   if (/\b(manager|mgr|gm|general\s+manager|agm|assistant\s+manager|deputy\s+manager|project\s+manager|product\s+manager|program\s+manager|account\s+manager|team\s+manager|operations\s+manager|branch\s+manager|area\s+manager|zonal\s+manager|regional\s+manager|supervisor|superintendent|controller|coordinator)\b/i.test(normalizedTitle)) {
     return 6
   }
-  
+
   // Level 5: Lead/Principal
   if (/\b(lead|principal|team\s+lead|tech\s+lead|technical\s+lead|group\s+lead|squad\s+lead|architect|staff\s+engineer|staff\s+developer|specialist|expert|consultant|advisor|strategist)\b/i.test(normalizedTitle)) {
     return 5
   }
-  
+
   // Level 4: Senior
   if (/\b(senior|sr\.?|snr|experienced|advanced|level\s*[3-4]|grade\s*[3-4]|band\s*[3-4])\b/i.test(normalizedTitle)) {
     return 4
   }
-  
+
   // Level 3: Mid-Level
   if (/\b(mid|mid-level|mid\s+level|intermediate|level\s*2|grade\s*2|band\s*2|associate(?!\s+(vice|director|manager)))\b/i.test(normalizedTitle)) {
     return 3
   }
-  
+
   // Level 2: Junior
   if (/\b(junior|jr\.?|jnr|fresher|graduate|trainee(?!\s+manager)|apprentice|probation|entry(?!\s+level)|beginner)\b/i.test(normalizedTitle)) {
     return 2
   }
-  
+
   // Level 1: Entry Level (default) - Also catch explicit entry level terms
   if (/\b(entry\s*level|intern|internship|trainee|fresher|newcomer|starter)\b/i.test(normalizedTitle)) {
     return 1
   }
-  
+
   // Default heuristics based on common title patterns
   // If title contains specific senior-ish terms without explicit level indicators
   if (/\b(analyst|engineer|developer|designer|executive|officer|representative|administrator|accountant|auditor|scientist|researcher)\b/i.test(normalizedTitle)) {
@@ -64,7 +65,7 @@ function detectLevelFromTitle(title) {
     }
     return 3 // Default to mid-level for professional roles without modifiers
   }
-  
+
   // Default to Entry Level for unknown titles
   return 1
 }
@@ -76,29 +77,29 @@ function detectLevelFromTitle(title) {
  */
 function detectUserRoleFromDesignation(designation, department) {
   if (!designation) return 'employee'
-  
+
   const title = designation.toLowerCase().trim()
   const dept = (department || '').toLowerCase().trim()
-  
+
   // HR roles - only if designation explicitly contains HR-related terms
   // Matches: HR, Human Resource, HR Executive, Associate-HR, AM-HR, HRBP, etc.
   if (/\b(hr|human\s*resource|hrbp|hr\s*business\s*partner)\b/i.test(title) ||
-      /[-_](hr|human\s*resource)$/i.test(title) ||
-      /^(hr|human\s*resource)[-_]/i.test(title)) {
+    /[-_](hr|human\s*resource)$/i.test(title) ||
+    /^(hr|human\s*resource)[-_]/i.test(title)) {
     return 'hr'
   }
-  
+
   // Also check if department is HR
   if (/\b(hr|human\s*resource)\b/i.test(dept)) {
     return 'hr'
   }
-  
+
   // Manager role - only if designation explicitly contains Manager/Lead terms
   // Matches: Manager, Team Lead, Tech Lead, Project Manager, etc.
   if (/\b(manager|mgr|team\s*lead|tech\s*lead|project\s*lead|engineering\s*lead)\b/i.test(title)) {
     return 'manager'
   }
-  
+
   // Default to employee for all other designations
   return 'employee'
 }
@@ -135,9 +136,9 @@ function generateRandomPassword() {
   const lowercase = 'abcdefghjkmnpqrstuvwxyz'  // Removed i, l, o for clarity
   const digits = '23456789'                     // Removed 0, 1 for clarity
   const special = '@#$%&*!'
-  
+
   let password = ''
-  
+
   // 3 uppercase
   for (let i = 0; i < 3; i++) {
     password += uppercase.charAt(Math.floor(Math.random() * uppercase.length))
@@ -152,7 +153,7 @@ function generateRandomPassword() {
   }
   // 1 special character
   password += special.charAt(Math.floor(Math.random() * special.length))
-  
+
   return password
 }
 
@@ -170,7 +171,7 @@ function calculateSalaryBreakdown(grossSalary) {
   const conveyance = 800                            // Fixed ₹800
   const medical = Math.round(gross * 0.05)         // 5% of gross
   const special = gross - basic - hra - conveyance - medical  // Remainder
-  
+
   return {
     basic,
     hra,
@@ -192,15 +193,15 @@ function excelSerialToDate(serial) {
   if (typeof serial !== 'number' || isNaN(serial) || serial < 1) {
     return null
   }
-  
+
   // Excel's epoch is January 1, 1900
   // But Excel incorrectly treats 1900 as a leap year, so we need to adjust for dates after Feb 28, 1900
   const excelEpoch = new Date(1899, 11, 30) // Dec 30, 1899 (LOCAL, not UTC)
   const millisecondsPerDay = 24 * 60 * 60 * 1000
-  
+
   // For serial numbers > 60 (after Feb 28, 1900), subtract 1 to account for Excel's leap year bug
   const adjustedSerial = serial > 60 ? serial - 1 : serial
-  
+
   const date = new Date(excelEpoch.getTime() + adjustedSerial * millisecondsPerDay)
   // Return as local date at midnight to preserve exact date
   return new Date(date.getFullYear(), date.getMonth(), date.getDate())
@@ -215,13 +216,13 @@ function excelSerialToDate(serial) {
  */
 function parseExcelDate(value) {
   if (!value && value !== 0) return null
-  
+
   // If it's already a Date object - convert to local date at midnight
   if (value instanceof Date) {
     if (isNaN(value.getTime())) return null
     return new Date(value.getFullYear(), value.getMonth(), value.getDate())
   }
-  
+
   // If it's a number (Excel serial date)
   if (typeof value === 'number') {
     // Check if it looks like an Excel serial date (reasonable range: 1900-2100)
@@ -241,11 +242,11 @@ function parseExcelDate(value) {
     }
     return null
   }
-  
+
   // If it's a string
   if (typeof value === 'string') {
     const trimmed = value.trim()
-    
+
     // Check if it's a numeric string (Excel serial)
     const numericValue = parseFloat(trimmed)
     if (!isNaN(numericValue) && /^\d+(\.\d+)?$/.test(trimmed)) {
@@ -253,7 +254,7 @@ function parseExcelDate(value) {
         return excelSerialToDate(numericValue)
       }
     }
-    
+
     // Try DD/MM/YYYY or DD-MM-YYYY format FIRST (most common in India)
     const ddmmyyyyMatch = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/)
     if (ddmmyyyyMatch) {
@@ -264,7 +265,7 @@ function parseExcelDate(value) {
         return parsed
       }
     }
-    
+
     // Try YYYY/MM/DD or YYYY-MM-DD format (ISO-like but treat as local)
     const yyyymmddMatch = trimmed.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/)
     if (yyyymmddMatch) {
@@ -275,14 +276,14 @@ function parseExcelDate(value) {
         return parsed
       }
     }
-    
+
     // Try standard Date parsing as fallback (but convert to local date)
     const parsed = new Date(trimmed)
     if (!isNaN(parsed.getTime())) {
       return new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate())
     }
   }
-  
+
   return null
 }
 
@@ -299,19 +300,19 @@ async function correctSpellingWithAI(data, existingDepartments, existingDesignat
   if (data.designation && typeof data.designation === 'string') fieldsToCorrect.designation = data.designation
   if (data.role && typeof data.role === 'string') fieldsToCorrect.role = data.role
   if (data.company && typeof data.company === 'string') fieldsToCorrect.company = data.company
-  
+
   // Skip if nothing to correct
   if (Object.keys(fieldsToCorrect).length === 0) {
     return data
   }
-  
+
   try {
     // Build context about existing values
     const existingDeptNames = existingDepartments.map(d => d.name).join(', ')
     const existingDesigNames = existingDesignations.map(d => d.title).join(', ')
     const existingCompanyNames = existingCompanies.map(c => c.name).join(', ')
     const validRoles = 'admin, hr, manager, employee, department_head'
-    
+
     const prompt = `Correct any spelling mistakes in these field values. Match to existing values when possible.
 
 Input values to correct:
@@ -333,19 +334,19 @@ Respond with ONLY a JSON object containing the corrected values:
 {"department": "corrected", "designation": "corrected", "role": "corrected", "company": "corrected"}`
 
     const response = await generateContent(prompt, 'You are a spell-check assistant. Respond only with valid JSON containing corrected values.')
-    
+
     // Parse the JSON response
     const jsonMatch = response.match(/\{[\s\S]*\}/)
     if (jsonMatch) {
       const corrections = JSON.parse(jsonMatch[0])
-      
+
       // Apply corrections back to data
       const correctedData = { ...data }
       if (corrections.department) correctedData.department = corrections.department
       if (corrections.designation) correctedData.designation = corrections.designation
       if (corrections.role) correctedData.role = corrections.role.toLowerCase()
       if (corrections.company) correctedData.company = corrections.company
-      
+
       // Log corrections for debugging
       const changesMade = []
       if (fieldsToCorrect.department !== corrections.department) {
@@ -360,18 +361,18 @@ Respond with ONLY a JSON object containing the corrected values:
       if (fieldsToCorrect.company !== corrections.company) {
         changesMade.push(`company: "${fieldsToCorrect.company}" → "${corrections.company}"`)
       }
-      
+
       if (changesMade.length > 0) {
         console.log(`[Bulk Import] AI spell-check corrections: ${changesMade.join(', ')}`)
       }
-      
+
       return correctedData
     }
   } catch (error) {
     console.error('[Bulk Import] AI spell-check failed:', error.message)
     // Fall through to return original data
   }
-  
+
   return data
 }
 
@@ -419,7 +420,7 @@ Return ONLY a JSON object mapping column indices to field names. Example:
 JSON response:`
 
     const response = await generateContent(prompt, 'You are a data mapping assistant. Return only valid JSON.')
-    
+
     // Extract JSON from response
     const jsonMatch = response.match(/\{[\s\S]*\}/)
     if (jsonMatch) {
@@ -430,7 +431,7 @@ JSON response:`
   } catch (error) {
     console.error('[AI Column Mapping Error]:', error.message)
   }
-  
+
   return null
 }
 
@@ -439,7 +440,7 @@ JSON response:`
  */
 function ruleBasedColumnMapping(headers, sampleRows) {
   const mapping = {}
-  
+
   const patterns = {
     employeeCode: /^(emp|employee|staff|id|code|number|no\.?|#)[\s_-]*(id|code|no\.?|number|#)?$/i,
     firstName: /^(first|given)[\s_-]*(name)?$/i,
@@ -457,30 +458,30 @@ function ruleBasedColumnMapping(headers, sampleRows) {
     salary: /^(salary|ctc|compensation|pay|wage)$/i,
     address: /^(address|location|city)$/i,
   }
-  
+
   headers.forEach((header, idx) => {
     if (!header) {
       // Check sample data to infer type
       const samples = sampleRows.slice(0, 5).map(row => row[idx]).filter(v => v)
-      
+
       // Check if all samples look like emails
       if (samples.every(s => String(s).includes('@'))) {
         mapping[idx] = 'email'
         return
       }
-      
+
       // Check if all samples look like phone numbers
       if (samples.every(s => /^[\d\s\-\+\(\)]{10,}$/.test(String(s)))) {
         mapping[idx] = 'phone'
         return
       }
-      
+
       mapping[idx] = 'ignore'
       return
     }
-    
+
     const normalizedHeader = header.toString().toLowerCase().trim()
-    
+
     // Check patterns
     for (const [field, pattern] of Object.entries(patterns)) {
       if (pattern.test(normalizedHeader)) {
@@ -488,7 +489,7 @@ function ruleBasedColumnMapping(headers, sampleRows) {
         return
       }
     }
-    
+
     // Check for partial matches
     if (normalizedHeader.includes('email') || normalizedHeader.includes('mail')) {
       mapping[idx] = 'email'
@@ -524,7 +525,7 @@ function ruleBasedColumnMapping(headers, sampleRows) {
       }
     }
   })
-  
+
   return mapping
 }
 
@@ -537,7 +538,7 @@ async function getColumnMapping(headers, sampleRows) {
   if (aiMapping && Object.keys(aiMapping).length > 0) {
     return { mapping: aiMapping, method: 'ai' }
   }
-  
+
   // Fallback to rule-based mapping
   const ruleMapping = ruleBasedColumnMapping(headers, sampleRows)
   return { mapping: ruleMapping, method: 'rules' }
@@ -548,21 +549,21 @@ async function getColumnMapping(headers, sampleRows) {
  */
 function parseRowWithMapping(row, mapping) {
   const data = {}
-  
+
   for (const [colIdx, fieldName] of Object.entries(mapping)) {
     // Skip null, undefined, 'ignore', or 'null' string mappings
     if (!fieldName || fieldName === 'ignore' || fieldName === 'null') continue
-    
+
     const idx = parseInt(colIdx)
     let value = row[idx]
-    
+
     if (value === undefined || value === null || value === '') continue
-    
+
     // Convert to string and trim for string fields
     if (typeof value === 'string') {
       value = value.trim()
     }
-    
+
     // Handle split fields (like "split:firstName,lastName")
     if (typeof fieldName === 'string' && fieldName.startsWith('split:')) {
       const fields = fieldName.replace('split:', '').split(',')
@@ -573,7 +574,7 @@ function parseRowWithMapping(row, mapping) {
       }
       continue
     }
-    
+
     // Handle fullName - split into firstName and lastName
     if (fieldName === 'fullName') {
       const nameParts = String(value).trim().split(/\s+/)
@@ -586,12 +587,12 @@ function parseRowWithMapping(row, mapping) {
       }
       continue
     }
-    
+
     // Parse dates
     if (fieldName === 'dateOfBirth' || fieldName === 'dateOfJoining') {
       value = parseExcelDate(value)
     }
-    
+
     // Normalize gender
     if (fieldName === 'gender' && value) {
       const normalized = String(value).toLowerCase()
@@ -603,7 +604,7 @@ function parseRowWithMapping(row, mapping) {
         value = 'other'
       }
     }
-    
+
     // Normalize role
     if (fieldName === 'role' && value) {
       const normalized = String(value).toLowerCase()
@@ -613,7 +614,7 @@ function parseRowWithMapping(row, mapping) {
         value = 'employee'
       }
     }
-    
+
     // Normalize employment type
     if (fieldName === 'employmentType' && value) {
       const normalized = String(value).toLowerCase().replace(/\s+/g, '-')
@@ -627,10 +628,10 @@ function parseRowWithMapping(row, mapping) {
         value = 'full-time'
       }
     }
-    
+
     data[fieldName] = value
   }
-  
+
   return data
 }
 
@@ -640,17 +641,17 @@ function parseRowWithMapping(row, mapping) {
 function levenshteinDistance(str1, str2) {
   const s1 = str1.toLowerCase()
   const s2 = str2.toLowerCase()
-  
+
   const matrix = []
-  
+
   for (let i = 0; i <= s1.length; i++) {
     matrix[i] = [i]
   }
-  
+
   for (let j = 0; j <= s2.length; j++) {
     matrix[0][j] = j
   }
-  
+
   for (let i = 1; i <= s1.length; i++) {
     for (let j = 1; j <= s2.length; j++) {
       if (s1[i - 1] === s2[j - 1]) {
@@ -664,7 +665,7 @@ function levenshteinDistance(str1, str2) {
       }
     }
   }
-  
+
   return matrix[s1.length][s2.length]
 }
 
@@ -706,17 +707,17 @@ const ABBREVIATION_MAP = {
 function normalizeForComparison(text) {
   if (!text) return ''
   let normalized = text.toLowerCase().trim()
-  
+
   // Expand known abbreviations
   Object.entries(ABBREVIATION_MAP).forEach(([abbr, full]) => {
     if (normalized === abbr || normalized.startsWith(abbr + ' ') || normalized.endsWith(' ' + abbr)) {
       normalized = normalized.replace(new RegExp(`\\b${abbr}\\b`, 'gi'), full)
     }
   })
-  
+
   // Remove special characters and extra spaces
   normalized = normalized.replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()
-  
+
   return normalized
 }
 
@@ -726,23 +727,23 @@ function normalizeForComparison(text) {
  */
 function findBestMatchingDepartment(searchName, departments, threshold = 0.75) {
   if (!searchName) return null
-  
+
   const normalizedSearch = normalizeForComparison(searchName)
   let bestMatch = null
   let bestSimilarity = 0
-  
+
   for (const dept of departments) {
     // Check exact match first
     const normalizedDept = normalizeForComparison(dept.name)
     if (normalizedDept === normalizedSearch) {
       return { department: dept, isExact: true, similarity: 1 }
     }
-    
+
     // Check code match
     if (dept.code && dept.code.toLowerCase() === searchName.toLowerCase().trim()) {
       return { department: dept, isExact: true, similarity: 1 }
     }
-    
+
     // Calculate similarity
     const similarity = calculateSimilarity(normalizedSearch, normalizedDept)
     if (similarity > bestSimilarity && similarity >= threshold) {
@@ -750,7 +751,7 @@ function findBestMatchingDepartment(searchName, departments, threshold = 0.75) {
       bestMatch = { department: dept, isExact: false, similarity }
     }
   }
-  
+
   return bestMatch
 }
 
@@ -759,28 +760,28 @@ function findBestMatchingDepartment(searchName, departments, threshold = 0.75) {
  */
 function findBestMatchingDesignation(searchTitle, designations, threshold = 0.75) {
   if (!searchTitle) return null
-  
+
   const normalizedSearch = normalizeForComparison(searchTitle)
   let bestMatch = null
   let bestSimilarity = 0
-  
+
   for (const desig of designations) {
     const normalizedDesig = normalizeForComparison(desig.title)
     if (normalizedDesig === normalizedSearch) {
       return { designation: desig, isExact: true, similarity: 1 }
     }
-    
+
     if (desig.code && desig.code.toLowerCase() === searchTitle.toLowerCase().trim()) {
       return { designation: desig, isExact: true, similarity: 1 }
     }
-    
+
     const similarity = calculateSimilarity(normalizedSearch, normalizedDesig)
     if (similarity > bestSimilarity && similarity >= threshold) {
       bestSimilarity = similarity
       bestMatch = { designation: desig, isExact: false, similarity }
     }
   }
-  
+
   return bestMatch
 }
 
@@ -813,40 +814,40 @@ function generateDesignationCode(title) {
  */
 async function getOrCreateDepartment(name, allDepartments, DepartmentModel) {
   if (!name) return { departmentId: null, created: false, matched: null }
-  
+
   const match = findBestMatchingDepartment(name, allDepartments)
-  
+
   if (match) {
-    return { 
-      departmentId: match.department._id, 
-      created: false, 
+    return {
+      departmentId: match.department._id,
+      created: false,
       matched: match.department.name,
       similarity: match.similarity,
       isExact: match.isExact
     }
   }
-  
+
   // Create new department
   const code = generateDepartmentCode(name)
   let uniqueCode = code
   let counter = 1
-  
+
   // Ensure unique code
   while (allDepartments.some(d => d.code === uniqueCode)) {
     uniqueCode = `${code}${counter}`
     counter++
   }
-  
+
   const newDept = await DepartmentModel.create({
     name: name.trim(),
     code: uniqueCode,
     description: `Department for ${name.trim()} operations`,
     isActive: true
   })
-  
+
   // Add to cache
   allDepartments.push({ _id: newDept._id, name: newDept.name, code: newDept.code })
-  
+
   return { departmentId: newDept._id, created: true, matched: name.trim() }
 }
 
@@ -855,33 +856,33 @@ async function getOrCreateDepartment(name, allDepartments, DepartmentModel) {
  */
 async function getOrCreateDesignation(title, allDesignations, DesignationModel) {
   if (!title) return { designationId: null, created: false, matched: null }
-  
+
   const match = findBestMatchingDesignation(title, allDesignations)
-  
+
   if (match) {
-    return { 
-      designationId: match.designation._id, 
-      created: false, 
+    return {
+      designationId: match.designation._id,
+      created: false,
       matched: match.designation.title,
       similarity: match.similarity,
       isExact: match.isExact
     }
   }
-  
+
   // Create new designation with smart level detection
   const code = generateDesignationCode(title)
   let uniqueCode = code
   let counter = 1
-  
+
   // Ensure unique code
   while (allDesignations.some(d => d.code === uniqueCode)) {
     uniqueCode = `${code}${counter}`
     counter++
   }
-  
+
   // Detect appropriate level based on title
   const detectedLevel = detectLevelFromTitle(title)
-  
+
   const newDesig = await DesignationModel.create({
     title: title.trim(),
     code: uniqueCode,
@@ -889,10 +890,10 @@ async function getOrCreateDesignation(title, allDesignations, DesignationModel) 
     level: detectedLevel,
     isActive: true
   })
-  
+
   // Add to cache
   allDesignations.push({ _id: newDesig._id, title: newDesig.title, code: newDesig.code, level: detectedLevel })
-  
+
   return { designationId: newDesig._id, created: true, matched: title.trim(), level: detectedLevel }
 }
 
@@ -902,23 +903,23 @@ async function getOrCreateDesignation(title, allDesignations, DesignationModel) 
  */
 function findBestMatchingCompany(searchName, companies, threshold = 0.75) {
   if (!searchName) return null
-  
+
   const normalizedSearch = normalizeForComparison(searchName)
   let bestMatch = null
   let bestSimilarity = 0
-  
+
   for (const comp of companies) {
     // Check exact match first
     const normalizedComp = normalizeForComparison(comp.name)
     if (normalizedComp === normalizedSearch) {
       return { company: comp, isExact: true, similarity: 1 }
     }
-    
+
     // Check code match
     if (comp.code && comp.code.toLowerCase() === searchName.toLowerCase().trim()) {
       return { company: comp, isExact: true, similarity: 1 }
     }
-    
+
     // Calculate similarity
     const similarity = calculateSimilarity(normalizedSearch, normalizedComp)
     if (similarity > bestSimilarity && similarity >= threshold) {
@@ -926,7 +927,7 @@ function findBestMatchingCompany(searchName, companies, threshold = 0.75) {
       bestMatch = { company: comp, isExact: false, similarity }
     }
   }
-  
+
   return bestMatch
 }
 
@@ -937,7 +938,7 @@ function findBestMatchingCompany(searchName, companies, threshold = 0.75) {
 function generateCompanyCodeAndDescription(companyName) {
   const name = companyName.trim()
   const words = name.split(/\s+/).filter(w => w.length > 0)
-  
+
   let code
   if (words.length === 1) {
     // Single word: take first 4 characters
@@ -949,15 +950,15 @@ function generateCompanyCodeAndDescription(companyName) {
     // Multiple words: take first letter of each (up to 6)
     code = words.map(w => w[0]).join('').toUpperCase().substring(0, 6)
   }
-  
+
   // Remove any non-alphanumeric characters
   code = code.replace(/[^A-Z0-9]/g, '')
-  
+
   // Ensure minimum length of 2
   if (code.length < 2) {
     code = name.replace(/[^A-Za-z0-9]/g, '').substring(0, 4).toUpperCase() || 'COMP'
   }
-  
+
   return {
     code,
     description: `${name} - Business entity`
@@ -970,31 +971,31 @@ function generateCompanyCodeAndDescription(companyName) {
  */
 async function getOrCreateCompany(name, allCompanies, companyMap, CompanyModel) {
   if (!name) return { companyId: null, created: false, matched: null }
-  
+
   const match = findBestMatchingCompany(name, allCompanies)
-  
+
   if (match) {
-    return { 
-      companyId: match.company._id, 
-      created: false, 
+    return {
+      companyId: match.company._id,
+      created: false,
       matched: match.company.name,
       similarity: match.similarity,
       isExact: match.isExact
     }
   }
-  
+
   // Generate code and description (fast, no AI)
   const { code: generatedCode, description } = generateCompanyCodeAndDescription(name)
-  
+
   let uniqueCode = generatedCode
   let counter = 1
-  
+
   // Ensure unique code
   while (allCompanies.some(c => c.code === uniqueCode)) {
     uniqueCode = `${generatedCode}${counter}`
     counter++
   }
-  
+
   // Create new company with defaults (similar to admin dashboard creation)
   const newCompany = await CompanyModel.create({
     name: name.trim(),
@@ -1012,12 +1013,12 @@ async function getOrCreateCompany(name, allCompanies, companyMap, CompanyModel) 
     },
     isActive: true
   })
-  
+
   // Add to cache arrays
   allCompanies.push({ _id: newCompany._id, name: newCompany.name, code: newCompany.code })
   companyMap.set(newCompany.name.toLowerCase(), newCompany._id)
   companyMap.set(newCompany.code.toLowerCase(), newCompany._id)
-  
+
   return { companyId: newCompany._id, created: true, matched: name.trim(), code: uniqueCode }
 }
 
@@ -1025,21 +1026,21 @@ async function getOrCreateCompany(name, allCompanies, companyMap, CompanyModel) 
  * Helper function to create or update a single employee and user account
  * Now supports upsert by email
  */
-async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignations, allCompanies, companyMap, models) {
+async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignations, allCompanies, companyMap, models, auth) {
   const { Employee, User, Department, Designation, Company, OnboardingEmail, CompanySettings } = models
   const warnings = []
-  
+
   // Email is required for deduplication
   if (!data.email) {
     return { success: false, errors: ['Email is required'], action: 'skipped' }
   }
 
   const email = data.email.toLowerCase().trim()
-  
+
   // Check for existing employee by email
   const existingEmployee = await Employee.findOne({ email }).lean()
   const existingUser = await User.findOne({ email }).lean()
-  
+
   // Handle department with fuzzy matching
   let departmentResult = { departmentId: null, created: false }
   if (data.department && typeof data.department === 'string') {
@@ -1050,7 +1051,7 @@ async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignatio
       warnings.push(`Matched department "${data.department}" to existing "${departmentResult.matched}" (${Math.round(departmentResult.similarity * 100)}% match)`)
     }
   }
-  
+
   // Handle designation with fuzzy matching
   let designationResult = { designationId: null, created: false }
   if (data.designation && typeof data.designation === 'string') {
@@ -1061,7 +1062,7 @@ async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignatio
       warnings.push(`Matched designation "${data.designation}" to existing "${designationResult.matched}" (${Math.round(designationResult.similarity * 100)}% match)`)
     }
   }
-  
+
   // Handle company with fuzzy matching and auto-creation
   let companyResult = { companyId: null, created: false }
   if (data.company && typeof data.company === 'string') {
@@ -1076,7 +1077,7 @@ async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignatio
 
   // Prepare employee data - only include non-empty fields
   const employeeData = {}
-  
+
   // Map fields, only setting if they have values
   if (data.employeeCode) employeeData.employeeCode = data.employeeCode
   if (data.firstName) employeeData.firstName = data.firstName
@@ -1098,7 +1099,7 @@ async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignatio
   if (companyId) employeeData.company = companyId
   if (data.designationLevel) employeeData.designationLevel = parseInt(data.designationLevel) || 1
   if (data.designationLevelName) employeeData.designationLevelName = data.designationLevelName
-  
+
   // Handle salary fields - auto-distribute from gross salary
   const grossSalaryValue = parseFloat(data.grossSalary) || parseFloat(data.salary) || parseFloat(data.ctc ? data.ctc / 12 : 0)
   if (grossSalaryValue > 0) {
@@ -1121,26 +1122,26 @@ async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignatio
   let user
   let action
   let password = null // Password is only set for new employees
-  
+
   if (existingEmployee) {
     // UPDATE existing employee - merge new data with existing (preserve existing if not provided in new data)
     const updateData = {}
-    
+
     Object.entries(employeeData).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
         // Only update if new value is provided
         updateData[key] = value
       }
     })
-    
+
     employee = await Employee.findByIdAndUpdate(
       existingEmployee._id,
       { $set: updateData },
       { new: true }
     )
-    
+
     action = 'updated'
-    
+
     // Update user if exists
     if (existingUser) {
       const userUpdateData = {}
@@ -1153,7 +1154,7 @@ async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignatio
       if (companyId) {
         userUpdateData.company = companyId
       }
-      
+
       if (Object.keys(userUpdateData).length > 0) {
         user = await User.findByIdAndUpdate(
           existingUser._id,
@@ -1172,7 +1173,7 @@ async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignatio
       employeeData.employeeCode = `EMP${String(count + 1).padStart(4, '0')}`
       warnings.push(`Auto-generated employee code: ${employeeData.employeeCode}`)
     }
-    
+
     // Set defaults for required fields if not provided
     if (!employeeData.firstName) {
       employeeData.firstName = email.split('@')[0]
@@ -1182,7 +1183,7 @@ async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignatio
       employeeData.lastName = '-'
       warnings.push('Last name not provided, using placeholder')
     }
-    
+
     // Check if employee code already exists
     const existingCode = await Employee.findOne({ employeeCode: employeeData.employeeCode }).lean()
     if (existingCode) {
@@ -1191,24 +1192,26 @@ async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignatio
       employeeData.employeeCode = `EMP${String(count + 1).padStart(4, '0')}-${Date.now().toString(36).slice(-4)}`
       warnings.push(`Employee code was duplicate, generated: ${employeeData.employeeCode}`)
     }
-    
+
     try {
       employee = await Employee.create(employeeData)
       action = 'created'
     } catch (error) {
       if (error.code === 11000) {
         // Duplicate key error
-        return { 
-          success: false, 
-          errors: [`Duplicate entry: ${JSON.stringify(error.keyValue)}`], 
-          action: 'failed' 
+        return {
+          success: false,
+          errors: [`Duplicate entry: ${JSON.stringify(error.keyValue)}`],
+          action: 'failed'
         }
       }
       throw error
     }
 
     // Create user account for new employee - generate random temporary password
-    password = data.password || generateRandomPassword()
+    // CRITICAL: Store plain text password BEFORE creating user (it will be hashed by User model's pre-save hook)
+    const plainTextPassword = data.password || generateRandomPassword()
+    password = plainTextPassword // Keep for email/credentials response
 
     // Detect role from designation if not explicitly provided
     const detectedRole = data.role || detectUserRoleFromDesignation(data.designation, data.department)
@@ -1216,7 +1219,7 @@ async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignatio
 
     const userData = {
       email: email,
-      password: password,
+      password: plainTextPassword, // Pass plain text - will be hashed by pre-save hook
       role: detectedRole,
       employeeId: employee._id,
       forcePasswordChange: true,
@@ -1226,21 +1229,41 @@ async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignatio
 
     try {
       user = await User.create(userData)
-      
+
       // Update employee with userId reference
       await Employee.findByIdAndUpdate(employee._id, { userId: user._id })
-      
+
+      // CRITICAL: Register user in tenant mapping for multi-tenant login
+      // Without this, users cannot login as the system won't know which database they belong to
+      if (auth?.tenant?.databaseName) {
+        const tenantCompany = await getTenantCompanyByDbName(auth.tenant.databaseName)
+        if (tenantCompany) {
+          registerUserTenantMapping({
+            email: email,
+            tenantCompanyId: tenantCompany._id,
+            databaseName: auth.tenant.databaseName,
+            companyName: tenantCompany.name,
+            companySlug: tenantCompany.slug,
+            role: detectedRole,
+          }).catch(err => console.error('[Bulk Import] Tenant mapping registration failed:', err))
+          console.log(`[Bulk Import] Registered tenant mapping for ${email} -> ${auth.tenant.databaseName}`)
+        } else {
+          console.warn(`[Bulk Import] Could not find tenant company for database ${auth.tenant.databaseName}`)
+        }
+      }
+
       // Sync user to backup database (fire-and-forget)
+      // Fetch hashed password for backup sync ONLY
       const userWithPassword = await User.findById(user._id).select('+password').lean()
       syncUserToBackup({
         userId: user._id,
         email: user.email,
         firstName: employeeData.firstName,
         lastName: employeeData.lastName,
-        password: userWithPassword.password,
+        password: userWithPassword.password, // Send hashed password to backup
         role: user.role,
       }).catch(err => console.error('[Bulk Import] Backup sync failed:', err))
-      
+
       // Get department name for email
       let departmentName = null
       if (departmentResult.departmentId) {
@@ -1306,7 +1329,7 @@ async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignatio
  */
 function parseExcelRow(row, headers) {
   const data = {}
-  
+
   // Map Excel column headers to employee fields
   const columnMapping = {
     'employee code': 'employeeCode',
@@ -1364,7 +1387,7 @@ function parseExcelRow(row, headers) {
     const normalizedHeader = header.toLowerCase().trim()
     const fieldName = columnMapping[normalizedHeader] || normalizedHeader
     let value = row[index]
-    
+
     // Skip empty values
     if (value === undefined || value === null || value === '') {
       return
@@ -1397,10 +1420,10 @@ function parseExcelRow(row, headers) {
       const normalized = value.toLowerCase().trim()
       if (normalized === 'active' || normalized === '1' || normalized === 'yes') {
         value = 'active'
-      } else if (normalized === 'terminated' || normalized === 'resigned' || normalized === 'left' || 
-                 normalized === 'exit' || normalized === 'exited' || normalized === 'quit' ||
-                 normalized === 'dismissed' || normalized === 'fired' || normalized === 'relieved' ||
-                 normalized === 'separated' || normalized === 'no' || normalized === '0') {
+      } else if (normalized === 'terminated' || normalized === 'resigned' || normalized === 'left' ||
+        normalized === 'exit' || normalized === 'exited' || normalized === 'quit' ||
+        normalized === 'dismissed' || normalized === 'fired' || normalized === 'relieved' ||
+        normalized === 'separated' || normalized === 'no' || normalized === '0') {
         value = 'inactive-skip' // Mark for skipping during import
       } else {
         value = 'inactive'
@@ -1449,7 +1472,7 @@ export async function POST(request) {
     // Parse form data
     const formData = await request.formData()
     const file = formData.get('file')
-    
+
     if (!file) {
       return NextResponse.json(
         { success: false, message: 'No file uploaded' },
@@ -1469,15 +1492,15 @@ export async function POST(request) {
     // Read file content
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
-    
+
     // Parse Excel file
     const workbook = XLSX.read(buffer, { type: 'buffer', cellDates: true })
     const sheetName = workbook.SheetNames[0]
     const worksheet = workbook.Sheets[sheetName]
-    
+
     // Convert to array of arrays (with header)
     const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false, dateNF: 'yyyy-mm-dd' })
-    
+
     if (rawData.length < 2) {
       return NextResponse.json(
         { success: false, message: 'Excel file is empty or has no data rows' },
@@ -1503,7 +1526,7 @@ export async function POST(request) {
     // Check if we have at least an email column mapped
     const hasEmailColumn = Object.values(columnMapping).includes('email')
     const hasNameColumn = Object.values(columnMapping).some(v => ['firstName', 'lastName', 'fullName'].includes(v))
-    
+
     if (!hasEmailColumn) {
       return NextResponse.json(
         { success: false, message: 'Could not detect an email column in the Excel file. Email is required for each employee.' },
@@ -1552,11 +1575,11 @@ export async function POST(request) {
     for (let i = 0; i < dataRows.length; i++) {
       const rowNumber = i + 2 // Account for header row and 1-based indexing
       const row = dataRows[i]
-      
+
       try {
         // Use AI-detected mapping to parse row
         let employeeData = parseRowWithMapping(row, columnMapping)
-        
+
         // Skip completely empty rows
         if (!employeeData.email && !employeeData.employeeCode && !employeeData.firstName) {
           continue
@@ -1578,7 +1601,8 @@ export async function POST(request) {
           allDesignations,
           allCompanies,
           companyMap,
-          models
+          models,
+          auth
         )
 
         if (result.success) {
@@ -1589,18 +1613,18 @@ export async function POST(request) {
             email: result.employee.email,
             warnings: result.warnings || [],
           }
-          
+
           if (result.action === 'created') {
             resultData.credentials = result.credentials
             results.created.push(resultData)
           } else {
             results.updated.push(resultData)
           }
-          
+
           if (result.departmentCreated) results.departmentsCreated++
           if (result.designationCreated) results.designationsCreated++
           if (result.companyCreated) results.companiesCreated++
-          
+
         } else {
           results.failed.push({
             rowNumber,
