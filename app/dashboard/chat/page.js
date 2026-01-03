@@ -357,7 +357,8 @@ export default function ChatPage() {
   const fetchEmployees = async () => {
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch('/api/employees/list', {
+      // Include admins for chat - all users should be searchable for conversations
+      const response = await fetch('/api/employees/list?includeAdmins=true', {
         headers: { 'Authorization': `Bearer ${token}` }
       })
       const result = await response.json()

@@ -96,7 +96,8 @@ export default function FloatingChatWidget() {
     try {
       setLoadingEmployees(true)
       const token = localStorage.getItem('token')
-      const response = await fetch('/api/employees/list', {
+      // Include admins for chat - we want all users to be searchable
+      const response = await fetch('/api/employees/list?includeAdmins=true', {
         headers: { 'Authorization': `Bearer ${token}` }
       })
       const data = await response.json()

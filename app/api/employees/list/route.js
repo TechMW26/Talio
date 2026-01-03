@@ -16,9 +16,13 @@ export async function GET(request) {
     const { user, models } = auth
     const { Employee, User, Designation, Department } = models
 
+    // Get URL params
+    const { searchParams } = new URL(request.url)
+    const includeAdmins = searchParams.get('includeAdmins') === 'true'
+
     // Check cache first (per user)
     const userId = user._id || user.userId
-    const cacheKey = queryCache.generateKey('employee-list', userId)
+    const cacheKey = queryCache.generateKey('employee-list', userId, includeAdmins ? 'all' : 'no-admin')
     const cached = queryCache.get(cacheKey)
     if (cached) {
       return NextResponse.json(cached)
@@ -53,14 +57,20 @@ export async function GET(request) {
       User.find({ isActive: true }).select('employeeId role').lean()
     ])
 
-    const adminEmployeeIds = allUsers
-      .filter(u => u.role === 'admin')
-      .map(u => u.employeeId?.toString())
-
-    // Filter out admin users
-    const filteredEmployees = employees.filter(emp =>
-      !adminEmployeeIds.includes(emp._id.toString())
-    )
+    // Filter based on includeAdmins param
+    let filteredEmployees = employees
+    
+    // Only filter out admins if includeAdmins is false (default behavior for regular employee lists)
+    // But for chat, we want ALL users to be searchable
+    if (!includeAdmins) {
+      const adminEmployeeIds = allUsers
+        .filter(u => u.role === 'admin')
+        .map(u => u.employeeId?.toString())
+      
+      filteredEmployees = employees.filter(emp =>
+        !adminEmployeeIds.includes(emp._id.toString())
+      )
+    }
 
     const response = {
       success: true,
