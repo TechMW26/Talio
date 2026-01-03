@@ -1,126 +1,71 @@
 {
   "name": "talio-desktop",
-  "version": "3.1.0",
-  "description": "Talio Desktop Application - Productivity Monitoring, Screen Capture, Location & OAuth",
+  "version": "4.0.0",
+  "description": "Talio HRMS Desktop - Productivity Monitoring with Screen Capture",
   "main": "src/main.js",
-  "author": "Talio",
+  "author": "Talio <support@talio.in>",
   "license": "MIT",
+  "private": true,
   "scripts": {
     "start": "electron .",
     "dev": "cross-env NODE_ENV=development electron .",
     "build": "npm run build:mac && npm run build:win",
-    "build:mac": "npm run build:mac-intel && npm run build:mac-arm",
+    "build:mac": "electron-builder --mac --x64 --arm64",
     "build:mac-intel": "electron-builder --mac --x64",
     "build:mac-arm": "electron-builder --mac --arm64",
-    "build:win": "electron-builder --win --ia32 --x64",
-    "build:linux": "electron-builder --linux",
-    "postinstall": "electron-builder install-app-deps",
-    "clean": "rimraf dist"
+    "build:win": "electron-builder --win --x64",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "dependencies": {
+    "auto-launch": "^5.0.6",
+    "electron-store": "^8.1.0",
+    "form-data": "^4.0.0",
+    "node-fetch": "^2.7.0",
+    "socket.io-client": "^4.7.4"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "electron": "^28.1.0",
+    "electron-builder": "^24.9.1"
   },
   "build": {
-    "appId": "com.talio.app",
+    "appId": "in.talio.desktop",
     "productName": "Talio",
-    "copyright": "Copyright © 2024 Talio",
-    "asar": true,
-    "compression": "maximum",
-    "protocols": [
-      {
-        "name": "Talio URL Protocol",
-        "schemes": ["talio"]
-      }
-    ],
     "directories": {
       "output": "dist",
       "buildResources": "build"
     },
     "files": [
       "src/**/*",
-      "build/**/*",
-      "!node_modules/**/*.md",
-      "!node_modules/**/*.ts",
-      "!node_modules/**/*.map"
+      "build/icon.png",
+      "package.json"
     ],
     "mac": {
-      "category": "public.app-category.business",
-      "icon": "build/icon.icns",
-      "hardenedRuntime": true,
-      "gatekeeperAssess": false,
-      "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.plist",
+      "category": "public.app-category.productivity",
       "target": [
         {
           "target": "dmg",
           "arch": ["x64", "arm64"]
         }
       ],
-      "extendInfo": {
-        "NSCameraUsageDescription": "Talio needs camera access for video calls and meetings.",
-        "NSMicrophoneUsageDescription": "Talio needs microphone access for audio calls and voice features.",
-        "NSScreenCaptureUsageDescription": "Talio needs screen recording access for productivity monitoring. Screenshots are captured every minute while you work.",
-        "NSLocationUsageDescription": "Talio needs location access for attendance geofencing and office location verification.",
-        "NSLocationWhenInUseUsageDescription": "Talio needs location access for attendance geofencing and office location verification.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Talio needs location access for attendance geofencing and office location verification.",
-        "NSDesktopFolderUsageDescription": "Talio may need access to save screenshots temporarily.",
-        "NSDocumentsFolderUsageDescription": "Talio may need access to store application data."
-      }
-    },
-    "dmg": {
-      "contents": [
-        {
-          "x": 130,
-          "y": 220
-        },
-        {
-          "x": 410,
-          "y": 220,
-          "type": "link",
-          "path": "/Applications"
-        }
-      ],
-      "window": {
-        "width": 540,
-        "height": 380
-      }
+      "icon": "build/icon.png",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
     },
     "win": {
-      "icon": "build/icon.ico",
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64", "ia32"]
+          "arch": ["x64"]
         }
-      ],
-      "requestedExecutionLevel": "asInvoker",
-      "publisherName": "Talio",
-      "legalTrademarks": "Talio - Workforce Management Platform",
-      "verifyUpdateCodeSignature": false
+      ]
     },
     "nsis": {
       "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
-      "installerIcon": "build/icon.ico",
-      "uninstallerIcon": "build/icon.ico",
-      "installerHeaderIcon": "build/icon.ico",
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "Talio",
-      "artifactName": "Talio Setup ${version}.exe",
-      "uninstallDisplayName": "Talio"
-    },
-    "linux": {
-      "icon": "build/icons",
-      "category": "Office",
-      "target": ["AppImage", "deb"]
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true
     }
-  },
-  "dependencies": {
-    "electron-store": "^8.1.0"
-  },
-  "devDependencies": {
-    "cross-env": "^7.0.3",
-    "electron": "^28.1.0",
-    "electron-builder": "^24.9.1",
-    "rimraf": "^5.0.5"
   }
 }

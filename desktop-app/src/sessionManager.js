@@ -1,203 +1,317 @@
-const Store = require('electron-store');
-const { randomBytes } = require('crypto');
-
-const store = new Store();
-
 /**
- * Generate a simple unique ID
- */
-function generateId() {
-  return `${Date.now()}-${randomBytes(4).toString('hex')}`;
-}
-
-/**
- * Session Manager
+ * Session Manager v4.0.0
  * Manages 30-minute activity sessions with 30 captures each
  */
+
+const Store = require('electron-store');
+const { randomBytes } = require('crypto');
+const logger = require('./logger');
+
+const store = new Store({ name: 'sessions' });
+
+const SESSION_DURATION_MINUTES = 30;
+const CAPTURES_PER_SESSION = 30;
+const HISTORY_DAYS = 7;
+
+function generateSessionId() {
+  return 'session_' + Date.now() + '_' + randomBytes(4).toString('hex');
+}
+
 class SessionManager {
-  constructor(options = {}) {
-    this.sessionDuration = options.sessionDuration || 30; // minutes
-    this.capturesPerSession = options.capturesPerSession || 30;
+  constructor() {
     this.currentSession = null;
     this.userId = null;
-    this.sessions = store.get('sessions', []);
+    this.sessions = [];
+    this.initialized = false;
   }
 
-  /**
-   * Start a new session
-   */
-  startNewSession(userId) {
-    this.userId = userId;
-    
-    // Check for existing active session
-    if (this.currentSession && !this.currentSession.isComplete) {
-      const elapsed = Date.now() - new Date(this.currentSession.startTime).getTime();
-      const minutesElapsed = elapsed / (1000 * 60);
-      
-      if (minutesElapsed < this.sessionDuration) {
-        console.log(`[Session] Resuming session #${this.currentSession.sessionNumber}`);
-        return this.currentSession;
-      }
+  initialize(userId) {
+    if (this.initialized && this.userId === userId) {
+      return this.currentSession;
     }
+    this.userId = userId;
+    this.loadSessions();
+    this.initialized = true;
+    const resumed = this.resumeActiveSession();
+    logger.log('info', 'SessionManager', 'Initialized for user ' + userId + '. Resumed: ' + resumed);
+    return this.currentSession;
+  }
 
-    // End previous session
-    if (this.currentSession) {
+  loadSessions() {
+    try {
+      const allSessions = store.get('sessions', []);
+      this.sessions = allSessions.filter(function(s) { return s.userId === this.userId; }.bind(this));
+      this.cleanOldSessions();
+    } catch (error) {
+      logger.log('error', 'SessionManager', 'Load failed: ' + error.message);
+      this.sessions = [];
+    }
+  }
+
+  cleanOldSessions() {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - HISTORY_DAYS);
+    const cutoffStr = cutoffDate.toISOString().split('T')[0];
+    const before = this.sessions.length;
+    this.sessions = this.sessions.filter(function(s) { return s.date >= cutoffStr; });
+    if (before !== this.sessions.length) {
+      logger.log('info', 'SessionManager', 'Cleaned ' + (before - this.sessions.length) + ' old sessions');
+      this.saveSessions();
+    }
+  }
+
+  resumeActiveSession() {
+    const today = new Date().toISOString().split('T')[0];
+    const userId = this.userId;
+    const activeSession = this.sessions
+      .filter(function(s) { return s.date === today && !s.isComplete; })
+      .sort(function(a, b) { return new Date(b.startTime) - new Date(a.startTime); })[0];
+    
+    if (!activeSession) return false;
+    
+    const elapsed = Date.now() - new Date(activeSession.startTime).getTime();
+    const minutesElapsed = elapsed / (1000 * 60);
+    
+    if (minutesElapsed < SESSION_DURATION_MINUTES && activeSession.captureCount < CAPTURES_PER_SESSION) {
+      this.currentSession = activeSession;
+      logger.log('info', 'SessionManager', 'Resumed session #' + activeSession.sessionNumber);
+      return true;
+    }
+    
+    activeSession.isComplete = true;
+    activeSession.endTime = new Date().toISOString();
+    this.saveSessions();
+    return false;
+  }
+
+  startNewSession() {
+    if (this.currentSession && !this.currentSession.isComplete) {
       this.endSession();
     }
-
-    // Count today's sessions
-    const today = new Date().toISOString().split('T')[0];
-    const todaySessions = this.sessions.filter(s => 
-      s.date === today && s.userId === userId
-    );
     
-    // Create new session
+    const today = new Date().toISOString().split('T')[0];
+    const userId = this.userId;
+    const todaySessions = this.sessions.filter(function(s) { 
+      return s.date === today && s.userId === userId; 
+    });
+    
     this.currentSession = {
-      sessionId: generateId(),
-      userId,
+      sessionId: generateSessionId(),
+      userId: this.userId,
       date: today,
       sessionNumber: todaySessions.length + 1,
       startTime: new Date().toISOString(),
       endTime: null,
       captures: [],
       captureCount: 0,
-      isComplete: false
+      isComplete: false,
+      totalWorkMinutes: 0
     };
-
-    console.log(`[Session] Started session #${this.currentSession.sessionNumber}`);
     
     this.sessions.push(this.currentSession);
     this.saveSessions();
-    
+    logger.log('info', 'SessionManager', 'Started session #' + this.currentSession.sessionNumber);
     return this.currentSession;
   }
 
-  /**
-   * Record a capture
-   */
   recordCapture(captureData) {
-    if (!this.currentSession) {
-      this.startNewSession(this.userId || captureData.userId);
-    }
-
-    // Check if session needs rotation
-    if (this.currentSession.captureCount >= this.capturesPerSession) {
-      console.log('[Session] 30 captures reached, rotating session');
-      this.startNewSession(this.userId);
-    }
-
-    // Check session time limit
-    const elapsed = Date.now() - new Date(this.currentSession.startTime).getTime();
-    if (elapsed >= this.sessionDuration * 60 * 1000) {
-      console.log('[Session] 30 minutes elapsed, rotating session');
-      this.startNewSession(this.userId);
-    }
-
-    // Record capture
-    this.currentSession.captures.push({
-      timestamp: new Date().toISOString(),
-      localPath: captureData.localPath,
-      size: captureData.size
-    });
+    captureData = captureData || {};
     
+    if (!this.currentSession) {
+      this.startNewSession();
+    }
+    
+    let sessionRotated = false;
+    
+    if (this.currentSession.captureCount >= CAPTURES_PER_SESSION) {
+      logger.log('info', 'SessionManager', 'Capture limit reached, rotating session');
+      this.startNewSession();
+      sessionRotated = true;
+    }
+    
+    const elapsed = Date.now() - new Date(this.currentSession.startTime).getTime();
+    if (elapsed >= SESSION_DURATION_MINUTES * 60 * 1000) {
+      logger.log('info', 'SessionManager', 'Time limit reached, rotating session');
+      this.startNewSession();
+      sessionRotated = true;
+    }
+    
+    const capture = {
+      captureId: captureData.captureId || generateSessionId(),
+      timestamp: new Date().toISOString(),
+      imageUrl: captureData.imageUrl || null,
+      imagekitFileId: captureData.imagekitFileId || null,
+      captureType: captureData.captureType || 'automatic',
+      offline: captureData.offline || false,
+      metadata: captureData.metadata || {}
+    };
+    
+    this.currentSession.captures.push(capture);
     this.currentSession.captureCount++;
     this.currentSession.endTime = new Date().toISOString();
-
-    // Mark complete if 30 captures
-    if (this.currentSession.captureCount >= this.capturesPerSession) {
+    
+    const sessionElapsed = Date.now() - new Date(this.currentSession.startTime).getTime();
+    this.currentSession.totalWorkMinutes = Math.round(sessionElapsed / (1000 * 60));
+    
+    if (this.currentSession.captureCount >= CAPTURES_PER_SESSION) {
       this.currentSession.isComplete = true;
     }
-
+    
     this.saveSessions();
-
+    
     return {
       sessionId: this.currentSession.sessionId,
       sessionNumber: this.currentSession.sessionNumber,
-      captureNumber: this.currentSession.captureCount
+      captureNumber: this.currentSession.captureCount,
+      isComplete: this.currentSession.isComplete,
+      sessionRotated: sessionRotated,
+      capture: capture
     };
   }
 
-  /**
-   * End current session
-   */
   endSession() {
-    if (this.currentSession) {
-      this.currentSession.endTime = new Date().toISOString();
-      this.currentSession.isComplete = true;
-      this.saveSessions();
-      console.log(`[Session] Ended session #${this.currentSession.sessionNumber} with ${this.currentSession.captureCount} captures`);
-    }
+    if (!this.currentSession) return;
+    
+    this.currentSession.endTime = new Date().toISOString();
+    this.currentSession.isComplete = true;
+    
+    const sessionElapsed = new Date(this.currentSession.endTime) - new Date(this.currentSession.startTime);
+    this.currentSession.totalWorkMinutes = Math.round(sessionElapsed / (1000 * 60));
+    
+    this.saveSessions();
+    logger.log('info', 'SessionManager', 'Ended session #' + this.currentSession.sessionNumber);
     this.currentSession = null;
   }
 
-  /**
-   * Get current session info
-   */
-  getCurrentSessionInfo() {
+  getCurrentSession() {
+    if (!this.currentSession) {
+      this.startNewSession();
+    }
+    return this.currentSession;
+  }
+
+  getSessionInfo() {
     if (!this.currentSession) {
       return {
         sessionId: null,
         sessionNumber: 0,
         captureCount: 0,
-        isActive: false
+        remainingCaptures: CAPTURES_PER_SESSION,
+        isActive: false,
+        startTime: null,
+        workMinutes: 0,
+        remainingMinutes: SESSION_DURATION_MINUTES
       };
     }
-
+    
+    const elapsed = Date.now() - new Date(this.currentSession.startTime).getTime();
+    const workMinutes = Math.round(elapsed / (1000 * 60));
+    const remainingMinutes = Math.max(0, SESSION_DURATION_MINUTES - workMinutes);
+    
     return {
       sessionId: this.currentSession.sessionId,
       sessionNumber: this.currentSession.sessionNumber,
       captureCount: this.currentSession.captureCount,
-      startTime: this.currentSession.startTime,
+      remainingCaptures: CAPTURES_PER_SESSION - this.currentSession.captureCount,
       isComplete: this.currentSession.isComplete,
-      isActive: !this.currentSession.isComplete
+      isActive: !this.currentSession.isComplete,
+      startTime: this.currentSession.startTime,
+      workMinutes: workMinutes,
+      remainingMinutes: remainingMinutes
     };
   }
 
-  /**
-   * Check if session is active
-   */
-  isSessionActive() {
-    return this.currentSession && !this.currentSession.isComplete;
-  }
-
-  /**
-   * Save sessions to store
-   */
   saveSessions() {
-    // Only keep last 7 days of sessions
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const cutoffDate = sevenDaysAgo.toISOString().split('T')[0];
-    
-    this.sessions = this.sessions.filter(s => s.date >= cutoffDate);
-    store.set('sessions', this.sessions);
+    try {
+      const allSessions = store.get('sessions', []);
+      const userId = this.userId;
+      const otherUsers = allSessions.filter(function(s) { return s.userId !== userId; });
+      const merged = otherUsers.concat(this.sessions);
+      store.set('sessions', merged);
+    } catch (error) {
+      logger.log('error', 'SessionManager', 'Save failed: ' + error.message);
+    }
   }
 
-  /**
-   * Get sessions for a date
-   */
-  getSessionsForDate(date) {
-    const dateStr = typeof date === 'string' ? date : date.toISOString().split('T')[0];
-    return this.sessions.filter(s => 
-      s.date === dateStr && s.userId === this.userId
-    );
-  }
-
-  /**
-   * Get today's stats
-   */
   getTodayStats() {
     const today = new Date().toISOString().split('T')[0];
-    const todaySessions = this.getSessionsForDate(today);
+    const userId = this.userId;
+    const todaySessions = this.sessions.filter(function(s) { 
+      return s.date === today && s.userId === userId; 
+    });
+    
+    let totalWorkMinutes = 0;
+    for (let i = 0; i < todaySessions.length; i++) {
+      const s = todaySessions[i];
+      if (s.isComplete) {
+        totalWorkMinutes += (s.totalWorkMinutes || 0);
+      } else {
+        const elapsed = Date.now() - new Date(s.startTime).getTime();
+        totalWorkMinutes += Math.round(elapsed / (1000 * 60));
+      }
+    }
+    
+    let totalCaptures = 0;
+    let completedSessions = 0;
+    for (let i = 0; i < todaySessions.length; i++) {
+      totalCaptures += todaySessions[i].captureCount;
+      if (todaySessions[i].isComplete) completedSessions++;
+    }
     
     return {
       date: today,
       totalSessions: todaySessions.length,
-      totalCaptures: todaySessions.reduce((sum, s) => sum + s.captureCount, 0),
-      completedSessions: todaySessions.filter(s => s.isComplete).length,
-      currentSession: this.getCurrentSessionInfo()
+      totalCaptures: totalCaptures,
+      completedSessions: completedSessions,
+      totalWorkMinutes: totalWorkMinutes,
+      totalWorkHours: (totalWorkMinutes / 60).toFixed(1),
+      currentSession: this.getSessionInfo()
     };
+  }
+
+  getHistory(days) {
+    days = days || 7;
+    const history = [];
+    const today = new Date();
+    const userId = this.userId;
+    
+    for (let i = 0; i < days; i++) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      const daySessions = this.sessions.filter(function(s) { 
+        return s.date === dateStr && s.userId === userId; 
+      });
+      
+      let captureCount = 0;
+      let workMinutes = 0;
+      for (let j = 0; j < daySessions.length; j++) {
+        captureCount += daySessions[j].captureCount;
+        workMinutes += (daySessions[j].totalWorkMinutes || 0);
+      }
+      
+      history.push({
+        date: dateStr,
+        sessionCount: daySessions.length,
+        captureCount: captureCount,
+        workMinutes: workMinutes
+      });
+    }
+    
+    return history;
+  }
+
+  reset() {
+    if (this.currentSession) {
+      this.endSession();
+    }
+    this.currentSession = null;
+    this.userId = null;
+    this.sessions = [];
+    this.initialized = false;
+    logger.log('info', 'SessionManager', 'Reset complete');
   }
 }
 
-module.exports = { SessionManager };
+module.exports = new SessionManager();

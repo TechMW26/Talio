@@ -6,9 +6,27 @@ import { ThemeProvider } from '@/contexts/ThemeContext'
 // Cache operations completely disabled - no imports needed
 // import { checkAndClearCaches } from '@/lib/cacheManager'
 
+/**
+ * Check if running in Electron/desktop app environment
+ */
+function isElectronApp() {
+    if (typeof window === 'undefined') return false
+    if (window.electronAPI) return true
+    if (window.talioDesktop?.isDesktopApp) return true
+    if (navigator.userAgent.toLowerCase().includes('electron')) return true
+    return false
+}
+
 export function Providers({ children }) {
     // Defer non-critical initialization (audio only)
     const initializeNonCritical = useCallback(async () => {
+        // CRITICAL: Skip audio initialization for desktop apps
+        // AudioContext can crash the Electron renderer process
+        if (isElectronApp()) {
+            console.log('[Providers] Desktop app detected, skipping audio init')
+            return
+        }
+        
         // Initialize audio system lazily (don't block render)
         try {
             const { initAudio } = await import('@/utils/audio')
@@ -21,6 +39,12 @@ export function Providers({ children }) {
     // NO cache operations - completely disabled to prevent white screen issues
     // on desktop apps (Windows/Mac), Android app, and web
     useEffect(() => {
+        // Skip audio init entirely for desktop apps
+        if (isElectronApp()) {
+            console.log('[Providers] Desktop app - audio disabled')
+            return
+        }
+        
         // Initialize audio after first user interaction or after delay
         const initOnInteraction = () => {
             initializeNonCritical();

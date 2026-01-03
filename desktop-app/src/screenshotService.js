@@ -1,379 +1,289 @@
 /**
- * Screenshot Service v3.1.0 - FIXED
- * 
- * Simple, direct upload to MongoDB GridFS
- * - Captures at 1080p resolution
- * - Native format (PNG)
- * - Direct upload, no local storage
- * - Skips capture if offline
+ * Screenshot Service v4.0.0
+ * Handles automatic screen capture with ImageKit uploads
  */
 
-const { desktopCapturer, screen } = require('electron');
-const debugLogger = require('./debugLogger');
+const { desktopCapturer, screen, nativeImage } = require('electron');
+const fetch = require('node-fetch');
+const FormData = require('form-data');
+const logger = require('./logger');
+const sessionManager = require('./sessionManager');
+const offlineQueue = require('./offlineQueue');
+
+// Configuration
+const CAPTURE_INTERVAL_MS = 60 * 1000; // 1 minute
+const API_BASE_URL = 'https://app.talio.in';
+const JPEG_QUALITY = 80;
 
 class ScreenshotService {
   constructor() {
     this.isCapturing = false;
-    this.captureInterval = null;
-    this.intervalMs = 60000; // 1 minute
-    this.serverUrl = null;
-    this.authToken = null;
-    this.sessionId = null;
+    this.captureTimer = null;
+    this.userId = null;
+    this.employeeId = null;
+    this.userRole = null;
+    this.token = null;
+    this.isOnline = true;
+    this.mainWindow = null;
     this.captureCount = 0;
     this.lastCaptureTime = null;
-    this.onCaptureCallback = null;
-    this.onErrorCallback = null;
-    
-    // Activity tracking
-    this.activityData = {
-      keystrokes: 0,
-      mouseClicks: 0,
-      mouseMovements: 0,
-      activeWindow: '',
-      activeApp: '',
-      isIdle: false
-    };
-    
-    // Bind methods to ensure 'this' context is correct
-    this.captureAndUpload = this.captureAndUpload.bind(this);
-    this.captureScreen = this.captureScreen.bind(this);
-    this.uploadScreenshot = this.uploadScreenshot.bind(this);
-    this.isOnline = this.isOnline.bind(this);
-    this.start = this.start.bind(this);
-    this.stop = this.stop.bind(this);
   }
 
-  /**
-   * Initialize the service with server details
-   */
-  initialize(serverUrl, authToken) {
-    this.serverUrl = serverUrl.replace(/\/$/, ''); // Remove trailing slash
-    this.authToken = authToken;
-    this.sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  initialize(config) {
+    this.userId = config.userId;
+    this.employeeId = config.employeeId;
+    this.userRole = config.role;
+    this.token = config.token;
+    this.mainWindow = config.mainWindow;
     
-    debugLogger.log('info', 'ScreenshotService', `Initialized with server: ${this.serverUrl}`);
+    // Initialize offline queue with upload function
+    var self = this;
+    offlineQueue.initialize(function(data) {
+      return self.uploadScreenshot(data.buffer, data);
+    });
+    
+    // Initialize session manager
+    sessionManager.initialize(this.userId);
+    
+    logger.log('info', 'ScreenshotService', 'Initialized for user ' + this.userId + ' (role: ' + this.userRole + ')');
   }
 
-  /**
-   * Check if online by making a simple fetch
-   */
-  async isOnline() {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000);
-      
-      const response = await fetch(`${this.serverUrl}/api/health`, {
-        method: 'HEAD',
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-      return response.ok;
-    } catch {
+  shouldCapture() {
+    // CRITICAL: Admin users should NEVER be captured
+    if (this.userRole === 'admin') {
+      logger.log('info', 'ScreenshotService', 'Admin user - capture disabled');
       return false;
     }
+    return true;
   }
 
-  /**
-   * Capture screenshot at 1080p resolution
-   */
-  async captureScreen() {
+  start() {
+    if (!this.shouldCapture()) {
+      logger.log('info', 'ScreenshotService', 'Capture not allowed for this user');
+      return false;
+    }
+    
+    if (this.isCapturing) {
+      logger.log('warn', 'ScreenshotService', 'Already capturing');
+      return false;
+    }
+    
+    this.isCapturing = true;
+    
+    // Take first screenshot immediately
+    this.captureScreen('session_start');
+    
+    // Start interval
+    var self = this;
+    this.captureTimer = setInterval(function() {
+      self.captureScreen('automatic');
+    }, CAPTURE_INTERVAL_MS);
+    
+    logger.log('info', 'ScreenshotService', 'Started capturing every ' + (CAPTURE_INTERVAL_MS / 1000) + ' seconds');
+    return true;
+  }
+
+  stop() {
+    if (this.captureTimer) {
+      clearInterval(this.captureTimer);
+      this.captureTimer = null;
+    }
+    
+    this.isCapturing = false;
+    sessionManager.endSession();
+    
+    logger.log('info', 'ScreenshotService', 'Stopped capturing. Total: ' + this.captureCount);
+  }
+
+  setOnlineStatus(online) {
+    this.isOnline = online;
+    offlineQueue.setOnlineStatus(online);
+    logger.log('info', 'ScreenshotService', 'Online status: ' + online);
+  }
+
+  async captureScreen(captureType) {
+    if (!this.isCapturing && captureType === 'automatic') {
+      return null;
+    }
+    
+    // Double check admin restriction
+    if (this.userRole === 'admin') {
+      logger.log('warn', 'ScreenshotService', 'Blocked capture attempt for admin');
+      return null;
+    }
+    
     try {
-      debugLogger.log('debug', 'ScreenshotService', 'Starting screen capture...');
+      logger.log('info', 'ScreenshotService', 'Capturing screen (' + captureType + ')');
       
-      // Get all sources
+      // Get all screens
       const sources = await desktopCapturer.getSources({
         types: ['screen'],
-        thumbnailSize: { width: 1920, height: 1080 }
+        thumbnailSize: this.getOptimalSize()
       });
-
-      debugLogger.log('debug', 'ScreenshotService', `Found ${sources.length} screen sources`);
-
+      
       if (!sources || sources.length === 0) {
         throw new Error('No screen sources available');
       }
-
-      // Get primary display or first available
-      const primaryDisplay = screen.getPrimaryDisplay();
-      let source = sources[0];
-
-      // Try to find the primary display source
-      for (const s of sources) {
-        if (s.display_id === primaryDisplay.id.toString()) {
-          source = s;
-          break;
-        }
-      }
-
-      debugLogger.log('debug', 'ScreenshotService', `Using source: ${source.name}`);
-
-      // Get thumbnail as PNG buffer
-      const thumbnail = source.thumbnail;
       
-      if (!thumbnail || thumbnail.isEmpty()) {
-        throw new Error('Failed to capture screen thumbnail');
+      // Get primary display
+      const primaryDisplay = screen.getPrimaryDisplay();
+      var primarySource = sources.find(function(s) { 
+        return s.display_id === String(primaryDisplay.id); 
+      }) || sources[0];
+      
+      // Get thumbnail as NativeImage and convert to JPEG buffer
+      const thumbnail = primarySource.thumbnail;
+      const buffer = thumbnail.toJPEG(JPEG_QUALITY);
+      
+      this.captureCount++;
+      this.lastCaptureTime = new Date().toISOString();
+      
+      // Record in session
+      const sessionData = sessionManager.recordCapture({
+        captureType: captureType,
+        offline: !this.isOnline
+      });
+      
+      // Upload or queue
+      if (this.isOnline) {
+        const result = await this.uploadScreenshot(buffer, {
+          captureType: captureType,
+          sessionId: sessionData.sessionId
+        });
+        
+        // Update session with upload result
+        if (result.success) {
+          sessionData.capture.imageUrl = result.imageUrl;
+          sessionData.capture.imagekitFileId = result.imagekitFileId;
+        }
+        
+        return result;
+      } else {
+        // Queue for later upload
+        return offlineQueue.add({
+          buffer: buffer,
+          userId: this.userId,
+          employeeId: this.employeeId,
+          captureType: captureType,
+          sessionId: sessionData.sessionId,
+          timestamp: this.lastCaptureTime
+        });
       }
-
-      // Convert to PNG buffer at 1080p
-      const resized = thumbnail.resize({ width: 1920, height: 1080, quality: 'best' });
-      const pngBuffer = resized.toPNG();
-
-      debugLogger.log('info', 'ScreenshotService', `Captured screen: ${pngBuffer.length} bytes`);
-
-      return {
-        buffer: pngBuffer,
-        mimeType: 'image/png',
-        width: 1920,
-        height: 1080,
-        timestamp: new Date().toISOString()
-      };
-
     } catch (error) {
-      debugLogger.log('error', 'ScreenshotService', `Capture error: ${error.message}`);
-      throw error;
+      logger.log('error', 'ScreenshotService', 'Capture failed: ' + error.message);
+      return { success: false, error: error.message };
     }
   }
 
-  /**
-   * Upload screenshot to server
-   */
-  async uploadScreenshot(screenshotData) {
-    try {
-      debugLogger.log('debug', 'ScreenshotService', 'Uploading screenshot...');
-      
-      const formData = new FormData();
-      
-      // Create blob from buffer
-      const blob = new Blob([screenshotData.buffer], { type: screenshotData.mimeType });
-      formData.append('screenshot', blob, `screenshot_${Date.now()}.png`);
-      
-      // Add activity data
-      formData.append('activity', JSON.stringify(this.activityData));
-      formData.append('sessionId', this.sessionId);
+  getOptimalSize() {
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const scaleFactor = primaryDisplay.scaleFactor || 1;
+    
+    // Capture at reasonable resolution (cap at 1920x1080 for bandwidth)
+    return {
+      width: Math.min(1920, primaryDisplay.workAreaSize.width * scaleFactor),
+      height: Math.min(1080, primaryDisplay.workAreaSize.height * scaleFactor)
+    };
+  }
 
-      const response = await fetch(`${this.serverUrl}/api/activity/screenshot`, {
+  async uploadScreenshot(buffer, metadata) {
+    metadata = metadata || {};
+    
+    try {
+      const formData = new FormData();
+      formData.append('screenshot', buffer, {
+        filename: 'screenshot_' + Date.now() + '.jpg',
+        contentType: 'image/jpeg'
+      });
+      formData.append('captureType', metadata.captureType || 'automatic');
+      formData.append('timestamp', metadata.timestamp || new Date().toISOString());
+      
+      if (metadata.sessionId) {
+        formData.append('sessionId', metadata.sessionId);
+      }
+      
+      const response = await fetch(API_BASE_URL + '/api/activity/screenshot', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.authToken}`
+          'Authorization': 'Bearer ' + this.token
         },
         body: formData
       });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || result.message || `Upload failed: ${response.status}`);
-      }
-
-      debugLogger.log('info', 'ScreenshotService', `Uploaded screenshot: ${result.screenshotId || 'success'}`);
       
-      return result;
-
-    } catch (error) {
-      debugLogger.log('error', 'ScreenshotService', `Upload error: ${error.message}`);
-      throw error;
-    }
-  }
-
-  /**
-   * Perform a single capture and upload cycle
-   */
-  async captureAndUpload() {
-    debugLogger.log('debug', 'ScreenshotService', 'Starting capture cycle...');
-    
-    // Check if we should capture
-    if (!this.isCapturing) {
-      debugLogger.log('debug', 'ScreenshotService', 'Skipping - not capturing');
-      return { skipped: true, reason: 'not_capturing' };
-    }
-
-    if (!this.serverUrl || !this.authToken) {
-      debugLogger.log('debug', 'ScreenshotService', 'Skipping - not initialized');
-      return { skipped: true, reason: 'not_initialized' };
-    }
-
-    // Check if online
-    const online = await this.isOnline();
-    if (!online) {
-      debugLogger.log('warn', 'ScreenshotService', 'Offline - skipping capture');
-      if (this.onErrorCallback) {
-        this.onErrorCallback({ type: 'offline', message: 'No internet connection' });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error('Upload failed: ' + response.status + ' - ' + errorText);
       }
-      return { skipped: true, reason: 'offline' };
-    }
-
-    try {
-      // Capture screen
-      const screenshotData = await this.captureScreen();
-
-      // Upload to server - FIXED: using this.uploadScreenshot
-      const result = await this.uploadScreenshot(screenshotData);
-
-      this.captureCount++;
-      this.lastCaptureTime = new Date();
-
-      // Reset activity counters after successful capture
-      this.activityData.keystrokes = 0;
-      this.activityData.mouseClicks = 0;
-      this.activityData.mouseMovements = 0;
-
-      // Notify success
-      if (this.onCaptureCallback) {
-        this.onCaptureCallback({
-          success: true,
-          screenshotId: result.screenshotId,
-          timestamp: this.lastCaptureTime,
-          captureCount: this.captureCount
-        });
-      }
-
-      debugLogger.log('info', 'ScreenshotService', `Capture cycle complete. Total: ${this.captureCount}`);
-
+      
+      const result = await response.json();
+      
+      logger.log('info', 'ScreenshotService', 'Uploaded successfully: ' + (result.imagekitUrl || result.imageUrl || 'OK'));
+      
       return {
         success: true,
-        screenshotId: result.screenshotId,
-        captureCount: this.captureCount
+        imageUrl: result.imagekitUrl || result.imageUrl,
+        imagekitFileId: result.imagekitFileId,
+        screenshotId: result.screenshotId || result._id
       };
-
     } catch (error) {
-      debugLogger.log('error', 'ScreenshotService', `Capture cycle failed: ${error.message}`);
+      logger.log('error', 'ScreenshotService', 'Upload failed: ' + error.message);
       
-      if (this.onErrorCallback) {
-        this.onErrorCallback({ type: 'capture_failed', message: error.message });
+      // If network error and we have a buffer, queue it
+      if (!metadata.isRetry && buffer) {
+        return offlineQueue.add({
+          buffer: buffer,
+          userId: this.userId,
+          employeeId: this.employeeId,
+          captureType: metadata.captureType || 'automatic',
+          sessionId: metadata.sessionId,
+          timestamp: metadata.timestamp || new Date().toISOString()
+        });
       }
-
-      return {
-        success: false,
-        error: error.message
-      };
+      
+      return { success: false, error: error.message };
     }
   }
 
-  /**
-   * Start automatic capture at intervals
-   */
-  start() {
-    if (this.isCapturing) {
-      debugLogger.log('warn', 'ScreenshotService', 'Already capturing');
-      return;
+  async manualCapture() {
+    // Allow manual captures even if auto-capture is paused
+    // But still block admins
+    if (this.userRole === 'admin') {
+      logger.log('warn', 'ScreenshotService', 'Manual capture blocked for admin');
+      return { success: false, error: 'Admin users cannot capture screenshots' };
     }
-
-    if (!this.serverUrl || !this.authToken) {
-      debugLogger.log('error', 'ScreenshotService', 'Cannot start - not initialized');
-      return;
-    }
-
-    this.isCapturing = true;
-    debugLogger.log('info', 'ScreenshotService', `Starting capture service (interval: ${this.intervalMs}ms)`);
-
-    // Capture immediately
-    this.captureAndUpload();
-
-    // Set up interval
-    this.captureInterval = setInterval(() => {
-      this.captureAndUpload();
-    }, this.intervalMs);
-  }
-
-  /**
-   * Stop automatic capture
-   */
-  stop() {
-    if (!this.isCapturing) {
-      return;
-    }
-
-    this.isCapturing = false;
-
-    if (this.captureInterval) {
-      clearInterval(this.captureInterval);
-      this.captureInterval = null;
-    }
-
-    debugLogger.log('info', 'ScreenshotService', `Capture stopped. Total captures: ${this.captureCount}`);
-  }
-
-  /**
-   * Update activity data (called from main process)
-   */
-  updateActivity(data) {
-    if (data.keystrokes !== undefined) {
-      this.activityData.keystrokes += data.keystrokes;
-    }
-    if (data.mouseClicks !== undefined) {
-      this.activityData.mouseClicks += data.mouseClicks;
-    }
-    if (data.mouseMovements !== undefined) {
-      this.activityData.mouseMovements += data.mouseMovements;
-    }
-    if (data.activeWindow !== undefined) {
-      this.activityData.activeWindow = data.activeWindow;
-    }
-    if (data.activeApp !== undefined) {
-      this.activityData.activeApp = data.activeApp;
-    }
-    if (data.isIdle !== undefined) {
-      this.activityData.isIdle = data.isIdle;
-    }
-  }
-
-  /**
-   * Set capture interval in milliseconds
-   */
-  setInterval(intervalMs) {
-    this.intervalMs = intervalMs;
-    debugLogger.log('info', 'ScreenshotService', `Capture interval set to ${intervalMs}ms`);
     
-    // If already capturing, restart with new interval
-    if (this.isCapturing) {
-      this.stop();
-      this.isCapturing = true;
-      this.start();
-    }
+    return await this.captureScreen('manual');
   }
 
-  /**
-   * Set callback for successful captures
-   */
-  onCapture(callback) {
-    this.onCaptureCallback = callback;
-  }
-
-  /**
-   * Set callback for errors
-   */
-  onError(callback) {
-    this.onErrorCallback = callback;
-  }
-
-  /**
-   * Get service status
-   */
   getStatus() {
     return {
       isCapturing: this.isCapturing,
       captureCount: this.captureCount,
       lastCaptureTime: this.lastCaptureTime,
-      sessionId: this.sessionId,
-      intervalMs: this.intervalMs,
-      serverUrl: this.serverUrl ? '***configured***' : null
+      isOnline: this.isOnline,
+      session: sessionManager.getSessionInfo(),
+      queue: offlineQueue.getStatus(),
+      userRole: this.userRole,
+      captureAllowed: this.shouldCapture()
     };
   }
 
-  /**
-   * Health check
-   */
-  async healthCheck() {
-    const status = this.getStatus();
-    const online = await this.isOnline();
-    
+  getStats() {
     return {
-      ...status,
-      online,
-      healthy: this.isCapturing && online
+      today: sessionManager.getTodayStats(),
+      history: sessionManager.getHistory(7),
+      queue: offlineQueue.getStatus()
     };
+  }
+
+  reset() {
+    this.stop();
+    this.captureCount = 0;
+    this.lastCaptureTime = null;
+    sessionManager.reset();
+    offlineQueue.reset();
+    logger.log('info', 'ScreenshotService', 'Reset complete');
   }
 }
 
-// Export singleton instance
 module.exports = new ScreenshotService();

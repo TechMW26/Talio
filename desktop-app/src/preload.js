@@ -1,125 +1,125 @@
-const { contextBridge, ipcRenderer } = require('electron');
-
 /**
- * Preload script - Enhanced with full permission support
- * Exposes safe APIs to renderer process
+ * Preload Script v4.0.0
+ * Exposes secure IPC channels to the renderer process
  */
 
-// Expose Talio Desktop API to renderer
-contextBridge.exposeInMainWorld('talioDesktop', {
-  // Identify as desktop app
-  isDesktopApp: true,
+const { contextBridge, ipcRenderer } = require('electron');
 
-  // Platform info
-  platform: process.platform,
-
-  // Auth token management
-  getAuthToken: () => ipcRenderer.invoke('get-auth-token'),
-  setAuthToken: (token) => ipcRenderer.invoke('set-auth-token', token),
-  clearAuthToken: () => ipcRenderer.invoke('clear-auth-token'),
-  checkAuthToken: () => ipcRenderer.invoke('check-auth-token'),
-
-  // App version and info
-  getVersion: () => ipcRenderer.invoke('get-app-version'),
-  getAppInfo: () => ipcRenderer.invoke('get-app-info'),
-
-  // Capture status and controls
-  getCaptureStatus: () => ipcRenderer.invoke('get-capture-status'),
-  forceCapture: () => ipcRenderer.invoke('force-capture'),
-
-  // Permission management
-  getPermissionStatus: () => ipcRenderer.invoke('get-permission-status'),
-  grantAllPermissions: () => ipcRenderer.invoke('grant-all-permissions'),
-  checkPermissions: () => ipcRenderer.invoke('check-permissions'),
-  retryPermissions: () => ipcRenderer.invoke('retry-permissions'),
-  openSystemPreferences: (section) => ipcRenderer.invoke('open-system-preferences', section),
-
-  // Location services
-  requestLocationPermission: () => ipcRenderer.invoke('request-location-permission'),
-  getCurrentLocation: () => ipcRenderer.invoke('get-current-location'),
-
-  // Google OAuth via system browser
-  openGoogleOAuth: () => ipcRenderer.invoke('open-google-oauth'),
-
-  // Open external URL in system browser (for OAuth)
-  openExternal: (url) => ipcRenderer.invoke('open-external-url', url),
-
-  // Storage info
-  getStoragePaths: () => ipcRenderer.invoke('get-storage-paths'),
-
+// Expose protected methods to the renderer
+contextBridge.exposeInMainWorld('electronAPI', {
+  // App info
+  getAppVersion: function() {
+    return ipcRenderer.invoke('get-app-version');
+  },
+  
+  // Authentication
+  onAuthSuccess: function(callback) {
+    ipcRenderer.on('auth-success', function(event, data) {
+      callback(data);
+    });
+  },
+  
+  sendAuthData: function(data) {
+    return ipcRenderer.invoke('auth-data', data);
+  },
+  
+  logout: function() {
+    return ipcRenderer.invoke('logout');
+  },
+  
+  // Screenshot service
+  startCapture: function() {
+    return ipcRenderer.invoke('start-capture');
+  },
+  
+  stopCapture: function() {
+    return ipcRenderer.invoke('stop-capture');
+  },
+  
+  manualCapture: function() {
+    return ipcRenderer.invoke('manual-capture');
+  },
+  
+  getCaptureStatus: function() {
+    return ipcRenderer.invoke('get-capture-status');
+  },
+  
+  getCaptureStats: function() {
+    return ipcRenderer.invoke('get-capture-stats');
+  },
+  
+  // Session management
+  getSessionInfo: function() {
+    return ipcRenderer.invoke('get-session-info');
+  },
+  
+  // Network status
+  setOnlineStatus: function(online) {
+    return ipcRenderer.invoke('set-online-status', online);
+  },
+  
+  // Window controls
+  minimizeWindow: function() {
+    return ipcRenderer.invoke('minimize-window');
+  },
+  
+  maximizeWindow: function() {
+    return ipcRenderer.invoke('maximize-window');
+  },
+  
+  closeWindow: function() {
+    return ipcRenderer.invoke('close-window');
+  },
+  
+  // Notifications
+  showNotification: function(title, body) {
+    return ipcRenderer.invoke('show-notification', { title: title, body: body });
+  },
+  
   // Event listeners
-  onCaptureComplete: (callback) => {
-    ipcRenderer.on('capture-complete', (event, data) => callback(data));
-    return () => ipcRenderer.removeAllListeners('capture-complete');
+  onCaptureStatus: function(callback) {
+    ipcRenderer.on('capture-status', function(event, data) {
+      callback(data);
+    });
   },
-
-  onUploadComplete: (callback) => {
-    ipcRenderer.on('upload-complete', (event, data) => callback(data));
-    return () => ipcRenderer.removeAllListeners('upload-complete');
+  
+  onSessionUpdate: function(callback) {
+    ipcRenderer.on('session-update', function(event, data) {
+      callback(data);
+    });
   },
-
-  onPermissionBlocked: (callback) => {
-    ipcRenderer.on('permission-blocked', (event, data) => callback(data));
-    return () => ipcRenderer.removeAllListeners('permission-blocked');
+  
+  onNotification: function(callback) {
+    ipcRenderer.on('notification', function(event, data) {
+      callback(data);
+    });
   },
-
-  onPermissionsGranted: (callback) => {
-    ipcRenderer.on('permissions-granted', (event, data) => callback(data));
-    return () => ipcRenderer.removeAllListeners('permissions-granted');
+  
+  onSocketStatus: function(callback) {
+    ipcRenderer.on('socket-status', function(event, data) {
+      callback(data);
+    });
   },
-
-  // Listen for auth token from deep link
-  onAuthReceived: (callback) => {
-    ipcRenderer.on('auth-token-received', (event, data) => callback(data));
-    return () => ipcRenderer.removeAllListeners('auth-token-received');
+  
+  onOnlineStatus: function(callback) {
+    ipcRenderer.on('online-status', function(event, data) {
+      callback(data);
+    });
+  },
+  
+  // Remove listeners
+  removeAllListeners: function(channel) {
+    ipcRenderer.removeAllListeners(channel);
+  },
+  
+  // Restart app (for crash recovery)
+  restartApp: function() {
+    return ipcRenderer.invoke('restart-app');
   }
 });
 
-// Also expose for permission setup screen (talioAPI)
-contextBridge.exposeInMainWorld('talioAPI', {
-  // Permission management for setup screen
-  grantAllPermissions: () => ipcRenderer.invoke('grant-all-permissions'),
-  checkPermissions: () => ipcRenderer.invoke('check-permissions'),
-  retryPermissions: () => ipcRenderer.invoke('retry-permissions'),
-  openSystemPreferences: (section) => ipcRenderer.invoke('open-system-preferences', section),
-  getPermissionStatus: () => ipcRenderer.invoke('get-permission-status')
-});
+// Also expose a flag to indicate this is running in Electron
+contextBridge.exposeInMainWorld('isElectron', true);
+contextBridge.exposeInMainWorld('platform', process.platform);
 
-// Sync localStorage auth token with main process
-if (typeof window !== 'undefined') {
-  window.addEventListener('DOMContentLoaded', () => {
-    // Override localStorage.setItem
-    const originalSetItem = localStorage.setItem.bind(localStorage);
-    localStorage.setItem = function (key, value) {
-      originalSetItem(key, value);
-
-      // Sync token to main process
-      if (key === 'token') {
-        console.log('[Talio] Token set, syncing to desktop app');
-        ipcRenderer.invoke('set-auth-token', value);
-      }
-    };
-
-    // Override localStorage.removeItem for logout
-    const originalRemoveItem = localStorage.removeItem.bind(localStorage);
-    localStorage.removeItem = function (key) {
-      originalRemoveItem(key);
-
-      if (key === 'token') {
-        console.log('[Talio] Token removed, clearing from desktop app');
-        ipcRenderer.invoke('clear-auth-token');
-      }
-    };
-
-    // Sync existing token if present
-    const existingToken = localStorage.getItem('token');
-    if (existingToken) {
-      console.log('[Talio] Syncing existing token to desktop app');
-      ipcRenderer.invoke('set-auth-token', existingToken);
-    }
-  });
-}
-
-// Log desktop app info
-console.log('[Talio Desktop] Preload initialized');
-console.log('[Talio Desktop] Platform:', process.platform);
+console.log('[Preload] Talio Desktop API exposed');
