@@ -14,9 +14,12 @@ export async function POST(request, { params }) {
   try {
     const { id: sessionId } = await params;
     
+    console.log(`[ProductivityAnalysis] Starting analysis for session: ${sessionId}`);
+    
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['ProductivitySession', 'User'])
     if (!auth.success) {
+      console.log(`[ProductivityAnalysis] Auth failed: ${auth.message}`);
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
@@ -25,21 +28,28 @@ export async function POST(request, { params }) {
     const currentUserId = user._id || user.userId;
     const currentUserRole = user.role;
     
+    console.log(`[ProductivityAnalysis] User: ${currentUserId}, Role: ${currentUserRole}`);
+    
     // Get session
     const session = await ProductivitySession.findById(sessionId);
     if (!session) {
+      console.log(`[ProductivityAnalysis] Session not found: ${sessionId}`);
       return NextResponse.json(
         { success: false, error: 'Session not found' },
         { status: 404 }
       );
     }
     
-    // Permission check
-    const isOwner = session.user.toString() === currentUserId.toString();
-    const isAdminOrHR = ['admin', 'hr'].includes(currentUserRole);
+    console.log(`[ProductivityAnalysis] Session found. User field: ${session.user}, Screenshots: ${session.screenshots?.length || 0}`);
     
-    if (!isOwner && !isAdminOrHR) {
-      // TODO: Add department head check if needed
+    // Permission check - be more lenient for department heads
+    const isOwner = session.user?.toString() === currentUserId?.toString();
+    const isAdminOrHR = ['admin', 'hr', 'manager', 'department_head'].includes(currentUserRole);
+    const isDepartmentHead = user.isDepartmentHead === true;
+    
+    console.log(`[ProductivityAnalysis] Permission check - Owner: ${isOwner}, AdminHR: ${isAdminOrHR}, DeptHead: ${isDepartmentHead}`);
+    
+    if (!isOwner && !isAdminOrHR && !isDepartmentHead) {
       return NextResponse.json(
         { success: false, error: 'Permission denied' },
         { status: 403 }
@@ -74,16 +84,45 @@ export async function POST(request, { params }) {
     const selectedIndices = selectEvenlyDistributed(screenshots.length, MAX_IMAGES_PER_ANALYSIS);
     const selectedScreenshots = selectedIndices.map(i => screenshots[i]);
     
-    // Load images
+    // Load images - handle both ImageKit URLs and local filesystem paths
     const images = [];
     const screenshotSummaries = [];
     
     for (const screenshot of selectedScreenshots) {
       try {
-        const imagePath = path.join(process.cwd(), 'public', screenshot.path);
-        const imageBuffer = await readFile(imagePath);
-        const base64 = imageBuffer.toString('base64');
-        const mimeType = screenshot.path.endsWith('.webp') ? 'image/webp' : 'image/png';
+        let base64;
+        let mimeType = 'image/jpeg'; // Default
+        const screenshotUrl = screenshot.url || screenshot.path;
+        
+        // Check if it's a URL (ImageKit) or filesystem path
+        if (screenshotUrl && (screenshotUrl.startsWith('http://') || screenshotUrl.startsWith('https://'))) {
+          // Fetch image from URL
+          console.log(`[ProductivityAnalysis] Fetching image from URL: ${screenshotUrl}`);
+          const response = await fetch(screenshotUrl);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch image: ${response.status}`);
+          }
+          const arrayBuffer = await response.arrayBuffer();
+          base64 = Buffer.from(arrayBuffer).toString('base64');
+          
+          // Determine mime type from URL or content-type header
+          const contentType = response.headers.get('content-type');
+          if (contentType) {
+            mimeType = contentType.split(';')[0];
+          } else if (screenshotUrl.endsWith('.webp')) {
+            mimeType = 'image/webp';
+          } else if (screenshotUrl.endsWith('.png')) {
+            mimeType = 'image/png';
+          }
+        } else if (screenshotUrl) {
+          // Load from filesystem (legacy)
+          const imagePath = path.join(process.cwd(), 'public', screenshotUrl);
+          const imageBuffer = await readFile(imagePath);
+          base64 = imageBuffer.toString('base64');
+          mimeType = screenshotUrl.endsWith('.webp') ? 'image/webp' : 'image/png';
+        } else {
+          throw new Error('No valid screenshot URL or path');
+        }
         
         images.push({
           mimeType,
@@ -91,20 +130,20 @@ export async function POST(request, { params }) {
         });
         
         screenshotSummaries.push({
-          screenshotPath: screenshot.path,
-          timestamp: screenshot.timestamp,
+          screenshotPath: screenshotUrl,
+          timestamp: screenshot.capturedAt || screenshot.timestamp,
           summary: '',
           activity: '',
           productivity: ''
         });
       } catch (error) {
-        console.error(`Failed to load image ${screenshot.path}:`, error.message);
+        console.error(`Failed to load image ${screenshot.url || screenshot.path}:`, error.message);
       }
     }
     
     if (images.length === 0) {
       return NextResponse.json(
-        { success: false, error: 'Failed to load screenshots' },
+        { success: false, error: 'Failed to load screenshots. Images may not be accessible.' },
         { status: 500 }
       );
     }

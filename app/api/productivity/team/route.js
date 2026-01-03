@@ -86,11 +86,15 @@ export async function GET(request) {
         .populate('designation', 'title')
         .lean();
       
+      console.log(`[Team API] Found ${employees.length} employees in department ${departmentName}`);
+      
       // Filter only employees with userId and map for consistency
       teamMembers = employees.filter(e => e.userId).map(e => ({
         ...e,
         user: e.userId // Map userId to user for consistency
       }));
+      
+      console.log(`[Team API] ${teamMembers.length} employees have userId linked`);
     }
     
     // Get session summaries for each team member
@@ -146,6 +150,8 @@ export async function GET(request) {
       if (b.sessionsSummary.averageScore !== null) return 1;
       return b.sessionsSummary.totalSessions - a.sessionsSummary.totalSessions;
     });
+    
+    console.log(`[Team API] Returning ${teamWithSessions.length} team members for ${departmentName}`);
     
     return NextResponse.json({
       success: true,

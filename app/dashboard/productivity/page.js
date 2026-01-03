@@ -14,10 +14,13 @@ import {
   HiOutlineXMark,
   HiOutlineArrowPath,
   HiOutlineCamera,
-  HiOutlineSquares2X2
+  HiOutlineSquares2X2,
+  HiOutlineTrophy,
+  HiOutlineChartBar
 } from 'react-icons/hi2'
 import RawCaptureViewer from '@/components/productivity/RawCaptureViewer'
 import ManualCapturePanel from '@/components/productivity/ManualCapturePanel'
+import ModalPortal from '@/components/ModalPortal'
 
 export default function ProductivityPage() {
   const [user, setUser] = useState(null)
@@ -31,6 +34,8 @@ export default function ProductivityPage() {
   const [canViewTeam, setCanViewTeam] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [viewMode, setViewMode] = useState('sessions') // 'sessions', 'raw', 'manual'
+  const [selectedTeamMember, setSelectedTeamMember] = useState(null) // For viewing team member's raw captures
+  const [currentSlideIndex, setCurrentSlideIndex] = useState(0) // For screenshot slider in modal
 
   // Get user from localStorage
   useEffect(() => {
@@ -56,7 +61,7 @@ export default function ProductivityPage() {
       const res = await fetch(`/api/productivity/sessions?date=${selectedDate}`)
       if (res.ok) {
         const data = await res.json()
-        setSessions(data.sessions || [])
+        setSessions(data.data || data.sessions || [])
       }
     } catch (error) {
       console.error('Error fetching sessions:', error)
@@ -72,7 +77,14 @@ export default function ProductivityPage() {
       const res = await fetch(`/api/productivity/team?date=${selectedDate}`)
       if (res.ok) {
         const data = await res.json()
-        setTeamSessions(data.members || [])
+        // Transform API response to frontend format
+        const members = (data.data || []).map(m => ({
+          ...m,
+          name: `${m.firstName || ''} ${m.lastName || ''}`.trim() || m.email,
+          sessionCount: m.sessionsSummary?.totalSessions || 0,
+          sessions: m.sessionsSummary?.sessions || []
+        }))
+        setTeamSessions(members)
       }
     } catch (error) {
       console.error('Error fetching team sessions:', error)
@@ -81,10 +93,14 @@ export default function ProductivityPage() {
 
   useEffect(() => {
     fetchSessions()
-    if (activeTab === 'team') {
+  }, [fetchSessions])
+
+  // Fetch team sessions when user can view team
+  useEffect(() => {
+    if (canViewTeam) {
       fetchTeamSessions()
     }
-  }, [fetchSessions, fetchTeamSessions, activeTab])
+  }, [canViewTeam, fetchTeamSessions, selectedDate])
 
   // Create sessions from screenshots
   const refreshSessions = async () => {
@@ -117,18 +133,24 @@ export default function ProductivityPage() {
       const res = await fetch(`/api/productivity/sessions/${sessionId}/analyze`, {
         method: 'POST'
       })
+      const data = await res.json()
       if (res.ok) {
-        const data = await res.json()
+        // API returns { success, message, data: session }
+        const updatedSession = data.data || data.session || data
         // Update the session in the list
         setSessions(prev => prev.map(s => 
-          s._id === sessionId ? { ...s, ...data.session } : s
+          s._id === sessionId ? { ...s, ...updatedSession } : s
         ))
         if (selectedSession?._id === sessionId) {
-          setSelectedSession({ ...selectedSession, ...data.session })
+          setSelectedSession({ ...selectedSession, ...updatedSession })
         }
+      } else {
+        console.error('AI Analysis failed:', data.error || data.message)
+        alert(`Analysis failed: ${data.error || data.message || 'Unknown error'}`)
       }
     } catch (error) {
       console.error('Error analyzing session:', error)
+      alert('Analysis failed: Network error')
     } finally {
       setAnalyzing(false)
     }
@@ -195,7 +217,13 @@ export default function ProductivityPage() {
       {canViewTeam && (
         <div className="flex gap-2 mb-4 sm:mb-6">
           <button
-            onClick={() => setActiveTab('my')}
+            onClick={() => {
+              setActiveTab('my')
+              // Reset viewMode if on manual capture (only available in team tab)
+              if (viewMode === 'manual') setViewMode('sessions')
+              // Reset selected team member
+              setSelectedTeamMember(null)
+            }}
             className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base font-medium transition flex-1 sm:flex-initial ${
               activeTab === 'my' 
                 ? 'bg-purple-600 text-white' 
@@ -246,7 +274,7 @@ export default function ProductivityPage() {
           <span className="hidden sm:inline">Raw Captures</span>
           <span className="sm:hidden">Raw</span>
         </button>
-        {canViewTeam && (
+        {canViewTeam && activeTab === 'team' && (
           <button
             onClick={() => setViewMode('manual')}
             className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition flex-1 sm:flex-initial ${
@@ -264,7 +292,42 @@ export default function ProductivityPage() {
 
       {/* Raw Capture View */}
       {viewMode === 'raw' && (
-        <RawCaptureViewer date={selectedDate} showFilters={true} />
+        <>
+          {/* Team member selector for team tab */}
+          {activeTab === 'team' && canViewTeam && (
+            <div className="mb-4 flex items-center gap-3">
+              <label className="text-sm font-medium text-gray-700">View captures for:</label>
+              <select
+                value={selectedTeamMember || ''}
+                onChange={(e) => setSelectedTeamMember(e.target.value || null)}
+                className="border rounded-lg px-3 py-2 text-sm focus:ring-purple-500 focus:border-purple-500 min-w-[200px]"
+              >
+                <option value="">Select team member</option>
+                {teamSessions.map((member) => (
+                  <option key={member.userId || member._id} value={member.userId || member._id}>
+                    {member.name || `${member.firstName || ''} ${member.lastName || ''}`.trim() || member.email}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {/* Show raw captures - for my tab or when team member is selected */}
+          {(activeTab === 'my' || (activeTab === 'team' && selectedTeamMember)) ? (
+            <RawCaptureViewer 
+              date={selectedDate} 
+              showFilters={true} 
+              userId={activeTab === 'team' ? selectedTeamMember : null}
+            />
+          ) : activeTab === 'team' && !selectedTeamMember ? (
+            <div className="bg-white rounded-2xl shadow-sm border p-6 sm:p-12 text-center">
+              <HiOutlineUsers className="w-12 h-12 sm:w-16 sm:h-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">Select a team member</h3>
+              <p className="text-sm sm:text-base text-gray-500">
+                Choose a team member from the dropdown above to view their raw captures.
+              </p>
+            </div>
+          ) : null}
+        </>
       )}
 
       {/* Manual Capture View */}
@@ -317,7 +380,10 @@ export default function ProductivityPage() {
                 <div
                   key={session._id}
                   className="bg-white rounded-xl shadow-sm border overflow-hidden hover:shadow-md transition cursor-pointer"
-                  onClick={() => setSelectedSession(session)}
+                  onClick={() => {
+                    setSelectedSession(session)
+                    setCurrentSlideIndex(0)
+                  }}
                 >
                   {/* Session Preview - First screenshot */}
                   <div className="aspect-video bg-gray-100 relative">
@@ -384,7 +450,7 @@ export default function ProductivityPage() {
 
       {/* Team Activity Tab */}
       {activeTab === 'team' && (
-        <div className="space-y-4">
+        <div>
           {teamSessions.length === 0 ? (
             <div className="bg-white rounded-2xl shadow-sm border p-6 sm:p-12 text-center">
               <HiOutlineUsers className="w-12 h-12 sm:w-16 sm:h-16 text-gray-300 mx-auto mb-4" />
@@ -394,42 +460,86 @@ export default function ProductivityPage() {
               </p>
             </div>
           ) : (
-            teamSessions.map((member) => (
-              <div key={member.userId} className="bg-white rounded-xl shadow-sm border p-3 sm:p-4">
-                <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-sm sm:text-base font-medium">
-                    {member.name?.charAt(0) || 'U'}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {teamSessions.map((member) => (
+                <div 
+                  key={member.userId} 
+                  className="bg-white rounded-xl shadow-sm border overflow-hidden hover:shadow-md transition-shadow"
+                >
+                  {/* Card Header with Profile */}
+                  <div className="p-4 border-b bg-gradient-to-r from-purple-50 to-indigo-50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-lg font-semibold shadow-lg">
+                        {member.name?.charAt(0) || 'U'}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="font-semibold text-gray-900 truncate">{member.name}</h3>
+                        <p className="text-xs text-gray-500">{member.designation || member.department || 'Team Member'}</p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <h3 className="text-sm sm:text-base font-medium text-gray-900 truncate">{member.name}</h3>
-                    <p className="text-xs sm:text-sm text-gray-500">{member.sessionCount} sessions today</p>
-                  </div>
-                </div>
-                {member.sessions?.length > 0 && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                    {member.sessions.slice(0, 4).map((session, idx) => (
+                  
+                  {/* Stats */}
+                  <div className="p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <HiOutlineSquares2X2 className="w-4 h-4 text-purple-500" />
+                        <span className="text-sm font-medium text-gray-700">{member.sessionCount || 0} Sessions</span>
+                      </div>
+                      {member.sessionsSummary?.averageScore && (
+                        <div className="flex items-center gap-1">
+                          <HiOutlineTrophy className="w-4 h-4 text-amber-500" />
+                          <span className={`text-sm font-bold ${
+                            member.sessionsSummary.averageScore >= 70 ? 'text-green-600' :
+                            member.sessionsSummary.averageScore >= 40 ? 'text-amber-600' : 'text-red-600'
+                          }`}>
+                            {member.sessionsSummary.averageScore}%
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Screenshot Preview */}
+                    {member.sessions?.length > 0 && member.sessions[0]?.screenshots?.[0]?.url ? (
                       <div 
-                        key={session._id}
-                        className="aspect-video bg-gray-100 rounded-lg overflow-hidden cursor-pointer hover:opacity-80 transition"
-                        onClick={() => setSelectedSession(session)}
+                        className="aspect-video bg-gray-100 rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition relative group"
+                        onClick={() => {
+                          setSelectedSession(member.sessions[0])
+                          setCurrentSlideIndex(0)
+                        }}
                       >
-                        {session.screenshots?.[0]?.url ? (
-                          <img
-                            src={session.screenshots[0].url}
-                            alt={`Session ${idx + 1}`}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex items-center justify-center h-full">
-                            <HiOutlinePhoto className="w-6 h-6 sm:w-8 sm:h-8 text-gray-300" />
+                        <img
+                          src={member.sessions[0].screenshots[0].url}
+                          alt="Latest activity"
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                          <span className="text-white text-sm font-medium">View Sessions</span>
+                        </div>
+                        {member.sessions.length > 1 && (
+                          <div className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
+                            +{member.sessions.length - 1} more
                           </div>
                         )}
                       </div>
-                    ))}
+                    ) : (
+                      <div className="aspect-video bg-gray-50 rounded-lg flex items-center justify-center">
+                        <div className="text-center">
+                          <HiOutlinePhoto className="w-8 h-8 text-gray-300 mx-auto mb-1" />
+                          <p className="text-xs text-gray-400">No screenshots</p>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Quick Stats Bar */}
+                    <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                      <span>{member.sessionsSummary?.totalScreenshots || 0} screenshots</span>
+                      <span>{member.sessionsSummary?.analyzedSessions || 0} analyzed</span>
+                    </div>
                   </div>
-                )}
-              </div>
-            ))
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}
@@ -437,90 +547,256 @@ export default function ProductivityPage() {
       )}
 
       {/* Session Detail Modal */}
-      {selectedSession && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <ModalPortal show={!!selectedSession}>
+        {selectedSession && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-2 sm:p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-7xl w-full max-h-[95vh] overflow-hidden flex flex-col">
             {/* Modal Header */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-4 border-b gap-3">
+            <div className="flex items-center justify-between p-3 sm:p-4 border-b bg-gray-50">
               <div className="min-w-0 flex-1">
-                <h2 className="text-base sm:text-lg font-bold text-gray-900">Session Details</h2>
-                <p className="text-xs sm:text-sm text-gray-500 truncate">
+                <h2 className="text-base sm:text-lg font-bold text-gray-900">Session {selectedSession.sessionNumber || 1}</h2>
+                <p className="text-xs sm:text-sm text-gray-500">
                   {formatTime(selectedSession.startTime)} - {formatTime(selectedSession.endTime)} • {selectedSession.screenshots?.length || 0} screenshots
                 </p>
               </div>
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                {!selectedSession.analysis && (
+              <div className="flex items-center gap-2">
+                {!selectedSession.analysis?.isAnalyzed && (
                   <button
                     onClick={() => analyzeSession(selectedSession._id)}
                     disabled={analyzing}
-                    className="flex-1 sm:flex-initial flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg text-xs sm:text-sm font-medium hover:opacity-90 transition disabled:opacity-50"
+                    className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg text-xs sm:text-sm font-medium hover:opacity-90 transition disabled:opacity-50"
                   >
-                    <HiOutlineSparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <HiOutlineSparkles className="w-4 h-4" />
                     <span className="hidden sm:inline">{analyzing ? 'Analyzing...' : 'Analyze with AI'}</span>
-                    <span className="sm:hidden">{analyzing ? 'Analyzing...' : 'Analyze'}</span>
+                    <span className="sm:hidden">{analyzing ? '...' : 'Analyze'}</span>
                   </button>
                 )}
                 <button
-                  onClick={() => setSelectedSession(null)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition"
+                  onClick={() => {
+                    setSelectedSession(null)
+                    setCurrentSlideIndex(0)
+                  }}
+                  className="p-2 hover:bg-gray-200 rounded-lg transition"
                 >
-                  <HiOutlineXMark className="w-5 h-5 sm:w-6 sm:h-6" />
+                  <HiOutlineXMark className="w-5 h-5" />
                 </button>
               </div>
             </div>
 
-            {/* Modal Content */}
-            <div className="flex-1 overflow-y-auto p-3 sm:p-4">
-              {/* AI Analysis (if available) */}
-              {selectedSession.analysis && (
-                <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-3 sm:p-4 mb-4 sm:mb-6">
-                  <div className="flex items-center gap-2 mb-3">
-                    <HiOutlineSparkles className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600" />
-                    <h3 className="text-sm sm:text-base font-medium text-purple-900">AI Analysis</h3>
-                    {selectedSession.analysis.score && (
-                      <span className={`ml-auto px-2 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm font-medium ${getScoreColor(selectedSession.analysis.score)}`}>
-                        Score: {selectedSession.analysis.score}%
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs sm:text-sm text-gray-700 mb-3">{selectedSession.analysis.summary}</p>
-                  {selectedSession.analysis.improvements?.length > 0 && (
-                    <div>
-                      <h4 className="text-xs sm:text-sm font-medium text-gray-900 mb-2">Suggestions:</h4>
-                      <ul className="list-disc list-inside text-xs sm:text-sm text-gray-600 space-y-1">
-                        {selectedSession.analysis.improvements.map((imp, idx) => (
-                          <li key={idx}>{imp}</li>
-                        ))}
-                      </ul>
+            {/* Modal Content - 40-60 Split */}
+            <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
+              {/* Left Side - Screenshots Slider (40%) */}
+              <div className="lg:w-[40%] bg-gray-900 flex flex-col">
+                {/* Main Screenshot */}
+                <div className="flex-1 relative flex items-center justify-center p-4 min-h-[200px] lg:min-h-0">
+                  {selectedSession.screenshots?.length > 0 ? (
+                    <>
+                      <img
+                        src={selectedSession.screenshots[currentSlideIndex]?.url}
+                        alt={`Screenshot ${currentSlideIndex + 1}`}
+                        className="max-w-full max-h-full object-contain rounded-lg shadow-2xl cursor-pointer"
+                        onClick={() => window.open(selectedSession.screenshots[currentSlideIndex]?.url, '_blank')}
+                      />
+                      
+                      {/* Navigation Arrows */}
+                      {selectedSession.screenshots.length > 1 && (
+                        <>
+                          <button
+                            onClick={() => setCurrentSlideIndex(prev => prev > 0 ? prev - 1 : selectedSession.screenshots.length - 1)}
+                            className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-white/20 hover:bg-white/40 rounded-full transition backdrop-blur-sm"
+                          >
+                            <HiOutlineChevronLeft className="w-5 h-5 text-white" />
+                          </button>
+                          <button
+                            onClick={() => setCurrentSlideIndex(prev => prev < selectedSession.screenshots.length - 1 ? prev + 1 : 0)}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-white/20 hover:bg-white/40 rounded-full transition backdrop-blur-sm"
+                          >
+                            <HiOutlineChevronRight className="w-5 h-5 text-white" />
+                          </button>
+                        </>
+                      )}
+                      
+                      {/* Slide Counter */}
+                      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-sm">
+                        {currentSlideIndex + 1} / {selectedSession.screenshots.length}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center text-gray-400">
+                      <HiOutlinePhoto className="w-16 h-16 mx-auto mb-2 opacity-50" />
+                      <p>No screenshots available</p>
                     </div>
                   )}
                 </div>
-              )}
-
-              {/* Screenshots Grid */}
-              <h3 className="text-sm sm:text-base font-medium text-gray-900 mb-3">Screenshots</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-                {selectedSession.screenshots?.map((screenshot, idx) => (
-                  <div 
-                    key={idx}
-                    className="aspect-video bg-gray-100 rounded-lg overflow-hidden group relative cursor-pointer"
-                    onClick={() => window.open(screenshot.url, '_blank')}
-                  >
-                    <img
-                      src={screenshot.url}
-                      alt={`Screenshot ${idx + 1}`}
-                      className="w-full h-full object-cover group-hover:scale-105 transition"
-                    />
-                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[10px] sm:text-xs p-1 text-center opacity-0 group-hover:opacity-100 transition">
-                      {formatTime(screenshot.capturedAt)}
+                
+                {/* Thumbnail Strip */}
+                {selectedSession.screenshots?.length > 1 && (
+                  <div className="border-t border-gray-700 p-2 bg-gray-800">
+                    <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-gray-600">
+                      {selectedSession.screenshots.map((screenshot, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => setCurrentSlideIndex(idx)}
+                          className={`flex-shrink-0 w-14 h-10 rounded overflow-hidden border-2 transition ${
+                            idx === currentSlideIndex ? 'border-purple-500' : 'border-transparent hover:border-gray-500'
+                          }`}
+                        >
+                          <img
+                            src={screenshot.url}
+                            alt={`Thumb ${idx + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        </button>
+                      ))}
                     </div>
                   </div>
-                ))}
+                )}
+                
+                {/* Screenshot Time */}
+                {selectedSession.screenshots?.[currentSlideIndex] && (
+                  <div className="p-2 bg-gray-800 text-center border-t border-gray-700">
+                    <p className="text-xs text-gray-400">
+                      <HiOutlineClock className="w-3 h-3 inline mr-1" />
+                      {formatTime(selectedSession.screenshots[currentSlideIndex].capturedAt)}
+                    </p>
+                  </div>
+                )}
+              </div>
+              
+              {/* Right Side - AI Analysis (60%) */}
+              <div className="lg:w-[60%] overflow-y-auto p-4 sm:p-6 bg-white">
+                {selectedSession.analysis?.isAnalyzed ? (
+                  <div className="space-y-6">
+                    {/* Score Header */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${
+                          selectedSession.analysis.score >= 70 ? 'bg-green-100' :
+                          selectedSession.analysis.score >= 40 ? 'bg-amber-100' : 'bg-red-100'
+                        }`}>
+                          <span className={`text-2xl font-bold ${
+                            selectedSession.analysis.score >= 70 ? 'text-green-600' :
+                            selectedSession.analysis.score >= 40 ? 'text-amber-600' : 'text-red-600'
+                          }`}>
+                            {selectedSession.analysis.score || '--'}
+                          </span>
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-gray-900">Productivity Score</h3>
+                          <p className="text-sm text-gray-500">
+                            {selectedSession.analysis.score >= 70 ? 'Excellent work!' :
+                             selectedSession.analysis.score >= 40 ? 'Good progress' : 'Needs improvement'}
+                          </p>
+                        </div>
+                      </div>
+                      <HiOutlineChartBar className="w-8 h-8 text-gray-300" />
+                    </div>
+                    
+                    {/* Summary */}
+                    <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-4">
+                      <h4 className="font-medium text-purple-900 mb-2 flex items-center gap-2">
+                        <HiOutlineSparkles className="w-4 h-4" />
+                        AI Summary
+                      </h4>
+                      <p className="text-sm text-gray-700 leading-relaxed">
+                        {selectedSession.analysis.summary || 'No summary available'}
+                      </p>
+                    </div>
+                    
+                    {/* Achievements */}
+                    {selectedSession.analysis.achievements?.length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+                          <HiOutlineTrophy className="w-4 h-4 text-amber-500" />
+                          Achievements
+                        </h4>
+                        <div className="space-y-2">
+                          {selectedSession.analysis.achievements.map((achievement, idx) => (
+                            <div key={idx} className="flex items-start gap-2 text-sm">
+                              <span className="text-green-500 mt-0.5">✓</span>
+                              <span className="text-gray-700">{achievement}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Suggestions */}
+                    {(selectedSession.analysis.suggestions?.length > 0 || selectedSession.analysis.improvements?.length > 0) && (
+                      <div>
+                        <h4 className="font-medium text-gray-900 mb-3">Suggestions for Improvement</h4>
+                        <div className="space-y-2">
+                          {(selectedSession.analysis.suggestions || selectedSession.analysis.improvements || []).map((suggestion, idx) => (
+                            <div key={idx} className="flex items-start gap-2 text-sm bg-amber-50 p-2 rounded-lg">
+                              <span className="text-amber-500 mt-0.5">💡</span>
+                              <span className="text-gray-700">{suggestion}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Insights */}
+                    {selectedSession.analysis.insights?.length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-gray-900 mb-3">Key Insights</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {selectedSession.analysis.insights.map((insight, idx) => (
+                            <div key={idx} className="text-sm bg-gray-50 p-3 rounded-lg text-gray-600">
+                              {insight}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Applications Used */}
+                    {selectedSession.analysis.applications?.length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-gray-900 mb-3">Applications Used</h4>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedSession.analysis.applications.map((app, idx) => (
+                            <span 
+                              key={idx} 
+                              className={`px-3 py-1 rounded-full text-xs font-medium ${
+                                app.category === 'work' ? 'bg-blue-100 text-blue-700' :
+                                app.category === 'communication' ? 'bg-green-100 text-green-700' :
+                                app.category === 'entertainment' ? 'bg-red-100 text-red-700' :
+                                'bg-gray-100 text-gray-700'
+                              }`}
+                            >
+                              {app.name} {app.estimatedMinutes && `(${app.estimatedMinutes}m)`}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center text-center py-12">
+                    <div className="w-20 h-20 bg-gradient-to-br from-purple-100 to-indigo-100 rounded-2xl flex items-center justify-center mb-4">
+                      <HiOutlineSparkles className="w-10 h-10 text-purple-500" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">AI Analysis Available</h3>
+                    <p className="text-sm text-gray-500 mb-6 max-w-xs">
+                      Get detailed insights about productivity, work patterns, and suggestions for improvement.
+                    </p>
+                    <button
+                      onClick={() => analyzeSession(selectedSession._id)}
+                      disabled={analyzing}
+                      className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-medium hover:opacity-90 transition disabled:opacity-50 shadow-lg shadow-purple-500/25"
+                    >
+                      <HiOutlineSparkles className="w-5 h-5" />
+                      {analyzing ? 'Analyzing...' : 'Analyze with AI'}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
-      )}
+        )}
+      </ModalPortal>
     </div>
   )
 }

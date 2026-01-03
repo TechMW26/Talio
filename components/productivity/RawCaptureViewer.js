@@ -14,6 +14,7 @@ import {
   HiOutlineShieldCheck,
   HiOutlineExclamationTriangle
 } from 'react-icons/hi2'
+import ModalPortal from '@/components/ModalPortal'
 
 /**
  * RawCaptureViewer Component
@@ -339,14 +340,15 @@ export default function RawCaptureViewer({ userId = null, date = null, showFilte
       </div>
 
       {/* Full Screen Viewer Modal */}
-      {selectedCapture && (
+      <ModalPortal show={!!selectedCapture}>
+        {selectedCapture && (
         <div
-          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center p-4"
           onClick={() => setSelectedCapture(null)}
         >
           <button
             onClick={() => setSelectedCapture(null)}
-            className="absolute top-4 right-4 p-2 text-white hover:bg-white/10 rounded-lg transition"
+            className="absolute top-4 right-4 p-2 text-black bg-white/80 hover:bg-white rounded-lg transition shadow-lg"
           >
             <HiOutlineXMark className="w-6 h-6" />
           </button>
@@ -377,7 +379,7 @@ export default function RawCaptureViewer({ userId = null, date = null, showFilte
                 setSelectedCapture(captures[currentIndex - 1])
               }
             }}
-            className="absolute left-4 top-1/2 -translate-y-1/2 p-3 text-white hover:bg-white/10 rounded-lg transition"
+            className="absolute left-4 top-1/2 -translate-y-1/2 p-3 text-black bg-white/80 hover:bg-white rounded-lg transition shadow-lg disabled:opacity-50"
             disabled={captures.findIndex(c => c.path === selectedCapture.path) === 0}
           >
             <HiOutlineChevronLeft className="w-8 h-8" />
@@ -390,13 +392,14 @@ export default function RawCaptureViewer({ userId = null, date = null, showFilte
                 setSelectedCapture(captures[currentIndex + 1])
               }
             }}
-            className="absolute right-4 top-1/2 -translate-y-1/2 p-3 text-white hover:bg-white/10 rounded-lg transition"
+            className="absolute right-4 top-1/2 -translate-y-1/2 p-3 text-black bg-white/80 hover:bg-white rounded-lg transition shadow-lg disabled:opacity-50"
             disabled={captures.findIndex(c => c.path === selectedCapture.path) === captures.length - 1}
           >
             <HiOutlineChevronRight className="w-8 h-8" />
           </button>
         </div>
-      )}
+        )}
+      </ModalPortal>
     </div>
   )
 }

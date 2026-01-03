@@ -23,46 +23,69 @@ function parseScreenshotTimestamp(filename) {
 }
 
 /**
- * Scan filesystem for screenshots and create/update sessions
+ * Sync screenshots to sessions - checks both database and filesystem
  * @param {string} userId - User ID
  * @param {Date} date - Date to scan
- * @param {Object} models - Tenant-specific models { User, ProductivitySession }
+ * @param {Object} models - Tenant-specific models { User, ProductivitySession, Screenshot }
  */
 async function syncScreenshotsToSessions(userId, date, models) {
-  const { User, ProductivitySession } = models;
-  const activityDir = path.join(process.cwd(), 'public', 'activity', userId);
+  const { User, ProductivitySession, Screenshot } = models;
   const dateFolder = date.toISOString().split('T')[0];
-  const datePath = path.join(activityDir, dateFolder);
   
   let screenshots = [];
   
-  try {
-    const files = await readdir(datePath);
-    const imageFiles = files.filter(f => /\.(webp|png|jpg|jpeg)$/i.test(f));
+  // First, try to get screenshots from the Screenshot model (primary source)
+  if (Screenshot) {
+    const dbScreenshots = await Screenshot.find({
+      user: userId,
+      dateString: dateFolder
+    }).sort({ capturedAt: 1 }).lean();
     
-    for (const file of imageFiles) {
-      const filePath = path.join(datePath, file);
-      const fileStat = await stat(filePath);
-      
+    for (const ss of dbScreenshots) {
+      const displayPath = ss.imagekitUrl || ss.path || `/api/activity/screenshot?id=${ss._id}`;
       screenshots.push({
-        path: `/activity/${userId}/${dateFolder}/${file}`,
-        filename: file,
-        timestamp: parseScreenshotTimestamp(file),
-        size: fileStat.size
+        path: displayPath,
+        filename: ss.filename || `screenshot_${ss._id}.webp`,
+        timestamp: ss.capturedAt,
+        size: ss.metadata?.fileSize || 0
       });
     }
+  }
+  
+  // Fallback: also check filesystem if no DB screenshots found
+  if (screenshots.length === 0) {
+    const activityDir = path.join(process.cwd(), 'public', 'activity', userId.toString());
+    const datePath = path.join(activityDir, dateFolder);
     
-    // Sort by timestamp
-    screenshots.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-  } catch (error) {
-    // Directory doesn't exist or is empty
+    try {
+      const files = await readdir(datePath);
+      const imageFiles = files.filter(f => /\.(webp|png|jpg|jpeg)$/i.test(f));
+      
+      for (const file of imageFiles) {
+        const filePath = path.join(datePath, file);
+        const fileStat = await stat(filePath);
+        
+        screenshots.push({
+          path: `/activity/${userId}/${dateFolder}/${file}`,
+          filename: file,
+          timestamp: parseScreenshotTimestamp(file),
+          size: fileStat.size
+        });
+      }
+      
+      // Sort by timestamp
+      screenshots.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    } catch (error) {
+      // Directory doesn't exist or is empty - that's fine if we have DB screenshots
+    }
+  }
+  
+  if (screenshots.length === 0) {
     console.log(`No screenshots found for user ${userId} on ${dateFolder}`);
     return [];
   }
   
-  if (screenshots.length === 0) {
-    return [];
-  }
+  console.log(`Found ${screenshots.length} screenshots for user ${userId} on ${dateFolder}`);
   
   // Get user and employee info
   const user = await User.findById(userId).select('employeeId');
@@ -73,6 +96,15 @@ async function syncScreenshotsToSessions(userId, date, models) {
   for (let i = 0; i < screenshots.length; i += SCREENSHOTS_PER_SESSION) {
     const sessionScreenshots = screenshots.slice(i, i + SCREENSHOTS_PER_SESSION);
     const sessionNumber = Math.floor(i / SCREENSHOTS_PER_SESSION) + 1;
+    
+    // Map screenshot data to match ProductivitySession schema
+    const mappedScreenshots = sessionScreenshots.map(ss => ({
+      path: ss.path, // path contains the URL or relative path (matches schema)
+      url: ss.path,  // Also keep url for frontend compatibility
+      timestamp: ss.timestamp,
+      capturedAt: ss.timestamp, // For frontend compatibility
+      filename: ss.filename
+    }));
     
     // Check if session already exists
     let session = await ProductivitySession.findOne({
@@ -91,14 +123,17 @@ async function syncScreenshotsToSessions(userId, date, models) {
         employee: employeeId,
         date: new Date(dateFolder),
         sessionNumber,
-        screenshots: sessionScreenshots,
+        screenshots: mappedScreenshots,
+        screenshotCount: mappedScreenshots.length,
         startTime: sessionScreenshots[0].timestamp,
         endTime: sessionScreenshots[sessionScreenshots.length - 1].timestamp
       });
       await session.save();
-    } else if (session.screenshotCount !== sessionScreenshots.length) {
+      console.log(`Created session ${sessionNumber} with ${mappedScreenshots.length} screenshots`);
+    } else if (session.screenshotCount !== mappedScreenshots.length) {
       // Update session with new screenshots
-      session.screenshots = sessionScreenshots;
+      session.screenshots = mappedScreenshots;
+      session.screenshotCount = mappedScreenshots.length;
       session.startTime = sessionScreenshots[0].timestamp;
       session.endTime = sessionScreenshots[sessionScreenshots.length - 1].timestamp;
       await session.save();
@@ -117,12 +152,12 @@ async function syncScreenshotsToSessions(userId, date, models) {
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['ProductivitySession', 'User', 'Employee', 'Department']);
+    const auth = await getAuthAndModels(request, ['ProductivitySession', 'User', 'Employee', 'Department', 'Screenshot']);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
     const { user, models } = auth;
-    const { ProductivitySession, User, Employee, Department } = models;
+    const { ProductivitySession, User, Employee, Department, Screenshot } = models;
 
     const currentUserId = user._id.toString();
     const currentUserRole = user.role;
@@ -194,7 +229,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['ProductivitySession', 'User', 'Employee']);
+    const auth = await getAuthAndModels(request, ['ProductivitySession', 'User', 'Employee', 'Screenshot']);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
