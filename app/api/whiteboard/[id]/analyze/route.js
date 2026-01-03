@@ -308,7 +308,7 @@ export async function POST(request, { params }) {
       // Use vision API if screenshot is provided for deeper visual understanding
       const hasScreenshot = canvasScreenshot && canvasScreenshot.length > 100;
 
-      const prompt = `You are MAYA, an insightful AI assistant analyzing a collaborative whiteboard. ${hasScreenshot ? 'You can see the actual canvas screenshot for visual context.' : ''} Look at the canvas contents and provide genuine, thoughtful analysis like a knowledgeable colleague would.
+      const prompt = `You are MIRA, an insightful AI assistant analyzing a collaborative whiteboard. ${hasScreenshot ? 'You can see the actual canvas screenshot for visual context.' : ''} Look at the canvas contents and provide genuine, thoughtful analysis like a knowledgeable colleague would.
 
 Canvas Elements:
 ${canvasDescription}
@@ -366,13 +366,13 @@ Be genuinely helpful and insightful rather than just describing what you see. Sh
       // Build conversation context
       const canvasDescription = describeCanvasObjects(whiteboard.pages);
       const previousMessages = whiteboard.aiAnalysis.messages.slice(-10).map(m =>
-        `${m.role === 'user' ? 'User' : 'MAYA'}: ${m.content}`
+        `${m.role === 'user' ? 'User' : 'MIRA'}: ${m.content}`
       ).join('\n\n');
 
       // Check if screenshot was provided for visual context
       const hasScreenshot = canvasScreenshot && canvasScreenshot.length > 100;
 
-      const context = `You are MAYA, an insightful AI assistant helping with a collaborative whiteboard. ${hasScreenshot ? 'You can see the actual canvas screenshot for visual understanding.' : ''} Respond naturally without any markdown formatting, bullet points, asterisks, dashes, numbered lists, emojis, or special characters. Write in flowing prose like a helpful colleague.
+      const context = `You are MIRA, an insightful AI assistant helping with a collaborative whiteboard. ${hasScreenshot ? 'You can see the actual canvas screenshot for visual understanding.' : ''} Respond naturally without any markdown formatting, bullet points, asterisks, dashes, numbered lists, emojis, or special characters. Write in flowing prose like a helpful colleague.
 
 Canvas Contents:
 ${canvasDescription}
@@ -534,7 +534,7 @@ POSITIONING STRATEGY:
 7. Layout: Organic/scattered but not overlapping`;
       }
 
-      const generatePrompt = `You are MAYA, an elite creative consultant and visual thinking expert. You transform ideas into stunning, professional whiteboard visualizations that inspire and clarify.
+      const generatePrompt = `You are MIRA, an elite creative consultant and visual thinking expert. You transform ideas into stunning, professional whiteboard visualizations that inspire and clarify.
 
 ═══════════════════════════════════════════════════════════
 🎯 YOUR MISSION
@@ -863,7 +863,7 @@ Return ONLY this JSON structure (no markdown, no explanation):
       const safeStartX = Math.round(layout.bounds.minX || 100);
 
       // Build continuation prompt
-      const continuePrompt = `You are MAYA, continuing to build a professional whiteboard visualization.
+      const continuePrompt = `You are MIRA, continuing to build a professional whiteboard visualization.
 
 ═══════════════════════════════════════════════════════════
 EXISTING CANVAS (${layout.objectCount} elements):
@@ -1046,7 +1046,7 @@ Return ONLY valid JSON:
       const layout = analyzeLayout(existingObjects);
       const existingCanvasDescription = describeCanvasObjects(whiteboard.pages);
 
-      const restructurePrompt = `You are MAYA, an expert at cleaning up and professionalizing whiteboard diagrams.
+      const restructurePrompt = `You are MIRA, an expert at cleaning up and professionalizing whiteboard diagrams.
 
 CURRENT CANVAS STATE:
 ${existingCanvasDescription}

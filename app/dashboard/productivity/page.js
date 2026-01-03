@@ -21,6 +21,7 @@ import {
 import RawCaptureViewer from '@/components/productivity/RawCaptureViewer'
 import ManualCapturePanel from '@/components/productivity/ManualCapturePanel'
 import ModalPortal from '@/components/ModalPortal'
+import { useAILoading } from '@/contexts/AILoadingContext'
 
 export default function ProductivityPage() {
   const [user, setUser] = useState(null)
@@ -36,6 +37,9 @@ export default function ProductivityPage() {
   const [viewMode, setViewMode] = useState('sessions') // 'sessions', 'raw', 'manual'
   const [selectedTeamMember, setSelectedTeamMember] = useState(null) // For viewing team member's raw captures
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0) // For screenshot slider in modal
+  
+  // Global AI loading animation
+  const { startAILoading, stopAILoading } = useAILoading()
 
   // Get user from localStorage
   useEffect(() => {
@@ -130,6 +134,7 @@ export default function ProductivityPage() {
   const analyzeSession = async (sessionId) => {
     try {
       setAnalyzing(true)
+      startAILoading('MIRA is analyzing your productivity session...')
       const res = await fetch(`/api/productivity/sessions/${sessionId}/analyze`, {
         method: 'POST'
       })
@@ -153,6 +158,7 @@ export default function ProductivityPage() {
       alert('Analysis failed: Network error')
     } finally {
       setAnalyzing(false)
+      stopAILoading()
     }
   }
 

@@ -19,6 +19,7 @@ import {
 } from 'react-icons/hi2'
 import { FaSpinner } from 'react-icons/fa'
 import toast from '@/utils/toast'
+import { useAILoading } from '@/contexts/AILoadingContext'
 
 const CATEGORIES = [
   { value: 'process_improvement', label: 'Process', Icon: HiOutlineCog6Tooth },
@@ -43,6 +44,9 @@ export default function CreateIdeaModal({ isOpen, onClose, onSuccess }) {
   })
   const [submitting, setSubmitting] = useState(false)
   const [aiExpanding, setAiExpanding] = useState(false)
+  
+  // Global AI loading animation
+  const { startAILoading, stopAILoading } = useAILoading()
 
   useEffect(() => {
     setMounted(true)
@@ -107,6 +111,7 @@ export default function CreateIdeaModal({ isOpen, onClose, onSuccess }) {
     }
 
     setAiExpanding(true)
+    startAILoading('MIRA is expanding your idea...')
     try {
       const token = localStorage.getItem('token')
       const res = await fetch('/api/ideas/expand', {
@@ -134,6 +139,7 @@ export default function CreateIdeaModal({ isOpen, onClose, onSuccess }) {
       toast.error('Failed to expand idea with AI')
     } finally {
       setAiExpanding(false)
+      stopAILoading()
     }
   }
 

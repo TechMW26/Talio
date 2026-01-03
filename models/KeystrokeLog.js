@@ -31,7 +31,7 @@ const KeystrokeLogSchema = new mongoose.Schema({
   textContent: {
     type: String,
     default: '',
-    index: 'text' // Full-text search for MAYA context
+    index: 'text' // Full-text search for MIRA context
   },
   // Application/Window context
   windowTitle: String,

@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useRef, useEffect, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
-import MayaLoadingOverlay from '@/components/ui/MayaLoadingOverlay';
+import MiraLoadingOverlay from '@/components/ui/MiraLoadingOverlay';
+import { useAILoading } from '@/contexts/AILoadingContext';
 
 // Utility functions
 const generateId = () => `obj-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -197,6 +198,9 @@ const WhiteboardCanvas = forwardRef(({
   const [aiLoading, setAiLoading] = useState(false);
   const [aiInput, setAiInput] = useState('');
   const [aiError, setAiError] = useState(null);
+  
+  // Global AI loading animation
+  const { startAILoading, stopAILoading } = useAILoading();
   const [showAgentMode, setShowAgentMode] = useState(false);
   const aiPanelRef = useRef(null);
   const aiMessagesEndRef = useRef(null);
@@ -1333,7 +1337,7 @@ const WhiteboardCanvas = forwardRef(({
     const point = getCanvasPoint(e);
     setStartPoint(point);
 
-    // Close ALL toolbox panels when clicking on canvas (except MAYA panel)
+    // Close ALL toolbox panels when clicking on canvas (except MIRA panel)
     setShowElementOptions(false);
     setShowLineOptions(false);
     setShowShapeOptions(false);
@@ -2367,6 +2371,7 @@ const WhiteboardCanvas = forwardRef(({
 
     setAiLoading(true);
     setAiError(null);
+    startAILoading('MIRA is analyzing your canvas...');
 
     // Start scanning animation
     startScanAnimation();
@@ -2400,8 +2405,9 @@ const WhiteboardCanvas = forwardRef(({
       setAiError(error.message);
     } finally {
       setAiLoading(false);
+      stopAILoading();
     }
-  }, [boardId, objects.length, startScanAnimation, captureCanvasScreenshot]);
+  }, [boardId, objects.length, startScanAnimation, captureCanvasScreenshot, startAILoading, stopAILoading]);
 
   // Smoothly zoom and pan to fit all content
   const smoothZoomToFitContent = useCallback((newObjects = []) => {
@@ -2531,14 +2537,16 @@ const WhiteboardCanvas = forwardRef(({
     if (!message.trim()) return;
 
     // Check if there's a pending template
-    const templateType = window.__mayaTemplateType;
+    const templateType = window.__miraTemplateType;
     if (templateType) {
-      window.__mayaTemplateType = null;
-      window.__mayaTemplatePrompt = null;
+      window.__miraTemplateType = null;
+      window.__miraTemplatePrompt = null;
     }
 
     setAiLoading(true);
     setAiError(null);
+    startAILoading(showAgentMode ? 'MIRA is generating your diagram...' : 'MIRA is thinking...');
+    startAILoading(showAgentMode ? 'MIRA is generating your diagram...' : 'MIRA is thinking...');
 
     // Start scanning animation for visual processing
     startScanAnimation();
@@ -2651,8 +2659,8 @@ const WhiteboardCanvas = forwardRef(({
     setAiInput('');
 
     // Set a flag to indicate we're waiting for user content
-    window.__mayaTemplateType = templateType;
-    window.__mayaTemplatePrompt = promptMessage;
+    window.__miraTemplateType = templateType;
+    window.__miraTemplatePrompt = promptMessage;
 
     setAiLoading(false);
   }, []);
@@ -2661,6 +2669,7 @@ const WhiteboardCanvas = forwardRef(({
   const continueGeneration = useCallback(async () => {
     setAiLoading(true);
     setAiError(null);
+    startAILoading('MIRA is continuing generation...');
 
     try {
       const token = localStorage.getItem('token');
@@ -2706,8 +2715,9 @@ const WhiteboardCanvas = forwardRef(({
       setAiError(error.message);
     } finally {
       setAiLoading(false);
+      stopAILoading();
     }
-  }, [boardId, saveHistory, setPages, animateNewObjects, smoothZoomToFitContent]);
+  }, [boardId, saveHistory, setPages, animateNewObjects, smoothZoomToFitContent, startAILoading, stopAILoading]);
 
   // Restructure the canvas - clean up layout, align elements, fix spacing
   const restructureCanvas = useCallback(async () => {
@@ -2718,6 +2728,7 @@ const WhiteboardCanvas = forwardRef(({
 
     setAiLoading(true);
     setAiError(null);
+    startAILoading('MIRA is restructuring your canvas...');
 
     try {
       const token = localStorage.getItem('token');
@@ -2748,8 +2759,9 @@ const WhiteboardCanvas = forwardRef(({
       setAiError(error.message);
     } finally {
       setAiLoading(false);
+      stopAILoading();
     }
-  }, [boardId, objects.length, saveHistory, setPages]);
+  }, [boardId, objects.length, saveHistory, setPages, startAILoading, stopAILoading]);
 
   const clearAIHistory = useCallback(async () => {
     setAiLoading(true);
@@ -3103,10 +3115,10 @@ const WhiteboardCanvas = forwardRef(({
 
   return (
     <div className="h-full w-full relative overflow-hidden" style={{ background: '#fffbf5' }}>
-      {/* Maya Loading Overlay for initial AI analysis */}
-      <MayaLoadingOverlay
+      {/* MIRA Loading Overlay for initial AI analysis */}
+      <MiraLoadingOverlay
         isLoading={aiLoading && !showAIPanel && (aiAnalysis?.messages?.length || 0) === 0}
-        message="MAYA is analyzing your canvas..."
+        message="MIRA is analyzing your canvas..."
         fullScreen={false}
       />
 
@@ -3144,7 +3156,7 @@ const WhiteboardCanvas = forwardRef(({
           style={{ cursor: tool === 'pan' ? 'grab' : tool === 'eraser' ? 'none' : tool === 'select' ? 'default' : 'crosshair' }}
         />
 
-        {/* MAYA Scanning Wave Effect */}
+        {/* MIRA Scanning Wave Effect */}
         {isScanningCanvas && (
           <div className="absolute inset-0 pointer-events-none overflow-hidden">
             {/* Scanning wave line */}
@@ -4915,7 +4927,7 @@ const WhiteboardCanvas = forwardRef(({
             hover:scale-[1.02] active:scale-[0.98]
             ${showAIPanel ? 'ring-2 ring-violet-400/40 bg-white/30' : ''}
           `}
-          title="Analyse with MAYA"
+          title="Analyse with MIRA"
         >
           {/* Icon */}
           <div className="relative flex items-center justify-center w-6 h-6">
@@ -4930,7 +4942,7 @@ const WhiteboardCanvas = forwardRef(({
           </div>
 
           {/* Text */}
-          <span className="text-sm font-medium text-gray-700">Analyse with MAYA</span>
+          <span className="text-sm font-medium text-gray-700">Analyse with MIRA</span>
 
           {/* Pulse effect when has content */}
           {aiAnalysis.messages.length > 0 && (
@@ -4962,7 +4974,7 @@ const WhiteboardCanvas = forwardRef(({
                   </svg>
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-800">MAYA Canvas Analysis</h3>
+                  <h3 className="text-sm font-semibold text-gray-800">MIRA Canvas Analysis</h3>
                   <p className="text-xs text-gray-500">AI-powered insights</p>
                 </div>
               </div>
@@ -5051,7 +5063,7 @@ const WhiteboardCanvas = forwardRef(({
                       <span className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
                       <span className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                     </div>
-                    <span className="text-xs text-gray-500">MAYA is thinking...</span>
+                    <span className="text-xs text-gray-500">MIRA is thinking...</span>
                   </div>
                 </div>
               </div>
@@ -5098,7 +5110,7 @@ const WhiteboardCanvas = forwardRef(({
                     sendAIMessage(aiInput);
                   }
                 }}
-                placeholder={showAgentMode ? "Describe what to create...\n(Ctrl+Enter to send)" : "Ask MAYA about your canvas...\n(Ctrl+Enter to send)"}
+                placeholder={showAgentMode ? "Describe what to create...\n(Ctrl+Enter to send)" : "Ask MIRA about your canvas...\n(Ctrl+Enter to send)"}
                 rows={2}
                 className="flex-1 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl
                   bg-white/50 backdrop-blur-[5px]

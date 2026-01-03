@@ -14,6 +14,7 @@ import {
   FaTimesCircle, FaQuestionCircle, FaInfoCircle
 } from 'react-icons/fa'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useAILoading } from '@/contexts/AILoadingContext'
 
 // Custom tooltip for charts
 const ChartTooltip = ({ active, payload, label }) => {
@@ -55,6 +56,9 @@ export default function ProjectOverview({ projectId }) {
   const [aiInsights, setAiInsights] = useState(null)
   const [error, setError] = useState(null)
   const [activeSection, setActiveSection] = useState('overview')
+  
+  // Global AI loading animation
+  const { startAILoading, stopAILoading } = useAILoading()
 
   // Theme-aware colors
   const colors = useMemo(() => ({
@@ -104,6 +108,7 @@ export default function ProjectOverview({ projectId }) {
   const fetchAIInsights = async (analyticsData) => {
     try {
       setAiLoading(true)
+      startAILoading('MIRA is analyzing project insights...')
       const token = localStorage.getItem('token')
       
       const response = await fetch(`/api/projects/${projectId}/analytics`, {
@@ -124,6 +129,7 @@ export default function ProjectOverview({ projectId }) {
       console.error('Fetch AI insights error:', err)
     } finally {
       setAiLoading(false)
+      stopAILoading()
     }
   }
 

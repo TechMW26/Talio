@@ -69,8 +69,8 @@ async function main() {
     console.log('\n🎉 Vector search is working correctly!\n');
     console.log('✅ Next steps:');
     console.log('   1. Start your app: npm run dev');
-    console.log('   2. Test the API: POST /api/maya/vector-search');
-    console.log('   3. Test MAYA chat: POST /api/maya/chat-with-context\n');
+    console.log('   2. Test the API: POST /api/mira/vector-search');
+    console.log('   3. Test MIRA chat: POST /api/mira/chat-with-context\n');
 
     process.exit(0);
   } catch (error) {

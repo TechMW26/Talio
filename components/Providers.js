@@ -2,6 +2,8 @@
 
 import { useEffect, useCallback } from 'react'
 import { ThemeProvider } from '@/contexts/ThemeContext'
+import { AILoadingProvider } from '@/contexts/AILoadingContext'
+import GlobalAILoadingOverlay from '@/components/ui/GlobalAILoadingOverlay'
 
 // Cache operations completely disabled - no imports needed
 // import { checkAndClearCaches } from '@/lib/cacheManager'
@@ -67,7 +69,10 @@ export function Providers({ children }) {
 
     return (
         <ThemeProvider>
-            {children}
+            <AILoadingProvider>
+                <GlobalAILoadingOverlay />
+                {children}
+            </AILoadingProvider>
         </ThemeProvider>
     )
 }

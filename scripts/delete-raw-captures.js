@@ -8,9 +8,9 @@ async function deleteOldData() {
     await mongoose.connect(uri);
     console.log('Connected to MongoDB');
     
-    // Delete MayaScreenSummary data
-    const mayaResult = await mongoose.connection.db.collection('mayascreensummaries').deleteMany({});
-    console.log('Deleted MayaScreenSummary:', mayaResult.deletedCount, 'documents');
+    // Delete MiraScreenSummary data
+    const miraResult = await mongoose.connection.db.collection('mirascreensummaries').deleteMany({});
+    console.log('Deleted MiraScreenSummary:', miraResult.deletedCount, 'documents');
     
     // Delete ProductivityData 
     const prodResult = await mongoose.connection.db.collection('productivitydatas').deleteMany({});

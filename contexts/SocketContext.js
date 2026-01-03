@@ -183,8 +183,8 @@ export function SocketProvider({ children }) {
 
     setSocket(socketInstance)
 
-    // Expose socket globally for MAYA to use
-    window.__MAYA_SOCKET__ = socketInstance
+    // Expose socket globally for MIRA to use
+    window.__MIRA_SOCKET__ = socketInstance
 
     // Cleanup on unmount
     return () => {
@@ -192,8 +192,8 @@ export function SocketProvider({ children }) {
         socketInstance.disconnect()
       }
       // Clean up global reference
-      if (window.__MAYA_SOCKET__ === socketInstance) {
-        delete window.__MAYA_SOCKET__
+      if (window.__MIRA_SOCKET__ === socketInstance) {
+        delete window.__MIRA_SOCKET__
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

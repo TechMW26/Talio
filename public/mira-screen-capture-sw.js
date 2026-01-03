@@ -1,5 +1,5 @@
 /**
- * MAYA Screen Capture Service Worker
+ * MIRA Screen Capture Service Worker
  * 
  * This service worker is a placeholder. Actual background screen capture
  * is NOT possible in web browsers due to security restrictions.
@@ -13,7 +13,7 @@
  */
 
 const SW_VERSION = '1.0.0';
-const SW_NAME = 'maya-screen-capture-sw';
+const SW_NAME = 'mira-screen-capture-sw';
 
 // Log service worker activation
 self.addEventListener('install', (event) => {
@@ -63,7 +63,7 @@ self.addEventListener('message', (event) => {
 
 // Periodic background sync (if supported)
 self.addEventListener('periodicsync', (event) => {
-  if (event.tag === 'maya-screen-capture') {
+  if (event.tag === 'mira-screen-capture') {
     // Note: Cannot actually capture screen here due to browser restrictions
     console.log(`[${SW_NAME}] Periodic sync triggered, but screen capture not available in browser`);
   }

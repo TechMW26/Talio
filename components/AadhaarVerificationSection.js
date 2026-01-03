@@ -16,6 +16,7 @@ import {
 } from 'react-icons/fa'
 import toast from '@/utils/toast'
 import ModalPortal from '@/components/ModalPortal'
+import { useAILoading } from '@/contexts/AILoadingContext'
 
 /**
  * AadhaarVerificationSection
@@ -42,6 +43,9 @@ export default function AadhaarVerificationSection({
 
   const frontInputRef = useRef(null)
   const backInputRef = useRef(null)
+  
+  // Global AI loading animation
+  const { startAILoading, stopAILoading } = useAILoading()
 
   // Load existing uploads on mount
   useEffect(() => {
@@ -188,6 +192,7 @@ export default function AadhaarVerificationSection({
     }
 
     setVerifying(true)
+    startAILoading('MIRA is verifying your Aadhaar documents...')
 
     try {
       const token = localStorage.getItem('token')
@@ -234,6 +239,7 @@ export default function AadhaarVerificationSection({
       setVerificationStatus('failed')
     } finally {
       setVerifying(false)
+      stopAILoading()
     }
   }
 

@@ -37,7 +37,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   // Dashboard button
   document.getElementById('dashboard-btn').addEventListener('click', () => {
-    chrome.tabs.create({ url: 'https://app.tailo.work/dashboard/maya/activity-history' });
+    chrome.tabs.create({ url: 'https://app.tailo.work/dashboard/mira/activity-history' });
   });
   
   // Pause button

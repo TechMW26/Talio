@@ -18,8 +18,8 @@ function question(query) {
 }
 
 async function main() {
-  console.log('\n🚀 MAYA Vector Database Setup Wizard\n');
-  console.log('This wizard will help you set up vector search for MAYA.\n');
+  console.log('\n🚀 MIRA Vector Database Setup Wizard\n');
+  console.log('This wizard will help you set up vector search for MIRA.\n');
 
   // Step 1: Check environment variables
   console.log('📋 Step 1: Environment Variables\n');
@@ -183,10 +183,10 @@ async function main() {
         console.log('\n✅ Embedding generation complete!\n');
         console.log('📋 Next Steps:\n');
         console.log('1. Test the API: npm run dev');
-        console.log('2. Try a search: curl -X POST http://localhost:3000/api/maya/vector-search \\');
+        console.log('2. Try a search: curl -X POST http://localhost:3000/api/mira/vector-search \\');
         console.log('     -H "Content-Type: application/json" \\');
         console.log('     -d \'{"query": "company events", "type": "announcements"}\'');
-        console.log('\n🎉 Setup complete! MAYA now has vector search capabilities!\n');
+        console.log('\n🎉 Setup complete! MIRA now has vector search capabilities!\n');
       } else {
         console.log('\n❌ Embedding generation failed. Check the error above.\n');
       }

@@ -561,7 +561,7 @@ export function InAppNotificationProvider({ children }) {
   return (
     <InAppNotificationContext.Provider value={{ showNotification }}>
       {children}
-      {/* Render notifications - z-index higher than Maya (2147483647) */}
+      {/* Render notifications - z-index higher than MIRA (2147483647) */}
       <div className="fixed top-20 md:top-4 right-0 left-0 md:left-auto md:right-4 pointer-events-none" style={{ zIndex: 2147483648 }}>
         <div className="flex flex-col gap-3 p-4 md:p-0 pointer-events-auto max-w-sm mx-auto md:mx-0">
           {notifications.map((notification) => (

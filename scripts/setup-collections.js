@@ -13,8 +13,8 @@ async function setupDB() {
     'leaves', 'attendances', 'payrolls', 'announcements', 'policies',
     'assets', 'expenses', 'travels', 'helpdesks', 'tasks', 'chats',
     'chatmessages', 'notifications', 'documents', 'performances',
-    'recruitments', 'candidates', 'mayamessages', 'mayaactionlogs',
-    'mayaformatteddatas', 'activitylogs', 'screenshots', 'settings',
+    'recruitments', 'candidates', 'miramessages', 'miraactionlogs',
+    'miraformatteddatas', 'activitylogs', 'screenshots', 'settings',
     'shifts', 'holidays', 'leavebalances', 'overtimes', 'payrollsettings'
   ];
   

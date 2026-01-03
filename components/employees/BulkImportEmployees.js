@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import toast from '@/utils/toast'
+import { useAILoading } from '@/contexts/AILoadingContext'
 import { 
   FaUpload, 
   FaFileExcel, 
@@ -33,6 +34,9 @@ export default function BulkImportEmployees() {
   // Inline editing state
   const [editingCell, setEditingCell] = useState(null) // { rowIdx, fieldKey }
   const [editValue, setEditValue] = useState('')
+  
+  // Global AI loading animation
+  const { startAILoading, stopAILoading } = useAILoading()
 
   // Handle row selection toggle
   const toggleRowSelection = (rowIdx) => {
@@ -150,6 +154,7 @@ export default function BulkImportEmployees() {
     setFile(selectedFile)
     setImportResult(null)
     setPreviewLoading(true)
+    startAILoading('MIRA is analyzing your Excel file...')
 
     // Call preview API to get AI-mapped data
     try {
@@ -186,6 +191,7 @@ export default function BulkImportEmployees() {
       setPreview(null)
     } finally {
       setPreviewLoading(false)
+      stopAILoading()
     }
   }
 
@@ -405,7 +411,7 @@ export default function BulkImportEmployees() {
       {previewLoading && (
         <div className="bg-purple-50 border border-purple-200 rounded-lg p-6 text-center">
           <FaSpinner className="animate-spin text-3xl text-purple-600 mx-auto mb-3" />
-          <p className="text-purple-800 font-medium">MAYA is analyzing your Excel file.</p>
+          <p className="text-purple-800 font-medium">MIRA is analyzing your Excel file.</p>
           <p className="text-purple-600 text-sm mt-1">Detecting columns, extracting data, and mapping to our template</p>
         </div>
       )}

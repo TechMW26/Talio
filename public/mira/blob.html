@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Maya</title>
+  <title>MIRA</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body {
@@ -15,7 +15,7 @@
       /* Ensure no background at all */
       background-color: transparent !important;
     }
-    .maya-blob-shell {
+    .mira-blob-shell {
       position: fixed;
       width: 120px;
       height: 120px;
@@ -26,7 +26,7 @@
       cursor: move;
       background: transparent !important;
     }
-    .maya-blob-card {
+    .mira-blob-card {
       position: relative;
       width: 72px;
       height: 72px;
@@ -36,10 +36,10 @@
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       background: transparent !important;
     }
-    .maya-blob-card:hover { transform: scale(1.1); }
-    .maya-blob-card:active { transform: scale(0.95); }
-    .maya-blob-card::before,
-    .maya-blob-card::after {
+    .mira-blob-card:hover { transform: scale(1.1); }
+    .mira-blob-card:active { transform: scale(0.95); }
+    .mira-blob-card::before,
+    .mira-blob-card::after {
       content: "";
       position: absolute;
       top: 50%;
@@ -52,23 +52,23 @@
       opacity: 0;
       pointer-events: none;
     }
-    .maya-blob-card.speaking::before { animation: maya-pulse-ring 1.5s ease-out infinite; }
-    .maya-blob-card.speaking::after { animation: maya-pulse-ring 1.5s ease-out infinite 0.75s; }
-    @keyframes maya-pulse-ring {
+    .mira-blob-card.speaking::before { animation: mira-pulse-ring 1.5s ease-out infinite; }
+    .mira-blob-card.speaking::after { animation: mira-pulse-ring 1.5s ease-out infinite 0.75s; }
+    @keyframes mira-pulse-ring {
       0% { transform: translate(-50%, -50%) scale(0.8); opacity: 1; }
       100% { transform: translate(-50%, -50%) scale(2.5); opacity: 0; }
     }
-    .maya-blob-card.speaking {
+    .mira-blob-card.speaking {
       filter: drop-shadow(0 0 60px rgba(77, 255, 163, 1)) drop-shadow(0 0 30px rgba(77, 255, 200, 0.8));
-      animation: maya-blob-speak-pulse 0.6s ease-in-out infinite;
+      animation: mira-blob-speak-pulse 0.6s ease-in-out infinite;
     }
-    @keyframes maya-blob-speak-pulse {
+    @keyframes mira-blob-speak-pulse {
       0%, 100% { transform: scale(1); }
       25% { transform: scale(1.15); }
       50% { transform: scale(1.08); }
       75% { transform: scale(1.2); }
     }
-    .maya-blob-canvas {
+    .mira-blob-canvas {
       position: absolute;
       inset: 0;
       width: 100%;
@@ -78,14 +78,14 @@
   </style>
 </head>
 <body>
-  <div class="maya-blob-shell" id="mayaBlobShell" title="Click to open MAYA">
-    <div class="maya-blob-card" id="mayaBlobCard">
-      <canvas class="maya-blob-canvas" id="mayaBlobCanvas"></canvas>
+  <div class="mira-blob-shell" id="miraBlobShell" title="Click to open MIRA">
+    <div class="mira-blob-card" id="miraBlobCard">
+      <canvas class="mira-blob-canvas" id="miraBlobCanvas"></canvas>
     </div>
   </div>
   <script>
-    const card = document.getElementById('mayaBlobCard');
-    const canvas = document.getElementById('mayaBlobCanvas');
+    const card = document.getElementById('miraBlobCard');
+    const canvas = document.getElementById('miraBlobCanvas');
     const ctx = canvas.getContext('2d');
     const COLORS = [
       { start: 'rgba(77, 255, 163, 0.9)', end: 'rgba(0, 200, 150, 0.3)' },
@@ -162,8 +162,8 @@
     initBlobs();
     animate(0);
 
-    // Click handler for blob - opens Maya widget
-    const shell = document.getElementById('mayaBlobShell');
+    // Click handler for blob - opens MIRA widget
+    const shell = document.getElementById('miraBlobShell');
     
     // Dragging state for Windows compatibility
     let isDragging = false;
@@ -179,25 +179,25 @@
       
       e.preventDefault();
       e.stopPropagation();
-      console.log('[Maya Blob] Click detected, opening widget...');
+      console.log('[MIRA Blob] Click detected, opening widget...');
       
       if (window.talioDesktop) {
-        console.log('[Maya Blob] talioDesktop available, calling expandWidget');
+        console.log('[MIRA Blob] talioDesktop available, calling expandWidget');
         try {
           window.talioDesktop.expandWidget().then(() => {
-            console.log('[Maya Blob] Widget expanded successfully');
+            console.log('[MIRA Blob] Widget expanded successfully');
           }).catch(err => {
-            console.error('[Maya Blob] expandWidget failed:', err);
-            // Fallback to openMayaFromBlob
-            if (window.talioDesktop.openMayaFromBlob) {
-              window.talioDesktop.openMayaFromBlob();
+            console.error('[MIRA Blob] expandWidget failed:', err);
+            // Fallback to openMiraFromBlob
+            if (window.talioDesktop.openMiraFromBlob) {
+              window.talioDesktop.openMiraFromBlob();
             }
           });
         } catch (err) {
-          console.error('[Maya Blob] Error calling expandWidget:', err);
+          console.error('[MIRA Blob] Error calling expandWidget:', err);
         }
       } else {
-        console.error('[Maya Blob] talioDesktop not available!');
+        console.error('[MIRA Blob] talioDesktop not available!');
       }
     }
     

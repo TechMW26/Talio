@@ -54,7 +54,7 @@ module.exports = {
         'theme-hover': 'var(--color-bg-hover, #EFF6FF)',
       },
       zIndex: {
-        'maya': '2147483647', // Maximum z-index for MAYA to appear above everything
+        'mira': '2147483647', // Maximum z-index for MIRA to appear above everything
       },
     },
   },

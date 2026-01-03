@@ -6,6 +6,7 @@ import * as XLSX from 'xlsx'
 import { FaDownload, FaChartBar, FaUsers, FaTrophy, FaCalendarAlt, FaFilter, FaRobot, FaSpinner, FaFileExcel, FaChevronDown, FaChevronUp, FaBrain, FaStar, FaAward, FaTasks, FaBullseye, FaSearch } from 'react-icons/fa'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Area, AreaChart } from 'recharts'
 import CustomTooltip from '@/components/charts/CustomTooltip'
+import { useAILoading } from '@/contexts/AILoadingContext'
 
 export default function PerformanceReportsPage() {
   const [loading, setLoading] = useState(true)
@@ -25,6 +26,9 @@ export default function PerformanceReportsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [isDepartmentHead, setIsDepartmentHead] = useState(false)
   const [userDepartmentId, setUserDepartmentId] = useState(null)
+  
+  // Global AI loading animation
+  const { startAILoading, stopAILoading } = useAILoading()
 
   useEffect(() => {
     const userData = localStorage.getItem('user')
@@ -461,6 +465,7 @@ export default function PerformanceReportsPage() {
     }
 
     setGeneratingInsights(true)
+    startAILoading('MIRA is generating performance insights...')
     try {
       const token = localStorage.getItem('token')
       const response = await fetch('/api/performance/ai-insights', {
@@ -484,6 +489,7 @@ export default function PerformanceReportsPage() {
       toast.error('Failed to generate AI insights')
     } finally {
       setGeneratingInsights(false)
+      stopAILoading()
     }
   }
 

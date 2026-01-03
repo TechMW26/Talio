@@ -139,7 +139,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
   }
 
   // Get menu items based on user role (memoized)
-  // NOTE: MAYA AI Assistant has been removed from web - only available in desktop apps
+  // NOTE: MIRA AI Assistant has been removed from web - only available in desktop apps
   const menuItems = useMemo(() => {
     if (!user) return []
     let baseMenuItems = getMenuItemsForRole(user.role)

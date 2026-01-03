@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useAILoading } from '@/contexts/AILoadingContext';
 import {
   FaInbox, FaPaperPlane, FaFile, FaTrash, FaStar, FaSearch,
   FaTimes, FaEnvelope, FaReply,
@@ -78,6 +79,9 @@ export default function MailPage() {
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiTone, setAiTone] = useState('professional');
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
+  
+  // Global AI loading animation
+  const { startAILoading, stopAILoading } = useAILoading();
 
   // Multi-account support
   const [accounts, setAccounts] = useState([]);
@@ -283,6 +287,7 @@ export default function MailPage() {
     if (!aiPrompt.trim()) return;
 
     setIsGeneratingAi(true);
+    startAILoading('MIRA is composing your email...');
     try {
       const token = localStorage.getItem('token');
       
@@ -319,6 +324,7 @@ export default function MailPage() {
       console.error('AI generation error:', error);
     } finally {
       setIsGeneratingAi(false);
+      stopAILoading();
     }
   };
 

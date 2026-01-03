@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-import { getEmployeeProjectSummaryForMaya } from '@/lib/projectPerformance'
+import { getEmployeeProjectSummaryForMira } from '@/lib/projectPerformance'
 import { generateSmartContent } from '@/lib/promptEngine'
 
 export const dynamic = 'force-dynamic'
@@ -15,7 +15,7 @@ export async function GET(request) {
     const { user, models } = auth
 
     const employeeId = user.employeeId?._id || user.employeeId || user._id
-    const summary = await getEmployeeProjectSummaryForMaya(employeeId, models)
+    const summary = await getEmployeeProjectSummaryForMira(employeeId, models)
 
     // Use AI to generate a natural language summary
     const prompt = `

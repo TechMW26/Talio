@@ -144,13 +144,13 @@ const UserSchema = new mongoose.Schema({
     attendance: { type: Boolean, default: true },
     announcements: { type: Boolean, default: true }
   },
-  // Maya AI Assistant preferences
-  mayaPreferences: {
+  // MIRA AI Assistant preferences
+  miraPreferences: {
     lastGreetingDate: { type: String }, // YYYY-MM-DD format to track daily greeting
     autoGreetingEnabled: { type: Boolean, default: true },
     voiceEnabled: { type: Boolean, default: true }
   },
-  lastMayaGreeting: { type: Date }, // Track last greeting timestamp
+  lastMiraGreeting: { type: Date }, // Track last greeting timestamp
   // General settings
   settings: {
     screenshotInterval: { type: Number, default: 5 }, // minutes

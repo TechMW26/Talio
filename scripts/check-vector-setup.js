@@ -69,9 +69,9 @@ async function main() {
     console.log('   - Use the JSON definition from MONGODB_ATLAS_VECTOR_SETUP.md\n');
     console.log('2. Once indexes are "Active", test vector search:');
     console.log('   - Run: node scripts/test-vector-search.js\n');
-    console.log('3. Start using MAYA with vector context:');
+    console.log('3. Start using MIRA with vector context:');
     console.log('   - Run: npm run dev');
-    console.log('   - Test: POST /api/maya/chat-with-context\n');
+    console.log('   - Test: POST /api/mira/chat-with-context\n');
 
   } catch (error) {
     console.error('\n❌ Error:', error.message);

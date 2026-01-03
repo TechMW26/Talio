@@ -36,7 +36,7 @@ async function validateOpenAIKey() {
       
       const data = await response.json();
       console.log(`📊 Available models: ${data.data.length}`);
-      console.log('🎉 MAYA is ready to chat!\n');
+      console.log('🎉 MIRA is ready to chat!\n');
       
       process.exit(0);
     } else {

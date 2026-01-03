@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-import { getTodaysTasks, getUserProjectsSummaryForMaya } from '@/lib/projectService'
+import { getTodaysTasks, getUserProjectsSummaryForMira } from '@/lib/projectService'
 
 // GET - Get user's tasks (today's, pending, all)
 export async function GET(request) {

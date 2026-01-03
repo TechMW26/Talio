@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
+import { useAILoading } from '@/contexts/AILoadingContext'
 import { 
   FaPlus, FaEdit, FaTrash, FaCalendarAlt, FaSync, FaRobot, 
   FaList, FaTh, FaChevronLeft, FaChevronRight 
@@ -48,6 +49,9 @@ export default function HolidaysPage() {
 
   // Real-time updates
   const { socket, isConnected, subscribe, onHolidayUpdate } = useSocket()
+  
+  // Global AI loading animation
+  const { startAILoading, stopAILoading } = useAILoading()
 
   useEffect(() => {
     fetchHolidays()
@@ -128,6 +132,7 @@ export default function HolidaysPage() {
     }
 
     setFetchingAi(true)
+    startAILoading('MIRA is fetching holidays for ' + aiForm.country + '...')
     try {
       const token = localStorage.getItem('token')
       const response = await fetch('/api/holidays/fetch-ai', {
@@ -152,6 +157,7 @@ export default function HolidaysPage() {
       toast.error('Failed to fetch holidays with AI')
     } finally {
       setFetchingAi(false)
+      stopAILoading()
     }
   }
 
@@ -681,7 +687,7 @@ export default function HolidaysPage() {
             <form onSubmit={handleAiFetch}>
               <div className="modal-body space-y-4">
                 <p className="text-sm text-gray-600">
-                  Automatically fetch and populate public holidays for a specific country using MAYA AI.
+                  Automatically fetch and populate public holidays for a specific country using MIRA AI.
                 </p>
                 
                 <div>

@@ -25,7 +25,7 @@ import {
 } from 'react-icons/hi2'
 
 // Define menu items for each role
-// NOTE: MAYA AI Assistant is only available in the desktop apps (Mac/Windows) via floating widget
+// NOTE: MIRA AI Assistant is only available in the desktop apps (Mac/Windows) via floating widget
 // It has been removed from the web version entirely
 export const roleBasedMenus = {
   // ADMIN - Full access to everything
