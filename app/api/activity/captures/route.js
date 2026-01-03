@@ -151,29 +151,38 @@ export async function GET(request) {
       });
     }
 
+    // Ensure targetUserId is a string for path operations
+    const targetUserIdStr = targetUserId.toString();
+
     // Read captures from filesystem
-    const activityDir = path.join(process.cwd(), 'public', 'activity', targetUserId, dateParam);
+    const activityDir = path.join(process.cwd(), 'public', 'activity', targetUserIdStr, dateParam);
     let captures = [];
     const seenPaths = new Set();
     
-    // First, get captures from Screenshot model (v3.0.0 desktop app)
+    // First, get captures from Screenshot model (v3.0.0+ desktop app)
     const dbScreenshots = await Screenshot.find({
       user: targetUserId,
       dateString: dateParam
     }).sort({ capturedAt: 1 }).lean();
     
     for (const ss of dbScreenshots) {
-      if (ss.path) {
+      // Prefer ImageKit URL, then path, then construct from gridfs
+      const displayPath = ss.imagekitUrl || ss.path || (ss._id ? `/api/activity/screenshot?id=${ss._id}` : null);
+      
+      if (displayPath) {
         captures.push({
-          path: ss.path,
+          path: displayPath,
           filename: ss.filename,
           timestamp: ss.capturedAt.toISOString(),
           size: ss.metadata?.fileSize || 0,
           date: dateParam,
           activity: ss.activity,
-          screenshotId: ss._id.toString()
+          screenshotId: ss._id.toString(),
+          storage: ss.metadata?.storage || (ss.imagekitUrl ? 'imagekit' : 'filesystem')
         });
-        seenPaths.add(ss.path);
+        seenPaths.add(ss.path || displayPath);
+        // Also add imagekitUrl to seen paths to avoid duplicates
+        if (ss.imagekitUrl) seenPaths.add(ss.imagekitUrl);
       }
     }
     
@@ -183,7 +192,7 @@ export async function GET(request) {
       const imageFiles = files.filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f));
       
       for (const file of imageFiles) {
-        const publicPath = `/activity/${targetUserId}/${dateParam}/${file}`;
+        const publicPath = `/activity/${targetUserIdStr}/${dateParam}/${file}`;
         
         // Skip if already in DB results
         if (seenPaths.has(publicPath)) continue;

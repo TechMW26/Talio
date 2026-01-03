@@ -34,13 +34,16 @@ export async function GET(request) {
     if (isAdminOrHR) {
       // Admin/HR can see all employees
       const employees = await Employee.find({ status: 'active' })
-        .select('firstName lastName email profilePicture department designation user')
+        .select('firstName lastName email profilePicture department designation userId')
         .populate('department', 'name')
         .populate('designation', 'title')
-        .populate('user', '_id')
         .lean();
       
-      teamMembers = employees.filter(e => e.user);
+      // Filter only employees with userId
+      teamMembers = employees.filter(e => e.userId).map(e => ({
+        ...e,
+        user: e.userId // Map userId to user for consistency
+      }));
       departmentName = 'All Departments';
     } else {
       // Check if user is department head
@@ -78,13 +81,16 @@ export async function GET(request) {
         department: department._id,
         status: 'active'
       })
-        .select('firstName lastName email profilePicture department designation user')
+        .select('firstName lastName email profilePicture department designation userId')
         .populate('department', 'name')
         .populate('designation', 'title')
-        .populate('user', '_id')
         .lean();
       
-      teamMembers = employees.filter(e => e.user);
+      // Filter only employees with userId and map for consistency
+      teamMembers = employees.filter(e => e.userId).map(e => ({
+        ...e,
+        user: e.userId // Map userId to user for consistency
+      }));
     }
     
     // Get session summaries for each team member

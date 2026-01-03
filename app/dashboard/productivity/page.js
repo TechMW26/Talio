@@ -41,12 +41,13 @@ export default function ProductivityPage() {
   }, [])
 
   const userRole = user?.role
+  const isDepartmentHead = user?.isDepartmentHead === true
 
-  // Check if user can view team (admin, hr, manager, dept_head, admin)
+  // Check if user can view team (admin, hr, manager, dept_head, or actual department head)
   useEffect(() => {
     const teamRoles = ['admin', 'hr', 'manager', 'department_head']
-    setCanViewTeam(teamRoles.includes(userRole))
-  }, [userRole])
+    setCanViewTeam(teamRoles.includes(userRole) || isDepartmentHead)
+  }, [userRole, isDepartmentHead])
 
   // Fetch sessions for selected date
   const fetchSessions = useCallback(async () => {

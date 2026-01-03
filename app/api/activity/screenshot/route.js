@@ -230,17 +230,17 @@ export async function POST(request) {
 
 /**
  * GET /api/activity/screenshot?id=xxx
- * Retrieve a screenshot image by ID (from GridFS)
+ * Retrieve a screenshot image by ID (from GridFS or ImageKit)
  */
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Screenshot']);
+    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department', 'Screenshot']);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
     const { user, models } = auth;
-    const { Screenshot } = models;
+    const { User, Employee, Department, Screenshot } = models;
 
     const userId = user._id || user.userId;
     const userRole = user.role;
@@ -264,17 +264,66 @@ export async function GET(request) {
       }, { status: 404 });
     }
 
-    // Access control
-    if (!['admin', 'hr', 'manager'].includes(userRole)) {
-      if (screenshot.user.toString() !== userId) {
-        return NextResponse.json({
-          success: false,
-          error: 'Access denied'
-        }, { status: 403 });
+    // Access control - check if user can view this screenshot
+    let hasAccess = false;
+    
+    // Admin, HR, Manager can view all
+    if (['admin', 'hr', 'manager'].includes(userRole)) {
+      hasAccess = true;
+    }
+    // Same user
+    else if (screenshot.user.toString() === userId.toString()) {
+      hasAccess = true;
+    }
+    // Department head check
+    else {
+      const viewer = await User.findById(userId).select('employeeId');
+      const screenshotOwner = await User.findById(screenshot.user).select('employeeId');
+      
+      if (viewer?.employeeId && screenshotOwner?.employeeId) {
+        const viewerEmployee = await Employee.findById(viewer.employeeId).select('_id');
+        const ownerEmployee = await Employee.findById(screenshotOwner.employeeId).select('department departments');
+        
+        if (viewerEmployee && ownerEmployee) {
+          // Get owner's departments
+          const ownerDepartments = [];
+          if (ownerEmployee.department) ownerDepartments.push(ownerEmployee.department);
+          if (ownerEmployee.departments?.length) ownerDepartments.push(...ownerEmployee.departments);
+          
+          // Check if viewer is head of any department
+          const departments = await Department.find({
+            _id: { $in: ownerDepartments },
+            $or: [
+              { head: viewerEmployee._id },
+              { heads: viewerEmployee._id }
+            ]
+          });
+          
+          hasAccess = departments.length > 0;
+        }
       }
     }
+    
+    if (!hasAccess) {
+      return NextResponse.json({
+        success: false,
+        error: 'Access denied'
+      }, { status: 403 });
+    }
 
-    // Get image from GridFS
+    // If ImageKit URL exists, redirect to it
+    if (screenshot.imagekitUrl) {
+      return NextResponse.redirect(screenshot.imagekitUrl);
+    }
+
+    // Otherwise, get from GridFS
+    if (!screenshot.gridfsFileId) {
+      return NextResponse.json({
+        success: false,
+        error: 'Screenshot image not available'
+      }, { status: 404 });
+    }
+    
     const imageBuffer = await getScreenshot(screenshot.gridfsFileId);
 
     // Return image

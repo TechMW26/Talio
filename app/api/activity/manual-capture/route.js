@@ -1,16 +1,34 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
 
-// Roles that can initiate manual captures
-const ALLOWED_INITIATOR_ROLES = ['admin', 'department_head'];
+// Roles that can initiate manual captures (in addition to department heads)
+const ALLOWED_INITIATOR_ROLES = ['admin', 'hr'];
 
 // Roles that cannot be captured (even manually)
 const PROTECTED_ROLES = ['admin'];
 
 /**
+ * Check if a user is a department head
+ * @returns {Array} Array of department IDs they are head of
+ */
+async function getDepartmentsWhereUserIsHead(employeeId, Department) {
+  if (!employeeId) return [];
+  
+  const departments = await Department.find({
+    $or: [
+      { head: employeeId },
+      { heads: employeeId }
+    ],
+    isActive: true
+  }).select('_id name');
+  
+  return departments;
+}
+
+/**
  * POST /api/activity/manual-capture
  * Request a manual capture of a target user's screen
- * Only Admin and Department Heads can initiate this
+ * Only Admin, HR, and Department Heads can initiate this
  */
 export async function POST(request) {
   try {
@@ -25,11 +43,26 @@ export async function POST(request) {
     const initiatorId = user._id.toString();
     const initiatorRole = user.role;
 
+    // Get initiator's employee ID for department head check
+    const initiatorUser = await User.findById(initiatorId).populate('employeeId');
+    const initiatorEmployeeId = initiatorUser?.employeeId?._id || initiatorUser?.employeeId;
+    
+    // Check if initiator is a department head (regardless of role)
+    let isDepartmentHead = false;
+    let headOfDepartments = [];
+    
+    if (initiatorEmployeeId) {
+      headOfDepartments = await getDepartmentsWhereUserIsHead(initiatorEmployeeId, Department);
+      isDepartmentHead = headOfDepartments.length > 0;
+    }
+
     // Check if initiator has permission to request manual captures
-    if (!ALLOWED_INITIATOR_ROLES.includes(initiatorRole)) {
-      console.log(`[ManualCapture] Permission denied - Role '${initiatorRole}' cannot initiate captures`);
+    const hasRolePermission = ALLOWED_INITIATOR_ROLES.includes(initiatorRole);
+    
+    if (!hasRolePermission && !isDepartmentHead) {
+      console.log(`[ManualCapture] Permission denied - User ${initiatorId} (role: ${initiatorRole}) is not admin/hr and not a department head`);
       return NextResponse.json(
-        { success: false, error: 'Permission denied - Only Admin or Department Head can initiate manual captures' },
+        { success: false, error: 'Permission denied - Only Admin, HR, or Department Heads can initiate manual captures' },
         { status: 403 }
       );
     }
@@ -72,18 +105,8 @@ export async function POST(request) {
       );
     }
 
-    // For Department Head, verify they can only capture users in their department
-    if (initiatorRole === 'department_head') {
-      const initiatorUser = await User.findById(initiatorId).populate('employeeId');
-      const initiatorEmployee = initiatorUser?.employeeId;
-      
-      if (!initiatorEmployee) {
-        return NextResponse.json(
-          { success: false, error: 'Initiator employee profile not found' },
-          { status: 400 }
-        );
-      }
-
+    // For Department Heads (not admin/hr), verify they can only capture users in their department
+    if (isDepartmentHead && !ALLOWED_INITIATOR_ROLES.includes(initiatorRole)) {
       const targetEmployee = targetUser.employeeId;
       
       if (!targetEmployee) {
@@ -93,29 +116,28 @@ export async function POST(request) {
         );
       }
 
-      // Check if initiator is head of target's department
-      const targetDeptId = targetEmployee.department?.toString();
+      // Get target user's department(s)
+      const targetDeptIds = [];
+      if (targetEmployee.department) {
+        targetDeptIds.push(targetEmployee.department.toString());
+      }
+      if (targetEmployee.departments?.length) {
+        targetEmployee.departments.forEach(d => targetDeptIds.push(d.toString()));
+      }
       
-      if (targetDeptId) {
-        const targetDept = await Department.findById(targetDeptId);
-        
-        if (targetDept) {
-          const allHeads = targetDept.allHeads || [];
-          const isHeadOfDept = allHeads.some(
-            headId => headId.toString() === initiatorEmployee._id.toString()
-          );
-          
-          if (!isHeadOfDept) {
-            console.log(`[ManualCapture] BLOCKED - Department Head cannot capture users outside their department`);
-            return NextResponse.json(
-              { 
-                success: false, 
-                error: 'You can only capture screens of users in your department' 
-              },
-              { status: 403 }
-            );
-          }
-        }
+      // Check if any of target's departments are headed by initiator
+      const headDeptIds = headOfDepartments.map(d => d._id.toString());
+      const hasAccess = targetDeptIds.some(id => headDeptIds.includes(id));
+      
+      if (!hasAccess) {
+        console.log(`[ManualCapture] BLOCKED - Department Head cannot capture users outside their department`);
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: 'You can only capture screens of users in your department' 
+          },
+          { status: 403 }
+        );
       }
     }
 
@@ -172,16 +194,30 @@ export async function GET(request) {
     const userId = user._id.toString();
     const userRole = user.role;
 
-    // Determine permissions based on role
-    const canInitiateCapture = ALLOWED_INITIATOR_ROLES.includes(userRole);
+    // Get current user's employee ID
+    const currentUser = await User.findById(userId).populate('employeeId');
+    const employeeId = currentUser?.employeeId?._id || currentUser?.employeeId;
+    
+    // Check if user is a department head (regardless of role)
+    let isDepartmentHead = false;
+    let headOfDepartments = [];
+    
+    if (employeeId) {
+      headOfDepartments = await getDepartmentsWhereUserIsHead(employeeId, Department);
+      isDepartmentHead = headOfDepartments.length > 0;
+    }
+
+    // Determine permissions based on role OR department head status
+    const hasRolePermission = ALLOWED_INITIATOR_ROLES.includes(userRole);
+    const canInitiateCapture = hasRolePermission || isDepartmentHead;
     const isProtectedFromCapture = PROTECTED_ROLES.includes(userRole);
 
     let captureScope = 'none';
     let targetableUsers = [];
 
     if (canInitiateCapture) {
-      if (['admin'].includes(userRole)) {
-        captureScope = 'all'; // Can capture any non-admin user
+      if (ALLOWED_INITIATOR_ROLES.includes(userRole)) {
+        captureScope = 'all'; // Admin/HR can capture any non-admin user
         
         // Get all non-admin users
         const users = await User.find({
@@ -198,53 +234,24 @@ export async function GET(request) {
           role: u.role
         }));
         
-      } else if (userRole === 'department_head') {
+      } else if (isDepartmentHead) {
         captureScope = 'department'; // Can only capture users in their department
         
-        // Get department head's departments
-        const currentUser = await User.findById(userId).populate('employeeId');
-        const employeeId = currentUser?.employeeId?._id || currentUser?.employeeId;
+        const deptIds = headOfDepartments.map(d => d._id);
         
-        if (!employeeId) {
-          return NextResponse.json({
-            success: true,
-            permissions: {
-              canInitiateCapture,
-              isProtectedFromCapture,
-              captureScope: 'none',
-              role: userRole
-            },
-            targetableUsers: []
-          });
-        }
-        
-        // Find departments where user is head
-        const depts = await Department.find({
-          $or: [
-            { head: employeeId },
-            { heads: employeeId }
-          ],
+        // Get employees in those departments (and sub-departments)
+        const subDepts = await Department.find({
+          parentDepartment: { $in: deptIds },
           isActive: true
         }).select('_id');
         
-        const deptIds = depts.map(d => d._id);
+        const allDeptIds = [...deptIds, ...subDepts.map(d => d._id)];
         
-        if (deptIds.length === 0) {
-          return NextResponse.json({
-            success: true,
-            permissions: {
-              canInitiateCapture,
-              isProtectedFromCapture,
-              captureScope: 'none',
-              role: userRole
-            },
-            targetableUsers: []
-          });
-        }
-        
-        // Get employees in those departments
         const employees = await Employee.find({
-          department: { $in: deptIds },
+          $or: [
+            { department: { $in: allDeptIds } },
+            { departments: { $in: allDeptIds } }
+          ],
           status: 'active'
         }).select('firstName lastName employeeCode');
         
@@ -273,7 +280,9 @@ export async function GET(request) {
         canInitiateCapture,
         isProtectedFromCapture,
         captureScope,
-        role: userRole
+        role: userRole,
+        isDepartmentHead,
+        departmentsHeaded: headOfDepartments.map(d => ({ _id: d._id, name: d.name }))
       },
       targetableUsers: canInitiateCapture ? targetableUsers : []
     });
