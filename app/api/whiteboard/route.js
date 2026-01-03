@@ -116,13 +116,19 @@ export async function POST(request) {
     const body = await request.json();
     const { title, name, description } = body;
 
+    // Get the user's _id (not employeeId) for the owner field
+    const userId = user._id || user.userId;
+
     const whiteboard = new Whiteboard({
-      name: name || title || 'Untitled Board',
+      title: title || name || 'Untitled Board',
+      name: title || name || 'Untitled Board', // Legacy field
       description: description || '',
-      createdBy: employeeId,
+      owner: userId,  // Required field - uses User._id
+      createdBy: employeeId, // Legacy field - uses Employee._id
       data: null,
       isPublic: false,
-      sharedWith: []
+      sharedWith: [],
+      pages: [{ id: 'page-1', objects: [] }]
     });
 
     await whiteboard.save();

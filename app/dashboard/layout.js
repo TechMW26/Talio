@@ -15,6 +15,7 @@ import useGeofencing from '@/hooks/useGeofencing'
 import { SocketProvider } from '@/contexts/SocketContext'
 import { UnreadMessagesProvider } from '@/contexts/UnreadMessagesContext'
 import { InAppNotificationProvider } from '@/contexts/InAppNotificationContext'
+import { ActionableToastProvider } from '@/contexts/ActionableToastContext'
 import { ChatWidgetProvider, useChatWidget } from '@/contexts/ChatWidgetContext'
 import { getCurrentUser, getEmployeeId, syncUserData, getToken } from '@/utils/userHelper'
 import CallAlertReceiver from '@/components/CallAlertReceiver'
@@ -269,8 +270,10 @@ export default function DashboardLayout({ children }) {
         <UnreadMessagesProvider>
           <ChatWidgetProvider>
             <InAppNotificationProvider>
-              {children}
-              <CallAlertReceiver />
+              <ActionableToastProvider>
+                {children}
+                <CallAlertReceiver />
+              </ActionableToastProvider>
             </InAppNotificationProvider>
           </ChatWidgetProvider>
         </UnreadMessagesProvider>
@@ -283,6 +286,7 @@ export default function DashboardLayout({ children }) {
       <UnreadMessagesProvider>
         <ChatWidgetProvider>
           <InAppNotificationProvider>
+            <ActionableToastProvider>
             {/* Sync sidebar state to chat widget context */}
             <SidebarStateSync sidebarCollapsed={sidebarCollapsed} />
 
@@ -353,6 +357,7 @@ export default function DashboardLayout({ children }) {
               {/* Web Push Notification Prompt */}
               <WebPushPrompt />
             </div>
+            </ActionableToastProvider>
           </InAppNotificationProvider>
         </ChatWidgetProvider>
       </UnreadMessagesProvider>

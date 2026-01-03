@@ -7,6 +7,7 @@ import {
   notifyMemberRemoved,
   getProjectMemberUserIds
 } from '@/lib/projectNotifications'
+import { createProjectInvitationNotification } from '@/lib/actionableNotifications'
 
 // GET - Get project members
 export async function GET(request, { params }) {
@@ -51,7 +52,7 @@ export async function GET(request, { params }) {
 export async function POST(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'User', 'Employee', 'Chat', 'ProjectTimelineEvent'])
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'User', 'Employee', 'Chat', 'ProjectTimelineEvent', 'ActionableNotification'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
@@ -155,6 +156,24 @@ export async function POST(request, { params }) {
 
         // Send notification
         await notifyProjectInvitation(project, invitedEmployee, inviterEmployee)
+
+        // Create actionable notification for the invited user (persistent toast)
+        try {
+          // Get the invited user's User ID (not employee ID)
+          const invitedUser = await User.findOne({ employeeId: userIdToAdd }).select('_id')
+          if (invitedUser) {
+            await createProjectInvitationNotification(models, {
+              targetUserId: invitedUser._id,
+              projectId: projectId,
+              projectName: project.name,
+              invitedBy: userRecord.employeeId,
+              invitedByName: inviterEmployee ? `${inviterEmployee.firstName} ${inviterEmployee.lastName}` : 'Someone'
+            })
+          }
+        } catch (actionErr) {
+          console.error('[ProjectMembers] Error creating actionable notification:', actionErr)
+          // Don't fail the request if actionable notification fails
+        }
 
         const populatedMembership = await ProjectMember.findById(membership._id)
           .populate('user', 'firstName lastName profilePicture email employeeCode department')

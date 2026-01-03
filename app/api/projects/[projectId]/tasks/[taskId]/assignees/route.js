@@ -6,6 +6,7 @@ import {
   notifyTaskAssignmentAccepted,
   notifyTaskAssignmentRejected
 } from '@/lib/projectNotifications'
+import { createTaskAssignmentNotification } from '@/lib/actionableNotifications'
 
 // GET - Get assignees for a task
 export async function GET(request, { params }) {
@@ -39,7 +40,7 @@ export async function GET(request, { params }) {
 export async function POST(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'Task', 'TaskAssignee', 'User', 'Employee', 'ProjectTimelineEvent'])
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'Task', 'TaskAssignee', 'User', 'Employee', 'ProjectTimelineEvent', 'ActionableNotification'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
@@ -141,6 +142,27 @@ export async function POST(request, { params }) {
       // Send notification if not self-assignment
       if (assigneeIdStr !== userRecord.employeeId.toString()) {
         await notifyTaskAssigned(project, task, assigneeEmployee, assignerEmployee)
+        
+        // Create actionable notification for task assignment (persistent toast)
+        try {
+          const assigneeUser = await User.findOne({ employeeId: assigneeIdStr }).select('_id')
+          if (assigneeUser) {
+            await createTaskAssignmentNotification(models, {
+              targetUserId: assigneeUser._id,
+              taskId: taskId,
+              taskTitle: task.title,
+              projectId: projectId,
+              projectName: project.name,
+              assignedBy: userRecord.employeeId,
+              assignedByName: assignerEmployee ? `${assignerEmployee.firstName} ${assignerEmployee.lastName}` : 'Someone',
+              dueDate: task.dueDate,
+              priority: task.priority || 'medium'
+            })
+          }
+        } catch (actionErr) {
+          console.error('[TaskAssignees] Error creating actionable notification:', actionErr)
+          // Don't fail the request if actionable notification fails
+        }
       }
 
       createdAssignees.push(assignee)

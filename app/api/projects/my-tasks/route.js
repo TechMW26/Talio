@@ -68,14 +68,47 @@ export async function GET(request) {
       .populate('project', 'name status endDate priority')
       .populate('createdBy', 'firstName lastName')
       .populate('assignedBy', 'firstName lastName')
+      .populate({
+        path: 'subtasks.completedBy',
+        select: 'firstName lastName'
+      })
+      .populate({
+        path: 'subtasks.acceptedBy',
+        select: 'firstName lastName'
+      })
       .sort({ dueDate: 1, priority: -1, createdAt: -1 })
 
-    // Attach assignment status
+    // Get all assignees for the tasks to enable multi-assignee features
+    const allTaskAssignees = await TaskAssignee.find({
+      task: { $in: taskIds },
+      assignmentStatus: { $in: ['pending', 'accepted'] }
+    })
+      .populate('user', 'firstName lastName profilePicture')
+      .select('task user assignmentStatus')
+
+    // Group assignees by task
+    const assigneesByTask = {}
+    allTaskAssignees.forEach(a => {
+      const taskIdStr = a.task.toString()
+      if (!assigneesByTask[taskIdStr]) {
+        assigneesByTask[taskIdStr] = []
+      }
+      assigneesByTask[taskIdStr].push({
+        _id: a._id,
+        user: a.user,
+        assignmentStatus: a.assignmentStatus
+      })
+    })
+
+    // Attach assignment status and all assignees
     const tasksWithAssignmentStatus = tasks.map(task => {
       const assignment = assignments.find(a => a.task.toString() === task._id.toString())
+      const taskIdStr = task._id.toString()
       return {
         ...task.toObject(),
         assignmentStatus: assignment?.assignmentStatus,
+        assignees: assigneesByTask[taskIdStr] || [],
+        isMultiAssignee: (assigneesByTask[taskIdStr] || []).length > 1,
         isOverdue: task.dueDate && task.dueDate < now && task.status !== 'completed'
       }
     })

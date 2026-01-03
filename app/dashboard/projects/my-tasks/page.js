@@ -426,6 +426,9 @@ export default function MyTasksPage() {
   const upcomingTasks = filteredTasks.filter(t => !isOverdue(t) && !isDueToday(t))
   const pendingAcceptance = filteredTasks.filter(t => t.assignmentStatus === 'pending')
 
+  // Get current employee ID for multi-assignee subtask acceptance
+  const currentEmployeeId = user?.employeeId?._id || user?.employeeId
+
   const stats = {
     total: tasks.length,
     todo: tasks.filter(t => t.status === 'todo').length,
@@ -652,6 +655,7 @@ export default function MyTasksPage() {
                 onDelete={() => { setTaskToDelete(task); setShowDeleteModal(true) }}
                 respondingTo={respondingTo}
                 isPendingAcceptance
+                currentEmployeeId={currentEmployeeId}
               />
             ))}
           </div>
@@ -675,6 +679,7 @@ export default function MyTasksPage() {
                 onDelete={() => { setTaskToDelete(task); setShowDeleteModal(true) }}
                 respondingTo={respondingTo}
                 isOverdue
+                currentEmployeeId={currentEmployeeId}
               />
             ))}
           </div>
@@ -697,6 +702,7 @@ export default function MyTasksPage() {
                 onViewProject={() => router.push(`/dashboard/projects/${task.project._id}`)}
                 onDelete={() => { setTaskToDelete(task); setShowDeleteModal(true) }}
                 respondingTo={respondingTo}
+                currentEmployeeId={currentEmployeeId}
               />
             ))}
           </div>
@@ -718,6 +724,7 @@ export default function MyTasksPage() {
                 onViewProject={() => router.push(`/dashboard/projects/${task.project._id}`)}
                 onDelete={() => { setTaskToDelete(task); setShowDeleteModal(true) }}
                 respondingTo={respondingTo}
+                currentEmployeeId={currentEmployeeId}
               />
             ))}
           </div>
@@ -982,7 +989,7 @@ export default function MyTasksPage() {
 }
 
 // Task Card Component
-function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onDelete, respondingTo, isPendingAcceptance, isOverdue }) {
+function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onDelete, respondingTo, isPendingAcceptance, isOverdue, currentEmployeeId }) {
   const [showStatusMenu, setShowStatusMenu] = useState(false)
   const [showSubtasks, setShowSubtasks] = useState(false)
   const [subtasks, setSubtasks] = useState(task.subtasks || [])
@@ -995,6 +1002,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
   const isUpdating = respondingTo === task._id
   const isCompleted = task.status === 'completed'
   const progressPercentage = task.progressPercentage || 0
+  const isMultiAssignee = task.isMultiAssignee || (task.assignees && task.assignees.length > 1)
 
   // Sync subtasks when task changes
   useEffect(() => {
@@ -1095,9 +1103,17 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
 
       const data = await response.json()
       if (data.success) {
+        // Update subtask with new state including pendingAcceptance
         setSubtasks(prevSubtasks => prevSubtasks.map(st =>
           (st._id?.toString() || st._id) === (subtaskId?.toString() || subtaskId)
-            ? { ...st, completed: !currentCompleted, completedAt: !currentCompleted ? new Date() : null }
+            ? { 
+                ...st, 
+                completed: data.data?.subtask?.completed ?? !currentCompleted, 
+                completedAt: !currentCompleted ? new Date() : null,
+                pendingAcceptance: data.data?.subtask?.pendingAcceptance || false,
+                acceptedBy: data.data?.subtask?.acceptedBy || [],
+                completedBy: data.data?.subtask?.completedBy
+              }
             : st
         ))
         // Update task progress and status
@@ -1108,11 +1124,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
           }
         }
         // Show appropriate toast message
-        if (data.data?.statusChanged) {
-          toast.success(data.message)
-        } else {
-          toast.success(!currentCompleted ? 'Subtask completed' : 'Subtask reopened')
-        }
+        toast.success(data.message)
       } else {
         toast.error(data.message || 'Failed to update subtask')
       }
@@ -1160,6 +1172,104 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
     } catch (error) {
       console.error('Delete subtask error:', error)
       toast.error('Failed to delete subtask')
+    }
+  }
+
+  // Accept a subtask completion (for multi-assignee tasks)
+  const handleAcceptSubtaskCompletion = async (subtaskId) => {
+    try {
+      setUpdatingSubtaskId(subtaskId)
+      const token = localStorage.getItem('token')
+      const projectId = task.project?._id || task.project
+      const idToSend = subtaskId?.toString() || subtaskId
+
+      const response = await fetch(`/api/projects/${projectId}/tasks/${task._id}/subtasks`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          subtaskId: idToSend,
+          action: 'acceptCompletion'
+        })
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        setSubtasks(prevSubtasks => prevSubtasks.map(st =>
+          (st._id?.toString() || st._id) === idToSend
+            ? { 
+                ...st, 
+                ...data.data.subtask,
+                pendingAcceptance: !data.data.allAccepted,
+                completed: data.data.allAccepted
+              }
+            : st
+        ))
+        if (task && data.data) {
+          task.progressPercentage = data.data.progressPercentage
+        }
+        toast.success(data.message)
+      } else {
+        toast.error(data.message || 'Failed to accept completion')
+      }
+    } catch (error) {
+      console.error('Accept subtask completion error:', error)
+      toast.error('Failed to accept completion')
+    } finally {
+      setUpdatingSubtaskId(null)
+    }
+  }
+
+  // Reject a subtask completion (for multi-assignee tasks)
+  const handleRejectSubtaskCompletion = async (subtaskId) => {
+    const reason = prompt('Why are you rejecting this completion?')
+    if (reason === null) return // User cancelled
+
+    try {
+      setUpdatingSubtaskId(subtaskId)
+      const token = localStorage.getItem('token')
+      const projectId = task.project?._id || task.project
+      const idToSend = subtaskId?.toString() || subtaskId
+
+      const response = await fetch(`/api/projects/${projectId}/tasks/${task._id}/subtasks`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          subtaskId: idToSend,
+          action: 'rejectCompletion',
+          reason: reason || 'No reason provided'
+        })
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        setSubtasks(prevSubtasks => prevSubtasks.map(st =>
+          (st._id?.toString() || st._id) === idToSend
+            ? { 
+                ...st, 
+                ...data.data.subtask,
+                completed: false,
+                pendingAcceptance: false
+              }
+            : st
+        ))
+        if (task && data.data) {
+          task.progressPercentage = data.data.progressPercentage
+        }
+        toast.success(data.message)
+      } else {
+        toast.error(data.message || 'Failed to reject completion')
+      }
+    } catch (error) {
+      console.error('Reject subtask completion error:', error)
+      toast.error('Failed to reject completion')
+    } finally {
+      setUpdatingSubtaskId(null)
     }
   }
 
@@ -1290,6 +1400,33 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                         }`}
                       style={{ width: `${progressPercentage}%` }}
                     />
+                  </div>
+                </div>
+              )}
+
+              {/* Multi-assignee indicator */}
+              {isMultiAssignee && task.assignees && (
+                <div className="mt-2 flex items-center gap-2 flex-wrap">
+                  <span className="text-xs text-gray-500">Shared with:</span>
+                  <div className="flex -space-x-2">
+                    {task.assignees.slice(0, 4).map((assignee, idx) => (
+                      <div
+                        key={assignee._id || idx}
+                        className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium border-2 border-white ${
+                          assignee.user?._id?.toString() === currentEmployeeId || assignee.user?.toString() === currentEmployeeId
+                            ? 'bg-primary-500 text-white'
+                            : 'bg-gray-200 text-gray-600'
+                        }`}
+                        title={`${assignee.user?.firstName || ''} ${assignee.user?.lastName || ''} (${assignee.assignmentStatus})`}
+                      >
+                        {assignee.user?.firstName?.[0] || '?'}
+                      </div>
+                    ))}
+                    {task.assignees.length > 4 && (
+                      <div className="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center text-xs font-medium border-2 border-white">
+                        +{task.assignees.length - 4}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1432,25 +1569,39 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                   }
 
                   return (
-                    <div key={subtask._id} className="bg-white rounded-lg p-3 border border-gray-200">
+                    <div key={subtask._id} className={`bg-white rounded-lg p-3 border ${subtask.pendingAcceptance ? 'border-yellow-300 bg-yellow-50' : 'border-gray-200'}`}>
                       <div className="flex items-center gap-3 group">
+                        {/* Checkbox - disabled if pending acceptance from others */}
                         <input
                           type="checkbox"
-                          checked={subtask.completed}
-                          onChange={() => handleToggleSubtask(subtask._id, subtask.completed)}
-                          disabled={updatingSubtaskId === subtask._id || isPendingAcceptance}
-                          className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 cursor-pointer disabled:opacity-50"
+                          checked={subtask.completed || subtask.pendingAcceptance}
+                          onChange={() => handleToggleSubtask(subtask._id, subtask.completed || subtask.pendingAcceptance)}
+                          disabled={updatingSubtaskId === subtask._id || isPendingAcceptance || subtask.pendingAcceptance}
+                          className={`w-4 h-4 border-gray-300 rounded focus:ring-primary-500 cursor-pointer disabled:opacity-50 ${
+                            subtask.pendingAcceptance ? 'text-yellow-500' : 'text-primary-600'
+                          }`}
                         />
                         <span
                           className={`flex-1 text-sm ${subtask.completed
                               ? 'line-through text-gray-400'
+                              : subtask.pendingAcceptance
+                              ? 'text-yellow-700'
                               : 'text-gray-700'
                             }`}
                         >
                           {subtask.title}
                         </span>
+                        
+                        {/* Pending acceptance badge */}
+                        {subtask.pendingAcceptance && (
+                          <span className="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full border border-yellow-300 flex items-center gap-1">
+                            <FaClock className="text-xs" />
+                            Pending ({subtask.acceptedBy?.length || 1}/{task.assignees?.length || 2})
+                          </span>
+                        )}
+                        
                         {/* Show subtask ETA if available */}
-                        {(subtask.estimatedDays > 0 || subtask.estimatedHours > 0) && (
+                        {(subtask.estimatedDays > 0 || subtask.estimatedHours > 0) && !subtask.pendingAcceptance && (
                           <span className="text-xs text-blue-600 flex items-center gap-1">
                             <FaClock className="text-xs" />
                             {subtask.estimatedDays > 0 && `${subtask.estimatedDays}d`}
@@ -1458,7 +1609,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                             {subtask.estimatedHours > 0 && `${subtask.estimatedHours}h`}
                           </span>
                         )}
-                        {!isPendingAcceptance && (
+                        {!isPendingAcceptance && !subtask.pendingAcceptance && (
                           <button
                             onClick={() => handleDeleteSubtask(subtask._id)}
                             className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition-opacity"
@@ -1468,6 +1619,46 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                           </button>
                         )}
                       </div>
+                      
+                      {/* Multi-assignee accept/reject buttons */}
+                      {subtask.pendingAcceptance && isMultiAssignee && (
+                        <div className="mt-2 flex items-center gap-2 pl-7">
+                          {/* Check if current user has already accepted */}
+                          {subtask.acceptedBy?.some(id => id?.toString() === currentEmployeeId || id?._id?.toString() === currentEmployeeId) ? (
+                            <span className="text-xs text-green-600 flex items-center gap-1">
+                              <FaCheck className="text-xs" />
+                              You accepted
+                            </span>
+                          ) : subtask.completedBy?.toString() === currentEmployeeId || subtask.completedBy?._id?.toString() === currentEmployeeId ? (
+                            <span className="text-xs text-blue-600 flex items-center gap-1">
+                              <FaClock className="text-xs" />
+                              Waiting for others to accept
+                            </span>
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => handleAcceptSubtaskCompletion(subtask._id)}
+                                disabled={updatingSubtaskId === subtask._id}
+                                className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50 flex items-center gap-1"
+                              >
+                                {updatingSubtaskId === subtask._id ? <FaSpinner className="animate-spin" /> : <FaCheck />}
+                                Accept
+                              </button>
+                              <button
+                                onClick={() => handleRejectSubtaskCompletion(subtask._id)}
+                                disabled={updatingSubtaskId === subtask._id}
+                                className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50 flex items-center gap-1"
+                              >
+                                {updatingSubtaskId === subtask._id ? <FaSpinner className="animate-spin" /> : <FaTimes />}
+                                Reject
+                              </button>
+                              <span className="text-xs text-gray-500">
+                                by {subtask.completedBy?.firstName || 'teammate'}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      )}
 
                       {/* Subtask Comments */}
                       {subtask.comments && subtask.comments.length > 0 && (

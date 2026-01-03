@@ -188,7 +188,7 @@ export async function PUT(request, { params }) {
 
     const { taskId } = await params
     const body = await request.json()
-    const { subtaskId, completed, title, order, estimatedDays, estimatedHours } = body
+    const { subtaskId, completed, title, order, estimatedDays, estimatedHours, action, reason } = body
 
     if (!subtaskId) {
       return NextResponse.json({ success: false, message: 'Subtask ID is required' }, { status: 400 })
@@ -256,18 +256,139 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ success: false, message: 'Subtask not found' }, { status: 404 })
     }
 
+    const currentSubtask = task.subtasks[subtaskIndex]
+
+    // Check how many assignees this task has (for multi-assignee flow)
+    const allAssignees = await TaskAssignee.find({
+      task: taskId,
+      assignmentStatus: 'accepted'
+    }).select('user')
+    const assigneeIds = allAssignees.map(a => a.user.toString())
+    const isMultiAssignee = assigneeIds.length > 1
+
     // Build update object for the subtask
     const updateFields = {}
     const setOperations = {}
 
+    // Handle accept/reject actions for multi-assignee subtask completion
+    if (action === 'acceptCompletion') {
+      // Another assignee is accepting a subtask completion
+      if (!currentSubtask.pendingAcceptance) {
+        return NextResponse.json({ 
+          success: false, 
+          message: 'This subtask is not pending acceptance' 
+        }, { status: 400 })
+      }
+
+      const acceptedBy = currentSubtask.acceptedBy || []
+      const alreadyAccepted = acceptedBy.some(id => id.toString() === userRecord.employeeId.toString())
+      
+      if (alreadyAccepted) {
+        return NextResponse.json({ 
+          success: false, 
+          message: 'You have already accepted this completion' 
+        }, { status: 400 })
+      }
+
+      // Add to acceptedBy
+      const newAcceptedBy = [...acceptedBy, userRecord.employeeId]
+      setOperations[`subtasks.${subtaskIndex}.acceptedBy`] = newAcceptedBy
+
+      // Check if all assignees have accepted
+      const allAccepted = assigneeIds.every(id => 
+        newAcceptedBy.some(accId => accId.toString() === id)
+      )
+
+      if (allAccepted) {
+        // All assignees accepted - mark as fully complete
+        setOperations[`subtasks.${subtaskIndex}.completed`] = true
+        setOperations[`subtasks.${subtaskIndex}.pendingAcceptance`] = false
+      }
+
+      // Update task and return
+      const updatedTask = await Task.findByIdAndUpdate(taskId, { $set: setOperations }, { new: true })
+      
+      // Recalculate progress
+      const completedCount = updatedTask.subtasks.filter(st => st.completed).length
+      const progressPercentage = Math.round((completedCount / updatedTask.subtasks.length) * 100)
+      await Task.findByIdAndUpdate(taskId, { $set: { progressPercentage } })
+
+      return NextResponse.json({
+        success: true,
+        message: allAccepted ? 'All assignees accepted. Subtask marked complete!' : 'Acceptance recorded',
+        data: {
+          subtask: updatedTask.subtasks[subtaskIndex],
+          allAccepted,
+          progressPercentage
+        }
+      })
+    }
+
+    if (action === 'rejectCompletion') {
+      // Another assignee is rejecting a subtask completion
+      if (!currentSubtask.pendingAcceptance) {
+        return NextResponse.json({ 
+          success: false, 
+          message: 'This subtask is not pending acceptance' 
+        }, { status: 400 })
+      }
+
+      // Reset the subtask - remove completion and pending state
+      setOperations[`subtasks.${subtaskIndex}.completed`] = false
+      setOperations[`subtasks.${subtaskIndex}.pendingAcceptance`] = false
+      setOperations[`subtasks.${subtaskIndex}.completedAt`] = null
+      setOperations[`subtasks.${subtaskIndex}.acceptedBy`] = []
+      
+      // Add rejection record
+      const newRejection = {
+        employee: userRecord.employeeId,
+        reason: reason || 'No reason provided',
+        rejectedAt: new Date()
+      }
+      const rejectedBy = currentSubtask.rejectedBy || []
+      setOperations[`subtasks.${subtaskIndex}.rejectedBy`] = [...rejectedBy, newRejection]
+
+      // Update task
+      const updatedTask = await Task.findByIdAndUpdate(taskId, { $set: setOperations }, { new: true })
+      
+      // Recalculate progress
+      const completedCount = updatedTask.subtasks.filter(st => st.completed).length
+      const progressPercentage = Math.round((completedCount / updatedTask.subtasks.length) * 100)
+      await Task.findByIdAndUpdate(taskId, { $set: { progressPercentage } })
+
+      return NextResponse.json({
+        success: true,
+        message: 'Subtask completion rejected and reset',
+        data: {
+          subtask: updatedTask.subtasks[subtaskIndex],
+          progressPercentage
+        }
+      })
+    }
+
+    // Standard completion toggle logic
     if (completed !== undefined) {
-      setOperations[`subtasks.${subtaskIndex}.completed`] = completed
-      if (completed) {
+      if (completed && isMultiAssignee) {
+        // Multi-assignee task: Set pending acceptance instead of completing
+        setOperations[`subtasks.${subtaskIndex}.pendingAcceptance`] = true
         setOperations[`subtasks.${subtaskIndex}.completedAt`] = new Date()
         setOperations[`subtasks.${subtaskIndex}.completedBy`] = userRecord.employeeId
+        setOperations[`subtasks.${subtaskIndex}.acceptedBy`] = [userRecord.employeeId]
+        setOperations[`subtasks.${subtaskIndex}.rejectedBy`] = []
+        // Don't set completed=true yet - wait for all acceptances
+      } else if (completed) {
+        // Single assignee task: Complete immediately
+        setOperations[`subtasks.${subtaskIndex}.completed`] = true
+        setOperations[`subtasks.${subtaskIndex}.completedAt`] = new Date()
+        setOperations[`subtasks.${subtaskIndex}.completedBy`] = userRecord.employeeId
+        setOperations[`subtasks.${subtaskIndex}.pendingAcceptance`] = false
       } else {
+        // Unchecking the subtask
+        setOperations[`subtasks.${subtaskIndex}.completed`] = false
         setOperations[`subtasks.${subtaskIndex}.completedAt`] = null
         setOperations[`subtasks.${subtaskIndex}.completedBy`] = null
+        setOperations[`subtasks.${subtaskIndex}.pendingAcceptance`] = false
+        setOperations[`subtasks.${subtaskIndex}.acceptedBy`] = []
       }
     }
 
@@ -287,9 +408,17 @@ export async function PUT(request, { params }) {
     }
 
     // Calculate new progress based on updated subtasks
+    // Note: For multi-assignee tasks, subtasks with pendingAcceptance don't count as complete
     const updatedSubtasks = [...task.subtasks]
     if (completed !== undefined) {
-      updatedSubtasks[subtaskIndex].completed = completed
+      // For multi-assignee: marking complete sets pendingAcceptance, not completed
+      if (completed && isMultiAssignee) {
+        updatedSubtasks[subtaskIndex].pendingAcceptance = true
+        updatedSubtasks[subtaskIndex].completed = false
+      } else {
+        updatedSubtasks[subtaskIndex].completed = completed
+        updatedSubtasks[subtaskIndex].pendingAcceptance = false
+      }
     }
     if (estimatedDays !== undefined) {
       updatedSubtasks[subtaskIndex].estimatedDays = parseInt(estimatedDays) || 0
@@ -298,7 +427,9 @@ export async function PUT(request, { params }) {
       updatedSubtasks[subtaskIndex].estimatedHours = parseInt(estimatedHours) || 0
     }
 
-    const completedCount = updatedSubtasks.filter(st => st.completed).length
+    // Only fully completed subtasks count towards progress
+    const completedCount = updatedSubtasks.filter(st => st.completed && !st.pendingAcceptance).length
+    const pendingCount = updatedSubtasks.filter(st => st.pendingAcceptance).length
     const progressPercentage = updatedSubtasks.length > 0 
       ? Math.round((completedCount / updatedSubtasks.length) * 100)
       : 0
@@ -470,17 +601,25 @@ export async function PUT(request, { params }) {
       }
     }
 
+    // Build appropriate message
+    let message = 'Subtask updated successfully'
+    if (statusChanged) {
+      message = `Subtask updated. Task moved to ${newStatus === 'in-progress' ? 'In Progress' : newStatus === 'review' ? 'Review (Pending Approval)' : newStatus === 'todo' ? 'To Do' : newStatus}`
+    } else if (completed && isMultiAssignee) {
+      message = 'Subtask marked for completion. Waiting for other assignees to accept.'
+    }
+
     return NextResponse.json({
       success: true,
-      message: statusChanged 
-        ? `Subtask updated. Task moved to ${newStatus === 'in-progress' ? 'In Progress' : newStatus === 'review' ? 'Review (Pending Approval)' : newStatus === 'todo' ? 'To Do' : newStatus}`
-        : 'Subtask updated successfully',
+      message,
       data: {
         subtask: updatedTask.subtasks[subtaskIndex],
         progressPercentage: updatedTask.progressPercentage,
         taskStatus: updatedTask.status,
         statusChanged,
-        approvalCreated
+        approvalCreated,
+        isMultiAssignee,
+        pendingAcceptance: isMultiAssignee && completed
       }
     })
   } catch (error) {

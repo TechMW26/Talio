@@ -11,12 +11,21 @@ export const dynamic = 'force-dynamic'
 function parseMailState(stateParam) {
   if (!stateParam) return null;
   try {
-    const decoded = JSON.parse(Buffer.from(stateParam, 'base64').toString());
+    // Try base64url decoding first (used by mail OAuth)
+    const decoded = JSON.parse(Buffer.from(stateParam, 'base64url').toString());
     if (decoded.type === 'mail_connect') {
       return decoded;
     }
   } catch (e) {
-    // Not a mail state, that's fine
+    // Try regular base64 as fallback
+    try {
+      const decoded = JSON.parse(Buffer.from(stateParam, 'base64').toString());
+      if (decoded.type === 'mail_connect') {
+        return decoded;
+      }
+    } catch (e2) {
+      // Not a mail state, that's fine
+    }
   }
   return null;
 }

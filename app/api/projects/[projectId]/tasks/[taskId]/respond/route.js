@@ -5,12 +5,13 @@ import {
   notifyTaskAssignmentAccepted,
   notifyTaskAssignmentRejected
 } from '@/lib/projectNotifications'
+import { dismissNotificationsForReference } from '@/lib/actionableNotifications'
 
 // POST - Respond to task assignment (accept/reject)
 export async function POST(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'Task', 'TaskAssignee', 'User', 'Employee', 'ProjectTimelineEvent'])
+    const auth = await getAuthAndModels(request, ['Project', 'Task', 'TaskAssignee', 'User', 'Employee', 'ProjectTimelineEvent', 'ActionableNotification'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
@@ -132,6 +133,14 @@ export async function POST(request, { params }) {
         notifyTaskAssignmentRejected(project, task, employee, notifyUserIds, reason).catch(console.error)
       }
     }).catch(console.error)
+    
+    // Dismiss actionable notification for this task assignment
+    try {
+      await dismissNotificationsForReference(models, 'Task', taskId)
+    } catch (dismissErr) {
+      console.error('[TaskRespond] Error dismissing notifications:', dismissErr)
+      // Don't fail the request
+    }
 
     return NextResponse.json({
       success: true,

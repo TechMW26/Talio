@@ -8,6 +8,7 @@ import {
 } from '@/lib/projectService'
 import { notifyTaskAssigned, getProjectMemberUserIds } from '@/lib/projectNotifications'
 import { emitTaskUpdate } from '@/lib/realtimeEvents'
+import { createTaskAssignmentNotification } from '@/lib/actionableNotifications'
 
 // GET - Get tasks for a project
 export async function GET(request, { params }) {
@@ -88,7 +89,7 @@ export async function GET(request, { params }) {
 export async function POST(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'Task', 'TaskAssignee', 'User', 'Employee', 'ProjectTimelineEvent'])
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'Task', 'TaskAssignee', 'User', 'Employee', 'ProjectTimelineEvent', 'ActionableNotification'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
@@ -241,6 +242,27 @@ export async function POST(request, { params }) {
       // Send notification if not self-assignment
       if (assigneeIdStr !== user.employeeId.toString()) {
         await notifyTaskAssigned(project, task, assigneeEmployee, creatorEmployee)
+        
+        // Create actionable notification for task assignment (persistent toast)
+        try {
+          const assigneeUser = await User.findOne({ employeeId: assigneeIdStr }).select('_id')
+          if (assigneeUser) {
+            await createTaskAssignmentNotification(models, {
+              targetUserId: assigneeUser._id,
+              taskId: task._id,
+              taskTitle: title,
+              projectId: projectId,
+              projectName: project.name,
+              assignedBy: userRecord.employeeId,
+              assignedByName: creatorEmployee ? `${creatorEmployee.firstName} ${creatorEmployee.lastName}` : 'Someone',
+              dueDate: calculatedDueDate,
+              priority: priority || 'medium'
+            })
+          }
+        } catch (actionErr) {
+          console.error('[Tasks] Error creating actionable notification:', actionErr)
+          // Don't fail the request if actionable notification fails
+        }
       }
     }
 

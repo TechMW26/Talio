@@ -81,7 +81,7 @@ export async function POST(request) {
       console.error('[Mail OAuth] Authentication failed:', auth.message);
       return NextResponse.json({ error: auth.message }, { status: 401 });
     }
-    const { user } = auth
+    const { user, tenant } = auth
 
     const clientId = process.env.GOOGLE_CLIENT_ID || process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
@@ -97,9 +97,11 @@ export async function POST(request) {
     }
 
     // Generate a state token to identify this as a mail connection request
+    // Include databaseName so callback can find the right tenant DB
     const stateData = JSON.stringify({
       type: 'mail_connect',  // This tells the callback it's for mail
       userId: user._id.toString(),
+      databaseName: tenant?.databaseName,  // Include tenant DB name for callback
       timestamp: Date.now()
     });
     // Use Buffer.from which is available in Node.js runtime

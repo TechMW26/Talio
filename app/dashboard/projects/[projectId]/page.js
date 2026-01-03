@@ -241,7 +241,15 @@ export default function ProjectDetailPage() {
   useEffect(() => {
     const userData = localStorage.getItem('user')
     if (userData) {
-      setUser(JSON.parse(userData))
+      const parsedUser = JSON.parse(userData)
+      setUser(parsedUser)
+      // Set currentEmployeeId from localStorage user data as fallback
+      if (parsedUser.employeeId && !currentEmployeeId) {
+        const empId = typeof parsedUser.employeeId === 'object' 
+          ? parsedUser.employeeId._id || parsedUser.employeeId
+          : parsedUser.employeeId
+        setCurrentEmployeeId(empId?.toString())
+      }
     }
     
     const tab = searchParams.get('tab')
@@ -249,6 +257,13 @@ export default function ProjectDetailPage() {
     
     fetchProject()
   }, [projectId, fetchProject])
+
+  // Always fetch tasks to get currentEmployeeId, regardless of active tab
+  useEffect(() => {
+    if (project) {
+      fetchTasks() // Always fetch to ensure currentEmployeeId is set
+    }
+  }, [project, fetchTasks])
 
   useEffect(() => {
     if (project && activeTab === 'tasks') {
@@ -545,8 +560,7 @@ export default function ProjectDetailPage() {
 
       const data = await response.json()
       if (data.success) {
-        playNotificationSound(NotificationSoundTypes.SUCCESS)
-        toast.success('Task created successfully')
+        // Close modal and reset form FIRST to ensure UI responds immediately
         setShowCreateTask(false)
         setShowTaskEtaModal(false)
         setTaskForm({ title: '', description: '', priority: 'medium', dueDate: '', assigneeIds: [], subtasks: [] })
@@ -554,15 +568,35 @@ export default function ProjectDetailPage() {
         setPendingTaskData(null)
         setTaskEta({ days: '', hours: '' })
         setSubtaskEtas({})
+        
+        // Show success feedback
+        toast.success('Task created successfully')
+        try {
+          playNotificationSound(NotificationSoundTypes.SUCCESS)
+        } catch (soundError) {
+          // Ignore sound errors - they shouldn't affect UX
+          console.warn('Sound playback failed:', soundError)
+        }
+        
+        // Refresh data in background
         fetchTasks()
         fetchProject() // Refresh completion percentage
       } else {
-        playNotificationSound(NotificationSoundTypes.WARNING)
-        toast.error(data.message)
+        toast.error(data.message || 'Failed to create task')
+        try {
+          playNotificationSound(NotificationSoundTypes.WARNING)
+        } catch (soundError) {
+          console.warn('Sound playback failed:', soundError)
+        }
       }
     } catch (error) {
-      playNotificationSound(NotificationSoundTypes.WARNING)
+      console.error('Create task error:', error)
       toast.error('Failed to create task')
+      try {
+        playNotificationSound(NotificationSoundTypes.WARNING)
+      } catch (soundError) {
+        console.warn('Sound playback failed:', soundError)
+      }
     } finally {
       setSubmitting(false)
     }
@@ -653,11 +687,25 @@ export default function ProjectDetailPage() {
         // Update the selected task's subtasks locally
         setSelectedTask(prev => {
           if (!prev) return prev
-          const updatedSubtasks = prev.subtasks.map(st => 
-            (st._id?.toString() || st._id) === (subtaskId?.toString() || subtaskId)
-              ? { ...st, completed: !currentCompleted, completedAt: !currentCompleted ? new Date() : null }
-              : st
-          )
+          const updatedSubtasks = prev.subtasks.map(st => {
+            if ((st._id?.toString() || st._id) === (subtaskId?.toString() || subtaskId)) {
+              // Check if API returned pending acceptance (multi-assignee task)
+              if (data.data.subtask) {
+                return {
+                  ...st,
+                  ...data.data.subtask,
+                  completedAt: data.data.subtask.completedAt || (!currentCompleted ? new Date() : null)
+                }
+              }
+              return { 
+                ...st, 
+                completed: !currentCompleted, 
+                completedAt: !currentCompleted ? new Date() : null,
+                pendingAcceptance: false
+              }
+            }
+            return st
+          })
           return {
             ...prev,
             subtasks: updatedSubtasks,
@@ -668,8 +716,10 @@ export default function ProjectDetailPage() {
         // Refresh tasks to update the list
         fetchTasks(true)
         
-        // Show appropriate toast message
-        if (data.data.statusChanged) {
+        // Show appropriate toast message based on response
+        if (data.data.subtask?.pendingAcceptance) {
+          toast.success('Waiting for other assignees to accept completion', { icon: '⏳' })
+        } else if (data.data.statusChanged) {
           toast.success(data.message)
         } else {
           toast.success(!currentCompleted ? 'Subtask completed' : 'Subtask reopened')
@@ -680,6 +730,100 @@ export default function ProjectDetailPage() {
     } catch (error) {
       console.error('Toggle subtask error:', error)
       toast.error('Failed to update subtask')
+    }
+  }
+
+  // Accept subtask completion (for multi-assignee tasks)
+  const handleAcceptSubtaskCompletion = async (taskId, subtaskId) => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/projects/${projectId}/tasks/${taskId}/subtasks`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          subtaskId,
+          action: 'acceptCompletion'
+        })
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        // Update subtask locally
+        setSelectedTask(prev => {
+          if (!prev) return prev
+          const updatedSubtasks = prev.subtasks.map(st => 
+            (st._id?.toString() || st._id) === subtaskId 
+              ? { ...st, ...data.data.subtask }
+              : st
+          )
+          return {
+            ...prev,
+            subtasks: updatedSubtasks,
+            progressPercentage: data.data.progressPercentage
+          }
+        })
+        fetchTasks(true)
+        
+        if (data.data.allAccepted) {
+          playNotificationSound(NotificationSoundTypes.SUCCESS)
+          toast.success('All assignees accepted! Subtask is now complete.', { icon: '✅' })
+        } else {
+          toast.success('Your acceptance has been recorded', { icon: '👍' })
+        }
+      } else {
+        toast.error(data.message)
+      }
+    } catch (error) {
+      console.error('Accept subtask error:', error)
+      toast.error('Failed to accept completion')
+    }
+  }
+
+  // Reject subtask completion (for multi-assignee tasks)
+  const handleRejectSubtaskCompletion = async (taskId, subtaskId, reason) => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/projects/${projectId}/tasks/${taskId}/subtasks`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          subtaskId,
+          action: 'rejectCompletion',
+          reason: reason || 'Rejected by team member'
+        })
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        // Update subtask locally - reset to incomplete
+        setSelectedTask(prev => {
+          if (!prev) return prev
+          const updatedSubtasks = prev.subtasks.map(st => 
+            (st._id?.toString() || st._id) === subtaskId 
+              ? { ...st, ...data.data.subtask, pendingAcceptance: false, completed: false }
+              : st
+          )
+          return {
+            ...prev,
+            subtasks: updatedSubtasks,
+            progressPercentage: data.data.progressPercentage
+          }
+        })
+        fetchTasks(true)
+        playNotificationSound(NotificationSoundTypes.WARNING)
+        toast.success('Subtask completion rejected and reset', { icon: '↩️' })
+      } else {
+        toast.error(data.message)
+      }
+    } catch (error) {
+      console.error('Reject subtask error:', error)
+      toast.error('Failed to reject completion')
     }
   }
 
@@ -2626,9 +2770,9 @@ export default function ProjectDetailPage() {
               <div className="flex items-center gap-2">
                 {(() => {
                   const isAssignedAndAccepted = selectedTask.assignees?.some(
-                    a => a.user._id === currentEmployeeId && a.assignmentStatus === 'accepted'
+                    a => (a.user?._id?.toString() || a.user?.toString()) === currentEmployeeId?.toString() && a.assignmentStatus === 'accepted'
                   )
-                  const canEdit = isProjectHead || (user && ['admin'].includes(user.role)) || isAssignedAndAccepted || selectedTask.createdBy?._id === currentEmployeeId
+                  const canEdit = isProjectHead || (user && ['admin'].includes(user.role)) || isAssignedAndAccepted || selectedTask.createdBy?._id?.toString() === currentEmployeeId?.toString()
                   
                   return canEdit && (
                     <button
@@ -2762,8 +2906,8 @@ export default function ProjectDetailPage() {
                   <div className="space-y-2">
                     {selectedTask.assignees.map(a => {
                       const canReassign = a.assignmentStatus === 'rejected' && 
-                        (selectedTask.createdBy?._id === currentEmployeeId || isProjectHead || (user && ['admin'].includes(user.role)))
-                      const isCurrentUserPending = a.user._id === currentEmployeeId && a.assignmentStatus === 'pending'
+                        (selectedTask.createdBy?._id?.toString() === currentEmployeeId?.toString() || isProjectHead || (user && ['admin'].includes(user.role)))
+                      const isCurrentUserPending = (a.user?._id?.toString() || a.user?.toString()) === currentEmployeeId?.toString() && a.assignmentStatus === 'pending'
                       const isUpdating = updatingTaskId === selectedTask._id
                       
                       return (
@@ -2788,7 +2932,7 @@ export default function ProjectDetailPage() {
                             <div>
                               <span className="font-medium text-gray-800">
                                 {a.user.firstName} {a.user.lastName}
-                                {a.user._id === currentEmployeeId && <span className="text-primary-600 ml-1">(You)</span>}
+                                {(a.user?._id?.toString() || a.user?.toString()) === currentEmployeeId?.toString() && <span className="text-primary-600 ml-1">(You)</span>}
                               </span>
                               {a.assignmentStatus === 'rejected' && a.rejectionReason && (
                                 <p className="text-xs text-orange-600 mt-0.5">Reason: {a.rejectionReason}</p>
@@ -2883,10 +3027,23 @@ export default function ProjectDetailPage() {
                   
                   <div className="space-y-3 bg-gray-50 rounded-lg p-3">
                     {selectedTask.subtasks.sort((a, b) => a.order - b.order).map((subtask) => {
-                      const isAssignedAndAccepted = selectedTask.assignees?.some(
-                        a => a.user._id === currentEmployeeId && a.assignmentStatus === 'accepted'
-                      )
-                      const canToggle = isAssignedAndAccepted || isProjectHead || (user && ['admin'].includes(user.role))
+                      // Use string comparison for ObjectIds - check multiple ways to match
+                      const currentEmpId = currentEmployeeId?.toString()
+                      const isAssignedAndAccepted = selectedTask.assignees?.some(a => {
+                        const assigneeId = a.user?._id?.toString() || a.user?._id || a.user?.toString()
+                        return assigneeId === currentEmpId && a.assignmentStatus === 'accepted'
+                      })
+                      
+                      // Also check if user is the task creator
+                      const isTaskCreator = selectedTask.createdBy?._id?.toString() === currentEmpId || 
+                                           selectedTask.createdBy?.toString() === currentEmpId
+                      
+                      // Check if user is task assignor
+                      const isTaskAssignor = selectedTask.assignedBy?._id?.toString() === currentEmpId ||
+                                            selectedTask.assignedBy?.toString() === currentEmpId
+                      
+                      // Allow toggle if: assigned & accepted, project head, admin, task creator, task assignor, or accepted project member
+                      const canToggle = isAssignedAndAccepted || isProjectHead || (user && ['admin'].includes(user.role)) || isTaskCreator || isTaskAssignor || isAcceptedMember
                       const canComment = canToggle // Same permissions for commenting
                       
                       // Color coding for comment author roles
@@ -2921,22 +3078,48 @@ export default function ProjectDetailPage() {
                       }
                       
                       return (
-                        <div key={subtask._id || subtask.title} className="bg-white rounded-lg p-3 border border-gray-200">
+                        <div key={subtask._id || subtask.title} className={`rounded-lg p-3 border ${
+                          subtask.pendingAcceptance 
+                            ? 'bg-yellow-50 border-yellow-300' 
+                            : 'bg-white border-gray-200'
+                        }`}>
+                          {/* Pending Acceptance Banner */}
+                          {subtask.pendingAcceptance && (
+                            <div className="mb-2 pb-2 border-b border-yellow-200">
+                              <div className="flex items-center gap-2 text-yellow-700">
+                                <HiOutlineClock className="w-4 h-4" />
+                                <span className="text-xs font-medium">
+                                  Pending acceptance from other assignees
+                                </span>
+                              </div>
+                              {subtask.acceptedBy && subtask.acceptedBy.length > 0 && (
+                                <p className="text-xs text-yellow-600 mt-1">
+                                  {subtask.acceptedBy.length} of {selectedTask.assignees?.filter(a => a.assignmentStatus === 'accepted').length || '?'} accepted
+                                </p>
+                              )}
+                            </div>
+                          )}
+                          
                           <div 
-                            className={`flex items-center gap-3 ${canToggle ? 'cursor-pointer' : ''}`}
-                            onClick={() => canToggle && handleToggleSubtask(selectedTask._id, subtask._id, subtask.completed)}
+                            className={`flex items-center gap-3 ${canToggle && !subtask.pendingAcceptance ? 'cursor-pointer' : ''}`}
+                            onClick={() => canToggle && !subtask.pendingAcceptance && handleToggleSubtask(selectedTask._id, subtask._id, subtask.completed)}
                           >
                             <span className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
                               subtask.completed 
                                 ? 'bg-green-500 border-green-500' 
-                                : 'border-gray-300 bg-white'
+                                : subtask.pendingAcceptance
+                                  ? 'bg-yellow-400 border-yellow-400'
+                                  : 'border-gray-300 bg-white'
                             }`}>
                               {subtask.completed && <FaCheck className="text-white text-xs" />}
+                              {subtask.pendingAcceptance && !subtask.completed && <HiOutlineClock className="text-white text-xs" />}
                             </span>
                             <span className={`flex-1 text-sm font-medium ${
                               subtask.completed 
                                 ? 'line-through text-gray-400' 
-                                : 'text-gray-700'
+                                : subtask.pendingAcceptance
+                                  ? 'text-yellow-700'
+                                  : 'text-gray-700'
                             }`}>
                               {subtask.title}
                             </span>
@@ -2946,6 +3129,47 @@ export default function ProjectDetailPage() {
                               </span>
                             )}
                           </div>
+                          
+                          {/* Accept/Reject buttons for pending acceptance (only show to other assignees who haven't accepted) */}
+                          {subtask.pendingAcceptance && isAssignedAndAccepted && (
+                            (() => {
+                              const hasAlreadyAccepted = subtask.acceptedBy?.some(
+                                id => id.toString() === currentEmployeeId
+                              )
+                              if (hasAlreadyAccepted) {
+                                return (
+                                  <div className="mt-2 pl-8">
+                                    <span className="text-xs text-green-600 flex items-center gap-1">
+                                      <FaCheck className="w-3 h-3" /> You've accepted this completion
+                                    </span>
+                                  </div>
+                                )
+                              }
+                              return (
+                                <div className="mt-2 pl-8 flex gap-2">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      handleAcceptSubtaskCompletion(selectedTask._id, subtask._id)
+                                    }}
+                                    className="px-3 py-1.5 text-xs bg-green-500 text-white rounded-lg hover:bg-green-600 flex items-center gap-1"
+                                  >
+                                    <FaCheck className="w-3 h-3" /> Accept
+                                  </button>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      const reason = prompt('Reason for rejection (optional):')
+                                      handleRejectSubtaskCompletion(selectedTask._id, subtask._id, reason)
+                                    }}
+                                    className="px-3 py-1.5 text-xs bg-red-500 text-white rounded-lg hover:bg-red-600 flex items-center gap-1"
+                                  >
+                                    <FaTimes className="w-3 h-3" /> Reject
+                                  </button>
+                                </div>
+                              )
+                            })()
+                          )}
                           
                           {/* Subtask Comments */}
                           {subtask.comments && subtask.comments.length > 0 && (
@@ -2995,32 +3219,15 @@ export default function ProjectDetailPage() {
               {/* Status Control Buttons - Only show for tasks WITHOUT subtasks */}
               {(() => {
                 const isAssignedAndAccepted = selectedTask.assignees?.some(
-                  a => a.user._id === currentEmployeeId && a.assignmentStatus === 'accepted'
+                  a => (a.user?._id?.toString() || a.user?.toString()) === currentEmployeeId?.toString() && a.assignmentStatus === 'accepted'
                 )
                 const canControlTask = isAssignedAndAccepted || isProjectHead || (user && ['admin'].includes(user.role))
-                const canDelete = selectedTask.createdBy?._id === currentEmployeeId || isProjectHead || (user && ['admin'].includes(user.role))
+                const canDelete = selectedTask.createdBy?._id?.toString() === currentEmployeeId?.toString() || isProjectHead || (user && ['admin'].includes(user.role))
                 const isUpdating = updatingTaskId === selectedTask._id
                 const hasSubtasks = selectedTask.subtasks && selectedTask.subtasks.length > 0
 
                 return (
                   <>
-                    {/* For tasks WITH subtasks - show info about automatic status */}
-                    {hasSubtasks && selectedTask.status !== 'completed' && (
-                      <div className="border-t border-gray-200 pt-4 mb-4">
-                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                          <h4 className="text-sm font-medium text-blue-800 mb-1">Automatic Status Updates</h4>
-                          <p className="text-xs text-blue-600">
-                            Task status is automatically managed based on subtask progress:
-                          </p>
-                          <ul className="text-xs text-blue-600 mt-1 ml-4 list-disc">
-                            <li>Start a subtask → Task moves to "In Progress"</li>
-                            <li>Complete all subtasks (100%) → Task moves to "Review" for approval</li>
-                            <li>Uncheck subtasks → Task returns to appropriate status</li>
-                          </ul>
-                        </div>
-                      </div>
-                    )}
-                    
                     {/* For tasks WITHOUT subtasks - show manual status controls */}
                     {!hasSubtasks && canControlTask && selectedTask.status !== 'completed' && (
                       <div className="border-t border-gray-200 pt-4 mb-4">

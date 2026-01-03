@@ -3,6 +3,7 @@ import { getAuthAndModels } from '@/lib/auth'
 import { sendPushToUser } from '@/lib/pushNotification'
 import { sendMeetingInviteEmail } from '@/lib/mailer'
 import { emitMeetingUpdate } from '@/lib/realtimeEvents'
+import { createMeetingInvitationNotification } from '@/lib/actionableNotifications'
 import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
@@ -140,7 +141,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Meeting', 'Employee', 'Department', 'User', 'Notification'])
+    const auth = await getAuthAndModels(request, ['Meeting', 'Employee', 'Department', 'User', 'Notification', 'ActionableNotification'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
@@ -394,6 +395,23 @@ export async function POST(request) {
               lastName: organizer.lastName
             }
           })
+          
+          // Create actionable notification for meeting invitation (persistent toast)
+          try {
+            await createMeetingInvitationNotification(models, {
+              targetUserId: emp.userId._id,
+              meetingId: meeting._id,
+              meetingTitle: meeting.title,
+              organizerId: organizer._id,
+              organizerName: `${organizer.firstName} ${organizer.lastName}`,
+              startTime: meeting.scheduledStart,
+              endTime: meeting.scheduledEnd,
+              isRecurring: !!meeting.recurrence
+            })
+          } catch (actionErr) {
+            console.error('[Meetings] Error creating actionable notification:', actionErr)
+            // Don't fail the request if actionable notification fails
+          }
         }
       }
     }

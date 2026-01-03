@@ -85,6 +85,29 @@ const TaskSchema = new mongoose.Schema({
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Employee'
     },
+    // Multi-assignee acceptance tracking
+    // When one assignee marks subtask complete, others must accept
+    pendingAcceptance: {
+      type: Boolean,
+      default: false
+    },
+    // List of employee IDs who have accepted this subtask completion
+    acceptedBy: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Employee'
+    }],
+    // List of employee IDs who rejected this subtask completion
+    rejectedBy: [{
+      employee: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Employee'
+      },
+      reason: String,
+      rejectedAt: {
+        type: Date,
+        default: Date.now
+      }
+    }],
     // Subtask-level ETA for accurate tracking
     estimatedDays: {
       type: Number,

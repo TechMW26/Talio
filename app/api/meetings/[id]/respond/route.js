@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { sendPushToUser } from '@/lib/pushNotification'
 import { sendMeetingResponseEmail } from '@/lib/mailer'
+import { dismissNotificationsForReference } from '@/lib/actionableNotifications'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,7 +12,7 @@ export async function POST(request, { params }) {
     const { id } = await params
 
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Meeting', 'Employee', 'User'])
+    const auth = await getAuthAndModels(request, ['Meeting', 'Employee', 'User', 'ActionableNotification'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
@@ -19,12 +20,16 @@ export async function POST(request, { params }) {
     const { Meeting, Employee, User } = models
 
     const data = await request.json();
-    const { response, reason } = data; // response: 'accepted', 'rejected', 'maybe'
+    // Support both 'response' and older status names for compatibility
+    const response = data.response || (data.status === 'tentative' ? 'maybe' : data.status)
+    const reason = data.reason; // response: 'accepted', 'rejected/declined', 'maybe/tentative'
 
-    if (!response || !['accepted', 'rejected', 'maybe'].includes(response)) {
+    const normalizedResponse = response === 'declined' ? 'rejected' : (response === 'tentative' ? 'maybe' : response)
+
+    if (!normalizedResponse || !['accepted', 'rejected', 'maybe'].includes(normalizedResponse)) {
       return NextResponse.json({ 
         success: false, 
-        message: 'Invalid response. Must be accepted, rejected, or maybe' 
+        message: 'Invalid response. Must be accepted, rejected/declined, or maybe/tentative' 
       }, { status: 400 });
     }
 
@@ -72,30 +77,38 @@ export async function POST(request, { params }) {
     }
 
     // Update invitation status
-    meeting.invitees[inviteeIndex].status = response
+    meeting.invitees[inviteeIndex].status = normalizedResponse
     meeting.invitees[inviteeIndex].respondedAt = new Date()
 
-    if (response === 'rejected' && reason) {
+    if (normalizedResponse === 'rejected' && reason) {
       meeting.invitees[inviteeIndex].rejectionReason = reason
     }
 
     await meeting.save()
+    
+    // Dismiss actionable notification for this meeting invitation
+    try {
+      await dismissNotificationsForReference(models, 'Meeting', id)
+    } catch (dismissErr) {
+      console.error('[MeetingRespond] Error dismissing notifications:', dismissErr)
+      // Don't fail the request
+    }
 
     // Notify organizer about the response
     const organizerUserId = meeting.organizer?.userId?._id || meeting.organizer?.userId
     if (organizerUserId) {
-      const statusEmoji = response === 'accepted' ? '✅' : response === 'rejected' ? '❌' : '❓'
-      const statusText = response === 'accepted' ? 'accepted' : response === 'rejected' ? 'declined' : 'marked as maybe for'
+      const statusEmoji = normalizedResponse === 'accepted' ? '✅' : normalizedResponse === 'rejected' ? '❌' : '❓'
+      const statusText = normalizedResponse === 'accepted' ? 'accepted' : normalizedResponse === 'rejected' ? 'declined' : 'marked as maybe for'
 
       sendPushToUser(organizerUserId, {
         title: `${statusEmoji} Meeting Response`,
-        body: `${employee.firstName} ${employee.lastName} ${statusText} "${meeting.title}"${response === 'rejected' && reason ? `. Reason: ${reason}` : ''}`
+        body: `${employee.firstName} ${employee.lastName} ${statusText} "${meeting.title}"${normalizedResponse === 'rejected' && reason ? `. Reason: ${reason}` : ''}`
       }, {
         eventType: 'meeting-response',
         clickAction: `/dashboard/meetings/${meeting._id}`,
         data: { 
           meetingId: meeting._id.toString(),
-          response,
+          response: normalizedResponse,
           respondent: employee._id.toString()
         }
       }).catch(console.error)
@@ -108,8 +121,8 @@ export async function POST(request, { params }) {
           organizerName: `${meeting.organizer.firstName} ${meeting.organizer.lastName}`,
           inviteeName: `${employee.firstName} ${employee.lastName}`,
           meetingTitle: meeting.title,
-          response,
-          reason: response === 'rejected' ? reason : null
+          response: normalizedResponse,
+          reason: normalizedResponse === 'rejected' ? reason : null
         }).catch(err => {
           console.error('Failed to send meeting response email:', err.message)
         })
@@ -125,7 +138,7 @@ export async function POST(request, { params }) {
             firstName: employee.firstName,
             lastName: employee.lastName
           },
-          response,
+          response: normalizedResponse,
           reason: reason || null
         })
       }
@@ -133,9 +146,9 @@ export async function POST(request, { params }) {
 
     return NextResponse.json({
       success: true,
-      message: `Meeting invitation ${response}`,
+      message: `Meeting invitation ${normalizedResponse}`,
       data: {
-        status: response,
+        status: normalizedResponse,
         respondedAt: meeting.invitees[inviteeIndex].respondedAt
       }
     })
