@@ -53,6 +53,20 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
     return () => window.removeEventListener('resize', checkDesktop)
   }, [])
 
+  // Handle Escape key to close MIRA modal
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && showMiraModal && !miraModalClosing) {
+        setMiraModalClosing(true)
+      }
+    }
+    
+    if (showMiraModal) {
+      window.addEventListener('keydown', handleEscape)
+      return () => window.removeEventListener('keydown', handleEscape)
+    }
+  }, [showMiraModal, miraModalClosing])
+
   // Get user initials for avatar fallback
   const getUserInitials = () => {
     const firstName = employeeData?.firstName || user?.firstName || ''
@@ -837,7 +851,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
       {/* Iframe container - stays mounted once opened, renders above blur */}
       {miraHasOpened && (
         <div 
-          className="fixed inset-0"
+          className={`fixed inset-0 ${(showMiraModal || miraModalClosing) ? (miraModalClosing ? 'animate-mira-iframe-out' : 'animate-mira-iframe-in') : ''}`}
           style={{ 
             zIndex: (showMiraModal || miraModalClosing) ? 99999 : -1,
             visibility: (showMiraModal || miraModalClosing) ? 'visible' : 'hidden',
