@@ -36,6 +36,8 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
   const [timezone, setTimezone] = useState('Asia/Kolkata')
   const [isDesktop, setIsDesktop] = useState(false)
   const [showMiraModal, setShowMiraModal] = useState(false)
+  const [miraModalClosing, setMiraModalClosing] = useState(false)
+  const [miraHasOpened, setMiraHasOpened] = useState(false)
   const notifRef = useRef(null)
   const profileRef = useRef(null)
   const searchRef = useRef(null)
@@ -532,7 +534,10 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
           {/* MIRA Cloud Button - Desktop Only */}
           <div className="hidden md:block relative group">
             <button
-              onClick={() => setShowMiraModal(true)}
+              onClick={() => {
+                setMiraHasOpened(true)
+                setShowMiraModal(true)
+              }}
               className="relative p-2.5 rounded-xl transition-all duration-300 group-hover:bg-gradient-to-br group-hover:from-blue-50 group-hover:to-indigo-50"
               style={{
                 color: 'var(--color-text-secondary)',
@@ -815,20 +820,30 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
       )}
 
       {/* MIRA Cloud Fullscreen Modal */}
-      {showMiraModal && (
+      {/* Backdrop overlay with blur animation - renders below iframe */}
+      {(showMiraModal || miraModalClosing) && (
         <div 
-          className="fixed inset-0 animate-fadeIn"
-          style={{ zIndex: 99999 }}
+          className={`fixed inset-0 ${miraModalClosing ? 'animate-mira-backdrop-out' : 'animate-mira-backdrop-in'}`}
+          style={{ zIndex: 99998, pointerEvents: 'none' }}
+          onAnimationEnd={() => {
+            if (miraModalClosing) {
+              setMiraModalClosing(false)
+              setShowMiraModal(false)
+            }
+          }}
+        />
+      )}
+      
+      {/* Iframe container - stays mounted once opened, renders above blur */}
+      {miraHasOpened && (
+        <div 
+          className="fixed inset-0"
+          style={{ 
+            zIndex: (showMiraModal || miraModalClosing) ? 99999 : -1,
+            visibility: (showMiraModal || miraModalClosing) ? 'visible' : 'hidden',
+            pointerEvents: (showMiraModal || miraModalClosing) ? 'auto' : 'none'
+          }}
         >
-          {/* Close button */}
-          <button
-            onClick={() => setShowMiraModal(false)}
-            className="absolute top-4 right-4 z-[100000] p-3 bg-gray-900/80 hover:bg-gray-900 rounded-full transition-all duration-200 group shadow-lg"
-          >
-            <FaTimes className="w-6 h-6 text-white group-hover:scale-110 transition-transform" />
-          </button>
-          
-          {/* Iframe - fullscreen */}
           <iframe
             src="https://itsmira.cloud"
             className="w-full h-full border-0"
@@ -837,6 +852,19 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
             title="MIRA Cloud"
           />
         </div>
+      )}
+      
+      {/* Close button - separate from backdrop for proper click handling */}
+      {(showMiraModal || miraModalClosing) && (
+        <button
+          onClick={() => {
+            setMiraModalClosing(true)
+          }}
+          className="fixed top-4 right-4 p-3 bg-gray-900/80 hover:bg-gray-900 rounded-full transition-all duration-200 group shadow-lg"
+          style={{ zIndex: 100000 }}
+        >
+          <FaTimes className="w-6 h-6 text-white group-hover:scale-110 transition-transform" />
+        </button>
       )}
     </header>
   )

@@ -457,6 +457,41 @@ body {
   animation: fadeInBackdrop 0.5s ease-out forwards;
 }
 
+/* MIRA Modal Backdrop Blur Animations */
+@keyframes miraBackdropBlurIn {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(1px);
+    -webkit-backdrop-filter: blur(1px);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+  }
+}
+
+@keyframes miraBackdropBlurOut {
+  from {
+    opacity: 1;
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+  }
+  to {
+    opacity: 0;
+    backdrop-filter: blur(1px);
+    -webkit-backdrop-filter: blur(1px);
+  }
+}
+
+.animate-mira-backdrop-in {
+  animation: miraBackdropBlurIn 0.3s ease-out forwards;
+}
+
+.animate-mira-backdrop-out {
+  animation: miraBackdropBlurOut 0.3s ease-in forwards;
+}
+
 /* Modal Enter Animation */
 @keyframes modal-enter {
   from {
