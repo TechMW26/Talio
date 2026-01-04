@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useAILoading } from '@/contexts/AILoadingContext'
+import { useTheme } from '@/contexts/ThemeContext'
+import { textToParticles, AI_MESSAGES, CHAR_WIDTH } from './particleFont'
 
 /**
  * Global AI Loading Animation Overlay
@@ -11,6 +13,7 @@ import { useAILoading } from '@/contexts/AILoadingContext'
  * - Pulsating backdrop blur (1px - 20px)
  * - Morphing 3D shapes (sphere → cube → pyramid → star → back)
  * - Particles disintegrate and reintegrate showing "thinking"
+ * - Text messages formed by particles
  */
 
 // 3D Shape definitions
@@ -182,58 +185,56 @@ const SHAPES = {
   }
 }
 
-// Shape order: sphere → scatter → cube → scatter → torus → scatter → hexagon → scatter → pyramid → scatter → octahedron → scatter → star → scatter
-const SHAPE_ORDER = ['sphere', 'scatter', 'cube', 'scatter', 'torus', 'scatter', 'hexagon', 'scatter', 'pyramid', 'scatter', 'octahedron', 'scatter', 'star', 'scatter']
+// Shape order: sphere → cube → torus → hexagon → pyramid → octahedron → star (text interspersed)
+// The animation will automatically scatter between each formation
+const BASE_SHAPES = ['sphere', 'cube', 'torus', 'hexagon', 'pyramid', 'octahedron', 'star']
 
-// Preload audio on module load (client-side only)
-let aiAnalysisAudio = null
-if (typeof window !== 'undefined') {
-  aiAnalysisAudio = new Audio('/sounds/ai-analysis.mp3')
-  aiAnalysisAudio.preload = 'auto'
-  aiAnalysisAudio.loop = true
-  aiAnalysisAudio.volume = 0.5
+// Animation phases: HOLDING (showing shape) → SCATTERING (dispersing) → MORPHING (forming new shape)
+const PHASE = {
+  HOLDING: 'holding',      // Particles are stationary showing shape/text
+  SCATTERING: 'scattering', // Particles dispersing outward
+  MORPHING: 'morphing'      // Particles forming new shape
 }
 
 export default function GlobalAILoadingOverlay() {
   const { isAILoading } = useAILoading()
+  const { theme } = useTheme()
   const canvasRef = useRef(null)
-  const gradientCanvasRef = useRef(null)
   const animationRef = useRef(null)
-  const gradientAnimRef = useRef(null)
   const particlesRef = useRef([])
-  const shapeIndexRef = useRef(0)
   const morphProgressRef = useRef(0)
-  const audioRef = useRef(aiAnalysisAudio)
   const [mounted, setMounted] = useState(false)
   const [isVisible, setIsVisible] = useState(false)
   const [isAnimatingOut, setIsAnimatingOut] = useState(false)
   const [blurAmount, setBlurAmount] = useState(1)
-
-  // Play/stop audio based on visibility
+  
+  // Get theme colors for particles - use primary 500 (lighter) and 800 (darker)
+  const themeColorsRef = useRef({
+    light: { r: 129, g: 193, b: 181 }, // fallback #81C1B5
+    dark: { r: 47, g: 109, b: 123 }    // fallback #2F6D7B
+  })
+  
+  // Update theme colors when theme changes
   useEffect(() => {
-    if (!audioRef.current) return
-    
-    if (isVisible && !isAnimatingOut) {
-      // Reset and play audio
-      audioRef.current.currentTime = 0
-      audioRef.current.play().catch(err => {
-        // Autoplay may be blocked by browser policy, ignore silently
-        console.log('[AI Loading] Audio autoplay blocked:', err.message)
-      })
-    } else {
-      // Fade out and stop audio
-      const fadeOut = () => {
-        if (audioRef.current.volume > 0.05) {
-          audioRef.current.volume = Math.max(0, audioRef.current.volume - 0.05)
-          requestAnimationFrame(fadeOut)
-        } else {
-          audioRef.current.pause()
-          audioRef.current.volume = 0.5 // Reset volume for next play
-        }
+    if (theme?.primary) {
+      // Parse hex colors from theme
+      const parseHex = (hex) => {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex)
+        return result ? {
+          r: parseInt(result[1], 16),
+          g: parseInt(result[2], 16),
+          b: parseInt(result[3], 16)
+        } : null
       }
-      fadeOut()
+      
+      const lightColor = parseHex(theme.primary[400]) || parseHex(theme.primary[500])
+      const darkColor = parseHex(theme.primary[700]) || parseHex(theme.primary[800])
+      
+      if (lightColor && darkColor) {
+        themeColorsRef.current = { light: lightColor, dark: darkColor }
+      }
     }
-  }, [isVisible, isAnimatingOut])
+  }, [theme])
 
   // Pulsating blur effect (1px - 20px)
   useEffect(() => {
@@ -255,115 +256,6 @@ export default function GlobalAILoadingOverlay() {
       if (blurAnimFrame) cancelAnimationFrame(blurAnimFrame)
     }
   }, [isVisible])
-
-  // Animated mesh gradient background - reactive to AI thinking
-  useEffect(() => {
-    if (!isVisible || !gradientCanvasRef.current || !mounted) return
-
-    const canvas = gradientCanvasRef.current
-    const ctx = canvas.getContext('2d')
-    
-    // Gradient blob positions - will react to "thinking" intensity
-    const blobs = [
-      { x: 0.2, y: 0.3, vx: 0.0006, vy: 0.0008, color: [255, 0, 100, 0.3], radius: 0.5, baseSpeed: 1 },   // Magenta
-      { x: 0.8, y: 0.2, vx: -0.0008, vy: 0.0006, color: [0, 100, 255, 0.3], radius: 0.55, baseSpeed: 1.2 },  // Blue
-      { x: 0.5, y: 0.8, vx: 0.0004, vy: -0.0006, color: [180, 0, 255, 0.3], radius: 0.5, baseSpeed: 0.9 }, // Purple
-      { x: 0.3, y: 0.6, vx: -0.0006, vy: -0.0004, color: [255, 50, 50, 0.3], radius: 0.45, baseSpeed: 1.1 }, // Red
-      { x: 0.7, y: 0.5, vx: 0.0007, vy: 0.0005, color: [0, 150, 180, 0.3], radius: 0.5, baseSpeed: 1 },    // Cyan
-      { x: 0.1, y: 0.9, vx: 0.0005, vy: -0.0007, color: [10, 10, 30, 0.3], radius: 0.65, baseSpeed: 0.8 }, // Near black, semi-transparent
-    ]
-    
-    let thinkingIntensity = 0
-    let targetIntensity = 1
-
-    const resize = () => {
-      const dpr = window.devicePixelRatio || 1
-      canvas.width = window.innerWidth * dpr
-      canvas.height = window.innerHeight * dpr
-      canvas.style.width = window.innerWidth + 'px'
-      canvas.style.height = window.innerHeight + 'px'
-      ctx.setTransform(1, 0, 0, 1, 0, 0)
-      ctx.scale(dpr, dpr)
-    }
-    
-    resize()
-
-    const animateGradient = () => {
-      const w = window.innerWidth
-      const h = window.innerHeight
-      const time = Date.now() * 0.001
-      
-      // Animate thinking intensity with pulsing
-      targetIntensity = 0.7 + Math.sin(time * 2) * 0.3
-      thinkingIntensity += (targetIntensity - thinkingIntensity) * 0.05
-      
-      // Clear canvas and set 10% opacity dark base background
-      ctx.clearRect(0, 0, w, h)
-      ctx.fillStyle = 'rgba(5, 5, 15, 0.1)'
-      ctx.fillRect(0, 0, w, h)
-      
-      // Update and draw blobs with lighter composite for color mixing
-      ctx.globalCompositeOperation = 'lighter'
-      
-      blobs.forEach((blob, idx) => {
-        // Reactive movement - speed increases with thinking intensity
-        const speedMultiplier = 1 + thinkingIntensity * 2
-        const pulsePhase = time * 3 + idx * 0.5
-        const pulse = 1 + Math.sin(pulsePhase) * 0.3 * thinkingIntensity
-        
-        // Move blob with reactive speed
-        blob.x += blob.vx * speedMultiplier * blob.baseSpeed
-        blob.y += blob.vy * speedMultiplier * blob.baseSpeed
-        
-        // Add some swirling motion based on thinking
-        blob.x += Math.sin(time * 2 + idx) * 0.001 * thinkingIntensity
-        blob.y += Math.cos(time * 2 + idx * 0.7) * 0.001 * thinkingIntensity
-        
-        // Bounce off edges with energy
-        if (blob.x < 0 || blob.x > 1) {
-          blob.vx *= -1
-          blob.vx += (Math.random() - 0.5) * 0.0004 * thinkingIntensity
-        }
-        if (blob.y < 0 || blob.y > 1) {
-          blob.vy *= -1
-          blob.vy += (Math.random() - 0.5) * 0.0004 * thinkingIntensity
-        }
-        
-        // Clamp positions
-        blob.x = Math.max(0, Math.min(1, blob.x))
-        blob.y = Math.max(0, Math.min(1, blob.y))
-        
-        // Draw gradient blob with pulsing radius
-        const currentRadius = blob.radius * pulse
-        const gradient = ctx.createRadialGradient(
-          blob.x * w, blob.y * h, 0,
-          blob.x * w, blob.y * h, currentRadius * Math.max(w, h)
-        )
-        
-        // Color intensity at 30% max transparency
-        const baseAlpha = 0.3 // 30% max transparency
-        const colorIntensity = baseAlpha * (0.6 + thinkingIntensity * 0.4)
-        gradient.addColorStop(0, `rgba(${blob.color[0]}, ${blob.color[1]}, ${blob.color[2]}, ${colorIntensity})`)
-        gradient.addColorStop(0.4, `rgba(${blob.color[0]}, ${blob.color[1]}, ${blob.color[2]}, ${colorIntensity * 0.5})`)
-        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)')
-        
-        ctx.fillStyle = gradient
-        ctx.fillRect(0, 0, w, h)
-      })
-      
-      ctx.globalCompositeOperation = 'source-over'
-      
-      gradientAnimRef.current = requestAnimationFrame(animateGradient)
-    }
-    
-    animateGradient()
-    window.addEventListener('resize', resize)
-    
-    return () => {
-      if (gradientAnimRef.current) cancelAnimationFrame(gradientAnimRef.current)
-      window.removeEventListener('resize', resize)
-    }
-  }, [isVisible, mounted])
 
   // Handle visibility transitions
   useEffect(() => {
@@ -398,10 +290,20 @@ export default function GlobalAILoadingOverlay() {
     
     let baseRadius = getBaseRadius()
     const PARTICLE_COUNT = 6000 // Increased for denser shapes
-    const LERP_SPEED = 0.12 // Direct interpolation speed (no spring)
+    const LERP_SPEED = 0.18 // Faster interpolation for quicker formation
+    const SCATTER_LERP_SPEED = 0.22 // Fast scattering
     const Z_PERSPECTIVE = 500
-    const MORPH_DURATION = 1000 // ms per shape transition
-    const HOLD_DURATION = 1500 // ms to hold each shape
+    const HOLD_DURATION = 1400 // ms to hold each shape
+    const TEXT_HOLD_DURATION = 3200 // ms to hold text (longer for readability)
+    const SCATTER_DURATION = 1500 // ms for scatter animation (increased for longer scatter hold)
+    const MORPH_DURATION = 450 // ms for forming new shape (faster)
+    
+    // Track current state
+    let currentShapeIndex = 0
+    let currentMessageIndex = Math.floor(Math.random() * AI_MESSAGES.length)
+    let showTextNext = true // Alternate between shapes and text
+    let currentPhase = PHASE.HOLDING
+    let phaseStartTime = Date.now()
 
     const resize = () => {
       const dpr = window.devicePixelRatio || 1
@@ -417,35 +319,98 @@ export default function GlobalAILoadingOverlay() {
     // Initialize particles with targets
     const initParticles = () => {
       particlesRef.current = []
-      const shapeFn = SHAPES[SHAPE_ORDER[0]]
+      const shapeFn = SHAPES.sphere
       
       for (let i = 0; i < PARTICLE_COUNT; i++) {
         const pos = shapeFn(i, PARTICLE_COUNT, baseRadius)
         particlesRef.current.push({
           x: pos.x, y: pos.y, z: pos.z,
           targetX: pos.x, targetY: pos.y, targetZ: pos.z,
-          size: Math.random() * 0.8 + 0.3, // Smaller dots (was 2.2 + 0.4)
+          baseTargetX: pos.x, baseTargetY: pos.y, baseTargetZ: pos.z, // Store base position for oscillation
+          size: Math.random() * 1 + 0.8,
           hueOffset: Math.random() * 60 - 30,
-          phaseOffset: Math.random() * Math.PI * 2
+          phaseOffset: Math.random() * Math.PI * 2,
+          // Oscillation properties
+          oscillate: false,
+          oscillateSpeed: 1 + Math.random() * 2,
+          oscillateAmount: 3 + Math.random() * 5,
+          oscillatePhase: Math.random() * Math.PI * 2,
+          // Store scatter target for each particle
+          scatterX: 0, scatterY: 0, scatterZ: 0
         })
       }
     }
 
-    // Update particle targets for new shape
-    const setNewShapeTargets = (shapeIndex) => {
-      const shapeName = SHAPE_ORDER[shapeIndex % SHAPE_ORDER.length]
-      const shapeFn = SHAPES[shapeName]
-      
-      particlesRef.current.forEach((p, i) => {
-        const newPos = shapeFn(i, PARTICLE_COUNT, baseRadius)
-        p.targetX = newPos.x
-        p.targetY = newPos.y
-        p.targetZ = newPos.z
+    // Set scatter targets - particles fly outward
+    const setScatterTargets = () => {
+      particlesRef.current.forEach((p) => {
+        const scatterPos = SHAPES.scatter(0, PARTICLE_COUNT, baseRadius)
+        p.scatterX = scatterPos.x
+        p.scatterY = scatterPos.y
+        p.scatterZ = scatterPos.z
+        p.targetX = p.scatterX
+        p.targetY = p.scatterY
+        p.targetZ = p.scatterZ
+        p.oscillate = false // No oscillation during scatter
       })
     }
 
-    let lastShapeChange = Date.now()
-    let isHolding = true
+    // Update particle targets for new shape or text
+    const setNewShapeTargets = (isText) => {
+      if (isText) {
+        // Get next message (cycle through)
+        currentMessageIndex = (currentMessageIndex + 1) % AI_MESSAGES.length
+        const message = AI_MESSAGES[currentMessageIndex]
+        
+        // Calculate scale based on screen width - bezier font uses different scaling
+        const maxWidth = window.innerWidth * 0.65
+        const minDim = Math.min(window.innerWidth, window.innerHeight)
+        // Scale factor for bezier curves (larger numbers = bigger text)
+        const scale = Math.min(Math.max(minDim * 0.045, 28), 50)
+        
+        // Get particle positions for text
+        const textParticles = textToParticles(message, scale, 0, 0)
+        
+        // Assign text positions to particles
+        particlesRef.current.forEach((p, i) => {
+          if (textParticles.length > 0) {
+            const tp = textParticles[i % textParticles.length]
+            const baseX = tp.x
+            const baseY = tp.y
+            const baseZ = tp.z || (Math.random() - 0.5) * 8
+            
+            p.targetX = baseX
+            p.targetY = baseY
+            p.targetZ = baseZ
+            p.baseTargetX = baseX
+            p.baseTargetY = baseY
+            p.baseTargetZ = baseZ
+            
+            // Transfer oscillation properties from text particle
+            p.oscillate = tp.oscillate || false
+            p.oscillateSpeed = tp.oscillateSpeed || (1 + Math.random() * 2)
+            p.oscillateAmount = tp.oscillateAmount || (scale * 0.4)
+            p.oscillatePhase = Math.random() * Math.PI * 2
+          }
+        })
+      } else {
+        // Regular 3D shape - no oscillation
+        const shapeName = BASE_SHAPES[currentShapeIndex % BASE_SHAPES.length]
+        const shapeFn = SHAPES[shapeName]
+        particlesRef.current.forEach((p, i) => {
+          const newPos = shapeFn(i, PARTICLE_COUNT, baseRadius)
+          p.targetX = newPos.x
+          p.targetY = newPos.y
+          p.targetZ = newPos.z
+          p.baseTargetX = newPos.x
+          p.baseTargetY = newPos.y
+          p.baseTargetZ = newPos.z
+          p.oscillate = false
+        })
+      }
+    }
+
+    let isTextMode = false // Track if currently showing text
     
     const animate = () => {
       const width = window.innerWidth
@@ -456,31 +421,70 @@ export default function GlobalAILoadingOverlay() {
       
       ctx.clearRect(0, 0, width, height)
       
-      // Check if we need to transition to next shape
-      const elapsed = Date.now() - lastShapeChange
-      if (isHolding && elapsed > HOLD_DURATION) {
-        isHolding = false
-        shapeIndexRef.current = (shapeIndexRef.current + 1) % SHAPE_ORDER.length
-        setNewShapeTargets(shapeIndexRef.current)
-        lastShapeChange = Date.now()
-      } else if (!isHolding && elapsed > MORPH_DURATION) {
-        isHolding = true
-        lastShapeChange = Date.now()
+      // Phase state machine
+      const elapsed = Date.now() - phaseStartTime
+      
+      if (currentPhase === PHASE.HOLDING) {
+        // After holding, start scattering
+        const holdTime = isTextMode ? TEXT_HOLD_DURATION : HOLD_DURATION
+        if (elapsed > holdTime) {
+          currentPhase = PHASE.SCATTERING
+          phaseStartTime = Date.now()
+          setScatterTargets()
+        }
+        
+        // Apply oscillation to particles during text mode holding
+        if (isTextMode) {
+          particlesRef.current.forEach(p => {
+            if (p.oscillate) {
+              const osc = Math.sin(time * p.oscillateSpeed + p.oscillatePhase) * p.oscillateAmount
+              p.targetX = p.baseTargetX + osc * 0.5
+              p.targetY = p.baseTargetY + Math.cos(time * p.oscillateSpeed * 0.7 + p.oscillatePhase) * p.oscillateAmount * 0.3
+            }
+          })
+        }
+      } else if (currentPhase === PHASE.SCATTERING) {
+        // After scattering, start morphing into new shape
+        if (elapsed > SCATTER_DURATION) {
+          currentPhase = PHASE.MORPHING
+          phaseStartTime = Date.now()
+          
+          // Decide next formation: alternate between shapes and text
+          if (showTextNext) {
+            isTextMode = true
+            setNewShapeTargets(true) // Show text
+          } else {
+            isTextMode = false
+            currentShapeIndex = (currentShapeIndex + 1) % BASE_SHAPES.length
+            setNewShapeTargets(false) // Show shape
+          }
+          showTextNext = !showTextNext
+        }
+      } else if (currentPhase === PHASE.MORPHING) {
+        // After morphing complete, start holding
+        if (elapsed > MORPH_DURATION) {
+          currentPhase = PHASE.HOLDING
+          phaseStartTime = Date.now()
+        }
       }
       
-      // Rotation
-      const autoRotX = Math.sin(time * 0.5) * 0.25
-      const autoRotY = time * 0.4
-      const autoRotZ = Math.sin(time * 0.3) * 0.15
+      // Determine lerp speed based on phase
+      const currentLerpSpeed = currentPhase === PHASE.SCATTERING ? SCATTER_LERP_SPEED : LERP_SPEED
+      
+      // Rotation - reduce for text mode to keep readable
+      const rotationScale = isTextMode ? 0.1 : 1
+      const autoRotX = Math.sin(time * 0.5) * 0.25 * rotationScale
+      const autoRotY = isTextMode ? 0 : time * 0.4 // No Y rotation for text
+      const autoRotZ = Math.sin(time * 0.3) * 0.15 * rotationScale
 
       // Sort by Z for depth
       const sorted = [...particlesRef.current].sort((a, b) => b.z - a.z)
 
       sorted.forEach(p => {
-        // Move directly towards target (linear interpolation, no spring)
-        p.x += (p.targetX - p.x) * LERP_SPEED
-        p.y += (p.targetY - p.y) * LERP_SPEED
-        p.z += (p.targetZ - p.z) * LERP_SPEED
+        // Move towards target with current speed
+        p.x += (p.targetX - p.x) * currentLerpSpeed
+        p.y += (p.targetY - p.y) * currentLerpSpeed
+        p.z += (p.targetZ - p.z) * currentLerpSpeed
 
         // Apply rotation for display
         let rx = p.x, ry = p.y, rz = p.z
@@ -503,15 +507,16 @@ export default function GlobalAILoadingOverlay() {
         // Project to 2D
         const scale = Z_PERSPECTIVE / (Z_PERSPECTIVE + rz)
         if (rz > -Z_PERSPECTIVE + 10 && scale > 0) {
-          // Color: cyan to magenta based on position - fully opaque
+          // Color: interpolate between theme colors (darker and lighter variants)
           const colorPhase = (Math.sin(time + p.phaseOffset) * 0.5 + 0.5)
-          const r = Math.floor(80 + colorPhase * 150 + p.hueOffset)
-          const g = Math.floor(180 - colorPhase * 80 + p.hueOffset * 0.3)
-          const b = 255
+          const { light, dark } = themeColorsRef.current
+          const r = Math.floor(dark.r + colorPhase * (light.r - dark.r) + p.hueOffset * 0.2)
+          const g = Math.floor(dark.g + colorPhase * (light.g - dark.g) + p.hueOffset * 0.3)
+          const b = Math.floor(dark.b + colorPhase * (light.b - dark.b) + p.hueOffset * 0.2)
           
           ctx.beginPath()
           ctx.arc(cx + rx * scale, cy + ry * scale, Math.max(0.2, p.size * scale), 0, Math.PI * 2)
-          ctx.fillStyle = `rgb(${Math.min(255, Math.max(0, r))},${Math.min(255, Math.max(0, g))},${b})`
+          ctx.fillStyle = `rgb(${Math.min(255, Math.max(0, r))},${Math.min(255, Math.max(0, g))},${Math.min(255, Math.max(0, b))})`
           ctx.fill()
         }
       })
@@ -553,12 +558,6 @@ export default function GlobalAILoadingOverlay() {
           isAnimatingOut ? 'ai-loading-exit' : 'ai-loading-enter'
         }`}
       >
-        {/* Animated mesh gradient background */}
-        <canvas 
-          ref={gradientCanvasRef}
-          className="absolute inset-0 w-full h-full"
-        />
-
         {/* Morphing 3D shape particles */}
         <canvas 
           ref={canvasRef}

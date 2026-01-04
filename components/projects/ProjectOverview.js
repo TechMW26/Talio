@@ -11,7 +11,9 @@ import {
   FaExclamationTriangle, FaRocket, FaLightbulb, FaCheckCircle,
   FaArrowUp, FaArrowDown, FaSpinner, FaBrain, FaStar,
   FaChartPie, FaChartBar, FaTrophy, FaFlag, FaRedo,
-  FaTimesCircle, FaQuestionCircle, FaInfoCircle
+  FaTimesCircle, FaQuestionCircle, FaInfoCircle, FaBolt,
+  FaUserClock, FaBalanceScale, FaShieldAlt, FaFire, FaBullseye,
+  FaUserCheck, FaUserTimes, FaExclamationCircle, FaArrowRight
 } from 'react-icons/fa'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAILoading } from '@/contexts/AILoadingContext'
@@ -54,6 +56,7 @@ export default function ProjectOverview({ projectId }) {
   const [aiLoading, setAiLoading] = useState(false)
   const [analytics, setAnalytics] = useState(null)
   const [aiInsights, setAiInsights] = useState(null)
+  const [aiInsightsFetched, setAiInsightsFetched] = useState(false) // Track if AI insights were already fetched
   const [error, setError] = useState(null)
   const [activeSection, setActiveSection] = useState('overview')
   
@@ -93,7 +96,7 @@ export default function ProjectOverview({ projectId }) {
       
       if (data.success) {
         setAnalytics(data.data)
-        fetchAIInsights(data.data)
+        // AI insights are now fetched on-demand when user clicks Smart Insights tab
       } else {
         setError(data.message || 'Failed to load analytics')
       }
@@ -124,6 +127,7 @@ export default function ProjectOverview({ projectId }) {
       
       if (data.success && data.insights) {
         setAiInsights(data.insights)
+        setAiInsightsFetched(true)
       }
     } catch (err) {
       console.error('Fetch AI insights error:', err)
@@ -215,11 +219,17 @@ export default function ProjectOverview({ projectId }) {
           { id: 'overview', label: 'Overview', icon: FaChartLine },
           { id: 'team', label: 'Team Analytics', icon: FaUsers },
           { id: 'tasks', label: 'Task Insights', icon: FaTasks },
-          { id: 'ai', label: 'AI Analysis', icon: FaBrain }
+          { id: 'ai', label: 'Smart Insights', icon: FaBrain }
         ].map(tab => (
           <button
             key={tab.id}
-            onClick={() => setActiveSection(tab.id)}
+            onClick={() => {
+              setActiveSection(tab.id)
+              // Fetch AI insights on-demand when Smart Insights tab is clicked
+              if (tab.id === 'ai' && !aiInsightsFetched && !aiLoading && analytics) {
+                fetchAIInsights(analytics)
+              }
+            }}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all ${
               activeSection === tab.id
                 ? 'bg-blue-600 text-white shadow-md'
@@ -750,135 +760,296 @@ export default function ProjectOverview({ projectId }) {
         </div>
       )}
 
-      {/* AI Analysis Section */}
+      {/* Smart Insights Section */}
       {activeSection === 'ai' && (
         <div className="space-y-6">
           {aiLoading ? (
             <div className="flex items-center justify-center py-16">
               <div className="text-center">
                 <FaBrain className="animate-pulse text-6xl text-blue-600 mx-auto mb-4" />
-                <p className="text-lg font-semibold text-gray-700">AI is analyzing your project...</p>
-                <p className="text-sm text-gray-500 mt-2">This may take a few seconds</p>
+                <p className="text-lg font-semibold text-gray-700">Analyzing project data...</p>
+                <p className="text-sm text-gray-500 mt-2">Generating actionable insights</p>
               </div>
             </div>
           ) : aiInsights ? (
             <>
-              {/* AI Summary */}
-              <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl p-6 shadow-sm">
-                <div className="flex items-start gap-4">
-                  <div className="p-4 bg-white/20 rounded-xl">
-                    <FaBrain className="text-white text-3xl" />
+              {/* Health Score & Verdict */}
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                {/* Health Score Gauge */}
+                <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+                  <div className="text-center">
+                    <div className={`inline-flex items-center justify-center w-20 h-20 rounded-full border-4 ${
+                      (aiInsights.healthScore || 0) >= 80 ? 'border-green-500 bg-green-50' :
+                      (aiInsights.healthScore || 0) >= 60 ? 'border-blue-500 bg-blue-50' :
+                      (aiInsights.healthScore || 0) >= 40 ? 'border-amber-500 bg-amber-50' :
+                      'border-red-500 bg-red-50'
+                    }`}>
+                      <span className={`text-2xl font-black ${
+                        (aiInsights.healthScore || 0) >= 80 ? 'text-green-600' :
+                        (aiInsights.healthScore || 0) >= 60 ? 'text-blue-600' :
+                        (aiInsights.healthScore || 0) >= 40 ? 'text-amber-600' :
+                        'text-red-600'
+                      }`}>{aiInsights.healthScore || 0}</span>
+                    </div>
+                    <p className="mt-2 text-sm font-bold text-gray-700">Health Score</p>
+                    <p className={`text-xs font-semibold uppercase ${
+                      aiInsights.healthStatus === 'good' ? 'text-green-600' :
+                      aiInsights.healthStatus === 'warning' ? 'text-amber-600' :
+                      'text-red-600'
+                    }`}>{aiInsights.healthStatus || 'N/A'}</p>
                   </div>
+                </div>
+
+                {/* One Line Verdict */}
+                <div className="lg:col-span-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-5 shadow-sm border border-gray-200 flex items-center">
+                  <FaBrain className="text-blue-600 text-2xl mr-4 flex-shrink-0" />
                   <div>
-                    <h3 className="text-xl font-bold text-white mb-2">
-                      AI Project Summary
-                    </h3>
-                    <p className="text-white/90 text-lg leading-relaxed">
-                      {aiInsights.summary || 'No summary available'}
-                    </p>
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">AI Verdict</p>
+                    <p className="text-lg font-bold text-gray-900">{aiInsights.oneLineVerdict || 'Analysis complete'}</p>
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Strengths */}
-                <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-                  <div className="flex items-center gap-3 mb-4">
-                    <FaStar className="text-green-500 text-xl" />
-                    <h3 className="text-xl font-bold text-gray-900">Strengths</h3>
-                  </div>
-                  <ul className="space-y-3">
-                    {(aiInsights.strengths || []).map((strength, i) => (
-                      <li key={i} className="flex items-start gap-3">
-                        <FaCheckCircle className="text-green-500 mt-1 flex-shrink-0" />
-                        <span className="text-gray-700 font-medium">{strength}</span>
-                      </li>
-                    ))}
-                    {(!aiInsights.strengths || aiInsights.strengths.length === 0) && (
-                      <li className="text-gray-500 font-medium">No strengths identified yet</li>
-                    )}
-                  </ul>
-                </div>
-
-                {/* Areas for Improvement */}
-                <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-                  <div className="flex items-center gap-3 mb-4">
-                    <FaExclamationTriangle className="text-amber-500 text-xl" />
-                    <h3 className="text-xl font-bold text-gray-900">Areas to Improve</h3>
-                  </div>
-                  <ul className="space-y-3">
-                    {(aiInsights.improvements || []).map((item, i) => (
-                      <li key={i} className="flex items-start gap-3">
-                        <FaFlag className="text-amber-500 mt-1 flex-shrink-0" />
-                        <span className="text-gray-700 font-medium">{item}</span>
-                      </li>
-                    ))}
-                    {(!aiInsights.improvements || aiInsights.improvements.length === 0) && (
-                      <li className="text-gray-500 font-medium">No improvements needed</li>
-                    )}
-                  </ul>
-                </div>
-
-                {/* Risk Factors */}
-                <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-                  <div className="flex items-center gap-3 mb-4">
-                    <FaExclamationTriangle className="text-red-500 text-xl" />
-                    <h3 className="text-xl font-bold text-gray-900">Risk Factors</h3>
-                  </div>
-                  <ul className="space-y-3">
-                    {(aiInsights.riskFactors || []).map((risk, i) => (
-                      <li key={i} className="flex items-start gap-3">
-                        <FaTimesCircle className="text-red-500 mt-1 flex-shrink-0" />
-                        <span className="text-gray-700 font-medium">{risk}</span>
-                      </li>
-                    ))}
-                    {(!aiInsights.riskFactors || aiInsights.riskFactors.length === 0) && (
-                      <li className="text-gray-500 font-medium">No major risks identified</li>
-                    )}
-                  </ul>
-                </div>
-              </div>
-
-              {/* Recommendations */}
-              <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-                <div className="flex items-center gap-3 mb-6">
-                  <FaLightbulb className="text-purple-500 text-xl" />
-                  <h3 className="text-xl font-bold text-gray-900">AI Recommendations</h3>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {(aiInsights.recommendations || []).map((rec, i) => (
-                    <div key={i} className="flex items-start gap-4 p-4 bg-purple-50 rounded-xl">
-                      <div className="w-8 h-8 rounded-full bg-purple-500 flex items-center justify-center text-white font-bold flex-shrink-0">
-                        {i + 1}
+              {/* Key Metrics Row */}
+              {aiInsights.keyMetrics && aiInsights.keyMetrics.length > 0 && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {aiInsights.keyMetrics.slice(0, 4).map((metric, i) => (
+                    <div key={i} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-semibold text-gray-500 uppercase">{metric.label}</span>
+                        {metric.trend === 'up' && <FaArrowUp className="text-green-500 text-xs" />}
+                        {metric.trend === 'down' && <FaArrowDown className="text-red-500 text-xs" />}
                       </div>
-                      <span className="text-gray-800 font-medium">{rec}</span>
+                      <p className={`text-xl font-black ${
+                        metric.status === 'good' ? 'text-green-600' :
+                        metric.status === 'warning' ? 'text-amber-600' :
+                        metric.status === 'critical' ? 'text-red-600' :
+                        'text-gray-900'
+                      }`}>{metric.value}</p>
                     </div>
                   ))}
                 </div>
+              )}
+
+              {/* Immediate Actions */}
+              {aiInsights.immediateActions && aiInsights.immediateActions.length > 0 && (
+                <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+                  <div className="flex items-center gap-2 mb-4">
+                    <FaBolt className="text-amber-500" />
+                    <h3 className="font-bold text-gray-900">Immediate Actions</h3>
+                    <span className="ml-auto text-xs font-semibold px-2 py-1 bg-amber-100 text-amber-700 rounded-full">
+                      {aiInsights.immediateActions.length} action{aiInsights.immediateActions.length > 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {aiInsights.immediateActions.map((action, i) => (
+                      <div key={i} className={`flex items-center gap-3 p-3 rounded-lg ${
+                        action.impact === 'high' ? 'bg-red-50 border border-red-100' : 'bg-gray-50'
+                      }`}>
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                          action.impact === 'high' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'
+                        }`}>{i + 1}</div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-gray-900 text-sm">{action.action}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-xs text-gray-500">→ {action.owner}</span>
+                            <span className="text-xs font-semibold text-amber-600">{action.deadline}</span>
+                          </div>
+                        </div>
+                        <FaArrowRight className="text-gray-400 text-xs" />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Two Column: Employee Insights & Quick Wins */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Employee Insights */}
+                {aiInsights.employeeInsights && aiInsights.employeeInsights.length > 0 && (
+                  <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+                    <div className="flex items-center gap-2 mb-4">
+                      <FaUsers className="text-indigo-500" />
+                      <h3 className="font-bold text-gray-900">Team Member Analysis</h3>
+                    </div>
+                    <div className="space-y-3">
+                      {aiInsights.employeeInsights.map((emp, i) => (
+                        <div key={i} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                            emp.status === 'star' ? 'bg-yellow-100' :
+                            emp.status === 'ontrack' ? 'bg-green-100' :
+                            emp.status === 'attention' ? 'bg-amber-100' :
+                            'bg-red-100'
+                          }`}>
+                            {emp.status === 'star' && <FaStar className="text-yellow-600 text-sm" />}
+                            {emp.status === 'ontrack' && <FaUserCheck className="text-green-600 text-sm" />}
+                            {emp.status === 'attention' && <FaExclamationCircle className="text-amber-600 text-sm" />}
+                            {emp.status === 'overloaded' && <FaUserClock className="text-red-600 text-sm" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-gray-900 text-sm">{emp.name}</p>
+                            <p className="text-xs text-gray-600 mt-0.5">{emp.insight}</p>
+                            <p className="text-xs text-blue-600 font-medium mt-1">💡 {emp.suggestion}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Quick Wins */}
+                {aiInsights.quickWins && aiInsights.quickWins.length > 0 && (
+                  <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+                    <div className="flex items-center gap-2 mb-4">
+                      <FaRocket className="text-green-500" />
+                      <h3 className="font-bold text-gray-900">Quick Wins</h3>
+                      <span className="text-xs text-gray-500 ml-1">Low effort, high impact</span>
+                    </div>
+                    <div className="space-y-2">
+                      {aiInsights.quickWins.map((win, i) => (
+                        <div key={i} className="flex items-center gap-3 p-3 bg-green-50 rounded-lg border border-green-100">
+                          <FaCheckCircle className="text-green-500 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-gray-900 text-sm">{win.action}</p>
+                            <p className="text-xs text-gray-500 mt-0.5">⏱ {win.timeToComplete}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
-              {/* Task Prioritization */}
-              {aiInsights.taskPrioritization && aiInsights.taskPrioritization.length > 0 && (
-                <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-                  <div className="flex items-center gap-3 mb-6">
-                    <FaTasks className="text-blue-500 text-xl" />
-                    <h3 className="text-xl font-bold text-gray-900">Suggested Task Priority</h3>
+              {/* Workload Distribution Chart */}
+              {aiInsights.workloadDistribution && (
+                <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+                  <div className="flex items-center gap-2 mb-4">
+                    <FaBalanceScale className="text-blue-500" />
+                    <h3 className="font-bold text-gray-900">Workload Distribution</h3>
                   </div>
-                  <div className="space-y-4">
-                    {aiInsights.taskPrioritization.map((item, i) => (
-                      <div key={i} className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
-                        <div className={`w-12 h-12 rounded-full flex items-center justify-center font-black text-lg text-white ${
-                          item.priority === 1 ? 'bg-red-500' :
-                          item.priority === 2 ? 'bg-orange-500' :
-                          'bg-blue-500'
-                        }`}>
-                          {item.priority}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="text-center p-4 bg-red-50 rounded-xl border border-red-100">
+                      <FaFire className="text-red-500 text-xl mx-auto mb-2" />
+                      <p className="text-xs font-bold text-red-700 uppercase mb-2">Overloaded</p>
+                      <div className="space-y-1">
+                        {(aiInsights.workloadDistribution.overloaded || []).map((name, i) => (
+                          <p key={i} className="text-sm font-semibold text-gray-700">{name}</p>
+                        ))}
+                        {(!aiInsights.workloadDistribution.overloaded || aiInsights.workloadDistribution.overloaded.length === 0) && (
+                          <p className="text-sm text-gray-400">None</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-center p-4 bg-green-50 rounded-xl border border-green-100">
+                      <FaCheckCircle className="text-green-500 text-xl mx-auto mb-2" />
+                      <p className="text-xs font-bold text-green-700 uppercase mb-2">Balanced</p>
+                      <div className="space-y-1">
+                        {(aiInsights.workloadDistribution.balanced || []).map((name, i) => (
+                          <p key={i} className="text-sm font-semibold text-gray-700">{name}</p>
+                        ))}
+                        {(!aiInsights.workloadDistribution.balanced || aiInsights.workloadDistribution.balanced.length === 0) && (
+                          <p className="text-sm text-gray-400">None</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-center p-4 bg-blue-50 rounded-xl border border-blue-100">
+                      <FaUserTimes className="text-blue-500 text-xl mx-auto mb-2" />
+                      <p className="text-xs font-bold text-blue-700 uppercase mb-2">Underutilized</p>
+                      <div className="space-y-1">
+                        {(aiInsights.workloadDistribution.underutilized || []).map((name, i) => (
+                          <p key={i} className="text-sm font-semibold text-gray-700">{name}</p>
+                        ))}
+                        {(!aiInsights.workloadDistribution.underutilized || aiInsights.workloadDistribution.underutilized.length === 0) && (
+                          <p className="text-sm text-gray-400">None</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Weekly Focus & Risk Radar */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Weekly Focus */}
+                {aiInsights.weeklyFocus && (
+                  <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+                    <div className="flex items-center gap-2 mb-4">
+                      <FaBullseye className="text-purple-500" />
+                      <h3 className="font-bold text-gray-900">This Week's Focus</h3>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3 p-3 bg-purple-50 rounded-lg border border-purple-100">
+                        <span className="w-6 h-6 rounded-full bg-purple-500 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">1</span>
+                        <p className="text-sm font-semibold text-gray-900">{aiInsights.weeklyFocus.priority1}</p>
+                      </div>
+                      <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                        <span className="w-6 h-6 rounded-full bg-gray-400 text-white text-xs font-bold flex items-center justify-center flex-shrink-0">2</span>
+                        <p className="text-sm font-medium text-gray-700">{aiInsights.weeklyFocus.priority2}</p>
+                      </div>
+                      <div className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                        <span className="w-6 h-6 rounded-full bg-gray-300 text-gray-600 text-xs font-bold flex items-center justify-center flex-shrink-0">3</span>
+                        <p className="text-sm text-gray-600">{aiInsights.weeklyFocus.priority3}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Risk Radar */}
+                {aiInsights.riskRadar && aiInsights.riskRadar.length > 0 && (
+                  <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+                    <div className="flex items-center gap-2 mb-4">
+                      <FaShieldAlt className="text-red-500" />
+                      <h3 className="font-bold text-gray-900">Risk Radar</h3>
+                    </div>
+                    <div className="space-y-3">
+                      {aiInsights.riskRadar.map((risk, i) => (
+                        <div key={i} className="p-3 bg-gray-50 rounded-lg">
+                          <div className="flex items-center gap-2 mb-1">
+                            <FaExclamationTriangle className={`text-sm ${
+                              risk.probability === 'high' ? 'text-red-500' :
+                              risk.probability === 'medium' ? 'text-amber-500' :
+                              'text-gray-400'
+                            }`} />
+                            <p className="font-semibold text-gray-900 text-sm">{risk.risk}</p>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs mb-1">
+                            <span className={`px-1.5 py-0.5 rounded font-semibold ${
+                              risk.probability === 'high' ? 'bg-red-100 text-red-700' :
+                              risk.probability === 'medium' ? 'bg-amber-100 text-amber-700' :
+                              'bg-gray-100 text-gray-600'
+                            }`}>P: {risk.probability}</span>
+                            <span className={`px-1.5 py-0.5 rounded font-semibold ${
+                              risk.impact === 'high' ? 'bg-red-100 text-red-700' :
+                              risk.impact === 'medium' ? 'bg-amber-100 text-amber-700' :
+                              'bg-gray-100 text-gray-600'
+                            }`}>I: {risk.impact}</span>
+                          </div>
+                          <p className="text-xs text-blue-600 font-medium">→ {risk.mitigation}</p>
                         </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Blockers */}
+              {aiInsights.blockers && aiInsights.blockers.length > 0 && (
+                <div className="bg-white rounded-xl p-5 shadow-sm border border-red-100">
+                  <div className="flex items-center gap-2 mb-4">
+                    <FaTimesCircle className="text-red-500" />
+                    <h3 className="font-bold text-gray-900">Blockers & Bottlenecks</h3>
+                    <span className="ml-auto text-xs font-semibold px-2 py-1 bg-red-100 text-red-700 rounded-full">
+                      {aiInsights.blockers.length} issue{aiInsights.blockers.length > 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <div className="space-y-3">
+                    {aiInsights.blockers.map((blocker, i) => (
+                      <div key={i} className="flex items-start gap-3 p-3 bg-red-50 rounded-lg">
+                        <FaExclamationCircle className="text-red-500 mt-0.5 flex-shrink-0" />
                         <div className="flex-1">
-                          <p className="font-bold text-gray-900">{item.action}</p>
-                          {item.reason && (
-                            <p className="text-sm text-gray-600 mt-1">{item.reason}</p>
-                          )}
+                          <p className="font-semibold text-gray-900 text-sm">{blocker.issue}</p>
+                          <p className="text-xs text-gray-600 mt-0.5">Affects {blocker.affectedTasks} task{blocker.affectedTasks > 1 ? 's' : ''}</p>
+                          <p className="text-xs text-green-600 font-medium mt-1">✓ Fix: {blocker.suggestedFix}</p>
                         </div>
                       </div>
                     ))}
@@ -886,26 +1057,17 @@ export default function ProjectOverview({ projectId }) {
                 </div>
               )}
 
-              {/* Team Insights */}
-              {aiInsights.teamInsights && (
-                <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-xl p-6 shadow-sm">
-                  <div className="flex items-start gap-4">
-                    <div className="p-4 bg-white/20 rounded-xl">
-                      <FaUsers className="text-white text-3xl" />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-bold text-white mb-2">
-                        Team Performance Insights
-                      </h3>
-                      <p className="text-white/90 text-lg leading-relaxed">
-                        {aiInsights.teamInsights}
-                      </p>
-                    </div>
+              {/* Projection Insight */}
+              {aiInsights.projectionInsight && (
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100">
+                  <div className="flex items-center gap-3">
+                    <FaCalendarAlt className="text-blue-600" />
+                    <p className="font-semibold text-gray-900">{aiInsights.projectionInsight}</p>
                   </div>
                 </div>
               )}
 
-              {/* Refresh AI Analysis */}
+              {/* Refresh Button */}
               <div className="flex justify-center">
                 <button
                   onClick={() => fetchAIInsights(analytics)}
@@ -913,19 +1075,19 @@ export default function ProjectOverview({ projectId }) {
                   className="flex items-center gap-2 px-6 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition-colors"
                 >
                   <FaRedo className={aiLoading ? 'animate-spin' : ''} />
-                  Refresh AI Analysis
+                  Refresh Insights
                 </button>
               </div>
             </>
           ) : (
             <div className="text-center py-16 bg-gray-50 rounded-2xl">
               <FaBrain className="text-6xl text-gray-300 mx-auto mb-4" />
-              <p className="text-lg font-semibold text-gray-600">AI insights are not available</p>
+              <p className="text-lg font-semibold text-gray-600">Smart insights are not available</p>
               <button
                 onClick={() => fetchAIInsights(analytics)}
                 className="mt-4 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-xl transition-colors"
               >
-                Generate AI Insights
+                Generate Smart Insights
               </button>
             </div>
           )}

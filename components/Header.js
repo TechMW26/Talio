@@ -35,6 +35,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
   const [employeeData, setEmployeeData] = useState(null)
   const [timezone, setTimezone] = useState('Asia/Kolkata')
   const [isDesktop, setIsDesktop] = useState(false)
+  const [showMiraModal, setShowMiraModal] = useState(false)
   const notifRef = useRef(null)
   const profileRef = useRef(null)
   const searchRef = useRef(null)
@@ -528,11 +529,41 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
             )}
           </div> */}
 
+          {/* MIRA Cloud Button - Desktop Only */}
+          <div className="hidden md:block relative group">
+            <button
+              onClick={() => setShowMiraModal(true)}
+              className="relative p-2.5 rounded-xl transition-all duration-300 group-hover:bg-gradient-to-br group-hover:from-blue-50 group-hover:to-indigo-50"
+              style={{
+                color: 'var(--color-text-secondary)',
+              }}
+            >
+              {/* MIRA AI Icon */}
+              <div className="relative">
+                <svg 
+                  className="w-5 h-5 transition-all duration-300 group-hover:text-blue-500 group-hover:scale-110"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+                </svg>
+                
+                {/* Pulse effect on hover */}
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-blue-400 rounded-full opacity-0 group-hover:opacity-100 group-hover:animate-ping transition-opacity" />
+              </div>
+              
+              {/* Tooltip */}
+              <span className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2 py-1 text-xs font-medium text-white bg-gray-900 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+                MIRA Cloud
+              </span>
+            </button>
+          </div>
+
           {/* Ideas Button - Desktop Only */}
           <div className="hidden md:block relative group">
             <button
               onClick={() => router.push('/dashboard/sandbox')}
-              className="relative p-2.5 rounded-xl transition-all duration-300 group-hover:bg-gradient-to-br group-hover:from-yellow-50 group-hover:to-orange-50 dark:group-hover:from-yellow-900/20 dark:group-hover:to-orange-900/20"
+              className="relative p-2.5 rounded-xl transition-all duration-300 group-hover:bg-gradient-to-br group-hover:from-yellow-50 group-hover:to-orange-50"
               style={{
                 color: 'var(--color-text-secondary)',
               }}
@@ -554,7 +585,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
               </div>
               
               {/* Tooltip */}
-              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs font-medium text-white bg-gray-900 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
+              <span className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2 py-1 text-xs font-medium text-white bg-gray-900 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
                 Ideas Sandbox
               </span>
             </button>
@@ -780,6 +811,31 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
               ) : null}
             </div>
           </div>
+        </div>
+      )}
+
+      {/* MIRA Cloud Fullscreen Modal */}
+      {showMiraModal && (
+        <div 
+          className="fixed inset-0 animate-fadeIn"
+          style={{ zIndex: 99999 }}
+        >
+          {/* Close button */}
+          <button
+            onClick={() => setShowMiraModal(false)}
+            className="absolute top-4 right-4 z-[100000] p-3 bg-gray-900/80 hover:bg-gray-900 rounded-full transition-all duration-200 group shadow-lg"
+          >
+            <FaTimes className="w-6 h-6 text-white group-hover:scale-110 transition-transform" />
+          </button>
+          
+          {/* Iframe - fullscreen */}
+          <iframe
+            src="https://itsmira.cloud"
+            className="w-full h-full border-0"
+            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+            allow="microphone; camera; clipboard-read; clipboard-write"
+            title="MIRA Cloud"
+          />
         </div>
       )}
     </header>

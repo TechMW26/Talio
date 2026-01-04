@@ -625,57 +625,65 @@ async function generateAIInsights(analyticsData, userId) {
   try {
     const { project, taskAnalytics, memberAnalytics, completionPrediction, timelineAnalytics } = analyticsData
 
-    const prompt = `You are a project management AI assistant. Analyze this project data and provide actionable insights in JSON format.
+    const prompt = `You are a senior project management consultant. Analyze this project data and provide ACTIONABLE, SPECIFIC insights. Be concise - use bullet points and numbers. No fluff.
 
-PROJECT DATA:
-- Name: ${project.name}
-- Status: ${project.status}
-- Priority: ${project.priority}
-- Completion: ${project.completionPercentage}%
-- Deadline: ${new Date(project.endDate).toLocaleDateString()}
-- Days Remaining: ${timelineAnalytics?.remaining || 'N/A'}
+PROJECT: ${project.name}
+Status: ${project.status} | Priority: ${project.priority} | Completion: ${project.completionPercentage}%
+Deadline: ${new Date(project.endDate).toLocaleDateString()} | Days Remaining: ${timelineAnalytics?.remaining || 'N/A'}
 
-TASK METRICS:
-- Total Tasks: ${taskAnalytics.total}
-- Completed: ${taskAnalytics.statusDistribution.completed}
-- In Progress: ${taskAnalytics.statusDistribution['in-progress']}
-- Overdue: ${taskAnalytics.overdueCount}
-- Due Soon: ${taskAnalytics.dueSoonCount}
-- Critical Priority: ${taskAnalytics.priorityDistribution.critical}
-- High Priority: ${taskAnalytics.priorityDistribution.high}
-- Blocked: ${taskAnalytics.statusDistribution.blocked}
-- Avg Completion Time: ${taskAnalytics.avgCompletionTime} days
+TASKS:
+Total: ${taskAnalytics.total} | Completed: ${taskAnalytics.statusDistribution.completed} | In Progress: ${taskAnalytics.statusDistribution['in-progress']}
+Overdue: ${taskAnalytics.overdueCount} | Due Soon (3 days): ${taskAnalytics.dueSoonCount}
+Critical: ${taskAnalytics.priorityDistribution.critical} | High: ${taskAnalytics.priorityDistribution.high} | Blocked: ${taskAnalytics.statusDistribution.blocked}
+Avg Completion: ${taskAnalytics.avgCompletionTime} days
 
-TEAM PERFORMANCE:
-${memberAnalytics.slice(0, 5).map(m => 
-  `- ${m.member.firstName} ${m.member.lastName}: ${m.stats.tasksCompleted}/${m.stats.tasksAssigned} tasks (${m.stats.productivityScore}% productivity)`
+TEAM (${memberAnalytics.length} members):
+${memberAnalytics.slice(0, 8).map(m => 
+  `• ${m.member.firstName} ${m.member.lastName}: ${m.stats.tasksCompleted}/${m.stats.tasksAssigned} done, ${m.stats.tasksOverdue} overdue, ${m.stats.productivityScore}% score`
 ).join('\n')}
 
 TIMELINE:
-- Time Progress: ${timelineAnalytics?.timeProgress}%
-- Task Progress: ${timelineAnalytics?.taskProgress}%
-- Velocity: ${timelineAnalytics?.velocity} tasks/day
-- Progress Status: ${timelineAnalytics?.isAhead ? 'Ahead' : timelineAnalytics?.isBehind ? 'Behind' : 'On Track'}
+Time Used: ${timelineAnalytics?.timeProgress}% | Tasks Done: ${timelineAnalytics?.taskProgress}%
+Velocity: ${timelineAnalytics?.velocity} tasks/day | Status: ${timelineAnalytics?.isAhead ? 'AHEAD' : timelineAnalytics?.isBehind ? 'BEHIND' : 'ON TRACK'}
+Projection: ${completionPrediction.status} | Variance: ${completionPrediction.daysVariance} days | Confidence: ${completionPrediction.confidence}%
 
-PROJECTION:
-- Status: ${completionPrediction.status}
-- Projected Completion: ${completionPrediction.projectedDate ? new Date(completionPrediction.projectedDate).toLocaleDateString() : 'N/A'}
-- Days Variance: ${completionPrediction.daysVariance} days
-- Confidence: ${completionPrediction.confidence}%
-
-Provide your response ONLY as valid JSON with this exact structure:
+Respond ONLY with valid JSON. Be SPECIFIC with names, numbers, and actions:
 {
-  "summary": "2-3 sentence executive summary of project health",
-  "strengths": ["strength 1", "strength 2", "strength 3"],
-  "improvements": ["area 1", "area 2", "area 3"],
-  "recommendations": ["recommendation 1", "recommendation 2", "recommendation 3", "recommendation 4"],
-  "taskPrioritization": [
-    {"priority": 1, "action": "most important action", "reason": "why this is urgent"},
-    {"priority": 2, "action": "second action", "reason": "why this matters"},
-    {"priority": 3, "action": "third action", "reason": "benefit of doing this"}
+  "healthScore": 85,
+  "healthStatus": "good|warning|critical",
+  "oneLineVerdict": "One sentence project status",
+  "keyMetrics": [
+    {"label": "Metric Name", "value": "42", "trend": "up|down|stable", "status": "good|warning|critical"}
   ],
-  "riskFactors": ["risk 1", "risk 2"],
-  "teamInsights": "analysis of team performance and suggestions"
+  "immediateActions": [
+    {"action": "Specific action with task/person name", "owner": "Role or Name", "deadline": "Today/Tomorrow/This Week", "impact": "high|medium"}
+  ],
+  "employeeInsights": [
+    {"name": "Employee Name", "status": "star|ontrack|attention|overloaded", "insight": "Brief specific observation", "suggestion": "Concrete action"}
+  ],
+  "blockers": [
+    {"issue": "Specific blocker", "affectedTasks": 3, "suggestedFix": "Solution"}
+  ],
+  "riskRadar": [
+    {"risk": "Specific risk", "probability": "high|medium|low", "impact": "high|medium|low", "mitigation": "Action"}
+  ],
+  "quickWins": [
+    {"action": "Easy win action", "effort": "low", "impact": "high", "timeToComplete": "1-2 hours"}
+  ],
+  "bottlenecks": [
+    {"area": "Where", "cause": "Why", "recommendation": "What to do"}
+  ],
+  "weeklyFocus": {
+    "priority1": "Most critical this week",
+    "priority2": "Second focus",
+    "priority3": "If time permits"
+  },
+  "workloadDistribution": {
+    "overloaded": ["Name1"],
+    "balanced": ["Name2", "Name3"],
+    "underutilized": ["Name4"]
+  },
+  "projectionInsight": "One line about timeline - will it finish on time?"
 }`
 
     const text = await generateSmartContent(prompt, { userId, feature: 'project-analytics' });
