@@ -466,16 +466,16 @@ body {
   }
   to {
     opacity: 1;
-    backdrop-filter: blur(15px);
-    -webkit-backdrop-filter: blur(15px);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
   }
 }
 
 @keyframes miraBackdropBlurOut {
   from {
     opacity: 1;
-    backdrop-filter: blur(15px);
-    -webkit-backdrop-filter: blur(15px);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
   }
   to {
     opacity: 0;
