@@ -492,7 +492,12 @@ export default function ProductivityPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-              {sessions.map((session, index) => (
+              {sessions.map((session, index) => {
+                // Calculate session number: oldest = 1, latest = highest number
+                // Since sessions are sorted latest first (index 0 = latest), reverse the numbering
+                const sessionNumber = sessions.length - index
+                
+                return (
                 <div
                   key={session._id}
                   className="bg-white rounded-xl shadow-sm border overflow-hidden hover:shadow-md transition cursor-pointer"
@@ -530,13 +535,19 @@ export default function ProductivityPage() {
                         {session.screenshots?.length || 0}
                       </div>
                     )}
+                    {/* Ongoing badge for latest session */}
+                    {index === 0 && !session.analysis?.isAnalyzed && (
+                      <div className="absolute top-2 left-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                        Latest
+                      </div>
+                    )}
                   </div>
 
                   {/* Session Info */}
                   <div className="p-3 sm:p-4">
                     <div className="flex items-center justify-between mb-2">
                       <h3 className="text-sm sm:text-base font-medium text-gray-900">
-                        {session.sessionTitle || `Session ${index + 1}`}
+                        {session.sessionTitle || `Session ${sessionNumber}`}
                       </h3>
                       {session.analysis?.score != null && !session.analysis?.isAnalyzed && (
                         <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium ${getScoreColor(session.analysis.score)}`}>
@@ -602,7 +613,8 @@ export default function ProductivityPage() {
                     )}
                   </div>
                 </div>
-              ))}
+                )
+              })}
             </div>
           )}
         </>
@@ -651,7 +663,12 @@ export default function ProductivityPage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                  {employeeSessions.map((session, index) => (
+                  {employeeSessions.map((session, index) => {
+                    // Calculate session number: oldest = 1, latest = highest number
+                    // Since sessions are sorted latest first (index 0 = latest), reverse the numbering
+                    const sessionNumber = employeeSessions.length - index
+                    
+                    return (
                     <div
                       key={session._id}
                       onClick={() => {
@@ -665,11 +682,11 @@ export default function ProductivityPage() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2 sm:gap-3">
                             <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center text-white text-sm sm:text-base font-bold">
-                              {index + 1}
+                              {sessionNumber}
                             </div>
                             <div>
                               <h3 className="font-semibold text-gray-900 text-sm sm:text-base">
-                                {session.sessionTitle || `Session ${index + 1}`}
+                                {session.sessionTitle || `Session ${sessionNumber}`}
                               </h3>
                               <p className="text-[10px] sm:text-xs text-gray-500">
                                 {formatTime(session.startTime)} - {formatTime(session.endTime)}
@@ -677,6 +694,9 @@ export default function ProductivityPage() {
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
+                            {index === 0 && !session.analysis?.isAnalyzed && (
+                              <span className="text-[10px] sm:text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Latest</span>
+                            )}
                             <span className="text-[10px] sm:text-xs text-gray-400">{session.screenshotCount || session.screenshots?.length || 0} screenshots</span>
                           </div>
                         </div>
@@ -740,7 +760,8 @@ export default function ProductivityPage() {
                         )}
                       </div>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
             </>
