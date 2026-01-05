@@ -168,16 +168,30 @@ export async function POST(request, { params }) {
     
     // Get user info for context - try user first, then employee
     let employeeName = 'Employee';
+    let employeeRole = 'Employee';
+    let employeeDesignation = '';
+    let employeeDepartment = '';
+    
     if (sessionUserId) {
-      const userRecord = await User.findById(sessionUserId).populate('employeeId');
+      const userRecord = await User.findById(sessionUserId).populate({
+        path: 'employeeId',
+        populate: { path: 'department', select: 'name' }
+      });
       if (userRecord?.employeeId) {
         employeeName = `${userRecord.employeeId.firstName} ${userRecord.employeeId.lastName}`;
+        employeeDesignation = userRecord.employeeId.designation || userRecord.employeeId.jobTitle || '';
+        employeeDepartment = userRecord.employeeId.department?.name || '';
+      }
+      if (userRecord?.role) {
+        employeeRole = userRecord.role;
       }
     } else if (sessionEmployeeId) {
-      const { Employee } = await getTenantModels(auth.tenant.databaseName, ['Employee']);
-      const employee = await Employee.findById(sessionEmployeeId);
+      const { Employee, Department } = await getTenantModels(auth.tenant.databaseName, ['Employee', 'Department']);
+      const employee = await Employee.findById(sessionEmployeeId).populate('department', 'name');
       if (employee) {
         employeeName = `${employee.firstName} ${employee.lastName}`;
+        employeeDesignation = employee.designation || employee.jobTitle || '';
+        employeeDepartment = employee.department?.name || '';
       }
     }
     
@@ -269,6 +283,13 @@ export async function POST(request, { params }) {
     const sessionDurationMinutes = Math.round(sessionDurationMs / (1000 * 60));
     const sessionDurationHours = (sessionDurationMinutes / 60).toFixed(1);
     
+    // Build role context for better analysis
+    const roleContext = [];
+    if (employeeDesignation) roleContext.push(`Designation: ${employeeDesignation}`);
+    if (employeeDepartment) roleContext.push(`Department: ${employeeDepartment}`);
+    if (employeeRole && employeeRole !== 'employee') roleContext.push(`System Role: ${employeeRole}`);
+    const roleContextStr = roleContext.length > 0 ? roleContext.join('\n- ') : 'Not specified';
+    
     // Build analysis prompt with comprehensive KPIs
     // IMPORTANT: Emphasize this is workplace productivity analysis, not facial recognition
     const analysisPrompt = `You are an expert workplace productivity analyst. Your task is to analyze computer desktop screenshots to assess work activities and productivity metrics.
@@ -279,8 +300,18 @@ IMPORTANT CONTEXT:
 - Focus ONLY on: applications open, websites visited, documents being worked on, code being written, etc.
 - Do NOT attempt to identify any individuals - focus purely on the digital work content visible on screen
 
+EMPLOYEE PROFILE:
+- Name: ${employeeName}
+- ${roleContextStr}
+
+Use this role/designation context to better understand expected work activities:
+- A "Developer" or "Engineer" would typically use code editors, terminals, documentation
+- A "Designer" would use design tools like Figma, Photoshop, Canva
+- An "HR" or "Manager" would use spreadsheets, emails, HR systems, video calls
+- A "Sales" person would use CRM, emails, video calls, presentations
+- An "Admin" would use office tools, email, scheduling, data entry
+
 SESSION CONTEXT:
-- Employee Name: ${employeeName}
 - Date: ${session.date.toISOString().split('T')[0]}
 - Time: ${session.startTime.toLocaleTimeString()} - ${session.endTime.toLocaleTimeString()}
 - Duration: ${sessionDurationMinutes} minutes (${sessionDurationHours} hours)
@@ -289,9 +320,9 @@ SESSION CONTEXT:
 
 ANALYSIS INSTRUCTIONS:
 1. Examine EACH screenshot to identify visible applications and websites
-2. Look for: code editors, browsers, documents, spreadsheets, chat apps, etc.
-3. Classify each screenshot's productivity level based on the work activities visible
-4. Calculate the score based on ACTUAL observed software/activities, NOT a default value
+2. Consider the employee's role/designation when evaluating productivity
+3. A developer coding is productive; a sales person on CRM is productive
+4. Activities should be judged relative to the employee's job function
 5. Be specific about what applications and tasks are visible
 
 SCORING GUIDELINES (calculate based on observations):
