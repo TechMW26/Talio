@@ -39,7 +39,8 @@ const statusColors = {
   'on-track': 'bg-blue-500 text-white',
   'at-risk': 'bg-amber-500 text-white',
   'delayed': 'bg-red-500 text-white',
-  'completed': 'bg-emerald-500 text-white'
+  'completed': 'bg-emerald-500 text-white',
+  'yet-to-start': 'bg-red-500 text-white'
 }
 
 const statusIcons = {
@@ -47,7 +48,8 @@ const statusIcons = {
   'on-track': FaCheckCircle,
   'at-risk': FaExclamationTriangle,
   'delayed': FaTimesCircle,
-  'completed': FaTrophy
+  'completed': FaTrophy,
+  'yet-to-start': FaClock
 }
 
 export default function ProjectOverview({ projectId }) {

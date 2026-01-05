@@ -53,6 +53,7 @@ export async function GET(request) {
 
       projects = await Project.find(query)
         .populate('projectHead', 'firstName lastName profilePicture')
+        .populate('projectHeads', 'firstName lastName profilePicture')
         .populate('createdBy', 'firstName lastName')
         .populate('department', 'name')
         .sort({ updatedAt: -1 })
@@ -88,6 +89,7 @@ export async function GET(request) {
       
       const projectResults = await Project.find(projectQuery)
         .populate('projectHead', 'firstName lastName profilePicture')
+        .populate('projectHeads', 'firstName lastName profilePicture')
         .populate('createdBy', 'firstName lastName')
         .populate('department', 'name')
         .sort({ updatedAt: -1 })
@@ -175,7 +177,8 @@ export async function POST(request) {
       description, 
       startDate, 
       endDate, 
-      projectHeadId, 
+      projectHeadId,  // Legacy support - single head
+      projectHeadIds, // New - multiple heads
       members = [],
       priority,
       department,
@@ -183,11 +186,14 @@ export async function POST(request) {
       status
     } = body
 
+    // Support both single and multiple heads
+    const headIds = projectHeadIds?.length ? projectHeadIds : (projectHeadId ? [projectHeadId] : [])
+
     // Validate required fields
-    if (!name || !startDate || !endDate || !projectHeadId) {
+    if (!name || !startDate || !endDate || headIds.length === 0) {
       return NextResponse.json({
         success: false,
-        message: 'Name, start date, end date, and project head are required'
+        message: 'Name, start date, end date, and at least one project head are required'
       }, { status: 400 })
     }
 
@@ -201,12 +207,12 @@ export async function POST(request) {
       }, { status: 400 })
     }
 
-    // Verify project head exists
-    const projectHead = await Employee.findById(projectHeadId)
-    if (!projectHead) {
+    // Verify all project heads exist
+    const projectHeads = await Employee.find({ _id: { $in: headIds } })
+    if (projectHeads.length !== headIds.length) {
       return NextResponse.json({
         success: false,
-        message: 'Project head not found'
+        message: 'One or more project heads not found'
       }, { status: 404 })
     }
 
@@ -217,7 +223,8 @@ export async function POST(request) {
         description,
         startDate: start,
         endDate: end,
-        projectHead: projectHeadId,
+        projectHeads: headIds, // Pass array of heads
+        projectHead: headIds[0], // Keep first as legacy projectHead for compatibility
         priority: priority || 'medium',
         department,
         tags: tags || [],
@@ -232,6 +239,21 @@ export async function POST(request) {
       })),
       models // Pass tenant-specific models
     )
+
+    // Send notifications to invited project heads (non-blocking)
+    // Only send to heads who are not the creator
+    for (const headId of headIds) {
+      if (headId.toString() !== creatorEmployee._id.toString()) {
+        try {
+          const invitedHead = await Employee.findById(headId)
+          if (invitedHead) {
+            await notifyProjectInvitation(project, invitedHead, creatorEmployee, models, 'head')
+          }
+        } catch (notifyError) {
+          console.error('Failed to send project head invitation notification:', notifyError)
+        }
+      }
+    }
 
     // Send notifications to invited members (non-blocking)
     for (const member of members) {
@@ -249,6 +271,7 @@ export async function POST(request) {
     // Populate and return the project
     const populatedProject = await Project.findById(project._id)
       .populate('projectHead', 'firstName lastName profilePicture')
+      .populate('projectHeads', 'firstName lastName profilePicture')
       .populate('createdBy', 'firstName lastName')
       .populate('department', 'name')
       .populate('chatGroup')

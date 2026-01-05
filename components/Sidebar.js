@@ -19,6 +19,16 @@ import UnreadBadge from './UnreadBadge'
 
 import ModalPortal from '@/components/ui/ModalPortal'
 
+// Badge component for sidebar counts - positioned on top-right corner of the icon box
+function SidebarBadge({ count }) {
+  if (!count || count <= 0) return null
+  return (
+    <span className="absolute -top-4 -right-4 w-5 h-5 bg-red-100 border-[1px] border-red-500 text-red-400 text-[10px] font-bold rounded-full flex items-center justify-center z-10">
+      {count > 99 ? '99+' : count}
+    </span>
+  )
+}
+
 export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed }) {
   const pathname = usePathname()
   const router = useRouter()
@@ -33,6 +43,17 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
   const [tooltipContent, setTooltipContent] = useState(null)
   const tooltipY = useRef(0)
   const tooltipRef = useRef(null)
+  
+  // Sidebar pending counts
+  const [sidebarCounts, setSidebarCounts] = useState({
+    projects: 0,
+    tasks: 0,
+    leaves: 0,
+    attendance: 0,
+    expenses: 0,
+    helpdesk: 0,
+    notifications: 0
+  })
   
   // Auto-collapse timer ref
   const autoCollapseTimerRef = useRef(null)
@@ -138,6 +159,44 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
     }
   }
 
+  // Fetch sidebar pending counts
+  const fetchSidebarCounts = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return
+
+      const response = await fetch('/api/sidebar/counts', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        setSidebarCounts(data.data)
+      }
+    } catch (error) {
+      console.error('Error fetching sidebar counts:', error)
+    }
+  }, [])
+
+  // Fetch counts on mount and periodically
+  useEffect(() => {
+    if (mounted && user) {
+      // Small delay to ensure token is available after login
+      const initialTimeout = setTimeout(() => {
+        fetchSidebarCounts()
+      }, 500)
+      
+      // Refresh counts every 60 seconds
+      const interval = setInterval(fetchSidebarCounts, 60000)
+      return () => {
+        clearTimeout(initialTimeout)
+        clearInterval(interval)
+      }
+    }
+  }, [mounted, user, fetchSidebarCounts])
+
   // Get menu items based on user role (memoized)
   // NOTE: MIRA AI Assistant has been removed from web - only available in desktop apps
   const menuItems = useMemo(() => {
@@ -219,6 +278,24 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
       return item.submenu.some(subItem => subItem.path === pathname)
     }
     return false
+  }
+
+  // Helper to get badge count for a menu item
+  const getBadgeCount = (itemName) => {
+    switch (itemName) {
+      case 'Projects':
+        return sidebarCounts.projects + sidebarCounts.tasks
+      case 'Attendance & Leaves':
+        return sidebarCounts.leaves + sidebarCounts.attendance
+      case 'Expenses':
+        return sidebarCounts.expenses
+      case 'Helpdesk':
+        return sidebarCounts.helpdesk
+      case 'Notifications':
+        return sidebarCounts.notifications
+      default:
+        return 0
+    }
   }
 
   // Don't render until mounted to avoid hydration mismatch
@@ -350,7 +427,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                   >
                     <div className={`flex items-center ${isDesktop && isCollapsed ? '' : 'space-x-3'}`}>
                       <div
-                        className={`transition-colors ${isDesktop && isCollapsed ? '' : 'p-2 rounded-lg'}`}
+                        className={`transition-colors relative ${isDesktop && isCollapsed ? '' : 'p-2 rounded-lg'}`}
                         style={{
                           backgroundColor: isDesktop && isCollapsed ? 'transparent' : (expandedMenus[item.name] ? 'var(--color-primary-500)' : 'var(--color-primary-100)'),
                           color: isDesktop && isCollapsed 
@@ -359,8 +436,19 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                         }}
                       >
                         <item.icon className={isDesktop && isCollapsed ? 'w-6 h-6 group-hover:text-white' : 'w-5 h-5'} />
+                        {/* Only show badge on icon when collapsed */}
+                        {(isDesktop && isCollapsed) && <SidebarBadge count={getBadgeCount(item.name)} />}
                       </div>
-                      {!(isDesktop && isCollapsed) && <span className="text-sm font-medium">{item.name}</span>}
+                      {!(isDesktop && isCollapsed) && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">{item.name}</span>
+                          {getBadgeCount(item.name) > 0 && (
+                            <span className="w-5 h-5 bg-red-100 border-2 border-red-500 text-red-600 text-[10px] font-bold rounded-full flex items-center justify-center">
+                              {getBadgeCount(item.name) > 99 ? '99+' : getBadgeCount(item.name)}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                     {!(isDesktop && isCollapsed) && (
                       <div className={`transition-transform duration-200 ${expandedMenus[item.name] ? 'rotate-90' : ''}`}>
@@ -466,11 +554,23 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                     }}
                   >
                     <item.icon className={isDesktop && isCollapsed ? 'w-6 h-6 group-hover:text-white' : 'w-5 h-5'} />
+                    {/* Chat unread badge - always on icon */}
                     {item.name === 'Chat' && unreadCount > 0 && (
                       <UnreadBadge count={unreadCount} />
                     )}
+                    {/* Other badges - only on icon when collapsed */}
+                    {item.name !== 'Chat' && (isDesktop && isCollapsed) && <SidebarBadge count={getBadgeCount(item.name)} />}
                   </div>
-                  {!(isDesktop && isCollapsed) && <span className="text-sm font-medium">{item.name}</span>}
+                  {!(isDesktop && isCollapsed) && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{item.name}</span>
+                      {item.name !== 'Chat' && getBadgeCount(item.name) > 0 && (
+                        <span className="w-5 h-5 bg-red-100 border-2 border-red-500 text-red-600 text-[10px] font-bold rounded-full flex items-center justify-center">
+                          {getBadgeCount(item.name) > 99 ? '99+' : getBadgeCount(item.name)}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </Link>
               )}
             </div>

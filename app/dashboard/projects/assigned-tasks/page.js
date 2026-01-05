@@ -440,7 +440,7 @@ export default function AssignedTasksPage() {
             </div>
             <div>
               <p className="text-xs text-gray-500 dark:text-gray-400">Total</p>
-              <p className="font-semibold text-gray-800 dark:text-white">{stats.total || 0}</p>
+              <p className="font-semibold text-gray-800 dark:text-black">{stats.total || 0}</p>
             </div>
           </div>
         </div>
@@ -451,7 +451,7 @@ export default function AssignedTasksPage() {
             </div>
             <div>
               <p className="text-xs text-gray-500 dark:text-gray-400">Pending Accept</p>
-              <p className="font-semibold text-gray-800 dark:text-white">{stats.pendingAcceptance || 0}</p>
+              <p className="font-semibold text-gray-800 dark:text-black">{stats.pendingAcceptance || 0}</p>
             </div>
           </div>
         </div>
@@ -462,7 +462,7 @@ export default function AssignedTasksPage() {
             </div>
             <div>
               <p className="text-xs text-gray-500 dark:text-gray-400">In Progress</p>
-              <p className="font-semibold text-gray-800 dark:text-white">{stats.inProgress || 0}</p>
+              <p className="font-semibold text-gray-800 dark:text-black">{stats.inProgress || 0}</p>
             </div>
           </div>
         </div>
@@ -473,7 +473,7 @@ export default function AssignedTasksPage() {
             </div>
             <div>
               <p className="text-xs text-gray-500 dark:text-gray-400">In Review</p>
-              <p className="font-semibold text-gray-800 dark:text-white">{stats.review || 0}</p>
+              <p className="font-semibold text-gray-800 dark:text-black">{stats.review || 0}</p>
             </div>
           </div>
         </div>
@@ -484,7 +484,7 @@ export default function AssignedTasksPage() {
             </div>
             <div>
               <p className="text-xs text-gray-500 dark:text-gray-400">Completed</p>
-              <p className="font-semibold text-gray-800 dark:text-white">{stats.completed || 0}</p>
+              <p className="font-semibold text-gray-800 dark:text-black">{stats.completed || 0}</p>
             </div>
           </div>
         </div>
@@ -495,7 +495,7 @@ export default function AssignedTasksPage() {
             </div>
             <div>
               <p className="text-xs text-gray-500 dark:text-gray-400">Pending Delete</p>
-              <p className="font-semibold text-gray-800 dark:text-white">{stats.pendingDeletion || 0}</p>
+              <p className="font-semibold text-gray-800 dark:text-black">{stats.pendingDeletion || 0}</p>
             </div>
           </div>
         </div>

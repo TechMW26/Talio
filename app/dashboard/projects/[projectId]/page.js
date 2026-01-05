@@ -98,6 +98,7 @@ export default function ProjectDetailPage() {
   const [reassignToId, setReassignToId] = useState('')
   const [showEditTaskModal, setShowEditTaskModal] = useState(false)
   const [editTaskForm, setEditTaskForm] = useState(null)
+  const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
   
   // Auto-refresh refs
   const refreshIntervalRef = useRef(null)
@@ -1190,7 +1191,7 @@ export default function ProjectDetailPage() {
             <FaArrowLeft className="text-gray-600" />
           </button>
           <div>
-            <div className="flex items-center gap-3 mb-2">
+            <div className="flex items-center gap-3 mb-2 flex-wrap">
               <h1 className="text-3xl font-bold text-gray-800">{project.name}</h1>
               {project.chatGroup && (
                 <button
@@ -1210,7 +1211,36 @@ export default function ProjectDetailPage() {
                 {project.priority}
               </span>
             </div>
-            <p className="text-gray-600">{project.description || 'No description'}</p>
+            {/* Description Section */}
+            {project.description ? (
+              <div className="mt-3 bg-gray-50 rounded-lg p-4 border border-gray-100 max-w-4xl">
+                <p className={`text-gray-600 text-sm leading-relaxed whitespace-pre-wrap ${
+                  !isDescriptionExpanded && project.description.length > 200 ? 'line-clamp-3' : ''
+                }`}>
+                  {project.description}
+                </p>
+                {project.description.length > 200 && (
+                  <button
+                    onClick={() => setIsDescriptionExpanded(!isDescriptionExpanded)}
+                    className="mt-2 text-primary-600 hover:text-primary-700 text-sm font-medium flex items-center gap-1"
+                  >
+                    {isDescriptionExpanded ? (
+                      <>
+                        <FaChevronUp className="w-3 h-3" />
+                        Show Less
+                      </>
+                    ) : (
+                      <>
+                        <FaChevronDown className="w-3 h-3" />
+                        Read More
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <p className="text-gray-400 text-sm italic mt-2">No description provided</p>
+            )}
           </div>
         </div>
 

@@ -82,7 +82,7 @@ export function WebPushPrompt({ onClose }) {
                                     <Check className="w-7 h-7 text-white" strokeWidth={2.5} />
                                 </div>
                             </div>
-                            <h3 className="text-xl font-semibold text-slate-800 dark:text-white mb-3 tracking-tight">
+                            <h3 className="text-xl font-semibold text-slate-800 dark:text-black mb-3 tracking-tight">
                                 Notifications Enabled!
                             </h3>
                             <p className="text-sm text-slate-500 dark:text-gray-400">
@@ -123,7 +123,7 @@ export function WebPushPrompt({ onClose }) {
                     </div>
 
                     {/* Title */}
-                    <h3 className="text-xl font-semibold text-slate-800 dark:text-white mb-3 tracking-tight">
+                    <h3 className="text-xl font-semibold text-slate-800 dark:text-black mb-3 tracking-tight">
                         Stay Updated
                     </h3>
 
@@ -268,7 +268,7 @@ export function WebPushSettings() {
                         )}
                     </div>
                     <div>
-                        <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        <p className="text-sm font-medium text-gray-900 dark:text-black">
                             Browser Push Notifications
                         </p>
                         <p className="text-xs text-gray-500 dark:text-gray-400">

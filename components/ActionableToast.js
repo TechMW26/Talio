@@ -196,7 +196,7 @@ export default function ActionableToast({ notification, onDismiss, onAction }) {
             <span className="text-2xl flex-shrink-0">{getTypeIcon()}</span>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-semibold text-gray-900 dark:text-white text-sm">
+                <h3 className="font-semibold text-gray-900 dark:text-black text-sm">
                   {notification.title}
                 </h3>
                 {getPriorityBadge()}
@@ -238,7 +238,7 @@ export default function ActionableToast({ notification, onDismiss, onAction }) {
               onChange={(e) => setReason(e.target.value)}
               placeholder="Enter reason..."
               className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg 
-                       bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                       bg-white dark:bg-gray-700 text-gray-900 dark:text-black
                        focus:ring-2 focus:ring-blue-500 focus:border-transparent
                        resize-none"
               rows={2}

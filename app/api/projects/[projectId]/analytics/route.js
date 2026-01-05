@@ -469,6 +469,18 @@ function calculateCompletionPrediction(project, tasks, taskAnalytics) {
   const completedTasks = tasks.filter(t => t.status === 'completed').length
   const remainingTasks = totalTasks - completedTasks
 
+  // No tasks at all - project hasn't started
+  if (totalTasks === 0) {
+    return {
+      status: 'yet-to-start',
+      message: 'No tasks created yet. Add tasks to track progress.',
+      projectedDate: null,
+      daysVariance: 0,
+      confidence: 0
+    }
+  }
+
+  // All tasks completed
   if (remainingTasks === 0) {
     return {
       status: 'completed',

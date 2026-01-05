@@ -28,6 +28,7 @@ export async function GET(request, { params }) {
     // Get project with all relationships
     const project = await Project.findById(projectId)
       .populate('projectHead', 'firstName lastName profilePicture email employeeCode')
+      .populate('projectHeads', 'firstName lastName profilePicture email employeeCode')
       .populate('createdBy', 'firstName lastName profilePicture')
       .populate('department', 'name code')
       .populate('chatGroup')
@@ -89,7 +90,8 @@ export async function GET(request, { params }) {
         pendingApproval,
         currentUserRole: userMembership?.role,
         currentUserInvitationStatus: userMembership?.invitationStatus,
-        isProjectHead: project.projectHead._id.toString() === employeeId.toString(),
+        isProjectHead: project.projectHead?._id?.toString() === employeeId.toString() ||
+                       project.projectHeads?.some(h => h._id?.toString() === employeeId.toString()),
         isCreator: project.createdBy._id.toString() === employeeId.toString()
       }
     })
@@ -103,12 +105,12 @@ export async function GET(request, { params }) {
 export async function PUT(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'Employee', 'Chat', 'ProjectTimelineEvent'])
+    const auth = await getAuthAndModels(request, ['Project', 'Employee', 'Chat', 'ProjectTimelineEvent', 'ProjectMember'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Project, Employee, Chat } = models
+    const { Project, Employee, Chat, ProjectMember } = models
 
     const { projectId } = await params
 
@@ -123,8 +125,10 @@ export async function PUT(request, { params }) {
     }
 
     // Only project head can update project (except admins)
+    // Check against both single projectHead and projectHeads array
     const isAdmin = ['admin'].includes(user.role)
-    const isHead = project.projectHead.toString() === employeeId.toString()
+    const isHead = project.projectHead?.toString() === employeeId.toString() ||
+                   project.projectHeads?.some(h => h.toString() === employeeId.toString())
 
     if (!isAdmin && !isHead) {
       return NextResponse.json({ 
@@ -134,7 +138,7 @@ export async function PUT(request, { params }) {
     }
 
     const body = await request.json()
-    const { name, description, startDate, endDate, priority, tags, status } = body
+    const { name, description, startDate, endDate, priority, tags, status, projectHeadIds } = body
 
     const updates = {}
     const changes = []
@@ -168,6 +172,63 @@ export async function PUT(request, { params }) {
       updates.tags = tags
     }
 
+    // Handle project heads update
+    if (projectHeadIds && Array.isArray(projectHeadIds) && projectHeadIds.length > 0) {
+      const currentHeadIds = (project.projectHeads || []).map(h => h.toString())
+      const newHeadIds = projectHeadIds.map(h => h.toString())
+      
+      // Check if heads changed
+      const headsChanged = newHeadIds.length !== currentHeadIds.length ||
+        newHeadIds.some(h => !currentHeadIds.includes(h)) ||
+        currentHeadIds.some(h => !newHeadIds.includes(h))
+      
+      if (headsChanged) {
+        // Verify all new heads exist
+        const newHeads = await Employee.find({ _id: { $in: projectHeadIds } })
+        if (newHeads.length !== projectHeadIds.length) {
+          return NextResponse.json({ success: false, message: 'One or more project heads not found' }, { status: 404 })
+        }
+        
+        // Remove head role from removed heads
+        const removedHeads = currentHeadIds.filter(h => !newHeadIds.includes(h))
+        for (const headId of removedHeads) {
+          // Change their role to member instead of removing
+          await ProjectMember.updateOne(
+            { project: projectId, user: headId, role: 'head' },
+            { $set: { role: 'member' } }
+          )
+        }
+        
+        // Add head role to new heads
+        const addedHeads = newHeadIds.filter(h => !currentHeadIds.includes(h))
+        for (const headId of addedHeads) {
+          // Check if already a member
+          const existingMember = await ProjectMember.findOne({ project: projectId, user: headId })
+          if (existingMember) {
+            // Update to head role
+            existingMember.role = 'head'
+            await existingMember.save()
+          } else {
+            // Create new head member
+            await ProjectMember.create({
+              project: projectId,
+              user: headId,
+              role: 'head',
+              invitationStatus: 'accepted',
+              invitedBy: employeeId,
+              respondedAt: new Date()
+            })
+          }
+        }
+        
+        updates.projectHeads = projectHeadIds
+        updates.projectHead = projectHeadIds[0] // Keep first as legacy
+        
+        const headNames = newHeads.map(h => `${h.firstName} ${h.lastName}`).join(', ')
+        changes.push(`Project heads updated: ${headNames}`)
+      }
+    }
+
     // Handle status change separately using service
     if (status && status !== project.status) {
       const employee = await Employee.findById(employeeId)
@@ -193,6 +254,7 @@ export async function PUT(request, { params }) {
 
     const updatedProject = await Project.findById(projectId)
       .populate('projectHead', 'firstName lastName profilePicture')
+      .populate('projectHeads', 'firstName lastName profilePicture')
       .populate('createdBy', 'firstName lastName')
       .populate('department', 'name')
 
@@ -207,16 +269,16 @@ export async function PUT(request, { params }) {
   }
 }
 
-// DELETE - Archive project
+// DELETE - Delete project and associated data
 export async function DELETE(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'ProjectTimelineEvent'])
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'ProjectTimelineEvent', 'Task', 'Chat', 'Message', 'ProjectNote'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Project } = models
+    const { Project, ProjectMember, ProjectTimelineEvent, Task, Chat, Message, ProjectNote } = models
 
     const { projectId } = await params
 
@@ -230,32 +292,51 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ success: false, message: 'Project not found' }, { status: 404 })
     }
 
-    // Only admin or project head can archive
+    // Only admin or project head can delete
     const isAdmin = ['admin'].includes(user.role)
-    const isHead = project.projectHead.toString() === employeeId.toString()
+    const isHead = project.projectHead?.toString() === employeeId.toString() ||
+                   project.projectHeads?.some(h => h.toString() === employeeId.toString())
 
     if (!isAdmin && !isHead) {
       return NextResponse.json({ 
         success: false, 
-        message: 'Only admin or project head can archive the project' 
+        message: 'Only admin or project head can delete the project' 
       }, { status: 403 })
     }
 
-    // Archive instead of delete
-    project.status = 'archived'
-    await project.save()
+    // Delete associated chat group and messages
+    if (project.chatGroup) {
+      try {
+        // Delete all messages in the chat
+        await Message.deleteMany({ chat: project.chatGroup })
+        // Delete the chat group
+        await Chat.findByIdAndDelete(project.chatGroup)
+        console.log(`Deleted chat group ${project.chatGroup} for project ${projectId}`)
+      } catch (chatErr) {
+        console.error('Error deleting chat group:', chatErr.message)
+      }
+    }
 
-    await createTimelineEvent({
-      project: projectId,
-      type: 'project_status_changed',
-      createdBy: employeeId,
-      description: 'Project archived',
-      metadata: { oldStatus: project.status, newStatus: 'archived' }
-    }, models)
+    // Delete all project members
+    await ProjectMember.deleteMany({ project: projectId })
+
+    // Delete all project tasks
+    await Task.deleteMany({ project: projectId })
+
+    // Delete all project notes
+    if (ProjectNote) {
+      await ProjectNote.deleteMany({ project: projectId })
+    }
+
+    // Delete all timeline events
+    await ProjectTimelineEvent.deleteMany({ project: projectId })
+
+    // Delete the project
+    await Project.findByIdAndDelete(projectId)
 
     return NextResponse.json({
       success: true,
-      message: 'Project archived successfully'
+      message: 'Project and all associated data deleted successfully'
     })
   } catch (error) {
     console.error('Delete project error:', error)

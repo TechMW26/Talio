@@ -144,18 +144,18 @@ export async function POST(request, { params }) {
         }
 
         // Create timeline event
-        const inviterEmployee = await Employee.findById(user.employeeId)
+        const inviterEmployee = await Employee.findById(userRecord.employeeId)
         await createTimelineEvent({
           project: projectId,
           type: 'member_invited',
-          createdBy: user.employeeId,
+          createdBy: userRecord.employeeId,
           relatedMember: userIdToAdd,
           description: `${invitedEmployee.firstName} ${invitedEmployee.lastName} was invited to the project`,
           metadata: { role, isExternal }
         }, models)
 
-        // Send notification
-        await notifyProjectInvitation(project, invitedEmployee, inviterEmployee)
+        // Send notification - pass models for multi-tenant support
+        await notifyProjectInvitation(project, invitedEmployee, inviterEmployee, models, 'member')
 
         // Create actionable notification for the invited user (persistent toast)
         try {

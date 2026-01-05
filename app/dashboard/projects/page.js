@@ -464,27 +464,46 @@ export default function ProjectsPage() {
                     </div>
                   )}
 
-                  {/* Project Head */}
+                  {/* Project Heads */}
                   <div className="flex items-center justify-between pt-4 border-t border-gray-100">
                     <div className="flex items-center">
-                      <div className="w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center text-white text-sm font-medium overflow-hidden">
-                        {project.projectHead?.profilePicture ? (
-                          <img 
-                            src={project.projectHead.profilePicture} 
-                            alt={`${project.projectHead.firstName} ${project.projectHead.lastName}`}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <span>
-                            {project.projectHead?.firstName?.[0]}{project.projectHead?.lastName?.[0]}
-                          </span>
+                      {/* Show stacked avatars for multiple heads */}
+                      <div className="flex -space-x-2">
+                        {(project.projectHeads?.length ? project.projectHeads : (project.projectHead ? [project.projectHead] : [])).slice(0, 3).map((head, idx) => (
+                          <div 
+                            key={head?._id || idx}
+                            className="w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center text-white text-sm font-medium overflow-hidden border-2 border-white"
+                            title={`${head?.firstName} ${head?.lastName}`}
+                          >
+                            {head?.profilePicture ? (
+                              <img 
+                                src={head.profilePicture} 
+                                alt={`${head.firstName} ${head.lastName}`}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <span>
+                                {head?.firstName?.[0]}{head?.lastName?.[0]}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                        {project.projectHeads?.length > 3 && (
+                          <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center text-gray-600 text-xs font-medium border-2 border-white">
+                            +{project.projectHeads.length - 3}
+                          </div>
                         )}
                       </div>
                       <div className="ml-2">
                         <p className="text-sm font-medium text-gray-700">
-                          {project.projectHead?.firstName} {project.projectHead?.lastName}
+                          {project.projectHeads?.length > 1 
+                            ? `${project.projectHeads[0]?.firstName} +${project.projectHeads.length - 1} more`
+                            : `${project.projectHead?.firstName || project.projectHeads?.[0]?.firstName} ${project.projectHead?.lastName || project.projectHeads?.[0]?.lastName}`
+                          }
                         </p>
-                        <p className="text-xs text-gray-500">Project Head</p>
+                        <p className="text-xs text-gray-500">
+                          {project.projectHeads?.length > 1 ? 'Project Heads' : 'Project Head'}
+                        </p>
                       </div>
                     </div>
                     {project.userRole && (
