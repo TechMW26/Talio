@@ -94,7 +94,7 @@ export default function GoalsWidget({ userId }) {
                     <p className="text-xs mt-1">Visit Performance section to create goals</p>
                 </div>
             ) : (
-                <div className="space-y-2 max-h-48 overflow-y-auto">
+                <div className="space-y-2 max-h-[200px] overflow-y-auto">
                     {goals.map((goal) => (
                         <div key={goal._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                             <div className="flex-1 min-w-0">

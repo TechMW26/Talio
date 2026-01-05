@@ -44,7 +44,7 @@ export default function MyHelpdeskWidget({ user }) {
   }
 
   return (
-  <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+    <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-base sm:text-lg font-bold text-gray-800">Helpdesk</h3>
         <button 
@@ -60,7 +60,7 @@ export default function MyHelpdeskWidget({ user }) {
           <p className="text-sm">No open tickets</p>
         </div>
       ) : (
-        <div className="space-y-2 max-h-48 overflow-y-auto">
+        <div className="space-y-2 max-h-[200px] overflow-y-auto">
           {tickets.slice(0, 5).map(ticket => (
             <div key={ticket._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
               <div className="min-w-0 flex-1 pr-2">

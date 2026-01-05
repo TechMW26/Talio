@@ -224,7 +224,7 @@ export async function GET(request) {
     const sessions = await ProductivitySession.find({
       user: targetUserId,
       date: { $gte: dateStart, $lte: dateEnd }
-    }).sort({ sessionNumber: 1 });
+    }).sort({ startTime: -1 }); // Sort by latest session first
 
     // Filter by capture type if specified
     if (captureType && sessions.length > 0) {

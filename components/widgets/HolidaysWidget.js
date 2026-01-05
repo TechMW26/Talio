@@ -70,9 +70,8 @@ export default function HolidaysWidget({ limit = 5 }) {
                 </button>
             </div>
             
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-            {holidays.length > 0 ? (
-                holidays.map((holiday, index) => {
+            <div className="space-y-2 max-h-[200px] overflow-y-auto">
+            {holidays.map((holiday, index) => {
                     const daysUntil = getDaysUntil(holiday.date)
                     return (
                         <div
@@ -99,15 +98,9 @@ export default function HolidaysWidget({ limit = 5 }) {
                                     <span className="text-xs text-gray-400">Passed</span>
                                 )}
                             </div>
-                        </div>
-                    )
-                })
-            ) : (
-                <div className="text-center py-6 text-gray-500">
-                    <FaGift className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                    <p className="text-sm">No upcoming holidays</p>
-                </div>
-            )}
+                    </div>
+                )
+            })}
             </div>
         </div>
     )

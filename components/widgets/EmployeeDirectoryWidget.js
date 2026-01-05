@@ -51,7 +51,7 @@ export default function EmployeeDirectoryWidget() {
   }
 
   return (
-  <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+    <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-base sm:text-lg font-bold text-gray-800">Employee Directory</h3>
         <button
@@ -75,11 +75,11 @@ export default function EmployeeDirectoryWidget() {
       </div>
 
       {/* Employee List */}
-      <div className="space-y-2 max-h-48 overflow-y-auto">
+      <div className="space-y-2 max-h-[200px] overflow-y-auto">
         {filteredEmployees.length === 0 ? (
           <div className="text-center py-6 text-gray-500">
             <FaUser className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-            <p className="text-sm">No employees found</p>
+            <p className="text-sm">No employees match your search</p>
           </div>
         ) : (
           filteredEmployees.slice(0, 8).map((emp) => (

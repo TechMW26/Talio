@@ -111,15 +111,18 @@ export default function RawCaptureViewer({ userId = null, date = null, showFilte
     })
   }
 
-  // Group captures by session
-  const groupedCaptures = sessions.map(session => ({
+  // Group captures by session - sessions are already sorted by latest first from API
+  // Map each session with its captures
+  const groupedCaptures = sessions.map((session, idx) => ({
     ...session,
+    // Display number: 1 = latest, 2 = second latest, etc.
+    displayNumber: idx + 1,
     captures: captures.filter(c => {
       const captureTime = new Date(c.timestamp).getTime()
       const sessionStart = new Date(session.startTime).getTime()
       const sessionEnd = new Date(session.endTime).getTime()
       return captureTime >= sessionStart && captureTime <= sessionEnd
-    })
+    }).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)) // Sort captures within session by time
   }))
 
   // Get ungrouped captures (not in any session)
@@ -265,8 +268,9 @@ export default function RawCaptureViewer({ userId = null, date = null, showFilte
                 <div className="flex items-center gap-2 mb-3">
                   <div className="h-px flex-1 bg-gray-200"></div>
                   <span className="text-xs font-medium text-gray-500 px-2 py-1 bg-gray-100 rounded-full">
-                    Session {session.sessionNumber} • {formatTime(session.startTime)} - {formatTime(session.endTime)}
+                    {session.sessionTitle || `Session ${session.displayNumber}`} • {formatTime(session.startTime)} - {formatTime(session.endTime)}
                     {session.isComplete && ' ✓'}
+                    {session.analysis?.isAnalyzed && ' ★'}
                   </span>
                   <div className="h-px flex-1 bg-gray-200"></div>
                 </div>

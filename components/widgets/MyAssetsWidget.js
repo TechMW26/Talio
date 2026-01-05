@@ -44,37 +44,30 @@ export default function MyAssetsWidget({ user }) {
   }
 
   return (
-  <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+    <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-base sm:text-lg font-bold text-gray-800">My Assets</h3>
         <span className="text-xs font-medium bg-primary-100 text-primary-800 px-2 py-1 rounded-full">
           {assets.length}
         </span>
       </div>
-      {assets.length === 0 ? (
-        <div className="text-center py-6 text-gray-500">
-          <FaLaptop className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-          <p className="text-sm">No assets assigned</p>
-        </div>
-      ) : (
-        <div className="space-y-2 max-h-48 overflow-y-auto">
-          {assets.map(asset => (
-            <div key={asset._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-gray-800 truncate">{asset.name}</p>
-                <p className="text-xs text-gray-500">{asset.assetId || asset.uin}</p>
-              </div>
-              <span className={`text-xs px-2 py-1 rounded-full capitalize ${
-                asset.status === 'active' ? 'bg-green-100 text-green-700' :
-                asset.status === 'maintenance' ? 'bg-yellow-100 text-yellow-700' :
-                'bg-gray-100 text-gray-700'
-              }`}>
-                {asset.status}
-              </span>
+      <div className="space-y-2 max-h-[200px] overflow-y-auto">
+        {assets.map(asset => (
+          <div key={asset._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-gray-800 truncate">{asset.name}</p>
+              <p className="text-xs text-gray-500">{asset.assetId || asset.uin}</p>
             </div>
-          ))}
-        </div>
-      )}
+            <span className={`text-xs px-2 py-1 rounded-full capitalize ${
+              asset.status === 'active' ? 'bg-green-100 text-green-700' :
+              asset.status === 'maintenance' ? 'bg-yellow-100 text-yellow-700' :
+              'bg-gray-100 text-gray-700'
+            }`}>
+              {asset.status}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

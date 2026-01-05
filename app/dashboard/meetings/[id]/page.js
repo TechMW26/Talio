@@ -37,6 +37,8 @@ export default function MeetingDetailPage({ params }) {
   const [rejectReason, setRejectReason] = useState('')
   const [guestAccess, setGuestAccess] = useState(null)
   const [togglingGuest, setTogglingGuest] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     fetchMeeting()
@@ -172,8 +174,7 @@ export default function MeetingDetailPage({ params }) {
   }
 
   const handleDeleteMeeting = async () => {
-    if (!confirm('Are you sure you want to permanently delete this meeting? This action cannot be undone.')) return
-
+    setDeleting(true)
     try {
       const token = localStorage.getItem('token')
       const response = await fetch(`/api/meetings/${id}?permanent=true`, {
@@ -191,6 +192,9 @@ export default function MeetingDetailPage({ params }) {
     } catch (error) {
       console.error('Error deleting meeting:', error)
       toast.error('Failed to delete meeting')
+    } finally {
+      setDeleting(false)
+      setShowDeleteModal(false)
     }
   }
 
@@ -276,26 +280,23 @@ export default function MeetingDetailPage({ params }) {
             Back to Meetings
           </Link>
 
-          {meeting.isOrganizer && meeting.status === 'scheduled' && (
+          {meeting.isOrganizer && (
             <div className="flex gap-2">
+              {meeting.status === 'scheduled' && (
+                <button
+                  onClick={handleCancelMeeting}
+                  className="flex items-center gap-2 px-4 py-2 text-amber-600 border border-amber-600 rounded-lg hover:bg-amber-50"
+                >
+                  <HiOutlineXMark className="w-4 h-4" />
+                  Cancel
+                </button>
+              )}
               <button
-                onClick={handleCancelMeeting}
+                onClick={() => setShowDeleteModal(true)}
                 className="flex items-center gap-2 px-4 py-2 text-red-600 border border-red-600 rounded-lg hover:bg-red-50"
               >
                 <HiOutlineTrash className="w-4 h-4" />
-                Cancel
-              </button>
-            </div>
-          )}
-
-          {meeting.isOrganizer && meeting.status === 'cancelled' && (
-            <div className="flex gap-2">
-              <button
-                onClick={handleDeleteMeeting}
-                className="flex items-center gap-2 px-4 py-2 text-red-600 bg-red-50 border border-red-600 rounded-lg hover:bg-red-100"
-              >
-                <HiOutlineTrash className="w-4 h-4" />
-                Delete Permanently
+                Delete
               </button>
             </div>
           )}
@@ -683,6 +684,54 @@ export default function MeetingDetailPage({ params }) {
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <ModalPortal isOpen={showDeleteModal}>
+        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setShowDeleteModal(false)}>
+          <div className="modal-backdrop" />
+          <div className="modal-container modal-md">
+            <div className="modal-header border-b border-red-100 bg-red-50">
+              <h3 className="modal-title text-red-700">Delete Meeting Permanently</h3>
+              <button onClick={() => setShowDeleteModal(false)} className="modal-close-btn">
+                <HiOutlineXMark className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                  <HiOutlineTrash className="w-5 h-5 text-red-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900 mb-1">Are you sure you want to delete this meeting?</p>
+                  <p className="text-sm text-gray-600">
+                    This will permanently delete <strong>"{meeting?.title}"</strong> from the database. 
+                    All associated data including invitees, transcripts, and AI summaries will be removed.
+                  </p>
+                  <p className="text-sm text-red-600 mt-2 font-medium">
+                    ⚠️ This action cannot be undone.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                disabled={deleting}
+                className="modal-btn modal-btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteMeeting}
+                disabled={deleting}
+                className="modal-btn bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleting ? 'Deleting...' : 'Delete Permanently'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </ModalPortal>
 
       {/* Reject Modal */}
       <ModalPortal isOpen={showRejectModal}>

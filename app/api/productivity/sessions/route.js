@@ -179,9 +179,22 @@ export async function GET(request) {
       if (!isAdminOrHR && targetUser?.employeeId?.department) {
         const dept = await Department.findById(targetUser.employeeId.department);
         if (dept) {
-          const allHeads = dept.allHeads || [];
-          isDeptHead = allHeads.includes(currentUser?.employeeId?._id?.toString());
+          const currentEmployeeId = currentUser?.employeeId?._id?.toString();
+          // Check both legacy head field and heads array
+          const isLegacyHead = dept.head?.toString() === currentEmployeeId;
+          const isInHeadsArray = dept.heads?.some(h => h?.toString() === currentEmployeeId);
+          isDeptHead = isLegacyHead || isInHeadsArray;
+          
+          console.log(`[Sessions API] Permission check - currentEmployee: ${currentEmployeeId}, dept.head: ${dept.head}, dept.heads: ${JSON.stringify(dept.heads)}, isDeptHead: ${isDeptHead}`);
         }
+      }
+      
+      // Also check if current user has isDepartmentHead flag and manages target's department
+      if (!isAdminOrHR && !isDeptHead && currentUser?.isDepartmentHead) {
+        const headOfDepts = currentUser.headOfDepartments || [];
+        const targetDeptId = targetUser?.employeeId?.department?.toString();
+        isDeptHead = headOfDepts.some(d => d?.toString() === targetDeptId);
+        console.log(`[Sessions API] Checking User.headOfDepartments: ${JSON.stringify(headOfDepts)}, targetDept: ${targetDeptId}, isDeptHead: ${isDeptHead}`);
       }
       
       if (!isAdminOrHR && !isDeptHead) {
@@ -202,7 +215,7 @@ export async function GET(request) {
         $gte: date,
         $lt: new Date(date.getTime() + 24 * 60 * 60 * 1000)
       }
-    }).sort({ sessionNumber: 1 });
+    }).sort({ startTime: -1 }); // Sort by latest session first
     
     return NextResponse.json({
       success: true,

@@ -107,49 +107,42 @@ export default function RoleNewsWidget() {
 
             {/* News List */}
             <div className="flex-1 flex flex-col">
-                {news.length === 0 ? (
-                    <div className="text-center py-6 text-gray-500 flex-1 flex flex-col justify-center">
-                        <HiOutlineNewspaper className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                        <p className="text-sm">No news available</p>
-                    </div>
-                ) : (
-                    <div className="space-y-2 overflow-y-auto flex-1 max-h-64">
-                        {news.map((item, index) => {
-                            const config = CATEGORY_CONFIG[item.category] || CATEGORY_CONFIG.tech
-                            const Icon = config.icon
+                <div className="space-y-2 overflow-y-auto flex-1 max-h-[200px]">
+                    {news.map((item, index) => {
+                        const config = CATEGORY_CONFIG[item.category] || CATEGORY_CONFIG.tech
+                        const Icon = config.icon
 
-                            return (
-                                <a
-                                    key={index}
-                                    href={item.link}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group"
-                                >
-                                    {/* Icon */}
-                                    <div className={`w-10 h-10 ${config.bg} rounded-full flex items-center justify-center flex-shrink-0`}>
-                                        <Icon className={`w-5 h-5 ${config.color}`} />
+                        return (
+                            <a
+                                key={index}
+                                href={item.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group"
+                            >
+                                {/* Icon */}
+                                <div className={`w-10 h-10 ${config.bg} rounded-full flex items-center justify-center flex-shrink-0`}>
+                                    <Icon className={`w-5 h-5 ${config.color}`} />
+                                </div>
+
+                                {/* Content */}
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-gray-800 line-clamp-2 group-hover:text-primary-600 transition-colors">
+                                        {item.title}
+                                    </p>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <span className="text-xs text-gray-500 truncate max-w-[100px]">{item.source}</span>
+                                        <span className="text-xs text-gray-400">•</span>
+                                        <span className="text-xs text-gray-400">{item.time}</span>
                                     </div>
+                                </div>
 
-                                    {/* Content */}
-                                    <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium text-gray-800 line-clamp-2 group-hover:text-primary-600 transition-colors">
-                                            {item.title}
-                                        </p>
-                                        <div className="flex items-center gap-2 mt-1">
-                                            <span className="text-xs text-gray-500 truncate max-w-[100px]">{item.source}</span>
-                                            <span className="text-xs text-gray-400">•</span>
-                                            <span className="text-xs text-gray-400">{item.time}</span>
-                                        </div>
-                                    </div>
-
-                                    {/* External link indicator */}
-                                    <FaExternalLinkAlt className="w-3 h-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-                                </a>
-                            )
-                        })}
-                    </div>
-                )}
+                                {/* External link indicator */}
+                                <FaExternalLinkAlt className="w-3 h-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                            </a>
+                        )
+                    })}
+                </div>
             </div>
         </div>
     )

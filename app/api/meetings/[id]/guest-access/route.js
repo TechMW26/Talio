@@ -7,7 +7,7 @@ import { getAuthAndModels } from '@/lib/auth'
  */
 export async function POST(request, { params }) {
   try {
-    const auth = await getAuthAndModels(request, ['Meeting', 'Employee'])
+    const auth = await getAuthAndModels(request, ['Meeting', 'Employee', 'User'])
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
@@ -27,9 +27,21 @@ export async function POST(request, { params }) {
       )
     }
 
+    // Get current user's employee record
+    const userRecord = await models.User.findById(user._id || user.userId).select('employeeId').lean()
+    
+    let employee = null
+    if (userRecord?.employeeId) {
+      employee = await models.Employee.findById(userRecord.employeeId).lean()
+    }
+    
+    // If user doesn't have employeeId directly, try to find employee by userId
+    if (!employee) {
+      employee = await models.Employee.findOne({ userId: user._id || user.userId }).lean()
+    }
+
     // Check if user is the organizer or admin
-    const employee = await models.Employee.findById(user.employeeId)
-    const isOrganizer = meeting.organizer.toString() === user.employeeId?.toString()
+    const isOrganizer = meeting.organizer?.toString() === employee?._id?.toString()
     const isAdmin = ['admin', 'hr'].includes(user.role)
 
     if (!isOrganizer && !isAdmin) {
@@ -59,9 +71,12 @@ export async function POST(request, { params }) {
     meeting.guestAccess.enabled = enabled
 
     // Generate guest link if enabling and doesn't exist
+    // Include tenant database name in the link for multi-tenant support
     if (enabled && !meeting.guestAccess.guestLink) {
-      meeting.guestAccess.guestLink = `guest-${Date.now()}-${Math.random().toString(36).substr(2, 12)}`
+      const tenantId = auth.tenant.databaseName.replace('talio_', '') // Remove prefix for shorter URLs
+      meeting.guestAccess.guestLink = `${tenantId}-${Date.now()}-${Math.random().toString(36).substr(2, 8)}`
       meeting.guestAccess.guestLinkCreatedAt = new Date()
+      meeting.guestAccess.tenantDatabase = auth.tenant.databaseName // Store full database name
     }
 
     await meeting.save()

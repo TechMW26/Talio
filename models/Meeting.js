@@ -127,8 +127,9 @@ const MeetingSchema = new mongoose.Schema({
       type: Boolean,
       default: false
     },
-    guestLink: String, // Unique guest link token
+    guestLink: String, // Unique guest link token (format: {tenantId}-{timestamp}-{random})
     guestLinkCreatedAt: Date,
+    tenantDatabase: String, // Store tenant database name for guest link lookup
     // Optional: require approval for guests
     requireApproval: {
       type: Boolean,

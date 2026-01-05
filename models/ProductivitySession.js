@@ -99,6 +99,38 @@ const ProductivitySessionSchema = new mongoose.Schema({
       default: null
     },
     
+    // Focus score (0-100)
+    focusScore: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: null
+    },
+    
+    // Task completion indicators (0-100)
+    taskCompletionIndicators: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: null
+    },
+    
+    // Time distribution percentages
+    timeDistribution: {
+      deepWork: { type: Number, default: 0 },
+      collaboration: { type: Number, default: 0 },
+      administrative: { type: Number, default: 0 },
+      breaks: { type: Number, default: 0 },
+      unfocused: { type: Number, default: 0 }
+    },
+    
+    // Focus metrics
+    focusMetrics: {
+      longestFocusStreak: { type: String },
+      contextSwitches: { type: Number, default: 0 },
+      distractionCount: { type: Number, default: 0 }
+    },
+    
     // Key achievements during this session
     achievements: [{
       type: String
@@ -114,7 +146,19 @@ const ProductivitySessionSchema = new mongoose.Schema({
       type: String
     }],
     
-    // Individual screenshot summaries
+    // Concerns identified
+    concerns: [{
+      type: String
+    }],
+    
+    // Work categories breakdown
+    workCategories: [{
+      category: String,
+      percentage: Number,
+      description: String
+    }],
+    
+    // Individual screenshot summaries (legacy)
     screenshotSummaries: [{
       screenshotPath: String,
       timestamp: Date,
@@ -123,12 +167,46 @@ const ProductivitySessionSchema = new mongoose.Schema({
       productivity: String // high, medium, low, idle
     }],
     
-    // Detected applications/activities
+    // Per-screenshot analysis (new format)
+    screenshotAnalysis: [{
+      index: Number,
+      timestamp: String,
+      summary: String,
+      activity: String,
+      productivity: String,
+      applicationVisible: String,
+      websiteVisible: String,
+      taskDescription: String
+    }],
+    
+    // Detected applications/activities (legacy)
     detectedApplications: [{
       name: String,
       duration: Number, // minutes
       category: String // work, communication, entertainment, etc.
     }],
+    
+    // Applications (new format)
+    applications: [{
+      name: String,
+      category: String,
+      estimatedMinutes: Number,
+      productivityImpact: String
+    }],
+    
+    // Websites visited
+    websites: [{
+      domain: String,
+      category: String,
+      estimatedMinutes: Number
+    }],
+    
+    // Overall assessment
+    overallAssessment: {
+      strengths: [{ type: String }],
+      areasForImprovement: [{ type: String }],
+      recommendation: String
+    },
     
     // Error if analysis failed
     error: String
@@ -143,7 +221,14 @@ const ProductivitySessionSchema = new mongoose.Schema({
   isComplete: {
     type: Boolean,
     default: false // true when session has 30 screenshots
-  }
+  },
+  
+  // Cleanup tracking - screenshots deleted after AI analysis
+  screenshotsDeleted: {
+    type: Boolean,
+    default: false
+  },
+  screenshotsDeletedAt: Date
 }, {
   timestamps: true
 });

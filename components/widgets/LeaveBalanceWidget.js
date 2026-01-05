@@ -56,7 +56,7 @@ export default function LeaveBalanceWidget({ employeeId }) {
                         <p className="text-sm">No leave balance data</p>
                     </div>
                 ) : (
-                    <div className="space-y-2 overflow-y-auto flex-1">
+                    <div className="space-y-2 overflow-y-auto flex-1 max-h-[200px]">
                         {balances.map((balance, index) => (
                             <div
                                 key={balance._id || index}

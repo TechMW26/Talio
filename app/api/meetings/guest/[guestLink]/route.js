@@ -1,11 +1,75 @@
 import { NextResponse } from 'next/server'
-import connectDB from '@/lib/mongodb'
-import Meeting from '@/models/Meeting'
+import { getTenantModel } from '@/lib/tenantModels'
+import { connectSuperadminDB } from '@/lib/superadminDb'
+import getTenantCompanyModel from '@/models/TenantCompany'
 
 /**
  * Public API route for guest meeting access
  * No authentication required - guests can join with just the link
+ * 
+ * Guest link formats:
+ * - New format: {tenantId}-{timestamp}-{random} (includes tenant info)
+ * - Old format: guest-{timestamp}-{random} (requires tenant search)
  */
+
+// Helper to extract tenant from guest link (new format)
+function extractTenantFromLink(guestLink) {
+  // Old format starts with "guest-" - no tenant info available
+  if (guestLink.startsWith('guest-')) {
+    return null
+  }
+  
+  // New format: {tenantId}-{timestamp}-{random}
+  const parts = guestLink.split('-')
+  if (parts.length < 3) return null
+  
+  // Find the timestamp part (13 digit number)
+  let tenantParts = []
+  for (let i = 0; i < parts.length; i++) {
+    if (/^\d{13}$/.test(parts[i])) {
+      // This is the timestamp, everything before is tenant ID
+      tenantParts = parts.slice(0, i)
+      break
+    }
+  }
+  
+  if (tenantParts.length === 0) return null
+  return `talio_${tenantParts.join('-')}`
+}
+
+// Helper to find meeting across all tenant databases (for old format links)
+async function findMeetingAcrossTenants(guestLink) {
+  try {
+    // Connect to superadmin DB to get list of tenants
+    await connectSuperadminDB()
+    
+    const TenantCompany = await getTenantCompanyModel()
+    const tenants = await TenantCompany.find({ isActive: true }).select('databaseName').lean()
+    
+    // Search each tenant database for the meeting
+    for (const tenant of tenants) {
+      try {
+        const Meeting = await getTenantModel(tenant.databaseName, 'Meeting')
+        const meeting = await Meeting.findOne({
+          'guestAccess.guestLink': guestLink,
+          'guestAccess.enabled': true
+        }).select('title description scheduledStart scheduledEnd roomId isLinkActive type status guestAccess.requireApproval')
+        
+        if (meeting) {
+          return { meeting, tenantDatabase: tenant.databaseName }
+        }
+      } catch (err) {
+        console.error(`Error searching tenant ${tenant.databaseName}:`, err.message)
+        continue
+      }
+    }
+    
+    return null
+  } catch (error) {
+    console.error('Error finding meeting across tenants:', error.message)
+    return null
+  }
+}
 
 // GET - Validate guest link and get meeting info
 export async function GET(request, { params }) {
@@ -19,13 +83,33 @@ export async function GET(request, { params }) {
       )
     }
 
-    await connectDB()
+    let meeting = null
+    let tenantDatabase = null
 
-    // Find meeting by guest link
-    const meeting = await Meeting.findOne({
-      'guestAccess.guestLink': guestLink,
-      'guestAccess.enabled': true
-    }).select('title description scheduledStart scheduledEnd roomId isLinkActive type status guestAccess.requireApproval')
+    // Try to extract tenant from link (new format)
+    tenantDatabase = extractTenantFromLink(guestLink)
+    
+    if (tenantDatabase) {
+      // New format - direct lookup in specific tenant
+      try {
+        const Meeting = await getTenantModel(tenantDatabase, 'Meeting')
+        meeting = await Meeting.findOne({
+          'guestAccess.guestLink': guestLink,
+          'guestAccess.enabled': true
+        }).select('title description scheduledStart scheduledEnd roomId isLinkActive type status guestAccess.requireApproval')
+      } catch (err) {
+        console.error('Error finding meeting in tenant:', err.message)
+      }
+    }
+    
+    // If not found or old format, search across all tenants
+    if (!meeting) {
+      const result = await findMeetingAcrossTenants(guestLink)
+      if (result) {
+        meeting = result.meeting
+        tenantDatabase = result.tenantDatabase
+      }
+    }
 
     if (!meeting) {
       return NextResponse.json(
@@ -102,13 +186,35 @@ export async function POST(request, { params }) {
       )
     }
 
-    await connectDB()
+    let meeting = null
+    let tenantDatabase = null
+    let Meeting = null
 
-    // Find and update meeting
-    const meeting = await Meeting.findOne({
-      'guestAccess.guestLink': guestLink,
-      'guestAccess.enabled': true
-    })
+    // Try to extract tenant from link (new format)
+    tenantDatabase = extractTenantFromLink(guestLink)
+    
+    if (tenantDatabase) {
+      // New format - direct lookup in specific tenant
+      try {
+        Meeting = await getTenantModel(tenantDatabase, 'Meeting')
+        meeting = await Meeting.findOne({
+          'guestAccess.guestLink': guestLink,
+          'guestAccess.enabled': true
+        })
+      } catch (err) {
+        console.error('Error finding meeting in tenant:', err.message)
+      }
+    }
+    
+    // If not found or old format, search across all tenants
+    if (!meeting) {
+      const result = await findMeetingAcrossTenants(guestLink)
+      if (result) {
+        meeting = result.meeting
+        tenantDatabase = result.tenantDatabase
+        Meeting = await getTenantModel(tenantDatabase, 'Meeting')
+      }
+    }
 
     if (!meeting) {
       return NextResponse.json(

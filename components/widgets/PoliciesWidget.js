@@ -57,7 +57,7 @@ export default function PoliciesWidget() {
           <p className="text-sm">No policies found</p>
         </div>
       ) : (
-        <div className="space-y-2 max-h-48 overflow-y-auto">
+        <div className="space-y-2 max-h-[200px] overflow-y-auto">
           {policies.slice(0, 5).map(policy => (
             <div 
               key={policy._id} 
