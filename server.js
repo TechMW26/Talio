@@ -140,8 +140,134 @@ app.prepare().then(() => {
       });
     });
 
+    // ========== MEETING ROOM HANDLERS ==========
+    
+    // Join a meeting room
+    socket.on('join-meeting', (data) => {
+      const { roomId, userId, userName } = data;
+      socket.meetingRoom = roomId;
+      socket.meetingUserId = userId;
+      socket.meetingUserName = userName;
+      
+      socket.join(`meeting:${roomId}`);
+      console.log(`📹 [Socket.IO] User ${userName} (${socket.id}) joined meeting:${roomId}`);
+      
+      // Notify others in the meeting room
+      socket.to(`meeting:${roomId}`).emit('user-joined', {
+        id: socket.id,
+        userId: userId,
+        userName: userName
+      });
+      
+      // Send list of existing participants to the new user
+      const room = io.sockets.adapter.rooms.get(`meeting:${roomId}`);
+      if (room) {
+        const existingParticipants = [];
+        room.forEach((socketId) => {
+          const participantSocket = io.sockets.sockets.get(socketId);
+          if (participantSocket && participantSocket.id !== socket.id) {
+            existingParticipants.push({
+              id: participantSocket.id,
+              userId: participantSocket.meetingUserId,
+              userName: participantSocket.meetingUserName
+            });
+          }
+        });
+        if (existingParticipants.length > 0) {
+          socket.emit('existing-participants', existingParticipants);
+        }
+      }
+    });
+
+    // Leave meeting room
+    socket.on('leave-meeting', (data) => {
+      const { roomId } = data;
+      socket.leave(`meeting:${roomId}`);
+      console.log(`📹 [Socket.IO] User ${socket.meetingUserName || socket.id} left meeting:${roomId}`);
+      
+      // Notify others
+      socket.to(`meeting:${roomId}`).emit('user-left', {
+        id: socket.id,
+        userId: socket.meetingUserId,
+        userName: socket.meetingUserName
+      });
+    });
+
+    // WebRTC signaling: Offer
+    socket.on('offer', (data) => {
+      const { to, offer } = data;
+      console.log(`📹 [Socket.IO] Relaying offer from ${socket.id} to ${to}`);
+      io.to(to).emit('offer', {
+        from: socket.id,
+        offer: offer
+      });
+    });
+
+    // WebRTC signaling: Answer
+    socket.on('answer', (data) => {
+      const { to, answer } = data;
+      console.log(`📹 [Socket.IO] Relaying answer from ${socket.id} to ${to}`);
+      io.to(to).emit('answer', {
+        from: socket.id,
+        answer: answer
+      });
+    });
+
+    // WebRTC signaling: ICE Candidate
+    socket.on('ice-candidate', (data) => {
+      const { to, candidate } = data;
+      io.to(to).emit('ice-candidate', {
+        from: socket.id,
+        candidate: candidate
+      });
+    });
+
+    // Meeting chat message
+    socket.on('meeting-chat', (data) => {
+      const { roomId, message, userName, timestamp } = data;
+      console.log(`💬 [Socket.IO] Meeting chat in ${roomId}: ${userName}: ${message}`);
+      io.to(`meeting:${roomId}`).emit('meeting-chat', {
+        message,
+        userName,
+        userId: socket.meetingUserId,
+        timestamp: timestamp || new Date().toISOString()
+      });
+    });
+
+    // Hand raise
+    socket.on('raise-hand', (data) => {
+      const { roomId } = data;
+      socket.to(`meeting:${roomId}`).emit('hand-raised', {
+        id: socket.id,
+        userId: socket.meetingUserId,
+        userName: socket.meetingUserName
+      });
+    });
+
+    // Meeting reaction
+    socket.on('meeting-reaction', (data) => {
+      const { roomId, reaction } = data;
+      io.to(`meeting:${roomId}`).emit('meeting-reaction', {
+        id: socket.id,
+        userName: socket.meetingUserName,
+        reaction: reaction
+      });
+    });
+
+    // ========== END MEETING ROOM HANDLERS ==========
+
     socket.on('disconnect', () => {
       console.log('❌ [Socket.IO] Client disconnected:', socket.id);
+      
+      // If user was in a meeting, notify others
+      if (socket.meetingRoom) {
+        socket.to(`meeting:${socket.meetingRoom}`).emit('user-left', {
+          id: socket.id,
+          userId: socket.meetingUserId,
+          userName: socket.meetingUserName
+        });
+        console.log(`📹 [Socket.IO] User ${socket.meetingUserName || socket.id} disconnected from meeting:${socket.meetingRoom}`);
+      }
     });
   });
 

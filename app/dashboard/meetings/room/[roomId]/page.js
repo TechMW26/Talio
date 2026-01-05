@@ -18,9 +18,11 @@ import {
   HiOutlineStopCircle
 } from 'react-icons/hi2'
 import { 
-  HiMicrophone, 
-  HiVideoCamera 
-} from 'react-icons/hi2'
+  HiMicrophone,
+  HiMicrophoneOff,
+  HiVideoCamera,
+  HiVideoCameraOff
+} from 'react-icons/hi'
 import { BsPin, BsPinFill, BsEmojiSmile } from 'react-icons/bs'
 import toast from '@/utils/toast'
 
@@ -58,6 +60,8 @@ export default function MeetingRoomPage({ params }) {
   const [floatingReactions, setFloatingReactions] = useState([])
   const [hasLocalStream, setHasLocalStream] = useState(false) // Track when stream is ready
   const [hasScreenStream, setHasScreenStream] = useState(false) // Track screen stream
+  const [previewReady, setPreviewReady] = useState(false) // Track preview camera state
+  const [previewError, setPreviewError] = useState(null) // Track preview errors
   
   // Refs
   const localVideoRef = useRef(null)
@@ -126,6 +130,9 @@ export default function MeetingRoomPage({ params }) {
         }
         
         setMeeting(meetingData)
+        
+        // Start camera preview after meeting data is loaded
+        startCameraPreview()
       } else {
         toast.error('Meeting not found')
         router.push('/dashboard/meetings')
@@ -138,21 +145,72 @@ export default function MeetingRoomPage({ params }) {
     }
   }
 
-  // Initialize WebRTC and Socket connection
-  const joinMeeting = useCallback(async () => {
+  // Start camera preview before joining
+  const startCameraPreview = async () => {
     try {
-      // Get local media stream
       const stream = await navigator.mediaDevices.getUserMedia({
         video: true,
         audio: true
       })
       
       localStreamRef.current = stream
-      setHasLocalStream(true) // Trigger re-render and useEffect to attach stream
+      setHasLocalStream(true)
+      setPreviewReady(true)
       
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream
-        localVideoRef.current.play().catch(() => {}) // Ensure video plays
+        localVideoRef.current.play().catch(() => {})
+      }
+    } catch (error) {
+      console.error('Error starting camera preview:', error)
+      if (error.name === 'NotAllowedError') {
+        setPreviewError('Camera/microphone access denied. Please allow access to join the meeting.')
+      } else if (error.name === 'NotFoundError') {
+        setPreviewError('No camera or microphone found on this device.')
+      } else {
+        setPreviewError('Could not access camera. Please check your device settings.')
+      }
+    }
+  }
+
+  // Toggle preview mute (before joining)
+  const togglePreviewMute = () => {
+    if (localStreamRef.current) {
+      const audioTrack = localStreamRef.current.getAudioTracks()[0]
+      if (audioTrack) {
+        audioTrack.enabled = isMuted
+        setIsMuted(!isMuted)
+      }
+    }
+  }
+
+  // Toggle preview video (before joining)
+  const togglePreviewVideo = () => {
+    if (localStreamRef.current) {
+      const videoTrack = localStreamRef.current.getVideoTracks()[0]
+      if (videoTrack) {
+        videoTrack.enabled = isVideoOff
+        setIsVideoOff(!isVideoOff)
+      }
+    }
+  }
+
+  // Initialize WebRTC and Socket connection
+  const joinMeeting = useCallback(async () => {
+    try {
+      // Use existing preview stream or get new one
+      if (!localStreamRef.current) {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true
+        })
+        localStreamRef.current = stream
+        setHasLocalStream(true)
+      }
+      
+      if (localVideoRef.current && localStreamRef.current) {
+        localVideoRef.current.srcObject = localStreamRef.current
+        localVideoRef.current.play().catch(() => {})
       }
 
       // Connect to socket for signaling
@@ -171,12 +229,23 @@ export default function MeetingRoomPage({ params }) {
         })
       })
 
-      // Handle other participants
+      // Handle existing participants when joining
+      socketRef.current.on('existing-participants', async (existingUsers) => {
+        console.log('Existing participants:', existingUsers)
+        for (const userData of existingUsers) {
+          setParticipants(prev => [...prev.filter(p => p.id !== userData.id), userData])
+          // Create peer connection and send offer to existing user
+          await createPeerConnectionAndOffer(userData.id, userData.userName)
+        }
+      })
+
+      // Handle other participants joining after us
       socketRef.current.on('user-joined', (userData) => {
         console.log('User joined:', userData)
         setParticipants(prev => [...prev.filter(p => p.id !== userData.id), userData])
-        // Create peer connection for new user
-        createPeerConnection(userData.id, userData.userName)
+        // Don't create offer - wait for the new user to send us an offer
+        // The new user will initiate connections with existing participants
+        createPeerConnection(userData.id, userData.userName, false)
       })
 
       socketRef.current.on('user-left', (userData) => {
@@ -203,14 +272,28 @@ export default function MeetingRoomPage({ params }) {
 
       // WebRTC Signaling
       socketRef.current.on('offer', async ({ from, offer }) => {
-        const pc = createPeerConnection(from, 'Participant')
+        console.log('Received offer from', from)
+        // Create peer connection for this participant if not exists
+        let pc = peerConnectionsRef.current[from]
+        if (!pc) {
+          pc = createPeerConnection(from, 'Participant', false)
+          // Also add to participants list
+          setParticipants(prev => {
+            if (!prev.find(p => p.id === from)) {
+              return [...prev, { id: from, userName: 'Participant' }]
+            }
+            return prev
+          })
+        }
         await pc.setRemoteDescription(new RTCSessionDescription(offer))
         const answer = await pc.createAnswer()
         await pc.setLocalDescription(answer)
+        console.log('Sending answer to', from)
         socketRef.current.emit('answer', { to: from, answer })
       })
 
       socketRef.current.on('answer', async ({ from, answer }) => {
+        console.log('Received answer from', from)
         const pc = peerConnectionsRef.current[from]
         if (pc) {
           await pc.setRemoteDescription(new RTCSessionDescription(answer))
@@ -219,8 +302,12 @@ export default function MeetingRoomPage({ params }) {
 
       socketRef.current.on('ice-candidate', async ({ from, candidate }) => {
         const pc = peerConnectionsRef.current[from]
-        if (pc) {
-          await pc.addIceCandidate(new RTCIceCandidate(candidate))
+        if (pc && candidate) {
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(candidate))
+          } catch (err) {
+            console.error('Error adding ICE candidate:', err)
+          }
         }
       })
 
@@ -237,11 +324,18 @@ export default function MeetingRoomPage({ params }) {
   }, [roomId, user])
 
   // Create WebRTC peer connection
-  const createPeerConnection = (peerId, peerName) => {
+  const createPeerConnection = (peerId, peerName, shouldOffer = false) => {
+    // Don't create duplicate connections
+    if (peerConnectionsRef.current[peerId]) {
+      return peerConnectionsRef.current[peerId]
+    }
+
     const configuration = {
       iceServers: [
         { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' }
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:stun2.l.google.com:19302' },
+        { urls: 'stun:stun3.l.google.com:19302' }
       ]
     }
 
@@ -257,7 +351,7 @@ export default function MeetingRoomPage({ params }) {
 
     // Handle incoming tracks
     pc.ontrack = (event) => {
-      console.log('Received remote track', event)
+      console.log('Received remote track from', peerId, event)
       // Add remote stream to participant video
       setParticipants(prev => prev.map(p => 
         p.id === peerId ? { ...p, stream: event.streams[0] } : p
@@ -274,17 +368,27 @@ export default function MeetingRoomPage({ params }) {
       }
     }
 
-    // Create and send offer for new connections
-    pc.onnegotiationneeded = async () => {
-      try {
-        const offer = await pc.createOffer()
-        await pc.setLocalDescription(offer)
-        socketRef.current?.emit('offer', { to: peerId, offer })
-      } catch (err) {
-        console.error('Error creating offer:', err)
-      }
+    // Handle connection state changes
+    pc.onconnectionstatechange = () => {
+      console.log(`Peer ${peerId} connection state:`, pc.connectionState)
     }
 
+    return pc
+  }
+
+  // Create peer connection and send offer (for initiating connection)
+  const createPeerConnectionAndOffer = async (peerId, peerName) => {
+    const pc = createPeerConnection(peerId, peerName, true)
+    
+    try {
+      const offer = await pc.createOffer()
+      await pc.setLocalDescription(offer)
+      console.log('Sending offer to', peerId)
+      socketRef.current?.emit('offer', { to: peerId, offer })
+    } catch (err) {
+      console.error('Error creating offer:', err)
+    }
+    
     return pc
   }
 
@@ -538,49 +642,118 @@ export default function MeetingRoomPage({ params }) {
   if (!isJoined) {
     return (
       <div className="h-screen w-screen bg-gray-100 flex items-center justify-center p-4 overflow-hidden">
-        <div className="max-w-md w-full bg-white rounded-2xl p-6 text-center shadow-xl border border-gray-200">
+        <div className="max-w-lg w-full bg-white rounded-2xl p-6 text-center shadow-xl border border-gray-200">
           <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <HiOutlineVideoCamera className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-gray-800 mb-2">
             {meeting?.title || 'Meeting Room'}
           </h1>
-          <p className="text-gray-500 mb-6">
+          <p className="text-gray-500 mb-4">
             Ready to join the meeting?
           </p>
           
-          {/* Preview */}
-          <div className="relative bg-gray-900 rounded-xl aspect-video mb-6 overflow-hidden">
-            <video
-              ref={(el) => {
-                localVideoRef.current = el
-                // Attach stream when element mounts
-                if (el && localStreamRef.current && el.srcObject !== localStreamRef.current) {
-                  el.srcObject = localStreamRef.current
-                  el.play().catch(() => {})
-                }
-              }}
-              autoPlay
-              playsInline
-              muted
-              className="w-full h-full object-contain absolute inset-0 z-10 -scale-x-100"
-            />
-            {!localStreamRef.current && (
-              <div className="absolute inset-0 flex items-center justify-center z-0">
-                <p className="text-gray-500">Camera preview will appear here</p>
+          {/* Camera Preview */}
+          <div className="relative bg-gray-900 rounded-xl aspect-video mb-4 overflow-hidden">
+            {previewReady && !isVideoOff ? (
+              <video
+                ref={(el) => {
+                  localVideoRef.current = el
+                  if (el && localStreamRef.current && el.srcObject !== localStreamRef.current) {
+                    el.srcObject = localStreamRef.current
+                    el.play().catch(() => {})
+                  }
+                }}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover absolute inset-0 z-10 -scale-x-100"
+              />
+            ) : previewError ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center z-0 p-4">
+                <HiOutlineVideoCamera className="w-12 h-12 text-red-400 mb-2" />
+                <p className="text-red-400 text-sm text-center">{previewError}</p>
+              </div>
+            ) : isVideoOff && previewReady ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-800 z-0">
+                <div className="w-20 h-20 bg-indigo-600 rounded-full flex items-center justify-center mb-2">
+                  <span className="text-3xl font-bold text-white">
+                    {user?.firstName?.[0]?.toUpperCase() || 'Y'}
+                  </span>
+                </div>
+                <p className="text-gray-400 text-sm">Camera off</p>
+              </div>
+            ) : (
+              <div className="absolute inset-0 flex flex-col items-center justify-center z-0">
+                <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+                <p className="text-gray-400 text-sm">Starting camera...</p>
+              </div>
+            )}
+            
+            {/* Preview Controls Overlay */}
+            {previewReady && (
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-20">
+                <button
+                  onClick={togglePreviewMute}
+                  className={`p-3 rounded-full transition-colors ${
+                    isMuted 
+                      ? 'bg-red-500 hover:bg-red-600 text-white' 
+                      : 'bg-gray-800/80 hover:bg-gray-700 text-white'
+                  }`}
+                  title={isMuted ? 'Unmute' : 'Mute'}
+                >
+                  {isMuted ? <HiMicrophoneOff className="w-5 h-5" /> : <HiMicrophone className="w-5 h-5" />}
+                </button>
+                <button
+                  onClick={togglePreviewVideo}
+                  className={`p-3 rounded-full transition-colors ${
+                    isVideoOff 
+                      ? 'bg-red-500 hover:bg-red-600 text-white' 
+                      : 'bg-gray-800/80 hover:bg-gray-700 text-white'
+                  }`}
+                  title={isVideoOff ? 'Turn on camera' : 'Turn off camera'}
+                >
+                  {isVideoOff ? <HiVideoCameraOff className="w-5 h-5" /> : <HiVideoCamera className="w-5 h-5" />}
+                </button>
               </div>
             )}
           </div>
 
+          {/* Mic/Video status indicator */}
+          {previewReady && (
+            <div className="flex items-center justify-center gap-4 mb-4 text-sm text-gray-600">
+              <span className={`flex items-center gap-1 ${isMuted ? 'text-red-500' : 'text-green-600'}`}>
+                {isMuted ? <HiMicrophoneOff className="w-4 h-4" /> : <HiMicrophone className="w-4 h-4" />}
+                {isMuted ? 'Muted' : 'Mic on'}
+              </span>
+              <span className={`flex items-center gap-1 ${isVideoOff ? 'text-red-500' : 'text-green-600'}`}>
+                {isVideoOff ? <HiVideoCameraOff className="w-4 h-4" /> : <HiVideoCamera className="w-4 h-4" />}
+                {isVideoOff ? 'Camera off' : 'Camera on'}
+              </span>
+            </div>
+          )}
+
           <button
             onClick={joinMeeting}
-            className="w-full py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 transition-colors"
+            disabled={!previewReady && !previewError}
+            className={`w-full py-3 font-medium rounded-xl transition-colors ${
+              previewReady || previewError
+                ? 'bg-indigo-600 text-white hover:bg-indigo-700'
+                : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+            }`}
           >
-            Join Meeting
+            {previewReady || previewError ? 'Join Meeting' : 'Preparing...'}
           </button>
           
           <button
-            onClick={() => router.push(meeting?._id ? `/dashboard/meetings/${meeting._id}` : '/dashboard/meetings')}
+            onClick={() => {
+              // Stop preview stream when canceling
+              if (localStreamRef.current) {
+                localStreamRef.current.getTracks().forEach(track => track.stop())
+                localStreamRef.current = null
+              }
+              router.push(meeting?._id ? `/dashboard/meetings/${meeting._id}` : '/dashboard/meetings')
+            }}
             className="w-full py-3 text-gray-500 hover:text-gray-700 mt-3"
           >
             Cancel
