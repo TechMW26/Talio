@@ -3,12 +3,13 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
-import { FaSave, FaArrowLeft, FaChevronDown, FaTimes } from 'react-icons/fa'
+import { FaSave, FaArrowLeft, FaChevronDown, FaTimes, FaExclamationTriangle } from 'react-icons/fa'
 
 export default function EditEmployeePage() {
   const params = useParams()
   const router = useRouter()
   const [loading, setLoading] = useState(true)
+  const [accessDenied, setAccessDenied] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [departments, setDepartments] = useState([])
   const [designations, setDesignations] = useState([])
@@ -76,6 +77,17 @@ export default function EditEmployeePage() {
   })
 
   useEffect(() => {
+    // Check access control
+    const userData = localStorage.getItem('user')
+    if (userData) {
+      const parsedUser = JSON.parse(userData)
+      const allowedRoles = ['admin', 'hr']
+      if (!allowedRoles.includes(parsedUser.role)) {
+        setAccessDenied(true)
+        setLoading(false)
+        return
+      }
+    }
     fetchEmployee()
     fetchDepartments()
     fetchDesignations()
@@ -241,6 +253,30 @@ export default function EditEmployeePage() {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  // Access denied screen for non-admin/non-hr users
+  if (accessDenied) {
+    return (
+      <div className="p-6">
+        <div className="flex flex-col items-center justify-center min-h-[60vh]">
+          <div className="bg-red-50 rounded-full p-6 mb-6">
+            <FaExclamationTriangle className="w-16 h-16 text-red-500" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">Access Denied</h1>
+          <p className="text-gray-600 text-center max-w-md mb-6">
+            You don't have permission to edit employees. 
+            This page is restricted to Admin and HR users only.
+          </p>
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="btn-primary"
+          >
+            Go to Dashboard
+          </button>
+        </div>
+      </div>
+    )
   }
 
   if (loading) {

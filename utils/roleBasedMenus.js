@@ -375,17 +375,6 @@ export const roleBasedMenus = {
       ]
     },
     {
-      name: 'Employees',
-      icon: HiOutlineUserGroup,
-      path: '/dashboard/employees',
-      submenu: [
-        { name: 'All Employees', path: '/dashboard/employees' },
-        { name: 'Add Employee', path: '/dashboard/employees/add' },
-        { name: 'Departments', path: '/dashboard/departments' },
-        { name: 'Designations', path: '/dashboard/designations' },
-      ]
-    },
-    {
       name: 'Attendance & Leaves',
       icon: HiOutlineClock,
       path: '/dashboard/attendance',

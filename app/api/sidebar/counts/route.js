@@ -5,7 +5,7 @@ import { getAuthAndModels } from '@/lib/auth'
 export async function GET(request) {
   try {
     const auth = await getAuthAndModels(request, [
-      'User', 'Employee', 'ProjectMember', 'Leave', 'AttendanceCorrection',
+      'User', 'Employee', 'Department', 'ProjectMember', 'Leave', 'AttendanceCorrection',
       'Expense', 'Helpdesk', 'Notification', 'Task', 'TaskAssignee'
     ])
     
@@ -27,7 +27,7 @@ export async function GET(request) {
     
     const { user, models } = auth
     const { 
-      User, Employee, ProjectMember, Leave, AttendanceCorrection,
+      User, Employee, Department, ProjectMember, Leave, AttendanceCorrection,
       Expense, Helpdesk, Notification, Task, TaskAssignee 
     } = models
 
@@ -96,18 +96,51 @@ export async function GET(request) {
     const canApprove = ['admin', 'hr', 'manager', 'department_head'].includes(userRole)
     
     if (canApprove) {
-      // Get employee's department for department head scope
-      const employee = await Employee.findById(employeeId).select('department')
-      const departmentId = employee?.department
+      // Check if user is a department head (via User model flag OR role)
+      const userDoc = await User.findById(user._id || user.userId).select('isDepartmentHead headOfDepartments').lean()
+      const isDeptHead = userRole === 'department_head' || userDoc?.isDepartmentHead === true
+      
+      // Determine if this user should have department-scoped view
+      // Only admin and HR see company-wide counts
+      // Managers and department heads see only their department's counts
+      const hasDeptScopedView = !['admin', 'hr'].includes(userRole)
+      
+      // For users with department-scoped view, find departments they manage
+      let departmentEmployeeIds = []
+      
+      if (hasDeptScopedView) {
+        // Get departments from headOfDepartments array on User model first
+        let managedDeptIds = []
+        if (userDoc?.headOfDepartments?.length > 0) {
+          managedDeptIds = userDoc.headOfDepartments
+        }
+        
+        // Also check Department model for head/heads fields
+        const managedDepartments = await Department.find({
+          $or: [
+            { head: employeeId },
+            { heads: employeeId },
+            { _id: { $in: managedDeptIds } }
+          ]
+        }).select('_id').lean()
+        
+        if (managedDepartments.length > 0) {
+          const deptIds = managedDepartments.map(d => d._id)
+          const deptEmployees = await Employee.find({ department: { $in: deptIds } }).select('_id').lean()
+          departmentEmployeeIds = deptEmployees.map(e => e._id)
+        }
+      }
 
-      // 3. Pending leave approvals
+      // 4. Pending leave approvals
       try {
         const leaveQuery = { status: 'pending' }
         
-        // Department heads only see their department's leaves
-        if (userRole === 'department_head' && departmentId) {
-          const deptEmployees = await Employee.find({ department: departmentId }).select('_id')
-          leaveQuery.employee = { $in: deptEmployees.map(e => e._id) }
+        // Department heads/managers only see their managed departments' leaves
+        if (hasDeptScopedView && departmentEmployeeIds.length > 0) {
+          leaveQuery.employee = { $in: departmentEmployeeIds }
+        } else if (hasDeptScopedView) {
+          // No departments managed, no pending leaves to show
+          leaveQuery._id = null // Will return 0
         }
         
         counts.leaves = await Leave.countDocuments(leaveQuery)
@@ -115,13 +148,14 @@ export async function GET(request) {
         console.error('Error counting leave approvals:', err.message)
       }
 
-      // 4. Pending attendance corrections
+      // 5. Pending attendance corrections
       try {
         const correctionQuery = { status: 'pending' }
         
-        if (userRole === 'department_head' && departmentId) {
-          const deptEmployees = await Employee.find({ department: departmentId }).select('_id')
-          correctionQuery.employee = { $in: deptEmployees.map(e => e._id) }
+        if (hasDeptScopedView && departmentEmployeeIds.length > 0) {
+          correctionQuery.employee = { $in: departmentEmployeeIds }
+        } else if (hasDeptScopedView) {
+          correctionQuery._id = null // Will return 0
         }
         
         counts.attendance = await AttendanceCorrection.countDocuments(correctionQuery)
@@ -129,13 +163,14 @@ export async function GET(request) {
         console.error('Error counting attendance corrections:', err.message)
       }
 
-      // 5. Pending expense approvals
+      // 6. Pending expense approvals
       try {
         const expenseQuery = { status: 'pending' }
         
-        if (userRole === 'department_head' && departmentId) {
-          const deptEmployees = await Employee.find({ department: departmentId }).select('_id')
-          expenseQuery.employee = { $in: deptEmployees.map(e => e._id) }
+        if (hasDeptScopedView && departmentEmployeeIds.length > 0) {
+          expenseQuery.employee = { $in: departmentEmployeeIds }
+        } else if (hasDeptScopedView) {
+          expenseQuery._id = null // Will return 0
         }
         
         counts.expenses = await Expense.countDocuments(expenseQuery)
@@ -143,7 +178,7 @@ export async function GET(request) {
         console.error('Error counting expenses:', err.message)
       }
 
-      // 6. Pending helpdesk tickets (for IT/HR admins)
+      // 7. Pending helpdesk tickets (for IT/HR admins only)
       if (['admin', 'hr'].includes(userRole)) {
         try {
           counts.helpdesk = await Helpdesk.countDocuments({

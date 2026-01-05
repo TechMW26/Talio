@@ -3,11 +3,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
-import { FaSave, FaTimes, FaChevronDown, FaCheck, FaTimes as FaX, FaUserPlus, FaFileUpload } from 'react-icons/fa'
+import { FaSave, FaTimes, FaChevronDown, FaCheck, FaTimes as FaX, FaUserPlus, FaFileUpload, FaExclamationTriangle } from 'react-icons/fa'
 import BulkImportEmployees from '@/components/employees/BulkImportEmployees'
 
 export default function AddEmployeePage() {
   const router = useRouter()
+  const [accessDenied, setAccessDenied] = useState(false)
   const [activeTab, setActiveTab] = useState('single') // 'single' or 'bulk'
   const [loading, setLoading] = useState(false)
   const [departments, setDepartments] = useState([])
@@ -83,6 +84,16 @@ export default function AddEmployeePage() {
   })
 
   useEffect(() => {
+    // Check access control
+    const userData = localStorage.getItem('user')
+    if (userData) {
+      const parsedUser = JSON.parse(userData)
+      const allowedRoles = ['admin', 'hr']
+      if (!allowedRoles.includes(parsedUser.role)) {
+        setAccessDenied(true)
+        return
+      }
+    }
     fetchDepartments()
     fetchDesignations()
     fetchCompanies()
@@ -282,6 +293,30 @@ export default function AddEmployeePage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Access denied screen for non-admin/non-hr users
+  if (accessDenied) {
+    return (
+      <div className="p-6">
+        <div className="flex flex-col items-center justify-center min-h-[60vh]">
+          <div className="bg-red-50 rounded-full p-6 mb-6">
+            <FaExclamationTriangle className="w-16 h-16 text-red-500" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">Access Denied</h1>
+          <p className="text-gray-600 text-center max-w-md mb-6">
+            You don't have permission to add employees. 
+            This page is restricted to Admin and HR users only.
+          </p>
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="btn-primary"
+          >
+            Go to Dashboard
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (

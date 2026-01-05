@@ -44,6 +44,7 @@ export default function EmployeesPage() {
   const [totalPages, setTotalPages] = useState(1)
   const [totalEmployees, setTotalEmployees] = useState(0)
   const [user, setUser] = useState(null)
+  const [accessDenied, setAccessDenied] = useState(false)
   const [sortBy, setSortBy] = useState('createdAt')
   const [sortOrder, setSortOrder] = useState('desc')
   const [showFilters, setShowFilters] = useState(false)
@@ -101,6 +102,14 @@ export default function EmployeesPage() {
     if (userData) {
       const parsedUser = JSON.parse(userData)
       setUser(parsedUser)
+      
+      // Check if user has access (admin or hr only)
+      const allowedRoles = ['admin', 'hr']
+      if (!allowedRoles.includes(parsedUser.role)) {
+        setAccessDenied(true)
+        setLoading(false)
+        return
+      }
     }
     fetchDepartments()
     fetchDesignations()
@@ -388,6 +397,30 @@ export default function EmployeesPage() {
     }, 300)
     return () => clearTimeout(timer)
   }, [search])
+
+  // Access denied screen for non-admin/non-hr users
+  if (accessDenied) {
+    return (
+      <div className="page-container">
+        <div className="flex flex-col items-center justify-center min-h-[60vh]">
+          <div className="bg-red-50 rounded-full p-6 mb-6">
+            <FaExclamationTriangle className="w-16 h-16 text-red-500" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">Access Denied</h1>
+          <p className="text-gray-600 text-center max-w-md mb-6">
+            You don't have permission to access the Employees section. 
+            This page is restricted to Admin and HR users only.
+          </p>
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="btn-primary"
+          >
+            Go to Dashboard
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="page-container">
