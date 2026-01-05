@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
+import { getTenantModels } from '@/lib/tenantModels';
 import { readFile } from 'fs/promises';
 import path from 'path';
 import { generateVisionContent, generateContent } from '@/lib/gemini';
@@ -40,10 +41,23 @@ export async function POST(request, { params }) {
       );
     }
     
-    console.log(`[ProductivityAnalysis] Session found. User field: ${session.user}, Screenshots: ${session.screenshots?.length || 0}`);
+    // Get session owner - could be stored as 'user' or 'employee'
+    const sessionUserId = session.user?.toString();
+    const sessionEmployeeId = session.employee?.toString();
+    
+    console.log(`[ProductivityAnalysis] Session found. User: ${sessionUserId}, Employee: ${sessionEmployeeId}, Screenshots: ${session.screenshots?.length || 0}`);
     
     // Permission check - be more lenient for department heads
-    const isOwner = session.user?.toString() === currentUserId?.toString();
+    // Check ownership by user ID or by employee ID
+    let isOwner = false;
+    if (sessionUserId) {
+      isOwner = sessionUserId === currentUserId?.toString();
+    }
+    if (!isOwner && sessionEmployeeId && user.employeeId) {
+      const currentEmployeeId = user.employeeId._id?.toString() || user.employeeId?.toString();
+      isOwner = sessionEmployeeId === currentEmployeeId;
+    }
+    
     const isAdminOrHR = ['admin', 'hr', 'manager', 'department_head'].includes(currentUserRole);
     const isDepartmentHead = user.isDepartmentHead === true;
     
@@ -65,11 +79,20 @@ export async function POST(request, { params }) {
       });
     }
     
-    // Get user info for context
-    const userRecord = await User.findById(session.user).populate('employeeId');
-    const employeeName = userRecord?.employeeId 
-      ? `${userRecord.employeeId.firstName} ${userRecord.employeeId.lastName}`
-      : 'Employee';
+    // Get user info for context - try user first, then employee
+    let employeeName = 'Employee';
+    if (sessionUserId) {
+      const userRecord = await User.findById(sessionUserId).populate('employeeId');
+      if (userRecord?.employeeId) {
+        employeeName = `${userRecord.employeeId.firstName} ${userRecord.employeeId.lastName}`;
+      }
+    } else if (sessionEmployeeId) {
+      const { Employee } = await getTenantModels(auth.tenant.databaseName, ['Employee']);
+      const employee = await Employee.findById(sessionEmployeeId);
+      if (employee) {
+        employeeName = `${employee.firstName} ${employee.lastName}`;
+      }
+    }
     
     // Prepare images for analysis
     const screenshots = session.screenshots || [];

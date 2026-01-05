@@ -23,6 +23,12 @@ import ManualCapturePanel from '@/components/productivity/ManualCapturePanel'
 import ModalPortal from '@/components/ModalPortal'
 import { useAILoading } from '@/contexts/AILoadingContext'
 
+// Helper function to get screenshot URL (handles different field names)
+const getScreenshotUrl = (screenshot) => {
+  if (!screenshot) return null
+  return screenshot.url || screenshot.path || screenshot.imagekitUrl || null
+}
+
 export default function ProductivityPage() {
   const [user, setUser] = useState(null)
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
@@ -128,6 +134,32 @@ export default function ProductivityPage() {
     const date = new Date(selectedDate)
     date.setDate(date.getDate() + direction)
     setSelectedDate(date.toISOString().split('T')[0])
+  }
+
+  // Fetch full session data by ID (for team member sessions)
+  const fetchSessionById = async (sessionId) => {
+    try {
+      // First try to get from local sessions
+      const localSession = sessions.find(s => s._id === sessionId)
+      if (localSession && localSession.screenshots?.length > 0) {
+        setSelectedSession(localSession)
+        setCurrentSlideIndex(0)
+        return
+      }
+      
+      // Fetch from API
+      const res = await fetch(`/api/productivity/sessions/${sessionId}`)
+      if (res.ok) {
+        const data = await res.json()
+        const session = data.data || data.session || data
+        setSelectedSession(session)
+        setCurrentSlideIndex(0)
+      } else {
+        console.error('Failed to fetch session:', sessionId)
+      }
+    } catch (error) {
+      console.error('Error fetching session:', error)
+    }
   }
 
   // Analyze session with AI
@@ -393,9 +425,9 @@ export default function ProductivityPage() {
                 >
                   {/* Session Preview - First screenshot */}
                   <div className="aspect-video bg-gray-100 relative">
-                    {session.screenshots?.[0]?.url ? (
+                    {getScreenshotUrl(session.screenshots?.[0]) ? (
                       <img
-                        src={session.screenshots[0].url}
+                        src={getScreenshotUrl(session.screenshots[0])}
                         alt="Session preview"
                         className="w-full h-full object-cover"
                       />
@@ -467,7 +499,13 @@ export default function ProductivityPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {teamSessions.map((member) => (
+              {teamSessions.map((member) => {
+                // Get sessions from sessionsSummary
+                const memberSessions = member.sessionsSummary?.sessions || [];
+                const firstSession = memberSessions[0];
+                const previewUrl = firstSession?.previewUrl || getScreenshotUrl(firstSession?.screenshots?.[0]);
+                
+                return (
                 <div 
                   key={member.userId} 
                   className="bg-white rounded-xl shadow-sm border overflow-hidden hover:shadow-md transition-shadow"
@@ -476,10 +514,10 @@ export default function ProductivityPage() {
                   <div className="p-4 border-b bg-gradient-to-r from-purple-50 to-indigo-50">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-lg font-semibold shadow-lg">
-                        {member.name?.charAt(0) || 'U'}
+                        {member.name?.charAt(0) || member.firstName?.charAt(0) || 'U'}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <h3 className="font-semibold text-gray-900 truncate">{member.name}</h3>
+                        <h3 className="font-semibold text-gray-900 truncate">{member.name || `${member.firstName} ${member.lastName}`}</h3>
                         <p className="text-xs text-gray-500">{member.designation || member.department || 'Team Member'}</p>
                       </div>
                     </div>
@@ -490,7 +528,7 @@ export default function ProductivityPage() {
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
                         <HiOutlineSquares2X2 className="w-4 h-4 text-purple-500" />
-                        <span className="text-sm font-medium text-gray-700">{member.sessionCount || 0} Sessions</span>
+                        <span className="text-sm font-medium text-gray-700">{member.sessionsSummary?.totalSessions || 0} Sessions</span>
                       </div>
                       {member.sessionsSummary?.averageScore && (
                         <div className="flex items-center gap-1">
@@ -506,25 +544,27 @@ export default function ProductivityPage() {
                     </div>
                     
                     {/* Screenshot Preview */}
-                    {member.sessions?.length > 0 && member.sessions[0]?.screenshots?.[0]?.url ? (
+                    {previewUrl ? (
                       <div 
                         className="aspect-video bg-gray-100 rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition relative group"
                         onClick={() => {
-                          setSelectedSession(member.sessions[0])
-                          setCurrentSlideIndex(0)
+                          // Fetch full session data including all screenshots
+                          if (firstSession?._id) {
+                            fetchSessionById(firstSession._id)
+                          }
                         }}
                       >
                         <img
-                          src={member.sessions[0].screenshots[0].url}
+                          src={previewUrl}
                           alt="Latest activity"
                           className="w-full h-full object-cover"
                         />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
                           <span className="text-white text-sm font-medium">View Sessions</span>
                         </div>
-                        {member.sessions.length > 1 && (
+                        {memberSessions.length > 1 && (
                           <div className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
-                            +{member.sessions.length - 1} more
+                            +{memberSessions.length - 1} more
                           </div>
                         )}
                       </div>
@@ -544,7 +584,7 @@ export default function ProductivityPage() {
                     </div>
                   </div>
                 </div>
-              ))}
+              )})}
             </div>
           )}
         </div>
@@ -598,10 +638,10 @@ export default function ProductivityPage() {
                   {selectedSession.screenshots?.length > 0 ? (
                     <>
                       <img
-                        src={selectedSession.screenshots[currentSlideIndex]?.url}
+                        src={getScreenshotUrl(selectedSession.screenshots[currentSlideIndex])}
                         alt={`Screenshot ${currentSlideIndex + 1}`}
                         className="max-w-full max-h-full object-contain rounded-lg shadow-2xl cursor-pointer"
-                        onClick={() => window.open(selectedSession.screenshots[currentSlideIndex]?.url, '_blank')}
+                        onClick={() => window.open(getScreenshotUrl(selectedSession.screenshots[currentSlideIndex]), '_blank')}
                       />
                       
                       {/* Navigation Arrows */}
@@ -648,7 +688,7 @@ export default function ProductivityPage() {
                           }`}
                         >
                           <img
-                            src={screenshot.url}
+                            src={getScreenshotUrl(screenshot)}
                             alt={`Thumb ${idx + 1}`}
                             className="w-full h-full object-cover"
                           />

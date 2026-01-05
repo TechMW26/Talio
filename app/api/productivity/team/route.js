@@ -101,18 +101,37 @@ export async function GET(request) {
     const teamWithSessions = await Promise.all(
       teamMembers.map(async (member) => {
         const userId = member.user._id || member.user;
+        const employeeId = member._id; // The Employee document ID
         
-        // Get sessions for this date
+        // Get sessions for this date - query by user OR employee
         const sessions = await ProductivitySession.find({
-          user: userId,
+          $or: [
+            { user: userId },
+            { employee: employeeId }
+          ],
           date: { $gte: date, $lt: dateEnd }
-        }).select('sessionNumber screenshotCount analysis.score analysis.isAnalyzed startTime endTime');
+        }).select('sessionNumber screenshotCount screenshots analysis startTime endTime').lean();
         
         // Calculate average score
         const analyzedSessions = sessions.filter(s => s.analysis?.isAnalyzed && s.analysis?.score != null);
         const avgScore = analyzedSessions.length > 0
           ? Math.round(analyzedSessions.reduce((sum, s) => sum + s.analysis.score, 0) / analyzedSessions.length)
           : null;
+        
+        // Get first screenshot URL from each session for preview
+        const sessionsWithPreview = sessions.map(s => ({
+          _id: s._id,
+          sessionNumber: s.sessionNumber,
+          screenshotCount: s.screenshotCount,
+          isAnalyzed: s.analysis?.isAnalyzed || false,
+          score: s.analysis?.score || null,
+          startTime: s.startTime,
+          endTime: s.endTime,
+          // Include first screenshot for preview
+          previewUrl: s.screenshots?.[0]?.url || s.screenshots?.[0]?.path || null,
+          // Include all screenshots for modal view
+          screenshots: s.screenshots || []
+        }));
         
         return {
           _id: member._id,
@@ -128,14 +147,7 @@ export async function GET(request) {
             totalScreenshots: sessions.reduce((sum, s) => sum + s.screenshotCount, 0),
             analyzedSessions: analyzedSessions.length,
             averageScore: avgScore,
-            sessions: sessions.map(s => ({
-              sessionNumber: s.sessionNumber,
-              screenshotCount: s.screenshotCount,
-              isAnalyzed: s.analysis?.isAnalyzed || false,
-              score: s.analysis?.score || null,
-              startTime: s.startTime,
-              endTime: s.endTime
-            }))
+            sessions: sessionsWithPreview
           }
         };
       })
