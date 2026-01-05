@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { FaBars, FaBell, FaUser, FaSignOutAlt, FaCog, FaSearch, FaComments, FaTimes, FaSpinner } from 'react-icons/fa'
+import { FaBars, FaBell, FaUser, FaSignOutAlt, FaCog, FaSearch, FaComments, FaTimes, FaSpinner, FaSyncAlt } from 'react-icons/fa'
 import toast from '@/utils/toast'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
@@ -480,6 +480,16 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
 
         {/* Right side */}
         <div className="flex items-center space-x-2 sm:space-x-4 flex-1 justify-end">
+          {/* Refresh Button - Desktop Only */}
+          <button
+            onClick={() => window.location.reload()}
+            className="hidden md:flex items-center justify-center p-2.5 rounded-xl transition-all duration-200 hover:bg-gray-100 dark:hover:bg-gray-800 group"
+            style={{ color: 'var(--color-text-secondary)' }}
+            title="Refresh page"
+          >
+            <FaSyncAlt className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
+          </button>
+
           {/* Real-time Clock - Desktop Only */}
           <div className="hidden md:flex items-center gap-2 px-4 py-2.5 " style={{ color: 'var(--color-text-secondary)' }}>
             <RealTimeClock timezone={timezone} />

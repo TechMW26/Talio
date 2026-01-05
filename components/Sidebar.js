@@ -142,7 +142,10 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
   // NOTE: MIRA AI Assistant has been removed from web - only available in desktop apps
   const menuItems = useMemo(() => {
     if (!user) return []
-    let baseMenuItems = getMenuItemsForRole(user.role)
+    
+    // If user is detected as department head, use department_head menu
+    const effectiveRole = isDepartmentHead ? 'department_head' : user.role
+    let baseMenuItems = getMenuItemsForRole(effectiveRole)
 
     // Add Team menu item if user is a department head
     if (isDepartmentHead) {

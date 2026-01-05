@@ -16,6 +16,9 @@ import {
   HiOutlineCalendar,
   HiOutlineExclamationTriangle,
   HiOutlineBolt,
+  HiOutlinePaperAirplane,
+  HiOutlinePlus,
+  HiOutlineXMark,
 } from 'react-icons/hi2'
 import toast from '@/utils/toast'
 
@@ -43,6 +46,12 @@ export default function OnboardingEmailsPage() {
   const [autoSendEnabled, setAutoSendEnabled] = useState(true)
   const [togglingAutoSend, setTogglingAutoSend] = useState(false)
   const [user, setUser] = useState(null)
+  
+  // Send new email modal state
+  const [showSendModal, setShowSendModal] = useState(false)
+  const [sendEmailAddress, setSendEmailAddress] = useState('')
+  const [resetPassword, setResetPassword] = useState(true)
+  const [sendingEmail, setSendingEmail] = useState(false)
   
   // Get user info
   useEffect(() => {
@@ -134,6 +143,49 @@ export default function OnboardingEmailsPage() {
       toast.error('Failed to update setting')
     } finally {
       setTogglingAutoSend(false)
+    }
+  }
+
+  // Send new onboarding email
+  const handleSendOnboardingEmail = async () => {
+    if (!sendEmailAddress.trim()) {
+      toast.error('Please enter an email address')
+      return
+    }
+    
+    setSendingEmail(true)
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch('/api/employees/send-onboarding-email', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: sendEmailAddress.trim(),
+          resetPassword: resetPassword,
+        }),
+      })
+      
+      const data = await res.json()
+      
+      if (data.success) {
+        toast.success(data.message)
+        if (data.data?.newPassword) {
+          toast.success(`New password: ${data.data.newPassword}`, { duration: 10000 })
+        }
+        setShowSendModal(false)
+        setSendEmailAddress('')
+        fetchEmails() // Refresh the list
+      } else {
+        toast.error(data.message || 'Failed to send email')
+      }
+    } catch (error) {
+      console.error('Send email error:', error)
+      toast.error('Failed to send onboarding email')
+    } finally {
+      setSendingEmail(false)
     }
   }
 
@@ -284,8 +336,18 @@ export default function OnboardingEmailsPage() {
           </p>
         </div>
         
-        {/* Auto-send Toggle */}
-        <div className={`flex items-center gap-3 p-3 rounded-xl border ${
+        <div className="flex items-center gap-3">
+          {/* Send New Email Button */}
+          <button
+            onClick={() => setShowSendModal(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-medium transition-colors"
+          >
+            <HiOutlinePaperAirplane className="w-5 h-5" />
+            Send Email
+          </button>
+          
+          {/* Auto-send Toggle */}
+          <div className={`flex items-center gap-3 p-3 rounded-xl border ${
           autoSendEnabled 
             ? 'bg-green-500/10 border-green-500/30' 
             : 'bg-gray-500/10 border-gray-500/30'
@@ -315,6 +377,7 @@ export default function OnboardingEmailsPage() {
               }`}
             />
           </button>
+        </div>
         </div>
       </div>
 
@@ -618,6 +681,92 @@ export default function OnboardingEmailsPage() {
           </div>
         )}
       </div>
+
+      {/* Send Email Modal */}
+      {showSendModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-theme-bg-card border border-theme-bg-hover rounded-2xl w-full max-w-md p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-theme-text-primary flex items-center gap-2">
+                <HiOutlinePaperAirplane className="w-5 h-5 text-purple-500" />
+                Send Onboarding Email
+              </h3>
+              <button
+                onClick={() => {
+                  setShowSendModal(false)
+                  setSendEmailAddress('')
+                }}
+                className="p-2 rounded-lg hover:bg-theme-bg-hover transition-colors"
+              >
+                <HiOutlineXMark className="w-5 h-5 text-theme-text-secondary" />
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-theme-text-secondary mb-2">
+                  Employee Email Address
+                </label>
+                <input
+                  type="email"
+                  value={sendEmailAddress}
+                  onChange={(e) => setSendEmailAddress(e.target.value)}
+                  placeholder="employee@company.com"
+                  className="w-full px-4 py-2.5 rounded-xl border border-theme-bg-hover bg-theme-bg-secondary text-theme-text-primary placeholder-theme-text-secondary/50 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+              
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-theme-bg-secondary border border-theme-bg-hover">
+                <input
+                  type="checkbox"
+                  id="resetPassword"
+                  checked={resetPassword}
+                  onChange={(e) => setResetPassword(e.target.checked)}
+                  className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                />
+                <label htmlFor="resetPassword" className="text-sm text-theme-text-primary cursor-pointer">
+                  Reset password and send new credentials
+                </label>
+              </div>
+              
+              <p className="text-xs text-theme-text-secondary">
+                {resetPassword 
+                  ? "A new random password will be generated and sent to the employee. They will be required to change it on first login."
+                  : "The email will be sent with the default password (employee123). Enable password reset for security."}
+              </p>
+            </div>
+            
+            <div className="flex items-center gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowSendModal(false)
+                  setSendEmailAddress('')
+                }}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-theme-bg-hover text-theme-text-primary hover:bg-theme-bg-hover transition-colors font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSendOnboardingEmail}
+                disabled={sendingEmail || !sendEmailAddress.trim()}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {sendingEmail ? (
+                  <>
+                    <HiOutlineArrowPath className="w-4 h-4 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <HiOutlinePaperAirplane className="w-4 h-4" />
+                    Send Email
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
