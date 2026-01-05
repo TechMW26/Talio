@@ -254,7 +254,7 @@ export function InAppNotificationProvider({ children }) {
           showNotification({
             title,
             message,
-            url: `/dashboard/tasks/my-tasks`,
+            url: `/dashboard/todo/my-tasks`,
             type: notificationType
           })
         }

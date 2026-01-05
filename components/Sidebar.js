@@ -318,7 +318,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
       case 'My Projects':
       case 'Project Invitations':
         return sidebarCounts.projects
-      case 'My Tasks':
+      case "To-Do's":
         return sidebarCounts.tasks
       default:
         return 0

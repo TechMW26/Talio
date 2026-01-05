@@ -237,7 +237,7 @@ export default function DashboardLayout({ children }) {
   // Check if current page is a bottom nav page (excluding chat which doesn't show fade)
   const isBottomNavPage =
     pathname === '/dashboard' ||
-    pathname?.startsWith('/dashboard/tasks') ||
+    pathname?.startsWith('/dashboard/todo') ||
     pathname?.startsWith('/dashboard/projects') ||
     pathname?.startsWith('/dashboard/leave') ||
     pathname?.startsWith('/dashboard/sandbox')

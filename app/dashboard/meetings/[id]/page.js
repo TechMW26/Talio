@@ -19,7 +19,10 @@ import {
   HiOutlineDocumentText,
   HiOutlineMicrophone,
   HiOutlineSparkles,
-  HiOutlineClipboardDocumentList
+  HiOutlineClipboardDocumentList,
+  HiOutlineLink,
+  HiOutlineClipboard,
+  HiOutlineGlobeAlt
 } from 'react-icons/hi2'
 import toast from '@/utils/toast'
 import ModalPortal from '@/components/ui/ModalPortal'
@@ -32,9 +35,12 @@ export default function MeetingDetailPage({ params }) {
   const [responding, setResponding] = useState(false)
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
+  const [guestAccess, setGuestAccess] = useState(null)
+  const [togglingGuest, setTogglingGuest] = useState(false)
 
   useEffect(() => {
     fetchMeeting()
+    fetchGuestAccess()
   }, [id])
 
   const fetchMeeting = async () => {
@@ -55,6 +61,60 @@ export default function MeetingDetailPage({ params }) {
       toast.error('Failed to load meeting')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchGuestAccess = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/meetings/${id}/guest-access`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      const data = await response.json()
+      if (data.success) {
+        setGuestAccess(data.data)
+      }
+    } catch (error) {
+      console.error('Error fetching guest access:', error)
+    }
+  }
+
+  const toggleGuestAccess = async () => {
+    setTogglingGuest(true)
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/meetings/${id}/guest-access`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ enabled: !guestAccess?.guestAccessEnabled })
+      })
+      const data = await response.json()
+      if (data.success) {
+        setGuestAccess(prev => ({
+          ...prev,
+          guestAccessEnabled: data.data.guestAccessEnabled,
+          guestLink: data.data.guestLink,
+          guestUrl: data.data.guestUrl
+        }))
+        toast.success(data.message)
+      } else {
+        toast.error(data.message || 'Failed to update guest access')
+      }
+    } catch (error) {
+      console.error('Error toggling guest access:', error)
+      toast.error('Failed to update guest access')
+    } finally {
+      setTogglingGuest(false)
+    }
+  }
+
+  const copyGuestLink = () => {
+    if (guestAccess?.guestUrl) {
+      navigator.clipboard.writeText(guestAccess.guestUrl)
+      toast.success('Guest link copied to clipboard!')
     }
   }
 
@@ -378,6 +438,58 @@ export default function MeetingDetailPage({ params }) {
                       Join Meeting Room
                     </Link>
                   </div>
+                </div>
+              )}
+
+              {/* Guest Link Sharing - Only for online meetings and organizer */}
+              {meeting.type === 'online' && meeting.isOrganizer && guestAccess && (
+                <div className="p-4 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl md:col-span-2 border border-indigo-100">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <HiOutlineGlobeAlt className="w-5 h-5 text-indigo-600" />
+                      <span className="font-medium text-gray-800">Guest Access</span>
+                    </div>
+                    <button
+                      onClick={toggleGuestAccess}
+                      disabled={togglingGuest}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        guestAccess.guestAccessEnabled ? 'bg-indigo-600' : 'bg-gray-300'
+                      } ${togglingGuest ? 'opacity-50' : ''}`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          guestAccess.guestAccessEnabled ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  
+                  <p className="text-sm text-gray-600 mb-3">
+                    Allow anyone with the link to join without signing in
+                  </p>
+
+                  {guestAccess.guestAccessEnabled && guestAccess.guestUrl && (
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600 truncate">
+                        {guestAccess.guestUrl}
+                      </div>
+                      <button
+                        onClick={copyGuestLink}
+                        className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                      >
+                        <HiOutlineClipboard className="w-4 h-4" />
+                        Copy
+                      </button>
+                    </div>
+                  )}
+
+                  {guestAccess.guests && guestAccess.guests.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-indigo-100">
+                      <p className="text-xs text-gray-500 mb-2">
+                        {guestAccess.guests.length} guest(s) have joined via link
+                      </p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

@@ -473,7 +473,7 @@ export default function EmployeeDashboard({ user: userProp }) {
         icon: FaFileAlt,
         color: primaryColor,
         trend: dashboardStats.stats?.pendingTasks?.trend || 'neutral',
-        href: '/dashboard/tasks'
+        href: '/dashboard/todo'
       },
     ]
   }

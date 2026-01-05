@@ -670,17 +670,25 @@ export default function UnifiedDashboard({ user: userProp }) {
                     })
                 }
                 if (dashboardStats.onLeaveToday) {
+                    // onLeaveToday can be an array or an object with value
+                    const onLeaveCount = Array.isArray(dashboardStats.onLeaveToday) 
+                        ? dashboardStats.onLeaveToday.length 
+                        : (dashboardStats.onLeaveToday?.value ?? dashboardStats.onLeaveToday)
                     statsArray.push({
                         title: 'On Leave',
-                        value: dashboardStats.onLeaveToday?.value?.toString() || '0',
+                        value: onLeaveCount?.toString() || '0',
                         icon: FaCalendarAlt,
                         href: '/dashboard/leave'
                     })
                 }
                 if (dashboardStats.lateToday) {
+                    // lateToday can be an array or an object with value
+                    const lateCount = Array.isArray(dashboardStats.lateToday) 
+                        ? dashboardStats.lateToday.length 
+                        : (dashboardStats.lateToday?.value ?? dashboardStats.lateToday)
                     statsArray.push({
                         title: 'Late Today',
-                        value: dashboardStats.lateToday?.value?.toString() || '0',
+                        value: lateCount?.toString() || '0',
                         icon: FaUserTimes,
                         href: '/dashboard/attendance'
                     })
@@ -711,9 +719,13 @@ export default function UnifiedDashboard({ user: userProp }) {
                     })
                 }
                 if (dashboardStats.presentToday !== undefined) {
+                    // presentToday can be an array or a number
+                    const presentCount = Array.isArray(dashboardStats.presentToday) 
+                        ? dashboardStats.presentToday.length 
+                        : dashboardStats.presentToday
                     statsArray.push({
                         title: 'Present Today',
-                        value: dashboardStats.presentToday?.toString() || '0',
+                        value: presentCount?.toString() || '0',
                         icon: FaUserClock,
                         href: '/dashboard/attendance'
                     })

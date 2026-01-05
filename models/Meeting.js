@@ -121,6 +121,27 @@ const MeetingSchema = new mongoose.Schema({
     type: Boolean,
     default: true
   },
+  // Guest access settings
+  guestAccess: {
+    enabled: {
+      type: Boolean,
+      default: false
+    },
+    guestLink: String, // Unique guest link token
+    guestLinkCreatedAt: Date,
+    // Optional: require approval for guests
+    requireApproval: {
+      type: Boolean,
+      default: false
+    },
+    // List of guests who joined
+    guests: [{
+      name: String,
+      joinedAt: Date,
+      leftAt: Date,
+      socketId: String
+    }]
+  },
   // Organizer
   organizer: {
     type: mongoose.Schema.Types.ObjectId,
@@ -273,6 +294,7 @@ MeetingSchema.index({ status: 1, scheduledStart: 1 })
 MeetingSchema.index({ type: 1, scheduledStart: 1 })
 MeetingSchema.index({ invitedDepartments: 1 })
 MeetingSchema.index({ scheduledStart: 1, scheduledEnd: 1 })
+MeetingSchema.index({ 'guestAccess.guestLink': 1 }, { sparse: true })
 
 // Virtual for checking if meeting is past
 MeetingSchema.virtual('isPast').get(function() {
@@ -300,6 +322,11 @@ MeetingSchema.pre('save', function(next) {
   if (this.type === 'online' && !this.roomId) {
     this.roomId = `talio-meet-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
     this.meetingLink = `/dashboard/meetings/room/${this.roomId}`
+  }
+  // Generate guest link token if guest access is enabled and no link exists
+  if (this.guestAccess?.enabled && !this.guestAccess?.guestLink) {
+    this.guestAccess.guestLink = `guest-${Date.now()}-${Math.random().toString(36).substr(2, 12)}`
+    this.guestAccess.guestLinkCreatedAt = new Date()
   }
   next()
 })

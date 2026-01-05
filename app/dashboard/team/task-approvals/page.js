@@ -177,7 +177,7 @@ export default function TaskApprovals() {
               <div
                 key={task._id}
                 className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow cursor-pointer"
-                onClick={() => router.push(`/dashboard/tasks/${task._id}`)}
+                onClick={() => router.push(`/dashboard/projects/${task.project?._id || task.project}`)}
               >
                 <div className="flex flex-col md:flex-row md:items-start md:justify-between">
                   <div className="flex-1">
