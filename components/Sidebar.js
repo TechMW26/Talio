@@ -23,7 +23,17 @@ import ModalPortal from '@/components/ui/ModalPortal'
 function SidebarBadge({ count }) {
   if (!count || count <= 0) return null
   return (
-    <span className="absolute -top-4 -right-4 w-5 h-5 bg-red-100 border-[1px] border-red-500 text-red-400 text-[10px] font-bold rounded-full flex items-center justify-center z-10">
+    <span className="absolute -top-4 -right-4 w-5 h-5 bg-red-100 border border-red-500 text-red-500 text-[10px] font-bold rounded-full flex items-center justify-center z-10">
+      {count > 99 ? '99+' : count}
+    </span>
+  )
+}
+
+// Inline badge component for expanded menu items
+function InlineBadge({ count }) {
+  if (!count || count <= 0) return null
+  return (
+    <span className="w-5 h-5 bg-red-100 border border-red-500 text-red-500 text-[10px] font-bold rounded-full flex items-center justify-center flex-shrink-0">
       {count > 99 ? '99+' : count}
     </span>
   )
@@ -298,6 +308,23 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
     }
   }
 
+  // Helper to get badge count for submenu items
+  const getSubmenuBadgeCount = (subItemName) => {
+    switch (subItemName) {
+      case 'Attendance Regularisation':
+        return sidebarCounts.attendance
+      case 'Leave Approvals':
+        return sidebarCounts.leaves
+      case 'My Projects':
+      case 'Project Invitations':
+        return sidebarCounts.projects
+      case 'My Tasks':
+        return sidebarCounts.tasks
+      default:
+        return 0
+    }
+  }
+
   // Don't render until mounted to avoid hydration mismatch
   if (!mounted) {
     return null
@@ -442,11 +469,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                       {!(isDesktop && isCollapsed) && (
                         <div className="flex items-center gap-2">
                           <span className="text-sm font-medium">{item.name}</span>
-                          {getBadgeCount(item.name) > 0 && (
-                            <span className="w-5 h-5 bg-red-100 border-2 border-red-500 text-red-600 text-[10px] font-bold rounded-full flex items-center justify-center">
-                              {getBadgeCount(item.name) > 99 ? '99+' : getBadgeCount(item.name)}
-                            </span>
-                          )}
+                          <InlineBadge count={getBadgeCount(item.name)} />
                         </div>
                       )}
                     </div>
@@ -463,13 +486,14 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                           key={subItem.path}
                           href={subItem.path}
                           onClick={handleLinkClick}
-                          className="w-full text-left block px-3 py-2 text-sm rounded-lg transition-all duration-200 cursor-pointer"
+                          className="w-full text-left flex items-center justify-between px-3 py-2 text-sm rounded-lg transition-all duration-200 cursor-pointer"
                           style={{
                             backgroundColor: pathname === subItem.path ? 'var(--color-primary-500)' : 'transparent',
                             color: pathname === subItem.path ? 'white' : '#6B7280'
                           }}
                         >
-                          {subItem.name}
+                          <span>{subItem.name}</span>
+                          <InlineBadge count={getSubmenuBadgeCount(subItem.name)} />
                         </Link>
                       ))}
                     </div>
@@ -564,11 +588,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                   {!(isDesktop && isCollapsed) && (
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium">{item.name}</span>
-                      {item.name !== 'Chat' && getBadgeCount(item.name) > 0 && (
-                        <span className="w-5 h-5 bg-red-100 border-2 border-red-500 text-red-600 text-[10px] font-bold rounded-full flex items-center justify-center">
-                          {getBadgeCount(item.name) > 99 ? '99+' : getBadgeCount(item.name)}
-                        </span>
-                      )}
+                      {item.name !== 'Chat' && <InlineBadge count={getBadgeCount(item.name)} />}
                     </div>
                   )}
                 </Link>

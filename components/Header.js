@@ -37,7 +37,6 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
   const [isDesktop, setIsDesktop] = useState(false)
   const [showMiraModal, setShowMiraModal] = useState(false)
   const [miraModalClosing, setMiraModalClosing] = useState(false)
-  const [miraHasOpened, setMiraHasOpened] = useState(false)
   const notifRef = useRef(null)
   const profileRef = useRef(null)
   const searchRef = useRef(null)
@@ -559,7 +558,6 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
           <div className="hidden md:block relative group">
             <button
               onClick={() => {
-                setMiraHasOpened(true)
                 setShowMiraModal(true)
               }}
               className="relative p-2.5 rounded-xl transition-all duration-300 group-hover:bg-gradient-to-br group-hover:from-blue-50 group-hover:to-indigo-50"
@@ -858,14 +856,13 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
         />
       )}
       
-      {/* Iframe container - stays mounted once opened, renders above blur */}
-      {miraHasOpened && (
+      {/* Iframe container - only mounted when modal is open */}
+      {(showMiraModal || miraModalClosing) && (
         <div 
-          className={`fixed inset-0 ${(showMiraModal || miraModalClosing) ? (miraModalClosing ? 'animate-mira-iframe-out' : 'animate-mira-iframe-in') : ''}`}
+          className={`fixed inset-0 ${miraModalClosing ? 'animate-mira-iframe-out' : 'animate-mira-iframe-in'}`}
           style={{ 
-            zIndex: (showMiraModal || miraModalClosing) ? 99999 : -1,
-            visibility: (showMiraModal || miraModalClosing) ? 'visible' : 'hidden',
-            pointerEvents: (showMiraModal || miraModalClosing) ? 'auto' : 'none'
+            zIndex: 99999,
+            pointerEvents: 'auto'
           }}
         >
           <iframe
