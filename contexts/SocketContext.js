@@ -181,6 +181,79 @@ export function SocketProvider({ children }) {
       }
     })
 
+    // Handle force-refresh events from admin
+    // This triggers a hard refresh to clear cache and reload the page
+    socketInstance.on('force-refresh', (data) => {
+      try {
+        console.log('🔄 [Socket.IO Client] Force refresh request received:', data)
+
+        const message = data?.message || 'The administrator has requested a page refresh.'
+
+        // Show toast notification before refresh
+        toast.custom((t) => (
+          <div
+            className={`${t.visible ? 'animate-enter' : 'animate-leave'
+              } max-w-md w-full bg-amber-50 border border-amber-200 shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-amber-300`}
+          >
+            <div className="flex-1 w-0 p-4">
+              <div className="flex items-start">
+                <div className="flex-shrink-0 pt-0.5">
+                  <div className="h-10 w-10 rounded-full bg-amber-500 flex items-center justify-center">
+                    <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="ml-3 flex-1">
+                  <p className="text-sm font-medium text-amber-900">
+                    Page Refresh Required
+                  </p>
+                  <p className="mt-1 text-sm text-amber-700">
+                    {message}
+                  </p>
+                  <p className="mt-2 text-xs text-amber-600">
+                    Refreshing in 3 seconds...
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        ), {
+          duration: 4000,
+          position: 'top-center',
+        })
+
+        // Delay the refresh to let user see the message
+        setTimeout(() => {
+          // Hard refresh: clear cache and reload
+          if (data?.hard) {
+            // Clear localStorage cache items (but not auth)
+            const keysToRemove = []
+            for (let i = 0; i < localStorage.length; i++) {
+              const key = localStorage.key(i)
+              if (key && (key.startsWith('cache_') || key.startsWith('query_'))) {
+                keysToRemove.push(key)
+              }
+            }
+            keysToRemove.forEach(key => localStorage.removeItem(key))
+
+            // Clear session storage
+            sessionStorage.clear()
+
+            // Force reload bypassing cache
+            window.location.reload(true)
+          } else {
+            // Normal reload
+            window.location.reload()
+          }
+        }, 3000)
+      } catch (error) {
+        console.error('❌ [Socket.IO Client] Error handling force-refresh:', error)
+        // Still try to refresh even if there's an error
+        setTimeout(() => window.location.reload(), 2000)
+      }
+    })
+
     setSocket(socketInstance)
 
     // Expose socket globally for MIRA to use

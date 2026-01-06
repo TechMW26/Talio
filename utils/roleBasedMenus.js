@@ -22,7 +22,8 @@ import {
   HiOutlineChartBar,
   HiOutlineVideoCamera,
   HiOutlineComputerDesktop,
-  HiOutlineListBullet
+  HiOutlineListBullet,
+  HiOutlineSignal,
 } from 'react-icons/hi2'
 
 // Define menu items for each role
@@ -61,6 +62,7 @@ export const roleBasedMenus = {
         { name: 'Designations', path: '/dashboard/designations' },
       ]
     },
+    { name: 'Live Users', icon: HiOutlineSignal, path: '/dashboard/admin/live-users' },
     {
       name: 'Attendance & Leaves',
       icon: HiOutlineClock,
@@ -179,6 +181,7 @@ export const roleBasedMenus = {
         { name: 'Designations', path: '/dashboard/designations' },
       ]
     },
+    { name: 'Live Users', icon: HiOutlineSignal, path: '/dashboard/admin/live-users' },
     {
       name: 'Attendance & Leaves',
       icon: HiOutlineClock,
@@ -386,6 +389,7 @@ export const roleBasedMenus = {
   department_head: [
     { name: 'Dashboard', icon: HiOutlineSquares2X2, path: '/dashboard' },
     { name: 'Productivity', icon: HiOutlineComputerDesktop, path: '/dashboard/productivity' },
+    { name: 'Live Users', icon: HiOutlineSignal, path: '/dashboard/admin/live-users' },
     { name: 'Chat', icon: HiOutlineChatBubbleLeftRight, path: '/dashboard/chat' },
     { name: 'Mail', icon: HiOutlineEnvelope, path: '/dashboard/mail' },
     { name: 'Meetings', icon: HiOutlineVideoCamera, path: '/dashboard/meetings' },
