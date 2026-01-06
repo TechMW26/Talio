@@ -58,6 +58,7 @@ export default function MailPage() {
   const [loading, setLoading] = useState(true);
   const [connectingEmail, setConnectingEmail] = useState(false);
   const [emails, setEmails] = useState([]);
+  const [isDesktopApp, setIsDesktopApp] = useState(false);
   const [selectedFolder, setSelectedFolder] = useState('inbox');
   const [selectedEmail, setSelectedEmail] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -997,6 +998,12 @@ export default function MailPage() {
 
   // Check for connection status on mount
   useEffect(() => {
+    // Detect if running in desktop app (Electron)
+    // The desktop app's preload.js exposes window.isElectron = true
+    if (typeof window !== 'undefined' && window.isElectron) {
+      setIsDesktopApp(true);
+    }
+
     checkConnectionStatus();
 
     const params = new URLSearchParams(window.location.search);
@@ -1050,6 +1057,62 @@ export default function MailPage() {
 
   // Not connected - Gmail style connect screen
   if (!isConnected) {
+    // Desktop app users need to connect via web browser (OAuth redirect doesn't work in Electron)
+    if (isDesktopApp) {
+      return (
+        <div className="flex flex-col items-center justify-center h-[calc(100vh-120px)] bg-[#f6f8fc]">
+          <div className="text-center max-w-md px-4">
+            <div className="mb-8">
+              <div className="w-24 h-24 mx-auto relative">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-500 via-purple-500 to-indigo-500 rounded-2xl opacity-20"></div>
+                <div className="absolute inset-2 bg-white rounded-xl flex items-center justify-center">
+                  <FaEnvelope className="text-4xl text-blue-500" />
+                </div>
+              </div>
+            </div>
+
+            <h1 className="text-3xl font-normal text-gray-800 mb-2">
+              Connect Your Email
+            </h1>
+            <p className="text-gray-600 mb-4 text-base">
+              To connect your Gmail account, you need to sign in through your web browser.
+            </p>
+            <p className="text-gray-500 mb-8 text-sm">
+              This is required for secure Google authentication. Once connected, you can access your emails here in the desktop app.
+            </p>
+
+            <button
+              onClick={() => {
+                // This will be intercepted by Electron's setWindowOpenHandler and opened in external browser
+                window.open('https://app.talio.in/dashboard/mail', '_blank');
+              }}
+              className="inline-flex items-center gap-3 bg-blue-600 text-white px-8 py-3 rounded-full font-medium hover:bg-blue-700 hover:shadow-lg transition-all text-base"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+              </svg>
+              Open in Browser to Connect
+            </button>
+
+            <p className="text-xs text-gray-500 mt-6">
+              After connecting in your browser, return here and refresh the page to access your emails.
+            </p>
+
+            <button
+              onClick={() => {
+                setLoading(true);
+                checkConnectionStatus();
+              }}
+              className="mt-4 text-blue-600 hover:text-blue-700 text-sm font-medium hover:underline"
+            >
+              I've connected my email - Refresh
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // Regular web browser - show normal connect screen
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-120px)] bg-[#f6f8fc]">
         <div className="text-center max-w-md">
