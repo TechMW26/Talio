@@ -64,9 +64,9 @@ export async function POST(request, { params }) {
 
     // Send notifications
     if (accept) {
-      await notifyProjectInvitationAccepted(project, employee, notifyUserIds)
+      await notifyProjectInvitationAccepted(project, employee, notifyUserIds, models)
     } else {
-      await notifyProjectInvitationRejected(project, employee, notifyUserIds, reason)
+      await notifyProjectInvitationRejected(project, employee, notifyUserIds, reason, models)
     }
 
     return NextResponse.json({

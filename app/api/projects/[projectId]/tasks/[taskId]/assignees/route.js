@@ -141,7 +141,7 @@ export async function POST(request, { params }) {
 
       // Send notification if not self-assignment
       if (assigneeIdStr !== userRecord.employeeId.toString()) {
-        await notifyTaskAssigned(project, task, assigneeEmployee, assignerEmployee)
+        await notifyTaskAssigned(project, task, assigneeEmployee, assignerEmployee, models)
         
         // Create actionable notification for task assignment (persistent toast)
         try {

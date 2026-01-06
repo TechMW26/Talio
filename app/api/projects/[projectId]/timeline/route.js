@@ -136,7 +136,7 @@ export async function POST(request, { params }) {
 
     if (shouldNotify) {
       const memberUserIds = await getProjectMemberUserIds(projectId, userDoc.employeeId, models)
-      await notifyCommentAdded(project, employee, memberUserIds, content)
+      await notifyCommentAdded(project, employee, memberUserIds, content, models)
     }
 
     const populatedEvent = await ProjectTimelineEvent.findById(event._id)

@@ -8,10 +8,7 @@ import {
   HiOutlineCalendarDays,
   HiOutlineClock,
   HiOutlineBell,
-  HiOutlineTag,
-  HiOutlineListBullet,
-  HiOutlinePlus,
-  HiOutlineTrash
+  HiOutlineTag
 } from 'react-icons/hi2'
 import toast from '@/utils/toast'
 
@@ -35,16 +32,13 @@ export default function CreateTodoModal({ isOpen, onClose, onSuccess, categories
   const [loading, setLoading] = useState(false)
   const [formData, setFormData] = useState({
     title: '',
-    description: '',
     priority: '',
     category: defaultCategory || '',
     dueDate: '',
     dueTime: '',
     reminders: [],
-    subtasks: [],
     tags: ''
   })
-  const [newSubtask, setNewSubtask] = useState('')
 
   useEffect(() => {
     if (defaultCategory) {
@@ -66,43 +60,26 @@ export default function CreateTodoModal({ isOpen, onClose, onSuccess, categories
 
       const payload = {
         title: formData.title.trim(),
-        description: formData.description.trim(),
         priority: formData.priority || undefined, // Don't send if empty, will use schema default
         category: formData.category || undefined,
         dueDate: formData.dueDate ? new Date(formData.dueDate).toISOString() : undefined,
         dueTime: formData.dueTime || undefined,
-        subtasks: formData.subtasks.map(st => ({ title: st, completed: false })),
         tags: formData.tags ? formData.tags.split(',').map(t => t.trim()).filter(Boolean) : []
       }
 
-      // Process reminders
+      // Process reminders - convert to schema format
       if (formData.reminders.length > 0 && formData.dueDate) {
-        const dueDateTime = new Date(`${formData.dueDate}${formData.dueTime ? `T${formData.dueTime}` : 'T09:00'}`)
-        
         payload.reminders = formData.reminders.map(reminder => {
-          let reminderTime = new Date(dueDateTime)
-          
-          switch (reminder) {
-            case 'at-time':
-              // Keep as is
-              break
-            case '15-min':
-              reminderTime.setMinutes(reminderTime.getMinutes() - 15)
-              break
-            case '30-min':
-              reminderTime.setMinutes(reminderTime.getMinutes() - 30)
-              break
-            case '1-hour':
-              reminderTime.setHours(reminderTime.getHours() - 1)
-              break
-            case '1-day':
-              reminderTime.setDate(reminderTime.getDate() - 1)
-              break
+          // Convert frontend reminder format to schema format
+          const reminderTypeMap = {
+            'at-time': '1hour', // Treat "at-time" as close to due time
+            '15-min': '15min',
+            '30-min': '30min',
+            '1-hour': '1hour',
+            '1-day': '1day'
           }
-
           return {
-            time: reminderTime.toISOString(),
-            type: 'email', // Default to email, can be expanded
+            type: reminderTypeMap[reminder] || '1hour',
             sent: false
           }
         })
@@ -136,33 +113,13 @@ export default function CreateTodoModal({ isOpen, onClose, onSuccess, categories
   const resetForm = () => {
     setFormData({
       title: '',
-      description: '',
       priority: '',
       category: defaultCategory || '',
       dueDate: '',
       dueTime: '',
       reminders: [],
-      subtasks: [],
       tags: ''
     })
-    setNewSubtask('')
-  }
-
-  const addSubtask = () => {
-    if (newSubtask.trim()) {
-      setFormData(prev => ({
-        ...prev,
-        subtasks: [...prev.subtasks, newSubtask.trim()]
-      }))
-      setNewSubtask('')
-    }
-  }
-
-  const removeSubtask = (index) => {
-    setFormData(prev => ({
-      ...prev,
-      subtasks: prev.subtasks.filter((_, i) => i !== index)
-    }))
   }
 
   const toggleReminder = (value) => {
@@ -223,17 +180,6 @@ export default function CreateTodoModal({ isOpen, onClose, onSuccess, categories
                       onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg text-lg font-medium focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                       autoFocus
-                    />
-                  </div>
-
-                  {/* Description */}
-                  <div>
-                    <textarea
-                      placeholder="Add description..."
-                      value={formData.description}
-                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                      rows={3}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
                     />
                   </div>
 
@@ -322,50 +268,6 @@ export default function CreateTodoModal({ isOpen, onClose, onSuccess, categories
                       </div>
                     </div>
                   )}
-
-                  {/* Subtasks */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      <HiOutlineListBullet className="w-4 h-4 inline mr-1" />
-                      Subtasks
-                    </label>
-                    <div className="space-y-2">
-                      {formData.subtasks.map((st, index) => (
-                        <div key={index} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
-                          <span className="flex-1 text-gray-700">{st}</span>
-                          <button
-                            type="button"
-                            onClick={() => removeSubtask(index)}
-                            className="text-gray-400 hover:text-red-500"
-                          >
-                            <HiOutlineTrash className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          placeholder="Add a subtask..."
-                          value={newSubtask}
-                          onChange={(e) => setNewSubtask(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault()
-                              addSubtask()
-                            }
-                          }}
-                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                        />
-                        <button
-                          type="button"
-                          onClick={addSubtask}
-                          className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg"
-                        >
-                          <HiOutlinePlus className="w-5 h-5" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
 
                   {/* Tags */}
                   <div>

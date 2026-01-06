@@ -280,7 +280,7 @@ export async function DELETE(request, { params }) {
     // Send notification if not self-removal
     if (!isSelf) {
       const removerEmployee = await Employee.findById(userRecord.employeeId)
-      await notifyMemberRemoved(project, membership.user, removerEmployee)
+      await notifyMemberRemoved(project, membership.user, removerEmployee, models)
     }
 
     await ProjectMember.findByIdAndDelete(memberId)

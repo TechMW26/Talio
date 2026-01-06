@@ -175,13 +175,11 @@ export async function POST(request) {
 
     const {
       title,
-      description,
       category,
       priority,
       dueDate,
       dueTime,
       reminders,
-      subtasks,
       tags,
       isRecurring,
       recurrence
@@ -194,6 +192,15 @@ export async function POST(request) {
       )
     }
 
+    // Extract employee ID properly (could be object or string)
+    const employeeId = user.employeeId?._id || user.employeeId
+    if (!employeeId) {
+      return NextResponse.json(
+        { success: false, message: 'Employee not found' },
+        { status: 404 }
+      )
+    }
+
     // Get max order for ordering new todos at the end
     const maxOrderTodo = await models.PersonalTodo.findOne({
       user: user.userId,
@@ -203,23 +210,41 @@ export async function POST(request) {
 
     const newOrder = (maxOrderTodo?.order || 0) + 1
 
-    // Create todo
-    const todo = new models.PersonalTodo({
+    // Validate and clean priority - only accept valid enum values
+    const validPriorities = ['low', 'medium', 'high', 'urgent']
+    const cleanPriority = priority && validPriorities.includes(priority) ? priority : 'medium'
+
+    // Create todo data object
+    const todoData = {
       user: user.userId,
-      employee: user.employeeId,
+      employee: employeeId,
       title: title.trim(),
-      description: description?.trim(),
-      category: category || undefined,
-      priority: priority || 'medium',
-      dueDate: dueDate ? new Date(dueDate) : undefined,
-      dueTime,
-      reminders: reminders || [],
-      subtasks: subtasks || [],
-      tags: tags || [],
-      isRecurring: isRecurring || false,
-      recurrence: isRecurring ? recurrence : undefined,
-      order: newOrder
-    })
+      priority: cleanPriority,
+      order: newOrder,
+      subtasks: [],
+      tags: Array.isArray(tags) ? tags : [],
+      isRecurring: isRecurring || false
+    }
+
+    // Only add optional fields if they have valid values
+    if (category) todoData.category = category
+    if (dueDate) todoData.dueDate = new Date(dueDate)
+    if (dueTime) todoData.dueTime = dueTime
+    if (isRecurring && recurrence) todoData.recurrence = recurrence
+
+    // Process reminders - convert to schema format
+    if (Array.isArray(reminders) && reminders.length > 0) {
+      todoData.reminders = reminders.map(r => {
+        // Handle both old format {time, type, sent} and new format
+        if (r.type && ['15min', '30min', '1hour', '1day', 'custom'].includes(r.type)) {
+          return r
+        }
+        // If it's a simple string type, convert it
+        return { type: r.type || '1hour', sent: false }
+      }).filter(r => r.type) // Filter out invalid reminders
+    }
+
+    const todo = new models.PersonalTodo(todoData)
 
     await todo.save()
 
@@ -233,9 +258,9 @@ export async function POST(request) {
     }, { status: 201 })
 
   } catch (error) {
-    console.error('Error creating todo:', error)
+    console.error('Error creating todo:', error.message, error.stack)
     return NextResponse.json(
-      { success: false, message: 'Failed to create todo' },
+      { success: false, message: error.message || 'Failed to create todo' },
       { status: 500 }
     )
   }

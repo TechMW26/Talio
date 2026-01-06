@@ -99,7 +99,7 @@ export async function POST(request, { params }) {
       const approval = await requestCompletionApproval(projectId, employee, remark, models)
       
       // Notify project head
-      await notifyProjectCompletionRequested(project, employee)
+      await notifyProjectCompletionRequested(project, employee, models)
 
       return NextResponse.json({
         success: true,
@@ -173,9 +173,9 @@ export async function PUT(request, { params }) {
       const memberUserIds = await getProjectMemberUserIds(projectId, null, models)
 
       if (approve) {
-        await notifyProjectApproved(project, employee, memberUserIds, remark)
+        await notifyProjectApproved(project, employee, memberUserIds, remark, models)
       } else {
-        await notifyProjectRejected(project, employee, memberUserIds, remark)
+        await notifyProjectRejected(project, employee, memberUserIds, remark, models)
       }
 
       return NextResponse.json({
