@@ -74,8 +74,8 @@ export async function GET(request) {
     try {
       if (TaskAssignee) {
         counts.tasks = await TaskAssignee.countDocuments({
-          employee: employeeId,
-          invitationStatus: 'invited'
+          user: employeeId,
+          assignmentStatus: 'pending'
         })
       }
     } catch (err) {

@@ -452,9 +452,9 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                       color: '#111827'
                     }}
                   >
-                    <div className={`flex items-center ${isDesktop && isCollapsed ? '' : 'space-x-3'}`}>
+                    <div className={`flex items-center ${isDesktop && isCollapsed ? '' : 'gap-3'}`}>
                       <div
-                        className={`transition-colors relative ${isDesktop && isCollapsed ? '' : 'p-2 rounded-lg'}`}
+                        className={`transition-colors relative flex-shrink-0 ${isDesktop && isCollapsed ? '' : 'p-2 rounded-lg'}`}
                         style={{
                           backgroundColor: isDesktop && isCollapsed ? 'transparent' : (expandedMenus[item.name] ? 'var(--color-primary-500)' : 'var(--color-primary-100)'),
                           color: isDesktop && isCollapsed 
@@ -467,15 +467,15 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                         {(isDesktop && isCollapsed) && <SidebarBadge count={getBadgeCount(item.name)} />}
                       </div>
                       {!(isDesktop && isCollapsed) && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium">{item.name}</span>
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <span className="text-sm font-medium truncate">{item.name}</span>
                           <InlineBadge count={getBadgeCount(item.name)} />
                         </div>
                       )}
                     </div>
                     {!(isDesktop && isCollapsed) && (
-                      <div className={`transition-transform duration-200 ${expandedMenus[item.name] ? 'rotate-90' : ''}`}>
-                        <HiOutlineChevronRight className="w-3 h-3" />
+                      <div className={`transition-transform duration-200 flex-shrink-0 ${expandedMenus[item.name] ? 'rotate-90' : ''}`}>
+                        <HiOutlineChevronRight className="w-4 h-4" />
                       </div>
                     )}
                   </button>
@@ -521,7 +521,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                     }
                   }}
                   onMouseLeave={() => setTooltipContent(null)}
-                  className={`w-full flex items-center rounded-xl transition-all duration-200 group cursor-pointer relative ${isDesktop && isCollapsed ? 'justify-center p-2.5 bg-[var(--color-primary-100)] hover:!bg-gray-800' : 'space-x-3 px-3 sm:px-4 py-3'}`}
+                  className={`w-full flex items-center rounded-xl transition-all duration-200 group cursor-pointer relative ${isDesktop && isCollapsed ? 'justify-center p-2.5 bg-[var(--color-primary-100)] hover:!bg-gray-800' : 'gap-3 px-3 sm:px-4 py-3'}`}
                   style={{
                     backgroundColor: isDesktop && isCollapsed ? undefined : 'transparent',
                     color: '#111827'
@@ -560,7 +560,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                     }
                   }}
                   onMouseLeave={() => setTooltipContent(null)}
-                  className={`w-full flex items-center rounded-xl transition-all duration-200 group cursor-pointer relative ${isDesktop && isCollapsed ? 'justify-center p-2.5 bg-[var(--color-primary-100)] hover:!bg-gray-800' : 'space-x-3 px-3 sm:px-4 py-3'}`}
+                  className={`w-full flex items-center rounded-xl transition-all duration-200 group cursor-pointer relative ${isDesktop && isCollapsed ? 'justify-center p-2.5 bg-[var(--color-primary-100)] hover:!bg-gray-800' : 'gap-3 px-3 sm:px-4 py-3'}`}
                   style={{
                     backgroundColor: isDesktop && isCollapsed 
                       ? (isActive ? 'var(--color-primary-500)' : undefined) 
@@ -569,7 +569,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                   }}
                 >
                   <div
-                    className={`transition-colors relative ${isDesktop && isCollapsed ? '' : 'p-2 rounded-lg'}`}
+                    className={`transition-colors relative flex-shrink-0 ${isDesktop && isCollapsed ? '' : 'p-2 rounded-lg'}`}
                     style={{
                       backgroundColor: isDesktop && isCollapsed ? 'transparent' : (isActive ? 'var(--color-primary-600)' : 'var(--color-primary-100)'),
                       color: isDesktop && isCollapsed 
@@ -586,8 +586,8 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                     {item.name !== 'Chat' && (isDesktop && isCollapsed) && <SidebarBadge count={getBadgeCount(item.name)} />}
                   </div>
                   {!(isDesktop && isCollapsed) && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">{item.name}</span>
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <span className="text-sm font-medium truncate">{item.name}</span>
                       {item.name !== 'Chat' && <InlineBadge count={getBadgeCount(item.name)} />}
                     </div>
                   )}
