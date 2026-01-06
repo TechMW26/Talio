@@ -7,6 +7,10 @@ import { getAuthAndModels } from '@/lib/auth';
  * Admin: Full access to all users + refresh capability
  * HR: Full access to all users (view only, no refresh)
  * Department Head: Access to their department's users only (view only)
+ * 
+ * NOTE: Department head access is determined by BOTH:
+ * 1. User role === 'department_head'
+ * 2. User being listed in Department.head or Department.heads[] fields
  */
 export async function GET(request) {
   try {
@@ -21,31 +25,92 @@ export async function GET(request) {
     const userRole = user.role;
     const isAdmin = userRole === 'admin';
     const isHR = userRole === 'hr';
-    const isDepartmentHead = userRole === 'department_head';
+    let isDepartmentHead = userRole === 'department_head';
+
+    // Get current user's employee info for department filtering
+    const currentUser = await User.findById(user._id || user.userId)
+      .populate('employeeId')
+      .lean();
+
+    // Also check if user is a department head via Department model (head/heads fields)
+    // This handles cases where role != 'department_head' but user IS head of a department
+    if (!isDepartmentHead && !isAdmin && !isHR) {
+      const employeeId = currentUser?.employeeId?._id || currentUser?.employeeId;
+      if (employeeId) {
+        const headOfDept = await Department.findOne({
+          $or: [
+            { head: employeeId },
+            { heads: employeeId }
+          ],
+          isActive: true
+        }).select('_id').lean();
+        
+        if (headOfDept) {
+          isDepartmentHead = true;
+          console.log(`[Live Users] User ${currentUser?.email} detected as department head via Department model`);
+        }
+      }
+    }
 
     // Check access - admin, HR, or department_head only
     if (!isAdmin && !isHR && !isDepartmentHead) {
       return NextResponse.json({ message: 'Access denied.' }, { status: 403 });
     }
 
-    // Get current user's employee info for department filtering
-    const currentUser = await User.findById(user._id || user.userId)
-      .populate('employeeId')
-      .populate('headOfDepartments')
-      .lean();
-
     // Determine which departments this user can see
     let allowedDepartmentIds = null; // null means all departments
     
     if (isDepartmentHead) {
       // Department heads can only see their department(s)
+      // Check multiple sources for department head assignments:
+      
+      // 1. Check headOfDepartments array on User model
       if (currentUser?.headOfDepartments?.length > 0) {
-        allowedDepartmentIds = currentUser.headOfDepartments.map(d => d._id?.toString() || d.toString());
-      } else if (currentUser?.employeeId?.department) {
-        allowedDepartmentIds = [currentUser.employeeId.department._id?.toString() || currentUser.employeeId.department.toString()];
-      } else {
-        return NextResponse.json({ message: 'No department assigned.' }, { status: 403 });
+        allowedDepartmentIds = currentUser.headOfDepartments.map(d => d?.toString());
       }
+      
+      // 2. Also check Department model for head/heads fields
+      const managedDepartments = await Department.find({
+        $or: [
+          { head: currentUser?.employeeId?._id || currentUser?.employeeId },
+          { heads: currentUser?.employeeId?._id || currentUser?.employeeId }
+        ]
+      }).select('_id').lean();
+      
+      if (managedDepartments.length > 0) {
+        const deptIds = managedDepartments.map(d => d._id.toString());
+        if (allowedDepartmentIds) {
+          // Merge with existing
+          allowedDepartmentIds = [...new Set([...allowedDepartmentIds, ...deptIds])];
+        } else {
+          allowedDepartmentIds = deptIds;
+        }
+      }
+      
+      // 3. Fallback to employee's own department
+      if (!allowedDepartmentIds || allowedDepartmentIds.length === 0) {
+        if (currentUser?.employeeId?.department) {
+          const deptId = currentUser.employeeId.department._id?.toString() || currentUser.employeeId.department.toString();
+          allowedDepartmentIds = [deptId];
+        }
+      }
+      
+      // If still no departments found, deny access
+      if (!allowedDepartmentIds || allowedDepartmentIds.length === 0) {
+        return NextResponse.json({ 
+          success: false,
+          message: 'No department assigned to this account.',
+          data: {
+            summary: { totalUsers: 0, activeNow: 0, loggedInToday: 0, checkedInToday: 0 },
+            users: { all: [], activeNow: [], loggedInToday: [], checkedInToday: [] },
+            byDepartment: [],
+            departments: [],
+            permissions: { canRefresh: false, viewScope: 'department', userRole: userRole }
+          }
+        });
+      }
+      
+      console.log(`[Live Users] Department head ${currentUser?.email} can access departments:`, allowedDepartmentIds);
     }
 
     // Get today's date range (IST)
@@ -55,11 +120,15 @@ export async function GET(request) {
 
     // Get departments (filtered for department heads)
     let departmentQuery = {};
-    if (allowedDepartmentIds) {
-      departmentQuery._id = { $in: allowedDepartmentIds };
+    if (allowedDepartmentIds && allowedDepartmentIds.length > 0) {
+      // Convert to ObjectId strings for comparison
+      departmentQuery._id = { $in: allowedDepartmentIds.map(id => id.toString()) };
     }
     const departments = await Department.find(departmentQuery).select('_id name').lean();
     const departmentMap = new Map(departments.map(d => [d._id.toString(), d.name]));
+    
+    // Create a Set of allowed department IDs for faster lookup
+    const allowedDeptSet = allowedDepartmentIds ? new Set(allowedDepartmentIds.map(id => id.toString())) : null;
 
     // Get all active users with their employee info
     const users = await User.find({ isActive: true })
@@ -99,10 +168,10 @@ export async function GET(request) {
 
       const employee = u.employeeId;
       const employeeId = employee._id?.toString();
-      const employeeDeptId = employee.department?._id?.toString() || null;
+      const employeeDeptId = employee.department?._id?.toString() || employee.department?.toString() || null;
       
       // Filter by department for department heads
-      if (allowedDepartmentIds && (!employeeDeptId || !allowedDepartmentIds.includes(employeeDeptId))) {
+      if (allowedDeptSet && (!employeeDeptId || !allowedDeptSet.has(employeeDeptId))) {
         continue; // Skip users not in allowed departments
       }
       
