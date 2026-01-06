@@ -8,7 +8,7 @@ import {
   HiOutlineCog6Tooth,
   HiOutlineArrowRightOnRectangle,
   HiOutlineChatBubbleLeftRight,
-  HiOutlineUserGroup
+  HiOutlineUsers
 } from 'react-icons/hi2'
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { getMenuItemsForRole } from '@/utils/roleBasedMenus'
@@ -221,7 +221,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
       // Insert Team menu after Dashboard - includes Performance options
       const teamMenuItem = {
         name: 'Team',
-        icon: HiOutlineUserGroup,
+        icon: HiOutlineUsers,
         path: '/dashboard/team',
         submenu: [
           { name: 'Team Dashboard', path: '/dashboard/team' },

@@ -20,6 +20,7 @@ export async function GET(request) {
     
     const { searchParams } = new URL(request.url);
     const dateParam = searchParams.get('date') || new Date().toISOString().split('T')[0];
+    const departmentFilter = searchParams.get('department'); // Department filter for admin/HR
     const date = new Date(dateParam);
     const dateEnd = new Date(date.getTime() + 24 * 60 * 60 * 1000);
     
@@ -32,8 +33,19 @@ export async function GET(request) {
     let departmentName = null;
     
     if (isAdminOrHR) {
-      // Admin/HR can see all employees
-      const employees = await Employee.find({ status: 'active' })
+      // Admin/HR can see all employees, optionally filtered by department
+      let employeeQuery = { status: 'active' };
+      
+      // Apply department filter if specified
+      if (departmentFilter && departmentFilter !== 'all') {
+        employeeQuery.department = departmentFilter;
+        const dept = await Department.findById(departmentFilter).lean();
+        departmentName = dept?.name || 'Filtered Department';
+      } else {
+        departmentName = 'All Departments';
+      }
+      
+      const employees = await Employee.find(employeeQuery)
         .select('firstName lastName email profilePicture department designation userId')
         .populate('department', 'name')
         .populate('designation', 'title')
@@ -44,7 +56,8 @@ export async function GET(request) {
         ...e,
         user: e.userId // Map userId to user for consistency
       }));
-      departmentName = 'All Departments';
+      
+      console.log(`[Team API] Admin/HR viewing ${teamMembers.length} employees from ${departmentName}`);
     } else {
       // Check if user is department head
       const currentEmployeeId = currentUser?.employeeId?._id;

@@ -83,6 +83,7 @@ export async function GET(request) {
     const status = searchParams.get('status')
     const employeeId = searchParams.get('employeeId')
     const type = searchParams.get('type') // 'my' for own requests, 'pending' for requests to approve
+    const departmentFilter = searchParams.get('department') // Department filter for admin/HR
 
     const userEmployeeId = user?.employeeId?._id?.toString() || user?.employeeId?.toString()
 
@@ -91,15 +92,24 @@ export async function GET(request) {
     if (type === 'my' && userEmployeeId) {
       // Get user's own correction requests
       query.employee = userEmployeeId
-    } else if (type === 'pending') {
-      // Get pending requests for approval (for admins/HRs/dept heads)
+    } else if (type === 'pending' || type === 'all') {
+      // Get requests for approval (for admins/HRs/dept heads)
       const canApprove = await canApproveCorrections(user._id, null, models)
 
       if (['admin', 'hr'].includes(user?.role)) {
-        // Can see all pending
-        query.status = 'pending'
+        // Admin/HR can see all corrections
+        if (type === 'pending') {
+          query.status = 'pending'
+        }
+        
+        // Apply department filter if specified
+        if (departmentFilter && departmentFilter !== 'all') {
+          const deptEmployees = await Employee.find({ department: departmentFilter }).select('_id').lean()
+          const empIds = deptEmployees.map(e => e._id)
+          query.employee = { $in: empIds }
+        }
       } else if (user?.employeeId) {
-        // Department head - get pending for their department
+        // Department head - get corrections for their department
         const userEmpId = user.employeeId._id || user.employeeId
         const departments = await Department.find({
           $or: [
@@ -113,7 +123,9 @@ export async function GET(request) {
         const empIds = deptEmployees.map(e => e._id)
 
         query.employee = { $in: empIds }
-        query.status = 'pending'
+        if (type === 'pending') {
+          query.status = 'pending'
+        }
       }
     } else if (employeeId) {
       query.employee = employeeId
@@ -126,7 +138,8 @@ export async function GET(request) {
     const corrections = await AttendanceCorrection.find(query)
       .populate({
         path: 'employee',
-        select: 'firstName lastName employeeCode profilePicture',
+        select: 'firstName lastName employeeCode profilePicture department',
+        populate: { path: 'department', select: 'name' },
         options: { strictPopulate: false }
       })
       .populate({

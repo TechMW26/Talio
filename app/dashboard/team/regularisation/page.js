@@ -3,24 +3,41 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
-import { FaCheck, FaTimes, FaCalendarCheck, FaExclamationCircle, FaChevronDown, FaChevronUp, FaFilter } from 'react-icons/fa'
+import { FaCheck, FaTimes, FaCalendarCheck, FaExclamationCircle, FaChevronDown, FaChevronUp, FaFilter, FaBuilding } from 'react-icons/fa'
 
 export default function TeamRegularisationPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
-  const [isDepartmentHead, setIsDepartmentHead] = useState(false)
+  const [user, setUser] = useState(null)
+  const [hasAccess, setHasAccess] = useState(false)
   const [pendingCorrections, setPendingCorrections] = useState([])
   const [allCorrections, setAllCorrections] = useState([])
   const [processingCorrection, setProcessingCorrection] = useState(null)
   const [expandedCards, setExpandedCards] = useState({})
   const [statusFilter, setStatusFilter] = useState('pending')
+  const [departments, setDepartments] = useState([])
+  const [selectedDepartment, setSelectedDepartment] = useState('all')
 
   useEffect(() => {
-    checkDepartmentHead()
+    const userData = localStorage.getItem('user')
+    if (userData) {
+      const parsedUser = JSON.parse(userData)
+      setUser(parsedUser)
+      checkAccess(parsedUser)
+    }
   }, [])
 
-  const checkDepartmentHead = async () => {
+  const checkAccess = async (currentUser) => {
     try {
+      // Admin and HR have full access
+      if (['admin', 'hr'].includes(currentUser?.role)) {
+        setHasAccess(true)
+        fetchDepartments()
+        fetchCorrections()
+        return
+      }
+
+      // Check for department head status
       const token = localStorage.getItem('token')
       const response = await fetch('/api/team/check-head', {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -29,15 +46,30 @@ export default function TeamRegularisationPage() {
       const data = await response.json()
       
       if (data.success && data.isDepartmentHead) {
-        setIsDepartmentHead(true)
+        setHasAccess(true)
         fetchCorrections()
       } else {
-        setIsDepartmentHead(false)
+        setHasAccess(false)
         setLoading(false)
       }
     } catch (error) {
-      console.error('Error checking department head:', error)
+      console.error('Error checking access:', error)
       setLoading(false)
+    }
+  }
+
+  const fetchDepartments = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/departments', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      const data = await response.json()
+      if (data.success) {
+        setDepartments(data.data || [])
+      }
+    } catch (error) {
+      console.error('Error fetching departments:', error)
     }
   }
 
@@ -45,14 +77,24 @@ export default function TeamRegularisationPage() {
     try {
       const token = localStorage.getItem('token')
       
+      // Build query params
+      let queryParams = 'type=pending'
+      if (selectedDepartment && selectedDepartment !== 'all') {
+        queryParams += `&department=${selectedDepartment}`
+      }
+      
       // Fetch pending corrections
-      const pendingResponse = await fetch('/api/attendance/corrections?type=pending', {
+      const pendingResponse = await fetch(`/api/attendance/corrections?${queryParams}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
       const pendingData = await pendingResponse.json()
       
       // Fetch all corrections for history
-      const allResponse = await fetch('/api/attendance/corrections?type=all', {
+      let allQueryParams = 'type=all'
+      if (selectedDepartment && selectedDepartment !== 'all') {
+        allQueryParams += `&department=${selectedDepartment}`
+      }
+      const allResponse = await fetch(`/api/attendance/corrections?${allQueryParams}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
       const allData = await allResponse.json()
@@ -69,6 +111,14 @@ export default function TeamRegularisationPage() {
       setLoading(false)
     }
   }
+
+  // Refetch when department filter changes
+  useEffect(() => {
+    if (hasAccess) {
+      setLoading(true)
+      fetchCorrections()
+    }
+  }, [selectedDepartment])
 
   const handleApproveReject = async (correctionId, action, comments = '') => {
     setProcessingCorrection(correctionId)
@@ -146,6 +196,8 @@ export default function TeamRegularisationPage() {
     }
   }
 
+  const isAdminOrHR = ['admin', 'hr'].includes(user?.role)
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center pb-14 md:pb-6">
@@ -154,13 +206,13 @@ export default function TeamRegularisationPage() {
     )
   }
 
-  if (!isDepartmentHead) {
+  if (!hasAccess) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4 py-4 sm:p-6 lg:p-8 pb-14 md:pb-6">
         <div className="text-center">
           <FaExclamationCircle className="mx-auto h-12 w-12 text-yellow-500 mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Restricted</h2>
-          <p className="text-gray-600">This section is only available to department heads.</p>
+          <p className="text-gray-600">This section is only available to admins, HR, and department heads.</p>
         </div>
       </div>
     )
@@ -175,23 +227,43 @@ export default function TeamRegularisationPage() {
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Attendance Regularisation</h1>
           <p className="text-gray-600 mt-1">
-            Review and approve attendance correction requests from your team
+            Review and approve attendance correction requests {isAdminOrHR ? 'across all departments' : 'from your team'}
           </p>
         </div>
         
-        {/* Filter */}
-        <div className="flex items-center space-x-2">
-          <FaFilter className="text-gray-400" />
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-          >
-            <option value="pending">Pending ({pendingCorrections.length})</option>
-            <option value="approved">Approved</option>
-            <option value="rejected">Rejected</option>
-            <option value="all">All Requests</option>
-          </select>
+        {/* Filters */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Department filter - only for admin/HR */}
+          {isAdminOrHR && departments.length > 0 && (
+            <div className="flex items-center space-x-2">
+              <FaBuilding className="text-gray-400" />
+              <select
+                value={selectedDepartment}
+                onChange={(e) => setSelectedDepartment(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">All Departments</option>
+                {departments.map(dept => (
+                  <option key={dept._id} value={dept._id}>{dept.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          
+          {/* Status filter */}
+          <div className="flex items-center space-x-2">
+            <FaFilter className="text-gray-400" />
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+            >
+              <option value="pending">Pending ({pendingCorrections.length})</option>
+              <option value="approved">Approved</option>
+              <option value="rejected">Rejected</option>
+              <option value="all">All Requests</option>
+            </select>
+          </div>
         </div>
       </div>
 

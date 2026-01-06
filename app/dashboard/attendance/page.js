@@ -291,7 +291,13 @@ export default function AttendancePage() {
 
       // Get the date from the selected record (use selectedDayForEdit or record date)
       const recordDate = selectedDayForEdit || selectedRecord.date
-      const dateOnly = new Date(recordDate).toISOString().split('T')[0]
+      
+      // Format date in local timezone (avoid UTC conversion issues)
+      const dateObj = new Date(recordDate)
+      const year = dateObj.getFullYear()
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0')
+      const day = String(dateObj.getDate()).padStart(2, '0')
+      const dateOnly = `${year}-${month}-${day}`
 
       // Build the full datetime strings using the record's date and user's time input
       let requestedCheckIn = undefined
@@ -468,9 +474,12 @@ export default function AttendancePage() {
   // State to track selected day for missing entry
   const [selectedDayForMissingEntry, setSelectedDayForMissingEntry] = useState(null)
 
-  const openCorrectionModal = (record) => {
+  const openCorrectionModal = (record, calendarDate = null) => {
     setSelectedRecord(record)
-    setSelectedDayForEdit(record.date) // Store the date for the correction
+    // Use the calendar date if provided (more accurate for timezone handling)
+    // Otherwise fall back to record.date
+    const dateToUse = calendarDate || record.date
+    setSelectedDayForEdit(dateToUse)
     setCorrectionForm({
       correctionType: 'both',
       requestedCheckIn: formatTimeForInput(record.checkIn),
@@ -706,7 +715,8 @@ export default function AttendancePage() {
   const openDayEditModal = (dayData) => {
     if (dayData.isFuture) return
     if (dayData.record) {
-      openCorrectionModal(dayData.record)
+      // Pass dayData.date for accurate timezone handling
+      openCorrectionModal(dayData.record, dayData.date)
     } else {
       // No record - open missing entry modal for this date
       setSelectedDayForMissingEntry(dayData.date)
@@ -1266,7 +1276,8 @@ export default function AttendancePage() {
                           setShowHolidayModal(true)
                         } else if (dayData.record) {
                           // Open correction modal to view/edit the attendance record
-                          openCorrectionModal(dayData.record)
+                          // Pass dayData.date for accurate timezone handling
+                          openCorrectionModal(dayData.record, dayData.date)
                         } else if (dayData.isCurrentMonth && !isWeekend && !isHoliday && new Date(dayData.date) < new Date()) {
                           // Handle missing entry click
                           setMissingEntryForm(prev => ({
@@ -1308,7 +1319,8 @@ export default function AttendancePage() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
-                            openCorrectionModal(dayData.record)
+                            // Pass dayData.date for accurate timezone handling
+                            openCorrectionModal(dayData.record, dayData.date)
                           }}
                           className="absolute top-0.5 sm:top-1 right-0.5 sm:right-1 p-0.5 sm:p-1 rounded-full bg-white shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-50 z-10"
                           title="Request Regularisation"
@@ -1452,7 +1464,12 @@ export default function AttendancePage() {
                             </span>
                           ) : (
                             <button
-                              onClick={() => openCorrectionModal(record)}
+                              onClick={() => {
+                                // Extract date in local timezone from the record
+                                const recordDate = new Date(record.date)
+                                const localDate = new Date(recordDate.getFullYear(), recordDate.getMonth(), recordDate.getDate())
+                                openCorrectionModal(record, localDate)
+                              }}
                               className="text-blue-600 hover:text-blue-800 flex items-center space-x-1"
                               title="Request Correction"
                             >

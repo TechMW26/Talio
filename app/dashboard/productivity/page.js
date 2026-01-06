@@ -17,7 +17,8 @@ import {
   HiOutlineSquares2X2,
   HiOutlineTrophy,
   HiOutlineChartBar,
-  HiOutlineExclamationCircle
+  HiOutlineExclamationCircle,
+  HiOutlineBuildingOffice2
 } from 'react-icons/hi2'
 import RawCaptureViewer from '@/components/productivity/RawCaptureViewer'
 import ManualCapturePanel from '@/components/productivity/ManualCapturePanel'
@@ -47,6 +48,8 @@ export default function ProductivityPage() {
   const [selectedEmployee, setSelectedEmployee] = useState(null) // For viewing team member's sessions
   const [employeeSessions, setEmployeeSessions] = useState([]) // Sessions for selected employee
   const [loadingEmployeeSessions, setLoadingEmployeeSessions] = useState(false)
+  const [departments, setDepartments] = useState([]) // Department list for filtering
+  const [selectedDepartment, setSelectedDepartment] = useState('all') // Selected department filter
   
   // Global AI loading animation
   const { startAILoading, stopAILoading } = useAILoading()
@@ -61,12 +64,36 @@ export default function ProductivityPage() {
 
   const userRole = user?.role
   const isDepartmentHead = user?.isDepartmentHead === true
+  const isAdminOrHR = ['admin', 'hr'].includes(userRole)
 
   // Check if user can view team (admin, hr, manager, dept_head, or actual department head)
   useEffect(() => {
     const teamRoles = ['admin', 'hr', 'manager', 'department_head']
     setCanViewTeam(teamRoles.includes(userRole) || isDepartmentHead)
   }, [userRole, isDepartmentHead])
+
+  // Fetch departments for admin/HR filter
+  const fetchDepartments = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch('/api/departments', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setDepartments(data.data || [])
+      }
+    } catch (error) {
+      console.error('Error fetching departments:', error)
+    }
+  }, [])
+
+  // Fetch departments when admin/HR
+  useEffect(() => {
+    if (isAdminOrHR) {
+      fetchDepartments()
+    }
+  }, [isAdminOrHR, fetchDepartments])
 
   // Fetch sessions for selected date
   const fetchSessions = useCallback(async () => {
@@ -84,11 +111,15 @@ export default function ProductivityPage() {
     }
   }, [selectedDate])
 
-  // Fetch team sessions
+  // Fetch team sessions with optional department filter
   const fetchTeamSessions = useCallback(async () => {
     if (!canViewTeam) return
     try {
-      const res = await fetch(`/api/productivity/team?date=${selectedDate}`)
+      let url = `/api/productivity/team?date=${selectedDate}`
+      if (isAdminOrHR && selectedDepartment && selectedDepartment !== 'all') {
+        url += `&department=${selectedDepartment}`
+      }
+      const res = await fetch(url)
       if (res.ok) {
         const data = await res.json()
         // Transform API response to frontend format
@@ -103,7 +134,7 @@ export default function ProductivityPage() {
     } catch (error) {
       console.error('Error fetching team sessions:', error)
     }
-  }, [selectedDate, canViewTeam])
+  }, [selectedDate, canViewTeam, isAdminOrHR, selectedDepartment])
 
   useEffect(() => {
     fetchSessions()
@@ -366,6 +397,25 @@ export default function ProductivityPage() {
             <span className="hidden sm:inline">Team Activity</span>
             <span className="sm:hidden">Team</span>
           </button>
+          
+          {/* Department Filter for Admin/HR */}
+          {isAdminOrHR && activeTab === 'team' && departments.length > 0 && (
+            <div className="flex items-center gap-2 ml-auto">
+              <HiOutlineBuildingOffice2 className="w-4 h-4 text-gray-400" />
+              <select
+                value={selectedDepartment}
+                onChange={(e) => setSelectedDepartment(e.target.value)}
+                className="border rounded-lg px-3 py-2 text-sm focus:ring-purple-500 focus:border-purple-500 min-w-[150px]"
+              >
+                <option value="all">All Departments</option>
+                {departments.map((dept) => (
+                  <option key={dept._id} value={dept._id}>
+                    {dept.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       )}
 

@@ -144,9 +144,10 @@ export const roleBasedMenus = {
     },
     { name: 'Holidays', icon: HiOutlineCalendarDays, path: '/dashboard/holidays' },
     { name: 'General Calendar', icon: HiOutlineCalendarDays, path: '/dashboard/calendar' },
+    { name: 'Productivity', icon: HiOutlineComputerDesktop, path: '/dashboard/productivity' },
   ],
 
-  // HR - HR management focused
+  // HR - Full HR management access (similar to admin for HR functions)
   hr: [
     { name: 'Dashboard', icon: HiOutlineSquares2X2, path: '/dashboard' },
     { name: 'Chat', icon: HiOutlineChatBubbleLeftRight, path: '/dashboard/chat' },
@@ -185,6 +186,8 @@ export const roleBasedMenus = {
       submenu: [
         { name: 'My Attendance', path: '/dashboard/attendance' },
         { name: 'Attendance Report', path: '/dashboard/attendance/report' },
+        { name: 'Employee Check-ins', path: '/dashboard/attendance/checkins' },
+        { name: 'Attendance Regularisation', path: '/dashboard/team/regularisation' },
         { name: 'Apply Leave', path: '/dashboard/leave/apply' },
         { name: 'My Leave Balance', path: '/dashboard/leave/balance' },
         { name: 'Leave Requests', path: '/dashboard/leave/requests' },
@@ -198,6 +201,7 @@ export const roleBasedMenus = {
       icon: HiOutlineBanknotes, 
       path: '/dashboard/payroll',
       submenu: [
+        { name: 'Process Payroll', path: '/dashboard/payroll' },
         { name: 'Generate Payroll', path: '/dashboard/payroll/generate' },
         { name: 'Payslips', path: '/dashboard/payroll/payslips' },
         { name: 'Salary Structure', path: '/dashboard/payroll/structure' },
@@ -237,9 +241,28 @@ export const roleBasedMenus = {
     },
     { name: 'Policies', icon: HiOutlineBookOpen, path: '/dashboard/policies' },
     { name: 'Helpdesk', icon: HiOutlineLifebuoy, path: '/dashboard/helpdesk' },
-    { name: 'Announcements', icon: HiOutlineMegaphone, path: '/dashboard/announcements' },
+    { 
+      name: 'Learning (LMS)', 
+      icon: HiOutlineAcademicCap, 
+      path: '/dashboard/learning',
+      submenu: [
+        { name: 'Courses', path: '/dashboard/learning/courses' },
+        { name: 'My Trainings', path: '/dashboard/learning/trainings' },
+        { name: 'Certificates', path: '/dashboard/learning/certificates' },
+      ]
+    },
+    {
+      name: 'Announcements',
+      icon: HiOutlineMegaphone,
+      path: '/dashboard/announcements',
+      submenu: [
+        { name: 'All Announcements', path: '/dashboard/announcements' },
+        { name: 'Create Announcement', path: '/dashboard/announcements/create' },
+      ]
+    },
     { name: 'Holidays', icon: HiOutlineCalendarDays, path: '/dashboard/holidays' },
     { name: 'General Calendar', icon: HiOutlineCalendarDays, path: '/dashboard/calendar' },
+    { name: 'Productivity', icon: HiOutlineComputerDesktop, path: '/dashboard/productivity' },
   ],
 
   // MANAGER - Team management focused
