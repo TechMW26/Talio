@@ -210,7 +210,7 @@ export default function OfflinePage() {
                 App will automatically reload when connection is restored
               </p>
             </div>
-          )
+          )}
 
           {/* Possible Reasons */}
           {!isOnline && (
