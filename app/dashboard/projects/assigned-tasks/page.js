@@ -8,10 +8,11 @@ import {
   FaCheck, FaPlay, FaEye, FaClock, FaExclamationTriangle,
   FaChevronDown, FaCheckCircle, FaTimes, FaSpinner, FaPlus,
   FaTrash, FaChevronUp, FaEdit, FaUserPlus, FaExchangeAlt,
-  FaArrowLeft
+  FaArrowLeft, FaTh, FaList
 } from 'react-icons/fa'
 import { playNotificationSound, NotificationSoundTypes } from '@/lib/notificationSounds'
 import Portal from '@/components/ui/Portal'
+import KanbanBoard from '@/components/tasks/KanbanBoard'
 
 const statusColors = {
   'todo': 'bg-gray-100 text-gray-700 border-gray-200',
@@ -76,6 +77,15 @@ export default function AssignedTasksPage() {
   const [showReassignModal, setShowReassignModal] = useState(false)
   const [showAddSubtaskModal, setShowAddSubtaskModal] = useState(false)
   const [showDeletionApprovalModal, setShowDeletionApprovalModal] = useState(false)
+  const [viewMode, setViewMode] = useState('kanban') // 'list' or 'kanban' - kanban is default
+  const [modalUpdatingSubtask, setModalUpdatingSubtask] = useState(null) // For modal subtask toggle loading
+  const [modalUpdatingStatus, setModalUpdatingStatus] = useState(false) // For modal status change loading
+  const [showModalStatusDropdown, setShowModalStatusDropdown] = useState(false) // For status dropdown visibility
+  
+  // Reason modal for status changes
+  const [showReasonModal, setShowReasonModal] = useState(false)
+  const [pendingStatusChange, setPendingStatusChange] = useState(null) // { task, newStatus, source: 'kanban' | 'modal' }
+  const [statusChangeReason, setStatusChangeReason] = useState('')
   
   // Form states
   const [editForm, setEditForm] = useState({ title: '', description: '', priority: 'medium', dueDate: '' })
@@ -377,6 +387,88 @@ export default function AssignedTasksPage() {
     return task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'completed'
   }
 
+  // Handler for Kanban drag-drop status changes
+  const handleKanbanStatusChange = async (task, newStatus) => {
+    // Don't allow status change for tasks with subtasks (they are auto-managed)
+    if (task.subtasks && task.subtasks.length > 0) {
+      toast.error('Tasks with subtasks are auto-managed. Update subtasks to change status.')
+      return
+    }
+    
+    // Don't allow status change for tasks pending acceptance
+    const isPendingAcceptance = task.assignmentStatus === 'pending' || 
+      task.assignees?.some(a => a.assignmentStatus === 'pending')
+    const hasAcceptedAssignee = task.assignees?.some(a => a.assignmentStatus === 'accepted')
+    if (isPendingAcceptance && !hasAcceptedAssignee) {
+      toast.error('Task must be accepted before changing status.')
+      return
+    }
+    
+    // Show reason modal instead of changing directly
+    setPendingStatusChange({ task, newStatus, source: 'kanban' })
+    setStatusChangeReason('')
+    setShowReasonModal(true)
+  }
+  
+  // Execute the actual status change after reason is provided
+  const executeStatusChange = async (reason) => {
+    if (!pendingStatusChange) return
+    
+    const { task, newStatus, source } = pendingStatusChange
+    
+    // Immediately update local state for instant UI feedback
+    setTasks(prevTasks => prevTasks.map(t => 
+      t._id === task._id ? { ...t, status: newStatus } : t
+    ))
+    
+    // Update selectedTask if it's the same task (for modal source)
+    if (source === 'modal' && selectedTask?._id === task._id) {
+      setSelectedTask(prev => ({ ...prev, status: newStatus }))
+    }
+    
+    // Close modals
+    setShowReasonModal(false)
+    setPendingStatusChange(null)
+    setStatusChangeReason('')
+    
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/projects/${task.project._id || task.project}/tasks/${task._id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ 
+          status: newStatus,
+          statusChangeReason: reason 
+        })
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        if (newStatus === 'completed') {
+          playNotificationSound(NotificationSoundTypes.SUCCESS)
+        } else {
+          playNotificationSound(NotificationSoundTypes.UPDATE)
+        }
+        toast.success('Task updated')
+        // Silent refresh to sync with server
+        fetchTasks(true)
+      } else {
+        playNotificationSound(NotificationSoundTypes.WARNING)
+        toast.error(data.message)
+        // Revert local state on error
+        fetchTasks(true)
+      }
+    } catch (error) {
+      playNotificationSound(NotificationSoundTypes.WARNING)
+      toast.error('Failed to update task')
+      // Revert local state on error
+      fetchTasks(true)
+    }
+  }
+
   // Filter tasks
   const filteredTasks = tasks.filter(task => {
     if (filters.project !== 'all' && task.project?._id !== filters.project) return false
@@ -433,76 +525,76 @@ export default function AssignedTasksPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4">
+        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg">
-              <FaTasks className="text-gray-600 dark:text-gray-400" />
+            <div className="p-2 bg-gray-100 rounded-lg">
+              <FaTasks className="w-5 h-5 text-gray-600" />
             </div>
             <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Total</p>
-              <p className="font-semibold text-gray-800 dark:text-black">{stats.total || 0}</p>
+              <p className="text-2xl font-bold text-gray-800">{stats.total || 0}</p>
+              <p className="text-sm text-gray-500">Total</p>
             </div>
           </div>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4">
+        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg">
-              <FaClock className="text-yellow-600" />
+            <div className="p-2 bg-amber-100 rounded-lg">
+              <FaClock className="w-5 h-5 text-amber-600" />
             </div>
             <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Pending Accept</p>
-              <p className="font-semibold text-gray-800 dark:text-black">{stats.pendingAcceptance || 0}</p>
+              <p className="text-2xl font-bold text-gray-800">{stats.pendingAcceptance || 0}</p>
+              <p className="text-sm text-gray-500">Pending Accept</p>
             </div>
           </div>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4">
+        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-              <FaPlay className="text-blue-600" />
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <FaPlay className="w-5 h-5 text-blue-600" />
             </div>
             <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">In Progress</p>
-              <p className="font-semibold text-gray-800 dark:text-black">{stats.inProgress || 0}</p>
+              <p className="text-2xl font-bold text-gray-800">{stats.inProgress || 0}</p>
+              <p className="text-sm text-gray-500">In Progress</p>
             </div>
           </div>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4">
+        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-              <FaEye className="text-purple-600" />
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <FaEye className="w-5 h-5 text-purple-600" />
             </div>
             <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">In Review</p>
-              <p className="font-semibold text-gray-800 dark:text-black">{stats.review || 0}</p>
+              <p className="text-2xl font-bold text-gray-800">{stats.review || 0}</p>
+              <p className="text-sm text-gray-500">In Review</p>
             </div>
           </div>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4">
+        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-              <FaCheckCircle className="text-green-600" />
+            <div className="p-2 bg-green-100 rounded-lg">
+              <FaCheckCircle className="w-5 h-5 text-green-600" />
             </div>
             <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Completed</p>
-              <p className="font-semibold text-gray-800 dark:text-black">{stats.completed || 0}</p>
+              <p className="text-2xl font-bold text-gray-800">{stats.completed || 0}</p>
+              <p className="text-sm text-gray-500">Completed</p>
             </div>
           </div>
         </div>
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4">
+        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-red-100 dark:bg-red-900/30 rounded-lg">
-              <FaTrash className="text-red-600" />
+            <div className="p-2 bg-red-100 rounded-lg">
+              <FaTrash className="w-5 h-5 text-red-600" />
             </div>
             <div>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Pending Delete</p>
-              <p className="font-semibold text-gray-800 dark:text-black">{stats.pendingDeletion || 0}</p>
+              <p className="text-2xl font-bold text-gray-800">{stats.pendingDeletion || 0}</p>
+              <p className="text-sm text-gray-500">Pending Delete</p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Search & Filters */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-4 mb-6">
+      <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="relative flex-1">
             <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -522,6 +614,32 @@ export default function AssignedTasksPage() {
             Filters
             <FaChevronDown className={`ml-2 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
           </button>
+          
+          {/* View Toggle */}
+          <div className="flex border border-gray-300 rounded-lg overflow-hidden">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`px-3 py-2 flex items-center gap-1.5 transition-colors ${
+                viewMode === 'list'
+                  ? 'bg-primary-500 text-white'
+                  : 'bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+              title="List View"
+            >
+              <FaList className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('kanban')}
+              className={`px-3 py-2 flex items-center gap-1.5 transition-colors border-l border-gray-300 ${
+                viewMode === 'kanban'
+                  ? 'bg-primary-500 text-white'
+                  : 'bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+              title="Kanban View"
+            >
+              <FaTh className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {showFilters && (
@@ -559,8 +677,41 @@ export default function AssignedTasksPage() {
         )}
       </div>
 
-      {/* Pending Deletion Requests */}
-      {pendingDeletion.length > 0 && (
+      {/* Kanban View */}
+      {viewMode === 'kanban' && (
+        <div className="mb-6">
+          <KanbanBoard
+            tasks={filteredTasks.filter(t => t.deletionRequest?.status !== 'pending')}
+            onTaskClick={(task) => setSelectedTask(task)}
+            onStatusChange={handleKanbanStatusChange}
+            showProject={true}
+            enableDragDrop={true}
+            onProjectClick={(projectId) => router.push(`/dashboard/projects/${projectId}`)}
+          />
+          
+          {/* Show pending deletion in kanban mode */}
+          {pendingDeletion.length > 0 && (
+            <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <h3 className="text-sm font-medium text-red-800 mb-2 flex items-center gap-2">
+                <FaTrash className="w-4 h-4" />
+                {pendingDeletion.length} task(s) pending deletion approval
+              </h3>
+              <button
+                onClick={() => setViewMode('list')}
+                className="text-sm text-red-700 hover:text-red-900 underline"
+              >
+                Switch to list view to review
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* List View */}
+      {viewMode === 'list' && (
+        <>
+          {/* Pending Deletion Requests */}
+          {pendingDeletion.length > 0 && (
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
             <FaTrash className="text-red-500" />
@@ -759,6 +910,8 @@ export default function AssignedTasksPage() {
           <p className="text-gray-500">Tasks you assign to others will appear here</p>
         </div>
       )}
+        </>
+      )}
 
       {/* Edit Task Modal */}
       {showEditModal && selectedTask && (
@@ -824,6 +977,69 @@ export default function AssignedTasksPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      </Portal>
+      )}
+
+      {/* Reason for Status Change Modal */}
+      {showReasonModal && pendingStatusChange && (
+      <Portal>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[10000] p-4" onClick={(e) => e.target === e.currentTarget && (setShowReasonModal(false), setPendingStatusChange(null), setStatusChangeReason(''))}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-modal-enter">
+            <div className="px-6 py-4 bg-gradient-to-r from-blue-500 to-indigo-500 flex items-center justify-between rounded-t-2xl">
+              <h3 className="text-xl font-bold text-white">Reason for Status Change</h3>
+              <button onClick={() => { setShowReasonModal(false); setPendingStatusChange(null); setStatusChangeReason('') }} className="text-white/80 hover:text-white">
+                <FaTimes />
+              </button>
+            </div>
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-4 p-3 bg-blue-50 rounded-lg">
+                <div className="flex items-center gap-2 text-blue-700">
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusColors[pendingStatusChange.task.status]}`}>
+                    {pendingStatusChange.task.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  </span>
+                  <FaArrowLeft className="rotate-180" />
+                  <span className={`px-2 py-0.5 rounded text-xs font-medium ${statusColors[pendingStatusChange.newStatus]}`}>
+                    {pendingStatusChange.newStatus.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  </span>
+                </div>
+              </div>
+              <p className="text-gray-600 mb-4">Task: <strong>{pendingStatusChange.task.title}</strong></p>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Why are you changing this task's status? <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={statusChangeReason}
+                  onChange={(e) => setStatusChangeReason(e.target.value)}
+                  placeholder="Provide a reason for this status change (this will be logged in the task timeline)..."
+                  rows={3}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
+                  autoFocus
+                />
+                <p className="text-xs text-gray-400 mt-1">This reason will be visible in the task timeline</p>
+              </div>
+            </div>
+            <div className="p-4 border-t border-gray-200 flex justify-end gap-3">
+              <button 
+                onClick={() => { setShowReasonModal(false); setPendingStatusChange(null); setStatusChangeReason('') }} 
+                className="btn-secondary"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => executeStatusChange(statusChangeReason)}
+                disabled={!statusChangeReason.trim() || modalUpdatingStatus}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {modalUpdatingStatus ? (
+                  <><FaSpinner className="animate-spin" /> Updating...</>
+                ) : (
+                  <><FaCheck /> Confirm Change</>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </Portal>
@@ -1096,6 +1312,351 @@ export default function AssignedTasksPage() {
           </div>
         </div>
       </Portal>
+      )}
+
+      {/* Task Detail Modal - Opens when clicking task in Kanban view */}
+      {selectedTask && !showEditModal && !showDeleteModal && !showAddUserModal && !showReassignModal && !showAddSubtaskModal && !showDeletionApprovalModal && (
+        <Portal>
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4" onClick={(e) => e.target === e.currentTarget && setSelectedTask(null)}>
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
+              <div className="px-6 py-4 bg-gray-50 flex items-center justify-between flex-shrink-0">
+                <h3 className="text-lg font-semibold text-gray-800">Task Details</h3>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setEditForm({
+                        title: selectedTask.title,
+                        description: selectedTask.description || '',
+                        priority: selectedTask.priority,
+                        dueDate: selectedTask.dueDate ? new Date(selectedTask.dueDate).toISOString().split('T')[0] : ''
+                      })
+                      setShowEditModal(true)
+                    }}
+                    className="btn-primary flex items-center gap-2 text-sm py-1.5 px-3"
+                  >
+                    <FaEdit className="w-3 h-3" />
+                    Edit Task
+                  </button>
+                  <button
+                    onClick={() => router.push(`/dashboard/projects/${selectedTask.project?._id || selectedTask.project}`)}
+                    className="btn-secondary flex items-center gap-2 text-sm py-1.5 px-3"
+                  >
+                    <FaProjectDiagram className="w-3 h-3" />
+                    View Project
+                  </button>
+                  <button
+                    onClick={() => setSelectedTask(null)}
+                    className="p-2 hover:bg-gray-100 rounded-lg text-gray-500"
+                  >
+                    <FaTimes />
+                  </button>
+                </div>
+              </div>
+              
+              <div className="p-6 overflow-y-auto flex-1">
+                {/* Task Title & Status */}
+                <div className="flex items-start justify-between mb-4">
+                  <h2 className="text-xl font-semibold text-gray-800">{selectedTask.title}</h2>
+                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[selectedTask.status]}`}>
+                    {selectedTask.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                  </span>
+                </div>
+
+                {/* Project Badge */}
+                {selectedTask.project && (
+                  <div className="mb-4">
+                    <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${getProjectColor(selectedTask.project?._id).badge} ${getProjectColor(selectedTask.project?._id).text}`}>
+                      <FaProjectDiagram className="w-3 h-3" />
+                      {selectedTask.project.name || 'Project'}
+                    </span>
+                  </div>
+                )}
+
+                {/* Description */}
+                {selectedTask.description && (
+                  <div className="mb-6">
+                    <h4 className="text-sm font-medium text-gray-500 mb-2">Description</h4>
+                    <p className="text-gray-700 whitespace-pre-wrap">{selectedTask.description}</p>
+                  </div>
+                )}
+
+                {/* Details Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 mb-1">Priority</p>
+                    <span className={`px-2 py-1 rounded text-sm font-medium ${priorityColors[selectedTask.priority]}`}>
+                      {selectedTask.priority.charAt(0).toUpperCase() + selectedTask.priority.slice(1)}
+                    </span>
+                  </div>
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 mb-1">Due Date</p>
+                    <p className={`font-medium ${
+                      selectedTask.dueDate && new Date(selectedTask.dueDate) < new Date() && selectedTask.status !== 'completed'
+                        ? 'text-red-600' : 'text-gray-800'
+                    }`}>
+                      {selectedTask.dueDate ? new Date(selectedTask.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set'}
+                    </p>
+                  </div>
+                  {selectedTask.estimatedHours && (
+                    <div className="bg-gray-50 p-3 rounded-lg">
+                      <p className="text-xs text-gray-500 mb-1">Estimated Time</p>
+                      <p className="font-medium text-gray-800">
+                        {selectedTask.estimatedHours >= 8 
+                          ? `${Math.floor(selectedTask.estimatedHours / 8)}d ${selectedTask.estimatedHours % 8}h`
+                          : `${selectedTask.estimatedHours}h`}
+                      </p>
+                    </div>
+                  )}
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 mb-1">Progress</p>
+                    <p className="font-medium text-gray-800">{selectedTask.progressPercentage || 0}%</p>
+                  </div>
+                </div>
+
+                {/* Progress Bar */}
+                {selectedTask.subtasks && selectedTask.subtasks.length > 0 && (
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-sm font-medium text-gray-500">Progress</h4>
+                      <span className="text-sm text-gray-600">{selectedTask.progressPercentage || 0}%</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div
+                        className={`h-2 rounded-full transition-all ${
+                          selectedTask.progressPercentage === 100 ? 'bg-green-500' :
+                          selectedTask.progressPercentage >= 50 ? 'bg-blue-500' :
+                          'bg-orange-500'
+                        }`}
+                        style={{ width: `${selectedTask.progressPercentage || 0}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Subtasks - Interactive for managers */}
+                {selectedTask.subtasks && selectedTask.subtasks.length > 0 && (
+                  <div className="mb-6">
+                    <h4 className="text-sm font-medium text-gray-500 mb-3">
+                      Subtasks ({selectedTask.subtasks.filter(st => st.completed).length}/{selectedTask.subtasks.length})
+                    </h4>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {selectedTask.subtasks.map((subtask, idx) => {
+                        // Allow toggle if: subtask is completed (can unmark) OR not pending acceptance (can mark)
+                        const canToggle = subtask.completed || !subtask.pendingAcceptance
+                        
+                        return (
+                          <div key={subtask._id || idx} className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
+                            subtask.completed ? 'bg-green-50' : 
+                            subtask.pendingAcceptance ? 'bg-yellow-50' : 'bg-gray-50'
+                          } ${canToggle ? 'hover:bg-gray-100 cursor-pointer' : ''}`}
+                          onClick={async () => {
+                            if (!canToggle || modalUpdatingSubtask) return
+                            const subtaskId = subtask._id
+                            const projectId = selectedTask.project?._id || selectedTask.project
+                            
+                            try {
+                              setModalUpdatingSubtask(subtaskId)
+                              const token = localStorage.getItem('token')
+                              const response = await fetch(`/api/projects/${projectId}/tasks/${selectedTask._id}/subtasks`, {
+                                method: 'PUT',
+                                headers: {
+                                  'Content-Type': 'application/json',
+                                  'Authorization': `Bearer ${token}`
+                                },
+                                body: JSON.stringify({
+                                  subtaskId: subtaskId.toString(),
+                                  completed: !subtask.completed
+                                })
+                              })
+                              const data = await response.json()
+                              if (data.success) {
+                                // Update selectedTask subtasks
+                                setSelectedTask(prev => ({
+                                  ...prev,
+                                  subtasks: prev.subtasks.map(st => 
+                                    st._id === subtaskId 
+                                      ? { ...st, completed: data.data?.subtask?.completed ?? !subtask.completed, pendingAcceptance: data.data?.subtask?.pendingAcceptance || false }
+                                      : st
+                                  ),
+                                  progressPercentage: data.data?.progressPercentage || prev.progressPercentage,
+                                  status: data.data?.taskStatus || prev.status
+                                }))
+                                // Also refresh main task list
+                                fetchTasks(true)
+                                toast.success(data.message || 'Subtask updated')
+                              } else {
+                                toast.error(data.message || 'Failed to update subtask')
+                              }
+                            } catch (error) {
+                              toast.error('Failed to update subtask')
+                            } finally {
+                              setModalUpdatingSubtask(null)
+                            }
+                          }}
+                          >
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center transition-all ${
+                              modalUpdatingSubtask === subtask._id ? 'bg-blue-500 animate-pulse' :
+                              subtask.completed ? 'bg-green-500 text-white' : 
+                              subtask.pendingAcceptance ? 'bg-yellow-500 text-white' : 
+                              canToggle ? 'bg-gray-300 hover:bg-gray-400' : 'bg-gray-200'
+                            }`}>
+                              {modalUpdatingSubtask === subtask._id ? (
+                                <FaSpinner className="w-3 h-3 text-white animate-spin" />
+                              ) : subtask.completed ? (
+                                <FaCheck className="w-3 h-3" />
+                              ) : subtask.pendingAcceptance ? (
+                                <FaClock className="w-3 h-3" />
+                              ) : null}
+                            </div>
+                            <div className="flex-1">
+                              <p className={`text-sm ${subtask.completed ? 'text-gray-500 line-through' : 'text-gray-800'}`}>
+                                {subtask.title}
+                              </p>
+                              {subtask.estimatedHours && (
+                                <p className="text-xs text-gray-400 mt-0.5">
+                                  Est: {subtask.estimatedHours >= 8 ? `${Math.floor(subtask.estimatedHours / 8)}d ${subtask.estimatedHours % 8}h` : `${subtask.estimatedHours}h`}
+                                </p>
+                              )}
+                            </div>
+                            {subtask.pendingAcceptance && (
+                              <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded">Pending Review</span>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Assignees */}
+                {selectedTask.assignees && selectedTask.assignees.length > 0 && (
+                  <div className="mb-6">
+                    <h4 className="text-sm font-medium text-gray-500 mb-3">Assignees</h4>
+                    <div className="flex flex-wrap gap-2">
+                      {selectedTask.assignees.map((assignee, idx) => (
+                        <div key={assignee._id || idx} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${
+                          assignee.assignmentStatus === 'accepted' ? 'bg-green-50 text-green-700' :
+                          assignee.assignmentStatus === 'rejected' ? 'bg-red-50 text-red-700' :
+                          'bg-yellow-50 text-yellow-700'
+                        }`}>
+                          <div className="w-6 h-6 rounded-full bg-primary-500 text-white flex items-center justify-center text-xs">
+                            {assignee.user?.profilePicture ? (
+                              <img src={assignee.user.profilePicture} alt="" className="w-full h-full rounded-full object-cover" />
+                            ) : (
+                              assignee.user?.firstName?.[0] || '?'
+                            )}
+                          </div>
+                          <span className="text-sm">{assignee.user?.firstName} {assignee.user?.lastName}</span>
+                          <span className="text-xs opacity-75">({assignee.assignmentStatus})</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Status Update - For tasks WITHOUT subtasks */}
+                {(!selectedTask.subtasks || selectedTask.subtasks.length === 0) && (
+                  <div className="mb-6">
+                    <h4 className="text-sm font-medium text-gray-500 mb-3">Update Status</h4>
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowModalStatusDropdown(!showModalStatusDropdown)}
+                        disabled={modalUpdatingStatus}
+                        className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-all ${
+                          modalUpdatingStatus ? 'bg-gray-100 cursor-not-allowed' : 'bg-white hover:bg-gray-50 cursor-pointer'
+                        }`}
+                      >
+                        <span className={`flex items-center gap-2 font-medium ${statusColors[selectedTask.status]?.split(' ')[1] || 'text-gray-700'}`}>
+                          {modalUpdatingStatus ? (
+                            <FaSpinner className="animate-spin" />
+                          ) : (
+                            selectedTask.status === 'completed' ? <FaCheckCircle /> :
+                            selectedTask.status === 'in-progress' ? <FaPlay /> :
+                            selectedTask.status === 'review' ? <FaEye /> :
+                            selectedTask.status === 'blocked' ? <FaExclamationTriangle /> :
+                            <FaClock />
+                          )}
+                          {selectedTask.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        </span>
+                        <FaChevronDown className={`transition-transform ${showModalStatusDropdown ? 'rotate-180' : ''}`} />
+                      </button>
+                      
+                      {showModalStatusDropdown && (
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-10 overflow-hidden">
+                          {['todo', 'in-progress', 'review', 'completed', 'blocked'].map(status => (
+                            <button
+                              key={status}
+                              onClick={() => {
+                                if (status === selectedTask.status) {
+                                  setShowModalStatusDropdown(false)
+                                  return
+                                }
+                                // Show reason modal instead of changing directly
+                                setShowModalStatusDropdown(false)
+                                setPendingStatusChange({ task: selectedTask, newStatus: status, source: 'modal' })
+                                setStatusChangeReason('')
+                                setShowReasonModal(true)
+                              }}
+                              className={`w-full flex items-center gap-2 px-4 py-2.5 text-left hover:bg-gray-50 transition-colors ${
+                                status === selectedTask.status ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                              }`}
+                            >
+                              {status === 'completed' ? <FaCheckCircle className="text-green-500" /> :
+                               status === 'in-progress' ? <FaPlay className="text-blue-500" /> :
+                               status === 'review' ? <FaEye className="text-purple-500" /> :
+                               status === 'blocked' ? <FaExclamationTriangle className="text-red-500" /> :
+                               <FaClock className="text-gray-400" />}
+                              {status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                              {status === selectedTask.status && <FaCheck className="ml-auto text-blue-500" />}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex flex-wrap gap-3 pt-4 border-t">
+                  <button
+                    onClick={() => {
+                      fetchProjectMembers(selectedTask.project._id)
+                      setShowAddUserModal(true)
+                    }}
+                    className="btn-secondary flex items-center gap-2"
+                  >
+                    <FaUserPlus className="w-4 h-4" />
+                    Add User
+                  </button>
+                  <button
+                    onClick={() => {
+                      fetchProjectMembers(selectedTask.project._id)
+                      setShowReassignModal(true)
+                    }}
+                    className="btn-secondary flex items-center gap-2"
+                  >
+                    <FaExchangeAlt className="w-4 h-4" />
+                    Reassign
+                  </button>
+                  <button
+                    onClick={() => setShowAddSubtaskModal(true)}
+                    className="btn-secondary flex items-center gap-2"
+                  >
+                    <FaPlus className="w-4 h-4" />
+                    Add Subtask
+                  </button>
+                  <button
+                    onClick={() => setShowDeleteModal(true)}
+                    className="btn-secondary text-red-600 hover:bg-red-50 flex items-center gap-2"
+                  >
+                    <FaTrash className="w-4 h-4" />
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Portal>
       )}
     </div>
   )

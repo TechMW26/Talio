@@ -274,24 +274,17 @@ export default function ProjectTasksWidget({ limit = 5, showPendingAcceptance = 
                     </div>
                   </div>
 
-                  {/* Quick Action Button */}
+                  {/* Status indicator - no action buttons, status updates only from projects/tasks pages */}
                   {task.status !== 'completed' && (
-                    <button
-                      onClick={() => {
-                        const nextStatus = {
-                          'todo': 'in-progress',
-                          'in-progress': 'review',
-                          'review': 'completed'
-                        }
-                        handleUpdateStatus(task, nextStatus[task.status])
-                      }}
-                      disabled={respondingTo === task._id}
-                      className="px-2 py-1 text-xs bg-primary-100 text-primary-600 rounded hover:bg-primary-200 disabled:opacity-50 flex-shrink-0 ml-2"
-                    >
-                      {task.status === 'todo' ? 'Start' :
-                        task.status === 'in-progress' ? 'Review' :
-                          task.status === 'review' ? 'Complete' : ''}
-                    </button>
+                    <span className={`px-2 py-1 text-xs rounded-lg flex-shrink-0 ml-2 ${
+                      task.status === 'todo' ? 'bg-gray-100 text-gray-600' :
+                      task.status === 'in-progress' ? 'bg-blue-100 text-blue-600' :
+                      task.status === 'review' ? 'bg-purple-100 text-purple-600' : 'bg-gray-100 text-gray-600'
+                    }`}>
+                      {task.status === 'todo' ? 'To Do' :
+                        task.status === 'in-progress' ? 'In Progress' :
+                          task.status === 'review' ? 'In Review' : task.status}
+                    </span>
                   )}
                 </div>
               </div>

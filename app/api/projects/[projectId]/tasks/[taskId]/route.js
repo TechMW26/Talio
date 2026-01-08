@@ -126,7 +126,8 @@ export async function PUT(request, { params }) {
       estimatedHours,
       actualHours,
       order,
-      subtasks
+      subtasks,
+      statusChangeReason // Reason for status change (required when manager/head changes status)
     } = body
 
     // For status changes, only the assigned person (who accepted), project head, or admin can update
@@ -328,14 +329,27 @@ export async function PUT(request, { params }) {
 
     // Create timeline events - pass models for multi-tenant
     if (status && status !== oldStatus) {
+      // Build description with reason if provided
+      const reasonText = statusChangeReason ? ` - Reason: "${statusChangeReason}"` : ''
+      const eventDescription = `Task "${task.title}" status changed from ${oldStatus} to ${status}${reasonText}`
+      
       // Create timeline event (don't await to speed up response)
       createTimelineEvent({
         project: projectId,
         type: 'task_status_changed',
         createdBy: user.employeeId,
         relatedTask: taskId,
-        description: `Task "${task.title}" status changed from ${oldStatus} to ${status}`,
-        metadata: { taskTitle: task.title, oldStatus, newStatus: status }
+        description: eventDescription,
+        metadata: { 
+          taskTitle: task.title, 
+          oldStatus, 
+          newStatus: status,
+          reason: statusChangeReason || null,
+          changedBy: {
+            employeeId: user.employeeId,
+            name: updaterEmployee ? `${updaterEmployee.firstName} ${updaterEmployee.lastName}` : 'Unknown'
+          }
+        }
       }, models).catch(console.error)
 
       // Notify relevant users (non-blocking)
