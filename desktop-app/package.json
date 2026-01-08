@@ -1,6 +1,6 @@
 {
   "name": "talio-desktop",
-  "version": "4.0.0",
+  "version": "3.1.0",
   "description": "Talio HRMS Desktop - Productivity Monitoring with Screen Capture",
   "main": "src/main.js",
   "author": "Talio <support@talio.in>",
@@ -31,6 +31,7 @@
   "build": {
     "appId": "in.talio.desktop",
     "productName": "Talio",
+    "copyright": "Copyright © 2026 Talio Technologies Pvt. Ltd.",
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -49,10 +50,14 @@
         }
       ],
       "icon": "build/icon.icns",
-      "hardenedRuntime": true,
+      "hardenedRuntime": false,
       "gatekeeperAssess": false,
+      "identity": null,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist"
+    },
+    "dmg": {
+      "sign": false
     },
     "win": {
       "target": [
@@ -61,12 +66,21 @@
           "arch": ["x64"]
         }
       ],
-      "icon": "build/icon.ico"
+      "icon": "build/icon.ico",
+      "publisherName": "Talio Technologies Pvt. Ltd.",
+      "legalTrademarks": "Talio is a trademark of Talio Technologies Pvt. Ltd.",
+      "requestedExecutionLevel": "asInvoker"
     },
     "nsis": {
       "oneClick": false,
       "perMachine": true,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Talio"
     }
   }
 }

@@ -222,11 +222,8 @@ function loadApp() {
  */
 function handleLoadTimeout() {
   logger.log('warn', 'Main', 'Load timeout reached');
-  if (loadRetries < MAX_LOAD_RETRIES) {
-    setTimeout(loadApp, RETRY_DELAY_MS);
-  } else {
-    showOfflinePage();
-  }
+  // Keep retrying indefinitely - let server handle offline state
+  setTimeout(loadApp, RETRY_DELAY_MS);
 }
 
 /**
@@ -234,16 +231,14 @@ function handleLoadTimeout() {
  */
 function handleLoadError(error) {
   clearTimeout(loadTimeout);
-  if (loadRetries < MAX_LOAD_RETRIES) {
-    logger.log('info', 'Main', 'Retrying in ' + (RETRY_DELAY_MS / 1000) + 's...');
-    setTimeout(loadApp, RETRY_DELAY_MS);
-  } else {
-    showOfflinePage();
-  }
+  logger.log('info', 'Main', 'Retrying in ' + (RETRY_DELAY_MS / 1000) + 's...');
+  // Keep retrying indefinitely - let server handle offline state
+  setTimeout(loadApp, RETRY_DELAY_MS);
 }
 
 /**
  * Show offline page when can't connect
+ * Includes auto-reconnect that polls every 3 seconds
  */
 function showOfflinePage() {
   const offlineHTML = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Talio - Offline</title><style>' +
@@ -252,18 +247,61 @@ function showOfflinePage() {
     '.icon{font-size:64px;margin-bottom:20px}' +
     'h2{margin:10px 0}' +
     'p{color:rgba(255,255,255,0.6);line-height:1.6}' +
-    '.retry-btn{background:#6366f1;color:#fff;border:none;padding:12px 24px;border-radius:8px;cursor:pointer;margin-top:20px;font-size:16px}' +
+    '.status-box{background:rgba(255,255,255,0.1);border-radius:12px;padding:16px;margin:24px 0;display:flex;align-items:center;justify-content:center;gap:12px}' +
+    '.spinner{width:20px;height:20px;border:2px solid rgba(255,255,255,0.3);border-top-color:#6366f1;border-radius:50%;animation:spin 1s linear infinite}' +
+    '@keyframes spin{to{transform:rotate(360deg)}}' +
+    '.status-text{font-size:14px;color:rgba(255,255,255,0.8)}' +
+    '.retry-btn{background:#6366f1;color:#fff;border:none;padding:12px 24px;border-radius:8px;cursor:pointer;margin-top:10px;font-size:16px;transition:background 0.2s}' +
     '.retry-btn:hover{background:#4f46e5}' +
+    '.success{color:#22c55e}' +
+    '.success .spinner{border-top-color:#22c55e;animation:none;border:2px solid #22c55e}' +
+    '.success .spinner:after{content:"✓";display:block;text-align:center;line-height:16px}' +
     '</style></head><body>' +
     '<div class="container">' +
     '<div class="icon">📡</div>' +
     '<h2>Unable to Connect</h2>' +
-    '<p>We could not connect to Talio servers. Please check your internet connection and try again.</p>' +
-    '<button class="retry-btn" onclick="location.reload()">Try Again</button>' +
-    '</div></body></html>';
+    '<p>We could not connect to Talio servers. Please check your internet connection.</p>' +
+    '<div class="status-box" id="status">' +
+    '<div class="spinner"></div>' +
+    '<span class="status-text">Checking connection...</span>' +
+    '</div>' +
+    '<button class="retry-btn" onclick="location.reload()">Try Again Now</button>' +
+    '</div>' +
+    '<script>' +
+    '(function(){' +
+    'var attempts=0;var maxAttempts=200;var interval=3000;' +
+    'function updateStatus(msg,success){' +
+    'var el=document.getElementById("status");' +
+    'if(success){el.classList.add("success");}' +
+    'el.querySelector(".status-text").textContent=msg;' +
+    '}' +
+    'function check(){' +
+    'attempts++;' +
+    'updateStatus("Checking connection... ("+attempts+")",false);' +
+    'fetch("https://app.talio.in/api/health",{method:"GET",cache:"no-store"})' +
+    '.then(function(r){' +
+    'if(r.ok){' +
+    'updateStatus("Connected! Reloading...",true);' +
+    'setTimeout(function(){' +
+    'var lastUrl=localStorage.getItem("talio_last_url");' +
+    'if(lastUrl&&!lastUrl.includes("/offline")&&lastUrl.startsWith("https://app.talio.in")){' +
+    'window.location.href=lastUrl;' +
+    '}else{window.location.href="https://app.talio.in/dashboard";}' +
+    '},1500);' +
+    '}else{scheduleNext();}' +
+    '}).catch(function(){scheduleNext();});' +
+    '}' +
+    'function scheduleNext(){' +
+    'if(attempts<maxAttempts){setTimeout(check,interval);}' +
+    'else{updateStatus("Connection check paused. Click Try Again.",false);}' +
+    '}' +
+    'setTimeout(check,1000);' +
+    '})();' +
+    '</script>' +
+    '</body></html>';
   
   mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(offlineHTML));
-  logger.log('info', 'Main', 'Showing offline page');
+  logger.log('info', 'Main', 'Showing offline page with auto-reconnect');
 }
 
 /**
