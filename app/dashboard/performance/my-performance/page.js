@@ -6,9 +6,10 @@ import toast from '@/utils/toast'
 import {
   FaChartLine, FaStar, FaTrophy, FaBullseye, FaCalendarAlt,
   FaCheckCircle, FaClock, FaExclamationTriangle, FaArrowUp,
-  FaArrowDown, FaMinus, FaSpinner, FaChevronRight, FaPlus,
+  FaArrowDown, FaMinus, FaChevronRight, FaPlus,
   FaEdit, FaEye, FaAward, FaLightbulb, FaUserTie
 } from 'react-icons/fa'
+import Loader from '@/components/ui/Loader'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
 
 export default function MyPerformancePage() {
@@ -176,7 +177,7 @@ export default function MyPerformancePage() {
     return (
       <div className="p-4 sm:p-6 flex justify-center items-center min-h-[400px]">
         <div className="text-center">
-          <FaSpinner className="animate-spin h-12 w-12 text-primary-500 mx-auto" />
+          <Loader size="lg" />
           <p className="mt-4 text-gray-600">Loading your performance data...</p>
         </div>
       </div>

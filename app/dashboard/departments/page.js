@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaEdit, FaTrash, FaBuilding, FaUsers, FaTimes, FaUserTie, FaSearch } from 'react-icons/fa'
+import Loader from '@/components/ui/Loader'
 
 export default function DepartmentsPage() {
   const [departments, setDepartments] = useState([])
@@ -320,7 +321,7 @@ export default function DepartmentsPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
         {loading ? (
           <div className="col-span-full bg-white rounded-lg shadow-md p-6 sm:p-8 text-center">
-            <div className="animate-spin rounded-full h-8 w-8 sm:h-12 sm:w-12 border-b-2 border-primary-500 mx-auto"></div>
+            <Loader size="lg" />
             <p className="mt-4 text-gray-600 text-sm sm:text-base">Loading departments...</p>
           </div>
         ) : departments.length === 0 ? (

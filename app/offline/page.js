@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { FaWifi, FaExclamationTriangle, FaHome, FaRedo, FaCloudDownloadAlt, FaServer } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
 import Script from 'next/script'
+import Loader from '@/components/ui/Loader'
 
 export default function OfflinePage() {
   const [isOnline, setIsOnline] = useState(true)
@@ -203,7 +204,7 @@ export default function OfflinePage() {
           {!isOnline && (
             <div className="mb-8 bg-gray-50 rounded-lg px-4 py-3 border border-gray-200">
               <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
-                <div className="w-4 h-4 border-2 border-gray-400 border-t-primary-500 rounded-full animate-spin" />
+                <Loader size="xs" />
                 <span>Auto-checking every 3 seconds... (attempt {checkAttempts})</span>
               </div>
               <p className="text-xs text-gray-500 mt-1">
@@ -281,7 +282,7 @@ export default function OfflinePage() {
             {isOnline ? (
               <>
                 <div className="flex items-center justify-center space-x-3 text-green-600 py-2">
-                  <div className="w-5 h-5 border-3 border-green-600 border-t-transparent rounded-full animate-spin" />
+                  <Loader size="xs" />
                   <span className="text-base font-medium">Redirecting to dashboard...</span>
                 </div>
                 
@@ -303,7 +304,7 @@ export default function OfflinePage() {
                 >
                   {isChecking ? (
                     <>
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <Loader size="xs" />
                       <span>Checking Connection...</span>
                     </>
                   ) : (

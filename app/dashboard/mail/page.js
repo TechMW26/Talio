@@ -6,12 +6,13 @@ import {
   FaInbox, FaPaperPlane, FaFile, FaTrash, FaStar, FaSearch,
   FaTimes, FaEnvelope, FaReply,
   FaForward, FaPaperclip, FaChevronLeft,
-  FaSpinner, FaRegStar,
+  FaRegStar,
   FaRegEnvelope, FaRegEnvelopeOpen, FaAngleLeft, FaAngleRight,
   FaExpandAlt, FaCompressAlt, FaMinus, FaBold, FaItalic,
   FaUnderline, FaListUl, FaListOl, FaQuoteRight, FaStrikethrough,
   FaLink, FaSmile, FaChevronDown, FaChevronRight, FaMagic
 } from 'react-icons/fa';
+import Loader from '@/components/ui/Loader';
 import {
   MdRefresh, MdMoreVert, MdArchive, MdDelete,
   MdSchedule, MdCheckBoxOutlineBlank, MdKeyboardArrowDown,
@@ -1050,7 +1051,7 @@ export default function MailPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-120px)] bg-white">
-        <FaSpinner className="animate-spin text-4xl text-gray-400" />
+        <Loader size="lg" />
       </div>
     );
   }
@@ -1138,7 +1139,7 @@ export default function MailPage() {
             className="inline-flex items-center gap-3 bg-white border border-gray-300 text-gray-700 px-8 py-3 rounded-full font-medium hover:bg-gray-50 hover:shadow-md transition-all disabled:opacity-50 text-base"
           >
             {connectingEmail ? (
-              <FaSpinner className="animate-spin" />
+              <Loader size="xs" />
             ) : (
               <>
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -1566,7 +1567,7 @@ export default function MailPage() {
                 </div>
               ) : loadingEmails && emails.length === 0 ? (
                 <div className="flex items-center justify-center h-40">
-                  <FaSpinner className="animate-spin text-2xl text-gray-400" />
+                  <Loader size="md" />
                 </div>
               ) : filteredEmails.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-64 text-gray-500">
@@ -1707,7 +1708,7 @@ export default function MailPage() {
 
               {loadingEmails && emails.length > 0 && (
                 <div className="flex items-center justify-center py-4">
-                  <FaSpinner className="animate-spin text-gray-400" />
+                  <Loader size="xs" />
                 </div>
               )}
             </div>
@@ -2151,7 +2152,7 @@ export default function MailPage() {
                   disabled={isGeneratingAi || !aiPrompt.trim()}
                   className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2"
                 >
-                  {isGeneratingAi ? <FaSpinner className="animate-spin" /> : <FaMagic />}
+                  {isGeneratingAi ? <Loader size="xs" /> : <FaMagic />}
                   Generate
                 </button>
               </div>
@@ -2405,7 +2406,7 @@ export default function MailPage() {
                       disabled={sending || !composeData.to || !composeData.subject}
                       className="flex items-center gap-2 bg-[#1a73e8] hover:bg-[#1557b0] text-white px-6 py-2 rounded font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {sending ? <FaSpinner className="animate-spin" /> : 'Send'}
+                      {sending ? <Loader size="xs" /> : 'Send'}
                     </button>
                     <button className="p-2 hover:bg-gray-100 rounded hidden sm:block">
                       <MdArrowDropDown className="text-xl text-gray-600" />
@@ -2450,7 +2451,7 @@ export default function MailPage() {
                       disabled={uploadingAttachment}
                     >
                       {uploadingAttachment ? (
-                        <FaSpinner className="animate-spin text-gray-500" />
+                        <Loader size="xs" />
                       ) : (
                         <MdAttachFile className="text-xl text-gray-500 -rotate-45" />
                       )}

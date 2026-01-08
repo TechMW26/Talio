@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import toast from '@/utils/toast'
 import * as XLSX from 'xlsx'
-import { FaDownload, FaChartBar, FaUsers, FaTrophy, FaCalendarAlt, FaFilter, FaRobot, FaSpinner, FaFileExcel, FaChevronDown, FaChevronUp, FaBrain, FaStar, FaAward, FaTasks, FaBullseye, FaSearch, FaClock, FaCheckCircle, FaExclamationTriangle, FaArrowUp, FaArrowDown, FaMinus, FaUserCheck, FaClipboardCheck, FaFire, FaLightbulb, FaExclamationCircle } from 'react-icons/fa'
+import { FaDownload, FaChartBar, FaUsers, FaTrophy, FaCalendarAlt, FaFilter, FaRobot, FaFileExcel, FaChevronDown, FaChevronUp, FaBrain, FaStar, FaAward, FaTasks, FaBullseye, FaSearch, FaClock, FaCheckCircle, FaExclamationTriangle, FaArrowUp, FaArrowDown, FaMinus, FaUserCheck, FaClipboardCheck, FaFire, FaLightbulb, FaExclamationCircle } from 'react-icons/fa'
+import Loader from '@/components/ui/Loader'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Area, AreaChart, ComposedChart } from 'recharts'
 import CustomTooltip from '@/components/charts/CustomTooltip'
 import { useAILoading } from '@/contexts/AILoadingContext'
@@ -803,7 +804,7 @@ export default function PerformanceReportsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+        <Loader size="lg" />
       </div>
     )
   }
@@ -834,7 +835,7 @@ export default function PerformanceReportsPage() {
               disabled={generatingInsights}
               className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {generatingInsights ? <FaSpinner className="animate-spin" /> : <FaRobot />}
+              {generatingInsights ? <Loader size="xs" /> : <FaRobot />}
               <span>{generatingInsights ? 'Generating...' : 'AI Insights'}</span>
             </button>
             <button

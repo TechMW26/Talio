@@ -20,13 +20,14 @@ import {
   FaCheckCircle, FaClock, FaExclamationTriangle, FaComments,
   FaChartLine, FaEllipsisV, FaCheck, FaTimes, FaTrash,
   FaUserPlus, FaArchive, FaComment, FaHistory, FaChevronDown,
-  FaChevronUp, FaPlay, FaEye, FaStickyNote, FaSpinner, FaArrowRight,
+  FaChevronUp, FaPlay, FaEye, FaStickyNote, FaArrowRight,
   FaThumbtack, FaLock, FaSync, FaExchangeAlt
 } from 'react-icons/fa'
 import { playNotificationSound, NotificationSoundTypes } from '@/lib/notificationSounds'
 import ProjectOverview from '@/components/projects/ProjectOverview'
 import KanbanBoard from '@/components/tasks/KanbanBoard'
 import Portal from '@/components/ui/Portal'
+import Loader from '@/components/ui/Loader'
 
 const statusColors = {
   planned: 'bg-blue-100 text-blue-800',
@@ -1251,7 +1252,7 @@ export default function ProjectDetailPage() {
     return (
       <div className="page-container">
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+          <Loader size="lg" />
         </div>
       </div>
     )
@@ -2457,7 +2458,7 @@ export default function ProjectDetailPage() {
                 className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 flex items-center gap-2"
               >
                 {submitting ? (
-                  <><FaSpinner className="animate-spin" /> Creating...</>
+                  <><Loader size="xs" /> <span className="ml-1">Creating...</span></>
                 ) : (
                   <><FaCheck /> Create Task</>
                 )}
@@ -2947,7 +2948,7 @@ export default function ProjectDetailPage() {
                                   disabled={isUpdating}
                                   className="px-3 py-1.5 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 flex items-center gap-1"
                                 >
-                                  {isUpdating ? <FaSpinner className="animate-spin" /> : <FaCheck />}
+                                  {isUpdating ? <Loader size="xs" /> : <FaCheck />}
                                   Accept
                                 </button>
                                 <button
@@ -2960,7 +2961,7 @@ export default function ProjectDetailPage() {
                                   disabled={isUpdating}
                                   className="px-3 py-1.5 text-sm bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 flex items-center gap-1"
                                 >
-                                  {isUpdating ? <FaSpinner className="animate-spin" /> : <FaTimes />}
+                                  {isUpdating ? <Loader size="xs" /> : <FaTimes />}
                                   Reject
                                 </button>
                               </>
@@ -3238,7 +3239,7 @@ export default function ProjectDetailPage() {
                               disabled={isUpdating}
                               className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 flex items-center gap-2"
                             >
-                              {isUpdating ? <FaSpinner className="animate-spin" /> : <FaTasks />}
+                              {isUpdating ? <Loader size="xs" /> : <FaTasks />}
                               To Do
                             </button>
                           )}
@@ -3248,7 +3249,7 @@ export default function ProjectDetailPage() {
                               disabled={isUpdating}
                               className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 disabled:opacity-50 flex items-center gap-2"
                             >
-                              {isUpdating ? <FaSpinner className="animate-spin" /> : <FaPlay />}
+                              {isUpdating ? <Loader size="xs" /> : <FaPlay />}
                               In Progress
                             </button>
                           )}
@@ -3258,7 +3259,7 @@ export default function ProjectDetailPage() {
                               disabled={isUpdating}
                               className="px-4 py-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 disabled:opacity-50 flex items-center gap-2"
                             >
-                              {isUpdating ? <FaSpinner className="animate-spin" /> : <FaEye />}
+                              {isUpdating ? <Loader size="xs" /> : <FaEye />}
                               Review
                             </button>
                           )}
@@ -3267,7 +3268,7 @@ export default function ProjectDetailPage() {
                             disabled={isUpdating}
                             className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 disabled:opacity-50 flex items-center gap-2"
                           >
-                            {isUpdating ? <FaSpinner className="animate-spin" /> : <FaCheckCircle />}
+                            {isUpdating ? <Loader size="xs" /> : <FaCheckCircle />}
                             Complete
                           </button>
                         </div>

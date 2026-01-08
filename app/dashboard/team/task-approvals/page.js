@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { FaArrowLeft, FaCheckCircle, FaTimesCircle, FaUser, FaFileAlt, FaCalendarAlt, FaTag } from 'react-icons/fa'
+import Loader from '@/components/ui/Loader'
 
 export default function TaskApprovals() {
   const router = useRouter()
@@ -99,7 +100,7 @@ export default function TaskApprovals() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center pb-14 md:pb-6">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <Loader size="lg" />
       </div>
     )
   }

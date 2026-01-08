@@ -13,6 +13,7 @@ import {
 } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
 import ModalPortal from '@/components/ui/ModalPortal'
+import Loader from '@/components/ui/Loader'
 import * as XLSX from 'xlsx'
 
 const ADMIN_ROLES = ['admin', 'hr', 'super_admin']
@@ -924,7 +925,7 @@ export default function PayrollPage() {
 
         {loading ? (
           <div className="p-8 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+            <Loader size="lg" />
             <p className="mt-4 text-sm sm:text-base text-gray-600">Loading payroll records...</p>
           </div>
         ) : (

@@ -21,7 +21,8 @@ import {
   HiOutlineGlobeAlt,
   HiOutlineAcademicCap
 } from 'react-icons/hi2'
-import { FaThumbtack, FaUserSecret, FaUser, FaSpinner, FaPaperPlane } from 'react-icons/fa'
+import { FaThumbtack, FaUserSecret, FaUser, FaPaperPlane } from 'react-icons/fa'
+import Loader from '@/components/ui/Loader'
 import toast from '@/utils/toast'
 
 const CATEGORIES = {
@@ -305,7 +306,7 @@ export default function IdeaCard({ idea, onVote, onPin, onDelete, isAdmin, onCom
             <div className="space-y-2 mb-3 max-h-48 overflow-y-auto">
               {loadingComments ? (
                 <div className="flex justify-center py-4">
-                  <FaSpinner className="w-5 h-5 animate-spin text-gray-400" />
+                  <Loader size="sm" />
                 </div>
               ) : comments.length === 0 ? (
                 <p className="text-sm text-gray-500 text-center py-3">
@@ -361,7 +362,7 @@ export default function IdeaCard({ idea, onVote, onPin, onDelete, isAdmin, onCom
                 className="px-3 py-2 bg-blue-600 text-black rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {submittingComment ? (
-                  <FaSpinner className="w-4 h-4 animate-spin" />
+                  <Loader size="xs" />
                 ) : (
                   <FaPaperPlane className="w-4 h-4" />
                 )}

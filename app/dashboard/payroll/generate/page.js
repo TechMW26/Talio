@@ -9,6 +9,7 @@ import {
   FaUserClock, FaCalendarCheck, FaInfoCircle, FaToggleOn, FaToggleOff,
   FaExclamationCircle
 } from 'react-icons/fa'
+import Loader from '@/components/ui/Loader'
 import { formatDepartments } from '@/lib/formatters'
 
 export default function GeneratePayrollPage() {
@@ -754,7 +755,7 @@ export default function GeneratePayrollPage() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-96">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+        <Loader size="lg" />
       </div>
     )
   }
@@ -1258,7 +1259,7 @@ export default function GeneratePayrollPage() {
               >
                 {generating ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    <Loader size="xs" />
                     <span>Generating...</span>
                   </>
                 ) : (

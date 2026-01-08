@@ -12,6 +12,7 @@ import {
   HiOutlineXMark,
   HiOutlinePaperAirplane
 } from 'react-icons/hi2'
+import Loader from '@/components/ui/Loader'
 import { 
   HiMicrophone,
   HiMicrophoneOff,
@@ -399,7 +400,7 @@ export default function GuestMeetingRoom({ params }) {
     return (
       <div className="h-screen w-screen bg-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <Loader size="lg" className="mb-4" />
           <p className="text-white">Loading meeting...</p>
         </div>
       </div>
@@ -447,7 +448,7 @@ export default function GuestMeetingRoom({ params }) {
               </div>
             ) : (
               <div className="absolute inset-0 flex flex-col items-center justify-center z-0">
-                <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+                <Loader size="md" className="mb-3" />
                 <p className="text-gray-400 text-sm">Starting camera...</p>
               </div>
             )}

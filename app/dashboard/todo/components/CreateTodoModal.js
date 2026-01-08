@@ -10,6 +10,7 @@ import {
   HiOutlineBell,
   HiOutlineTag
 } from 'react-icons/hi2'
+import Loader from '@/components/ui/Loader'
 import toast from '@/utils/toast'
 
 const PRIORITY_OPTIONS = [
@@ -300,7 +301,7 @@ export default function CreateTodoModal({ isOpen, onClose, onSuccess, categories
                     >
                       {loading ? (
                         <>
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          <Loader size="xs" />
                           Creating...
                         </>
                       ) : (

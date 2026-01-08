@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
+import Loader from '@/components/ui/Loader'
 
 /**
  * NetworkMonitor Component
@@ -178,12 +179,12 @@ export default function NetworkMonitor() {
         }`}>
           {isReconnecting ? (
             <>
-              <div className="w-4 h-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+              <Loader size="xs" />
               <span>Reconnecting...</span>
             </>
           ) : (
             <>
-              <div className="w-4 h-4 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />
+              <Loader size="xs" />
               <span>Checking connection... (attempt {checkAttempts})</span>
             </>
           )}

@@ -3,10 +3,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
+import Loader from '@/components/ui/Loader'
 import { 
   FaTasks, FaCalendarAlt, FaFilter, FaSearch, FaProjectDiagram,
   FaCheck, FaPlay, FaEye, FaClock, FaExclamationTriangle,
-  FaChevronDown, FaCheckCircle, FaTimes, FaSpinner, FaPlus,
+  FaChevronDown, FaCheckCircle, FaTimes, FaPlus,
   FaTrash, FaChevronUp, FaEdit, FaUserPlus, FaExchangeAlt,
   FaArrowLeft, FaTh, FaList
 } from 'react-icons/fa'
@@ -499,7 +500,7 @@ export default function AssignedTasksPage() {
     return (
       <div className="page-container">
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+          <Loader size="lg" />
         </div>
       </div>
     )
@@ -1034,7 +1035,7 @@ export default function AssignedTasksPage() {
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {modalUpdatingStatus ? (
-                  <><FaSpinner className="animate-spin" /> Updating...</>
+                  <><Loader size="xs" /> <span className="ml-1">Updating...</span></>
                 ) : (
                   <><FaCheck /> Confirm Change</>
                 )}
@@ -1080,7 +1081,7 @@ export default function AssignedTasksPage() {
                 Cancel
               </button>
               <button onClick={handleDeleteTask} disabled={submitting} className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2">
-                {submitting ? <><FaSpinner className="animate-spin" /> Requesting...</> : <><FaTrash /> Request Deletion</>}
+                {submitting ? <><Loader size="xs" /> <span className="ml-1">Requesting...</span></> : <><FaTrash /> Request Deletion</>}
               </button>
             </div>
           </div>
@@ -1120,7 +1121,7 @@ export default function AssignedTasksPage() {
                 Cancel
               </button>
               <button onClick={handleAddSubtask} disabled={submitting || !newSubtaskTitle.trim()} className="btn-primary flex items-center gap-2">
-                {submitting ? <><FaSpinner className="animate-spin" /> Adding...</> : <><FaPlus /> Add Subtask</>}
+                {submitting ? <><Loader size="xs" /> <span className="ml-1">Adding...</span></> : <><FaPlus /> Add Subtask</>}
               </button>
             </div>
           </div>
@@ -1164,7 +1165,7 @@ export default function AssignedTasksPage() {
                 Cancel
               </button>
               <button onClick={handleReassignTask} disabled={submitting || !reassignToId} className="btn-primary flex items-center gap-2">
-                {submitting ? <><FaSpinner className="animate-spin" /> Reassigning...</> : <><FaExchangeAlt /> Reassign</>}
+                {submitting ? <><Loader size="xs" /> <span className="ml-1">Reassigning...</span></> : <><FaExchangeAlt /> Reassign</>}
               </button>
             </div>
           </div>
@@ -1220,7 +1221,7 @@ export default function AssignedTasksPage() {
                 Cancel
               </button>
               <button onClick={handleAddUserToTask} disabled={submitting || addUserIds.length === 0} className="btn-primary flex items-center gap-2">
-                {submitting ? <><FaSpinner className="animate-spin" /> Adding...</> : <><FaUserPlus /> Add Users</>}
+                {submitting ? <><Loader size="xs" /> <span className="ml-1">Adding...</span></> : <><FaUserPlus /> Add Users</>}
               </button>
             </div>
           </div>
@@ -1305,7 +1306,7 @@ export default function AssignedTasksPage() {
                     : 'bg-green-600 text-white hover:bg-green-700'
                 }`}
               >
-                {submitting ? <FaSpinner className="animate-spin" /> : deletionResponse.action === 'approve' ? <FaTrash /> : <FaCheck />}
+                {submitting ? <Loader size="xs" /> : deletionResponse.action === 'approve' ? <FaTrash /> : <FaCheck />}
                 {deletionResponse.action === 'approve' ? 'Approve Deletion' : 'Reject Deletion'}
               </button>
             </div>
@@ -1501,7 +1502,7 @@ export default function AssignedTasksPage() {
                               canToggle ? 'bg-gray-300 hover:bg-gray-400' : 'bg-gray-200'
                             }`}>
                               {modalUpdatingSubtask === subtask._id ? (
-                                <FaSpinner className="w-3 h-3 text-white animate-spin" />
+                                <Loader size="xs" color="#ffffff" />
                               ) : subtask.completed ? (
                                 <FaCheck className="w-3 h-3" />
                               ) : subtask.pendingAcceptance ? (
@@ -1568,7 +1569,7 @@ export default function AssignedTasksPage() {
                       >
                         <span className={`flex items-center gap-2 font-medium ${statusColors[selectedTask.status]?.split(' ')[1] || 'text-gray-700'}`}>
                           {modalUpdatingStatus ? (
-                            <FaSpinner className="animate-spin" />
+                            <Loader size="xs" />
                           ) : (
                             selectedTask.status === 'completed' ? <FaCheckCircle /> :
                             selectedTask.status === 'in-progress' ? <FaPlay /> :

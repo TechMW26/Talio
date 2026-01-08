@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { FaMapMarkerAlt, FaPlus, FaEdit, FaTrash, FaStar, FaRegStar, FaClock } from 'react-icons/fa'
 import GeofenceMap from '@/components/GeofenceMap'
+import Loader from '@/components/ui/Loader'
 
 export default function GeofenceLocationsPage() {
   const [locations, setLocations] = useState([])
@@ -215,7 +216,7 @@ export default function GeofenceLocationsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+        <Loader size="lg" />
       </div>
     )
   }

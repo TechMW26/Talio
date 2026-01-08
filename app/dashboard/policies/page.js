@@ -5,6 +5,7 @@ import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaFileAlt, FaEdit, FaTrash, FaCheckCircle, FaExclamationCircle } from 'react-icons/fa'
 import ModalPortal from '@/components/ModalPortal'
+import Loader from '@/components/ui/Loader'
 
 export default function PoliciesPage() {
   const [policies, setPolicies] = useState([])
@@ -277,7 +278,7 @@ export default function PoliciesPage() {
       <div className="space-y-4">
         {loading ? (
           <div className="bg-white rounded-lg shadow-md p-8 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+            <Loader size="lg" className="mx-auto" />
             <p className="mt-4 text-gray-600">Loading policies...</p>
           </div>
         ) : policies.length === 0 ? (

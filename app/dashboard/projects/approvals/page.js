@@ -3,9 +3,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
+import Loader from '@/components/ui/Loader'
 import { 
   FaArrowLeft, FaCheck, FaTimes, FaTrash, FaProjectDiagram,
-  FaClock, FaCheckCircle, FaTimesCircle, FaFilter, FaSpinner,
+  FaClock, FaCheckCircle, FaTimesCircle, FaFilter,
   FaExclamationTriangle, FaTasks, FaUser, FaCalendarAlt, FaEye
 } from 'react-icons/fa'
 import { playNotificationSound, NotificationSoundTypes } from '@/lib/notificationSounds'
@@ -385,7 +386,7 @@ export default function ApprovalsPage() {
       {/* Requests List */}
       {loading ? (
         <div className="bg-white rounded-lg shadow-md p-8 text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+          <Loader size="lg" className="mx-auto" />
           <p className="mt-4 text-gray-600">Loading requests...</p>
         </div>
       ) : requests.length === 0 ? (
@@ -487,7 +488,7 @@ export default function ApprovalsPage() {
                         className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 flex items-center gap-2"
                       >
                         {processingId === request._id ? (
-                          <FaSpinner className="animate-spin" />
+                          <Loader size="xs" />
                         ) : (
                           <FaCheck />
                         )}
@@ -499,7 +500,7 @@ export default function ApprovalsPage() {
                         className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 flex items-center gap-2"
                       >
                         {processingId === request._id ? (
-                          <FaSpinner className="animate-spin" />
+                          <Loader size="xs" />
                         ) : (
                           <FaTimes />
                         )}
@@ -546,7 +547,7 @@ export default function ApprovalsPage() {
             <div className="p-6 max-h-[70vh] overflow-y-auto">
               {loadingTask ? (
                 <div className="flex items-center justify-center py-8">
-                  <FaSpinner className="animate-spin text-2xl text-gray-400" />
+                  <Loader size="md" />
                 </div>
               ) : (
                 <>
@@ -700,8 +701,8 @@ export default function ApprovalsPage() {
                 >
                   {processingId ? (
                     <>
-                      <FaSpinner className="animate-spin" />
-                      Rejecting...
+                      <Loader size="xs" />
+                      <span className="ml-1">Rejecting...</span>
                     </>
                   ) : (
                     'Reject Task'

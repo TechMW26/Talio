@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Loader from '@/components/ui/Loader'
 import {
   HiOutlineXMark,
   HiOutlineVideoCamera,
@@ -763,7 +764,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
           >
             {loading ? (
               <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                <Loader size="xs" />
                 Creating...
               </>
             ) : step === 3 ? (

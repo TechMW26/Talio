@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { FaDownload, FaArrowLeft, FaPrint, FaEnvelope } from 'react-icons/fa'
+import Loader from '@/components/ui/Loader'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
@@ -341,7 +342,7 @@ export default function PayslipDetailPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+        <Loader size="lg" />
       </div>
     )
   }
@@ -389,7 +390,7 @@ export default function PayslipDetailPage() {
           >
             {downloading ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                <Loader size="xs" />
                 <span>Generating...</span>
               </>
             ) : (

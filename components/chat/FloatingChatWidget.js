@@ -5,6 +5,7 @@ import { FaComments, FaTimes, FaUsers, FaUserPlus, FaSearch } from 'react-icons/
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useTheme } from '@/contexts/ThemeContext'
+import Loader from '@/components/ui/Loader'
 
 export default function FloatingChatWidget() {
   const { 
@@ -382,10 +383,7 @@ export default function FloatingChatWidget() {
                   <div>
                     {loadingEmployees ? (
                       <div className="p-8 text-center">
-                        <div 
-                          className="w-8 h-8 border-3 border-t-transparent rounded-full animate-spin mx-auto"
-                          style={{ borderColor: primaryColor, borderTopColor: 'transparent' }}
-                        ></div>
+                        <Loader size="sm" />
                         <p className="text-gray-500 text-sm mt-2">Loading people...</p>
                       </div>
                     ) : filteredEmployees.length > 0 ? (
@@ -425,10 +423,7 @@ export default function FloatingChatWidget() {
               ) : loading ? (
                 <div className="p-8 text-center h-full flex items-center justify-center">
                   <div>
-                    <div 
-                      className="w-8 h-8 border-3 border-t-transparent rounded-full animate-spin mx-auto"
-                      style={{ borderColor: primaryColor, borderTopColor: 'transparent' }}
-                    ></div>
+                    <Loader size="sm" />
                     <p className="text-gray-500 text-sm mt-2">Loading chats...</p>
                   </div>
                 </div>

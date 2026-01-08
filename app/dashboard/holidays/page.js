@@ -8,6 +8,7 @@ import {
   FaPlus, FaEdit, FaTrash, FaCalendarAlt, FaSync, FaRobot, 
   FaList, FaTh, FaChevronLeft, FaChevronRight 
 } from 'react-icons/fa'
+import Loader from '@/components/ui/Loader'
 import ModalPortal from '@/components/ui/ModalPortal'
 import { 
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, 
@@ -472,7 +473,7 @@ export default function HolidaysPage() {
       {/* Main Content */}
       {loading ? (
         <div className="bg-white rounded-lg shadow-md p-8 text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+          <Loader size="lg" />
           <p className="mt-4 text-gray-600">Loading holidays...</p>
         </div>
       ) : (
@@ -730,7 +731,7 @@ export default function HolidaysPage() {
                 >
                   {fetchingAi ? (
                     <>
-                      <FaSync className="animate-spin" />
+                      <Loader size="xs" />
                       Fetching...
                     </>
                   ) : (

@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { FaTimes, FaSpinner, FaCheck, FaExclamationTriangle } from 'react-icons/fa'
+import { FaTimes, FaCheck, FaExclamationTriangle } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
+import Loader from '@/components/ui/Loader'
 
 /**
  * ActionableToast Component
@@ -258,7 +259,7 @@ export default function ActionableToast({ notification, onDismiss, onAction }) {
                 className={`px-3 py-1.5 text-sm rounded-lg ${getButtonStyle(selectedAction.variant)}`}
               >
                 {loadingAction === selectedAction.id ? (
-                  <FaSpinner className="w-4 h-4 animate-spin" />
+                  <Loader size="xs" />
                 ) : (
                   'Submit'
                 )}
@@ -290,7 +291,7 @@ export default function ActionableToast({ notification, onDismiss, onAction }) {
                 className={`px-3 py-1.5 text-sm rounded-lg ${getButtonStyle(selectedAction.variant)}`}
               >
                 {loadingAction === selectedAction.id ? (
-                  <FaSpinner className="w-4 h-4 animate-spin" />
+                  <Loader size="xs" />
                 ) : (
                   'Confirm'
                 )}
@@ -317,7 +318,7 @@ export default function ActionableToast({ notification, onDismiss, onAction }) {
                 `}
               >
                 {loadingAction === action.id ? (
-                  <FaSpinner className="w-4 h-4 animate-spin" />
+                  <Loader size="xs" />
                 ) : null}
                 {action.label}
               </button>

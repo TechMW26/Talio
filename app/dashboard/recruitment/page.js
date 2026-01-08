@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaBriefcase, FaMapMarkerAlt, FaClock } from 'react-icons/fa'
+import Loader from '@/components/ui/Loader'
 
 export default function RecruitmentPage() {
   const [jobs, setJobs] = useState([])
@@ -117,7 +118,7 @@ export default function RecruitmentPage() {
 
         {loading ? (
           <div className="p-8 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+            <Loader size="lg" className="mx-auto" />
             <p className="mt-4 text-gray-600">Loading jobs...</p>
           </div>
         ) : jobs.length === 0 ? (

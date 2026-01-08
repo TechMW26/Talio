@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import Loader from '@/components/ui/Loader'
 import {
   HiOutlineEnvelope,
   HiOutlineCheckCircle,
@@ -482,7 +483,7 @@ export default function OnboardingEmailsPage() {
           >
             {bulkRetrying ? (
               <>
-                <HiOutlineArrowPath className="w-5 h-5 animate-spin" />
+                <Loader size="xs" />
                 Retrying {selectedEmails.length}...
               </>
             ) : (
@@ -639,7 +640,7 @@ export default function OnboardingEmailsPage() {
                         } disabled:opacity-50`}
                       >
                         {retrying[email._id] ? (
-                          <HiOutlineArrowPath className="w-4 h-4 animate-spin" />
+                          <Loader size="xs" />
                         ) : (
                           <HiOutlineArrowPath className="w-4 h-4" />
                         )}
@@ -753,7 +754,7 @@ export default function OnboardingEmailsPage() {
               >
                 {sendingEmail ? (
                   <>
-                    <HiOutlineArrowPath className="w-4 h-4 animate-spin" />
+                    <Loader size="xs" />
                     Sending...
                   </>
                 ) : (

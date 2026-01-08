@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSocket } from '@/contexts/SocketContext'
 import toast from '@/utils/toast'
+import Loader from '@/components/ui/Loader'
 import {
   HiOutlineSignal,
   HiOutlineUserGroup,
@@ -224,7 +225,7 @@ export default function LiveUsersPage() {
     return (
       <div className="page-container">
         <div className="flex items-center justify-center min-h-[400px]">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <Loader size="lg" />
         </div>
       </div>
     )

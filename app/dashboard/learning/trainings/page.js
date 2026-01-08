@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { FaPlay, FaCheckCircle, FaClock, FaTrophy, FaBook, FaChartLine } from 'react-icons/fa'
 import toast from '@/utils/toast'
+import Loader from '@/components/ui/Loader'
 
 export default function TrainingsPage() {
   const [mounted, setMounted] = useState(false)
@@ -122,7 +123,7 @@ export default function TrainingsPage() {
   if (!mounted) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <Loader size="md" />
       </div>
     )
   }
@@ -222,7 +223,7 @@ export default function TrainingsPage() {
       {/* Trainings List */}
       {loading ? (
         <div className="text-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <Loader size="lg" className="mx-auto" />
           <p className="text-gray-600 mt-4">Loading trainings...</p>
         </div>
       ) : filteredTrainings.length === 0 ? (

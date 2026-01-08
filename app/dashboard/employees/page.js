@@ -10,6 +10,7 @@ import {
   FaLayerGroup, FaSave, FaUndo
 } from 'react-icons/fa'
 import { formatDesignation, formatDepartments, getLevelNameFromNumber } from '@/lib/formatters'
+import Loader from '@/components/ui/Loader'
 
 // Status options with colors
 const STATUS_OPTIONS = [
@@ -607,7 +608,7 @@ export default function EmployeesPage() {
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         {loading ? (
           <div className="p-8 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+            <Loader size="lg" />
             <p className="mt-4 text-gray-600">Loading employees...</p>
           </div>
         ) : employees.length === 0 ? (
@@ -857,7 +858,7 @@ export default function EmployeesPage() {
             <div className="px-6 py-4 bg-gray-50 flex justify-end gap-3">
               <button onClick={() => { setShowBulkEditModal(false); setBulkEditData({ department: '', designation: '', level: '', status: '', reportingManager: '' }); }} className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
               <button onClick={handleBulkEdit} disabled={bulkUpdating} className="px-4 py-2 text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2 disabled:opacity-50">
-                {bulkUpdating ? (<><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div><span>Updating...</span></>) : (<><FaSave className="text-sm" /><span>Update {selectedEmployees.length} Employee(s)</span></>)}
+                {bulkUpdating ? (<><Loader size="xs" color="#ffffff" /><span>Updating...</span></>) : (<><FaSave className="text-sm" /><span>Update {selectedEmployees.length} Employee(s)</span></>)}
               </button>
             </div>
           </div>

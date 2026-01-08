@@ -7,6 +7,7 @@ import {
   HiOutlineTrash,
   HiOutlineSwatch
 } from 'react-icons/hi2'
+import Loader from '@/components/ui/Loader'
 import toast from '@/utils/toast'
 
 const PRESET_COLORS = [
@@ -259,7 +260,7 @@ export default function CategoryModal({ isOpen, onClose, onSuccess, category }) 
                       >
                         {deleting ? (
                           <>
-                            <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+                            <Loader size="xs" />
                             Deleting...
                           </>
                         ) : (
@@ -288,7 +289,7 @@ export default function CategoryModal({ isOpen, onClose, onSuccess, category }) 
                       >
                         {loading ? (
                           <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            <Loader size="xs" />
                             Saving...
                           </>
                         ) : (

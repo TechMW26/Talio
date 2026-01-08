@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { FaDownload, FaTimes, FaMobile, FaCheck } from 'react-icons/fa'
+import Loader from '@/components/ui/Loader'
 
 export default function PWAInstaller() {
   const [deferredPrompt, setDeferredPrompt] = useState(null)
@@ -119,7 +120,7 @@ export default function PWAInstaller() {
               >
                 {isInstalling ? (
                   <>
-                    <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
+                    <Loader size="xs" color="#ffffff" />
                     <span>Installing...</span>
                   </>
                 ) : (

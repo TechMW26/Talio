@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { FaArrowLeft, FaUser, FaPaperPlane, FaClock, FaTag, FaExclamationCircle, FaCheckCircle } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
+import Loader from '@/components/ui/Loader'
 
 export default function TicketDetailPage() {
   const params = useParams()
@@ -120,7 +121,7 @@ export default function TicketDetailPage() {
   if (loading) {
     return (
       <div className="p-6 flex justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+        <Loader size="lg" />
       </div>
     )
   }

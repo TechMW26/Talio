@@ -5,6 +5,7 @@ import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaMoneyBillWave, FaCheckCircle, FaClock, FaTimesCircle } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
+import Loader from '@/components/ui/Loader'
 
 export default function ExpensesPage() {
   const [expenses, setExpenses] = useState([])
@@ -215,7 +216,7 @@ export default function ExpensesPage() {
 
         {loading ? (
           <div className="p-8 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+            <Loader size="lg" />
             <p className="mt-4 text-gray-600">Loading expenses...</p>
           </div>
         ) : (

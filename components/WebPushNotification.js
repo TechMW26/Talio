@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Bell, BellOff, Check, X, Loader2, Smartphone, Monitor, AlertCircle } from 'lucide-react';
+import { Bell, BellOff, Check, X, Smartphone, Monitor, AlertCircle } from 'lucide-react';
+import Loader from '@/components/ui/Loader';
 import useWebPush from '@/hooks/useWebPush';
 
 /**
@@ -151,7 +152,7 @@ export function WebPushPrompt({ onClose }) {
                         >
                             {isLoading ? (
                                 <>
-                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    <Loader size="xs" />
                                     Enabling...
                                 </>
                             ) : (
@@ -312,7 +313,7 @@ export function WebPushSettings() {
                     >
                         {testLoading ? (
                             <>
-                                <Loader2 className="w-3 h-3 animate-spin" />
+                                <Loader size="xs" />
                                 Sending...
                             </>
                         ) : testSent ? (

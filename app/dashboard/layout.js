@@ -10,6 +10,7 @@ import OutOfPremisesPopup from '@/components/OutOfPremisesPopup'
 import ChatWidgetContainer from '@/components/chat/ChatWidgetContainer'
 import ProfileCompletionModal from '@/components/ProfileCompletionModal'
 import { WebPushPrompt } from '@/components/WebPushNotification'
+import Loader from '@/components/ui/Loader'
 
 import useGeofencing from '@/hooks/useGeofencing'
 import { SocketProvider } from '@/contexts/SocketContext'
@@ -256,7 +257,7 @@ export default function DashboardLayout({ children }) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--color-bg-main)' }}>
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <Loader size="lg" />
           <p className="mt-4 text-gray-600 dark:text-gray-300">Loading...</p>
         </div>
       </div>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, Suspense } from 'react'
+import Loader from '@/components/ui/Loader'
 
 function AuthCallbackContent() {
   const [status, setStatus] = useState('Processing...')
@@ -139,7 +140,7 @@ function AuthCallbackContent() {
         }
       `}</style>
       <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+        <Loader size="lg" className="mb-4" />
         <p className="text-gray-600 font-medium">Completing sign in...</p>
         <p className="text-gray-400 text-sm mt-2">{status}</p>
       </div>
@@ -157,7 +158,7 @@ export default function AuthCallbackPage() {
           }
         `}</style>
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <Loader size="lg" className="mb-4" />
           <p className="text-gray-600 font-medium">Loading...</p>
         </div>
       </div>

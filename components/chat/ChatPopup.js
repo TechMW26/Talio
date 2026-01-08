@@ -7,6 +7,7 @@ import { useSocket } from '@/contexts/SocketContext'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { playNotificationSound } from '@/utils/audio'
+import Loader from '@/components/ui/Loader'
 
 export default function ChatPopup({ chat, index }) {
   const { closeChat, chatPositions, updateChatPosition, bringToFront, triggerSource, widgetPosition, getZIndex, focusedChatId, sidebarCollapsed, isAutoMinimized } = useChatWidget()
@@ -917,10 +918,7 @@ export default function ChatPopup({ chat, index }) {
           {loading ? (
             <div className="flex items-center justify-center h-full">
               <div>
-                <div
-                  className="w-8 h-8 border-3 border-t-transparent rounded-full animate-spin mx-auto"
-                  style={{ borderColor: primaryColor, borderTopColor: 'transparent' }}
-                ></div>
+                <Loader size="sm" />
                 <p className="text-gray-500 text-xs mt-2">Loading messages...</p>
               </div>
             </div>
@@ -1019,10 +1017,7 @@ export default function ChatPopup({ chat, index }) {
               title="Send message"
             >
               {sending ? (
-                <div
-                  className="animate-spin rounded-full w-5 h-5 border-2 border-t-transparent"
-                  style={{ borderColor: primaryColor, borderTopColor: 'transparent' }}
-                ></div>
+                <Loader size="xs" />
               ) : (
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="w-5 h-5" fill="currentColor">
                   <path d="M498.1 5.6c10.1 7 15.4 19.1 13.5 31.2l-64 416c-1.5 9.7-7.4 18.2-16 23s-18.9 5.4-28 1.6L284 427.7l-68.5 74.1c-8.9 9.7-22.9 12.9-35.2 8.1S160 493.3 160 480V392c0-8.5 3.4-16.6 9.4-22.6l208-208c6.2-6.2 6.2-16.4 0-22.6s-16.4-6.2-22.6 0L121.4 340.4l-96.4-40.2c-9.6-4-16.1-12.9-16.9-23.1s4.9-19.8 14.1-24.8l464-256c9.6-5.3 21.5-5.2 31 .5z" />

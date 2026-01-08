@@ -9,7 +9,6 @@ import {
   FaDownload, 
   FaCheck, 
   FaTimes, 
-  FaSpinner,
   FaExclamationTriangle,
   FaInfoCircle,
   FaEye,
@@ -18,6 +17,7 @@ import {
   FaArrowRight,
   FaEdit
 } from 'react-icons/fa'
+import Loader from '@/components/ui/Loader'
 
 export default function BulkImportEmployees() {
   const [file, setFile] = useState(null)
@@ -335,7 +335,7 @@ export default function BulkImportEmployees() {
           className="btn-secondary flex items-center gap-2"
         >
           {downloadingTemplate ? (
-            <FaSpinner className="animate-spin" />
+            <Loader size="xs" />
           ) : (
             <FaDownload />
           )}
@@ -410,7 +410,7 @@ export default function BulkImportEmployees() {
       {/* Loading State */}
       {previewLoading && (
         <div className="bg-purple-50 border border-purple-200 rounded-lg p-6 text-center">
-          <FaSpinner className="animate-spin text-3xl text-purple-600 mx-auto mb-3" />
+          <div className="flex justify-center mb-3"><Loader size="md" /></div>
           <p className="text-purple-800 font-medium">MIRA is analyzing your Excel file.</p>
           <p className="text-purple-600 text-sm mt-1">Detecting columns, extracting data, and mapping to our template</p>
         </div>
@@ -637,7 +637,7 @@ export default function BulkImportEmployees() {
           >
             {loading ? (
               <>
-                <FaSpinner className="animate-spin" />
+                <Loader size="xs" color="#ffffff" />
                 <span>Importing...</span>
               </>
             ) : (

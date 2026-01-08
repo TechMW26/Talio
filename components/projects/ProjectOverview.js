@@ -9,7 +9,7 @@ import {
 import {
   FaChartLine, FaUsers, FaTasks, FaCalendarAlt, FaClock,
   FaExclamationTriangle, FaRocket, FaLightbulb, FaCheckCircle,
-  FaArrowUp, FaArrowDown, FaSpinner, FaBrain, FaStar,
+  FaArrowUp, FaArrowDown, FaBrain, FaStar,
   FaChartPie, FaChartBar, FaTrophy, FaFlag, FaRedo,
   FaTimesCircle, FaQuestionCircle, FaInfoCircle, FaBolt,
   FaUserClock, FaBalanceScale, FaShieldAlt, FaFire, FaBullseye,
@@ -17,6 +17,7 @@ import {
 } from 'react-icons/fa'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useAILoading } from '@/contexts/AILoadingContext'
+import Loader from '@/components/ui/Loader'
 
 // Custom tooltip for charts
 const ChartTooltip = ({ active, payload, label }) => {
@@ -152,8 +153,8 @@ export default function ProjectOverview({ projectId }) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
-          <FaSpinner className="animate-spin text-4xl text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-700 font-medium">Loading project analytics...</p>
+          <Loader size="lg" />
+          <p className="text-gray-700 font-medium mt-4">Loading project analytics...</p>
         </div>
       </div>
     )

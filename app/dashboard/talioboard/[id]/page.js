@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import WhiteboardCanvas from '@/components/whiteboard/WhiteboardCanvas';
+import Loader from '@/components/ui/Loader';
 import { FiArrowLeft, FiShare2, FiX, FiUsers, FiMaximize, FiMinimize } from 'react-icons/fi';
 
 export default function WhiteboardEditorPage() {
@@ -349,7 +350,7 @@ export default function WhiteboardEditorPage() {
     return (
       <div className="h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="w-8 h-8 border-2 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <Loader size="md" />
           <p className="mt-4 text-gray-500">Loading board...</p>
         </div>
       </div>
@@ -385,7 +386,7 @@ export default function WhiteboardEditorPage() {
       {isSaving && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-xl px-6 py-4 flex items-center gap-3 shadow-xl">
-            <div className="w-5 h-5 border-2 border-violet-600 border-t-transparent rounded-full animate-spin"></div>
+            <Loader size="sm" />
             <span className="text-gray-700 font-medium">Saving...</span>
           </div>
         </div>
@@ -490,7 +491,7 @@ export default function WhiteboardEditorPage() {
                     <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 max-h-64 overflow-y-auto z-10">
                       {loadingUsers ? (
                         <div className="p-4 text-center text-gray-500">
-                          <div className="w-5 h-5 border-2 border-violet-600 border-t-transparent rounded-full animate-spin mx-auto mb-2" />
+                          <Loader size="sm" className="mx-auto mb-2" />
                           Searching...
                         </div>
                       ) : safeArrayLength(userResults) === 0 ? (

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
+import Loader from '@/components/ui/Loader'
 import {
   FaUsers, FaSearch, FaUser, FaEnvelope, FaPhone, FaCalendarAlt,
   FaBriefcase, FaStar, FaChartLine
@@ -100,7 +101,7 @@ export default function TeamMembersPage() {
       {/* Team Members List */}
       {loading ? (
         <div className="bg-white rounded-lg shadow-md p-8 text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <Loader size="lg" className="mx-auto" />
           <p className="mt-4 text-gray-600">Loading team members...</p>
         </div>
       ) : filteredMembers.length === 0 ? (

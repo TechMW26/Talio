@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
+import Loader from '@/components/ui/Loader'
 import {
   HiOutlineArrowLeft,
   HiOutlinePlus,
@@ -580,8 +581,8 @@ export default function CreateProjectPage() {
           >
             {loading ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Creating...
+                <Loader size="xs" />
+                <span className="ml-2">Creating...</span>
               </>
             ) : (
               <>

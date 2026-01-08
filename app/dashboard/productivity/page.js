@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Loader from '@/components/ui/Loader'
 import { 
   HiOutlineComputerDesktop, 
   HiOutlineCalendarDays,
@@ -524,7 +525,7 @@ export default function ProductivityPage() {
           {/* Sessions Grid */}
           {loading ? (
             <div className="flex items-center justify-center h-64">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+              <Loader size="lg" />
             </div>
           ) : sessions.length === 0 ? (
             <div className="bg-white rounded-2xl shadow-sm border p-6 sm:p-12 text-center">
@@ -701,7 +702,7 @@ export default function ProductivityPage() {
               {/* Employee Sessions Grid */}
               {loadingEmployeeSessions ? (
                 <div className="flex items-center justify-center h-64">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+                  <Loader size="lg" />
                 </div>
               ) : employeeSessions.length === 0 ? (
                 <div className="bg-white rounded-2xl shadow-sm border p-6 sm:p-12 text-center">

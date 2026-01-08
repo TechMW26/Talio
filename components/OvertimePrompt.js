@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import toast from '@/utils/toast'
-import { FaClock, FaCheck, FaTimes, FaBell, FaMapMarkerAlt, FaSpinner } from 'react-icons/fa'
+import { FaClock, FaCheck, FaTimes, FaBell, FaMapMarkerAlt } from 'react-icons/fa'
+import Loader from '@/components/ui/Loader'
 
 /**
  * OvertimePrompt Component
@@ -194,7 +195,7 @@ export default function OvertimePrompt({ userId, onClose, onResponse }) {
                   'bg-gray-50 text-gray-600'
               }`}>
               {checkingLocation ? (
-                <FaSpinner className="w-4 h-4 animate-spin" />
+                <Loader size="xs" />
               ) : (
                 <FaMapMarkerAlt className="w-4 h-4" />
               )}

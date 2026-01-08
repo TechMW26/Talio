@@ -12,6 +12,7 @@ import {
   FaTh
 } from 'react-icons/fa'
 import toast from '@/utils/toast'
+import Loader from '@/components/ui/Loader'
 
 export default function CalendarPage() {
   const [currentMonth, setCurrentMonth] = useState(new Date())
@@ -171,7 +172,7 @@ export default function CalendarPage() {
   if (loading) {
     return (
       <div className="p-6 flex justify-center items-center min-h-[400px]">
-        <div className="animate-spin h-12 w-12 rounded-full border-b-2 border-primary-500" />
+        <Loader size="lg" />
       </div>
     )
   }

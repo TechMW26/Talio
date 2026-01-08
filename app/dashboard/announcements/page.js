@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaBullhorn, FaCalendarAlt, FaExclamationTriangle, FaUsers, FaEdit, FaTrash } from 'react-icons/fa'
+import Loader from '@/components/ui/Loader'
 
 export default function AnnouncementsPage() {
   const router = useRouter()
@@ -131,7 +132,7 @@ export default function AnnouncementsPage() {
       <div className="space-y-3 sm:space-y-4">
         {loading ? (
           <div className="bg-white rounded-lg shadow-md p-6 sm:p-8 text-center">
-            <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-primary-500 mx-auto"></div>
+            <Loader size="lg" className="mx-auto" />
             <p className="mt-3 sm:mt-4 text-sm sm:text-base text-gray-600">Loading announcements...</p>
           </div>
         ) : announcements.length === 0 ? (

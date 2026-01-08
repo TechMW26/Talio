@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import toast from '@/utils/toast'
 import { FaCheck, FaTimes, FaEye, FaFilter } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
+import Loader from '@/components/ui/Loader'
 
 export default function LeaveApprovalsPage() {
   const [leaves, setLeaves] = useState([])
@@ -209,7 +210,7 @@ export default function LeaveApprovalsPage() {
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         {loading ? (
           <div className="p-8 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+            <Loader size="lg" />
             <p className="mt-4 text-gray-600">Loading leave requests...</p>
           </div>
         ) : (

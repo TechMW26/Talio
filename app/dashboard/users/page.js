@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { FaUser, FaEye, FaEyeSlash, FaCopy } from 'react-icons/fa'
 import toast from '@/utils/toast'
+import Loader from '@/components/ui/Loader'
 
 export default function UsersPage() {
   const [users, setUsers] = useState([])
@@ -47,7 +48,7 @@ export default function UsersPage() {
   if (loading) {
     return (
       <div className="p-6">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+        <Loader size="lg" className="mx-auto" />
       </div>
     )
   }

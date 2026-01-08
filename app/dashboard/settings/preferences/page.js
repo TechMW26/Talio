@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import toast from '@/utils/toast'
 import { FaCog, FaMoneyBillWave, FaClock, FaCalendarAlt, FaSave } from 'react-icons/fa'
+import Loader from '@/components/ui/Loader'
 
 export default function PreferencesPage() {
   const [user, setUser] = useState(null)
@@ -115,7 +116,7 @@ export default function PreferencesPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+        <Loader size="lg" />
       </div>
     )
   }

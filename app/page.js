@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Loader from '@/components/ui/Loader'
 
 /**
  * Check if running in Electron/desktop app environment
@@ -140,15 +141,19 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white" style={{ backgroundColor: '#FFFFFF', minHeight: '100vh' }}>
+    <div className="min-h-screen w-full flex items-center justify-center bg-white" style={{ backgroundColor: '#FFFFFF', minHeight: '100vh', width: '100%' }}>
       <style jsx global>{`
         html, body {
           background-color: #FFFFFF !important;
+          margin: 0;
+          padding: 0;
+          width: 100%;
+          height: 100%;
         }
       `}</style>
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-        <p className="mt-4 text-gray-600">Checking session...</p>
+      <div className="text-center flex flex-col items-center justify-center">
+        <Loader size="lg" />
+        <p className="mt-4 text-gray-600 text-center">Checking session...</p>
 
         {showClearOption && (
           <div className="mt-6 p-4 bg-white rounded-lg shadow-lg max-w-sm mx-auto">

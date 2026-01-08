@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { FaTrophy, FaDownload, FaShare, FaCalendar, FaClock, FaAward, FaMedal } from 'react-icons/fa'
 import toast from '@/utils/toast'
+import Loader from '@/components/ui/Loader'
 
 export default function CertificatesPage() {
   const [mounted, setMounted] = useState(false)
@@ -102,7 +103,7 @@ export default function CertificatesPage() {
   if (!mounted) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <Loader size="md" />
       </div>
     )
   }
@@ -166,7 +167,7 @@ export default function CertificatesPage() {
       {/* Certificates Grid */}
       {loading ? (
         <div className="text-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-600 mx-auto"></div>
+          <Loader size="lg" className="mx-auto" />
           <p className="text-gray-600 mt-4">Loading certificates...</p>
         </div>
       ) : certificates.length === 0 ? (

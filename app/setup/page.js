@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { FaUserShield, FaEnvelope, FaLock, FaUser, FaEye, FaEyeSlash, FaBuilding, FaArrowRight } from 'react-icons/fa';
 import toast from '@/utils/toast';
+import Loader from '@/components/ui/Loader';
 
 export default function SetupPage() {
   const router = useRouter();
@@ -195,7 +196,7 @@ export default function SetupPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <Loader size="lg" />
           <p className="mt-4 text-gray-600">Checking system status...</p>
         </div>
       </div>
@@ -371,7 +372,7 @@ export default function SetupPage() {
             >
               {submitting ? (
                 <span className="flex items-center justify-center gap-2">
-                  <div className="animate-spin rounded-full h-5 w-5 border-2 border-white/30 border-t-white"></div>
+                  <Loader size="xs" />
                   Creating Account...
                 </span>
               ) : (

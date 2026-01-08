@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { FiPlus, FiSearch, FiGrid, FiList, FiMoreHorizontal, FiTrash2, FiEdit2, FiShare2, FiClock, FiUser, FiUsers, FiX, FiLink, FiCopy, FiCheck } from 'react-icons/fi';
 import { useTheme } from '@/contexts/ThemeContext';
+import Loader from '@/components/ui/Loader';
 
 export default function WhiteboardDashboard() {
   const router = useRouter();
@@ -241,7 +242,7 @@ export default function WhiteboardDashboard() {
       <div className="max-w-7xl mx-auto px-6 pb-12">
         {loading ? (
           <div className="loading-container py-20">
-            <div className="loading-spinner loading-spinner-lg" />
+            <Loader size="lg" />
             <p className="loading-text">Loading boards...</p>
           </div>
         ) : error ? (

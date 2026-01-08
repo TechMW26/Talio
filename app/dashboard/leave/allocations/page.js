@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import toast from '@/utils/toast'
 import { FaPlus, FaEdit, FaUsers, FaCalendarAlt, FaDownload, FaUpload } from 'react-icons/fa'
 import ModalPortal from '@/components/ModalPortal'
+import Loader from '@/components/ui/Loader'
 
 export default function LeaveAllocationsPage() {
   const [employees, setEmployees] = useState([])
@@ -190,7 +191,7 @@ export default function LeaveAllocationsPage() {
   if (loading && leaveBalances.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+        <Loader size="lg" />
       </div>
     )
   }

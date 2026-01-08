@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import toast from '@/utils/toast'
 import { FaUsers, FaBuilding, FaArrowLeft, FaCalendarAlt, FaClock, FaChevronLeft, FaChevronRight, FaSearch, FaUserCircle, FaMapMarkerAlt } from 'react-icons/fa'
+import Loader from '@/components/ui/Loader'
 
 export default function TeamAttendancePage() {
   const [loading, setLoading] = useState(true)
@@ -257,7 +258,7 @@ export default function TeamAttendancePage() {
   if (loading && view === 'initial') {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+        <Loader size="lg" />
       </div>
     )
   }
@@ -354,7 +355,7 @@ export default function TeamAttendancePage() {
         <>
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+              <Loader size="lg" />
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -489,7 +490,7 @@ export default function TeamAttendancePage() {
           {/* Calendar Grid */}
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+              <Loader size="lg" />
             </div>
           ) : (
             <div className="overflow-x-auto overflow-y-visible p-2 -m-2">

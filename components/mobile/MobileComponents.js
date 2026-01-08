@@ -1,5 +1,7 @@
 'use client';
 
+import Loader from '@/components/ui/Loader';
+
 /**
  * Mobile-optimized page wrapper component
  * Provides consistent mobile-first layout structure
@@ -173,7 +175,7 @@ export function MobileLoader({ fullScreen = false, text }) {
   if (fullScreen) {
     return (
       <div className="fixed inset-0 flex flex-col items-center justify-center bg-white z-50">
-        <div className="loading-mobile animate-spin rounded-full border-b-2 border-blue-600"></div>
+        <Loader size="lg" />
         {text && <p className="mt-4 text-sm text-gray-600">{text}</p>}
       </div>
     );
@@ -181,7 +183,7 @@ export function MobileLoader({ fullScreen = false, text }) {
 
   return (
     <div className="flex flex-col items-center justify-center py-8 sm:py-12">
-      <div className="loading-mobile animate-spin rounded-full border-b-2 border-blue-600"></div>
+      <Loader size="md" />
       {text && <p className="mt-4 text-sm text-gray-600">{text}</p>}
     </div>
   );

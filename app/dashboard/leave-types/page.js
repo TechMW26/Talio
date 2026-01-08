@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import toast from '@/utils/toast'
 import { FaPlus, FaEdit, FaTrash, FaUmbrella } from 'react-icons/fa'
+import Loader from '@/components/ui/Loader'
 
 export default function LeaveTypesPage() {
   const [leaveTypes, setLeaveTypes] = useState([])
@@ -200,7 +201,7 @@ export default function LeaveTypesPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {loading ? (
           <div className="col-span-full bg-white rounded-lg shadow-md p-8 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+            <Loader size="lg" className="mx-auto" />
             <p className="mt-4 text-gray-600">Loading leave types...</p>
           </div>
         ) : leaveTypes.length === 0 ? (

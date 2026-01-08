@@ -17,6 +17,7 @@ import {
   HiOutlineDocumentText,
   HiOutlineCheckCircle
 } from 'react-icons/hi2'
+import Loader from '@/components/ui/Loader'
 import toast from '@/utils/toast'
 
 const PRIORITY_OPTIONS = [
@@ -456,7 +457,7 @@ export default function TodoDetailPanel({ todo, categories, onClose, onUpdate, o
             >
               {saving ? (
                 <>
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <Loader size="xs" />
                   Saving...
                 </>
               ) : (

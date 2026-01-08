@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { FaPhoneAlt, FaVolumeUp, FaVolumeMute, FaCheck, FaUser, FaExclamationTriangle } from 'react-icons/fa';
 import { useSocket } from '@/contexts/SocketContext';
 import toast from '@/utils/toast';
+import Loader from '@/components/ui/Loader';
 
 // Alert sound URL - using existing notification sound
 const ALERT_SOUND_URL = '/sounds/notification.mp3';
@@ -563,7 +564,7 @@ export default function CallAlertReceiver() {
             >
               {acknowledging ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white"></div>
+                  <Loader size="xs" color="#ffffff" />
                   <span>Acknowledging...</span>
                 </>
               ) : (

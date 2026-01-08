@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaEdit, FaTrash, FaBriefcase } from 'react-icons/fa'
+import Loader from '@/components/ui/Loader'
 
 export default function DesignationsPage() {
   const [designations, setDesignations] = useState([])
@@ -184,7 +185,7 @@ export default function DesignationsPage() {
 
         {loading ? (
           <div className="p-8 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+            <Loader size="lg" />
             <p className="mt-4 text-gray-600">Loading designations...</p>
           </div>
         ) : (

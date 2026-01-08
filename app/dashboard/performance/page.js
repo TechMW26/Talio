@@ -8,6 +8,7 @@ import {
   FaChartLine, FaUsers, FaPlus, FaEye, FaEdit, FaAward,
   FaStar, FaTrophy, FaBullseye, FaCalendarAlt
 } from 'react-icons/fa'
+import Loader from '@/components/ui/Loader'
 
 export default function PerformancePage() {
   const router = useRouter()
@@ -131,7 +132,7 @@ export default function PerformancePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+        <Loader size="lg" />
       </div>
     )
   }
@@ -223,7 +224,7 @@ export default function PerformancePage() {
 
         {loading ? (
           <div className="p-8 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+            <Loader size="lg" />
             <p className="mt-4 text-gray-600">Loading reviews...</p>
           </div>
         ) : reviews.length === 0 ? (

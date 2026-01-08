@@ -9,6 +9,7 @@ import {
 } from 'react-icons/fa'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts'
 import CustomTooltip, { CustomPieTooltip } from '@/components/charts/CustomTooltip'
+import Loader from '@/components/ui/Loader'
 
 const TaskDashboard = () => {
   const [dashboardData, setDashboardData] = useState(null)
@@ -84,7 +85,7 @@ const TaskDashboard = () => {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <Loader size="lg" />
       </div>
     )
   }

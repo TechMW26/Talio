@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import toast from '@/utils/toast'
+import Loader from '@/components/ui/Loader'
 
 export default function SuperAdminLayout({ children }) {
   const router = useRouter()
@@ -63,7 +64,7 @@ export default function SuperAdminLayout({ children }) {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-600"></div>
+        <Loader size="lg" />
       </div>
     )
   }

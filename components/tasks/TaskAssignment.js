@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { FaPlus, FaTrash, FaUser, FaUsers, FaSearch, FaCheck, FaTimes, FaChevronDown } from 'react-icons/fa'
 import { formatDesignation } from '@/lib/formatters'
+import Loader from '@/components/ui/Loader'
 
 const TaskAssignment = ({ taskId, currentAssignees = [], onAssignmentChange, mode = 'create' }) => {
   const [employees, setEmployees] = useState([])
@@ -608,7 +609,7 @@ const TaskAssignment = ({ taskId, currentAssignees = [], onAssignmentChange, mod
 
                   {employeeLoading && (
                     <div className="p-3 text-center">
-                      <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                      <Loader size="sm" />
                       <p className="text-xs text-gray-500 mt-2">Loading more employees...</p>
                     </div>
                   )}

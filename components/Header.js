@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { FaBars, FaBell, FaUser, FaSignOutAlt, FaCog, FaSearch, FaComments, FaTimes, FaSpinner, FaSyncAlt } from 'react-icons/fa'
+import { FaBars, FaBell, FaUser, FaSignOutAlt, FaCog, FaSearch, FaComments, FaTimes, FaSyncAlt } from 'react-icons/fa'
+import Loader from '@/components/ui/Loader'
 import toast from '@/utils/toast'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
@@ -410,7 +411,9 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                   style={{ '--tw-ring-color': primaryMedium }}
                 />
                 {searching && (
-                  <FaSpinner className="absolute right-3 animate-spin w-4 h-4 z-10" style={{ color: primaryColor }} />
+                  <div className="absolute right-3 z-10">
+                    <Loader size="xs" />
+                  </div>
                 )}
                 {searchQuery && !searching && (
                   <button
@@ -754,7 +757,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                 )}
                 {searching && (
                   <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                    <FaSpinner className="animate-spin w-4 h-4" style={{ color: primaryColor }} />
+                    <Loader size="xs" />
                   </div>
                 )}
               </div>
@@ -772,7 +775,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                 </div>
               ) : searching ? (
                 <div className="flex items-center justify-center h-full">
-                  <FaSpinner className="animate-spin w-8 h-8" style={{ color: primaryColor }} />
+                  <Loader size="md" />
                 </div>
               ) : searchResults ? (
                 <div>

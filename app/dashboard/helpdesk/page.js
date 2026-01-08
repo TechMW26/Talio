@@ -7,6 +7,7 @@ import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaTicketAlt, FaCheckCircle, FaClock, FaExclamationCircle, FaTimes, FaCog } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
 import ModalPortal from '@/components/ui/ModalPortal'
+import Loader from '@/components/ui/Loader'
 
 export default function HelpdeskPage() {
   const [mounted, setMounted] = useState(false)
@@ -238,7 +239,7 @@ export default function HelpdeskPage() {
 
         {loading ? (
           <div className="p-8 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+            <Loader size="lg" className="mx-auto" />
             <p className="mt-4 text-gray-600">Loading tickets...</p>
           </div>
         ) : (

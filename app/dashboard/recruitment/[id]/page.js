@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import toast from '@/utils/toast'
 import { FaArrowLeft, FaEdit, FaTrash, FaBriefcase, FaMapMarkerAlt, FaClock, FaDollarSign, FaUsers, FaEye } from 'react-icons/fa'
+import Loader from '@/components/ui/Loader'
 
 export default function JobDetailsPage() {
   const router = useRouter()
@@ -140,7 +141,7 @@ export default function JobDetailsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+        <Loader size="lg" />
       </div>
     )
   }

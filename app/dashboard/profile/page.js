@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
+import Loader from '@/components/ui/Loader'
 import {
   FaUser,
   FaEnvelope,
@@ -474,7 +475,7 @@ export default function ProfilePage() {
     return (
       <div className="fixed inset-0 flex items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-3">
-          <div className="animate-spin rounded-full h-12 w-12 border-[3px] border-slate-300 border-t-blue-600" />
+          <Loader size="lg" />
           <p className="text-sm text-slate-500 font-medium tracking-wide">
             Loading your profile…
           </p>
@@ -1654,7 +1655,7 @@ export default function ProfilePage() {
               >
                 {uploadingImage ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <Loader size="xs" />
                     Saving…
                   </>
                 ) : (

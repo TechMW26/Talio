@@ -5,6 +5,7 @@ import toast from '@/utils/toast'
 import { FaCheck, FaTimes, FaEye, FaFileInvoiceDollar, FaUser } from 'react-icons/fa'
 import { getCurrentUser } from '@/utils/userHelper'
 import { useRouter } from 'next/navigation'
+import Loader from '@/components/ui/Loader'
 
 export default function ExpenseApprovalsPage() {
   const [expenses, setExpenses] = useState([])
@@ -80,7 +81,7 @@ export default function ExpenseApprovalsPage() {
   if (loading) {
     return (
       <div className="p-6 flex justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+        <Loader size="lg" />
       </div>
     )
   }

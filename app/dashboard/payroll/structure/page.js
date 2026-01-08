@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { FaMoneyBillWave, FaPlus, FaEdit, FaTrash, FaSave, FaTimes } from 'react-icons/fa'
 import toast from '@/utils/toast'
+import Loader from '@/components/ui/Loader'
 
 export default function SalaryStructurePage() {
   const [structures, setStructures] = useState([])
@@ -228,7 +229,7 @@ export default function SalaryStructurePage() {
       {/* Structures List */}
       {loading ? (
         <div className="text-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <Loader size="lg" />
           <p className="text-gray-600 mt-4">Loading salary structures...</p>
         </div>
       ) : structures.length === 0 ? (

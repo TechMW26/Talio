@@ -15,6 +15,7 @@ import {
   HiOutlineExclamationTriangle
 } from 'react-icons/hi2'
 import ModalPortal from '@/components/ModalPortal'
+import Loader from '@/components/ui/Loader'
 
 /**
  * RawCaptureViewer Component
@@ -212,7 +213,7 @@ export default function RawCaptureViewer({ userId = null, date = null, showFilte
       <div className="p-4">
         {loading ? (
           <div className="flex items-center justify-center h-48">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <Loader size="md" />
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center h-48 text-center">

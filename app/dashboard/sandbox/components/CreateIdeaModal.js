@@ -17,7 +17,7 @@ import {
   HiOutlineAcademicCap,
   HiOutlineEyeSlash
 } from 'react-icons/hi2'
-import { FaSpinner } from 'react-icons/fa'
+import Loader from '@/components/ui/Loader'
 import toast from '@/utils/toast'
 import { useAILoading } from '@/contexts/AILoadingContext'
 
@@ -223,7 +223,7 @@ export default function CreateIdeaModal({ isOpen, onClose, onSuccess }) {
                   className="flex items-center gap-1 px-2 py-1 bg-purple-600 text-white text-[10px] font-medium rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >
                   {aiExpanding ? (
-                    <FaSpinner className="w-2.5 h-2.5 animate-spin" />
+                    <Loader size="xs" />
                   ) : (
                     <HiOutlineSparkles className="w-2.5 h-2.5" />
                   )}
@@ -274,7 +274,7 @@ export default function CreateIdeaModal({ isOpen, onClose, onSuccess }) {
           >
             {submitting ? (
               <span className="flex items-center gap-1.5">
-                <FaSpinner className="w-3 h-3 animate-spin" />
+                <Loader size="xs" />
                 Submitting...
               </span>
             ) : (

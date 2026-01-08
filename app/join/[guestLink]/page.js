@@ -4,6 +4,7 @@ import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import { HiOutlineVideoCamera, HiOutlineUser, HiOutlineClock, HiOutlineCalendar } from 'react-icons/hi2'
 import toast from '@/utils/toast'
+import Loader from '@/components/ui/Loader'
 
 export default function GuestJoinPage({ params }) {
   const router = useRouter()
@@ -97,7 +98,7 @@ export default function GuestJoinPage({ params }) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 flex items-center justify-center p-4">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <Loader size="lg" className="mb-4" />
           <p className="text-gray-600">Loading meeting information...</p>
         </div>
       </div>
@@ -196,7 +197,7 @@ export default function GuestJoinPage({ params }) {
             >
               {joining ? (
                 <span className="flex items-center justify-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <Loader size="xs" />
                   Joining...
                 </span>
               ) : (

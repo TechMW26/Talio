@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
+import Loader from '@/components/ui/Loader'
 import {
   HiOutlineClipboardDocumentList,
   HiOutlineClock,
@@ -23,7 +24,7 @@ import {
 import {
   FaTasks, FaCalendarAlt, FaFilter, FaSearch, FaProjectDiagram,
   FaCheck, FaPlay, FaEye, FaClock, FaExclamationTriangle,
-  FaChevronDown, FaCheckCircle, FaTimes, FaSpinner, FaPlus,
+  FaChevronDown, FaCheckCircle, FaTimes, FaPlus,
   FaTrash, FaChevronUp, FaComment
 } from 'react-icons/fa'
 import { playNotificationSound, NotificationSoundTypes } from '@/lib/notificationSounds'
@@ -484,7 +485,7 @@ export default function MyTasksPage() {
     return (
       <div className="page-container">
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+          <Loader size="lg" />
         </div>
       </div>
     )
@@ -494,7 +495,7 @@ export default function MyTasksPage() {
     return (
       <div className="page-container">
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+          <Loader size="lg" />
         </div>
       </div>
     )
@@ -1023,7 +1024,7 @@ export default function MyTasksPage() {
                   className="modal-btn modal-btn-success"
                 >
                   {respondingTo === taskForEta._id ? (
-                    <><FaSpinner className="animate-spin" /> Accepting...</>
+                    <><Loader size="xs" /> Accepting...</>
                   ) : (
                     <><FaCheck /> Accept Task</>
                   )}
@@ -1075,7 +1076,7 @@ export default function MyTasksPage() {
                   className="modal-btn modal-btn-danger"
                 >
                   {deleting ? (
-                    <><FaSpinner className="animate-spin" /> Deleting...</>
+                    <><Loader size="xs" /> Deleting...</>
                   ) : (
                     <><FaTrash /> Delete Task</>
                   )}
@@ -1260,7 +1261,7 @@ export default function MyTasksPage() {
                               canToggle ? 'bg-gray-300 hover:bg-gray-400' : 'bg-gray-200'
                             }`}>
                               {modalUpdatingSubtask === subtask._id ? (
-                                <FaSpinner className="w-3 h-3 text-white animate-spin" />
+                                <Loader size="xs" color="#ffffff" />
                               ) : subtask.completed ? (
                                 <FaCheck className="w-3 h-3" />
                               ) : subtask.pendingAcceptance ? (
@@ -1331,7 +1332,7 @@ export default function MyTasksPage() {
                         >
                           <span className={`flex items-center gap-2 font-medium ${statusColors[selectedTask.status]?.split(' ')[1] || 'text-gray-700'}`}>
                             {modalUpdatingStatus ? (
-                              <FaSpinner className="animate-spin" />
+                              <Loader size="xs" />
                             ) : (
                               selectedTask.status === 'completed' ? <FaCheckCircle /> :
                               selectedTask.status === 'in-progress' ? <FaPlay /> :
@@ -1905,14 +1906,14 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                 disabled={isUpdating}
                 className="px-3 py-1.5 border border-red-300 text-red-600 rounded-lg text-sm hover:bg-red-50 disabled:opacity-50"
               >
-                {isUpdating ? <FaSpinner className="animate-spin" /> : 'Reject'}
+                {isUpdating ? <Loader size="xs" /> : 'Reject'}
               </button>
               <button
                 onClick={onAccept}
                 disabled={isUpdating}
                 className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-50 flex items-center gap-1"
               >
-                {isUpdating ? <FaSpinner className="animate-spin" /> : <><FaCheck /> Accept</>}
+                {isUpdating ? <Loader size="xs" /> : <><FaCheck /> Accept</>}
               </button>
             </>
           ) : isCompleted ? (
@@ -1937,7 +1938,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                 className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-50 flex items-center gap-1"
               >
                 {isUpdating ? (
-                  <FaSpinner className="animate-spin" />
+                  <Loader size="xs" />
                 ) : (
                   <>
                     Update Status
@@ -2093,7 +2094,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                                 disabled={updatingSubtaskId === subtask._id}
                                 className="px-2 py-1 text-xs bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50 flex items-center gap-1"
                               >
-                                {updatingSubtaskId === subtask._id ? <FaSpinner className="animate-spin" /> : <FaCheck />}
+                                {updatingSubtaskId === subtask._id ? <Loader size="xs" color="#ffffff" /> : <FaCheck />}
                                 Accept
                               </button>
                               <button
@@ -2101,7 +2102,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                                 disabled={updatingSubtaskId === subtask._id}
                                 className="px-2 py-1 text-xs bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50 flex items-center gap-1"
                               >
-                                {updatingSubtaskId === subtask._id ? <FaSpinner className="animate-spin" /> : <FaTimes />}
+                                {updatingSubtaskId === subtask._id ? <Loader size="xs" color="#ffffff" /> : <FaTimes />}
                                 Reject
                               </button>
                               <span className="text-xs text-gray-500">
@@ -2197,7 +2198,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                   className="ml-auto px-4 py-1.5 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   {addingSubtask ? (
-                    <FaSpinner className="animate-spin" />
+                    <Loader size="xs" />
                   ) : (
                     <><FaPlus className="text-xs" /> Add</>
                   )}

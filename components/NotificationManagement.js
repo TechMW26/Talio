@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { FaBell, FaClock, FaRedo, FaPaperPlane, FaUsers, FaBuilding, FaUserTag, FaCalendar, FaTrash, FaEdit, FaPause, FaPlay, FaHistory, FaCheck, FaTimes, FaChevronDown, FaSync } from 'react-icons/fa'
 import toast from '@/utils/toast'
+import Loader from '@/components/ui/Loader'
 
 export default function NotificationManagement() {
   const [activeTab, setActiveTab] = useState('send')
@@ -91,7 +92,7 @@ export default function NotificationManagement() {
   if (loading) {
     return (
       <div className="text-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto" style={{ borderColor: 'var(--color-primary-500)' }}></div>
+        <Loader size="lg" />
         <p className="mt-4 text-gray-600">Loading...</p>
       </div>
     )
@@ -580,7 +581,7 @@ function SendNotificationTab({ userRole, userDepartment, isDepartmentHead, apiKe
 
                     {employeeLoading && (
                       <div className="text-center py-3">
-                        <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2" style={{ borderColor: 'var(--color-primary-500)' }}></div>
+                        <Loader size="sm" />
                         <p className="text-xs text-gray-500 mt-2">Loading more employees...</p>
                       </div>
                     )}
@@ -738,7 +739,7 @@ function ScheduledNotificationsTab({ userRole, userDepartment, isDepartmentHead 
   if (loading) {
     return (
       <div className="text-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto" style={{ borderColor: 'var(--color-primary-500)' }}></div>
+        <Loader size="lg" />
         <p className="mt-4 text-gray-600">Loading scheduled notifications...</p>
       </div>
     )
@@ -1036,7 +1037,7 @@ function CreateRecurringForm({ formData, setFormData, handleSubmit, creating, de
 
                   {employeeLoading2 && (
                     <div className="text-center py-3">
-                      <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2" style={{ borderColor: 'var(--color-primary-500)' }}></div>
+                      <Loader size="sm" />
                       <p className="text-xs text-gray-500 mt-2">Loading more employees...</p>
                     </div>
                   )}
@@ -1103,7 +1104,7 @@ function CreateRecurringForm({ formData, setFormData, handleSubmit, creating, de
         >
           {creating ? (
             <>
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              <Loader size="xs" color="#ffffff" />
               <span>Creating...</span>
             </>
           ) : (
@@ -1317,7 +1318,7 @@ function RecurringNotificationsTab({ userRole, userDepartment, isDepartmentHead 
   if (loading) {
     return (
       <div className="text-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto" style={{ borderColor: 'var(--color-primary-500)' }}></div>
+        <Loader size="lg" />
         <p className="mt-4 text-gray-600">Loading recurring notifications...</p>
       </div>
     )
@@ -1489,7 +1490,7 @@ function NotificationHistoryTab({ userRole, userDepartment, isDepartmentHead }) 
   if (loading) {
     return (
       <div className="text-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto" style={{ borderColor: 'var(--color-primary-500)' }}></div>
+        <Loader size="lg" />
         <p className="mt-4 text-gray-600">Loading notification history...</p>
       </div>
     )
@@ -1589,7 +1590,7 @@ function ConfigurationTab({ apiKeyConfigured, onConfigUpdate }) {
   if (loading) {
     return (
       <div className="text-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto" style={{ borderColor: 'var(--color-primary-500)' }}></div>
+        <Loader size="lg" />
         <p className="mt-4 text-gray-600">Loading configuration...</p>
       </div>
     )

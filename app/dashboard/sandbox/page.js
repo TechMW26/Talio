@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Loader from '@/components/ui/Loader'
 import {
   HiOutlineLightBulb,
   HiOutlinePlus,
@@ -19,7 +20,7 @@ import {
   HiOutlineBuildingOffice2,
   HiOutlineCheck
 } from 'react-icons/hi2'
-import { FaSpinner, FaThumbtack, FaUserSecret, FaPaperPlane } from 'react-icons/fa'
+import { FaThumbtack, FaUserSecret, FaPaperPlane } from 'react-icons/fa'
 import toast from '@/utils/toast'
 import CreateIdeaModal from './components/CreateIdeaModal'
 import IdeaCard from './components/IdeaCard'
@@ -202,7 +203,7 @@ export default function SandboxPage() {
     return (
       <div className="page-container">
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+          <Loader size="lg" />
         </div>
       </div>
     )

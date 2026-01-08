@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Loader from '@/components/ui/Loader';
 import { 
   HiOutlineXMark,
   HiOutlinePhone,
@@ -440,7 +441,7 @@ export default function CallAlertButton({ user }) {
                   <div className="border border-gray-300 rounded-xl max-h-72 overflow-y-auto bg-white">
                     {loading ? (
                       <div className="flex items-center justify-center py-12">
-                        <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-200 border-t-blue-500"></div>
+                        <Loader size="md" />
                       </div>
                     ) : filteredDeptGroups.length === 0 ? (
                       <div className="flex flex-col items-center justify-center py-12 text-gray-500">
@@ -705,7 +706,7 @@ export default function CallAlertButton({ user }) {
                   >
                     {sending ? (
                       <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white/30 border-t-white"></div>
+                        <Loader size="xs" color="#ffffff" />
                         Sending...
                       </>
                     ) : (

@@ -2,6 +2,7 @@
 
 import React, { useRef, useEffect, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import MiraLoadingOverlay from '@/components/ui/MiraLoadingOverlay';
+import Loader from '@/components/ui/Loader';
 import { useAILoading } from '@/contexts/AILoadingContext';
 
 // Utility functions
@@ -4932,7 +4933,7 @@ const WhiteboardCanvas = forwardRef(({
           {/* Icon */}
           <div className="relative flex items-center justify-center w-6 h-6">
             {aiLoading ? (
-              <div className="w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+              <Loader size="xs" />
             ) : (
               <svg className="w-5 h-5 text-violet-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707" />
@@ -5214,9 +5215,7 @@ const WhiteboardCanvas = forwardRef(({
                   >
                     {aiLoading ? (
                       <>
-                        <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
-                        </svg>
+                        <Loader size="xs" />
                         Generating...
                       </>
                     ) : (

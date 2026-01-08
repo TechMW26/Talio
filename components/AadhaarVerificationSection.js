@@ -7,7 +7,6 @@ import {
   FaCheckCircle,
   FaTimesCircle,
   FaExclamationTriangle,
-  FaSpinner,
   FaShieldAlt,
   FaCamera,
   FaEye,
@@ -17,6 +16,7 @@ import {
 import toast from '@/utils/toast'
 import ModalPortal from '@/components/ModalPortal'
 import { useAILoading } from '@/contexts/AILoadingContext'
+import Loader from '@/components/ui/Loader'
 
 /**
  * AadhaarVerificationSection
@@ -344,7 +344,7 @@ export default function AadhaarVerificationSection({
                 {uploadingFront && (
                   <div className="absolute inset-0 bg-white/70 rounded-xl flex items-center justify-center">
                     <div className="flex flex-col items-center">
-                      <FaSpinner className="w-8 h-8 text-blue-500 animate-spin" />
+                      <Loader size="md" />
                       <p className="text-xs text-blue-600 mt-2 font-medium">Uploading...</p>
                     </div>
                   </div>
@@ -384,7 +384,7 @@ export default function AadhaarVerificationSection({
             ) : (
               <div className="flex flex-col items-center justify-center py-6">
                 {uploadingFront ? (
-                  <FaSpinner className="w-8 h-8 text-blue-500 animate-spin mb-2" />
+                  <div className="mb-2"><Loader size="md" /></div>
                 ) : (
                   <FaUpload className="w-8 h-8 text-slate-400 mb-2" />
                 )}
@@ -428,7 +428,7 @@ export default function AadhaarVerificationSection({
                 {uploadingBack && (
                   <div className="absolute inset-0 bg-white/70 rounded-xl flex items-center justify-center">
                     <div className="flex flex-col items-center">
-                      <FaSpinner className="w-8 h-8 text-blue-500 animate-spin" />
+                      <Loader size="md" />
                       <p className="text-xs text-blue-600 mt-2 font-medium">Uploading...</p>
                     </div>
                   </div>
@@ -468,7 +468,7 @@ export default function AadhaarVerificationSection({
             ) : (
               <div className="flex flex-col items-center justify-center py-6">
                 {uploadingBack ? (
-                  <FaSpinner className="w-8 h-8 text-blue-500 animate-spin mb-2" />
+                  <div className="mb-2"><Loader size="md" /></div>
                 ) : (
                   <FaUpload className="w-8 h-8 text-slate-400 mb-2" />
                 )}
@@ -498,12 +498,12 @@ export default function AadhaarVerificationSection({
           >
             {verifying ? (
               <>
-                <FaSpinner className="w-4 h-4 animate-spin" />
+                <Loader size="xs" color="#ffffff" />
                 Verifying with OCR...
               </>
             ) : uploadingFront || uploadingBack ? (
               <>
-                <FaSpinner className="w-4 h-4 animate-spin" />
+                <Loader size="xs" color="#ffffff" />
                 Waiting for upload...
               </>
             ) : !frontPreview || !backPreview ? (

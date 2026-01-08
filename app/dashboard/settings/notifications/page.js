@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { FaBell, FaClock, FaRedo, FaPaperPlane, FaUsers, FaBuilding, FaUserTag, FaCalendar, FaTrash, FaEdit, FaPause, FaPlay, FaHistory, FaPlus, FaEye, FaCheck, FaTimes, FaExclamationTriangle } from 'react-icons/fa'
 import toast from '@/utils/toast'
+import Loader from '@/components/ui/Loader'
 
 export default function NotificationsPage() {
   const [activeTab, setActiveTab] = useState('send')
@@ -492,7 +493,7 @@ function ScheduledNotificationsTab({ userRole, userDepartment }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <Loader size="md" />
       </div>
     )
   }
@@ -869,7 +870,7 @@ function RecurringNotificationsTab({ userRole, userDepartment }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <Loader size="md" />
       </div>
     )
   }
@@ -1281,7 +1282,7 @@ function NotificationHistoryTab({ userRole, userDepartment }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <Loader size="md" />
       </div>
     )
   }

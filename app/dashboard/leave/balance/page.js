@@ -6,6 +6,7 @@ import { FaCalendarAlt, FaClock, FaChartPie, FaHistory } from 'react-icons/fa'
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import CustomTooltip, { CustomPieTooltip } from '@/components/charts/CustomTooltip'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
+import Loader from '@/components/ui/Loader'
 
 export default function LeaveBalancePage() {
   const [leaveBalance, setLeaveBalance] = useState([])
@@ -123,7 +124,7 @@ export default function LeaveBalancePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+        <Loader size="lg" />
       </div>
     )
   }

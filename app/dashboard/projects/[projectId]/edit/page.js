@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import toast from '@/utils/toast'
 import { FaArrowLeft, FaSave, FaTrash, FaPlus, FaTimes, FaUsers, FaArchive, FaChevronDown, FaChevronRight, FaCheckSquare } from 'react-icons/fa'
 import Portal from '@/components/ui/Portal'
+import Loader from '@/components/ui/Loader'
 
 export default function EditProjectPage() {
   const { projectId } = useParams()
@@ -286,7 +287,7 @@ export default function EditProjectPage() {
     return (
       <div className="page-container">
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+          <Loader size="lg" />
         </div>
       </div>
     )

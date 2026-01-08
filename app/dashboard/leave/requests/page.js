@@ -5,6 +5,7 @@ import toast from '@/utils/toast'
 import { FaCalendarAlt, FaClock, FaCheck, FaTimes, FaEye, FaFilter } from 'react-icons/fa'
 import ModalPortal from '@/components/ModalPortal'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
+import Loader from '@/components/ui/Loader'
 
 export default function LeaveRequestsPage() {
   const [leaves, setLeaves] = useState([])
@@ -88,7 +89,7 @@ export default function LeaveRequestsPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500"></div>
+        <Loader size="lg" />
       </div>
     )
   }

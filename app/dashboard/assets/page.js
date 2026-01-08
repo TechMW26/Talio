@@ -5,6 +5,7 @@ import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaLaptop, FaCheckCircle, FaClock, FaTools, FaTimes, FaBox } from 'react-icons/fa'
 import { getCurrentUser } from '@/utils/userHelper'
+import Loader from '@/components/ui/Loader'
 
 export default function AssetsPage() {
   const [assets, setAssets] = useState([])
@@ -240,7 +241,7 @@ export default function AssetsPage() {
 
         {loading ? (
           <div className="p-8 text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+            <Loader size="lg" className="mx-auto" />
             <p className="mt-4 text-gray-600">Loading assets...</p>
           </div>
         ) : assets.length === 0 ? (

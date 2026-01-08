@@ -10,6 +10,7 @@ import {
   HiOutlineCheckCircle,
   HiOutlineMagnifyingGlass
 } from 'react-icons/hi2'
+import Loader from '@/components/ui/Loader'
 
 /**
  * ManualCapturePanel Component
@@ -197,7 +198,7 @@ export default function ManualCapturePanel() {
       <div className="p-4">
         {loading ? (
           <div className="flex items-center justify-center h-48">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
+            <Loader size="md" />
           </div>
         ) : error ? (
           <div className="flex flex-col items-center justify-center h-48 text-center">
@@ -279,7 +280,7 @@ export default function ManualCapturePanel() {
             >
               {capturing ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                  <Loader size="xs" color="#ffffff" />
                   Capturing...
                 </>
               ) : (

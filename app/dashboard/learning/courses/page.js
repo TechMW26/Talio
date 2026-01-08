@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { FaBook, FaClock, FaUsers, FaStar, FaPlay, FaFilter, FaSearch, FaGraduationCap } from 'react-icons/fa'
 import toast from '@/utils/toast'
+import Loader from '@/components/ui/Loader'
 
 export default function CoursesPage() {
   const [courses, setCourses] = useState([])
@@ -225,7 +226,7 @@ export default function CoursesPage() {
       {/* Courses Grid */}
       {loading ? (
         <div className="text-center py-12">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <Loader size="lg" className="mx-auto" />
           <p className="text-gray-600 mt-4">Loading courses...</p>
         </div>
       ) : filteredCourses.length === 0 ? (
