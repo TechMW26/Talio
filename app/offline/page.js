@@ -1,39 +1,105 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { FaWifi, FaExclamationTriangle, FaHome, FaRedo, FaCloudDownloadAlt, FaServer } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
+import Script from 'next/script'
 
 export default function OfflinePage() {
   const [isOnline, setIsOnline] = useState(true)
   const [isChecking, setIsChecking] = useState(false)
   const [lastChecked, setLastChecked] = useState(null)
+  const [checkAttempts, setCheckAttempts] = useState(0)
+  const pollIntervalRef = useRef(null)
   const router = useRouter()
 
   useEffect(() => {
     // Check initial online status
     setIsOnline(navigator.onLine)
 
+    // Start automatic polling every 3 seconds
+    const startPolling = () => {
+      if (pollIntervalRef.current) return
+      
+      pollIntervalRef.current = setInterval(async () => {
+        setCheckAttempts(prev => prev + 1)
+        try {
+          const response = await fetch('/api/health', {
+            method: 'GET',
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache' }
+          })
+          
+          if (response.ok) {
+            setIsOnline(true)
+            setLastChecked(new Date())
+            clearInterval(pollIntervalRef.current)
+            pollIntervalRef.current = null
+            
+            // Get last URL from localStorage or default to dashboard
+            let targetUrl = '/dashboard'
+            try {
+              const lastUrl = localStorage.getItem('talio_last_url')
+              if (lastUrl && !lastUrl.includes('/offline')) {
+                // Extract pathname from full URL
+                const url = new URL(lastUrl)
+                targetUrl = url.pathname + url.search
+              }
+            } catch (e) {}
+            
+            // Redirect after brief delay for visual feedback
+            setTimeout(() => {
+              router.push(targetUrl)
+            }, 1500)
+          }
+        } catch (error) {
+          // Still offline
+          setLastChecked(new Date())
+        }
+      }, 3000)
+    }
+
     // Listen for online/offline events
     const handleOnline = () => {
       setIsOnline(true)
       setLastChecked(new Date())
+      clearInterval(pollIntervalRef.current)
+      pollIntervalRef.current = null
+      
       // Automatically redirect when back online
       setTimeout(() => {
-        router.push('/dashboard')
+        let targetUrl = '/dashboard'
+        try {
+          const lastUrl = localStorage.getItem('talio_last_url')
+          if (lastUrl && !lastUrl.includes('/offline')) {
+            const url = new URL(lastUrl)
+            targetUrl = url.pathname + url.search
+          }
+        } catch (e) {}
+        router.push(targetUrl)
       }, 1500)
     }
+    
     const handleOffline = () => {
       setIsOnline(false)
       setLastChecked(new Date())
+      startPolling()
     }
 
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
 
+    // Start polling immediately if offline
+    if (!navigator.onLine) {
+      startPolling()
+    }
+
     return () => {
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current)
+      }
     }
   }, [router])
 
@@ -117,7 +183,7 @@ export default function OfflinePage() {
           </p>
 
           {/* Status Indicator */}
-          <div className={`inline-flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-semibold mb-8 ${
+          <div className={`inline-flex items-center space-x-2 px-4 py-2 rounded-full text-sm font-semibold mb-4 ${
             isOnline
               ? 'bg-green-100 text-green-800'
               : 'bg-red-100 text-red-800'
@@ -132,6 +198,19 @@ export default function OfflinePage() {
               </span>
             )}
           </div>
+
+          {/* Auto-retry status (only when offline) */}
+          {!isOnline && (
+            <div className="mb-8 bg-gray-50 rounded-lg px-4 py-3 border border-gray-200">
+              <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
+                <div className="w-4 h-4 border-2 border-gray-400 border-t-primary-500 rounded-full animate-spin" />
+                <span>Auto-checking every 3 seconds... (attempt {checkAttempts})</span>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                App will automatically reload when connection is restored
+              </p>
+            </div>
+          )
 
           {/* Possible Reasons */}
           {!isOnline && (

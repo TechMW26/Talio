@@ -148,6 +148,37 @@ export default function RootLayout({ children }) {
             }
           `
         }} />
+        
+        {/* URL Tracker - Saves last URL for offline recovery */}
+        <script dangerouslySetInnerHTML={{
+          __html: `
+            (function() {
+              var STORAGE_KEY = 'talio_last_url';
+              function saveUrl() {
+                try {
+                  var url = window.location.href;
+                  if (url && !url.includes('/offline') && !url.startsWith('data:') && url.includes('talio')) {
+                    localStorage.setItem(STORAGE_KEY, url);
+                  }
+                } catch(e) {}
+              }
+              // Save on page load
+              saveUrl();
+              // Save on navigation (SPA)
+              var origPush = history.pushState;
+              history.pushState = function() {
+                origPush.apply(this, arguments);
+                saveUrl();
+              };
+              var origReplace = history.replaceState;
+              history.replaceState = function() {
+                origReplace.apply(this, arguments);
+                saveUrl();
+              };
+              window.addEventListener('popstate', saveUrl);
+            })();
+          `
+        }} />
       </head>
 
       <body className={`${raleway.className} ${raleway.variable} ${poppins.variable} ${caveat.variable} ${dancingScript.variable} ${indieFlower.variable} ${patrickHand.variable} ${shadowsIntoLight.variable}`} suppressHydrationWarning>
