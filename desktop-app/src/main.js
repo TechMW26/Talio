@@ -244,62 +244,26 @@ function handleLoadError(error) {
 
 /**
  * Show offline page when can't connect
- * Includes network monitor script that auto-reloads when connection is restored
  */
 function showOfflinePage() {
-  // Network monitor script URL - fetched dynamically from server
-  const NETWORK_MONITOR_URL = 'https://app.talio.in/network-monitor.js';
-  
   const offlineHTML = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Talio - Offline</title><style>' +
     'body{margin:0;padding:0;background:#1a1a2e;display:flex;align-items:center;justify-content:center;height:100vh;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif}' +
     '.container{text-align:center;color:#fff;max-width:400px;padding:20px}' +
     '.icon{font-size:64px;margin-bottom:20px}' +
     'h2{margin:10px 0}' +
     'p{color:rgba(255,255,255,0.6);line-height:1.6}' +
-    '.status-box{background:rgba(255,255,255,0.1);border-radius:8px;padding:12px 16px;margin:20px 0;font-size:13px}' +
-    '.status-indicator{display:inline-block;width:8px;height:8px;border-radius:50%;background:#f87171;margin-right:8px;animation:pulse 2s infinite}' +
-    '@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}' +
     '.retry-btn{background:#6366f1;color:#fff;border:none;padding:12px 24px;border-radius:8px;cursor:pointer;margin-top:20px;font-size:16px}' +
     '.retry-btn:hover{background:#4f46e5}' +
-    '.auto-retry{color:rgba(255,255,255,0.5);font-size:12px;margin-top:15px}' +
     '</style></head><body>' +
     '<div class="container">' +
     '<div class="icon">📡</div>' +
     '<h2>Unable to Connect</h2>' +
-    '<p>We could not connect to Talio servers. Please check your internet connection.</p>' +
-    '<div class="status-box"><span class="status-indicator"></span>Checking connection every 3 seconds...</div>' +
-    '<button class="retry-btn" onclick="location.reload()">Try Again Now</button>' +
-    '<p class="auto-retry">App will automatically reload when connection is restored</p>' +
-    '</div>' +
-    '<script>' +
-    // Inline network monitor that fetches the full script from server
-    '(function(){' +
-    'var POLL_INTERVAL=3000;var isPolling=true;var attempts=0;' +
-    'function checkConnection(){' +
-    'if(!isPolling)return;' +
-    'attempts++;' +
-    'fetch("https://app.talio.in/api/health",{method:"GET",cache:"no-store",headers:{"Cache-Control":"no-cache"}})' +
-    '.then(function(r){if(r.ok){console.log("[Offline] Connection restored!");' +
-    'document.querySelector(".status-indicator").style.background="#22c55e";' +
-    'document.querySelector(".status-box").innerHTML="<span class=\\"status-indicator\\" style=\\"background:#22c55e\\"></span>Connection restored! Reloading...";' +
-    'setTimeout(function(){' +
-    'var lastUrl=localStorage.getItem("talio_last_url")||"https://app.talio.in/dashboard";' +
-    'if(lastUrl.includes("/offline")||lastUrl.startsWith("data:"))lastUrl="https://app.talio.in/dashboard";' +
-    'window.location.replace(lastUrl);' +
-    '},1500);}else{scheduleNext();}})' +
-    '.catch(function(){scheduleNext();});' +
-    '}' +
-    'function scheduleNext(){' +
-    'document.querySelector(".status-box").innerHTML="<span class=\\"status-indicator\\"></span>Checking connection... (attempt "+attempts+")";' +
-    'setTimeout(checkConnection,POLL_INTERVAL);' +
-    '}' +
-    'setTimeout(checkConnection,1000);' +
-    '})();' +
-    '</script>' +
-    '</body></html>';
+    '<p>We could not connect to Talio servers. Please check your internet connection and try again.</p>' +
+    '<button class="retry-btn" onclick="location.reload()">Try Again</button>' +
+    '</div></body></html>';
   
   mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(offlineHTML));
-  logger.log('info', 'Main', 'Showing offline page with auto-reconnect monitor');
+  logger.log('info', 'Main', 'Showing offline page');
 }
 
 /**

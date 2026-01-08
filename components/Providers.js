@@ -5,6 +5,7 @@ import { ThemeProvider } from '@/contexts/ThemeContext'
 import { AILoadingProvider } from '@/contexts/AILoadingContext'
 import GlobalAILoadingOverlay from '@/components/ui/GlobalAILoadingOverlay'
 import AutoRefresh from '@/components/AutoRefresh'
+import NetworkMonitor from '@/components/NetworkMonitor'
 
 // Cache operations completely disabled - no imports needed
 // import { checkAndClearCaches } from '@/lib/cacheManager'
@@ -73,6 +74,7 @@ export function Providers({ children }) {
             <AILoadingProvider>
                 <GlobalAILoadingOverlay />
                 <AutoRefresh />
+                <NetworkMonitor />
                 {children}
             </AILoadingProvider>
         </ThemeProvider>
