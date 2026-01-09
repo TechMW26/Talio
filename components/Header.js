@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { FaBars, FaBell, FaUser, FaSignOutAlt, FaCog, FaSearch, FaComments, FaTimes, FaSyncAlt } from 'react-icons/fa'
 import Loader from '@/components/ui/Loader'
+import MiraSphere from '@/components/ui/MiraSphere'
 import toast from '@/utils/toast'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
@@ -38,6 +39,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
   const [isDesktop, setIsDesktop] = useState(false)
   const [showMiraModal, setShowMiraModal] = useState(false)
   const [miraModalClosing, setMiraModalClosing] = useState(false)
+  const [isMiraHovered, setIsMiraHovered] = useState(false)
   const notifRef = useRef(null)
   const profileRef = useRef(null)
   const searchRef = useRef(null)
@@ -482,20 +484,35 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
 
         {/* Right side */}
         <div className="flex items-center space-x-2 sm:space-x-4 flex-1 justify-end">
-          {/* Refresh Button - Desktop Only */}
-          <button
-            onClick={() => window.location.reload()}
-            className="hidden md:flex items-center justify-center p-2.5 rounded-xl transition-all duration-200 hover:bg-gray-100 dark:hover:bg-gray-800 group"
-            style={{ color: 'var(--color-text-secondary)' }}
-            title="Refresh page"
+          {/* MIRA Cloud Button - Desktop Only */}
+          <div 
+            className="hidden md:flex items-center justify-center cursor-pointer relative group"
+            onClick={() => setShowMiraModal(true)}
+            onMouseEnter={() => setIsMiraHovered(true)}
+            onMouseLeave={() => setIsMiraHovered(false)}
           >
-            <FaSyncAlt className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
-          </button>
+            <MiraSphere size={55} isHovered={isMiraHovered} />
+            <span className="absolute top-full left-1/2 -translate-x-1/2 mt-1 px-2 py-1 text-xs font-medium text-white bg-gray-900 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+              MIRA Cloud
+            </span>
+          </div>
 
           {/* Real-time Clock - Desktop Only */}
           <div className="hidden md:flex items-center gap-2 px-4 py-2.5 " style={{ color: 'var(--color-text-secondary)' }}>
             <RealTimeClock timezone={timezone} />
           </div>
+
+          {/* Refresh Button - Desktop Only */}
+          <button
+            onClick={() => window.location.reload()}
+            className="hidden md:flex items-center justify-center p-2.5 rounded-xl transition-all duration-200 hover:bg-white hover:shadow-sm group relative"
+            style={{ color: 'var(--color-text-secondary)' }}
+          >
+            <FaSyncAlt className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
+            <span className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2 py-1 text-xs font-medium text-white bg-gray-900 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+              Refresh
+            </span>
+          </button>
 
           {/* PWA Status - Hidden */}
           {/* <PWAStatus /> */}
@@ -556,38 +573,6 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
               </div>
             )}
           </div> */}
-
-          {/* MIRA Cloud Button - Desktop Only */}
-          <div className="hidden md:block relative group">
-            <button
-              onClick={() => {
-                setShowMiraModal(true)
-              }}
-              className="relative p-2.5 rounded-xl transition-all duration-300 group-hover:bg-gradient-to-br group-hover:from-blue-50 group-hover:to-indigo-50"
-              style={{
-                color: 'var(--color-text-secondary)',
-              }}
-            >
-              {/* MIRA AI Icon */}
-              <div className="relative">
-                <svg 
-                  className="w-5 h-5 transition-all duration-300 group-hover:text-blue-500 group-hover:scale-110"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
-                </svg>
-                
-                {/* Pulse effect on hover */}
-                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-blue-400 rounded-full opacity-0 group-hover:opacity-100 group-hover:animate-ping transition-opacity" />
-              </div>
-              
-              {/* Tooltip */}
-              <span className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2 py-1 text-xs font-medium text-white bg-gray-900 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
-                MIRA Cloud
-              </span>
-            </button>
-          </div>
 
           {/* Ideas Button - Desktop Only */}
           <div className="hidden md:block relative group">
