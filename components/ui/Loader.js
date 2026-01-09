@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef } from 'react'
+import { useId } from 'react'
 
 // Talio brand color
 const TALIO_TEAL = '#7DBCAF'
@@ -34,8 +34,10 @@ export default function Loader({ size = 'md', className = '', color = TALIO_TEAL
 
   const pixelSize = sizeMap[size] || sizeMap.md
 
-  // Generate unique ID for this instance to avoid CSS conflicts between multiple loaders
-  const uniqueId = useRef(`loader-${Math.random().toString(36).substr(2, 9)}`).current
+  // Use React's useId for stable server/client ID generation (no hydration mismatch)
+  const reactId = useId()
+  // Convert to CSS-safe ID (remove colons)
+  const uniqueId = `loader${reactId.replace(/:/g, '')}`
 
   return (
     <>

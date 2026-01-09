@@ -2,16 +2,61 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { createTimelineEvent } from '@/lib/projectService'
 
-// POST - Mark project as complete (only if at 100% progress)
-export async function POST(request, { params }) {
+// GET - Check if project can be marked complete (all tasks completed)
+export async function GET(request, { params }) {
   try {
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'User', 'Employee', 'ProjectTimelineEvent'])
+    const auth = await getAuthAndModels(request, ['Project', 'Task', 'User'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Project, User, Employee } = models
+    const { Project, Task, User } = models
+
+    const { projectId } = await params
+
+    const project = await Project.findById(projectId)
+    if (!project) {
+      return NextResponse.json({ success: false, message: 'Project not found' }, { status: 404 })
+    }
+
+    // Get all non-archived tasks
+    const tasks = await Task.find({ 
+      project: projectId, 
+      status: { $ne: 'archived' } 
+    }).select('status title')
+
+    const totalTasks = tasks.length
+    const completedTasks = tasks.filter(t => t.status === 'completed').length
+    const allTasksCompleted = totalTasks > 0 && completedTasks === totalTasks
+    const incompleteTasks = tasks.filter(t => t.status !== 'completed')
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        canComplete: allTasksCompleted && !['completed', 'approved'].includes(project.status),
+        totalTasks,
+        completedTasks,
+        allTasksCompleted,
+        projectStatus: project.status,
+        incompleteTasks: incompleteTasks.map(t => ({ id: t._id, title: t.title, status: t.status }))
+      }
+    })
+  } catch (error) {
+    console.error('Check completion status error:', error)
+    return NextResponse.json({ success: false, message: error.message }, { status: 500 })
+  }
+}
+
+// POST - Mark project as complete (only if ALL tasks are completed)
+export async function POST(request, { params }) {
+  try {
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Project', 'Task', 'User', 'Employee', 'ProjectTimelineEvent'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Project, Task, User, Employee } = models
 
     const { projectId } = await params
 
@@ -42,11 +87,32 @@ export async function POST(request, { params }) {
       }, { status: 403 })
     }
 
-    // Check if project is at 100% completion
-    if (project.completionPercentage < 100) {
+    // Check if ALL tasks are completed (not just percentage)
+    const tasks = await Task.find({ 
+      project: projectId, 
+      status: { $ne: 'archived' } 
+    }).select('status title')
+
+    const totalTasks = tasks.length
+    const completedTasks = tasks.filter(t => t.status === 'completed').length
+    
+    if (totalTasks === 0) {
       return NextResponse.json({ 
         success: false, 
-        message: `Project must be at 100% completion. Current: ${project.completionPercentage}%` 
+        message: 'Cannot complete a project with no tasks' 
+      }, { status: 400 })
+    }
+
+    if (completedTasks !== totalTasks) {
+      const incompleteTasks = tasks.filter(t => t.status !== 'completed')
+      return NextResponse.json({ 
+        success: false, 
+        message: `All tasks must be completed. ${totalTasks - completedTasks} task(s) remaining.`,
+        data: {
+          totalTasks,
+          completedTasks,
+          incompleteTasks: incompleteTasks.slice(0, 5).map(t => t.title) // Show first 5
+        }
       }, { status: 400 })
     }
 
@@ -62,6 +128,7 @@ export async function POST(request, { params }) {
 
     // Update project status to completed
     project.status = 'completed'
+    project.completionPercentage = 100
     await project.save()
 
     // Create timeline event
@@ -73,7 +140,9 @@ export async function POST(request, { params }) {
       metadata: { 
         completedBy: user.employeeId,
         completerName: `${employee.firstName} ${employee.lastName}`,
-        completionPercentage: project.completionPercentage
+        completionPercentage: 100,
+        totalTasks,
+        completedTasks
       }
     }, models)
 

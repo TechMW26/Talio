@@ -107,6 +107,14 @@ export default function ProjectDetailPage() {
   const [pendingStatusChange, setPendingStatusChange] = useState(null) // { task, newStatus }
   const [statusChangeReason, setStatusChangeReason] = useState('')
   
+  // Project completion status
+  const [completionStatus, setCompletionStatus] = useState({
+    canComplete: false,
+    totalTasks: 0,
+    completedTasks: 0,
+    allTasksCompleted: false
+  })
+  
   // Auto-refresh refs
   const refreshIntervalRef = useRef(null)
   const lastFetchRef = useRef(Date.now())
@@ -237,14 +245,32 @@ export default function ProjectDetailPage() {
     }
   }, [projectId])
 
+  // Fetch completion status (whether all tasks are completed)
+  const fetchCompletionStatus = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/projects/${projectId}/complete`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        setCompletionStatus(data.data)
+      }
+    } catch (error) {
+      console.error('Fetch completion status error:', error)
+    }
+  }, [projectId])
+
   // Silent refresh function for auto-sync
   const silentRefresh = useCallback(() => {
     fetchProject(true)
+    fetchCompletionStatus() // Always check completion status
     if (activeTab === 'tasks') fetchTasks(true)
     if (activeTab === 'timeline') fetchTimeline()
     if (activeTab === 'notes') fetchNotes()
     lastFetchRef.current = Date.now()
-  }, [activeTab, fetchProject, fetchTasks, fetchTimeline, fetchNotes])
+  }, [activeTab, fetchProject, fetchTasks, fetchTimeline, fetchNotes, fetchCompletionStatus])
 
   useEffect(() => {
     const userData = localStorage.getItem('user')
@@ -266,12 +292,13 @@ export default function ProjectDetailPage() {
     fetchProject()
   }, [projectId, fetchProject])
 
-  // Always fetch tasks to get currentEmployeeId, regardless of active tab
+  // Always fetch tasks and completion status, regardless of active tab
   useEffect(() => {
     if (project) {
       fetchTasks() // Always fetch to ensure currentEmployeeId is set
+      fetchCompletionStatus() // Check if project can be marked complete
     }
-  }, [project, fetchTasks])
+  }, [project, fetchTasks, fetchCompletionStatus])
 
   useEffect(() => {
     if (project && activeTab === 'tasks') {
@@ -589,6 +616,7 @@ export default function ProjectDetailPage() {
         // Refresh data in background
         fetchTasks()
         fetchProject() // Refresh completion percentage
+        fetchCompletionStatus() // Check if all tasks completed
       } else {
         toast.error(data.message || 'Failed to create task')
         try {
@@ -730,6 +758,7 @@ export default function ProjectDetailPage() {
         }
         toast.success(`Task moved to ${newStatus.replace('-', ' ')}`)
         fetchTasks(true)
+        fetchCompletionStatus() // Update completion button state
       } else {
         playNotificationSound(NotificationSoundTypes.WARNING)
         toast.error(data.message || 'Failed to update task status')
@@ -1030,6 +1059,7 @@ export default function ProjectDetailPage() {
           setDeleteReason('')
           fetchTasks()
           fetchProject()
+          fetchCompletionStatus() // Update completion button state
         } else {
           playNotificationSound(NotificationSoundTypes.WARNING)
           toast.error(data.message)
@@ -1171,7 +1201,47 @@ export default function ProjectDetailPage() {
     }
   }
 
+  // Handle project head marking project as complete
+  const handleMarkComplete = async () => {
+    if (!completionStatus.canComplete) {
+      toast.error(`Cannot complete project. ${completionStatus.totalTasks - completionStatus.completedTasks} task(s) are not completed.`)
+      return
+    }
+
+    try {
+      setSubmitting(true)
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/projects/${projectId}/complete`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        playNotificationSound(NotificationSoundTypes.SUCCESS)
+        toast.success('Project marked as complete!')
+        fetchProject()
+        fetchCompletionStatus()
+      } else {
+        toast.error(data.message)
+      }
+    } catch (error) {
+      toast.error('Failed to mark project as complete')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // Handle member requesting project completion (sends to project head for approval)
   const handleRequestCompletion = async () => {
+    if (!completionStatus.allTasksCompleted) {
+      toast.error(`Cannot request completion. ${completionStatus.totalTasks - completionStatus.completedTasks} task(s) are not completed.`)
+      return
+    }
+
     try {
       setSubmitting(true)
       const token = localStorage.getItem('token')
@@ -1181,18 +1251,19 @@ export default function ProjectDetailPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ remark: 'Project completed and ready for review' })
+        body: JSON.stringify({ remark: 'All tasks completed. Project ready for review.' })
       })
 
       const data = await response.json()
       if (data.success) {
-        toast.success('Completion approval requested')
+        playNotificationSound(NotificationSoundTypes.SUCCESS)
+        toast.success('Completion request sent to project head')
         fetchProject()
       } else {
         toast.error(data.message)
       }
     } catch (error) {
-      toast.error('Failed to request approval')
+      toast.error('Failed to request completion')
     } finally {
       setSubmitting(false)
     }
@@ -1342,9 +1413,10 @@ export default function ProjectDetailPage() {
           </div>
         </div>
 
-        {/* Project head, creator, or admin can edit/manage project */}
-        {canManage && (
-          <div className="flex gap-2">
+        {/* Action Buttons */}
+        <div className="flex gap-2 flex-wrap">
+          {/* Edit button - for project head, creator, or admin */}
+          {canManage && (
             <button
               onClick={() => router.push(`/dashboard/projects/${projectId}/edit`)}
               className="btn-secondary flex items-center"
@@ -1352,18 +1424,56 @@ export default function ProjectDetailPage() {
               <FaEdit className="mr-2" />
               Edit
             </button>
-            {project.status === 'ongoing' && project.completionPercentage >= 80 && isProjectHead && (
-              <button
-                onClick={handleRequestCompletion}
-                disabled={submitting}
-                className="btn-secondary flex items-center"
-              >
-                <FaCheckCircle className="mr-2" />
-                Request Completion
-              </button>
-            )}
-          </div>
-        )}
+          )}
+          
+          {/* Mark Complete button - ONLY for Project Head (green, permanent) */}
+          {isProjectHead && project.status === 'ongoing' && (
+            <button
+              onClick={handleMarkComplete}
+              disabled={submitting || !completionStatus.canComplete}
+              className={`flex items-center px-4 py-2 rounded-lg font-medium transition-all ${
+                completionStatus.canComplete
+                  ? 'bg-green-600 hover:bg-green-700 text-white'
+                  : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+              }`}
+              title={completionStatus.canComplete 
+                ? 'Mark project as complete' 
+                : `${completionStatus.totalTasks - completionStatus.completedTasks} task(s) not completed`}
+            >
+              <FaCheckCircle className="mr-2" />
+              Mark Complete
+              {!completionStatus.canComplete && completionStatus.totalTasks > 0 && (
+                <span className="ml-2 text-xs bg-gray-300 px-2 py-0.5 rounded-full">
+                  {completionStatus.completedTasks}/{completionStatus.totalTasks}
+                </span>
+              )}
+            </button>
+          )}
+          
+          {/* Request Completion button - for project MEMBERS (not heads), green, permanent */}
+          {!isProjectHead && isAcceptedMember && project.status === 'ongoing' && (
+            <button
+              onClick={handleRequestCompletion}
+              disabled={submitting || !completionStatus.allTasksCompleted}
+              className={`flex items-center px-4 py-2 rounded-lg font-medium transition-all ${
+                completionStatus.allTasksCompleted
+                  ? 'bg-green-600 hover:bg-green-700 text-white'
+                  : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+              }`}
+              title={completionStatus.allTasksCompleted 
+                ? 'Request project completion approval from project head' 
+                : `${completionStatus.totalTasks - completionStatus.completedTasks} task(s) not completed`}
+            >
+              <FaCheckCircle className="mr-2" />
+              Request Completion
+              {!completionStatus.allTasksCompleted && completionStatus.totalTasks > 0 && (
+                <span className="ml-2 text-xs bg-gray-300 px-2 py-0.5 rounded-full">
+                  {completionStatus.completedTasks}/{completionStatus.totalTasks}
+                </span>
+              )}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Pending Invitation Banner */}
