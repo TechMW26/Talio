@@ -113,12 +113,12 @@ export async function GET(request, { params }) {
 export async function POST(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['User'])
+    const auth = await getAuthAndModels(request, ['User', 'Project'])
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { User } = models
+    const { User, Project } = models
 
     const { projectId } = await params
     const { analyticsData } = await request.json()
@@ -128,12 +128,34 @@ export async function POST(request, { params }) {
       return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
     }
 
-    // Generate AI insights using Gemini
+    // Fetch previous insights from project metadata
+    const project = await Project.findById(projectId).select('metadata')
+    const previousInsights = project?.metadata?.lastAIInsights || null
+    const previousInsightsDate = project?.metadata?.lastAIInsightsDate || null
+
+    // Generate AI insights using Gemini with previous context
     try {
-      const insights = await generateAIInsights(analyticsData, user._id)
+      const insights = await generateAIInsights(analyticsData, user._id, previousInsights)
+      
+      // Store the new insights in project metadata for future reference
+      await Project.findByIdAndUpdate(projectId, {
+        $set: {
+          'metadata.lastAIInsights': {
+            healthScore: insights.healthScore,
+            healthStatus: insights.healthStatus,
+            oneLineVerdict: insights.oneLineVerdict,
+            keyMetrics: insights.keyMetrics,
+            workloadDistribution: insights.workloadDistribution,
+            projectionInsight: insights.projectionInsight
+          },
+          'metadata.lastAIInsightsDate': new Date()
+        }
+      })
+      
       return NextResponse.json({
         success: true,
-        insights
+        insights,
+        previousInsightsDate
       })
     } catch (error) {
       console.error('AI generation failed, falling back to rule-based', error)
@@ -633,37 +655,111 @@ function generateRuleBasedInsights(data) {
 }
 
 // Generate AI insights using Gemini
-async function generateAIInsights(analyticsData, userId) {
+async function generateAIInsights(analyticsData, userId, previousInsights = null) {
   try {
     const { project, taskAnalytics, memberAnalytics, completionPrediction, timelineAnalytics } = analyticsData
 
-    const prompt = `You are a senior project management consultant. Analyze this project data and provide ACTIONABLE, SPECIFIC insights. Be concise - use bullet points and numbers. No fluff.
+    // Calculate days until deadline and urgency
+    const today = new Date()
+    const deadline = new Date(project.endDate)
+    const startDate = new Date(project.startDate)
+    const daysUntilDeadline = Math.ceil((deadline - today) / (1000 * 60 * 60 * 24))
+    const totalProjectDays = Math.ceil((deadline - startDate) / (1000 * 60 * 60 * 24))
+    const daysElapsed = Math.ceil((today - startDate) / (1000 * 60 * 60 * 24))
+    const isOverdue = daysUntilDeadline < 0
+    const deadlineUrgency = isOverdue ? 'OVERDUE' : daysUntilDeadline <= 3 ? 'CRITICAL' : daysUntilDeadline <= 7 ? 'URGENT' : daysUntilDeadline <= 14 ? 'APPROACHING' : 'COMFORTABLE'
+    
+    // Calculate expected completion % based on time elapsed
+    const expectedCompletion = Math.min(100, Math.round((daysElapsed / totalProjectDays) * 100))
+    const completionGap = expectedCompletion - (project.completionPercentage || 0)
+    
+    // Calculate task density (tasks per team member)
+    const tasksPerMember = memberAnalytics.length > 0 ? (taskAnalytics.total / memberAnalytics.length).toFixed(1) : 0
+    const isUnderdeveloped = taskAnalytics.total < 5 || tasksPerMember < 2
+    
+    // Calculate team utilization
+    const membersWithTasks = memberAnalytics.filter(m => m.stats.tasksAssigned > 0).length
+    const underutilizedMembers = memberAnalytics.length - membersWithTasks
+
+    // Build previous context section if available
+    let previousContextSection = ''
+    if (previousInsights) {
+      previousContextSection = `
+PREVIOUS ANALYSIS (for consistency reference only):
+Previous Health Score: ${previousInsights.healthScore || 'N/A'}
+Previous Status: ${previousInsights.healthStatus || 'N/A'}`
+    }
+
+    const prompt = `You are a strict project health auditor. Your job is to give ACCURATE, REALISTIC health scores. Do NOT be optimistic - be brutally honest.
+
+TODAY: ${today.toLocaleDateString()}
+${previousContextSection}
+
+===== MANDATORY HEALTH SCORE RULES (YOU MUST FOLLOW THESE EXACTLY) =====
+
+AUTOMATIC CRITICAL STATUS (healthScore 0-39, healthStatus="critical"):
+- Project is OVERDUE (past deadline)
+- Completion gap > 30% behind schedule (expected ${expectedCompletion}%, actual ${project.completionPercentage}%)
+- More than 50% of tasks are overdue
+- Project has < 5 total tasks (severely underdeveloped = CRITICAL)
+- More than half the team has 0 tasks assigned (${underutilizedMembers} of ${memberAnalytics.length} underutilized)
+
+AUTOMATIC WARNING STATUS (healthScore 40-69, healthStatus="warning"):
+- Completion gap 10-30% behind schedule
+- Any overdue tasks exist (${taskAnalytics.overdueCount} overdue)
+- Any blocked tasks exist (${taskAnalytics.statusDistribution.blocked} blocked)
+- Tasks per member < 3 (currently ${tasksPerMember})
+- Deadline within 14 days with < 70% completion
+
+GOOD STATUS (healthScore 70-100, healthStatus="good"):
+- Only if NONE of the above conditions apply
+- On track or ahead of schedule
+- No overdue tasks
+- Well-distributed workload
+
+===== CURRENT PROJECT ANALYSIS =====
 
 PROJECT: ${project.name}
-Status: ${project.status} | Priority: ${project.priority} | Completion: ${project.completionPercentage}%
-Deadline: ${new Date(project.endDate).toLocaleDateString()} | Days Remaining: ${timelineAnalytics?.remaining || 'N/A'}
+Status: ${project.status} | Priority: ${project.priority}
+Start: ${startDate.toLocaleDateString()} | Deadline: ${deadline.toLocaleDateString()}
+Days Remaining: ${isOverdue ? `${Math.abs(daysUntilDeadline)} days OVERDUE!` : daysUntilDeadline + ' days'}
+Deadline Urgency: ${deadlineUrgency}
 
-TASKS:
-Total: ${taskAnalytics.total} | Completed: ${taskAnalytics.statusDistribution.completed} | In Progress: ${taskAnalytics.statusDistribution['in-progress']}
-Overdue: ${taskAnalytics.overdueCount} | Due Soon (3 days): ${taskAnalytics.dueSoonCount}
-Critical: ${taskAnalytics.priorityDistribution.critical} | High: ${taskAnalytics.priorityDistribution.high} | Blocked: ${taskAnalytics.statusDistribution.blocked}
-Avg Completion: ${taskAnalytics.avgCompletionTime} days
+COMPLETION ANALYSIS:
+- Time Elapsed: ${daysElapsed} of ${totalProjectDays} days (${timelineAnalytics?.timeProgress || 0}%)
+- Expected Completion by now: ${expectedCompletion}%
+- Actual Completion: ${project.completionPercentage}%
+- Completion Gap: ${completionGap > 0 ? completionGap + '% BEHIND' : Math.abs(completionGap) + '% ahead'}
 
-TEAM (${memberAnalytics.length} members):
+TASK HEALTH:
+- Total Tasks: ${taskAnalytics.total} ${isUnderdeveloped ? '⚠️ SEVERELY UNDERDEVELOPED (< 5 tasks)' : ''}
+- Tasks per Team Member: ${tasksPerMember} ${tasksPerMember < 2 ? '⚠️ TOO FEW' : ''}
+- Completed: ${taskAnalytics.statusDistribution.completed} | In Progress: ${taskAnalytics.statusDistribution['in-progress']}
+- Overdue: ${taskAnalytics.overdueCount} ${taskAnalytics.overdueCount > 0 ? '⚠️ PROBLEM' : '✓'}
+- Due Soon (3 days): ${taskAnalytics.dueSoonCount}
+- Blocked: ${taskAnalytics.statusDistribution.blocked} ${taskAnalytics.statusDistribution.blocked > 0 ? '⚠️ BLOCKERS' : '✓'}
+
+TEAM UTILIZATION (${memberAnalytics.length} members):
+- Members with tasks: ${membersWithTasks}
+- Underutilized (0 tasks): ${underutilizedMembers} ${underutilizedMembers > 0 ? '⚠️ WASTED CAPACITY' : '✓'}
 ${memberAnalytics.slice(0, 8).map(m => 
-  `• ${m.member.firstName} ${m.member.lastName}: ${m.stats.tasksCompleted}/${m.stats.tasksAssigned} done, ${m.stats.tasksOverdue} overdue, ${m.stats.productivityScore}% score`
+  `• ${m.member.firstName} ${m.member.lastName}: ${m.stats.tasksAssigned} assigned, ${m.stats.tasksCompleted} done, ${m.stats.tasksOverdue} overdue`
 ).join('\n')}
 
-TIMELINE:
-Time Used: ${timelineAnalytics?.timeProgress}% | Tasks Done: ${timelineAnalytics?.taskProgress}%
-Velocity: ${timelineAnalytics?.velocity} tasks/day | Status: ${timelineAnalytics?.isAhead ? 'AHEAD' : timelineAnalytics?.isBehind ? 'BEHIND' : 'ON TRACK'}
-Projection: ${completionPrediction.status} | Variance: ${completionPrediction.daysVariance} days | Confidence: ${completionPrediction.confidence}%
+PROJECTION: ${completionPrediction.status} | Confidence: ${completionPrediction.confidence}%
 
-Respond ONLY with valid JSON. Be SPECIFIC with names, numbers, and actions:
+===== YOUR ASSESSMENT =====
+
+Based on the MANDATORY RULES above, determine:
+1. Is this CRITICAL? (score 0-39) - Check all critical conditions
+2. Is this WARNING? (score 40-69) - Check all warning conditions  
+3. Only if NO issues, rate as GOOD (score 70-100)
+
+Respond with ONLY valid JSON. healthScore and healthStatus MUST be consistent (critical=0-39, warning=40-69, good=70-100):
 {
-  "healthScore": 85,
-  "healthStatus": "good|warning|critical",
-  "oneLineVerdict": "One sentence project status",
+  "healthScore": "<number 0-100: critical=0-39, warning=40-69, good=70-100>",
+  "healthStatus": "critical|warning|good (MUST match healthScore range)",
+  "oneLineVerdict": "Brutally honest one-sentence assessment",
   "keyMetrics": [
     {"label": "Metric Name", "value": "42", "trend": "up|down|stable", "status": "good|warning|critical"}
   ],
