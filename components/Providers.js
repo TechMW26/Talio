@@ -4,6 +4,7 @@ import { useEffect, useCallback } from 'react'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { AILoadingProvider } from '@/contexts/AILoadingContext'
 import GlobalAILoadingOverlay from '@/components/ui/GlobalAILoadingOverlay'
+import MiraTransitionOverlay from '@/components/ui/MiraTransitionOverlay'
 import AutoRefresh from '@/components/AutoRefresh'
 import NetworkMonitor from '@/components/NetworkMonitor'
 
@@ -72,6 +73,7 @@ export function Providers({ children }) {
     return (
         <ThemeProvider>
             <AILoadingProvider>
+                <MiraTransitionOverlay />
                 <GlobalAILoadingOverlay />
                 <AutoRefresh />
                 <NetworkMonitor />

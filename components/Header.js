@@ -487,6 +487,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
           {/* MIRA Cloud Button - Desktop Only */}
           <div 
             className="hidden md:flex items-center justify-center cursor-pointer relative group"
+            data-mira-sphere="true"
             onClick={() => setShowMiraModal(true)}
             onMouseEnter={() => setIsMiraHovered(true)}
             onMouseLeave={() => setIsMiraHovered(false)}

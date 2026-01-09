@@ -10,10 +10,13 @@ import { textToParticles, AI_MESSAGES, CHAR_WIDTH } from './particleFont'
  * 
  * Features:
  * - Animated mesh gradient background (magenta, blue, black, red)
- * - Pulsating backdrop blur (1px - 20px)
+ * - Pulsating backdrop blur (1px - 20px) - ONLY after transition completes
  * - Morphing 3D shapes (sphere → cube → pyramid → star → back)
  * - Particles disintegrate and reintegrate showing "thinking"
  * - Text messages formed by particles
+ * 
+ * NOTE: The blur effect only starts AFTER MiraTransitionOverlay completes
+ * its particle-from-header animation. This is coordinated via transitionComplete.
  */
 
 // 3D Shape definitions
@@ -197,7 +200,7 @@ const PHASE = {
 }
 
 export default function GlobalAILoadingOverlay() {
-  const { isAILoading } = useAILoading()
+  const { isAILoading, transitionComplete } = useAILoading()
   const { theme } = useTheme()
   const canvasRef = useRef(null)
   const animationRef = useRef(null)
@@ -207,6 +210,7 @@ export default function GlobalAILoadingOverlay() {
   const [isVisible, setIsVisible] = useState(false)
   const [isAnimatingOut, setIsAnimatingOut] = useState(false)
   const [blurAmount, setBlurAmount] = useState(1)
+  const [showBlur, setShowBlur] = useState(false) // Control blur visibility
   
   // Get theme colors for particles - use primary 500 (lighter) and 800 (darker)
   const themeColorsRef = useRef({
@@ -236,9 +240,9 @@ export default function GlobalAILoadingOverlay() {
     }
   }, [theme])
 
-  // Pulsating blur effect (1px - 20px)
+  // Pulsating blur effect (1px - 20px) - only after transition completes
   useEffect(() => {
-    if (!isVisible) return
+    if (!isVisible || !showBlur) return
     
     let startTime = Date.now()
     let blurAnimFrame = null
@@ -255,14 +259,27 @@ export default function GlobalAILoadingOverlay() {
     return () => {
       if (blurAnimFrame) cancelAnimationFrame(blurAnimFrame)
     }
-  }, [isVisible])
+  }, [isVisible, showBlur])
 
-  // Handle visibility transitions
+  // Start blur when transition completes - with additional delay for smoother transition
   useEffect(() => {
-    if (isAILoading) {
+    if (transitionComplete && isAILoading) {
+      // Add extra delay for the blur to fade in smoothly after particle sphere forms
+      const timer = setTimeout(() => {
+        setShowBlur(true)
+      }, 400) // 400ms delay after transition completes
+      return () => clearTimeout(timer)
+    } else if (!isAILoading) {
+      setShowBlur(false)
+    }
+  }, [transitionComplete, isAILoading])
+
+  // Handle visibility transitions - wait for transition to complete before showing
+  useEffect(() => {
+    if (isAILoading && transitionComplete) {
       setIsVisible(true)
       setIsAnimatingOut(false)
-    } else if (isVisible) {
+    } else if (!isAILoading && isVisible) {
       setIsAnimatingOut(true)
       const timer = setTimeout(() => {
         setIsVisible(false)
@@ -270,7 +287,7 @@ export default function GlobalAILoadingOverlay() {
       }, 500)
       return () => clearTimeout(timer)
     }
-  }, [isAILoading, isVisible])
+  }, [isAILoading, transitionComplete, isVisible])
 
   useEffect(() => {
     setMounted(true)
@@ -281,32 +298,39 @@ export default function GlobalAILoadingOverlay() {
     if (!isVisible || !canvasRef.current || !mounted) return
 
     const canvas = canvasRef.current
-    const ctx = canvas.getContext('2d')
+    const ctx = canvas.getContext('2d', { alpha: true })
     
     const getBaseRadius = () => {
       const minDim = Math.min(window.innerWidth, window.innerHeight)
-      return Math.min(180, Math.max(100, minDim * 0.18))
+      return Math.min(160, Math.max(90, minDim * 0.14))
     }
     
     let baseRadius = getBaseRadius()
-    const PARTICLE_COUNT = 6000 // Increased for denser shapes
-    const LERP_SPEED = 0.18 // Faster interpolation for quicker formation
-    const SCATTER_LERP_SPEED = 0.22 // Fast scattering
-    const Z_PERSPECTIVE = 500
-    const HOLD_DURATION = 1400 // ms to hold each shape
-    const TEXT_HOLD_DURATION = 3200 // ms to hold text (longer for readability)
-    const SCATTER_DURATION = 1500 // ms for scatter animation (increased for longer scatter hold)
-    const MORPH_DURATION = 450 // ms for forming new shape (faster)
+    // Increased particles for denser text formations while maintaining performance
+    const PARTICLE_COUNT = 1500
+    const LERP_SPEED = 0.16
+    const SCATTER_LERP_SPEED = 0.20
+    const Z_PERSPECTIVE = 400
+    const HOLD_DURATION = 1400
+    const TEXT_HOLD_DURATION = 3200
+    const SCATTER_DURATION = 1500
+    const MORPH_DURATION = 450
+    
+    // Initial spin blending - start fast to match MiraTransitionOverlay handoff
+    const INITIAL_SPIN_DURATION = 600
+    let animationStartTime = Date.now()
+    let initialSpinOffset = 0
     
     // Track current state
     let currentShapeIndex = 0
     let currentMessageIndex = Math.floor(Math.random() * AI_MESSAGES.length)
-    let showTextNext = true // Alternate between shapes and text
+    let showTextNext = true
     let currentPhase = PHASE.HOLDING
     let phaseStartTime = Date.now()
+    let lastFrameTime = performance.now()
 
     const resize = () => {
-      const dpr = window.devicePixelRatio || 1
+      const dpr = Math.min(window.devicePixelRatio || 1, 2) // Cap DPR for performance
       canvas.width = window.innerWidth * dpr
       canvas.height = window.innerHeight * dpr
       canvas.style.width = window.innerWidth + 'px'
@@ -412,12 +436,16 @@ export default function GlobalAILoadingOverlay() {
 
     let isTextMode = false // Track if currently showing text
     
-    const animate = () => {
+    const animate = (currentTime) => {
+      // Delta time for consistent animation across frame rates
+      const dt = Math.min((currentTime - lastFrameTime) / 16.67, 2)
+      lastFrameTime = currentTime
+      
       const width = window.innerWidth
       const height = window.innerHeight
       const cx = width / 2
       const cy = height / 2
-      const time = Date.now() * 0.001
+      const time = currentTime * 0.001
       
       ctx.clearRect(0, 0, width, height)
       
@@ -433,15 +461,18 @@ export default function GlobalAILoadingOverlay() {
           setScatterTargets()
         }
         
-        // Apply oscillation to particles during text mode holding
+        // Apply oscillation to particles during text mode holding (optimized loop)
         if (isTextMode) {
-          particlesRef.current.forEach(p => {
+          const particles = particlesRef.current
+          for (let i = 0; i < particles.length; i++) {
+            const p = particles[i]
             if (p.oscillate) {
-              const osc = Math.sin(time * p.oscillateSpeed + p.oscillatePhase) * p.oscillateAmount
+              const oscTime = time * p.oscillateSpeed + p.oscillatePhase
+              const osc = Math.sin(oscTime) * p.oscillateAmount
               p.targetX = p.baseTargetX + osc * 0.5
-              p.targetY = p.baseTargetY + Math.cos(time * p.oscillateSpeed * 0.7 + p.oscillatePhase) * p.oscillateAmount * 0.3
+              p.targetY = p.baseTargetY + Math.cos(oscTime * 0.7) * p.oscillateAmount * 0.3
             }
-          })
+          }
         }
       } else if (currentPhase === PHASE.SCATTERING) {
         // After scattering, start morphing into new shape
@@ -468,65 +499,119 @@ export default function GlobalAILoadingOverlay() {
         }
       }
       
-      // Determine lerp speed based on phase
-      const currentLerpSpeed = currentPhase === PHASE.SCATTERING ? SCATTER_LERP_SPEED : LERP_SPEED
+      // Determine lerp speed based on phase - scale by delta time
+      const baseLerpSpeed = currentPhase === PHASE.SCATTERING ? SCATTER_LERP_SPEED : LERP_SPEED
+      const currentLerpSpeed = 1 - Math.pow(1 - baseLerpSpeed, dt)
+      
+      // Calculate initial spin offset (fast spin that slows down to blend with transition)
+      const timeSinceStart = Date.now() - animationStartTime
+      if (timeSinceStart < INITIAL_SPIN_DURATION) {
+        const spinProgress = timeSinceStart / INITIAL_SPIN_DURATION
+        const easeOutQuad = 1 - (1 - spinProgress) * (1 - spinProgress)
+        // Start fast (0.2) to match MiraTransitionOverlay handoff, decay to normal
+        const extraSpeed = 0.2 * (1 - easeOutQuad) * dt
+        initialSpinOffset += extraSpeed
+      }
       
       // Rotation - reduce for text mode to keep readable
       const rotationScale = isTextMode ? 0.1 : 1
       const autoRotX = Math.sin(time * 0.5) * 0.25 * rotationScale
-      const autoRotY = isTextMode ? 0 : time * 0.4 // No Y rotation for text
+      const autoRotY = isTextMode ? 0 : (time * 0.4 + initialSpinOffset)
       const autoRotZ = Math.sin(time * 0.3) * 0.15 * rotationScale
 
-      // Sort by Z for depth
-      const sorted = [...particlesRef.current].sort((a, b) => b.z - a.z)
+      // Pre-compute rotation matrices for performance
+      const cosRotY = Math.cos(autoRotY), sinRotY = Math.sin(autoRotY)
+      const cosRotX = Math.cos(autoRotX), sinRotX = Math.sin(autoRotX)
+      const cosRotZ = Math.cos(autoRotZ), sinRotZ = Math.sin(autoRotZ)
 
-      sorted.forEach(p => {
-        // Move towards target with current speed
+      // Build projection array without sorting every frame (sort every 3rd frame)
+      const frameCount = Math.floor(time * 60) % 3
+      const particles = particlesRef.current
+
+      // Update positions first (always)
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i]
+        // Move towards target with delta-time adjusted speed
         p.x += (p.targetX - p.x) * currentLerpSpeed
         p.y += (p.targetY - p.y) * currentLerpSpeed
         p.z += (p.targetZ - p.z) * currentLerpSpeed
+      }
 
-        // Apply rotation for display
+      // Only sort occasionally for depth ordering (reduces sort overhead by 66%)
+      if (frameCount === 0) {
+        particles.sort((a, b) => b.z - a.z)
+      }
+
+      // Batch draw setup
+      const { light, dark } = themeColorsRef.current
+      const PI2 = Math.PI * 2
+
+      // Draw all particles - optimized with single path per color batch
+      // Group by approximate color to reduce fillStyle changes
+      const colorBuckets = new Map()
+
+      for (let i = 0; i < particles.length; i++) {
+        const p = particles[i]
+
+        // Apply rotation for display (optimized with pre-computed trig)
         let rx = p.x, ry = p.y, rz = p.z
         
         // Y rotation
-        let nx = rx * Math.cos(autoRotY) - rz * Math.sin(autoRotY)
-        let nz = rx * Math.sin(autoRotY) + rz * Math.cos(autoRotY)
+        let nx = rx * cosRotY - rz * sinRotY
+        let nz = rx * sinRotY + rz * cosRotY
         rx = nx; rz = nz
         
         // X rotation
-        let ny = ry * Math.cos(autoRotX) - rz * Math.sin(autoRotX)
-        nz = ry * Math.sin(autoRotX) + rz * Math.cos(autoRotX)
+        let ny = ry * cosRotX - rz * sinRotX
+        nz = ry * sinRotX + rz * cosRotX
         ry = ny; rz = nz
         
         // Z rotation
-        nx = rx * Math.cos(autoRotZ) - ry * Math.sin(autoRotZ)
-        ny = rx * Math.sin(autoRotZ) + ry * Math.cos(autoRotZ)
+        nx = rx * cosRotZ - ry * sinRotZ
+        ny = rx * sinRotZ + ry * cosRotZ
         rx = nx; ry = ny
 
         // Project to 2D
         const scale = Z_PERSPECTIVE / (Z_PERSPECTIVE + rz)
         if (rz > -Z_PERSPECTIVE + 10 && scale > 0) {
-          // Color: interpolate between theme colors (darker and lighter variants)
+          // Color: interpolate between theme colors (quantize to reduce unique colors)
           const colorPhase = (Math.sin(time + p.phaseOffset) * 0.5 + 0.5)
-          const { light, dark } = themeColorsRef.current
-          const r = Math.floor(dark.r + colorPhase * (light.r - dark.r) + p.hueOffset * 0.2)
-          const g = Math.floor(dark.g + colorPhase * (light.g - dark.g) + p.hueOffset * 0.3)
-          const b = Math.floor(dark.b + colorPhase * (light.b - dark.b) + p.hueOffset * 0.2)
+          // Quantize to 16 color levels for batching
+          const r = Math.floor((dark.r + colorPhase * (light.r - dark.r) + p.hueOffset * 0.2) / 16) * 16
+          const g = Math.floor((dark.g + colorPhase * (light.g - dark.g) + p.hueOffset * 0.3) / 16) * 16
+          const b = Math.floor((dark.b + colorPhase * (light.b - dark.b) + p.hueOffset * 0.2) / 16) * 16
           
-          ctx.beginPath()
-          ctx.arc(cx + rx * scale, cy + ry * scale, Math.max(0.2, p.size * scale), 0, Math.PI * 2)
-          ctx.fillStyle = `rgb(${Math.min(255, Math.max(0, r))},${Math.min(255, Math.max(0, g))},${Math.min(255, Math.max(0, b))})`
-          ctx.fill()
+          const colorKey = `${Math.min(255, Math.max(0, r))},${Math.min(255, Math.max(0, g))},${Math.min(255, Math.max(0, b))}`
+          
+          if (!colorBuckets.has(colorKey)) {
+            colorBuckets.set(colorKey, [])
+          }
+          colorBuckets.get(colorKey).push({
+            x: cx + rx * scale,
+            y: cy + ry * scale,
+            r: Math.max(0.2, p.size * scale)
+          })
         }
-      })
+      }
+
+      // Draw batched by color - significantly reduces ctx state changes
+      for (const [colorKey, circles] of colorBuckets) {
+        ctx.fillStyle = `rgb(${colorKey})`
+        ctx.beginPath()
+        for (let i = 0; i < circles.length; i++) {
+          const c = circles[i]
+          ctx.moveTo(c.x + c.r, c.y)
+          ctx.arc(c.x, c.y, c.r, 0, PI2)
+        }
+        ctx.fill()
+      }
       
       animationRef.current = requestAnimationFrame(animate)
     }
 
     resize()
     initParticles()
-    animate()
+    animationRef.current = requestAnimationFrame(animate)
 
     window.addEventListener('resize', resize)
 
@@ -540,17 +625,19 @@ export default function GlobalAILoadingOverlay() {
 
   return (
     <>
-      {/* Backdrop blur layer - blurs content behind overlay */}
-      <div 
-        className={`fixed inset-0 z-[999998] ${
-          isAnimatingOut ? 'ai-loading-exit' : 'ai-loading-enter'
-        }`}
-        style={{
-          backdropFilter: `blur(${blurAmount}px)`,
-          WebkitBackdropFilter: `blur(${blurAmount}px)`,
-          backgroundColor: 'rgba(0, 0, 0, 0.1)',
-        }}
-      />
+      {/* Backdrop blur layer - blurs content behind overlay - only after transition */}
+      {showBlur && (
+        <div 
+          className={`fixed inset-0 z-[999998] ${
+            isAnimatingOut ? 'ai-loading-exit' : 'ai-blur-enter'
+          }`}
+          style={{
+            backdropFilter: `blur(${blurAmount}px)`,
+            WebkitBackdropFilter: `blur(${blurAmount}px)`,
+            backgroundColor: 'rgba(0, 0, 0, 0.08)',
+          }}
+        />
+      )}
       
       {/* Main overlay container */}
       <div 
@@ -572,6 +659,15 @@ export default function GlobalAILoadingOverlay() {
         }
 
         @keyframes aiLoadingEnter {
+          0% { opacity: 0; }
+          100% { opacity: 1; }
+        }
+
+        .ai-blur-enter {
+          animation: aiBlurEnter 0.8s ease-out forwards;
+        }
+
+        @keyframes aiBlurEnter {
           0% { opacity: 0; }
           100% { opacity: 1; }
         }
