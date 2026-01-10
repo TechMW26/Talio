@@ -350,7 +350,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
           <div className="flex items-center space-x-2 sm:space-x-4">
             <button
               onClick={toggleSidebar}
-              className="md:hidden focus:outline-none p-1"
+              className="md:!hidden focus:outline-none p-1"
             >
               <img
                 src="/hamburger.png"
@@ -377,7 +377,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
         <div className="flex items-center space-x-2 sm:space-x-4 flex-1">
           <button
             onClick={toggleSidebar}
-            className="md:hidden focus:outline-none p-1"
+            className="md:!hidden focus:outline-none p-1"
           >
             <img
               src="/hamburger.png"
@@ -681,7 +681,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
 
       {/* Mobile Search Fullscreen Modal */}
       {showMobileSearch && (
-        <div className="fixed inset-0 bg-white z-[100] lg:hidden">
+        <div className="fixed inset-0 bg-white z-[100] md:!hidden">
           <div className="flex flex-col h-full">
             {/* Search Header - Match header height */}
             <div className="flex items-center gap-3 px-3 h-16 border-b border-gray-200 bg-white">

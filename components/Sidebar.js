@@ -122,7 +122,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
     return () => clearAutoCollapseTimer()
   }, [clearAutoCollapseTimer])
 
-  // Check if desktop
+  // Check if desktop/tablet (matches Tailwind md: breakpoint at 768px)
   useEffect(() => {
     const checkDesktop = () => {
       setIsDesktop(window.innerWidth >= 768)
@@ -341,7 +341,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
       {/* Mobile overlay with tinted background - smooth fade animation */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-[60] lg:hidden animate-fade-in"
+          className="fixed inset-0 z-[60] md:!hidden animate-fade-in"
           onClick={() => setIsOpen(false)}
           style={{
             backgroundColor: 'rgba(255,255,255,0.6)',
@@ -405,7 +405,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                 {/* Mobile close button */}
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="lg:hidden hover:opacity-70 focus:outline-none"
+                  className="md:!hidden hover:opacity-70 focus:outline-none"
                   style={{ color: '#374151' }}
                 >
                   <HiOutlineXMark className="w-5 h-5" />
@@ -547,7 +547,11 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                         <UnreadBadge count={unreadCount} />
                       )}
                     </div>
-                    {!(isDesktop && isCollapsed) && <span className="text-sm font-medium">{item.name}</span>}
+                    {!(isDesktop && isCollapsed) && (
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <span className="text-sm font-medium truncate">{item.name}</span>
+                      </div>
+                    )}
                   </div>
                 </button>
               ) : (
