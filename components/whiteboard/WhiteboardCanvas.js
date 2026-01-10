@@ -4796,7 +4796,11 @@ const WhiteboardCanvas = forwardRef(({
       {/* Custom confirmation modal */}
       {confirmModal && (
         <>
-          <div className="fixed inset-0 bg-black/50 z-[999]" onClick={() => !confirmModal.onConfirm && setConfirmModal(null)} />
+          <div 
+            className="fixed inset-0 z-[999]" 
+            style={{ backgroundColor: "rgba(255,255,255,0.6)" }} 
+            onClick={() => !confirmModal.onConfirm && setConfirmModal(null)} 
+          />
           <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl p-6 z-[1000] min-w-[320px]">
             <p className="text-gray-800 text-center mb-6">{confirmModal.message}</p>
             <div className="flex gap-3 justify-center">
@@ -4920,7 +4924,7 @@ const WhiteboardCanvas = forwardRef(({
           onClick={() => setShowAIPanel(prev => !prev)}
           className={`
             group relative flex items-center gap-2 px-4 py-3 rounded-2xl
-            backdrop-blur-[5px] bg-white/20
+            bg-white/20
             border border-white/30
             shadow-[0_4px_24px_rgba(0,0,0,0.08)]
             hover:bg-white/30 hover:shadow-[0_8px_32px_rgba(99,102,241,0.15)]
@@ -4957,7 +4961,7 @@ const WhiteboardCanvas = forwardRef(({
         <div
           ref={aiPanelRef}
           className="fixed bottom-20 sm:bottom-36 right-4 sm:right-6 z-50 w-[calc(100vw-2rem)] sm:w-96 max-h-[calc(100vh-120px)] sm:max-h-[calc(100vh-180px)] flex flex-col
-            backdrop-blur-[5px] bg-white/25
+            bg-white/25
             border border-white/40
             rounded-2xl
             shadow-[0_8px_40px_rgba(0,0,0,0.1)]
@@ -5038,7 +5042,7 @@ const WhiteboardCanvas = forwardRef(({
                     <div
                       className={`max-w-[85%] rounded-2xl px-4 py-3 ${msg.role === 'user'
                           ? 'bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-br-md'
-                          : 'bg-white/60 backdrop-blur-[5px] text-gray-800 border border-white/40 rounded-bl-md'
+                          : 'bg-white/60 text-gray-800 border border-white/40 rounded-bl-md'
                         }`}
                     >
                       <div className="text-sm whitespace-pre-wrap leading-relaxed">
@@ -5057,7 +5061,7 @@ const WhiteboardCanvas = forwardRef(({
             {/* Loading indicator */}
             {aiLoading && aiAnalysis.messages.length > 0 && (
               <div className="flex justify-start">
-                <div className="bg-white/60 backdrop-blur-[5px] rounded-2xl rounded-bl-md px-4 py-3 border border-white/40">
+                <div className="bg-white/60 rounded-2xl rounded-bl-md px-4 py-3 border border-white/40">
                   <div className="flex items-center gap-2">
                     <div className="flex gap-1">
                       <span className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
@@ -5072,7 +5076,7 @@ const WhiteboardCanvas = forwardRef(({
 
             {/* Error message */}
             {aiError && (
-              <div className="bg-red-50/80 backdrop-blur-[5px] border border-red-200/50 rounded-xl px-4 py-3 text-sm text-red-600">
+              <div className="bg-red-50/80 border border-red-200/50 rounded-xl px-4 py-3 text-sm text-red-600">
                 {aiError}
               </div>
             )}
@@ -5114,7 +5118,7 @@ const WhiteboardCanvas = forwardRef(({
                 placeholder={showAgentMode ? "Describe what to create...\n(Ctrl+Enter to send)" : "Ask MIRA about your canvas...\n(Ctrl+Enter to send)"}
                 rows={2}
                 className="flex-1 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl
-                  bg-white/50 backdrop-blur-[5px]
+                  bg-white/50
                   border border-white/40
                   text-sm text-gray-800 placeholder-gray-400
                   focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-300/50

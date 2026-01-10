@@ -12,11 +12,9 @@ nav.sidebar {
   background-color: var(--color-bg-sidebar) !important;
 }
 
-/* Cards */
-.card,
-.bg-white,
-[class*="bg-white"] {
-  background-color: var(--color-bg-card) !important;
+/* Cards - only apply to explicit .card class, not all bg-white elements */
+.card {
+  background-color: var(--color-bg-card);
 }
 
 /* Hover states */

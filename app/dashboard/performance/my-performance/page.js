@@ -229,19 +229,19 @@ export default function MyPerformancePage() {
           </div>
           
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-            <div className="bg-blue-500/50 backdrop-blur-sm rounded-xl p-4 text-center border border-blue-400/30">
+            <div className="bg-blue-500/50 rounded-xl p-4 text-center border border-blue-400/30">
               <p className="text-2xl sm:text-3xl font-bold">{stats.totalReviews}</p>
               <p className="text-xs sm:text-sm text-blue-100 font-medium mt-1">Reviews</p>
             </div>
-            <div className="bg-blue-500/50 backdrop-blur-sm rounded-xl p-4 text-center border border-blue-400/30">
+            <div className="bg-blue-500/50 rounded-xl p-4 text-center border border-blue-400/30">
               <p className="text-2xl sm:text-3xl font-bold">{stats.totalGoals}</p>
               <p className="text-xs sm:text-sm text-blue-100 font-medium mt-1">Goals</p>
             </div>
-            <div className="bg-blue-500/50 backdrop-blur-sm rounded-xl p-4 text-center border border-blue-400/30">
+            <div className="bg-blue-500/50 rounded-xl p-4 text-center border border-blue-400/30">
               <p className="text-2xl sm:text-3xl font-bold">{stats.completedGoals}</p>
               <p className="text-xs sm:text-sm text-blue-100 font-medium mt-1">Completed</p>
             </div>
-            <div className="bg-blue-500/50 backdrop-blur-sm rounded-xl p-4 text-center border border-blue-400/30">
+            <div className="bg-blue-500/50 rounded-xl p-4 text-center border border-blue-400/30">
               <p className="text-2xl sm:text-3xl font-bold">{stats.goalsProgress}%</p>
               <p className="text-xs sm:text-sm text-blue-100 font-medium mt-1">Progress</p>
             </div>

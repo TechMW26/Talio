@@ -1273,7 +1273,7 @@ export default function ChatPage() {
 
       {/* Group Members Modal */}
       {showMembersModal && selectedChat?.isGroup && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[90] p-4">
+        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[90] p-4">
           <div className="bg-white rounded-2xl max-w-md w-full max-h-[80vh] overflow-hidden shadow-2xl">
             {/* Modal Header */}
             <div

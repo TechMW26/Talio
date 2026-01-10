@@ -438,7 +438,7 @@ a,
 
 /* Backdrop blur for mobile */
 .backdrop-mobile {
-  @apply backdrop-blur-sm bg-black/50;
+  @apply bg-black/50;
 }
 
 /* Pull to refresh indicator space */

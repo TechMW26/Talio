@@ -144,7 +144,7 @@ export default function CreateTodoModal({ isOpen, onClose, onSuccess, categories
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" />
+          <div className="fixed inset-0 modal-overlay" />
         </Transition.Child>
 
         <div className="fixed inset-0 overflow-y-auto">

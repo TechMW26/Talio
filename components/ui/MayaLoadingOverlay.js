@@ -135,8 +135,8 @@ export default function MiraLoadingOverlay({
   if (!isLoading || !mounted) return null
 
   const overlayClasses = fullScreen
-    ? 'fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm'
-    : `absolute inset-0 z-10 flex flex-col items-center justify-center bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm ${className}`
+    ? 'fixed inset-0 z-50 flex flex-col items-center justify-center modal-overlay-dark'
+    : `absolute inset-0 z-10 flex flex-col items-center justify-center modal-overlay-bg ${className}`
 
   return (
     <div className={overlayClasses}>

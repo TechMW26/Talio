@@ -441,47 +441,65 @@ body {
   animation: fadeIn 0.3s ease-in-out;
 }
 
-/* Backdrop fade-in animation with background color */
+/* Backdrop fade-in animation with blur and transparent white tint */
 @keyframes fadeInBackdrop {
   from {
     opacity: 0;
-    background-color: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(0px);
+    -webkit-backdrop-filter: blur(0px);
+    background-color: rgba(255, 255, 255, 0);
   }
   to {
     opacity: 1;
-    background-color: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    background-color: rgba(255, 255, 255, 0.6);
   }
 }
 
 .animate-fade-in {
   animation: fadeInBackdrop 0.5s ease-out forwards;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  background-color: rgba(255, 255, 255, 0.6);
 }
 
-/* MIRA Modal Backdrop Animations */
+/* MIRA Modal Backdrop Animations with blur and transparent white tint */
 @keyframes miraBackdropBlurIn {
   from {
     opacity: 0;
+    backdrop-filter: blur(1px);
+    -webkit-backdrop-filter: blur(1px);
     background-color: rgba(255, 255, 255, 0);
   }
   to {
     opacity: 1;
-    background-color: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    background-color: rgba(255, 255, 255, 0.6);
   }
 }
 
 @keyframes miraBackdropBlurOut {
   from {
     opacity: 1;
-    background-color: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    background-color: rgba(255, 255, 255, 0.6);
   }
   to {
     opacity: 0;
+    backdrop-filter: blur(1px);
+    -webkit-backdrop-filter: blur(1px);
     background-color: rgba(255, 255, 255, 0);
   }
 }
 
 .animate-mira-backdrop-in {
   animation: miraBackdropBlurIn 0.3s ease-out forwards;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  background-color: rgba(255, 255, 255, 0.6);
 }
 
 .animate-mira-backdrop-out {
@@ -568,6 +586,42 @@ body {
   animation: modal-enter 0.2s ease-out forwards;
 }
 
+/* ============================================
+   MODAL OVERLAY - Performance Optimized
+   Uses tinted background instead of backdrop-blur
+   for better performance on mobile devices
+   ============================================ */
+
+/* Overlay backgrounds with transparent white tint - GLOBAL STANDARD */
+/* All modals use rgba(255, 255, 255, 0.6) for consistent transparent white backdrop */
+/* NO backdrop-blur - just color and transparency */
+.modal-overlay-bg {
+  background-color: rgba(255, 255, 255, 0.6);
+}
+
+.modal-overlay-dark {
+  background-color: rgba(255, 255, 255, 0.6);
+}
+
+.modal-overlay-light {
+  background-color: rgba(255, 255, 255, 0.6);
+}
+
+/* Overlay with animation - no blur */
+@keyframes overlay-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal-overlay-animated {
+  background-color: rgba(255, 255, 255, 0.6);
+  animation: overlay-fade-in 0.2s ease-out;
+}
+
 /* Card Hover Effect */
 .card-hover {
   transition: all 0.3s ease;
@@ -593,6 +647,51 @@ body {
 
 .btn-success {
   @apply bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+}
+
+/* ============================================
+   BUTTON CENTERING FIX - Global
+   Ensures button text stays centered when
+   loading spinners or icons are added
+   ============================================ */
+button,
+[role="button"],
+.btn,
+.btn-primary,
+.btn-secondary,
+.btn-danger,
+.btn-success,
+a.btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  gap: 0.5rem;
+}
+
+/* Ensure flex children don't cause shift */
+button > *,
+[role="button"] > *,
+.btn > * {
+  flex-shrink: 0;
+}
+
+/* Inner flex containers in buttons should also center */
+button > span,
+button > div,
+[role="button"] > span,
+[role="button"] > div {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 0.5rem;
+}
+
+/* Fix for buttons with loading state - prevent width change */
+button[disabled],
+[role="button"][disabled],
+.btn[disabled] {
+  pointer-events: none;
 }
 
 /* Input Styles */
@@ -728,7 +827,7 @@ textarea::placeholder {
    All modals in the app should use these classes
    ============================================ */
 
-/* Modal Overlay - The backdrop behind the modal */
+/* Modal Overlay - The backdrop behind the modal with transparent white background */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -738,15 +837,14 @@ textarea::placeholder {
   justify-content: center;
   padding: 1rem;
   overflow-y: auto;
+  background-color: rgba(255, 255, 255, 0.6);
 }
 
-/* Modal Backdrop - The dark semi-transparent background */
+/* Modal Backdrop - Transparent white background - GLOBAL STANDARD */
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  background-color: rgba(255, 255, 255, 0.6);
   z-index: 99998;
 }
 

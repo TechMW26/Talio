@@ -122,7 +122,7 @@ export default function SuperAdminLayout({ children }) {
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-40 modal-overlay-dark lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -193,7 +193,7 @@ export default function SuperAdminLayout({ children }) {
       {/* Main Content */}
       <div className="lg:pl-64 h-screen flex flex-col overflow-hidden">
         {/* Mobile Header */}
-        <header className="lg:hidden sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-gray-200 flex-shrink-0">
+        <header className="lg:hidden sticky top-0 z-30 modal-overlay-bg border-b border-gray-200 flex-shrink-0">
           <div className="flex items-center justify-between px-4 py-3">
             <button
               onClick={() => setSidebarOpen(true)}

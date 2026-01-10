@@ -385,44 +385,54 @@ async function aiMapColumns(headers, sampleRows) {
     // Build a sample of what each column contains
     const columnSamples = headers.map((header, idx) => {
       const samples = sampleRows
-        .slice(0, 5)
+        .slice(0, 8)
         .map(row => row[idx])
         .filter(v => v !== undefined && v !== null && v !== '')
-        .slice(0, 3)
+        .slice(0, 5)
       return {
         index: idx,
         header: header || `Column ${idx + 1}`,
-        samples: samples.map(s => String(s).substring(0, 50))
+        samples: samples.map(s => String(s).substring(0, 80))
       }
     })
 
-    const prompt = `You are analyzing an Excel sheet for employee data import. 
-    
-Here are the columns with their headers and sample values:
-${columnSamples.map(c => `Column ${c.index}: Header="${c.header}", Samples=[${c.samples.map(s => `"${s}"`).join(', ')}]`).join('\n')}
+    const prompt = `Analyze this Excel employee data and map columns to our system fields.
 
-Map each column to ONE of these target fields (or "ignore" if not relevant):
+COLUMNS IN UPLOADED FILE:
+${columnSamples.map(c => `[${c.index}] Header: "${c.header}" | Samples: [${c.samples.map(s => `"${s}"`).join(', ')}]`).join('\n')}
+
+MAP TO THESE FIELDS (use "ignore" for columns that don't match any field):
 ${TARGET_FIELDS.map(f => `- ${f.name}: ${f.description}`).join('\n')}
-- ignore: Column is not needed for employee import (e.g., serial numbers, internal IDs, timestamps, etc.)
+- ignore: Column is not needed
 
-IMPORTANT RULES:
-1. "fullName" should be used when first and last names are combined in one column
-2. If you see a column with email patterns (@), map to "email"
-3. If you see numeric serial numbers (1-73050 range), those might be Excel dates
-4. Employee codes/IDs are alphanumeric identifiers like "EMP001", "STF-123"
-5. Phone numbers have 10+ digits or include country codes
-6. Map "Name" or "Employee Name" to "fullName"
-7. Serial number columns (1, 2, 3...) should be "ignore"
+CRITICAL RULES:
+1. Column with "Employee Name", "Name", "Full Name", "Emp Name" containing full names like "Amreesh Saxena" → "fullName"
+2. "Official Email", "Email ID", "E-mail", "Mail" columns with @ symbols → "email"
+3. "Mobile", "Phone", "Contact", "Mobile Number" with 10-digit numbers → "phone"
+4. "Employee Code", "Emp Code", "Emp ID", "Staff ID", codes like "A18", "A110", "EMP001" → "employeeCode"
+5. Numbers 25000-50000 are Excel serial dates (days since 1900) for DOB/DOJ
+6. "Date of Birth", "DOB", "D.O.B", "Birth Date" → "dateOfBirth"
+7. "Date of Joining", "DOJ", "D.O.J", "Joining Date", "Hire Date" → "dateOfJoining"
+8. "Department", "Dept", "Division" → "department"
+9. "Designation", "Title", "Position", "Post", "Job Title" → "designation"
+10. M/F/Male/Female in "Gender" or "Sex" column → "gender"
+11. "Salary", "CTC", "Gross Salary", "Compensation", "Pay" → "grossSalary"
+12. "Employee Type", "Employment Type", "Type" with values like "Full-time", "Employee" → "employmentType"
+13. IGNORE: Serial/S.No/#/Sl columns, Father's name, Address, Location, Shift, Reporting To, Employee Level
+14. "Company", "Organization", "Employer" → "company"
 
-Return ONLY a JSON object mapping column indices to field names. Example:
-{"0": "ignore", "1": "fullName", "2": "email", "3": "phone", "4": "dateOfJoining", "5": "department"}
+Return ONLY a JSON object mapping column index (as string) to field name or "ignore":
+Example: {"0": "employeeCode", "1": "fullName", "2": "email", "3": "phone", "4": "gender", "5": "department", "6": "designation"}
 
-JSON response:`
+JSON only:`
 
-    const response = await generateContent(prompt, 'You are a data mapping assistant. Return only valid JSON.')
+    const response = await generateContent(prompt, 'Return only valid JSON object, no markdown, no explanation.')
 
-    // Extract JSON from response
-    const jsonMatch = response.match(/\{[\s\S]*\}/)
+    // Extract JSON from response (handle various formats)
+    let jsonStr = response.trim()
+    jsonStr = jsonStr.replace(/```json\s*/gi, '').replace(/```\s*/gi, '')
+    
+    const jsonMatch = jsonStr.match(/\{[\s\S]*\}/)
     if (jsonMatch) {
       const mapping = JSON.parse(jsonMatch[0])
       console.log('[AI Column Mapping]:', mapping)
@@ -436,112 +446,371 @@ JSON response:`
 }
 
 /**
- * Fallback rule-based column mapping
+ * Detect which row contains the actual headers
+ * Some Excel files have title rows, merged cells, or metadata before the header row
+ * Returns the index of the header row (0-based)
+ */
+function findHeaderRow(rawData) {
+  // Common header keywords that indicate an employee data header row
+  const headerKeywords = [
+    'employee', 'emp', 'name', 'email', 'phone', 'mobile', 'gender', 'department', 
+    'designation', 'dob', 'doj', 'date', 'salary', 'code', 'id', 'first', 'last',
+    'contact', 'joining', 'birth', 'company', 'type', 'status'
+  ]
+  
+  // Check first 5 rows to find the header row
+  for (let i = 0; i < Math.min(5, rawData.length); i++) {
+    const row = rawData[i]
+    if (!row || !Array.isArray(row)) continue
+    
+    // Count how many cells in this row match header keywords
+    let headerMatches = 0
+    let nonEmptyCells = 0
+    
+    for (const cell of row) {
+      if (cell === undefined || cell === null || cell === '') continue
+      nonEmptyCells++
+      
+      const cellStr = String(cell).toLowerCase().trim()
+      // Check if this cell contains any header keyword
+      if (headerKeywords.some(keyword => cellStr.includes(keyword))) {
+        headerMatches++
+      }
+    }
+    
+    // If this row has at least 3 header-like cells and multiple non-empty cells, it's likely the header
+    if (headerMatches >= 3 && nonEmptyCells >= 5) {
+      console.log(`[HeaderDetection] Found header row at index ${i} (${headerMatches} header matches, ${nonEmptyCells} cells)`)
+      return i
+    }
+  }
+  
+  // Default to row 0 if no clear header row found
+  console.log('[HeaderDetection] No clear header row found, defaulting to row 0')
+  return 0
+}
+
+/**
+ * Detect field type from sample values
+ * SMART DETECTION: Analyzes actual data patterns
+ */
+function detectFieldFromSamples(samples) {
+  if (!samples || samples.length === 0) return null
+  
+  const validSamples = samples.filter(s => s !== undefined && s !== null && s !== '')
+  if (validSamples.length === 0) return null
+  
+  const stringSamples = validSamples.map(s => String(s).trim())
+  
+  // Check for email pattern
+  const emailMatches = stringSamples.filter(s => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s))
+  if (emailMatches.length >= validSamples.length * 0.7) {
+    return 'email'
+  }
+  
+  // Check for phone numbers
+  const phoneMatches = stringSamples.filter(s => {
+    const digits = s.replace(/[\s\-()+ ]/g, '')
+    return /^\d{10,15}$/.test(digits)
+  })
+  if (phoneMatches.length >= validSamples.length * 0.7) {
+    return 'phone'
+  }
+  
+  // Check for gender values
+  const genderValues = ['m', 'f', 'male', 'female', 'other', 'man', 'woman']
+  const genderMatches = stringSamples.filter(s => genderValues.includes(s.toLowerCase()))
+  if (genderMatches.length >= validSamples.length * 0.8) {
+    return 'gender'
+  }
+  
+  // Check for full names (multiple words)
+  const nameMatches = stringSamples.filter(s => {
+    if (!s.includes(' ')) return false
+    const cleaned = s.replace(/[a-zA-Z\s.'\-]/g, '')
+    return cleaned.length < s.length * 0.2
+  })
+  if (nameMatches.length >= validSamples.length * 0.6) {
+    return 'fullName'
+  }
+  
+  // Check for employee codes
+  const codeMatches = stringSamples.filter(s => {
+    return /^[A-Za-z]{1,4}\d{1,5}$/.test(s) ||
+           /^[A-Za-z]{2,5}\d{2,4}[A-Za-z]{0,2}$/.test(s)
+  })
+  if (codeMatches.length >= validSamples.length * 0.7) {
+    return 'employeeCode'
+  }
+  
+  return null
+}
+
+/**
+ * Fallback rule-based column mapping with extensive keyword matching
+ * Designed to be robust and handle various Excel formats
  */
 function ruleBasedColumnMapping(headers, sampleRows) {
   const mapping = {}
+  const usedFields = new Set()
 
-  const patterns = {
-    employeeCode: /^(emp|employee|staff|id|code|number|no\.?|#)[\s_-]*(id|code|no\.?|number|#)?$/i,
-    firstName: /^(first|given)[\s_-]*(name)?$/i,
-    lastName: /^(last|sur|family)[\s_-]*(name)?$/i,
-    fullName: /^(full[\s_-]*name|name|employee[\s_-]*name)$/i,
-    email: /^(e[\s_-]*mail|email[\s_-]*(id|address)?|mail)$/i,
-    phone: /^(phone|mobile|cell|contact|tel)[\s_-]*(no\.?|number)?$/i,
-    dateOfBirth: /^(d\.?o\.?b\.?|date[\s_-]*of[\s_-]*birth|birth[\s_-]*(date|day)?|birthday)$/i,
-    dateOfJoining: /^(d\.?o\.?j\.?|date[\s_-]*of[\s_-]*join|join[\s_-]*(date|ing)|hire[\s_-]*date|start[\s_-]*date)$/i,
-    gender: /^(gender|sex)$/i,
-    department: /^(dept\.?|department)$/i,
-    designation: /^(designation|title|position|role|job[\s_-]*(title)?|post)$/i,
-    employmentType: /^(employment[\s_-]*type|type|status|emp[\s_-]*type)$/i,
-    company: /^(company|organization|org|employer)$/i,
-    salary: /^(salary|ctc|compensation|pay|wage)$/i,
-    address: /^(address|location|city)$/i,
+  // Extensive keyword lists - ORDERED BY SPECIFICITY
+  const fieldKeywords = {
+    employeeCode: [
+      'employee code', 'emp code', 'emp_code', 'empcode', 'employee_code', 'employeecode',
+      'emp id', 'emp_id', 'empid', 'employee id', 'employee_id', 'employeeid',
+      'staff code', 'staff_code', 'staffcode', 'staff id', 'staff_id', 'staffid',
+      'worker id', 'worker_id', 'workerid', 'id no', 'id_no', 'idno',
+      'badge', 'badge no', 'badge_no', 'badgeno', 'code'
+    ],
+    firstName: [
+      'first name', 'first_name', 'firstname', 'given name', 'given_name', 'givenname',
+      'f name', 'f_name', 'fname', 'forename'
+    ],
+    lastName: [
+      'last name', 'last_name', 'lastname', 'surname', 'sur name', 'sur_name',
+      'family name', 'family_name', 'familyname', 'l name', 'l_name', 'lname'
+    ],
+    fullName: [
+      'employee name', 'employee_name', 'employeename', 'emp name', 'emp_name', 'empname',
+      'full name', 'full_name', 'fullname', 'staff name', 'staff_name', 'staffname',
+      'worker name', 'worker_name', 'workername', 'person name', 'person_name', 'name'
+    ],
+    email: [
+      'official email id', 'official_email_id', 'officialemail',
+      'official email', 'official_email', 'email id', 'email_id', 'emailid',
+      'email address', 'email_address', 'work email', 'work_email', 'workemail',
+      'company email', 'company_email', 'personal email', 'personal_email',
+      'e mail', 'e-mail', 'e_mail', 'email', 'mail'
+    ],
+    phone: [
+      'mobile number', 'mobile_number', 'mobilenumber',
+      'phone number', 'phone_number', 'phonenumber',
+      'contact number', 'contact_number', 'contactnumber',
+      'mobile no', 'mobile_no', 'mobileno', 'phone no', 'phone_no', 'phoneno',
+      'contact no', 'contact_no', 'contactno',
+      'cell phone', 'cell_phone', 'cellphone', 'cell no', 'cell_no', 'cellno',
+      'telephone', 'telephone no', 'telephone_no', 'tel no', 'tel_no',
+      'mobile', 'phone', 'cell', 'contact', 'tel'
+    ],
+    gender: [
+      'gender', 'sex', 'male female', 'male/female', 'm f', 'm/f'
+    ],
+    dateOfBirth: [
+      'date of birth', 'date_of_birth', 'dateofbirth',
+      'birth date', 'birth_date', 'birthdate', 'birthday', 'birth day', 'birth_day',
+      'd o b', 'd.o.b', 'd.o.b.', 'dob', 'born', 'born on', 'born_on'
+    ],
+    dateOfJoining: [
+      'date of joining', 'date_of_joining', 'dateofjoining',
+      'joining date', 'joining_date', 'joiningdate', 'join date', 'join_date', 'joindate',
+      'hire date', 'hire_date', 'hiredate', 'hired on', 'hired_on',
+      'start date', 'start_date', 'startdate', 'started on', 'started_on',
+      'd o j', 'd.o.j', 'd.o.j.', 'doj', 'joining', 'employment date', 'employment_date'
+    ],
+    department: [
+      'department name', 'department_name', 'departmentname',
+      'department', 'dept', 'dept.', 'division', 'unit', 'team', 'section', 'group', 'wing'
+    ],
+    designation: [
+      'designation', 'desig', 'desig.', 'job title', 'job_title', 'jobtitle',
+      'title', 'position', 'post', 'role title', 'role_title', 'job role', 'job_role',
+      'job position', 'job_position', 'rank'
+    ],
+    company: [
+      'company name', 'company_name', 'companyname', 'organization name', 'organization_name',
+      'company', 'organization', 'organisation', 'org', 'org name', 'org_name', 
+      'employer', 'firm', 'business', 'entity'
+    ],
+    employmentType: [
+      'employment type', 'employment_type', 'employmenttype', 'employee type', 'employee_type',
+      'emp type', 'emp_type', 'emptype', 'job type', 'job_type', 'jobtype',
+      'work type', 'work_type', 'worktype', 'contract type', 'contract_type', 'contracttype',
+      'ft pt', 'ft/pt', 'full time part time', 'full time/part time'
+    ],
+    grossSalary: [
+      'gross salary', 'gross_salary', 'grosssalary', 'monthly salary', 'monthly_salary',
+      'annual salary', 'annual_salary', 'base salary', 'base_salary', 'basic salary', 'basic_salary',
+      'cost to company', 'cost_to_company', 'ctc', 'c.t.c', 'c t c',
+      'salary', 'gross', 'gross pay', 'gross_pay', 'compensation', 'comp',
+      'pay', 'monthly pay', 'monthly_pay', 'wage', 'wages', 'remuneration', 'package', 'income'
+    ],
+    role: [
+      'system role', 'system_role', 'systemrole', 'user role', 'user_role', 'userrole',
+      'access role', 'access_role', 'accessrole', 'permission', 'access level', 'access_level',
+      'admin user', 'admin/user', 'account type', 'account_type'
+    ],
+    level: [
+      'employee level', 'employee_level', 'employeelevel', 'emp level', 'emp_level', 'emplevel',
+      'designation level', 'designation_level', 'job level', 'job_level', 'joblevel',
+      'grade', 'band', 'tier'
+    ]
   }
 
+  // Skip patterns - never map these (be specific to avoid false positives)
+  const skipPatterns = [
+    's no', 's.no', 'sno', 'serial', 'sr', 'sr.', 'sr no', 'sl', 'sl.', 'sl no',
+    '#', 'row', 'index', 'no.', 
+    'father', 'father name', 'fathers name', 'mother', 'mother name', 'mothers name',
+    'spouse', 'spouse name', 'guardian', 'emergency contact', 'reference',
+    'address', 'permanent address', 'current address', 'residential address',
+    'pincode', 'pin code', 'zip', 'zip code', 'postal',
+    'state', 'country', 'city', 'district', 'locality', 'location',
+    'blood', 'blood group', 'blood type',
+    'pan', 'pan no', 'pan number', 'pan card',
+    'aadhaar', 'aadhar', 'aadhaar no', 'aadhar no', 'aadhaar number', 'aadhar number', 'uid',
+    'passport', 'passport no',
+    'bank', 'bank name', 'account', 'account no', 'account number', 'ifsc', 'branch',
+    'shift', 'shift name', 'shift timing',
+    'reporting', 'reporting to', 'reports to', 'manager name', 'supervisor',
+    'marital', 'marital status', 'employee status', 'status'
+  ]
+
+  // Fields that should NEVER be skipped
+  const neverSkipFields = ['mobile number', 'phone number', 'contact number', 'mobile', 'phone', 'employee type', 'employment type', 'employee level', 'emp level', 'level', 'designation level', 'grade', 'band']
+
+  const normalizeHeader = (h) => {
+    if (!h) return ''
+    return String(h).toLowerCase().trim()
+      .replace(/[_\-\.\/\\]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+  }
+
+  const shouldSkip = (normalizedHeader) => {
+    // NEVER skip phone/mobile related fields
+    if (neverSkipFields.some(field => normalizedHeader.includes(field) || field.includes(normalizedHeader))) {
+      return false
+    }
+    
+    return skipPatterns.some(skip => {
+      const normalizedSkip = normalizeHeader(skip)
+      return normalizedHeader === normalizedSkip ||
+             normalizedHeader.startsWith(normalizedSkip + ' ') ||
+             normalizedHeader.endsWith(' ' + normalizedSkip) ||
+             (normalizedSkip.length > 3 && normalizedHeader.includes(normalizedSkip))
+    })
+  }
+
+  console.log('[RuleMapping] Starting header analysis...')
+
   headers.forEach((header, idx) => {
-    if (!header) {
-      // Check sample data to infer type
-      const samples = sampleRows.slice(0, 5).map(row => row[idx]).filter(v => v)
+    const samples = sampleRows.slice(0, 10).map(row => row[idx]).filter(v => v !== undefined && v !== null && v !== '')
+    const normalizedHeader = normalizeHeader(header)
 
-      // Check if all samples look like emails
-      if (samples.every(s => String(s).includes('@'))) {
-        mapping[idx] = 'email'
-        return
-      }
+    console.log(`[RuleMapping] Column ${idx}: "${header}" → "${normalizedHeader}"`)
 
-      // Check if all samples look like phone numbers
-      if (samples.every(s => /^[\d\s\-\+\(\)]{10,}$/.test(String(s)))) {
-        mapping[idx] = 'phone'
-        return
-      }
-
+    if (shouldSkip(normalizedHeader)) {
+      console.log(`[RuleMapping]   → SKIPPED`)
       mapping[idx] = 'ignore'
       return
     }
 
-    const normalizedHeader = header.toString().toLowerCase().trim()
-
-    // Check patterns
-    for (const [field, pattern] of Object.entries(patterns)) {
-      if (pattern.test(normalizedHeader)) {
-        mapping[idx] = field
-        return
-      }
-    }
-
-    // Check for partial matches
-    if (normalizedHeader.includes('email') || normalizedHeader.includes('mail')) {
-      mapping[idx] = 'email'
-    } else if (normalizedHeader.includes('phone') || normalizedHeader.includes('mobile')) {
-      mapping[idx] = 'phone'
-    } else if (normalizedHeader.includes('birth') || normalizedHeader === 'dob') {
-      mapping[idx] = 'dateOfBirth'
-    } else if (normalizedHeader.includes('join') || normalizedHeader === 'doj') {
-      mapping[idx] = 'dateOfJoining'
-    } else if (normalizedHeader.includes('name')) {
-      if (normalizedHeader.includes('first')) {
-        mapping[idx] = 'firstName'
-      } else if (normalizedHeader.includes('last') || normalizedHeader.includes('sur')) {
-        mapping[idx] = 'lastName'
-      } else {
-        mapping[idx] = 'fullName'
-      }
-    } else if (normalizedHeader.includes('dept')) {
-      mapping[idx] = 'department'
-    } else if (normalizedHeader.includes('design') || normalizedHeader.includes('title') || normalizedHeader.includes('position')) {
-      mapping[idx] = 'designation'
-    } else if (normalizedHeader === 'gender' || normalizedHeader === 'sex') {
-      mapping[idx] = 'gender'
-    } else {
-      // Check sample data
-      const samples = sampleRows.slice(0, 5).map(row => row[idx]).filter(v => v)
-      if (samples.every(s => String(s).includes('@'))) {
-        mapping[idx] = 'email'
-      } else if (samples.every(s => /^[\d\s\-\+\(\)]{10,}$/.test(String(s)))) {
-        mapping[idx] = 'phone'
+    // If no header, try to detect from samples
+    if (!header || header === '') {
+      const detected = detectFieldFromSamples(samples)
+      if (detected && !usedFields.has(detected)) {
+        console.log(`[RuleMapping]   → DETECTED FROM SAMPLES: ${detected}`)
+        mapping[idx] = detected
+        usedFields.add(detected)
       } else {
         mapping[idx] = 'ignore'
       }
+      return
+    }
+
+    // Try to match each field's keywords
+    let matched = false
+    for (const [field, keywords] of Object.entries(fieldKeywords)) {
+      if (usedFields.has(field)) continue
+      if (field === 'fullName' && (usedFields.has('firstName') || usedFields.has('lastName'))) continue
+
+      for (const keyword of keywords) {
+        const normalizedKeyword = normalizeHeader(keyword)
+        
+        // Exact match
+        if (normalizedHeader === normalizedKeyword) {
+          console.log(`[RuleMapping]   → EXACT: ${field}`)
+          mapping[idx] = field
+          usedFields.add(field)
+          matched = true
+          break
+        }
+        
+        // Partial match
+        if (normalizedHeader.includes(normalizedKeyword) ||
+            (normalizedKeyword.length > 4 && normalizedKeyword.includes(normalizedHeader))) {
+          console.log(`[RuleMapping]   → PARTIAL: ${field} (keyword: "${keyword}")`)
+          mapping[idx] = field
+          usedFields.add(field)
+          matched = true
+          break
+        }
+      }
+      if (matched) break
+    }
+
+    // If not matched, try sample-based detection
+    if (!matched) {
+      const detected = detectFieldFromSamples(samples)
+      if (detected && !usedFields.has(detected)) {
+        console.log(`[RuleMapping]   → DETECTED: ${detected}`)
+        mapping[idx] = detected
+        usedFields.add(detected)
+        matched = true
+      }
+    }
+
+    if (!matched) {
+      console.log(`[RuleMapping]   → NO MATCH`)
+      mapping[idx] = 'ignore'
     }
   })
 
+  console.log('[RuleMapping] Final mapping:', JSON.stringify(mapping))
   return mapping
 }
 
 /**
- * Get the best column mapping (AI first, fallback to rules)
+ * Get the best column mapping (pattern-based first, AI enhancement if needed)
+ * Pattern-based is deterministic and reliable; AI enhances unmapped fields
  */
 async function getColumnMapping(headers, sampleRows) {
-  // Try AI mapping first
-  const aiMapping = await aiMapColumns(headers, sampleRows)
-  if (aiMapping && Object.keys(aiMapping).length > 0) {
-    return { mapping: aiMapping, method: 'ai' }
+  console.log('[getColumnMapping] ═══════════════════════════════════════')
+  console.log('[getColumnMapping] Headers:', JSON.stringify(headers))
+  
+  // STEP 1: Pattern-based mapping FIRST (deterministic, reliable)
+  console.log('[getColumnMapping] STEP 1: Pattern-based mapping...')
+  const ruleMapping = ruleBasedColumnMapping(headers, sampleRows)
+  
+  // Check what pattern mapping found
+  const mappedFields = Object.values(ruleMapping).filter(v => v && v !== 'ignore' && v !== 'null')
+  const hasEmail = mappedFields.includes('email')
+  const hasName = mappedFields.includes('firstName') || mappedFields.includes('fullName')
+  
+  console.log(`[getColumnMapping] Pattern found ${mappedFields.length} fields:`, mappedFields)
+  console.log(`[getColumnMapping] Has email: ${hasEmail}, Has name: ${hasName}`)
+  
+  // STEP 2: If pattern missed essentials, enhance with AI
+  if (!hasEmail || !hasName) {
+    console.log('[getColumnMapping] STEP 2: Pattern incomplete, trying AI...')
+    const aiMapping = await aiMapColumns(headers, sampleRows)
+    
+    if (aiMapping && Object.keys(aiMapping).length > 0) {
+      console.log('[getColumnMapping] AI result:', JSON.stringify(aiMapping))
+      
+      // Merge: AI fills in what pattern missed
+      for (const [colIdx, field] of Object.entries(aiMapping)) {
+        if (field && field !== 'ignore' && field !== 'null' && 
+            (!ruleMapping[colIdx] || ruleMapping[colIdx] === 'ignore' || ruleMapping[colIdx] === 'null')) {
+          ruleMapping[colIdx] = field
+        }
+      }
+      return { mapping: ruleMapping, method: 'pattern+ai' }
+    }
   }
 
-  // Fallback to rule-based mapping
-  const ruleMapping = ruleBasedColumnMapping(headers, sampleRows)
-  return { mapping: ruleMapping, method: 'rules' }
+  return { mapping: ruleMapping, method: 'pattern' }
 }
 
 /**
@@ -1508,8 +1777,12 @@ export async function POST(request) {
       )
     }
 
-    const headers = rawData[0]
-    const dataRows = rawData.slice(1).filter(row => row.some(cell => cell !== undefined && cell !== null && cell !== ''))
+    // Smart header detection - find the actual header row
+    const headerRowIndex = findHeaderRow(rawData)
+    console.log(`[Bulk Import] Detected header row at index: ${headerRowIndex}`)
+
+    const headers = rawData[headerRowIndex]
+    const dataRows = rawData.slice(headerRowIndex + 1).filter(row => row.some(cell => cell !== undefined && cell !== null && cell !== ''))
 
     if (dataRows.length === 0) {
       return NextResponse.json(

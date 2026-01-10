@@ -18,8 +18,25 @@ import { UnreadMessagesProvider } from '@/contexts/UnreadMessagesContext'
 import { InAppNotificationProvider } from '@/contexts/InAppNotificationContext'
 import { ActionableToastProvider } from '@/contexts/ActionableToastContext'
 import { ChatWidgetProvider, useChatWidget } from '@/contexts/ChatWidgetContext'
+import { PageTransitionProvider, usePageTransition } from '@/contexts/PageTransitionContext'
 import { getCurrentUser, getEmployeeId, syncUserData, getToken } from '@/utils/userHelper'
 import CallAlertReceiver from '@/components/CallAlertReceiver'
+
+// Page transition loading overlay
+function PageTransitionOverlay() {
+  const { isNavigating } = usePageTransition()
+  
+  if (!isNavigating) return null
+  
+  return (
+    <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9998]">
+      <div className="flex flex-col items-center">
+        <Loader size="lg" />
+        <p className="mt-4 text-sm text-gray-600 animate-pulse">Loading...</p>
+      </div>
+    </div>
+  )
+}
 
 // Component to sync sidebar state with chat widget context
 function SidebarStateSync({ sidebarCollapsed }) {
@@ -286,10 +303,14 @@ export default function DashboardLayout({ children }) {
     <SocketProvider>
       <UnreadMessagesProvider>
         <ChatWidgetProvider>
+          <PageTransitionProvider>
           <InAppNotificationProvider>
             <ActionableToastProvider>
             {/* Sync sidebar state to chat widget context */}
             <SidebarStateSync sidebarCollapsed={sidebarCollapsed} />
+            
+            {/* Page transition loading overlay */}
+            <PageTransitionOverlay />
 
             {/* Main Layout Container - Flex Row */}
             <div className="flex h-screen w-full overflow-hidden" style={{ backgroundColor: 'var(--color-bg-main)' }}>
@@ -360,6 +381,7 @@ export default function DashboardLayout({ children }) {
             </div>
             </ActionableToastProvider>
           </InAppNotificationProvider>
+          </PageTransitionProvider>
         </ChatWidgetProvider>
       </UnreadMessagesProvider>
     </SocketProvider>

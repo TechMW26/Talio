@@ -654,7 +654,7 @@ export default function AadhaarVerificationSection({
       {showPreviewModal && (
         <ModalPortal show={true}>
           <div
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-[99999]"
+            className="fixed inset-0 modal-overlay-dark flex items-center justify-center p-4 z-[99999]"
             onClick={() => setShowPreviewModal(null)}
           >
             <div className="relative max-w-3xl w-full">

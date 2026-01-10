@@ -152,7 +152,7 @@ export default function CreateIdeaModal({ isOpen, onClose, onSuccess }) {
     >
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 modal-overlay-dark"
         onClick={onClose}
       />
       

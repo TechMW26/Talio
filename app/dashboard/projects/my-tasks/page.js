@@ -1090,7 +1090,7 @@ export default function MyTasksPage() {
       {/* Task Detail Modal - Opens when clicking task in Kanban view */}
       {selectedTask && !showRejectModal && (
         <Portal>
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4" onClick={(e) => e.target === e.currentTarget && setSelectedTask(null)}>
+          <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4" onClick={(e) => e.target === e.currentTarget && setSelectedTask(null)}>
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
               <div className="px-6 py-4 bg-gray-50 flex items-center justify-between flex-shrink-0">
                 <h3 className="text-lg font-semibold text-gray-800">Task Details</h3>

@@ -755,9 +755,25 @@ function CompanySettingsTab() {
                         required
                         className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-800"
                       >
-                        {(typeof Intl !== 'undefined' && Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : ['UTC', 'Asia/Kolkata', 'America/New_York', 'Europe/London']).map((tz) => (
-                          <option key={tz} value={tz}>{tz}</option>
-                        ))}
+                        {/* Show Asia/Kolkata (India) first, then other common timezones, then the rest alphabetically */}
+                        <option value="Asia/Kolkata">Asia/Kolkata (India Standard Time)</option>
+                        <optgroup label="Common Timezones">
+                          <option value="UTC">UTC</option>
+                          <option value="America/New_York">America/New_York (Eastern)</option>
+                          <option value="America/Los_Angeles">America/Los_Angeles (Pacific)</option>
+                          <option value="Europe/London">Europe/London (GMT/BST)</option>
+                          <option value="Asia/Dubai">Asia/Dubai (Gulf)</option>
+                          <option value="Asia/Singapore">Asia/Singapore</option>
+                          <option value="Asia/Tokyo">Asia/Tokyo (Japan)</option>
+                          <option value="Australia/Sydney">Australia/Sydney</option>
+                        </optgroup>
+                        <optgroup label="All Timezones">
+                          {(typeof Intl !== 'undefined' && Intl.supportedValuesOf ? Intl.supportedValuesOf('timeZone') : [])
+                            .filter(tz => !['Asia/Kolkata', 'UTC', 'America/New_York', 'America/Los_Angeles', 'Europe/London', 'Asia/Dubai', 'Asia/Singapore', 'Asia/Tokyo', 'Australia/Sydney'].includes(tz))
+                            .map((tz) => (
+                              <option key={tz} value={tz}>{tz}</option>
+                            ))}
+                        </optgroup>
                       </select>
                       <p className="text-xs text-gray-500 mt-1">All attendance records and notifications will use this timezone.</p>
                     </div>
@@ -1307,7 +1323,8 @@ function GeofenceLocationsManager() {
       {/* Modal - Rendered using Portal */}
       {isMounted && showModal && createPortal(
         <div
-          className="fixed inset-0 flex items-center justify-center p-4 z-[99999] bg-black/75"
+          className="fixed inset-0 flex items-center justify-center p-4 z-[99999]"
+          style={{ backgroundColor: 'rgba(255,255,255,0.6)' }}
           onClick={() => {
             setShowModal(false)
             setEditingLocation(null)

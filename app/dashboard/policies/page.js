@@ -351,7 +351,7 @@ export default function PoliciesPage() {
 
       {/* Add/Edit Modal */}
       <ModalPortal show={showModal}>
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center" style={{ zIndex: 99999 }}>
+        <div className="fixed inset-0 modal-overlay flex items-center justify-center" style={{ zIndex: 99999 }}>
           <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold text-gray-800 mb-4">
               {editingPolicy ? 'Edit Policy' : 'Add Policy'}
@@ -496,7 +496,7 @@ export default function PoliciesPage() {
 
       {/* Acknowledgment Modal */}
       <ModalPortal show={showAckModal}>
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center" style={{ zIndex: 99999 }}>
+        <div className="fixed inset-0 modal-overlay flex items-center justify-center" style={{ zIndex: 99999 }}>
           <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-2xl font-bold text-gray-800 flex items-center">

@@ -382,19 +382,19 @@ export default function FloatingChatWidget() {
                   </div>
                   <div>
                     {loadingEmployees ? (
-                      <div className="p-8 text-center">
-                        <Loader size="sm" />
-                        <p className="text-gray-500 text-sm mt-2">Loading people...</p>
+                      <div className="p-8 flex flex-col items-center justify-center">
+                        <Loader size="lg" />
+                        <p className="text-gray-500 text-sm mt-3">Loading people...</p>
                       </div>
                     ) : filteredEmployees.length > 0 ? (
                       filteredEmployees.map(emp => (
                         <button
                           key={emp._id}
                           onClick={() => startNewChat(emp._id)}
-                          className="w-full px-4 py-3 flex items-center gap-3 hover:bg-white/60 transition-colors border-b border-white/30"
+                          className="w-full px-4 py-3 flex items-center gap-4 hover:bg-white/60 transition-colors border-b border-white/30"
                         >
                           <div 
-                            className="w-10 h-10 rounded-full flex items-center justify-center text-white font-medium text-sm shadow-sm overflow-hidden"
+                            className="w-11 h-11 rounded-full flex items-center justify-center text-white font-medium text-sm shadow-sm overflow-hidden flex-shrink-0"
                             style={{ backgroundColor: primaryColor }}
                           >
                             {emp.profilePicture ? (
@@ -403,11 +403,11 @@ export default function FloatingChatWidget() {
                               <>{emp.firstName?.[0]}{emp.lastName?.[0]}</>
                             )}
                           </div>
-                          <div className="flex-1 text-left">
-                            <p className="font-medium text-gray-900 text-sm">
+                          <div className="flex-1 text-left min-w-0">
+                            <p className="font-medium text-gray-900 text-sm truncate">
                               {emp.firstName} {emp.lastName}
                             </p>
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-gray-500 truncate">
                               {emp.designation?.title || emp.department?.name || emp.email}
                             </p>
                           </div>

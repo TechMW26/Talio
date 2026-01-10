@@ -918,7 +918,7 @@ export default function ProductivityPage() {
       {/* Session Detail Modal */}
       <ModalPortal show={!!selectedSession}>
         {selectedSession && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-2 sm:p-4">
+        <div className="fixed inset-0 flex items-center justify-center z-[9999] p-2 sm:p-4" style={{ backgroundColor: 'rgba(255,255,255,0.6)' }}>
           <div className="bg-white rounded-2xl shadow-xl max-w-7xl w-full max-h-[95vh] overflow-hidden flex flex-col">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-3 sm:p-4 border-b bg-gray-50">
@@ -997,13 +997,13 @@ export default function ProductivityPage() {
                         <>
                           <button
                             onClick={() => setCurrentSlideIndex(prev => prev > 0 ? prev - 1 : selectedSession.screenshots.length - 1)}
-                            className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-white/20 hover:bg-white/40 rounded-full transition backdrop-blur-sm"
+                            className="absolute left-2 top-1/2 -translate-y-1/2 p-2 bg-white/20 hover:bg-white/40 rounded-full transition"
                           >
                             <HiOutlineChevronLeft className="w-5 h-5 text-white" />
                           </button>
                           <button
                             onClick={() => setCurrentSlideIndex(prev => prev < selectedSession.screenshots.length - 1 ? prev + 1 : 0)}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-white/20 hover:bg-white/40 rounded-full transition backdrop-blur-sm"
+                            className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-white/20 hover:bg-white/40 rounded-full transition"
                           >
                             <HiOutlineChevronRight className="w-5 h-5 text-white" />
                           </button>
@@ -1011,7 +1011,7 @@ export default function ProductivityPage() {
                       )}
                       
                       {/* Slide Counter */}
-                      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-3 py-1.5 rounded-full backdrop-blur-sm">
+                      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white text-xs px-3 py-1.5 rounded-full">
                         {currentSlideIndex + 1} / {selectedSession.screenshots.length}
                       </div>
                     </>

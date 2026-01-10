@@ -2226,7 +2226,7 @@ export default function ProjectDetailPage() {
       {/* Create Task Modal */}
       {showCreateTask && (
       <Portal>
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between flex-shrink-0">
               <h3 className="text-xl font-bold text-gray-900">Create New Task</h3>
@@ -2426,7 +2426,7 @@ export default function ProjectDetailPage() {
       {/* Task ETA Modal (for self-assignment) */}
       {showTaskEtaModal && pendingTaskData && (
       <Portal>
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between">
               <h3 className="text-xl font-bold text-gray-900">Set Your ETA</h3>
@@ -2582,7 +2582,7 @@ export default function ProjectDetailPage() {
       {/* Edit Task Modal */}
       {showEditTaskModal && editTaskForm && (
       <Portal>
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between">
               <h3 className="text-xl font-bold text-gray-900">Edit Task</h3>
@@ -2831,7 +2831,7 @@ export default function ProjectDetailPage() {
       {/* Reject Invitation Modal */}
       {showRejectInvitationModal && (
       <Portal>
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-modal-enter">
             <div className="p-6">
               <h3 className="text-lg font-semibold text-gray-800 mb-4">Reject Project Invitation</h3>
@@ -2873,7 +2873,7 @@ export default function ProjectDetailPage() {
       {/* Task Detail Modal */}
       {selectedTask && (
       <Portal>
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between flex-shrink-0">
               <h3 className="text-lg font-semibold text-gray-800">Task Details</h3>
@@ -3431,7 +3431,7 @@ export default function ProjectDetailPage() {
       {/* Delete Task Modal */}
       {showDeleteTaskModal && taskToDelete && (
       <Portal>
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-modal-enter">
             <div className="p-6">
               <h3 className="text-lg font-semibold text-gray-800 mb-4">
@@ -3484,7 +3484,7 @@ export default function ProjectDetailPage() {
       {/* Reassign Task Modal */}
       {showReassignModal && reassignTask && (
       <Portal>
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-800">Reassign Task</h3>
@@ -3557,7 +3557,7 @@ export default function ProjectDetailPage() {
       {/* Reason Modal for Status Changes */}
       {showReasonModal && pendingStatusChange && (
         <Portal>
-          <div className="fixed inset-0 bg-black/50 z-[10000] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(255,255,255,0.6)' }}>
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all">
               <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-amber-500 to-orange-500 rounded-t-xl">
                 <h3 className="text-lg font-semibold text-white">Reason Required</h3>

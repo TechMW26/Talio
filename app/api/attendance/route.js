@@ -7,6 +7,13 @@ import { calculateEffectiveWorkHours, determineAttendanceStatus } from '@/lib/at
 import { reverseGeocode, validateLocationData } from '@/lib/geocoding'
 import { emitAttendanceUpdate, emitDashboardRefresh } from '@/lib/realtimeEvents'
 import { getAuthAndModels } from '@/lib/auth'
+import { 
+  getTimezone, 
+  toTimezoneDate, 
+  compareTimeToOfficeHours, 
+  getDayNameInTimezone,
+  DEFAULT_TIMEZONE 
+} from '@/lib/timezone'
 
 // Calculate distance between two coordinates (Haversine formula)
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -387,10 +394,9 @@ export async function POST(request) {
     if (type === 'clock-in') {
       // --- Validation: Check Working Days & Holidays ---
       // Use Company Timezone for day checks to align with business operations
-      const companyTimezone = settings?.timezone || 'Asia/Kolkata';
-      const localNow = new Date(new Date().toLocaleString("en-US", { timeZone: companyTimezone }));
-      const daysOfWeek = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-      const currentDayName = daysOfWeek[localNow.getDay()];
+      const companyTimezone = getTimezone(settings?.timezone);
+      const currentDayName = getDayNameInTimezone(new Date(), companyTimezone);
+      const localNow = toTimezoneDate(new Date(), companyTimezone);
 
       // Default to Mon-Fri if not specified
       const workingDays = settings?.workingDays || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
@@ -470,25 +476,28 @@ export async function POST(request) {
       }
 
       const checkInTime = new Date()
-
+      
       // Use office timings from settings (default: 09:00 - 18:00)
-      const [startHour, startMin] = (settings?.checkInTime || '09:00').split(':').map(Number)
-      const [endHour, endMin] = (settings?.checkOutTime || '18:00').split(':').map(Number)
+      // Note: companyTimezone is already declared above for working day checks
+      const officeCheckInTime = settings?.checkInTime || '09:00'
       const lateThreshold = settings?.lateThreshold || 15 // Grace period in minutes
 
-      const officeStartTime = new Date(checkInTime)
-      officeStartTime.setHours(startHour, startMin, 0, 0)
+      // CRITICAL: Compare check-in time against office hours using company timezone
+      // This ensures proper early/late detection regardless of server timezone
+      const timeComparison = compareTimeToOfficeHours(
+        checkInTime,
+        officeCheckInTime,
+        companyTimezone,
+        lateThreshold
+      );
 
-      const lateThresholdTime = new Date(officeStartTime)
-      lateThresholdTime.setMinutes(lateThresholdTime.getMinutes() + lateThreshold)
-
-      // Determine check-in status based on settings
-      let checkInStatus = 'on-time'
-      if (checkInTime < officeStartTime) {
-        checkInStatus = 'early'
-      } else if (checkInTime > lateThresholdTime) {
-        checkInStatus = 'late'
-      }
+      // Determine check-in status based on timezone-aware comparison
+      const checkInStatus = timeComparison.status;
+      
+      // Log for debugging (can be removed in production)
+      console.log(`[Attendance Check-in] Timezone: ${companyTimezone}, Office: ${officeCheckInTime}, ` +
+                  `Actual: ${timeComparison.actualTime.toLocaleTimeString('en-IN', { timeZone: companyTimezone })}, ` +
+                  `Status: ${checkInStatus}, Diff: ${timeComparison.minutesDiff} mins`)
 
       // Server-side reverse geocoding for accurate address (only if location provided)
       let resolvedAddress = null
@@ -793,26 +802,30 @@ export async function POST(request) {
           : `Check-out: ${checkOutLocationWarning}`
       }
 
-      // Use office end time from settings
-      const [endHour, endMin] = (settings?.checkOutTime || '18:00').split(':').map(Number)
+      // Get company timezone for comparison
+      const companyTimezone = getTimezone(settings?.timezone);
+      const officeCheckOutTime = settings?.checkOutTime || '18:00';
 
-      // Construct office end time in IST (Asia/Kolkata) to ensure correct comparison
-      // regardless of server timezone
-      const checkOutDateIST = new Date(checkOutTime).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // YYYY-MM-DD
-      const officeEndTimeISO = `${checkOutDateIST}T${String(endHour).padStart(2, '0')}:${String(endMin).padStart(2, '0')}:00+05:30`;
-      const officeEndTime = new Date(officeEndTimeISO);
+      // Compare check-out time against office hours using company timezone
+      const checkOutComparison = compareTimeToOfficeHours(
+        checkOutTime,
+        officeCheckOutTime,
+        companyTimezone,
+        0 // No grace period for check-out
+      );
 
       // Determine check-out status
+      // "early" = left before office end time (negative for employee)
+      // "on-time" = left at or after office end time
       let checkOutStatus = 'on-time'
-
-      // Allow a small buffer (e.g., 1 minute) for precision issues
-      const bufferMs = 60 * 1000;
-
-      if (checkOutTime.getTime() < officeEndTime.getTime() - bufferMs) {
+      if (checkOutComparison.minutesDiff < -1) { // 1 minute buffer for precision
         checkOutStatus = 'early'
       }
-      // If checked out after office end time, it's still considered "on-time" (or overtime), not "late"
-      // "Late" usually implies a negative connotation for check-outs (which doesn't make sense)
+      
+      // Log for debugging
+      console.log(`[Attendance Check-out] Timezone: ${companyTimezone}, Office: ${officeCheckOutTime}, ` +
+                  `Actual: ${checkOutComparison.actualTime.toLocaleTimeString('en-IN', { timeZone: companyTimezone })}, ` +
+                  `Status: ${checkOutStatus}, Diff: ${checkOutComparison.minutesDiff} mins`)
 
       attendance.checkOutStatus = checkOutStatus
 

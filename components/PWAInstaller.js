@@ -96,7 +96,7 @@ export default function PWAInstaller() {
 
   return (
     <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:right-4 sm:max-w-sm z-50 animate-slide-up">
-      <div className="bg-white rounded-lg shadow-xl border border-gray-200 p-4 backdrop-blur-sm">
+      <div className="bg-white rounded-lg shadow-xl border border-gray-200 p-4">
         <div className="flex items-start space-x-3">
           <div className="flex-shrink-0">
             <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">

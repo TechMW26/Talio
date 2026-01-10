@@ -350,7 +350,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
           <div className="flex items-center space-x-2 sm:space-x-4">
             <button
               onClick={toggleSidebar}
-              className="lg:hidden focus:outline-none p-1"
+              className="md:hidden focus:outline-none p-1"
             >
               <img
                 src="/hamburger.png"
@@ -377,7 +377,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
         <div className="flex items-center space-x-2 sm:space-x-4 flex-1">
           <button
             onClick={toggleSidebar}
-            className="lg:hidden focus:outline-none p-1"
+            className="md:hidden focus:outline-none p-1"
           >
             <img
               src="/hamburger.png"
@@ -388,11 +388,12 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
           </button>
 
           {/* Search bar - Desktop */}
-          <div ref={searchRef} className="hidden md:block relative w-64 lg:w-96">
+          <div ref={searchRef} className="hidden lg:block relative w-64 lg:w-96">
             {/* Backdrop overlay when search is active */}
             {(showSearchResults || searchQuery.length >= 2) && (
               <div 
-                className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[100]"
+                className="fixed inset-0 z-[100]"
+                style={{ backgroundColor: 'rgba(255,255,255,0.6)' }}
                 onClick={() => {
                   setSearchQuery('')
                   setShowSearchResults(false)
@@ -401,7 +402,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
             )}
             
             {/* Unified Search Container */}
-            <div className={`z-[101] ${(showSearchResults || searchQuery.length >= 2) ? 'fixed left-1/2 -translate-x-1/2 top-4 w-[90%] max-w-xl bg-white/95 backdrop-blur-xl rounded-xl shadow-2xl border border-gray-200 overflow-hidden' : 'relative'}`}>
+            <div className={`z-[101] ${(showSearchResults || searchQuery.length >= 2) ? 'fixed left-1/2 -translate-x-1/2 top-4 w-[90%] max-w-xl bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden' : 'relative'}`}>
               <div className="relative flex items-center">
                 <FaSearch className="absolute left-3 text-gray-400 w-4 h-4 pointer-events-none z-10" />
                 <input
@@ -437,7 +438,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                     if (items.length === 0) return null
                     return (
                       <div key={category} className="border-b border-gray-100 last:border-b-0">
-                        <div className="px-4 py-2 bg-gray-50/80 font-semibold text-xs text-gray-600 uppercase sticky top-0 backdrop-blur-sm">
+                        <div className="px-4 py-2 bg-gray-50 font-semibold text-xs text-gray-600 uppercase sticky top-0">
                           {getCategoryLabel(category)} <span className="text-gray-400">({items.length})</span>
                         </div>
                         {items.map((item, index) => (
@@ -517,25 +518,6 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
 
           {/* PWA Status - Hidden */}
           {/* <PWAStatus /> */}
-
-          {/* Mobile Search Icon */}
-          <button
-            onClick={() => setShowMobileSearch(true)}
-            className="md:hidden p-2 rounded-lg transition-colors"
-            style={{
-              color: 'var(--color-text-secondary)',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.color = primaryColor
-              e.currentTarget.style.backgroundColor = primaryLight
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.color = 'var(--color-text-secondary)'
-              e.currentTarget.style.backgroundColor = 'transparent'
-            }}
-          >
-            <FaSearch className="w-5 h-5" />
-          </button>
 
           {/* Notifications */}
           {/* <div ref={notifRef} className="relative mt-3 md:mt-0">
@@ -635,22 +617,12 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                 {/* Notification badge placeholder - can be added here if needed */}
                 {/* Example: {hasNotifications && <UnreadBadge count={notificationCount} className="top-0 right-0" />} */}
               </div>
-              <div className="hidden md:block text-left">
-                <p className="text-sm font-medium text-gray-900 truncate max-w-32">
-                  {employeeData ? `${employeeData.firstName} ${employeeData.lastName}` :
-                    user?.firstName ? `${user.firstName} ${user.lastName}` :
-                      user?.email || 'User'}
-                </p>
-                <p className="text-xs text-gray-500">
-                  {formatDesignation(employeeData?.designation || user?.designation, employeeData) || user?.role || 'Employee'}
-                </p>
-              </div>
             </button>
 
             {showProfileMenu && (
               <>
-                <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[102]" onClick={() => setShowProfileMenu(false)} />
-                <div className="absolute right-0 mt-2 w-44 sm:w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-[103]">
+                <div className="fixed inset-0 z-[9998]" style={{ backgroundColor: 'rgba(255,255,255,0.6)' }} onClick={() => setShowProfileMenu(false)} />
+                <div className="absolute right-0 mt-2 w-44 sm:w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-[9999]">
                   {/* User Info Section */}
                   <div className="px-2 md:px-4 py-3 border-b border-gray-200">
                     <div className="flex items-center space-x-3">
@@ -709,7 +681,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
 
       {/* Mobile Search Fullscreen Modal */}
       {showMobileSearch && (
-        <div className="fixed inset-0 bg-white z-[100] md:hidden">
+        <div className="fixed inset-0 bg-white z-[100] lg:hidden">
           <div className="flex flex-col h-full">
             {/* Search Header - Match header height */}
             <div className="flex items-center gap-3 px-3 h-16 border-b border-gray-200 bg-white">

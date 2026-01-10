@@ -1423,12 +1423,12 @@ export default function ProfilePage() {
       {/* Image Editor Modal */}
       <ModalPortal show={showImageEditor}>
         <div
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-0 sm:p-4"
+          className="fixed inset-0 modal-overlay-dark flex items-center justify-center p-0 sm:p-4"
           style={{ zIndex: 99999 }}
         >
           <div className="bg-white rounded-none sm:rounded-3xl shadow-2xl w-full h-full sm:max-w-5xl sm:max-h-[95vh] sm:h-auto overflow-hidden flex flex-col">
             {/* Header */}
-            <div className="px-4 sm:px-6 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50/80 backdrop-blur-sm flex-shrink-0">
+            <div className="px-4 sm:px-6 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50 flex-shrink-0">
               <div className="flex flex-col">
                 <h2 className="text-base sm:text-lg font-semibold text-slate-900">
                   Edit Profile Picture
@@ -1640,7 +1640,7 @@ export default function ProfilePage() {
             </div>
 
             {/* Footer */}
-            <div className="px-4 sm:px-6 py-3 border-t border-slate-200 bg-slate-50/80 backdrop-blur-sm flex items-center justify-end gap-2 sm:gap-3 flex-shrink-0">
+            <div className="px-4 sm:px-6 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-2 sm:gap-3 flex-shrink-0">
               <button
                 onClick={closeImageEditor}
                 disabled={uploadingImage}

@@ -917,7 +917,7 @@ export default function AssignedTasksPage() {
       {/* Edit Task Modal */}
       {showEditModal && selectedTask && (
       <Portal>
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between">
               <h3 className="text-xl font-bold text-gray-900">Edit Task</h3>
@@ -986,7 +986,7 @@ export default function AssignedTasksPage() {
       {/* Reason for Status Change Modal */}
       {showReasonModal && pendingStatusChange && (
       <Portal>
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[10000] p-4" onClick={(e) => e.target === e.currentTarget && (setShowReasonModal(false), setPendingStatusChange(null), setStatusChangeReason(''))}>
+        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[10000] p-4" onClick={(e) => e.target === e.currentTarget && (setShowReasonModal(false), setPendingStatusChange(null), setStatusChangeReason(''))}>
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-modal-enter">
             <div className="px-6 py-4 bg-gradient-to-r from-blue-500 to-indigo-500 flex items-center justify-between rounded-t-2xl">
               <h3 className="text-xl font-bold text-white">Reason for Status Change</h3>
@@ -1049,7 +1049,7 @@ export default function AssignedTasksPage() {
       {/* Delete Task Modal */}
       {showDeleteModal && selectedTask && (
       <Portal>
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between">
               <h3 className="text-xl font-bold text-gray-900">Delete Task</h3>
@@ -1092,7 +1092,7 @@ export default function AssignedTasksPage() {
       {/* Add Subtask Modal */}
       {showAddSubtaskModal && selectedTask && (
       <Portal>
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between">
               <h3 className="text-xl font-bold text-gray-900">Add Subtask</h3>
@@ -1132,7 +1132,7 @@ export default function AssignedTasksPage() {
       {/* Reassign Modal */}
       {showReassignModal && selectedTask && (
       <Portal>
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between">
               <h3 className="text-xl font-bold text-gray-900">Reassign Task</h3>
@@ -1176,7 +1176,7 @@ export default function AssignedTasksPage() {
       {/* Add User Modal */}
       {showAddUserModal && selectedTask && (
       <Portal>
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between">
               <h3 className="text-xl font-bold text-gray-900">Add Users to Task</h3>
@@ -1232,7 +1232,7 @@ export default function AssignedTasksPage() {
       {/* Deletion Approval Modal */}
       {showDeletionApprovalModal && selectedTask && (
       <Portal>
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between">
               <h3 className="text-xl font-bold text-gray-900">Deletion Request</h3>
@@ -1318,7 +1318,7 @@ export default function AssignedTasksPage() {
       {/* Task Detail Modal - Opens when clicking task in Kanban view */}
       {selectedTask && !showEditModal && !showDeleteModal && !showAddUserModal && !showReassignModal && !showAddSubtaskModal && !showDeletionApprovalModal && (
         <Portal>
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4" onClick={(e) => e.target === e.currentTarget && setSelectedTask(null)}>
+          <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4" onClick={(e) => e.target === e.currentTarget && setSelectedTask(null)}>
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
               <div className="px-6 py-4 bg-gray-50 flex items-center justify-between flex-shrink-0">
                 <h3 className="text-lg font-semibold text-gray-800">Task Details</h3>

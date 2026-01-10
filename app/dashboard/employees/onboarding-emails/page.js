@@ -685,7 +685,7 @@ export default function OnboardingEmailsPage() {
 
       {/* Send Email Modal */}
       {showSendModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-overlay">
           <div className="bg-theme-bg-card border border-theme-bg-hover rounded-2xl w-full max-w-md p-6 shadow-xl">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-theme-text-primary flex items-center gap-2">

@@ -238,7 +238,7 @@ export default function LeaveRequestsPage() {
 
       {/* Leave Details Modal */}
       <ModalPortal show={showModal && selectedLeave}>
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center" style={{ zIndex: 99999 }}>
+        <div className="fixed inset-0 modal-overlay flex items-center justify-center" style={{ zIndex: 99999 }}>
           <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-screen overflow-y-auto">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold text-gray-800">Leave Request Details</h2>

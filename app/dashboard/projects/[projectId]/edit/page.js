@@ -582,7 +582,7 @@ export default function EditProjectPage() {
       {/* Add Member Modal */}
       {showAddMemberModal && (
       <Portal>
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
             <div className="p-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-2">
@@ -711,7 +711,7 @@ export default function EditProjectPage() {
       {/* Project Head Search Modal */}
       {showHeadSearch && (
       <Portal>
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
             <div className="p-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
               <h3 className="text-lg font-semibold text-gray-800">Add Project Head</h3>

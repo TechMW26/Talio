@@ -748,7 +748,7 @@ export default function EmployeesPage() {
       </div>
 
       {deleteModal.show && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ backgroundColor: 'rgba(255,255,255,0.6)' }}>
           <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 overflow-hidden">
             <div className="bg-red-50 px-6 py-4 border-b border-red-100">
               <div className="flex items-center gap-3">
@@ -794,7 +794,7 @@ export default function EmployeesPage() {
       )}
 
       {showBulkEditModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ backgroundColor: 'rgba(255,255,255,0.6)' }}>
           <div className="bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 overflow-hidden">
             <div className="bg-purple-50 px-6 py-4 border-b border-purple-100">
               <div className="flex items-center justify-between">

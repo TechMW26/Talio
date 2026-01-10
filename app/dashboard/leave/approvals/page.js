@@ -315,7 +315,7 @@ export default function LeaveApprovalsPage() {
 
       {/* Details Modal */}
       {showModal && selectedLeave && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center style={{ zIndex: 99999 }}">
+        <div className="fixed inset-0 modal-overlay flex items-center justify-center style={{ zIndex: 99999 }}">
           <div className="bg-white rounded-lg p-6 w-full max-w-2xl">
             <h2 className="text-2xl font-bold text-gray-800 mb-4">Leave Request Details</h2>
             

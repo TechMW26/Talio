@@ -167,7 +167,7 @@ export function PageLoader({ message = 'Loading...', size = 'lg' }) {
  */
 export function FullScreenLoader({ message = 'Loading...' }) {
   return (
-    <div className="fixed inset-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50">
+    <div className="fixed inset-0 modal-overlay-bg flex items-center justify-center z-50">
       <div className="flex flex-col items-center">
         <Loader size="xl" />
         {message && (
