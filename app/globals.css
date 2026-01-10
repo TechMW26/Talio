@@ -441,15 +441,15 @@ body {
   animation: fadeIn 0.3s ease-in-out;
 }
 
-/* Backdrop fade-in animation with blur */
+/* Backdrop fade-in animation with background color */
 @keyframes fadeInBackdrop {
   from {
     opacity: 0;
-    backdrop-filter: blur(0px);
+    background-color: rgba(255, 255, 255, 0.1);
   }
   to {
     opacity: 1;
-    backdrop-filter: blur(4px);
+    background-color: rgba(255, 255, 255, 0.4);
   }
 }
 

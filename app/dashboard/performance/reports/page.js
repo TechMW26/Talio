@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import toast from '@/utils/toast'
 import * as XLSX from 'xlsx'
-import { FaDownload, FaChartBar, FaUsers, FaTrophy, FaCalendarAlt, FaFilter, FaRobot, FaFileExcel, FaChevronDown, FaChevronUp, FaBrain, FaStar, FaAward, FaTasks, FaBullseye, FaSearch, FaClock, FaCheckCircle, FaExclamationTriangle, FaArrowUp, FaArrowDown, FaMinus, FaUserCheck, FaClipboardCheck, FaFire, FaLightbulb, FaExclamationCircle } from 'react-icons/fa'
+import { FaDownload, FaChartBar, FaUsers, FaTrophy, FaCalendarAlt, FaFilter, FaRobot, FaFileExcel, FaChevronDown, FaChevronUp, FaBrain, FaStar, FaAward, FaTasks, FaBullseye, FaSearch, FaClock, FaCheckCircle, FaExclamationTriangle, FaArrowUp, FaArrowDown, FaMinus, FaUserCheck, FaClipboardCheck, FaFire, FaLightbulb, FaExclamationCircle, FaRocket } from 'react-icons/fa'
 import Loader from '@/components/ui/Loader'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Area, AreaChart, ComposedChart } from 'recharts'
 import CustomTooltip from '@/components/charts/CustomTooltip'
@@ -137,7 +137,7 @@ export default function PerformanceReportsPage() {
     departmentAnalysis: true,
     employeeMetrics: true,
     actionableInsights: true,
-    aiInsights: false
+    aiInsights: true
   })
   const [searchTerm, setSearchTerm] = useState('')
   const [isDepartmentHead, setIsDepartmentHead] = useState(false)
@@ -901,6 +901,128 @@ export default function PerformanceReportsPage() {
         </div>
       </div>
 
+      {/* ==================== AI INSIGHTS (TOP) ==================== */}
+      {aiInsights && (
+        <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg shadow-md p-6 mb-6 border border-purple-200">
+          <div 
+            className="flex items-center justify-between cursor-pointer mb-4"
+            onClick={() => toggleSection('aiInsights')}
+          >
+            <h2 className="text-xl font-bold text-gray-800 flex items-center space-x-2">
+              <FaBrain className="text-purple-600" />
+              <span>AI-Powered Insights</span>
+            </h2>
+            {expandedSections.aiInsights ? <FaChevronUp /> : <FaChevronDown />}
+          </div>
+          
+          {expandedSections.aiInsights && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* Key Strengths */}
+              <div className="bg-white rounded-lg p-4 border border-green-200">
+                <h3 className="font-semibold text-green-800 mb-3 flex items-center space-x-2">
+                  <FaTrophy className="text-yellow-500" />
+                  <span>Key Strengths</span>
+                </h3>
+                <ul className="space-y-2">
+                  {(Array.isArray(aiInsights.strengths) ? aiInsights.strengths : [aiInsights.strengths]).map((item, idx) => (
+                    <li key={idx} className="flex items-start space-x-2 text-sm text-gray-700">
+                      <span className="text-green-500 mt-0.5">✓</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Areas for Improvement */}
+              <div className="bg-white rounded-lg p-4 border border-amber-200">
+                <h3 className="font-semibold text-amber-800 mb-3 flex items-center space-x-2">
+                  <FaChartBar className="text-amber-500" />
+                  <span>Areas to Improve</span>
+                </h3>
+                <ul className="space-y-2">
+                  {(Array.isArray(aiInsights.improvements) ? aiInsights.improvements : [aiInsights.improvements]).map((item, idx) => (
+                    <li key={idx} className="flex items-start space-x-2 text-sm text-gray-700">
+                      <span className="text-amber-500 mt-0.5">⚠</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Recommendations */}
+              <div className="bg-white rounded-lg p-4 border border-blue-200">
+                <h3 className="font-semibold text-blue-800 mb-3 flex items-center space-x-2">
+                  <FaBullseye className="text-blue-500" />
+                  <span>Action Items</span>
+                </h3>
+                <ul className="space-y-2">
+                  {(Array.isArray(aiInsights.recommendations) ? aiInsights.recommendations : [aiInsights.recommendations]).map((item, idx) => (
+                    <li key={idx} className="flex items-start space-x-2 text-sm text-gray-700">
+                      <span className="text-blue-500 mt-0.5">→</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {/* Predictions */}
+              {aiInsights.predictions && aiInsights.predictions.length > 0 && (
+                <div className="bg-white rounded-lg p-4 border border-purple-200">
+                  <h3 className="font-semibold text-purple-800 mb-3 flex items-center space-x-2">
+                    <FaBrain className="text-purple-500" />
+                    <span>Predictions</span>
+                  </h3>
+                  <ul className="space-y-2">
+                    {aiInsights.predictions.map((item, idx) => (
+                      <li key={idx} className="flex items-start space-x-2 text-sm text-gray-700">
+                        <span className="text-purple-500 mt-0.5">📈</span>
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Risk Alerts */}
+              {aiInsights.riskAlerts && aiInsights.riskAlerts.length > 0 && (
+                <div className="bg-white rounded-lg p-4 border border-red-200">
+                  <h3 className="font-semibold text-red-800 mb-3 flex items-center space-x-2">
+                    <FaExclamationTriangle className="text-red-500" />
+                    <span>Risk Alerts</span>
+                  </h3>
+                  <ul className="space-y-2">
+                    {aiInsights.riskAlerts.map((item, idx) => (
+                      <li key={idx} className="flex items-start space-x-2 text-sm text-gray-700">
+                        <span className="text-red-500 mt-0.5">⚡</span>
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Quick Wins */}
+              {aiInsights.quickWins && aiInsights.quickWins.length > 0 && (
+                <div className="bg-white rounded-lg p-4 border border-teal-200">
+                  <h3 className="font-semibold text-teal-800 mb-3 flex items-center space-x-2">
+                    <FaRocket className="text-teal-500" />
+                    <span>Quick Wins</span>
+                  </h3>
+                  <ul className="space-y-2">
+                    {aiInsights.quickWins.map((item, idx) => (
+                      <li key={idx} className="flex items-start space-x-2 text-sm text-gray-700">
+                        <span className="text-teal-500 mt-0.5">🚀</span>
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ==================== EXECUTIVE SUMMARY ==================== */}
       <div className="bg-gradient-to-r from-blue-50 via-white to-purple-50 rounded-lg shadow-lg p-6 mb-6 border border-blue-200">
         <div 
@@ -1332,48 +1454,6 @@ export default function PerformanceReportsPage() {
           </div>
         )}
       </div>
-
-      {/* AI Insights Section */}
-      {aiInsights && (
-        <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg shadow-md p-6 mb-6 border border-purple-200">
-          <div 
-            className="flex items-center justify-between cursor-pointer mb-4"
-            onClick={() => toggleSection('aiInsights')}
-          >
-            <h2 className="text-xl font-bold text-gray-800 flex items-center space-x-2">
-              <FaBrain className="text-purple-600" />
-              <span>AI-Powered Insights</span>
-            </h2>
-            {expandedSections.aiInsights ? <FaChevronUp /> : <FaChevronDown />}
-          </div>
-          
-          {expandedSections.aiInsights && (
-            <div className="space-y-4">
-              <div className="bg-white rounded-lg p-4 border border-purple-100">
-                <h3 className="font-semibold text-purple-800 mb-2 flex items-center space-x-2">
-                  <FaTrophy className="text-yellow-500" />
-                  <span>Key Strengths</span>
-                </h3>
-                <p className="text-gray-700">{aiInsights.strengths}</p>
-              </div>
-              <div className="bg-white rounded-lg p-4 border border-purple-100">
-                <h3 className="font-semibold text-purple-800 mb-2 flex items-center space-x-2">
-                  <FaChartBar className="text-blue-500" />
-                  <span>Areas for Improvement</span>
-                </h3>
-                <p className="text-gray-700">{aiInsights.improvements}</p>
-              </div>
-              <div className="bg-white rounded-lg p-4 border border-purple-100">
-                <h3 className="font-semibold text-purple-800 mb-2 flex items-center space-x-2">
-                  <FaBullseye className="text-green-500" />
-                  <span>Recommendations</span>
-                </h3>
-                <p className="text-gray-700">{aiInsights.recommendations}</p>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Overview Metrics */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">

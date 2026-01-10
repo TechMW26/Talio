@@ -129,7 +129,7 @@ export default function MiraTransitionOverlay() {
 
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d', { alpha: true })
-    const dpr = Math.min(window.devicePixelRatio || 1, 2)
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5)
 
     const resize = () => {
       canvas.width = window.innerWidth * dpr
@@ -148,8 +148,8 @@ export default function MiraTransitionOverlay() {
     const centerY = height / 2
     const sourcePos = sourcePositionRef.current
     
-    // Match GlobalAILoadingOverlay particle count
-    const PARTICLE_COUNT = 1500
+    // Match GlobalAILoadingOverlay particle count - reduced for performance
+    const PARTICLE_COUNT = 400
     const CENTER_SPHERE_RADIUS = Math.min(160, Math.max(90, Math.min(width, height) * 0.14))
     const sourceRadius = sourcePos.width * 0.30
     const Z_PERSPECTIVE = 400
@@ -186,27 +186,16 @@ export default function MiraTransitionOverlay() {
 
       particlesRef.current.push({
         // Starting position (header sphere)
-        startX,
-        startY,
-        startZ,
+        startX, startY, startZ,
         // Current position (animated)
-        x: startX,
-        y: startY,
-        z: startZ,
-        // Scatter position (final scattered location)
-        scatterX,
-        scatterY,
-        scatterZ,
+        x: startX, y: startY, z: startZ,
+        // Scatter position
+        scatterX, scatterY, scatterZ,
         // Final center sphere position
         targetX, targetY, targetZ,
-        // Match GlobalAILoadingOverlay particle sizes EXACTLY
-        size: Math.random() * 1 + 0.8,
-        hueOffset: Math.random() * 60 - 30,
-        phaseOffset: Math.random() * Math.PI * 2,
-        oscillateSpeed: 1 + Math.random() * 2,
-        oscillateAmount: CENTER_SPHERE_RADIUS * 0.15,
-        oscillatePhase: Math.random() * Math.PI * 2,
-        // Random delay for staggered emergence (0 to 0.4 of phase duration)
+        // Match GlobalAILoadingOverlay particle size EXACTLY: Math.random() * 0.8 + 0.5
+        size: Math.random() * 0.8 + 0.5,
+        oscillatePhase: Math.random() * 6.28,
         emergeDelay: Math.random() * 0.4
       })
     }
@@ -283,15 +272,9 @@ export default function MiraTransitionOverlay() {
       
       const phaseProgress = Math.min(1, elapsed / phaseDuration)
 
-      // Easing functions
-      const easeOutQuad = t => 1 - (1 - t) * (1 - t)
-      const easeInQuad = t => t * t
-      const easeInOutQuad = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2
-      const easeInOutCubic = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2
-      // Smoother easing for reverse animation - very smooth deceleration
-      const easeOutCubic = t => 1 - Math.pow(1 - t, 3)
-      const easeInOutSine = t => -(Math.cos(Math.PI * t) - 1) / 2
-      const easeOutQuart = t => 1 - Math.pow(1 - t, 4)
+      // Pre-computed easing - simple quadratic for performance
+      const easeOut = 1 - (1 - phaseProgress) * (1 - phaseProgress)
+      const easeInOut = phaseProgress < 0.5 ? 2 * phaseProgress * phaseProgress : 1 - Math.pow(-2 * phaseProgress + 2, 2) / 2
 
       // Rotation - use SAME speed as GlobalAILoadingOverlay (time * 0.4)
       // This ensures both spheres spin at identical velocity during handoff
@@ -306,47 +289,34 @@ export default function MiraTransitionOverlay() {
         let drawX, drawY, drawZ
 
         if (currentPhase === PHASE.EMERGE) {
-          // EMERGE: Particles slowly emerge from header sphere toward scatter positions
-          // Each particle has a random delay for staggered effect
-          // Use ease-in-out for slow start, accelerate in middle, slow at end
+          // EMERGE: Particles emerge from header sphere toward scatter positions
           const adjustedProgress = Math.max(0, (phaseProgress - p.emergeDelay) / (1 - p.emergeDelay))
-          const t = easeInOutQuad(adjustedProgress)
+          const t = adjustedProgress * adjustedProgress // Simple ease-in
           
-          // Interpolate from start to scatter position
           drawX = p.startX + (p.scatterX - p.startX) * t
           drawY = p.startY + (p.scatterY - p.startY) * t
           drawZ = p.startZ + (p.scatterZ - p.startZ) * t
-          
-          // Update actual position for seamless transition to SCATTER
-          p.x = drawX
-          p.y = drawY
-          p.z = drawZ
+          p.x = drawX; p.y = drawY; p.z = drawZ
           
         } else if (currentPhase === PHASE.SCATTER) {
-          // SCATTER: Particles oscillate at their scattered positions
-          const osc = Math.sin(time * p.oscillateSpeed + p.oscillatePhase) * p.oscillateAmount
-          drawX = p.scatterX + osc * 0.5
-          drawY = p.scatterY + Math.cos(time * p.oscillateSpeed * 0.7 + p.oscillatePhase) * p.oscillateAmount * 0.3
+          // SCATTER: Simple oscillation at scattered positions
+          const osc = Math.sin(time * 2 + p.oscillatePhase) * 8
+          drawX = p.scatterX + osc
+          drawY = p.scatterY + osc * 0.5
           drawZ = p.scatterZ
-          
-          // Update position for convergence
-          p.x = drawX
-          p.y = drawY
-          p.z = drawZ
+          p.x = drawX; p.y = drawY; p.z = drawZ
           
         } else if (currentPhase === PHASE.CONVERGE) {
-          // CONVERGE: Particles fly to center sphere while both spheres spin at same speed
-          const t = easeInOutCubic(phaseProgress)
-          // Apply rotation to target position - sphere is already spinning
+          // CONVERGE: Particles fly to center sphere
           const rotatedTargetX = p.targetX * cosR - p.targetZ * sinR
           const rotatedTargetZ = p.targetX * sinR + p.targetZ * cosR
           
-          drawX = p.x + (centerX + rotatedTargetX - p.x) * t
-          drawY = p.y + (centerY + p.targetY - p.y) * t
-          drawZ = p.z + (rotatedTargetZ - p.z) * t
+          drawX = p.x + (centerX + rotatedTargetX - p.x) * easeInOut
+          drawY = p.y + (centerY + p.targetY - p.y) * easeInOut
+          drawZ = p.z + (rotatedTargetZ - p.z) * easeInOut
           
         } else if (currentPhase === PHASE.SPIN_BLEND || currentPhase === PHASE.HANDOFF || currentPhase === PHASE.REVERSE_SPIN) {
-          // SPIN_BLEND, HANDOFF & REVERSE_SPIN: Sphere rotates at center
+          // Sphere rotates at center
           const rotatedX = p.targetX * cosR - p.targetZ * sinR
           const rotatedZ = p.targetX * sinR + p.targetZ * cosR
           drawX = centerX + rotatedX
@@ -354,67 +324,37 @@ export default function MiraTransitionOverlay() {
           drawZ = rotatedZ
           
         } else if (currentPhase === PHASE.REVERSE_SCATTER) {
-          // REVERSE_SCATTER: Particles fly from center sphere back to scattered positions
-          // Use easeOutCubic for smooth deceleration as particles spread out
-          const t = easeOutCubic(phaseProgress)
-          
-          // Start from rotating center sphere (capture rotation at start of scatter)
-          // Use fixed rotation to avoid spinning while scattering
-          const scatterStartRotation = rotation - (phaseProgress * REVERSE_SCATTER_DURATION * 0.001 * BASE_ROTATION_SPEED)
-          const cosStart = Math.cos(scatterStartRotation)
-          const sinStart = Math.sin(scatterStartRotation)
-          const rotatedX = p.targetX * cosStart - p.targetZ * sinStart
-          const rotatedZ = p.targetX * sinStart + p.targetZ * cosStart
-          const sphereX = centerX + rotatedX
+          // REVERSE_SCATTER: Particles fly from center back to scattered positions
+          const sphereX = centerX + p.targetX * cosR - p.targetZ * sinR
           const sphereY = centerY + p.targetY
-          const sphereZ = rotatedZ
+          const sphereZ = p.targetX * sinR + p.targetZ * cosR
           
-          // Interpolate to scatter position with smooth curve
-          drawX = sphereX + (p.scatterX - sphereX) * t
-          drawY = sphereY + (p.scatterY - sphereY) * t
-          drawZ = sphereZ + (p.scatterZ - sphereZ) * t
-          
-          // Update position for next phase
-          p.x = drawX
-          p.y = drawY
-          p.z = drawZ
+          drawX = sphereX + (p.scatterX - sphereX) * easeOut
+          drawY = sphereY + (p.scatterY - sphereY) * easeOut
+          drawZ = sphereZ + (p.scatterZ - sphereZ) * easeOut
+          p.x = drawX; p.y = drawY; p.z = drawZ
           
         } else if (currentPhase === PHASE.REVERSE_CONVERGE) {
-          // REVERSE_CONVERGE: Particles fly from scattered positions back to header sphere
-          // Use easeInOutSine for very smooth convergence without jitter
-          // NO staggered delay on reverse - all particles move together smoothly
-          const t = easeInOutSine(phaseProgress)
-          
-          // Interpolate from current scatter position to header start position
-          // Use stored scatter positions for consistency
-          drawX = p.scatterX + (p.startX - p.scatterX) * t
-          drawY = p.scatterY + (p.startY - p.scatterY) * t
-          drawZ = p.scatterZ + (p.startZ - p.scatterZ) * t
-          
-          p.x = drawX
-          p.y = drawY
-          p.z = drawZ
+          // REVERSE_CONVERGE: Particles fly back to header sphere
+          drawX = p.scatterX + (p.startX - p.scatterX) * easeInOut
+          drawY = p.scatterY + (p.startY - p.scatterY) * easeInOut
+          drawZ = p.scatterZ + (p.startZ - p.scatterZ) * easeInOut
+          p.x = drawX; p.y = drawY; p.z = drawZ
           
         } else if (currentPhase === PHASE.REVERSE_FADE) {
-          // REVERSE_FADE: Particles are at header position, fading out
-          drawX = p.startX
-          drawY = p.startY
-          drawZ = p.startZ
-          
+          drawX = p.startX; drawY = p.startY; drawZ = p.startZ
         } else {
-          // Fallback - shouldn't reach here
-          drawX = p.x
-          drawY = p.y
-          drawZ = p.z
+          drawX = p.x; drawY = p.y; drawZ = p.z
         }
 
         const scale = Z_PERSPECTIVE / (Z_PERSPECTIVE + drawZ)
-        if (scale > 0) {
+        const particleRadius = p.size * scale
+        // Skip particles that are too small
+        if (scale > 0 && particleRadius > 0.3) {
           let screenX, screenY
           if (currentPhase === PHASE.EMERGE || currentPhase === PHASE.SCATTER || 
               currentPhase === PHASE.REVERSE_SCATTER || currentPhase === PHASE.REVERSE_CONVERGE ||
               currentPhase === PHASE.REVERSE_FADE) {
-            // No perspective projection during scatter phases - particles are in 2D screen space
             screenX = drawX
             screenY = drawY
           } else {
@@ -422,71 +362,37 @@ export default function MiraTransitionOverlay() {
             screenY = centerY + (drawY - centerY) * scale
           }
           
-          projected.push({
-            x: screenX, y: screenY, z: drawZ, scale,
-            size: p.size, hueOffset: p.hueOffset, phaseOffset: p.phaseOffset,
-            phase: currentPhase, phaseProgress
-          })
+          projected.push({ x: screenX, y: screenY, size: p.size, scale })
         }
       })
 
-      // Sort only every 3 frames for performance
-      const frameCount = Math.floor(time * 60) % 3
-      if (frameCount === 0) {
-        projected.sort((a, b) => b.z - a.z)
-      }
-
-      // Draw with theme colors - batch by color for performance
-      const PI2 = Math.PI * 2
-      const colorBuckets = new Map()
+      // Skip sorting for performance - not critical for this effect
       
-      projected.forEach(p => {
-        const colorPhase = (Math.sin(time * 2 + p.phaseOffset) * 0.5 + 0.5)
-        // Quantize colors to reduce unique colors for batching
-        const r = Math.floor((colors.dark.r + colorPhase * (colors.light.r - colors.dark.r) + p.hueOffset * 0.15) / 16) * 16
-        const g = Math.floor((colors.dark.g + colorPhase * (colors.light.g - colors.dark.g) + p.hueOffset * 0.2) / 16) * 16
-        const b = Math.floor((colors.dark.b + colorPhase * (colors.light.b - colors.dark.b) + p.hueOffset * 0.15) / 16) * 16
-        
-        let alpha = 0.65 + p.scale * 0.35
-        
-        // Fade out during HANDOFF (forward animation ending)
-        if (p.phase === PHASE.HANDOFF) {
-          alpha *= (1 - p.phaseProgress)
-        }
-        // Fade in during REVERSE_SPIN (reverse animation starting)
-        if (p.phase === PHASE.REVERSE_SPIN) {
-          alpha *= p.phaseProgress
-        }
-        // Fade out during REVERSE_FADE (reverse animation ending)
-        if (p.phase === PHASE.REVERSE_FADE) {
-          alpha *= (1 - p.phaseProgress)
-        }
-        
-        // Quantize alpha for batching
-        const alphaQ = Math.round(alpha * 10) / 10
-        const colorKey = `${Math.min(255, Math.max(0, r))},${Math.min(255, Math.max(0, g))},${Math.min(255, Math.max(0, b))},${alphaQ}`
-        
-        if (!colorBuckets.has(colorKey)) {
-          colorBuckets.set(colorKey, [])
-        }
-        colorBuckets.get(colorKey).push({
-          x: p.x,
-          y: p.y,
-          r: Math.max(0.2, p.size * p.scale)
-        })
-      })
-
-      // Draw batched particles - much fewer fillStyle changes
-      for (const [colorKey, circles] of colorBuckets) {
-        ctx.fillStyle = `rgba(${colorKey})`
-        ctx.beginPath()
-        for (let i = 0; i < circles.length; i++) {
-          const c = circles[i]
-          ctx.moveTo(c.x + c.r, c.y)
-          ctx.arc(c.x, c.y, c.r, 0, PI2)
-        }
-        ctx.fill()
+      // Draw with simplified color - single color for all particles
+      const PI2 = Math.PI * 2
+      const baseAlpha = currentPhase === PHASE.HANDOFF ? (1 - phaseProgress) :
+                        currentPhase === PHASE.REVERSE_SPIN ? phaseProgress :
+                        currentPhase === PHASE.REVERSE_FADE ? (1 - phaseProgress) : 0.85
+      
+      // Use single color for all particles - much faster
+      const avgColor = {
+        r: Math.floor((colors.light.r + colors.dark.r) / 2),
+        g: Math.floor((colors.light.g + colors.dark.g) / 2),
+        b: Math.floor((colors.light.b + colors.dark.b) / 2)
       }
+      
+      ctx.fillStyle = `rgba(${avgColor.r},${avgColor.g},${avgColor.b},${baseAlpha})`
+      ctx.beginPath()
+      
+      for (let i = 0; i < projected.length; i++) {
+        const p = projected[i]
+        const r = p.size * p.scale
+        if (r > 0.3) {
+          ctx.moveTo(p.x + r, p.y)
+          ctx.arc(p.x, p.y, r, 0, PI2)
+        }
+      }
+      ctx.fill()
 
       animationRef.current = requestAnimationFrame(animate)
     }

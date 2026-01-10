@@ -209,8 +209,8 @@ export default function GlobalAILoadingOverlay() {
   const [mounted, setMounted] = useState(false)
   const [isVisible, setIsVisible] = useState(false)
   const [isAnimatingOut, setIsAnimatingOut] = useState(false)
-  const [blurAmount, setBlurAmount] = useState(1)
-  const [showBlur, setShowBlur] = useState(false) // Control blur visibility
+  const [bgOpacity, setBgOpacity] = useState(0.1)
+  const [showBg, setShowBg] = useState(false) // Control background visibility
   
   // Get theme colors for particles - use primary 500 (lighter) and 800 (darker)
   const themeColorsRef = useRef({
@@ -240,37 +240,37 @@ export default function GlobalAILoadingOverlay() {
     }
   }, [theme])
 
-  // Pulsating blur effect (1px - 20px) - only after transition completes
+  // Pulsating background opacity effect (10% - 40%) - only after transition completes
   useEffect(() => {
-    if (!isVisible || !showBlur) return
+    if (!isVisible || !showBg) return
     
     let startTime = Date.now()
-    let blurAnimFrame = null
+    let bgAnimFrame = null
     
-    const animateBlur = () => {
+    const animateBg = () => {
       const elapsed = (Date.now() - startTime) * 0.001
-      const blur = 1 + (Math.sin(elapsed * 1.5) * 0.5 + 0.5) * 19
-      setBlurAmount(blur)
-      blurAnimFrame = requestAnimationFrame(animateBlur)
+      const opacity = 0.1 + (Math.sin(elapsed * 1.5) * 0.5 + 0.5) * 0.5
+      setBgOpacity(opacity)
+      bgAnimFrame = requestAnimationFrame(animateBg)
     }
     
-    animateBlur()
+    animateBg()
     
     return () => {
-      if (blurAnimFrame) cancelAnimationFrame(blurAnimFrame)
+      if (bgAnimFrame) cancelAnimationFrame(bgAnimFrame)
     }
-  }, [isVisible, showBlur])
+  }, [isVisible, showBg])
 
-  // Start blur when transition completes - with additional delay for smoother transition
+  // Start background when transition completes - with additional delay for smoother transition
   useEffect(() => {
     if (transitionComplete && isAILoading) {
-      // Add extra delay for the blur to fade in smoothly after particle sphere forms
+      // Add extra delay for the background to fade in smoothly after particle sphere forms
       const timer = setTimeout(() => {
-        setShowBlur(true)
+        setShowBg(true)
       }, 400) // 400ms delay after transition completes
       return () => clearTimeout(timer)
     } else if (!isAILoading) {
-      setShowBlur(false)
+      setShowBg(false)
     }
   }, [transitionComplete, isAILoading])
 
@@ -330,7 +330,7 @@ export default function GlobalAILoadingOverlay() {
     let lastFrameTime = performance.now()
 
     const resize = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2) // Cap DPR for performance
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5) // Cap DPR for performance
       canvas.width = window.innerWidth * dpr
       canvas.height = window.innerHeight * dpr
       canvas.style.width = window.innerWidth + 'px'
@@ -351,7 +351,7 @@ export default function GlobalAILoadingOverlay() {
           x: pos.x, y: pos.y, z: pos.z,
           targetX: pos.x, targetY: pos.y, targetZ: pos.z,
           baseTargetX: pos.x, baseTargetY: pos.y, baseTargetZ: pos.z, // Store base position for oscillation
-          size: Math.random() * 1 + 0.8,
+          size: Math.random() * 0.8 + 0.5,
           hueOffset: Math.random() * 60 - 30,
           phaseOffset: Math.random() * Math.PI * 2,
           // Oscillation properties
@@ -573,7 +573,9 @@ export default function GlobalAILoadingOverlay() {
 
         // Project to 2D
         const scale = Z_PERSPECTIVE / (Z_PERSPECTIVE + rz)
-        if (rz > -Z_PERSPECTIVE + 10 && scale > 0) {
+        const particleRadius = p.size * scale
+        // Skip particles that are too small or behind camera
+        if (rz > -Z_PERSPECTIVE + 10 && scale > 0 && particleRadius > 0.3) {
           // Color: interpolate between theme colors (quantize to reduce unique colors)
           const colorPhase = (Math.sin(time + p.phaseOffset) * 0.5 + 0.5)
           // Quantize to 16 color levels for batching
@@ -589,7 +591,7 @@ export default function GlobalAILoadingOverlay() {
           colorBuckets.get(colorKey).push({
             x: cx + rx * scale,
             y: cy + ry * scale,
-            r: Math.max(0.2, p.size * scale)
+            r: particleRadius
           })
         }
       }
@@ -626,15 +628,13 @@ export default function GlobalAILoadingOverlay() {
   return (
     <>
       {/* Backdrop blur layer - blurs content behind overlay - only after transition */}
-      {showBlur && (
+      {showBg && (
         <div 
           className={`fixed inset-0 z-[999998] ${
-            isAnimatingOut ? 'ai-loading-exit' : 'ai-blur-enter'
+            isAnimatingOut ? 'ai-loading-exit' : 'ai-bg-enter'
           }`}
           style={{
-            backdropFilter: `blur(${blurAmount}px)`,
-            WebkitBackdropFilter: `blur(${blurAmount}px)`,
-            backgroundColor: 'rgba(0, 0, 0, 0.08)',
+            backgroundColor: `rgba(255, 255, 255, ${bgOpacity})`,
           }}
         />
       )}
@@ -663,11 +663,11 @@ export default function GlobalAILoadingOverlay() {
           100% { opacity: 1; }
         }
 
-        .ai-blur-enter {
-          animation: aiBlurEnter 0.8s ease-out forwards;
+        .ai-bg-enter {
+          animation: aiBgEnter 0.8s ease-out forwards;
         }
 
-        @keyframes aiBlurEnter {
+        @keyframes aiBgEnter {
           0% { opacity: 0; }
           100% { opacity: 1; }
         }
