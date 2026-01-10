@@ -451,7 +451,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                       }
                     }}
                     onMouseLeave={() => setTooltipContent(null)}
-                    className={`w-full flex items-center rounded-xl transition-all duration-200 group relative ${isDesktop && isCollapsed ? 'justify-center p-2.5 bg-[var(--color-primary-100)] hover:!bg-gray-800' : 'justify-between px-3 sm:px-4 py-3'}`}
+                    className={`w-full flex items-center text-left rounded-xl transition-all duration-200 group relative ${isDesktop && isCollapsed ? 'justify-center p-2.5 bg-[var(--color-primary-100)] hover:!bg-gray-800' : 'justify-between px-3 sm:px-4 py-3'}`}
                     style={{
                       backgroundColor: isDesktop && isCollapsed 
                         ? (isActive ? 'var(--color-primary-500)' : undefined) 
@@ -475,7 +475,13 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                       </div>
                       {!(isDesktop && isCollapsed) && (
                         <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <span className="text-sm font-medium truncate">{item.name}</span>
+                          {item.name === 'Attendance & Leaves' ? (
+                            <span className="text-sm font-medium leading-tight text-left">
+                              Attendance &<br />Leaves
+                            </span>
+                          ) : (
+                            <span className="text-sm font-medium truncate">{item.name}</span>
+                          )}
                           <InlineBadge count={getBadgeCount(item.name)} />
                         </div>
                       )}
@@ -528,7 +534,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                     }
                   }}
                   onMouseLeave={() => setTooltipContent(null)}
-                  className={`w-full flex items-center rounded-xl transition-all duration-200 group cursor-pointer relative ${isDesktop && isCollapsed ? 'justify-center p-2.5 bg-[var(--color-primary-100)] hover:!bg-gray-800' : 'px-3 sm:px-4 py-3'}`}
+                  className={`w-full flex items-center text-left rounded-xl transition-all duration-200 group cursor-pointer relative ${isDesktop && isCollapsed ? 'justify-center p-2.5 bg-[var(--color-primary-100)] hover:!bg-gray-800' : 'px-3 sm:px-4 py-3'}`}
                   style={{
                     backgroundColor: isDesktop && isCollapsed ? undefined : 'transparent',
                     color: '#111827'
@@ -573,7 +579,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                     }
                   }}
                   onMouseLeave={() => setTooltipContent(null)}
-                  className={`w-full flex items-center rounded-xl transition-all duration-200 group cursor-pointer relative ${isDesktop && isCollapsed ? 'justify-center p-2.5 bg-[var(--color-primary-100)] hover:!bg-gray-800' : 'px-3 sm:px-4 py-3'}`}
+                  className={`w-full flex items-center text-left rounded-xl transition-all duration-200 group cursor-pointer relative ${isDesktop && isCollapsed ? 'justify-center p-2.5 bg-[var(--color-primary-100)] hover:!bg-gray-800' : 'px-3 sm:px-4 py-3'}`}
                   style={{
                     backgroundColor: isDesktop && isCollapsed 
                       ? (isActive ? 'var(--color-primary-500)' : undefined) 
