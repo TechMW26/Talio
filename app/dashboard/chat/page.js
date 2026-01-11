@@ -503,6 +503,7 @@ export default function ChatPage() {
           body: JSON.stringify({
             content: `Sent a file: ${uploadResult.data.fileName}`,
             fileUrl: uploadResult.data.fileUrl,
+            fileId: uploadResult.data.fileId,
             fileName: uploadResult.data.fileName,
             fileType: uploadResult.data.fileType,
             fileSize: uploadResult.data.fileSize
@@ -1040,6 +1041,7 @@ export default function ChatPage() {
                       type="file"
                       onChange={handleFileUpload}
                       className="hidden"
+                      accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.rar,.ppt,.pptx,.mp4,.mp3,.avi,.mov,.svg,.json,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/zip,application/x-rar-compressed,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,image/*,video/*,audio/*"
                     />
                     <button
                       onClick={() => fileInputRef.current?.click()}

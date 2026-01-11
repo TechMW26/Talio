@@ -292,7 +292,7 @@ export default function FloatingChatWidget() {
       {isWidgetOpen && (
         <div
           ref={widgetRef}
-          className="fixed rounded-2xl overflow-hidden z-[9999] flex flex-col"
+          className="fixed rounded-2xl overflow-hidden overflow-x-hidden z-[9999] flex flex-col"
           style={{
             width: '340px',
             height: '480px',
@@ -343,7 +343,7 @@ export default function FloatingChatWidget() {
           </div>
 
           {/* Content */}
-          <div className="chat-widget-content flex-1 flex flex-col overflow-hidden">
+          <div className="chat-widget-content flex-1 flex flex-col overflow-hidden overflow-x-hidden">
             {/* Search */}
             <div className="p-3" style={{ background: 'rgba(255, 255, 255, 0.5)' }}>
               <div className="relative">
@@ -364,7 +364,7 @@ export default function FloatingChatWidget() {
             </div>
 
             {/* Chat List or New Chat */}
-            <div className="flex-1 overflow-y-auto" style={{ background: 'rgba(248, 250, 252, 0.5)' }}>
+            <div className="flex-1 overflow-y-auto overflow-x-hidden" style={{ background: 'rgba(248, 250, 252, 0.5)' }}>
               {showNewChat ? (
                 <>
                   <div className="px-4 py-2.5 flex items-center justify-between" style={{ background: 'rgba(255, 255, 255, 0.6)' }}>
@@ -435,7 +435,7 @@ export default function FloatingChatWidget() {
                       <button
                         key={chat._id}
                         onClick={() => openChat(chat)}
-                        className="w-full px-4 py-3 flex items-center gap-3 hover:bg-white/60 transition-colors border-b border-white/30 group"
+                        className="w-full px-4 py-3 flex items-center gap-3 hover:bg-white/60 transition-colors border-b border-white/30 group min-w-0"
                       >
                         <div className="relative">
                           <div 
@@ -452,7 +452,7 @@ export default function FloatingChatWidget() {
                           </div>
                           <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-sm"></div>
                         </div>
-                        <div className="flex-1 text-left min-w-0">
+                        <div className="flex-1 text-left min-w-0 overflow-hidden">
                           <div className="flex items-center justify-between">
                             <p className="font-medium text-gray-900 text-sm truncate">
                               {getChatName(chat)}

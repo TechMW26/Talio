@@ -4,7 +4,7 @@ import { writeFile, mkdir, unlink } from 'fs/promises'
 import path from 'path'
 import { existsSync } from 'fs'
 import { optimizeImage, isValidImage } from '@/lib/imageOptimization'
-import { uploadImageToImageKit, getImageKitFolder, generateEmployeeFolderName } from '@/lib/imagekit'
+import { uploadImageToImageKit, uploadFileToImageKit, getImageKitFolder, generateEmployeeFolderName } from '@/lib/imagekit'
 // Configure route for larger file uploads (10MB)
 export const config = {
   api: {
@@ -107,7 +107,7 @@ export async function POST(request) {
     })
 
     // Try ImageKit upload if configured, fallback to local storage
-    if (isImageKitConfigured() && isImage) {
+    if (isImageKitConfigured()) {
       try {
         console.log('[Upload] Attempting ImageKit upload...')
         console.log('[Upload] Buffer size:', buffer.length, 'bytes')
@@ -115,13 +115,20 @@ export async function POST(request) {
         // Build safe tags (no undefined values)
         const safeTags = ['upload', folder, employee?.employeeCode].filter(Boolean)
 
-        // Use uploadImageToImageKit directly (no temp file) - works better in serverless/Docker
-        const imagekitResult = await uploadImageToImageKit(buffer, {
-          fileName: finalFilename,
-          folder: imagekitFolder,
-          tags: safeTags,
-          useUniqueFileName: true,
-        })
+        const imagekitResult = isImage
+          ? await uploadImageToImageKit(buffer, {
+              fileName: finalFilename,
+              folder: imagekitFolder,
+              tags: safeTags,
+              useUniqueFileName: true,
+            })
+          : await uploadFileToImageKit(buffer, {
+              mimeType: file.type || 'application/octet-stream',
+              fileName: finalFilename,
+              folder: imagekitFolder,
+              tags: safeTags,
+              useUniqueFileName: true,
+            })
 
         console.log('[Upload] ImageKit SUCCESS:', imagekitResult.url)
 
@@ -131,7 +138,7 @@ export async function POST(request) {
             fileUrl: imagekitResult.url,
             fileId: imagekitResult.fileId,
             fileName: file.name,
-            fileType: 'image/webp',
+            fileType: isImage ? 'image/webp' : (file.type || 'application/octet-stream'),
             fileSize: imagekitResult.size || buffer.length,
             originalSize: file.size,
             optimized: !!optimizationInfo,

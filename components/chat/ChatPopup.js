@@ -29,6 +29,14 @@ export default function ChatPopup({ chat, index }) {
   const [showMembersPanel, setShowMembersPanel] = useState(false) // Show group members panel
   const [memberSearchQuery, setMemberSearchQuery] = useState('') // Search members in panel
 
+  // --- Mentions state ---
+  const [showMentionList, setShowMentionList] = useState(false)
+  const [mentionQuery, setMentionQuery] = useState('')
+  const [mentionCandidates, setMentionCandidates] = useState([])
+  const [mentionIndex, setMentionIndex] = useState(0)
+  const [mentions, setMentions] = useState([] // {id, name}
+  const messageInputRef = useRef(null)
+
   const popupRef = useRef(null)
   const messagesEndRef = useRef(null)
   const messagesContainerRef = useRef(null)
@@ -360,120 +368,166 @@ export default function ChatPopup({ chat, index }) {
     }
   }
 
-  const handleTyping = (e) => {
-    setMessage(e.target.value)
-
-    sendTyping?.(chat._id)
-
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current)
-    }
-
-    typingTimeoutRef.current = setTimeout(() => {
-      sendStopTyping?.(chat._id)
-    }, 2000)
-  }
-
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
-    }
-  }
-
-  // File upload - first upload to server, then send message with file info
-  const handleFileUpload = async (e) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-
+  // --- PATCH handleSend to send mentions ---
+  const origHandleSend = handleSend;
+  const handleSendWithMentions = async () => {
+    if (!message.trim() || sending) return;
+    const messageContent = message.trim();
+    setMessage('');
+    setMentions([]);
+    setSending(true);
     try {
-      const token = localStorage.getItem('token')
-
-      // Step 1: Upload the file
-      const uploadFormData = new FormData()
-      uploadFormData.append('file', file)
-
-      const uploadResponse = await fetch('/api/upload', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
-        body: uploadFormData
-      })
-
-      const uploadData = await uploadResponse.json()
-
-      if (!uploadResponse.ok || !uploadData.success) {
-        console.error('File upload error:', uploadData)
-        return
-      }
-
-      // Step 2: Send message with file info
-      const { fileUrl, fileName, fileType, fileSize } = uploadData.data
-
-      const messageResponse = await fetch(`/api/chat/${chat._id}/messages`, {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/chat/${chat._id}/messages`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          content: '',
-          fileUrl,
-          fileName,
-          fileType,
-          fileSize
-        })
-      })
-
-      const messageData = await messageResponse.json()
-      if (!messageResponse.ok) {
-        console.error('Message send error:', messageData)
-      } else if (messageData.success) {
-        // Add message locally for immediate feedback
+        body: JSON.stringify({ content: messageContent, mentions: mentions.map(m => m.id) })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        console.error('Send message error:', data);
+        setMessage(messageContent); // Restore message on error
+      } else if (data.success) {
         setMessages(prev => {
-          if (prev.some(msg => msg._id === messageData.data._id)) return prev
-          return [...prev, messageData.data]
-        })
+          if (prev.some(msg => msg._id === data.data._id)) return prev;
+          return [...prev, data.data];
+        });
       }
+      sendStopTyping?.(chat._id);
     } catch (error) {
-      console.error('Error uploading file:', error)
+      console.error('Error sending message:', error);
+      setMessage(messageContent);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  // Filter group members for mention popup
+  const getMentionCandidates = (query) => {
+    if (!chat.isGroup || !Array.isArray(chat.participants)) return [];
+    const q = query.toLowerCase();
+    return chat.participants.filter((m) => {
+      if (!m) return false;
+      const name = `${m.firstName || ''} ${m.lastName || ''}`.toLowerCase();
+      const code = (m.employeeCode || '').toLowerCase();
+      return name.includes(q) || code.includes(q);
+    });
+  };
+
+  // Handle typing with @mention detection
+  const handleTyping = (e) => {
+    const val = e.target.value;
+    setMessage(val);
+
+    // Detect @ for mention
+    const cursorPos = e.target.selectionStart;
+    const textUpToCursor = val.slice(0, cursorPos);
+    const atMatch = /(^|\s)@(\w*)$/.exec(textUpToCursor);
+    if (chat.isGroup && atMatch) {
+      setShowMentionList(true);
+      setMentionQuery(atMatch[2] || '');
+      setMentionCandidates(getMentionCandidates(atMatch[2] || ''));
+      setMentionIndex(0);
+    } else {
+      setShowMentionList(false);
+      setMentionQuery('');
+      setMentionCandidates([]);
+      setMentionIndex(0);
     }
 
-    // Reset file input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
-    }
-  }
+    sendTyping?.(chat._id);
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    typingTimeoutRef.current = setTimeout(() => {
+      sendStopTyping?.(chat._id);
+    }, 2000);
+  };
 
-  // Dragging handlers
-  const handleMouseDown = (e) => {
-    if (e.target.closest('.popup-content')) return
-    isDragging.current = true
-    bringToFront?.(chat._id)
-    const rect = popupRef.current?.getBoundingClientRect()
-    if (rect) {
-      dragOffset.current = {
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top
+  // Handle key events for mention selection
+  const handleKeyDown = (e) => {
+    if (showMentionList && mentionCandidates.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setMentionIndex((prev) => (prev + 1) % mentionCandidates.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setMentionIndex((prev) => (prev - 1 + mentionCandidates.length) % mentionCandidates.length);
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        handleSelectMention(mentionCandidates[mentionIndex]);
+        return;
+      }
+      if (e.key === 'Escape') {
+        setShowMentionList(false);
+        return;
       }
     }
-    document.addEventListener('mousemove', handleMouseMove)
-    document.addEventListener('mouseup', handleMouseUp)
+    // Normal send
+    if (e.key === 'Enter' && !e.shiftKey && !showMentionList) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  // Insert mention at cursor
+  const handleSelectMention = (member) => {
+    if (!member) return;
+    const input = messageInputRef.current;
+    if (!input) return;
+    const cursorPos = input.selectionStart;
+    const val = message;
+    // Find last @ before cursor
+    const before = val.slice(0, cursorPos).replace(/@\w*$/, '');
+    const after = val.slice(cursorPos);
+    const mentionText = `@${member.firstName || member.lastName || member.email || 'User'}`;
+    const newVal = before + mentionText + ' ' + after;
+    setMessage(newVal);
+    setMentions((prev) => {
+      if (prev.some((m) => m.id === (member._id || member.id))) return prev;
+      return [...prev, { id: member._id || member.id, name: mentionText }];
+    });
+    setShowMentionList(false);
+    setMentionQuery('');
+    setMentionCandidates([]);
+    setMentionIndex(0);
+    // Move cursor after inserted mention
+    setTimeout(() => {
+      input.focus();
+      input.setSelectionRange(before.length + mentionText.length + 1, before.length + mentionText.length + 1);
+    }, 0);
+  };
+
+  // Render message content with mentions highlighted
+  function renderMessageWithMentions(msg) {
+    if (!msg.mentions || !Array.isArray(msg.mentions) || !msg.mentions.length) return msg.content;
+    let content = msg.content || '';
+    // Highlight all mentions in content
+    let parts = [];
+    let lastIdx = 0;
+    // For each mention, find and wrap
+    msg.mentions.forEach((mention) => {
+      if (!mention || !mention.firstName) return;
+      const mentionText = `@${mention.firstName}`;
+      const idx = content.indexOf(mentionText, lastIdx);
+      if (idx !== -1) {
+        if (idx > lastIdx) parts.push(content.slice(lastIdx, idx));
+        parts.push(
+          <span key={mention._id || mention.id} className="bg-blue-100 text-blue-700 px-1 rounded font-semibold mr-1">
+            {mentionText}
+          </span>
+        );
+        lastIdx = idx + mentionText.length;
+      }
+    });
+    if (lastIdx < content.length) parts.push(content.slice(lastIdx));
+    return parts.length ? parts : content;
   }
-
-  const handleMouseMove = useCallback((e) => {
-    if (!isDragging.current) return
-    const x = e.clientX - dragOffset.current.x
-    const y = e.clientY - dragOffset.current.y
-    updateChatPosition?.(chat._id, x, y)
-  }, [chat._id, updateChatPosition])
-
-  const handleMouseUp = useCallback(() => {
-    isDragging.current = false
-    document.removeEventListener('mousemove', handleMouseMove)
-    document.removeEventListener('mouseup', handleMouseUp)
-  }, [handleMouseMove])
 
   // Calculate position - place chat windows side by side near the widget
   const getDefaultPosition = (forceExpanded = false) => {
@@ -945,7 +999,9 @@ export default function ChatPopup({ chat, index }) {
                       </p>
                     )}
                     {msg.fileUrl ? renderFileMessage(msg) : (
-                      <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>
+                      <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">
+                        {renderMessageWithMentions(msg)}
+                      </p>
                     )}
                     <p className={`text-[10px] mt-1.5 ${isMine ? 'text-white/70' : 'text-gray-400'}`}>
                       {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -986,7 +1042,13 @@ export default function ChatPopup({ chat, index }) {
         {/* Input */}
         <div className="popup-content p-3" style={{ background: 'rgba(255, 255, 255, 0.7)' }}>
           <div className="flex items-center gap-2">
-            <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+              className="hidden"
+              accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.zip,.rar,.ppt,.pptx,.mp4,.mp3,.avi,.mov,.svg,.json,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/zip,application/x-rar-compressed,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,image/*,video/*,audio/*"
+            />
             <button
               onClick={() => fileInputRef.current?.click()}
               className="p-2.5 rounded-xl transition-colors"
@@ -995,20 +1057,46 @@ export default function ChatPopup({ chat, index }) {
             >
               <FaPaperclip className="w-4 h-4 text-gray-500" />
             </button>
-            <input
-              type="text"
-              value={message}
-              onChange={handleTyping}
-              onKeyPress={handleKeyPress}
-              placeholder="Type a message..."
-              className="flex-1 px-4 py-2.5 rounded-xl text-sm focus:outline-none focus:ring-2 transition-all"
-              style={{
-                background: 'rgba(255, 255, 255, 0.8)',
-                border: '1px solid rgba(255, 255, 255, 0.3)',
-              }}
-            />
+            <div className="relative flex-1">
+              <input
+                ref={messageInputRef}
+                type="text"
+                value={message}
+                onChange={handleTyping}
+                onKeyDown={handleKeyDown}
+                placeholder="Type a message..."
+                className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none focus:ring-2 transition-all"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.8)',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                }}
+                autoComplete="off"
+              />
+              {/* Mention popup */}
+              {showMentionList && mentionCandidates.length > 0 && (
+                <div className="absolute left-0 bottom-12 w-full bg-white border border-gray-200 rounded-xl shadow-lg z-50 max-h-56 overflow-y-auto animate-fadeIn">
+                  {mentionCandidates.map((m, i) => (
+                    <div
+                      key={m._id || m.id}
+                      className={`flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-blue-50 ${i === mentionIndex ? 'bg-blue-100' : ''}`}
+                      onMouseDown={e => { e.preventDefault(); handleSelectMention(m); }}
+                    >
+                      <div className="w-7 h-7 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                        {m.profilePicture ? (
+                          <img src={m.profilePicture} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-gray-700 font-semibold text-xs">{m.firstName?.[0]}{m.lastName?.[0]}</span>
+                        )}
+                      </div>
+                      <span className="font-medium text-gray-900 text-sm truncate">{m.firstName} {m.lastName}</span>
+                      {m.employeeCode && <span className="text-xs text-gray-400 ml-2">{m.employeeCode}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             <button
-              onClick={handleSend}
+              onClick={handleSendWithMentions}
               disabled={!message.trim() || sending}
               className="transition-all disabled:opacity-30 hover:opacity-70"
               style={{

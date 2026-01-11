@@ -32,6 +32,7 @@ export async function GET(request, context) {
     // Fetch chat and verify user is a participant
     const chat = await Chat.findById(chatId)
       .populate('messages.sender', 'firstName lastName profilePicture employeeCode')
+      .populate('messages.mentions', 'firstName lastName profilePicture employeeCode')
 
     if (!chat) {
       return NextResponse.json({ success: false, message: 'Chat not found' }, { status: 404 })
@@ -84,7 +85,7 @@ export async function POST(request, context) {
     const params = await context.params
     const { chatId } = params
     const body = await request.json()
-    const { content, fileUrl, fileId, fileName, fileType, fileSize, replyTo } = body
+    const { content, fileUrl, fileId, fileName, fileType, fileSize, replyTo, mentions } = body
 
     // Get employee ID from authenticated user
     if (!user || !user.employeeId) {
@@ -113,6 +114,13 @@ export async function POST(request, context) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 403 })
     }
 
+    // Normalize + validate mentions (Employee IDs only)
+    const participantSet = new Set(chat.participants.map(p => p.toString()))
+    const mentionIds = Array.isArray(mentions)
+      ? [...new Set(mentions.map(m => m?.toString?.()).filter(Boolean))]
+      : []
+    const safeMentionIds = mentionIds.filter(id => participantSet.has(id))
+
     // Create message
     const message = {
       sender: employee._id,
@@ -123,6 +131,10 @@ export async function POST(request, context) {
         user: employee._id,
         readAt: new Date()
       }]
+    }
+
+    if (safeMentionIds.length > 0) {
+      message.mentions = safeMentionIds
     }
 
     // Add file info if present
@@ -150,6 +162,7 @@ export async function POST(request, context) {
     // Populate the new message
     const updatedChat = await Chat.findById(chatId)
       .populate('messages.sender', 'firstName lastName profilePicture employeeCode')
+      .populate('messages.mentions', 'firstName lastName profilePicture employeeCode')
       .populate('participants', 'firstName lastName')
 
     let newMessage = updatedChat.messages[updatedChat.messages.length - 1].toObject()

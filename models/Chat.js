@@ -27,6 +27,10 @@ const MessageSchema = new mongoose.Schema({
   fileSize: {
     type: Number
   },
+  mentions: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Employee'
+  }],
   replyTo: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Message'
