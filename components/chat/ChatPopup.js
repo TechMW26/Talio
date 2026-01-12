@@ -545,6 +545,85 @@ export default function ChatPopup({ chat, index }) {
     }, 0);
   };
 
+  // Handle file upload
+  const handleFileUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Reset input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+
+    // Validate file size (max 25MB)
+    const maxSize = 25 * 1024 * 1024
+    if (file.size > maxSize) {
+      alert('File size must be less than 25MB')
+      return
+    }
+
+    setSending(true)
+
+    try {
+      const token = localStorage.getItem('token')
+      
+      // Upload file first
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const uploadResponse = await fetch('/api/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      })
+
+      const uploadData = await uploadResponse.json()
+      if (!uploadResponse.ok || !uploadData.success) {
+        throw new Error(uploadData.message || 'Failed to upload file')
+      }
+
+      // Determine if it's an image
+      const isImage = file.type.startsWith('image/')
+      
+      // Send message with file attachment
+      const messagePayload = {
+        content: isImage ? '' : file.name,
+        ...(isImage ? { image: uploadData.url } : { 
+          file: {
+            url: uploadData.url,
+            name: file.name,
+            size: file.size,
+            type: file.type
+          }
+        })
+      }
+
+      const response = await fetch(`/api/chat/${chat._id}/messages`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(messagePayload)
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        setMessages(prev => {
+          if (prev.some(msg => msg._id === data.data._id)) return prev
+          return [...prev, data.data]
+        })
+      }
+    } catch (error) {
+      console.error('Error uploading file:', error)
+      alert('Failed to upload file. Please try again.')
+    } finally {
+      setSending(false)
+    }
+  }
+
   // Render message content with mentions highlighted
   function renderMessageWithMentions(msg) {
     if (!msg.mentions || !Array.isArray(msg.mentions) || !msg.mentions.length) return msg.content;

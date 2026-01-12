@@ -404,52 +404,52 @@ export default function TodoPage() {
             <div className="space-y-1 mb-4">
               <button
                 onClick={() => setActiveTab('all')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
+                className={`w-full flex items-center justify-start gap-3 px-3 py-2 rounded-lg transition-colors ${
                   activeTab === 'all' 
                     ? 'bg-indigo-50 text-indigo-700' 
                     : 'text-gray-700 hover:bg-gray-50'
                 }`}
               >
-                <HiOutlineListBullet className="w-5 h-5" />
-                <span className="flex-1 font-medium">All To-dos</span>
+                <HiOutlineListBullet className="w-5 h-5 flex-shrink-0" />
+                <span className="flex-1 text-left font-medium">All To-dos</span>
                 <span className="text-sm text-gray-500">{analytics?.summary?.total || 0}</span>
               </button>
 
               <button
                 onClick={() => setActiveTab('today')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
+                className={`w-full flex items-center justify-start gap-3 px-3 py-2 rounded-lg transition-colors ${
                   activeTab === 'today' 
                     ? 'bg-indigo-50 text-indigo-700' 
                     : 'text-gray-700 hover:bg-gray-50'
                 }`}
               >
-                <HiOutlineStar className="w-5 h-5 text-amber-500" />
-                <span className="flex-1 font-medium">Today</span>
+                <HiOutlineStar className="w-5 h-5 text-amber-500 flex-shrink-0" />
+                <span className="flex-1 text-left font-medium">Today</span>
               </button>
 
               <button
                 onClick={() => setActiveTab('upcoming')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
+                className={`w-full flex items-center justify-start gap-3 px-3 py-2 rounded-lg transition-colors ${
                   activeTab === 'upcoming' 
                     ? 'bg-indigo-50 text-indigo-700' 
                     : 'text-gray-700 hover:bg-gray-50'
                 }`}
               >
-                <HiOutlineCalendarDays className="w-5 h-5 text-blue-500" />
-                <span className="flex-1 font-medium">Upcoming</span>
+                <HiOutlineCalendarDays className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                <span className="flex-1 text-left font-medium">Upcoming</span>
               </button>
 
               {analytics?.summary?.overdue > 0 && (
                 <button
                   onClick={() => setActiveTab('overdue')}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
+                  className={`w-full flex items-center justify-start gap-3 px-3 py-2 rounded-lg transition-colors ${
                     activeTab === 'overdue' 
                       ? 'bg-red-50 text-red-700' 
                       : 'text-red-600 hover:bg-red-50'
                   }`}
                 >
-                  <HiOutlineExclamationTriangle className="w-5 h-5" />
-                  <span className="flex-1 font-medium">Overdue</span>
+                  <HiOutlineExclamationTriangle className="w-5 h-5 flex-shrink-0" />
+                  <span className="flex-1 text-left font-medium">Overdue</span>
                   <span className="text-sm bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
                     {analytics?.summary?.overdue}
                   </span>
@@ -458,14 +458,14 @@ export default function TodoPage() {
 
               <button
                 onClick={() => setActiveTab('completed')}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
+                className={`w-full flex items-center justify-start gap-3 px-3 py-2 rounded-lg transition-colors ${
                   activeTab === 'completed' 
                     ? 'bg-green-50 text-green-700' 
                     : 'text-gray-700 hover:bg-gray-50'
                 }`}
               >
-                <HiOutlineCheckCircle className="w-5 h-5 text-green-500" />
-                <span className="flex-1 font-medium">Completed</span>
+                <HiOutlineCheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+                <span className="flex-1 text-left font-medium">Completed</span>
               </button>
             </div>
 
@@ -492,7 +492,7 @@ export default function TodoPage() {
                 <button
                   key={category._id}
                   onClick={() => setActiveTab(category._id)}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors group ${
+                  className={`w-full flex items-center justify-start gap-3 px-3 py-2 rounded-lg transition-colors group ${
                     activeTab === category._id 
                       ? 'bg-indigo-50 text-indigo-700' 
                       : 'text-gray-700 hover:bg-gray-50'
@@ -502,7 +502,7 @@ export default function TodoPage() {
                     className="w-3 h-3 rounded-full flex-shrink-0" 
                     style={{ backgroundColor: category.color }}
                   ></div>
-                  <span className="flex-1 font-medium truncate">{category.name}</span>
+                  <span className="flex-1 text-left font-medium truncate">{category.name}</span>
                   <button
                     onClick={(e) => {
                       e.stopPropagation()
@@ -524,14 +524,14 @@ export default function TodoPage() {
             {/* No date to-dos */}
             <button
               onClick={() => setActiveTab('no-date')}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors mt-4 ${
+              className={`w-full flex items-center justify-start gap-3 px-3 py-2 rounded-lg transition-colors mt-4 ${
                 activeTab === 'no-date' 
                   ? 'bg-gray-100 text-gray-700' 
                   : 'text-gray-500 hover:bg-gray-50'
               }`}
             >
-              <HiOutlineDocumentText className="w-5 h-5" />
-              <span className="flex-1 font-medium">No Due Date</span>
+              <HiOutlineDocumentText className="w-5 h-5 flex-shrink-0" />
+              <span className="flex-1 text-left font-medium">No Due Date</span>
             </button>
           </div>
         </div>
