@@ -43,3 +43,111 @@ export async function GET(request, context) {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 })
   }
 }
+
+// POST - Leave a chat (remove current user from participants)
+export async function POST(request, { params }) {
+  try {
+    const auth = await getAuthAndModels(request, ['Chat', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Chat, Employee } = models
+
+    if (!user || !user.employeeId) {
+      return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
+    }
+
+    const employeeId = user.employeeId._id || user.employeeId
+    const employee = await Employee.findById(employeeId)
+    if (!employee) {
+      return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
+    }
+
+    const { chatId } = await params
+    const chat = await Chat.findById(chatId)
+    if (!chat) {
+      return NextResponse.json({ success: false, message: 'Chat not found' }, { status: 404 })
+    }
+
+    const isParticipant = chat.participants.some(p => p.toString() === employee._id.toString())
+    if (!isParticipant) {
+      return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
+    }
+
+    // Remove participant
+    chat.participants = chat.participants.filter(p => p.toString() !== employee._id.toString())
+
+    // If group and admin left, pick a new admin (best-effort)
+    if (chat.isGroup && chat.admin && chat.admin.toString() === employee._id.toString()) {
+      chat.admin = chat.participants[0] || undefined
+    }
+
+    // If no participants remain, delete the chat
+    if (!chat.participants || chat.participants.length === 0) {
+      await Chat.findByIdAndDelete(chat._id)
+      return NextResponse.json({ success: true, message: 'Chat removed' })
+    }
+
+    await chat.save()
+    return NextResponse.json({ success: true, message: 'Left chat' })
+  } catch (error) {
+    console.error('Leave chat error:', error)
+    return NextResponse.json({ success: false, message: error.message }, { status: 500 })
+  }
+}
+
+// DELETE - Delete a chat (group: admin only; direct: behaves like leave)
+export async function DELETE(request, { params }) {
+  try {
+    const auth = await getAuthAndModels(request, ['Chat', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Chat, Employee } = models
+
+    if (!user || !user.employeeId) {
+      return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
+    }
+
+    const employeeId = user.employeeId._id || user.employeeId
+    const employee = await Employee.findById(employeeId)
+    if (!employee) {
+      return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
+    }
+
+    const { chatId } = await params
+    const chat = await Chat.findById(chatId)
+    if (!chat) {
+      return NextResponse.json({ success: false, message: 'Chat not found' }, { status: 404 })
+    }
+
+    const isParticipant = chat.participants.some(p => p.toString() === employee._id.toString())
+    if (!isParticipant) {
+      return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
+    }
+
+    // For direct chats, treat "delete" as "leave" (remove from my list)
+    if (!chat.isGroup) {
+      chat.participants = chat.participants.filter(p => p.toString() !== employee._id.toString())
+      if (!chat.participants || chat.participants.length === 0) {
+        await Chat.findByIdAndDelete(chat._id)
+      } else {
+        await chat.save()
+      }
+      return NextResponse.json({ success: true, message: 'Chat removed' })
+    }
+
+    // For group chats, only admin can delete.
+    if (!chat.admin || chat.admin.toString() !== employee._id.toString()) {
+      return NextResponse.json({ success: false, message: 'Only admin can delete this group chat' }, { status: 403 })
+    }
+
+    await Chat.findByIdAndDelete(chat._id)
+    return NextResponse.json({ success: true, message: 'Chat deleted' })
+  } catch (error) {
+    console.error('Delete chat error:', error)
+    return NextResponse.json({ success: false, message: error.message }, { status: 500 })
+  }
+}

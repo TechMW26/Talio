@@ -31,8 +31,35 @@ export async function POST(request) {
         }
 
         // Determine platform from deviceInfo
-        const platform = deviceInfo?.platform || deviceInfo?.device || 'android'
-        const device = platform === 'web' ? 'web' : platform === 'ios' ? 'ios' : 'android'
+        // Supports: 'web', 'android', 'ios', 'android_expo', 'ios_expo', 'android_webview'
+        const rawPlatform = deviceInfo?.platform || deviceInfo?.device || 'android'
+        
+        // Map platform to device type for FCM routing
+        // All Android variants (expo, webview, native) use FCM
+        // All iOS variants use APNs via FCM
+        let device = 'android'
+        if (rawPlatform === 'web') {
+            device = 'web'
+        } else if (rawPlatform === 'ios' || rawPlatform === 'ios_expo') {
+            device = 'ios'
+        } else if (rawPlatform.includes('android') || rawPlatform === 'android_expo' || rawPlatform === 'android_webview') {
+            device = 'android'
+        }
+        
+        // Store the detailed platform for debugging
+        const platform = rawPlatform
+
+        // Validate FCM token format (should not be Expo Push Token)
+        if (fcmToken.startsWith('ExponentPushToken')) {
+            console.warn(`⚠️ Received Expo Push Token instead of FCM token for user ${userRecord.email}`);
+            return NextResponse.json(
+                { 
+                    success: false, 
+                    message: 'Invalid token format. Expected native FCM/APNs token, received Expo Push Token. Please update your app to use native push tokens.' 
+                },
+                { status: 400 }
+            );
+        }
 
         // Check if token already exists
         const existingTokenIndex = userRecord.fcmTokens?.findIndex(t => t.token === fcmToken) ?? -1;
@@ -65,7 +92,7 @@ export async function POST(request) {
 
         await userRecord.save();
 
-        console.log(`✅ FCM token registered for user ${userRecord.email} (platform: ${platform})`);
+        console.log(`✅ FCM token registered for user ${userRecord.email} (platform: ${platform}, device: ${device})`);
 
         return NextResponse.json({
             success: true,

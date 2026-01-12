@@ -354,7 +354,7 @@ export async function PATCH(request) {
       if (attendance.checkIn && attendance.checkOut) {
         // Get company settings for break timings and thresholds
         const settings = await CompanySettings.findOne().lean()
-        const breakTimings = settings?.breakTimings || []
+        const breakTimings = Array.isArray(settings?.breakTimings) ? settings.breakTimings : []
         const fullDayHours = settings?.fullDayHours || 8
         const halfDayHours = settings?.halfDayHours || 4
 

@@ -203,7 +203,7 @@ async function processAutoCheckoutForTenant(tenant, targetDate) {
     const checkOutTime = company.workingHours?.checkOutTime || '18:00'
     const fullDayHours = company.workingHours?.fullDayHours || 8
     const halfDayHours = company.workingHours?.halfDayHours || 4
-    const breakTimings = company.breakTimings || []
+    const breakTimings = Array.isArray(company.breakTimings) ? company.breakTimings : []
 
     // Calculate the date range for the target date in the company's timezone
     const targetDateStart = new Date(targetDate)
@@ -369,7 +369,7 @@ async function rectifyAttendanceForTenant(tenant, targetDate) {
     }
 
     const fullDayHours = company.workingHours?.fullDayHours || 8
-    const breakTimings = company.breakTimings || []
+    const breakTimings = Array.isArray(company.breakTimings) ? company.breakTimings : []
 
     // Calculate the date range for the target date
     const targetDateStart = new Date(targetDate)

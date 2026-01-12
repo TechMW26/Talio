@@ -28,7 +28,6 @@ export async function GET(request) {
 
     // Get notifications with pagination
     const notifications = await Notification.find(query)
-      .populate('sentBy', 'firstName lastName')
       .sort({ createdAt: -1 })
       .skip((page - 1) * limit)
       .limit(limit)

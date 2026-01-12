@@ -161,8 +161,8 @@ export async function POST(request) {
 
     attendance.checkOutStatus = 'auto-geofence'
 
-    // Calculate work hours using shrinkage method
-    const breakTimings = settings?.breakTimings || []
+    // Calculate work hours using shrinkage method - ensure breakTimings is an array
+    const breakTimings = Array.isArray(settings?.breakTimings) ? settings.breakTimings : []
     const workHoursCalc = calculateEffectiveWorkHours(
       new Date(attendance.checkIn),
       checkOutTime,

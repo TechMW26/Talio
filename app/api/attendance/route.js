@@ -833,8 +833,8 @@ export async function POST(request) {
       const checkIn = new Date(attendance.checkIn)
       const checkOut = new Date(attendance.checkOut)
 
-      // Get break timings from settings
-      const breakTimings = settings?.breakTimings || []
+      // Get break timings from settings - ensure it's always an array
+      const breakTimings = Array.isArray(settings?.breakTimings) ? settings.breakTimings : []
 
       // Calculate effective work hours accounting for breaks (shrinkage)
       const workHoursCalc = calculateEffectiveWorkHours(checkIn, checkOut, breakTimings)

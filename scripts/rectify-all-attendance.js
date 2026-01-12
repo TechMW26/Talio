@@ -129,7 +129,7 @@ async function main() {
         // Get company settings
         const settings = await CompanySettings.findOne().lean()
         const fullDayHours = settings?.fullDayHours || 8
-        const breakTimings = settings?.breakTimings || []
+        const breakTimings = Array.isArray(settings?.breakTimings) ? settings.breakTimings : []
 
         console.log(`📊 Company Settings:`)
         console.log(`   Full Day Hours: ${fullDayHours}h`)
