@@ -34,7 +34,7 @@ export default function ChatPopup({ chat, index }) {
   const [mentionQuery, setMentionQuery] = useState('')
   const [mentionCandidates, setMentionCandidates] = useState([])
   const [mentionIndex, setMentionIndex] = useState(0)
-  const [mentions, setMentions] = useState([] // {id, name}
+  const [mentions, setMentions] = useState([]) // {id, name}
   const messageInputRef = useRef(null)
 
   const popupRef = useRef(null)
@@ -172,6 +172,48 @@ export default function ChatPopup({ chat, index }) {
     setTimeout(() => {
       setAnimationState('normal')
     }, 300)
+  }
+
+  // Handle mouse down for dragging
+  const handleMouseDown = (e) => {
+    // Don't start drag if clicking on buttons
+    if (e.target.closest('button')) return
+    
+    isDragging.current = true
+    dragOffset.current = {
+      x: e.clientX - (chatPositions?.[chat._id]?.x || 0),
+      y: e.clientY - (chatPositions?.[chat._id]?.y || 0),
+    }
+    bringToFront?.(chat._id)
+    
+    // Add global mouse listeners
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+  }
+
+  // Handle mouse move for dragging
+  const handleMouseMove = (e) => {
+    if (!isDragging.current) return
+    
+    const newX = e.clientX - dragOffset.current.x
+    const newY = e.clientY - dragOffset.current.y
+    
+    // Constrain to viewport
+    const maxX = window.innerWidth - 360 // chat width
+    const maxY = window.innerHeight - 100
+    
+    updateChatPosition?.(
+      chat._id,
+      Math.max(0, Math.min(newX, maxX)),
+      Math.max(0, Math.min(newY, maxY))
+    )
+  }
+
+  // Handle mouse up to stop dragging
+  const handleMouseUp = () => {
+    isDragging.current = false
+    document.removeEventListener('mousemove', handleMouseMove)
+    document.removeEventListener('mouseup', handleMouseUp)
   }
 
   // Track unread messages while minimized

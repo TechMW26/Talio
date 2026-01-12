@@ -10,15 +10,13 @@ import {
   HiOutlineUserGroup,
   HiOutlineHandRaised,
   HiOutlineXMark,
-  HiOutlinePaperAirplane
+  HiOutlinePaperAirplane,
+  HiMiniMicrophone,
+  HiMiniVideoCamera
 } from 'react-icons/hi2'
 import Loader from '@/components/ui/Loader'
-import { 
-  HiMicrophone,
-  HiMicrophoneOff,
-  HiVideoCamera,
-  HiVideoCameraOff
-} from 'react-icons/hi'
+// Slash icons for muted/off states
+import { HiMicrophone as HiOutlineMicrophoneSlash, HiVideoCamera as HiOutlineVideoCameraSlash } from 'react-icons/hi'
 import { BsEmojiSmile } from 'react-icons/bs'
 import toast from '@/utils/toast'
 
@@ -462,7 +460,7 @@ export default function GuestMeetingRoom({ params }) {
                     isMuted ? 'bg-red-500 text-white' : 'bg-gray-800/80 text-white'
                   }`}
                 >
-                  {isMuted ? <HiMicrophoneOff className="w-5 h-5" /> : <HiMicrophone className="w-5 h-5" />}
+                  {isMuted ? <HiOutlineMicrophoneSlash className="w-5 h-5" /> : <HiMiniMicrophone className="w-5 h-5" />}
                 </button>
                 <button
                   onClick={togglePreviewVideo}
@@ -470,7 +468,7 @@ export default function GuestMeetingRoom({ params }) {
                     isVideoOff ? 'bg-red-500 text-white' : 'bg-gray-800/80 text-white'
                   }`}
                 >
-                  {isVideoOff ? <HiVideoCameraOff className="w-5 h-5" /> : <HiVideoCamera className="w-5 h-5" />}
+                  {isVideoOff ? <HiOutlineVideoCameraSlash className="w-5 h-5" /> : <HiMiniVideoCamera className="w-5 h-5" />}
                 </button>
               </div>
             )}
@@ -602,9 +600,9 @@ export default function GuestMeetingRoom({ params }) {
             }`}
           >
             {isMuted ? (
-              <HiMicrophoneOff className="w-6 h-6 text-white" />
+              <HiOutlineMicrophoneSlash className="w-6 h-6 text-white" />
             ) : (
-              <HiMicrophone className="w-6 h-6 text-white" />
+              <HiMiniMicrophone className="w-6 h-6 text-white" />
             )}
           </button>
 
@@ -615,9 +613,9 @@ export default function GuestMeetingRoom({ params }) {
             }`}
           >
             {isVideoOff ? (
-              <HiVideoCameraOff className="w-6 h-6 text-white" />
+              <HiOutlineVideoCameraSlash className="w-6 h-6 text-white" />
             ) : (
-              <HiVideoCamera className="w-6 h-6 text-white" />
+              <HiMiniVideoCamera className="w-6 h-6 text-white" />
             )}
           </button>
 

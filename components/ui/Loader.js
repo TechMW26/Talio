@@ -93,10 +93,15 @@ export default function Loader({ size = 'md', className = '', color = TALIO_TEAL
         }
       `}} />
       <div 
-        className={`${uniqueId}-container ${className}`}
+        className={`${uniqueId}-container talio-loader ${className}`}
+        data-loader-size={size}
         style={{
           width: pixelSize,
           height: pixelSize,
+          minWidth: pixelSize,
+          minHeight: pixelSize,
+          maxWidth: pixelSize,
+          maxHeight: pixelSize,
         }}
       >
         <svg 

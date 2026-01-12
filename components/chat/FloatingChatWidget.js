@@ -391,11 +391,12 @@ export default function FloatingChatWidget() {
                         <button
                           key={emp._id}
                           onClick={() => startNewChat(emp._id)}
-                          className="w-full px-4 py-3 flex items-center gap-4 hover:bg-white/60 transition-colors border-b border-white/30"
+                          className="w-full px-4 py-3 hover:bg-white/60 transition-colors border-b border-white/30"
+                          style={{ display: 'flex', alignItems: 'center', gap: '12px', maxWidth: '100%', overflow: 'hidden' }}
                         >
                           <div 
-                            className="w-11 h-11 rounded-full flex items-center justify-center text-white font-medium text-sm shadow-sm overflow-hidden flex-shrink-0"
-                            style={{ backgroundColor: primaryColor }}
+                            className="rounded-full flex items-center justify-center text-white font-medium text-sm shadow-sm overflow-hidden"
+                            style={{ width: '44px', height: '44px', minWidth: '44px', backgroundColor: primaryColor }}
                           >
                             {emp.profilePicture ? (
                               <img src={emp.profilePicture} alt="" className="w-full h-full object-cover" />
@@ -403,11 +404,17 @@ export default function FloatingChatWidget() {
                               <>{emp.firstName?.[0]}{emp.lastName?.[0]}</>
                             )}
                           </div>
-                          <div className="flex-1 text-left min-w-0">
-                            <p className="font-medium text-gray-900 text-sm truncate">
+                          <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                            <p 
+                              className="font-medium text-gray-900 text-sm"
+                              style={{ textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}
+                            >
                               {emp.firstName} {emp.lastName}
                             </p>
-                            <p className="text-xs text-gray-500 truncate">
+                            <p 
+                              className="text-xs text-gray-500"
+                              style={{ textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}
+                            >
                               {emp.designation?.title || emp.department?.name || emp.email}
                             </p>
                           </div>
@@ -428,16 +435,17 @@ export default function FloatingChatWidget() {
                   </div>
                 </div>
               ) : filteredChats.length > 0 ? (
-                <div>
+                <div className="w-full">
                   {filteredChats.map(chat => {
                     const unreadCount = getUnreadCount(chat._id)
                     return (
-                      <button
+                      <div
                         key={chat._id}
                         onClick={() => openChat(chat)}
-                        className="w-full px-4 py-3 flex items-center gap-3 hover:bg-white/60 transition-colors border-b border-white/30 group min-w-0"
+                        className="w-full px-4 py-3 flex items-start gap-3 hover:bg-white/60 transition-colors border-b border-white/30 cursor-pointer"
                       >
-                        <div className="relative">
+                        {/* Avatar - fixed width */}
+                        <div className="relative" style={{ width: '44px', flexShrink: 0 }}>
                           <div 
                             className="w-11 h-11 rounded-full flex items-center justify-center text-white font-medium text-sm shadow-sm overflow-hidden"
                             style={{ backgroundColor: chat.isGroup ? primaryDark : primaryColor }}
@@ -452,28 +460,66 @@ export default function FloatingChatWidget() {
                           </div>
                           <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-sm"></div>
                         </div>
-                        <div className="flex-1 text-left min-w-0 overflow-hidden">
-                          <div className="flex items-center justify-between">
-                            <p className="font-medium text-gray-900 text-sm truncate">
+                        {/* Content - takes remaining space */}
+                        <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                          {/* First row: Name + Time + Badge */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
+                            <span 
+                              style={{ 
+                                flex: 1, 
+                                minWidth: 0, 
+                                overflow: 'hidden', 
+                                textOverflow: 'ellipsis', 
+                                whiteSpace: 'nowrap',
+                                fontWeight: 500,
+                                fontSize: '14px',
+                                color: '#111827',
+                                textAlign: 'left',
+                                display: 'block'
+                              }}
+                            >
                               {getChatName(chat)}
-                            </p>
-                            <span className="text-[10px] text-gray-400 flex-shrink-0 ml-2">
+                            </span>
+                            <span style={{ flexShrink: 0, fontSize: '10px', color: '#9CA3AF', whiteSpace: 'nowrap' }}>
                               {chat.lastMessageAt ? new Date(chat.lastMessageAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                             </span>
+                            {unreadCount > 0 && (
+                              <span 
+                                style={{ 
+                                  flexShrink: 0, 
+                                  width: '20px', 
+                                  height: '20px', 
+                                  borderRadius: '50%', 
+                                  backgroundColor: primaryColor,
+                                  color: 'white',
+                                  fontSize: '12px',
+                                  fontWeight: 'bold',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center'
+                                }}
+                              >
+                                {unreadCount > 9 ? '9+' : unreadCount}
+                              </span>
+                            )}
                           </div>
-                          <p className="text-xs text-gray-500 truncate mt-0.5">
+                          {/* Second row: Last message */}
+                          <p 
+                            style={{ 
+                              margin: '2px 0 0 0',
+                              fontSize: '12px', 
+                              color: '#6B7280', 
+                              overflow: 'hidden', 
+                              textOverflow: 'ellipsis', 
+                              whiteSpace: 'nowrap',
+                              textAlign: 'left',
+                              width: '100%'
+                            }}
+                          >
                             {chat.lastMessage?.content || 'Start a conversation'}
                           </p>
                         </div>
-                        {unreadCount > 0 && (
-                          <span 
-                            className="w-5 h-5 text-white text-xs rounded-full flex items-center justify-center font-bold flex-shrink-0 shadow-sm"
-                            style={{ backgroundColor: primaryColor }}
-                          >
-                            {unreadCount > 9 ? '9+' : unreadCount}
-                          </span>
-                        )}
-                      </button>
+                      </div>
                     )
                   })}
                 </div>

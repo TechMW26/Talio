@@ -15,15 +15,13 @@ import {
   HiOutlineEllipsisVertical,
   HiOutlineXMark,
   HiOutlinePaperAirplane,
-  HiOutlineStopCircle
+  HiOutlineStopCircle,
+  HiMiniMicrophone,
+  HiMiniVideoCamera
 } from 'react-icons/hi2'
 import Loader from '@/components/ui/Loader'
-import { 
-  HiMicrophone,
-  HiMicrophoneOff,
-  HiVideoCamera,
-  HiVideoCameraOff
-} from 'react-icons/hi'
+// Slash icons for muted/off states
+import { HiMicrophone as HiOutlineMicrophoneSlash, HiVideoCamera as HiOutlineVideoCameraSlash } from 'react-icons/hi'
 import { BsPin, BsPinFill, BsEmojiSmile } from 'react-icons/bs'
 import toast from '@/utils/toast'
 
@@ -703,7 +701,7 @@ export default function MeetingRoomPage({ params }) {
                   }`}
                   title={isMuted ? 'Unmute' : 'Mute'}
                 >
-                  {isMuted ? <HiMicrophoneOff className="w-5 h-5" /> : <HiMicrophone className="w-5 h-5" />}
+                  {isMuted ? <HiOutlineMicrophoneSlash className="w-5 h-5" /> : <HiMiniMicrophone className="w-5 h-5" />}
                 </button>
                 <button
                   onClick={togglePreviewVideo}
@@ -714,7 +712,7 @@ export default function MeetingRoomPage({ params }) {
                   }`}
                   title={isVideoOff ? 'Turn on camera' : 'Turn off camera'}
                 >
-                  {isVideoOff ? <HiVideoCameraOff className="w-5 h-5" /> : <HiVideoCamera className="w-5 h-5" />}
+                  {isVideoOff ? <HiOutlineVideoCameraSlash className="w-5 h-5" /> : <HiMiniVideoCamera className="w-5 h-5" />}
                 </button>
               </div>
             )}
@@ -724,11 +722,11 @@ export default function MeetingRoomPage({ params }) {
           {previewReady && (
             <div className="flex items-center justify-center gap-4 mb-4 text-sm text-gray-600">
               <span className={`flex items-center gap-1 ${isMuted ? 'text-red-500' : 'text-green-600'}`}>
-                {isMuted ? <HiMicrophoneOff className="w-4 h-4" /> : <HiMicrophone className="w-4 h-4" />}
+                {isMuted ? <HiOutlineMicrophoneSlash className="w-4 h-4" /> : <HiMiniMicrophone className="w-4 h-4" />}
                 {isMuted ? 'Muted' : 'Mic on'}
               </span>
               <span className={`flex items-center gap-1 ${isVideoOff ? 'text-red-500' : 'text-green-600'}`}>
-                {isVideoOff ? <HiVideoCameraOff className="w-4 h-4" /> : <HiVideoCamera className="w-4 h-4" />}
+                {isVideoOff ? <HiOutlineVideoCameraSlash className="w-4 h-4" /> : <HiMiniVideoCamera className="w-4 h-4" />}
                 {isVideoOff ? 'Camera off' : 'Camera on'}
               </span>
             </div>

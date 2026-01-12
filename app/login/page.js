@@ -59,7 +59,9 @@ export default function LoginPage() {
       if (token && user) {
         // For desktop app, add timeout to validation to prevent hanging
         const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+        const timeoutId = setTimeout(() => {
+          controller.abort(new DOMException('Request timeout', 'TimeoutError'))
+        }, 5000) // 5 second timeout
 
         // Validate the token before redirecting
         try {
@@ -109,7 +111,7 @@ export default function LoginPage() {
 
           // For desktop app, if validation times out, show login form (don't clear storage)
           // The user may be offline and we don't want to lock them out
-          if (isDesktopApp() && error.name === 'AbortError') {
+          if (isDesktopApp() && (error.name === 'AbortError' || error.name === 'TimeoutError')) {
             console.log('[Login Page] Desktop app validation timeout, showing login form...')
             setChecking(false)
             return

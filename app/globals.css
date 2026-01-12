@@ -199,6 +199,74 @@ html, body {
   }
 }
 
+/* ============================================
+   GLOBAL LOADER SIZES - Talio Fox Animation
+   Forces consistent sizing across all loaders
+   ============================================ */
+.talio-loader {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+}
+
+/* Extra Small Loader (16px) - Buttons, inline */
+.talio-loader[data-loader-size="xs"] {
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  min-height: 16px !important;
+  max-width: 16px !important;
+  max-height: 16px !important;
+}
+
+/* Small Loader (24px) - Compact spaces */
+.talio-loader[data-loader-size="sm"] {
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  min-height: 24px !important;
+  max-width: 24px !important;
+  max-height: 24px !important;
+}
+
+/* Medium Loader (48px) - Default size */
+.talio-loader[data-loader-size="md"] {
+  width: 48px !important;
+  height: 48px !important;
+  min-width: 48px !important;
+  min-height: 48px !important;
+  max-width: 48px !important;
+  max-height: 48px !important;
+}
+
+/* Large Loader (64px) - Page loading states */
+.talio-loader[data-loader-size="lg"] {
+  width: 64px !important;
+  height: 64px !important;
+  min-width: 64px !important;
+  min-height: 64px !important;
+  max-width: 64px !important;
+  max-height: 64px !important;
+}
+
+/* Extra Large Loader (96px) - Full screen loading */
+.talio-loader[data-loader-size="xl"] {
+  width: 96px !important;
+  height: 96px !important;
+  min-width: 96px !important;
+  min-height: 96px !important;
+  max-width: 96px !important;
+  max-height: 96px !important;
+}
+
+/* Ensure SVG inside loader fills container properly */
+.talio-loader svg {
+  width: 100% !important;
+  height: 100% !important;
+  display: block !important;
+}
+
 /* Theme CSS Variables */
 :root {
   /* Default Blue Theme - Primary Colors */
