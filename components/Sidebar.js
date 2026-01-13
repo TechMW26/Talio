@@ -344,7 +344,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
           className="fixed inset-0 z-[60] md:!hidden animate-fade-in"
           onClick={() => setIsOpen(false)}
           style={{
-            backgroundColor: 'rgba(255,255,255,0.6)',
+            backgroundColor: 'rgba(255,255,255,0.8)',
             animation: 'fadeInBackdrop 0.5s ease-out forwards'
           }}
         />

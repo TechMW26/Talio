@@ -209,7 +209,7 @@ export default function GlobalAILoadingOverlay() {
   const [mounted, setMounted] = useState(false)
   const [isVisible, setIsVisible] = useState(false)
   const [isAnimatingOut, setIsAnimatingOut] = useState(false)
-  const [bgOpacity, setBgOpacity] = useState(0.1)
+  const [bgOpacity, setBgOpacity] = useState(0.8)
   const [showBg, setShowBg] = useState(false) // Control background visibility
   
   // Get theme colors for particles - use primary 500 (lighter) and 800 (darker)
@@ -240,7 +240,7 @@ export default function GlobalAILoadingOverlay() {
     }
   }, [theme])
 
-  // Pulsating background opacity effect (10% - 40%) - only after transition completes
+  // Pulsating background opacity effect (75% - 85%) - only after transition completes
   useEffect(() => {
     if (!isVisible || !showBg) return
     
@@ -249,7 +249,7 @@ export default function GlobalAILoadingOverlay() {
     
     const animateBg = () => {
       const elapsed = (Date.now() - startTime) * 0.001
-      const opacity = 0.1 + (Math.sin(elapsed * 1.5) * 0.5 + 0.5) * 0.5
+      const opacity = 0.75 + (Math.sin(elapsed * 1.5) * 0.5 + 0.5) * 0.1
       setBgOpacity(opacity)
       bgAnimFrame = requestAnimationFrame(animateBg)
     }

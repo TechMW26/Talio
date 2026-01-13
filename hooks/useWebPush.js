@@ -128,7 +128,7 @@ export function useWebPush() {
 
                     const title = notification.title || data.title || 'Talio Notification';
                     const body = notification.body || data.body || data.message || '';
-                    const icon = notification.icon || data.icon || '/icons/icon-192x192.png';
+                    const icon = notification.icon || data.icon || '/favicon.png';
                     const url = data.url || data.click_action || '/dashboard';
 
                     // Show browser notification for foreground messages

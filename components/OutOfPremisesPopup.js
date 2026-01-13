@@ -73,7 +73,7 @@ export default function OutOfPremisesPopup() {
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-[9950] p-4" style={{ backgroundColor: "rgba(255,255,255,0.6)" }}>
+    <div className="fixed inset-0 flex items-center justify-center z-[9950] p-4" style={{ backgroundColor: "rgba(255,255,255,0.8)" }}>
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
         {/* Header */}
         <div className="bg-red-500 text-white px-6 py-4 rounded-t-lg flex items-center justify-between">

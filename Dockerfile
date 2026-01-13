@@ -34,7 +34,7 @@ ENV SHARP_IGNORE_GLOBAL_LIBVIPS=0 \
     npm_config_fund=false \
     npm_config_audit=false
 
-RUN npm ci --legacy-peer-deps --prefer-offline && \
+RUN npm ci --prefer-offline && \
     npm cache clean --force
 
 # Source stage - preserve source files for runtime

@@ -140,9 +140,10 @@ export default function OfflinePage() {
 
     // Try to fetch a small resource to check connectivity
     try {
-      const response = await fetch('/manifest.json', {
-        method: 'HEAD',
-        cache: 'no-cache'
+      const response = await fetch('/api/health', {
+        method: 'GET',
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' }
       })
 
       if (response.ok) {

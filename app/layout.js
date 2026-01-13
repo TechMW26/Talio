@@ -67,39 +67,12 @@ const shadowsIntoLight = Shadows_Into_Light({
 export const metadata = {
   title: 'Talio - Workforce Management Platform',
   description: 'Complete solution for managing employees, attendance, productivity, and more',
-  manifest: '/manifest.json',
-
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: 'default',
-    title: 'Talio',
-  },
   icons: {
     icon: [
       { url: '/favicon-16.png', sizes: '16x16', type: 'image/png' },
       { url: '/favicon-32.png', sizes: '32x32', type: 'image/png' },
-      { url: '/favicon.png', sizes: '512x512', type: 'image/png' },
-      { url: '/assets/lanyard-card-logo.webp', sizes: '512x512', type: 'image/webp' },
-      { url: '/icons/icon-72x72.png', sizes: '72x72', type: 'image/png' },
-      { url: '/icons/icon-96x96.png', sizes: '96x96', type: 'image/png' },
-      { url: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png' },
-      { url: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png' },
     ],
     shortcut: '/favicon-32.png',
-    apple: [
-      { url: '/favicon.png', sizes: '512x512', type: 'image/png' },
-      { url: '/icons/icon-152x152.png', sizes: '152x152', type: 'image/png' },
-      { url: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png' },
-    ],
-  },
-  other: {
-    'mobile-web-app-capable': 'yes',
-    'apple-mobile-web-app-capable': 'yes',
-    'apple-mobile-web-app-status-bar-style': 'default',
-    'apple-mobile-web-app-title': 'Talio',
-    'application-name': 'Talio',
-    'msapplication-TileColor': '#ffffff',
-    'msapplication-TileImage': '/icons/icon-144x144.png',
   },
 }
 export const viewport = {
@@ -190,8 +163,6 @@ export default function RootLayout({ children }) {
           strategy="afterInteractive"
         />
         
-        {/* PWA Window Controls Overlay - Draggable title bar region */}
-        <div className="pwa-titlebar-drag" aria-hidden="true" />
         <Providers>
           <SplashVideo>
             <ErrorPageCache />

@@ -86,6 +86,12 @@ desktop-app/node_modules/
 desktop-app/dist/
 desktop-app/release/
 
+# Android (Gradle)
+android/**/build/
+android/.gradle/
+android/**/.cxx/
+android/local.properties
+
 # Binary releases
 download/releases/
 public/releases/

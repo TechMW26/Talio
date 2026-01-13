@@ -36,7 +36,7 @@
     POLL_INTERVAL: 3000,          // 3 seconds
     PING_TIMEOUT: 5000,           // 5 second timeout for ping
     PING_URL: 'https://app.talio.in/api/health',  // Health check endpoint
-    FALLBACK_PING_URL: 'https://app.talio.in/manifest.json',
+    FALLBACK_PING_URL: 'https://app.talio.in/api/health',
     RELOAD_DELAY: 1500,           // 1.5 second delay before reload (for UI feedback)
     STORAGE_KEY: 'talio_last_url',
     MAX_CONSECUTIVE_FAILURES: 20  // Stop polling after 1 minute of failures (20 * 3s)

@@ -4798,7 +4798,7 @@ const WhiteboardCanvas = forwardRef(({
         <>
           <div 
             className="fixed inset-0 z-[999]" 
-            style={{ backgroundColor: "rgba(255,255,255,0.6)" }} 
+            style={{ backgroundColor: "rgba(255,255,255,0.8)" }} 
             onClick={() => !confirmModal.onConfirm && setConfirmModal(null)} 
           />
           <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl p-6 z-[1000] min-w-[320px]">

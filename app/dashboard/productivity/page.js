@@ -316,149 +316,210 @@ export default function ProductivityPage() {
   }
 
   return (
-    <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+    <div className="page-container">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 sm:mb-6">
-        <div className="flex items-center gap-3">
-          <div className="p-2 sm:p-3 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl shadow-lg">
-            <HiOutlineComputerDesktop className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-          </div>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Productivity</h1>
-            <p className="text-xs sm:text-sm text-gray-500">Monitor your work activity</p>
-          </div>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+            <HiOutlineComputerDesktop className="w-7 h-7 text-primary-600" />
+            Productivity
+          </h1>
+          <p className="text-gray-600 mt-1">
+            Monitor your work activity
+          </p>
         </div>
 
         {/* Date Navigation */}
-        <div className="flex items-center gap-1 sm:gap-2 bg-white rounded-xl shadow-sm border px-1 sm:px-2 py-1">
+        <div className="flex items-center gap-2 bg-white rounded-xl shadow-sm border px-2 py-1">
           <button 
             onClick={() => changeDate(-1)}
-            className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-lg transition"
+            className="p-2 hover:bg-gray-100 rounded-lg transition"
           >
-            <HiOutlineChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+            <HiOutlineChevronLeft className="w-5 h-5" />
           </button>
-          <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3">
-            <HiOutlineCalendarDays className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" />
+          <div className="flex items-center gap-2 px-3">
+            <HiOutlineCalendarDays className="w-5 h-5 text-gray-400" />
             <input
               type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
               max={new Date().toISOString().split('T')[0]}
-              className="border-0 focus:ring-0 text-xs sm:text-sm font-medium w-[110px] sm:w-auto"
+              className="border-0 focus:ring-0 text-sm font-medium"
             />
           </div>
           <button 
             onClick={() => changeDate(1)}
             disabled={selectedDate >= new Date().toISOString().split('T')[0]}
-            className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-lg transition disabled:opacity-50"
+            className="p-2 hover:bg-gray-100 rounded-lg transition disabled:opacity-50"
           >
-            <HiOutlineChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
+            <HiOutlineChevronRight className="w-5 h-5" />
           </button>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-primary-100 rounded-lg">
+              <HiOutlineSquares2X2 className="w-5 h-5 text-primary-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-800">{sessions.length}</p>
+              <p className="text-sm text-gray-500">Sessions</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-green-100 rounded-lg">
+              <HiOutlineChartBar className="w-5 h-5 text-green-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-800">
+                {sessions.filter(s => s.analysis?.isAnalyzed).length}
+              </p>
+              <p className="text-sm text-gray-500">Analyzed</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <HiOutlinePhoto className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-800">
+                {sessions.reduce((acc, s) => acc + (s.screenshots?.length || 0), 0)}
+              </p>
+              <p className="text-sm text-gray-500">Captures</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-amber-100 rounded-lg">
+              <HiOutlineTrophy className="w-5 h-5 text-amber-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-gray-800">
+                {sessions.length > 0 
+                  ? Math.round(sessions.filter(s => s.analysis?.score).reduce((acc, s) => acc + (s.analysis?.score || 0), 0) / sessions.filter(s => s.analysis?.score).length) || '--'
+                  : '--'}
+              </p>
+              <p className="text-sm text-gray-500">Avg Score</p>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Tabs (if can view team) */}
       {canViewTeam && (
-        <div className="flex gap-2 mb-4 sm:mb-6">
-          <button
-            onClick={() => {
-              setActiveTab('my')
-              // Reset viewMode if on manual capture (only available in team tab)
-              if (viewMode === 'manual') setViewMode('sessions')
-              // Reset selected team member
-              setSelectedTeamMember(null)
-              // Reset selected employee (sessions view)
-              setSelectedEmployee(null)
-              setEmployeeSessions([])
-            }}
-            className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base font-medium transition flex-1 sm:flex-initial ${
-              activeTab === 'my' 
-                ? 'bg-purple-600 text-white' 
-                : 'bg-white text-gray-600 hover:bg-gray-50 border'
-            }`}
-          >
-            <HiOutlineUser className="w-4 h-4 sm:w-5 sm:h-5" />
-            <span className="hidden sm:inline">My Activity</span>
-            <span className="sm:hidden">My</span>
-          </button>
-          <button
-            onClick={() => {
-              setActiveTab('team')
-              // Reset selected employee when switching to team tab
-              setSelectedEmployee(null)
-              setEmployeeSessions([])
-            }}
-            className={`flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base font-medium transition flex-1 sm:flex-initial ${
-              activeTab === 'team' 
-                ? 'bg-purple-600 text-white' 
-                : 'bg-white text-gray-600 hover:bg-gray-50 border'
-            }`}
-          >
-            <HiOutlineUsers className="w-4 h-4 sm:w-5 sm:h-5" />
-            <span className="hidden sm:inline">Team Activity</span>
-            <span className="sm:hidden">Team</span>
-          </button>
-          
-          {/* Department Filter for Admin/HR */}
-          {isAdminOrHR && activeTab === 'team' && departments.length > 0 && (
-            <div className="flex items-center gap-2 ml-auto">
-              <HiOutlineBuildingOffice2 className="w-4 h-4 text-gray-400" />
-              <select
-                value={selectedDepartment}
-                onChange={(e) => setSelectedDepartment(e.target.value)}
-                className="border rounded-lg px-3 py-2 text-sm focus:ring-purple-500 focus:border-purple-500 min-w-[150px]"
+        <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex gap-2 flex-1">
+              <button
+                onClick={() => {
+                  setActiveTab('my')
+                  // Reset viewMode if on manual capture (only available in team tab)
+                  if (viewMode === 'manual') setViewMode('sessions')
+                  // Reset selected team member
+                  setSelectedTeamMember(null)
+                  // Reset selected employee (sessions view)
+                  setSelectedEmployee(null)
+                  setEmployeeSessions([])
+                }}
+                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium transition ${
+                  activeTab === 'my' 
+                    ? 'bg-primary-600 text-white' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
               >
-                <option value="all">All Departments</option>
-                {departments.map((dept) => (
-                  <option key={dept._id} value={dept._id}>
-                    {dept.name}
-                  </option>
-                ))}
-              </select>
+                <HiOutlineUser className="w-5 h-5" />
+                My Activity
+              </button>
+              <button
+                onClick={() => {
+                  setActiveTab('team')
+                  // Reset selected employee when switching to team tab
+                  setSelectedEmployee(null)
+                  setEmployeeSessions([])
+                }}
+                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium transition ${
+                  activeTab === 'team' 
+                    ? 'bg-primary-600 text-white' 
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                <HiOutlineUsers className="w-5 h-5" />
+                Team Activity
+              </button>
             </div>
-          )}
+            
+            {/* Department Filter for Admin/HR */}
+            {isAdminOrHR && activeTab === 'team' && departments.length > 0 && (
+              <div className="flex items-center gap-2">
+                <HiOutlineBuildingOffice2 className="w-5 h-5 text-gray-400" />
+                <select
+                  value={selectedDepartment}
+                  onChange={(e) => setSelectedDepartment(e.target.value)}
+                  className="px-4 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-primary-500 focus:border-transparent min-w-[150px]"
+                >
+                  <option value="all">All Departments</option>
+                  {departments.map((dept) => (
+                    <option key={dept._id} value={dept._id}>
+                      {dept.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
       {/* View Mode Tabs */}
-      <div className="flex flex-wrap gap-2 mb-4 sm:mb-6 bg-gray-100 p-1 rounded-xl">
-        <button
-          onClick={() => setViewMode('sessions')}
-          className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition flex-1 sm:flex-initial ${
-            viewMode === 'sessions'
-              ? 'bg-white text-gray-900 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          <HiOutlineSquares2X2 className="w-4 h-4" />
-          <span className="hidden sm:inline">Sessions</span>
-        </button>
-        <button
-          onClick={() => setViewMode('raw')}
-          className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition flex-1 sm:flex-initial ${
-            viewMode === 'raw'
-              ? 'bg-white text-gray-900 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          <HiOutlinePhoto className="w-4 h-4" />
-          <span className="hidden sm:inline">Raw Captures</span>
-          <span className="sm:hidden">Raw</span>
-        </button>
-        {canViewTeam && activeTab === 'team' && (
+      <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+        <div className="flex gap-2">
           <button
-            onClick={() => setViewMode('manual')}
-            className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition flex-1 sm:flex-initial ${
-              viewMode === 'manual'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
+            onClick={() => setViewMode('sessions')}
+            className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium transition ${
+              viewMode === 'sessions'
+                ? 'bg-primary-600 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
           >
-            <HiOutlineCamera className="w-4 h-4" />
-            <span className="hidden sm:inline">Manual Capture</span>
-            <span className="sm:hidden">Manual</span>
+            <HiOutlineSquares2X2 className="w-5 h-5" />
+            Sessions
           </button>
-        )}
+          <button
+            onClick={() => setViewMode('raw')}
+            className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium transition ${
+              viewMode === 'raw'
+                ? 'bg-primary-600 text-white'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+          >
+            <HiOutlinePhoto className="w-5 h-5" />
+            Raw Captures
+          </button>
+          {canViewTeam && activeTab === 'team' && (
+            <button
+              onClick={() => setViewMode('manual')}
+              className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium transition ${
+                viewMode === 'manual'
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              <HiOutlineCamera className="w-5 h-5" />
+              Manual Capture
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Raw Capture View */}
@@ -466,20 +527,22 @@ export default function ProductivityPage() {
         <>
           {/* Team member selector for team tab */}
           {activeTab === 'team' && canViewTeam && (
-            <div className="mb-4 flex items-center gap-3">
-              <label className="text-sm font-medium text-gray-700">View captures for:</label>
-              <select
-                value={selectedTeamMember || ''}
-                onChange={(e) => setSelectedTeamMember(e.target.value || null)}
-                className="border rounded-lg px-3 py-2 text-sm focus:ring-purple-500 focus:border-purple-500 min-w-[200px]"
-              >
-                <option value="">Select team member</option>
-                {teamSessions.map((member) => (
-                  <option key={member.userId || member._id} value={member.userId || member._id}>
-                    {member.name || `${member.firstName || ''} ${member.lastName || ''}`.trim() || member.email}
-                  </option>
-                ))}
-              </select>
+            <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+              <div className="flex items-center gap-3">
+                <label className="text-sm font-medium text-gray-700">View captures for:</label>
+                <select
+                  value={selectedTeamMember || ''}
+                  onChange={(e) => setSelectedTeamMember(e.target.value || null)}
+                  className="px-4 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-primary-500 focus:border-transparent min-w-[200px]"
+                >
+                  <option value="">Select team member</option>
+                  {teamSessions.map((member) => (
+                    <option key={member.userId || member._id} value={member.userId || member._id}>
+                      {member.name || `${member.firstName || ''} ${member.lastName || ''}`.trim() || member.email}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           )}
           {/* Show raw captures - for my tab or when team member is selected */}
@@ -490,10 +553,10 @@ export default function ProductivityPage() {
               userId={activeTab === 'team' ? selectedTeamMember : null}
             />
           ) : activeTab === 'team' && !selectedTeamMember ? (
-            <div className="bg-white rounded-2xl shadow-sm border p-6 sm:p-12 text-center">
-              <HiOutlineUsers className="w-12 h-12 sm:w-16 sm:h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">Select a team member</h3>
-              <p className="text-sm sm:text-base text-gray-500">
+            <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
+              <HiOutlineUsers className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+              <h3 className="text-lg font-medium text-gray-800 mb-2">Select a team member</h3>
+              <p className="text-gray-500">
                 Choose a team member from the dropdown above to view their raw captures.
               </p>
             </div>
@@ -510,15 +573,14 @@ export default function ProductivityPage() {
       {activeTab === 'my' && viewMode === 'sessions' && (
         <>
           {/* Refresh Button */}
-          <div className="flex justify-end mb-4">
+          <div className="flex justify-end mb-6">
             <button
               onClick={refreshSessions}
               disabled={refreshing}
-              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 bg-white border rounded-lg hover:bg-gray-50 transition text-xs sm:text-sm font-medium"
+              className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium text-gray-700"
             >
-              <HiOutlineArrowPath className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${refreshing ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">{refreshing ? 'Refreshing...' : 'Refresh Sessions'}</span>
-              <span className="sm:hidden">{refreshing ? 'Refreshing...' : 'Refresh'}</span>
+              <HiOutlineArrowPath className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
+              {refreshing ? 'Refreshing...' : 'Refresh Sessions'}
             </button>
           </div>
 
@@ -528,21 +590,21 @@ export default function ProductivityPage() {
               <Loader size="lg" />
             </div>
           ) : sessions.length === 0 ? (
-            <div className="bg-white rounded-2xl shadow-sm border p-6 sm:p-12 text-center">
-              <HiOutlinePhoto className="w-12 h-12 sm:w-16 sm:h-16 text-gray-300 mx-auto mb-3 sm:mb-4" />
-              <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">No activity recorded</h3>
-              <p className="text-sm sm:text-base text-gray-500 mb-4">
+            <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
+              <HiOutlinePhoto className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+              <h3 className="text-lg font-medium text-gray-800 mb-2">No activity recorded</h3>
+              <p className="text-gray-500 mb-4">
                 No screenshots were captured on this date. Make sure the desktop app is running while clocked in.
               </p>
               <button
                 onClick={refreshSessions}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition text-sm sm:text-base"
+                className="btn-primary inline-flex items-center gap-2"
               >
                 Check for Screenshots
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {sessions.map((session, index) => {
                 // Calculate session number: oldest = 1, latest = highest number
                 // Since sessions are sorted latest first (index 0 = latest), reverse the numbering
@@ -551,7 +613,7 @@ export default function ProductivityPage() {
                 return (
                 <div
                   key={session._id}
-                  className="bg-white rounded-xl shadow-sm border overflow-hidden hover:shadow-md transition cursor-pointer"
+                  className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition cursor-pointer"
                   onClick={() => {
                     setSelectedSession(session)
                     setCurrentSlideIndex(0)
@@ -561,9 +623,9 @@ export default function ProductivityPage() {
                   <div className="aspect-video bg-gray-100 relative">
                     {session.analysis?.isAnalyzed || session.screenshotsDeleted ? (
                       // Show "Analysis Complete" preview for analyzed sessions
-                      <div className="flex flex-col items-center justify-center h-full bg-gradient-to-br from-purple-500 to-indigo-600 text-white">
+                      <div className="flex flex-col items-center justify-center h-full bg-gradient-to-br from-primary-500 to-primary-700 text-white">
                         <HiOutlineSparkles className="w-10 h-10 mb-2" />
-                        <span className="text-sm font-medium">Analysis Complete</span>
+                        <span className="font-medium">Analysis Complete</span>
                         {session.analysis?.score != null && (
                           <span className="text-2xl font-bold mt-1">{session.analysis.score}%</span>
                         )}
@@ -595,20 +657,20 @@ export default function ProductivityPage() {
                   </div>
 
                   {/* Session Info */}
-                  <div className="p-3 sm:p-4">
+                  <div className="p-4">
                     <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-sm sm:text-base font-medium text-gray-900">
+                      <h3 className="font-medium text-gray-800">
                         {session.sessionTitle || `Session ${sessionNumber}`}
                       </h3>
                       {session.analysis?.score != null && !session.analysis?.isAnalyzed && (
-                        <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium ${getScoreColor(session.analysis.score)}`}>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${getScoreColor(session.analysis.score)}`}>
                           {session.analysis.score}%
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500 mb-2">
+                    <div className="flex items-center gap-4 text-sm text-gray-500 mb-2">
                       <span className="flex items-center gap-1">
-                        <HiOutlineClock className="w-3 h-3 sm:w-4 sm:h-4" />
+                        <HiOutlineClock className="w-4 h-4" />
                         <span className="truncate">{formatTime(session.startTime)} - {formatTime(session.endTime)}</span>
                       </span>
                     </div>
@@ -618,33 +680,33 @@ export default function ProductivityPage() {
                       <div className="space-y-2">
                         {/* Summary Preview */}
                         {session.analysis.summary && (
-                          <p className="text-xs sm:text-sm text-gray-600 line-clamp-2">
+                          <p className="text-sm text-gray-600 line-clamp-2">
                             {session.analysis.summary}
                           </p>
                         )}
                         
                         {/* Quick stats */}
-                        <div className="flex flex-wrap gap-1.5">
+                        <div className="flex flex-wrap gap-2">
                           {session.analysis.achievements?.length > 0 && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-50 text-green-700 rounded text-[10px] sm:text-xs">
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-green-50 text-green-700 rounded text-xs">
                               <HiOutlineTrophy className="w-3 h-3" />
                               {session.analysis.achievements.length} wins
                             </span>
                           )}
                           {(session.analysis.suggestions?.length > 0 || session.analysis.improvements?.length > 0) && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-700 rounded text-[10px] sm:text-xs">
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-700 rounded text-xs">
                               💡 {(session.analysis.suggestions?.length || 0) + (session.analysis.improvements?.length || 0)} tips
                             </span>
                           )}
                           {session.analysis.insights?.length > 0 && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 rounded text-[10px] sm:text-xs">
+                            <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs">
                               📊 {session.analysis.insights.length} insights
                             </span>
                           )}
                         </div>
                         
                         {/* View details hint */}
-                        <p className="text-[10px] sm:text-xs text-purple-600 font-medium mt-2">
+                        <p className="text-sm text-primary-600 font-medium mt-2">
                           Click to view full analysis →
                         </p>
                       </div>
@@ -655,11 +717,10 @@ export default function ProductivityPage() {
                           analyzeSession(session._id)
                         }}
                         disabled={analyzing}
-                        className="mt-2 w-full flex items-center justify-center gap-1.5 sm:gap-2 px-3 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg text-xs sm:text-sm font-medium hover:opacity-90 transition disabled:opacity-50"
+                        className="mt-2 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-lg font-medium hover:opacity-90 transition disabled:opacity-50"
                       >
-                        <HiOutlineSparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                        <span className="hidden sm:inline">{analyzing ? 'Analyzing...' : 'Analyze with AI'}</span>
-                        <span className="sm:hidden">{analyzing ? 'Analyzing...' : 'Analyze'}</span>
+                        <HiOutlineSparkles className="w-5 h-5" />
+                        {analyzing ? 'Analyzing...' : 'Analyze with AI'}
                       </button>
                     )}
                   </div>
@@ -679,22 +740,21 @@ export default function ProductivityPage() {
             /* Selected Employee's Sessions View */
             <>
               {/* Back button and employee header */}
-              <div className="mb-4 flex items-center gap-4">
+              <div className="mb-6 flex items-center gap-4">
                 <button
                   onClick={handleBackToTeam}
-                  className="flex items-center gap-2 px-3 py-2 bg-white border rounded-lg hover:bg-gray-50 transition text-sm font-medium"
+                  className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition font-medium text-gray-700"
                 >
-                  <HiOutlineChevronLeft className="w-4 h-4" />
-                  <span className="hidden sm:inline">Back to Team</span>
-                  <span className="sm:hidden">Back</span>
+                  <HiOutlineChevronLeft className="w-5 h-5" />
+                  Back to Team
                 </button>
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-semibold shadow-lg">
+                  <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-700 rounded-full flex items-center justify-center text-white font-semibold shadow-lg">
                     {selectedEmployee.name?.charAt(0) || selectedEmployee.firstName?.charAt(0) || 'U'}
                   </div>
                   <div>
-                    <h3 className="font-semibold text-gray-900">{selectedEmployee.name || `${selectedEmployee.firstName} ${selectedEmployee.lastName}`}</h3>
-                    <p className="text-xs text-gray-500">{selectedEmployee.designation || selectedEmployee.department || 'Team Member'}</p>
+                    <h3 className="font-semibold text-gray-800">{selectedEmployee.name || `${selectedEmployee.firstName} ${selectedEmployee.lastName}`}</h3>
+                    <p className="text-sm text-gray-500">{selectedEmployee.designation || selectedEmployee.department || 'Team Member'}</p>
                   </div>
                 </div>
               </div>
@@ -705,15 +765,15 @@ export default function ProductivityPage() {
                   <Loader size="lg" />
                 </div>
               ) : employeeSessions.length === 0 ? (
-                <div className="bg-white rounded-2xl shadow-sm border p-6 sm:p-12 text-center">
-                  <HiOutlinePhoto className="w-12 h-12 sm:w-16 sm:h-16 text-gray-300 mx-auto mb-3 sm:mb-4" />
-                  <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">No activity recorded</h3>
-                  <p className="text-sm sm:text-base text-gray-500">
+                <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
+                  <HiOutlinePhoto className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-800 mb-2">No activity recorded</h3>
+                  <p className="text-gray-500">
                     {selectedEmployee.name || 'This employee'} has no screenshots on this date.
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {employeeSessions.map((session, index) => {
                     // Calculate session number: oldest = 1, latest = highest number
                     // Since sessions are sorted latest first (index 0 = latest), reverse the numbering
@@ -726,44 +786,44 @@ export default function ProductivityPage() {
                         setSelectedSession(session)
                         setCurrentSlideIndex(0)
                       }}
-                      className="bg-white rounded-xl shadow-sm border overflow-hidden hover:shadow-md transition-all duration-200 cursor-pointer group"
+                      className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-all duration-200 cursor-pointer group"
                     >
                       {/* Session Header */}
-                      <div className="p-3 sm:p-4 border-b">
+                      <div className="p-4 border-b">
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2 sm:gap-3">
-                            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg flex items-center justify-center text-white text-sm sm:text-base font-bold">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg flex items-center justify-center text-white font-bold">
                               {sessionNumber}
                             </div>
                             <div>
-                              <h3 className="font-semibold text-gray-900 text-sm sm:text-base">
+                              <h3 className="font-semibold text-gray-800">
                                 {session.sessionTitle || `Session ${sessionNumber}`}
                               </h3>
-                              <p className="text-[10px] sm:text-xs text-gray-500">
+                              <p className="text-sm text-gray-500">
                                 {formatTime(session.startTime)} - {formatTime(session.endTime)}
                               </p>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
                             {index === 0 && !session.analysis?.isAnalyzed && (
-                              <span className="text-[10px] sm:text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Latest</span>
+                              <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Latest</span>
                             )}
-                            <span className="text-[10px] sm:text-xs text-gray-400">{session.screenshotCount || session.screenshots?.length || 0} screenshots</span>
+                            <span className="text-sm text-gray-400">{session.screenshotCount || session.screenshots?.length || 0} screenshots</span>
                           </div>
                         </div>
                       </div>
 
                       {/* Preview Screenshots */}
-                      <div className="p-2 sm:p-3">
+                      <div className="p-4">
                         {session.screenshotsDeleted || session.analysis?.isAnalyzed ? (
-                          <div className="aspect-video bg-gradient-to-br from-purple-50 to-indigo-50 rounded-lg flex items-center justify-center">
+                          <div className="aspect-video bg-gradient-to-br from-primary-50 to-primary-100 rounded-lg flex items-center justify-center">
                             <div className="text-center">
-                              <HiOutlineSparkles className="w-8 h-8 text-purple-400 mx-auto mb-2" />
-                              <p className="text-xs text-purple-600 font-medium">Analysis Complete</p>
+                              <HiOutlineSparkles className="w-8 h-8 text-primary-400 mx-auto mb-2" />
+                              <p className="text-sm text-primary-600 font-medium">Analysis Complete</p>
                             </div>
                           </div>
                         ) : session.screenshots?.length > 0 ? (
-                          <div className="grid grid-cols-3 gap-1 sm:gap-1.5">
+                          <div className="grid grid-cols-3 gap-2">
                             {session.screenshots.slice(0, 3).map((ss, i) => (
                               <div key={i} className="aspect-video bg-gray-100 rounded overflow-hidden">
                                 <img
@@ -783,16 +843,16 @@ export default function ProductivityPage() {
                       </div>
 
                       {/* Analysis Status / Actions */}
-                      <div className="p-3 sm:p-4 border-t bg-gray-50">
+                      <div className="p-4 border-t bg-gray-50">
                         {session.analysis?.isAnalyzed ? (
                           <div>
                             <div className="flex items-center gap-2 mb-2">
-                              <span className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium ${getScoreColor(session.analysis.score)}`}>
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getScoreColor(session.analysis.score)}`}>
                                 {session.analysis.score}%
                               </span>
-                              <span className="text-[10px] sm:text-xs text-gray-500">productivity score</span>
+                              <span className="text-sm text-gray-500">productivity score</span>
                             </div>
-                            <p className="text-[10px] sm:text-xs text-purple-600 font-medium">
+                            <p className="text-sm text-primary-600 font-medium">
                               Click to view full analysis →
                             </p>
                           </div>
@@ -803,10 +863,10 @@ export default function ProductivityPage() {
                               analyzeSession(session._id)
                             }}
                             disabled={analyzing}
-                            className="mt-2 w-full flex items-center justify-center gap-1.5 sm:gap-2 px-3 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg text-xs sm:text-sm font-medium hover:opacity-90 transition disabled:opacity-50"
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-lg font-medium hover:opacity-90 transition disabled:opacity-50"
                           >
-                            <HiOutlineSparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                            <span>{analyzing ? 'Analyzing...' : 'Analyze with AI'}</span>
+                            <HiOutlineSparkles className="w-5 h-5" />
+                            {analyzing ? 'Analyzing...' : 'Analyze with AI'}
                           </button>
                         )}
                       </div>
@@ -820,15 +880,15 @@ export default function ProductivityPage() {
             /* Team Grid View */
             <>
           {teamSessions.length === 0 ? (
-            <div className="bg-white rounded-2xl shadow-sm border p-6 sm:p-12 text-center">
-              <HiOutlineUsers className="w-12 h-12 sm:w-16 sm:h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-2">No team activity</h3>
-              <p className="text-sm sm:text-base text-gray-500">
+            <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
+              <HiOutlineUsers className="w-16 h-16 mx-auto text-gray-300 mb-4" />
+              <h3 className="text-lg font-medium text-gray-800 mb-2">No team activity</h3>
+              <p className="text-gray-500">
                 No team members have recorded activity on this date.
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {teamSessions.map((member) => {
                 // Get sessions from sessionsSummary
                 const memberSessions = member.sessionsSummary?.sessions || [];
@@ -838,18 +898,18 @@ export default function ProductivityPage() {
                 return (
                 <div 
                   key={member.userId} 
-                  className="bg-white rounded-xl shadow-sm border overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+                  className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
                   onClick={() => handleSelectEmployee(member)}
                 >
                   {/* Card Header with Profile */}
-                  <div className="p-4 border-b bg-gradient-to-r from-purple-50 to-indigo-50">
+                  <div className="p-4 border-b bg-gradient-to-r from-primary-50 to-primary-100">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-lg font-semibold shadow-lg">
+                      <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-primary-700 rounded-full flex items-center justify-center text-white text-lg font-semibold shadow-lg">
                         {member.name?.charAt(0) || member.firstName?.charAt(0) || 'U'}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <h3 className="font-semibold text-gray-900 truncate">{member.name || `${member.firstName} ${member.lastName}`}</h3>
-                        <p className="text-xs text-gray-500">{member.designation || member.department || 'Team Member'}</p>
+                        <h3 className="font-semibold text-gray-800 truncate">{member.name || `${member.firstName} ${member.lastName}`}</h3>
+                        <p className="text-sm text-gray-500">{member.designation || member.department || 'Team Member'}</p>
                       </div>
                     </div>
                   </div>
@@ -858,13 +918,13 @@ export default function ProductivityPage() {
                   <div className="p-4">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
-                        <HiOutlineSquares2X2 className="w-4 h-4 text-purple-500" />
-                        <span className="text-sm font-medium text-gray-700">{member.sessionsSummary?.totalSessions || 0} Sessions</span>
+                        <HiOutlineSquares2X2 className="w-5 h-5 text-primary-500" />
+                        <span className="font-medium text-gray-700">{member.sessionsSummary?.totalSessions || 0} Sessions</span>
                       </div>
                       {member.sessionsSummary?.averageScore && (
                         <div className="flex items-center gap-1">
-                          <HiOutlineTrophy className="w-4 h-4 text-amber-500" />
-                          <span className={`text-sm font-bold ${
+                          <HiOutlineTrophy className="w-5 h-5 text-amber-500" />
+                          <span className={`font-bold ${
                             member.sessionsSummary.averageScore >= 70 ? 'text-green-600' :
                             member.sessionsSummary.averageScore >= 40 ? 'text-amber-600' : 'text-red-600'
                           }`}>
@@ -883,7 +943,7 @@ export default function ProductivityPage() {
                           className="w-full h-full object-cover"
                         />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-                          <span className="text-white text-sm font-medium">View Sessions</span>
+                          <span className="text-white font-medium">View Sessions</span>
                         </div>
                         {memberSessions.length > 1 && (
                           <div className="absolute top-2 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full">
@@ -895,13 +955,13 @@ export default function ProductivityPage() {
                       <div className="aspect-video bg-gray-50 rounded-lg flex items-center justify-center">
                         <div className="text-center">
                           <HiOutlinePhoto className="w-8 h-8 text-gray-300 mx-auto mb-1" />
-                          <p className="text-xs text-gray-400">No screenshots</p>
+                          <p className="text-sm text-gray-400">No screenshots</p>
                         </div>
                       </div>
                     )}
                     
                     {/* Quick Stats Bar */}
-                    <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                    <div className="mt-3 flex items-center justify-between text-sm text-gray-500">
                       <span>{member.sessionsSummary?.totalScreenshots || 0} screenshots</span>
                       <span>{member.sessionsSummary?.analyzedSessions || 0} analyzed</span>
                     </div>
@@ -918,18 +978,18 @@ export default function ProductivityPage() {
       {/* Session Detail Modal */}
       <ModalPortal show={!!selectedSession}>
         {selectedSession && (
-        <div className="fixed inset-0 flex items-center justify-center z-[9999] p-2 sm:p-4" style={{ backgroundColor: 'rgba(255,255,255,0.6)' }}>
+        <div className="fixed inset-0 flex items-center justify-center z-[9999] p-4" style={{ backgroundColor: 'rgba(255,255,255,0.8)' }}>
           <div className="bg-white rounded-2xl shadow-xl max-w-7xl w-full max-h-[95vh] overflow-hidden flex flex-col">
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-3 sm:p-4 border-b bg-gray-50">
+            <div className="flex items-center justify-between p-4 border-b bg-gray-50">
               <div className="min-w-0 flex-1">
-                <h2 className="text-base sm:text-lg font-bold text-gray-900">
+                <h2 className="text-lg font-bold text-gray-800">
                   {selectedSession.sessionTitle || `Session ${selectedSession.sessionNumber || 1}`}
                 </h2>
-                <p className="text-xs sm:text-sm text-gray-500">
+                <p className="text-sm text-gray-500">
                   {formatTime(selectedSession.startTime)} - {formatTime(selectedSession.endTime)} 
                   {selectedSession.analysis?.isAnalyzed ? (
-                    <span> • <span className="text-purple-600 font-medium">AI Analyzed</span></span>
+                    <span> • <span className="text-primary-600 font-medium">AI Analyzed</span></span>
                   ) : (
                     <span> • {selectedSession.screenshots?.length || 0} screenshots</span>
                   )}
@@ -941,11 +1001,10 @@ export default function ProductivityPage() {
                   <button
                     onClick={() => analyzeSession(selectedSession._id)}
                     disabled={analyzing}
-                    className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg text-xs sm:text-sm font-medium hover:opacity-90 transition disabled:opacity-50"
+                    className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-lg font-medium hover:opacity-90 transition disabled:opacity-50"
                   >
-                    <HiOutlineSparkles className="w-4 h-4" />
-                    <span className="hidden sm:inline">{analyzing ? 'Analyzing...' : 'Analyze with AI'}</span>
-                    <span className="sm:hidden">{analyzing ? '...' : 'Analyze'}</span>
+                    <HiOutlineSparkles className="w-5 h-5" />
+                    {analyzing ? 'Analyzing...' : 'Analyze with AI'}
                   </button>
                 )}
                 <button
@@ -970,7 +1029,7 @@ export default function ProductivityPage() {
                   {selectedSession.screenshotsDeleted || selectedSession.analysis?.isAnalyzed ? (
                     <div className="text-center text-gray-400 p-6">
                       <div className="w-20 h-20 bg-gray-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                        <HiOutlineSparkles className="w-10 h-10 text-purple-400" />
+                        <HiOutlineSparkles className="w-10 h-10 text-primary-400" />
                       </div>
                       <h3 className="text-lg font-semibold text-white mb-2">Analysis Complete</h3>
                       <p className="text-sm text-gray-400 max-w-xs mx-auto">
@@ -1032,7 +1091,7 @@ export default function ProductivityPage() {
                           key={idx}
                           onClick={() => setCurrentSlideIndex(idx)}
                           className={`flex-shrink-0 w-14 h-10 rounded overflow-hidden border-2 transition ${
-                            idx === currentSlideIndex ? 'border-purple-500' : 'border-transparent hover:border-gray-500'
+                            idx === currentSlideIndex ? 'border-primary-500' : 'border-transparent hover:border-gray-500'
                           }`}
                         >
                           <img
@@ -1106,11 +1165,11 @@ export default function ProductivityPage() {
                       {/* Task Completion */}
                       {selectedSession.analysis.taskCompletionIndicators != null && (
                         <div className={`p-3 rounded-xl text-center ${
-                          selectedSession.analysis.taskCompletionIndicators >= 70 ? 'bg-purple-50 border border-purple-200' :
+                          selectedSession.analysis.taskCompletionIndicators >= 70 ? 'bg-primary-50 border border-primary-200' :
                           selectedSession.analysis.taskCompletionIndicators >= 40 ? 'bg-amber-50 border border-amber-200' : 'bg-red-50 border border-red-200'
                         }`}>
                           <span className={`text-2xl font-bold ${
-                            selectedSession.analysis.taskCompletionIndicators >= 70 ? 'text-purple-600' :
+                            selectedSession.analysis.taskCompletionIndicators >= 70 ? 'text-primary-600' :
                             selectedSession.analysis.taskCompletionIndicators >= 40 ? 'text-amber-600' : 'text-red-600'
                           }`}>
                             {selectedSession.analysis.taskCompletionIndicators}
@@ -1121,8 +1180,8 @@ export default function ProductivityPage() {
                     </div>
                     
                     {/* Summary */}
-                    <div className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-4">
-                      <h4 className="font-medium text-purple-900 mb-2 flex items-center gap-2">
+                    <div className="bg-gradient-to-r from-primary-50 to-primary-100 rounded-xl p-4">
+                      <h4 className="font-medium text-primary-900 mb-2 flex items-center gap-2">
                         <HiOutlineSparkles className="w-4 h-4" />
                         AI Summary
                       </h4>
@@ -1142,7 +1201,7 @@ export default function ProductivityPage() {
                           {[
                             { key: 'deepWork', label: 'Deep Work', color: 'bg-green-500' },
                             { key: 'collaboration', label: 'Collaboration', color: 'bg-blue-500' },
-                            { key: 'administrative', label: 'Administrative', color: 'bg-purple-500' },
+                            { key: 'administrative', label: 'Administrative', color: 'bg-primary-500' },
                             { key: 'breaks', label: 'Breaks', color: 'bg-gray-400' },
                             { key: 'unfocused', label: 'Unfocused', color: 'bg-red-400' }
                           ].map(({ key, label, color }) => {
@@ -1195,7 +1254,7 @@ export default function ProductivityPage() {
                             <div key={idx} className="flex items-center gap-2">
                               <span className="text-xs text-gray-600 w-28 truncate">{cat.category}</span>
                               <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                                <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${cat.percentage}%` }} />
+                                <div className="h-full bg-primary-500 rounded-full" style={{ width: `${cat.percentage}%` }} />
                               </div>
                               <span className="text-xs font-medium text-gray-700 w-10 text-right">{cat.percentage}%</span>
                             </div>
@@ -1351,8 +1410,8 @@ export default function ProductivityPage() {
                   </div>
                 ) : (
                   <div className="h-full flex flex-col items-center justify-center text-center py-12">
-                    <div className="w-20 h-20 bg-gradient-to-br from-purple-100 to-indigo-100 rounded-2xl flex items-center justify-center mb-4">
-                      <HiOutlineSparkles className="w-10 h-10 text-purple-500" />
+                    <div className="w-20 h-20 bg-gradient-to-br from-primary-100 to-primary-200 rounded-2xl flex items-center justify-center mb-4">
+                      <HiOutlineSparkles className="w-10 h-10 text-primary-500" />
                     </div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-2">AI Analysis Available</h3>
                     <p className="text-sm text-gray-500 mb-6 max-w-xs">
@@ -1361,7 +1420,7 @@ export default function ProductivityPage() {
                     <button
                       onClick={() => analyzeSession(selectedSession._id)}
                       disabled={analyzing}
-                      className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-medium hover:opacity-90 transition disabled:opacity-50 shadow-lg shadow-purple-500/25"
+                      className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-xl font-medium hover:opacity-90 transition disabled:opacity-50 shadow-lg shadow-primary-500/25"
                     >
                       <HiOutlineSparkles className="w-5 h-5" />
                       {analyzing ? 'Analyzing...' : 'Analyze with AI'}

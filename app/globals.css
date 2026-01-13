@@ -521,7 +521,7 @@ body {
     opacity: 1;
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    background-color: rgba(255, 255, 255, 0.6);
+    background-color: rgba(255, 255, 255, 0.8);
   }
 }
 
@@ -529,7 +529,7 @@ body {
   animation: fadeInBackdrop 0.5s ease-out forwards;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  background-color: rgba(255, 255, 255, 0.6);
+  background-color: rgba(255, 255, 255, 0.8);
 }
 
 /* MIRA Modal Backdrop Animations - Simple dark overlay without blur */
@@ -651,18 +651,18 @@ body {
    ============================================ */
 
 /* Overlay backgrounds with transparent white tint - GLOBAL STANDARD */
-/* All modals use rgba(255, 255, 255, 0.6) for consistent transparent white backdrop */
+/* All modals use rgba(255, 255, 255, 0.8) for consistent transparent white backdrop */
 /* NO backdrop-blur - just color and transparency */
 .modal-overlay-bg {
-  background-color: rgba(255, 255, 255, 0.6);
+  background-color: rgba(255, 255, 255, 0.8);
 }
 
 .modal-overlay-dark {
-  background-color: rgba(255, 255, 255, 0.6);
+  background-color: rgba(255, 255, 255, 0.8);
 }
 
 .modal-overlay-light {
-  background-color: rgba(255, 255, 255, 0.6);
+  background-color: rgba(255, 255, 255, 0.8);
 }
 
 /* Overlay with animation - no blur */
@@ -676,7 +676,7 @@ body {
 }
 
 .modal-overlay-animated {
-  background-color: rgba(255, 255, 255, 0.6);
+  background-color: rgba(255, 255, 255, 0.8);
   animation: overlay-fade-in 0.2s ease-out;
 }
 
@@ -895,14 +895,14 @@ textarea::placeholder {
   justify-content: center;
   padding: 1rem;
   overflow-y: auto;
-  background-color: rgba(255, 255, 255, 0.6);
+  background-color: rgba(255, 255, 255, 0.8);
 }
 
 /* Modal Backdrop - Transparent white background - GLOBAL STANDARD */
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background-color: rgba(255, 255, 255, 0.6);
+  background-color: rgba(255, 255, 255, 0.8);
   z-index: 99998;
 }
 

@@ -430,7 +430,7 @@ export default function FloatingChatWidget() {
               ) : loading ? (
                 <div className="p-8 text-center h-full flex items-center justify-center">
                   <div>
-                    <Loader size="sm" />
+                    <Loader size="lg" />
                     <p className="text-gray-500 text-sm mt-2">Loading chats...</p>
                   </div>
                 </div>
