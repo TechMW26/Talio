@@ -34,7 +34,8 @@ ENV SHARP_IGNORE_GLOBAL_LIBVIPS=0 \
     npm_config_fund=false \
     npm_config_audit=false
 
-RUN npm ci --prefer-offline && \
+RUN npm ci && \
+    npm rebuild sharp && \
     npm cache clean --force
 
 # Source stage - preserve source files for runtime
@@ -43,11 +44,10 @@ WORKDIR /app
 COPY . .
 
 # Builder stage
-FROM base AS builder
+FROM deps AS builder
 WORKDIR /app
 
-# Copy deps from previous stage
-COPY --from=deps /app/node_modules ./node_modules
+# Copy deps from previous stage (already have node_modules from deps stage)
 COPY . .
 
 # Build args for Next.js public envs
