@@ -11,10 +11,32 @@ export default function OfflinePage() {
   const [isChecking, setIsChecking] = useState(false)
   const [lastChecked, setLastChecked] = useState(null)
   const [checkAttempts, setCheckAttempts] = useState(0)
+  const [isDesktopApp, setIsDesktopApp] = useState(false)
   const pollIntervalRef = useRef(null)
   const router = useRouter()
 
+  // Check if running in desktop app - if so, use the Electron offline page
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const isElectron = window.isElectron === true || 
+                         window.electronAPI !== undefined ||
+                         navigator.userAgent.toLowerCase().includes('electron')
+      setIsDesktopApp(isElectron)
+      
+      // If desktop app, redirect to the Electron offline handling
+      if (isElectron && window.electronAPI && window.electronAPI.loadApp) {
+        console.log('[OfflinePage] Desktop app detected - using Electron offline page')
+        // Try to reload the main app, which will show the offline.html if needed
+        window.electronAPI.loadApp()
+        return
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    // Skip for desktop apps
+    if (isDesktopApp) return
+    
     // Check initial online status
     setIsOnline(navigator.onLine)
 
@@ -102,7 +124,16 @@ export default function OfflinePage() {
         clearInterval(pollIntervalRef.current)
       }
     }
-  }, [router])
+  }, [router, isDesktopApp])
+
+  // Don't render the offline UI for desktop apps
+  if (isDesktopApp) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <Loader size="lg" />
+      </div>
+    )
+  }
 
   const handleRefresh = async () => {
     setIsChecking(true)

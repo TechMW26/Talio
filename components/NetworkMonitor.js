@@ -13,8 +13,8 @@ import Loader from '@/components/ui/Loader'
  * 3. Shows inline reconnection UI when offline
  * 4. Auto-reloads when connection is restored
  * 
- * CRITICAL: This works WITHOUT rebuilding the desktop app!
- * Once the app loads successfully, this component takes over network monitoring.
+ * NOTE: This is DISABLED for desktop apps - they have their own offline handling
+ * in the Electron main process with a custom offline.html page.
  */
 
 const STORAGE_KEY = 'talio_last_url'
@@ -25,8 +25,24 @@ export default function NetworkMonitor() {
   const [isOffline, setIsOffline] = useState(false)
   const [checkAttempts, setCheckAttempts] = useState(0)
   const [isReconnecting, setIsReconnecting] = useState(false)
+  const [isDesktopApp, setIsDesktopApp] = useState(false)
   const pollIntervalRef = useRef(null)
   const hasShownOfflineRef = useRef(false)
+
+  // Check if running in desktop app
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      // Check for Electron/desktop app indicators
+      const isElectron = window.isElectron === true || 
+                         window.electronAPI !== undefined ||
+                         navigator.userAgent.toLowerCase().includes('electron')
+      setIsDesktopApp(isElectron)
+      
+      if (isElectron) {
+        console.log('[NetworkMonitor] Desktop app detected - offline handling disabled (using Electron offline page)')
+      }
+    }
+  }, [])
 
   // Save current URL whenever pathname changes
   useEffect(() => {
@@ -35,7 +51,7 @@ export default function NetworkMonitor() {
     try {
       const fullUrl = window.location.href
       // Don't save offline pages
-      if (!fullUrl.includes('/offline') && !fullUrl.startsWith('data:')) {
+      if (!fullUrl.includes('/offline') && !fullUrl.startsWith('data:') && !fullUrl.startsWith('file:')) {
         localStorage.setItem(STORAGE_KEY, fullUrl)
       }
     } catch (e) {
@@ -43,9 +59,15 @@ export default function NetworkMonitor() {
     }
   }, [pathname])
 
-  // Monitor network status
+  // Monitor network status - SKIP for desktop apps
   useEffect(() => {
     if (typeof window === 'undefined') return
+    
+    // Skip offline handling for desktop apps - they have their own offline page
+    if (isDesktopApp) {
+      console.log('[NetworkMonitor] Skipping network monitoring for desktop app')
+      return
+    }
 
     const checkConnection = async () => {
       try {
@@ -132,10 +154,10 @@ export default function NetworkMonitor() {
         clearInterval(pollIntervalRef.current)
       }
     }
-  }, [])
+  }, [isDesktopApp])
 
-  // Don't render anything if online
-  if (!isOffline) return null
+  // Don't render anything if online OR if in desktop app
+  if (!isOffline || isDesktopApp) return null
 
   // Overlay UI when offline
   return (

@@ -10,10 +10,19 @@
  * - Stores last visited URL for restoration
  * - Shows visual countdown before reload
  * - Works with both Electron offline page and Next.js /offline page
+ * 
+ * NOTE: This script is DISABLED when running in the Electron desktop app
+ * since the desktop app has its own offline.html page with built-in handling.
  */
 
 (function() {
   'use strict';
+
+  // Skip if running in Electron desktop app with its own offline handling
+  if (window.isElectron === true || window.electronAPI !== undefined) {
+    console.log('[NetworkMonitor] Desktop app detected - using Electron offline page instead');
+    return;
+  }
 
   // Prevent multiple initializations
   if (window.__TALIO_NETWORK_MONITOR__) {

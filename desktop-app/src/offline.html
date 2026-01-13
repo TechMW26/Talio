@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Talio - Connection Issue</title>
+  <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      /* Talio Blue Theme */
+      --color-primary-50: #EFF6FF;
+      --color-primary-100: #DBEAFE;
+      --color-primary-200: #BFDBFE;
+      --color-primary-300: #93C5FD;
+      --color-primary-400: #60A5FA;
+      --color-primary-500: #3B82F6;
+      --color-primary-600: #2563EB;
+      --color-primary-700: #1D4ED8;
+      --color-primary-800: #1E40AF;
+      --color-primary-900: #1E3A8A;
+      
+      /* Backgrounds */
+      --color-bg-main: #F9FAFB;
+      --color-bg-card: #FFFFFF;
+      
+      /* Text */
+      --color-text-primary: #1E40AF;
+      --color-text-secondary: #6B7280;
+      --color-text-muted: #9CA3AF;
+      
+      /* Status */
+      --color-success: #10B981;
+      --color-error: #EF4444;
+      --color-warning: #F59E0B;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Raleway', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--color-bg-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--color-text-primary);
+      overflow: auto;
+    }
+    
+    .container {
+      text-align: center;
+      padding: 40px;
+      max-width: 480px;
+      animation: fadeIn 0.4s ease-out;
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .logo-container {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 24px;
+      position: relative;
+    }
+    
+    .logo-container svg {
+      width: 100%;
+      height: 100%;
+    }
+    
+    .logo-path {
+      fill: var(--color-primary-500);
+    }
+    
+    /* Pulse animation for the logo when checking connection */
+    .checking .logo-container {
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    
+    .card {
+      background: var(--color-bg-card);
+      border-radius: 16px;
+      padding: 32px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+      border: 1px solid var(--color-primary-100);
+    }
+    
+    .error-code {
+      display: inline-block;
+      background: var(--color-primary-50);
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: var(--color-primary-600);
+      border: 1px solid var(--color-primary-200);
+    }
+    
+    h1 {
+      font-size: 24px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: var(--color-text-primary);
+    }
+    
+    .description {
+      font-size: 15px;
+      color: var(--color-text-secondary);
+      line-height: 1.6;
+      margin-bottom: 28px;
+    }
+    
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 12px 24px;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+      text-decoration: none;
+      font-family: inherit;
+    }
+    
+    .btn-primary {
+      background: var(--color-primary-500);
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background: var(--color-primary-600);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+    
+    .btn-primary:disabled {
+      background: var(--color-primary-300);
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+    
+    .btn-secondary {
+      background: var(--color-primary-50);
+      color: var(--color-primary-700);
+      border: 1px solid var(--color-primary-200);
+    }
+    
+    .btn-secondary:hover {
+      background: var(--color-primary-100);
+      border-color: var(--color-primary-300);
+    }
+    
+    .btn-outline {
+      background: transparent;
+      color: var(--color-text-secondary);
+      border: 1px solid #E5E7EB;
+    }
+    
+    .btn-outline:hover {
+      background: var(--color-bg-main);
+      border-color: #D1D5DB;
+    }
+    
+    .retry-status {
+      margin-top: 20px;
+      font-size: 14px;
+      color: var(--color-text-muted);
+      min-height: 20px;
+      font-weight: 500;
+    }
+    
+    .retry-status.success {
+      color: var(--color-success);
+    }
+    
+    .retry-status.error {
+      color: var(--color-error);
+    }
+    
+    .countdown {
+      margin-top: 6px;
+      font-size: 13px;
+      color: var(--color-text-muted);
+    }
+    
+    .tips {
+      margin-top: 28px;
+      padding: 20px;
+      background: var(--color-primary-50);
+      border-radius: 12px;
+      text-align: left;
+      border: 1px solid var(--color-primary-100);
+    }
+    
+    .tips h3 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: var(--color-primary-700);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .tips ul {
+      list-style: none;
+      padding: 0;
+    }
+    
+    .tips li {
+      font-size: 13px;
+      color: var(--color-text-secondary);
+      padding: 5px 0;
+      padding-left: 20px;
+      position: relative;
+    }
+    
+    .tips li::before {
+      content: "•";
+      position: absolute;
+      left: 0;
+      color: var(--color-primary-500);
+      font-weight: bold;
+    }
+    
+    /* Connection status indicator */
+    .connection-indicator {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: var(--color-bg-card);
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--color-text-secondary);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      border: 1px solid #E5E7EB;
+    }
+    
+    .indicator-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--color-error);
+    }
+    
+    .indicator-dot.online {
+      background: var(--color-success);
+    }
+    
+    .indicator-dot.checking {
+      background: var(--color-warning);
+      animation: blink 1s ease-in-out infinite;
+    }
+    
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+    
+    /* Subtle background decoration */
+    .bg-decoration {
+      position: fixed;
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(59, 130, 246, 0.05) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    
+    .bg-decoration.top-right {
+      top: -150px;
+      right: -150px;
+    }
+    
+    .bg-decoration.bottom-left {
+      bottom: -150px;
+      left: -150px;
+    }
+    
+    /* Divider */
+    .divider {
+      height: 1px;
+      background: #E5E7EB;
+      margin: 16px 0;
+    }
+    
+    .manual-link {
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid #E5E7EB;
+    }
+    
+    .manual-link p {
+      font-size: 13px;
+      color: var(--color-text-muted);
+      margin-bottom: 8px;
+    }
+    
+    .manual-link a {
+      color: var(--color-primary-500);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    
+    .manual-link a:hover {
+      color: var(--color-primary-600);
+      text-decoration: underline;
+    }
+    
+    /* Loading spinner */
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
+</head>
+<body>
+  <div class="bg-decoration top-right"></div>
+  <div class="bg-decoration bottom-left"></div>
+  
+  <div class="connection-indicator">
+    <div class="indicator-dot" id="indicatorDot"></div>
+    <span id="indicatorText">Offline</span>
+  </div>
+  
+  <div class="container" id="container">
+    <div class="logo-container">
+      <svg viewBox="0 0 385.322 416.819" xmlns="http://www.w3.org/2000/svg">
+        <path class="logo-path" d="M218.185 401.899C213.175 405.409 205.665 410.209 201.505 412.549L193.935 416.819L189.125 414.309C160.555 399.389 135.805 375.379 112.155 339.649L106.765 331.509L110.285 328.509C112.225 326.859 113.805 325.139 113.805 324.689C113.805 322.859 101.875 311.469 95.305 307.029C83.255 298.879 72.455 294.379 59.375 292.059C52.495 290.839 35.495 290.769 28.465 291.919C24.655 292.549 23.515 292.419 23.075 291.279C22.235 289.079 24.635 267.739 26.945 257.059C31.605 235.419 41.995 208.849 51.455 194.429C52.745 192.449 52.255 191.349 44.945 179.899C27.095 151.939 14.145 121.479 6.915 90.5085C0.754998 64.0785 -1.615 31.4185 1.135 10.6085C1.975 4.23853 2.785 1.40853 4.005 0.64853C9.065 -2.52147 39.985 6.51853 62.255 17.6785C96.355 34.7685 124.205 56.0885 158.125 91.0885L176.465 110.009H193.385L210.305 109.999L221.305 98.0185C243.725 73.5985 270.475 50.6185 296.315 33.5885C303.725 28.6985 308.245 26.0985 322.805 18.3585C332.255 13.3285 353.105 4.88853 360.805 2.98853C376.165 -0.81147 380.135 -0.93147 382.265 2.30853C384.815 6.19853 386.105 27.2385 384.815 44.0085C381.675 84.8885 371.875 119.939 353.105 157.399C347.505 168.569 346.875 169.669 337.885 183.689L332.645 191.859L336.055 197.189C349.295 217.879 360.175 252.099 362.705 281.009C363.735 292.799 363.335 293.439 355.875 292.019C343.145 289.609 323.715 291.709 310.075 296.969C297.415 301.849 282.845 312.119 275.595 321.269L272.465 325.229L276.225 328.379L279.975 331.529L273.795 340.949C257.305 366.049 235.945 389.469 218.185 401.899ZM67.095 162.839L71.135 169.159L75.225 164.359C81.485 156.999 95.305 143.529 104.325 135.999C113.865 128.029 133.585 113.029 135.485 112.299C136.215 112.019 136.805 111.429 136.805 110.979C136.805 108.299 114.365 87.1485 95.305 71.8585C79.025 58.7985 49.815 41.4285 35.925 36.5485C35.665 36.4485 35.405 36.3585 35.155 36.2685C32.345 35.2785 30.705 34.6985 29.805 35.2785C28.535 36.0685 28.685 39.0985 29.035 46.3285C29.065 46.7885 29.085 47.2685 29.105 47.7585C30.865 84.3585 45.725 129.349 67.095 162.839ZM311.415 164.889L314.195 168.259L316.245 165.679C319.605 161.459 329.665 142.809 334.825 131.259C341.895 115.409 346.765 101.229 350.355 86.0085C351.205 82.4385 352.325 77.7085 352.845 75.5085C353.375 73.3085 354.015 70.1585 354.275 68.5085C356.185 56.2785 356.765 50.4385 356.785 43.1485L356.805 34.7885L354.055 35.4685C349.035 36.7085 334.085 43.7585 323.425 49.8985C309.895 57.6885 298.105 66.0185 284.055 77.7185C271.155 88.4585 249.535 109.769 250.295 110.999C250.575 111.449 255.395 115.099 261.005 119.099C277.805 131.089 300.715 151.909 311.415 164.889ZM133.395 304.289L141.305 312.679L154.965 302.299C162.485 296.589 169.175 291.269 169.835 290.469C170.805 289.299 170.225 287.719 166.805 282.269C148.655 253.309 123.965 230.579 96.805 217.809C92.685 215.869 86.165 213.039 82.335 211.529L75.365 208.769L72.695 211.979C64.785 221.449 50.405 265.279 55.535 264.269C57.955 263.789 78.115 268.159 85.145 270.699C101.125 276.459 118.685 288.679 133.395 304.289ZM238.005 307.059L245.035 312.599L256.675 301.009C269.605 288.119 283.235 278.369 296.305 272.679C304.535 269.089 321.045 265.009 327.315 265.009C331.755 265.009 332.365 263.579 330.815 256.769C327.495 242.159 315.305 211.669 311.955 209.599C309.355 207.999 284.825 219.279 270.805 228.539C257.485 237.329 247.035 246.559 237.645 257.829C230.125 266.859 215.805 287.399 215.805 289.159C215.805 289.589 219.215 292.539 223.395 295.719C227.565 298.909 234.145 304.009 238.005 307.059ZM184.085 373.029L193.035 378.929L197.175 376.829C202.805 373.959 214.415 365.089 219.415 359.829C224.665 354.299 233.805 342.059 233.805 340.549C233.805 339.429 231.465 337.619 217.805 328.119C196.395 313.249 193.945 311.869 191.475 313.229C188.405 314.909 159.105 335.289 155.525 338.229L152.755 340.509L156.175 345.569C162.345 354.679 174.735 366.869 184.085 373.029Z"/>
+      </svg>
+    </div>
+    
+    <div class="card">
+      <div id="errorCode" class="error-code" style="display: none;"></div>
+      <h1 id="title">Connection Issue</h1>
+      <p id="description" class="description">
+        We're having trouble connecting to the Talio servers. This could be due to your internet connection or server maintenance.
+      </p>
+      
+      <div class="actions">
+        <button id="retryBtn" class="btn btn-primary" onclick="retryConnection()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+          </svg>
+          <span id="retryText">Retry Connection</span>
+        </button>
+        
+        <button class="btn btn-secondary" onclick="goToTalio()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+          </svg>
+          Go to Talio
+        </button>
+        
+        <button class="btn btn-outline" onclick="restartApp()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"/>
+          </svg>
+          Restart App
+        </button>
+      </div>
+      
+      <p id="retryStatus" class="retry-status"></p>
+      <p id="countdown" class="countdown"></p>
+      
+    </div>
+    
+    <div class="tips">
+      <h3>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <path d="M12 16v-4M12 8h.01"/>
+        </svg>
+        Troubleshooting Tips
+      </h3>
+      <ul>
+        <li>Check your internet connection</li>
+        <li>Try disabling VPN if you're using one</li>
+        <li>Check if app.talio.in is accessible in your browser</li>
+        <li>Contact your IT administrator if the issue persists</li>
+      </ul>
+    </div>
+  </div>
+  
+  <script>
+    // Error information passed from main process
+    const errorInfo = {
+      code: null,
+      type: 'offline',
+      description: ''
+    };
+    
+    // Parse URL params for error info
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('code')) {
+      errorInfo.code = urlParams.get('code');
+    }
+    if (urlParams.has('type')) {
+      errorInfo.type = urlParams.get('type');
+    }
+    if (urlParams.has('desc')) {
+      errorInfo.description = decodeURIComponent(urlParams.get('desc'));
+    }
+    
+    // Update UI based on error type
+    function updateErrorUI() {
+      const title = document.getElementById('title');
+      const description = document.getElementById('description');
+      const errorCodeEl = document.getElementById('errorCode');
+      
+      if (errorInfo.code) {
+        errorCodeEl.textContent = `Error ${errorInfo.code}`;
+        errorCodeEl.style.display = 'inline-block';
+      }
+      
+      switch (errorInfo.type) {
+        case 'offline':
+          title.textContent = 'You\'re Offline';
+          description.textContent = 'It looks like you\'ve lost your internet connection. Please check your network and try again.';
+          break;
+        case 'crash':
+          title.textContent = 'Something Went Wrong';
+          description.textContent = 'The app encountered an error. Please try again or restart the app if the issue persists.';
+          break;
+        case 'server-error':
+          if (errorInfo.code === '502') {
+            title.textContent = 'Server Temporarily Unavailable';
+            description.textContent = 'The Talio server is temporarily unavailable. Our team has been notified and is working on it. Please try again in a few moments.';
+          } else if (errorInfo.code === '503') {
+            title.textContent = 'Service Unavailable';
+            description.textContent = 'The service is temporarily under maintenance or experiencing high load. Please try again shortly.';
+          } else if (errorInfo.code === '504') {
+            title.textContent = 'Gateway Timeout';
+            description.textContent = 'The server took too long to respond. This could be due to high traffic. Please try again.';
+          } else if (errorInfo.code === '500') {
+            title.textContent = 'Server Error';
+            description.textContent = 'Something went wrong on our end. Our team has been notified and is working to fix it.';
+          } else {
+            title.textContent = 'Connection Error';
+            description.textContent = errorInfo.description || 'We couldn\'t connect to the Talio servers. Please try again.';
+          }
+          break;
+        case 'timeout':
+          title.textContent = 'Connection Timeout';
+          description.textContent = 'The connection took too long. This might be due to a slow internet connection or server issues.';
+          break;
+        case 'dns':
+          title.textContent = 'DNS Error';
+          description.textContent = 'Could not resolve the server address. Please check your DNS settings or try again later.';
+          break;
+        case 'ssl':
+          title.textContent = 'Security Error';
+          description.textContent = 'There was a security certificate issue. Please ensure your system time is correct and try again.';
+          break;
+        default:
+          title.textContent = 'Connection Issue';
+          description.textContent = errorInfo.description || 'We\'re having trouble connecting to the Talio servers. Please check your connection and try again.';
+      }
+    }
+    
+    // Initialize UI
+    updateErrorUI();
+    
+    let retryCount = 0;
+    let autoRetryInterval = null;
+    let countdownValue = 0;
+    
+    // Auto-retry configuration
+    const AUTO_RETRY_INTERVAL = 15;
+    const MAX_AUTO_RETRIES = 20;
+    
+    function updateIndicator(status) {
+      const dot = document.getElementById('indicatorDot');
+      const text = document.getElementById('indicatorText');
+      
+      dot.className = 'indicator-dot ' + status;
+      
+      switch (status) {
+        case 'online':
+          text.textContent = 'Connected';
+          break;
+        case 'checking':
+          text.textContent = 'Checking...';
+          break;
+        default:
+          text.textContent = 'Offline';
+      }
+    }
+    
+    async function checkConnection() {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
+        
+        // Try multiple endpoints for more reliable detection
+        const response = await fetch('https://app.talio.in/api/health', {
+          method: 'HEAD',
+          signal: controller.signal,
+          cache: 'no-store',
+          mode: 'no-cors' // Allow cross-origin for health check
+        });
+        
+        clearTimeout(timeout);
+        return true; // If we get here without error, we're online
+      } catch (e) {
+        // Try a simple connectivity check as fallback
+        try {
+          const img = new Image();
+          const imgPromise = new Promise((resolve, reject) => {
+            img.onload = () => resolve(true);
+            img.onerror = () => reject(false);
+            setTimeout(() => reject(false), 5000);
+          });
+          img.src = 'https://app.talio.in/favicon.ico?' + Date.now();
+          return await imgPromise;
+        } catch (e2) {
+          return false;
+        }
+      }
+    }
+    
+    async function retryConnection() {
+      const btn = document.getElementById('retryBtn');
+      const retryText = document.getElementById('retryText');
+      const retryStatus = document.getElementById('retryStatus');
+      const container = document.getElementById('container');
+      
+      btn.disabled = true;
+      retryText.textContent = 'Checking...';
+      retryStatus.textContent = '';
+      retryStatus.className = 'retry-status';
+      container.classList.add('checking');
+      updateIndicator('checking');
+      
+      stopAutoRetry();
+      
+      const isConnected = await checkConnection();
+      
+      if (isConnected) {
+        updateIndicator('online');
+        retryStatus.textContent = '✓ Connection restored! Redirecting...';
+        retryStatus.className = 'retry-status success';
+        
+        setTimeout(() => {
+          if (window.electronAPI && window.electronAPI.loadApp) {
+            window.electronAPI.loadApp();
+          } else {
+            window.location.href = 'https://app.talio.in';
+          }
+        }, 1000);
+      } else {
+        retryCount++;
+        updateIndicator('offline');
+        retryStatus.textContent = `✗ Still unable to connect (attempt ${retryCount})`;
+        retryStatus.className = 'retry-status error';
+        btn.disabled = false;
+        retryText.textContent = 'Retry Connection';
+        container.classList.remove('checking');
+        
+        if (retryCount < MAX_AUTO_RETRIES) {
+          startAutoRetry();
+        }
+      }
+    }
+    
+    function startAutoRetry() {
+      countdownValue = AUTO_RETRY_INTERVAL;
+      updateCountdown();
+      
+      autoRetryInterval = setInterval(() => {
+        countdownValue--;
+        updateCountdown();
+        
+        if (countdownValue <= 0) {
+          stopAutoRetry();
+          retryConnection();
+        }
+      }, 1000);
+    }
+    
+    function stopAutoRetry() {
+      if (autoRetryInterval) {
+        clearInterval(autoRetryInterval);
+        autoRetryInterval = null;
+      }
+      document.getElementById('countdown').textContent = '';
+    }
+    
+    function updateCountdown() {
+      const countdown = document.getElementById('countdown');
+      if (countdownValue > 0) {
+        countdown.textContent = `Auto-retry in ${countdownValue}s`;
+      } else {
+        countdown.textContent = '';
+      }
+    }
+    
+    function restartApp() {
+      if (window.electronAPI && window.electronAPI.restartApp) {
+        window.electronAPI.restartApp();
+      } else {
+        window.location.reload();
+      }
+    }
+    
+    function goToTalio() {
+      // Navigate to Talio within the app (not external browser)
+      if (window.electronAPI && window.electronAPI.loadApp) {
+        window.electronAPI.loadApp();
+      } else {
+        // Fallback for non-Electron environment - navigate in same window
+        window.location.href = 'https://app.talio.in';
+      }
+    }
+    
+    // Listen for online/offline events
+    window.addEventListener('online', () => {
+      updateIndicator('checking');
+      setTimeout(retryConnection, 1000);
+    });
+    
+    window.addEventListener('offline', () => {
+      updateIndicator('offline');
+      stopAutoRetry();
+    });
+    
+    // Start auto-retry after initial page load
+    setTimeout(() => {
+      if (retryCount < MAX_AUTO_RETRIES) {
+        startAutoRetry();
+      }
+    }, 3000);
+  </script>
+</body>
+</html>

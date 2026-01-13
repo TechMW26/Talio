@@ -3,7 +3,7 @@
  * Exposes secure IPC channels to the renderer process
  */
 
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, desktopCapturer } = require('electron');
 
 // Expose protected methods to the renderer
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -46,6 +46,29 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   getCaptureStats: function() {
     return ipcRenderer.invoke('get-capture-stats');
+  },
+  
+  // Desktop capture for screen sharing (used by meetings)
+  getDesktopSources: async function(options) {
+    try {
+      const sources = await desktopCapturer.getSources(options || {
+        types: ['window', 'screen'],
+        thumbnailSize: { width: 150, height: 150 },
+        fetchWindowIcons: true
+      });
+      return sources.map(function(source) {
+        return {
+          id: source.id,
+          name: source.name,
+          thumbnail: source.thumbnail.toDataURL(),
+          appIcon: source.appIcon ? source.appIcon.toDataURL() : null,
+          display_id: source.display_id
+        };
+      });
+    } catch (error) {
+      console.error('[Preload] Error getting desktop sources:', error);
+      return [];
+    }
   },
   
   // Session management
@@ -115,6 +138,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Restart app (for crash recovery)
   restartApp: function() {
     return ipcRenderer.invoke('restart-app');
+  },
+  
+  // Load main app (for offline page retry)
+  loadApp: function() {
+    return ipcRenderer.invoke('load-app');
   }
 });
 

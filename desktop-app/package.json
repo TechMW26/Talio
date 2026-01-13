@@ -1,6 +1,6 @@
 {
   "name": "talio-desktop",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "description": "Talio HRMS Desktop - Productivity Monitoring with Screen Capture",
   "main": "src/main.js",
   "author": "Talio <support@talio.in>",
