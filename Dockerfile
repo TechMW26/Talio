@@ -9,6 +9,7 @@ FROM node:20-slim AS base
 # Install runtime deps (libvips) in a single layer
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libvips42 \
+    libvips-dev \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
@@ -23,19 +24,22 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     python3 \
     pkg-config \
+    libvips-dev \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Copy only package files first (better cache)
 COPY package.json package-lock.json* ./
 
-# Install with optimized settings (include devDeps for build)
-ENV SHARP_IGNORE_GLOBAL_LIBVIPS=0 \
-    npm_config_update_notifier=false \
+# Install dependencies and sharp for linux-x64
+ENV npm_config_update_notifier=false \
     npm_config_fund=false \
-    npm_config_audit=false
+    npm_config_audit=false \
+    npm_config_platform=linux \
+    npm_config_arch=x64
 
-RUN npm ci && \
-    npm rebuild sharp && \
+RUN npm ci --legacy-peer-deps && \
+    npm uninstall sharp && \
+    npm install --os=linux --cpu=x64 sharp && \
     npm cache clean --force
 
 # Source stage - preserve source files for runtime
