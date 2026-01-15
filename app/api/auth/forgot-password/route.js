@@ -8,12 +8,20 @@ const MAX_REQUESTS_PER_WINDOW = 3
 
 export async function POST(request) {
   try {
-    const { email } = await request.json()
+    const body = await request.json().catch(() => ({}))
+    const { email } = body
     console.log('[forgot-password] Received request for email:', email)
 
     if (!email) {
       return NextResponse.json(
         { error: 'Email is required' },
+        { status: 400 }
+      )
+    }
+
+    if (typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return NextResponse.json(
+        { error: 'Invalid email address' },
         { status: 400 }
       )
     }

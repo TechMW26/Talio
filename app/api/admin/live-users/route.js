@@ -28,9 +28,18 @@ export async function GET(request) {
     let isDepartmentHead = userRole === 'department_head';
 
     // Get current user's employee info for department filtering
-    const currentUser = await User.findById(user._id || user.userId)
+    const currentUserId = user._id || user.userId
+    if (!currentUserId) {
+      return NextResponse.json({ message: 'User ID not found' }, { status: 400 });
+    }
+
+    const currentUser = await User.findById(currentUserId)
       .populate('employeeId')
       .lean();
+
+    if (!currentUser) {
+      return NextResponse.json({ message: 'User not found' }, { status: 404 });
+    }
 
     // Also check if user is a department head via Department model (head/heads fields)
     // This handles cases where role != 'department_head' but user IS head of a department

@@ -40,6 +40,10 @@ export async function GET(request) {
 
     // Get current user with employee info
     const currentUser = await User.findById(currentUserId).populate('employeeId');
+
+    if (!currentUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
     
     const isAdmin = ADMIN_ROLES.includes(currentUserRole);
     

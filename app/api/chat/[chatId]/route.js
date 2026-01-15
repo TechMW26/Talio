@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import mongoose from 'mongoose'
+
+const isValidObjectId = (id) => {
+  return mongoose.Types.ObjectId.isValid(id) &&
+    (new mongoose.Types.ObjectId(id)).toString() === id
+}
 // GET - Fetch a single chat by ID
 export async function GET(request, context) {
   try {
@@ -13,9 +19,18 @@ export async function GET(request, context) {
 
     const { chatId } = await context.params
 
+    if (!isValidObjectId(chatId)) {
+      return NextResponse.json({ success: false, message: 'Invalid chat ID' }, { status: 400 })
+    }
+
     // Get user's employee ID from authenticated user
     if (!user.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
+    }
+
+    const employeeId = user.employeeId._id || user.employeeId
+    if (!isValidObjectId(employeeId.toString())) {
+      return NextResponse.json({ success: false, message: 'Invalid employee ID' }, { status: 400 })
     }
 
     // Fetch the chat
@@ -30,7 +45,7 @@ export async function GET(request, context) {
 
     // Verify user is a participant
     const isParticipant = chat.participants.some(
-      p => p._id.toString() === user.employeeId._id.toString()
+      p => p._id.toString() === employeeId.toString()
     )
 
     if (!isParticipant) {
@@ -59,12 +74,18 @@ export async function POST(request, { params }) {
     }
 
     const employeeId = user.employeeId._id || user.employeeId
+    if (!isValidObjectId(employeeId.toString())) {
+      return NextResponse.json({ success: false, message: 'Invalid employee ID' }, { status: 400 })
+    }
     const employee = await Employee.findById(employeeId)
     if (!employee) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
     const { chatId } = await params
+    if (!isValidObjectId(chatId)) {
+      return NextResponse.json({ success: false, message: 'Invalid chat ID' }, { status: 400 })
+    }
     const chat = await Chat.findById(chatId)
     if (!chat) {
       return NextResponse.json({ success: false, message: 'Chat not found' }, { status: 404 })
@@ -112,12 +133,18 @@ export async function DELETE(request, { params }) {
     }
 
     const employeeId = user.employeeId._id || user.employeeId
+    if (!isValidObjectId(employeeId.toString())) {
+      return NextResponse.json({ success: false, message: 'Invalid employee ID' }, { status: 400 })
+    }
     const employee = await Employee.findById(employeeId)
     if (!employee) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
     const { chatId } = await params
+    if (!isValidObjectId(chatId)) {
+      return NextResponse.json({ success: false, message: 'Invalid chat ID' }, { status: 400 })
+    }
     const chat = await Chat.findById(chatId)
     if (!chat) {
       return NextResponse.json({ success: false, message: 'Chat not found' }, { status: 404 })

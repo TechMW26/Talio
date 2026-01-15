@@ -11,8 +11,15 @@ export async function GET(request) {
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
+    if (!auth.models) {
+      return NextResponse.json({ success: false, message: 'Failed to load database models' }, { status: 500 })
+    }
     const { user, models } = auth
     const { Attendance, Employee, User, Leave, CompanySettings } = models
+
+    if (!Attendance || !Employee || !User || !Leave || !CompanySettings) {
+      return NextResponse.json({ success: false, message: 'Failed to load required models' }, { status: 500 })
+    }
 
     // Get the requesting user with employee info
     const requestingUser = await User.findById(user._id).populate({

@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import mongoose from 'mongoose'
+
+const isValidObjectId = (id) => {
+  return mongoose.Types.ObjectId.isValid(id) &&
+    (new mongoose.Types.ObjectId(id)).toString() === id
+}
 export async function DELETE(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
@@ -12,12 +18,19 @@ export async function DELETE(request, { params }) {
 
     const { chatId, messageId } = params
 
+    if (!isValidObjectId(chatId) || !isValidObjectId(messageId)) {
+      return NextResponse.json({ success: false, error: 'Invalid chat or message ID' }, { status: 400 })
+    }
+
     // Get employee ID from authenticated user
     if (!user || !user.employeeId) {
       return NextResponse.json({ success: false, error: 'Employee not found' }, { status: 404 })
     }
 
     const employeeId = user.employeeId._id || user.employeeId
+    if (!isValidObjectId(employeeId.toString())) {
+      return NextResponse.json({ success: false, error: 'Invalid employee ID' }, { status: 400 })
+    }
 
     // Get employee details
     const employee = await Employee.findById(employeeId)

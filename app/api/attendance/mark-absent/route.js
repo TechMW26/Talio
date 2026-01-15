@@ -4,6 +4,12 @@ import { sendPushToUser } from '@/lib/pushNotification'
 
 export const dynamic = 'force-dynamic'
 
+const isValidDateString = (value) => {
+  if (!value) return false
+  const parsed = new Date(value)
+  return !Number.isNaN(parsed.getTime())
+}
+
 // Map day index (0-6) to day name
 const DAY_INDEX_TO_NAME = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
 
@@ -82,6 +88,27 @@ export async function POST(request) {
 
     const body = await request.json().catch(() => ({}))
     const { date, startDate, endDate, sendNotifications = false, dryRun = false } = body
+
+    if (date && !isValidDateString(date)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid date format' },
+        { status: 400 }
+      )
+    }
+
+    if (startDate && !isValidDateString(startDate)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid startDate format' },
+        { status: 400 }
+      )
+    }
+
+    if (endDate && !isValidDateString(endDate)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid endDate format' },
+        { status: 400 }
+      )
+    }
 
     // Get working days from database - prioritize Company model (companies collection)
     // Based on the actual database structure where workingHours.workingDays is stored in Company

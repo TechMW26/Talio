@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import mongoose from 'mongoose'
+
+const isValidObjectId = (id) => {
+  return mongoose.Types.ObjectId.isValid(id) &&
+    (new mongoose.Types.ObjectId(id)).toString() === id
+}
 
 export async function POST(request, { params }) {
   try {
@@ -12,9 +18,14 @@ export async function POST(request, { params }) {
     const { Chat } = models
 
     const { chatId, messageId } = params
-    const { reaction } = await request.json()
+    const body = await request.json().catch(() => ({}))
+    const { reaction } = body
 
-    if (!reaction) {
+    if (!isValidObjectId(chatId) || !isValidObjectId(messageId)) {
+      return NextResponse.json({ success: false, error: 'Invalid chat or message ID' }, { status: 400 })
+    }
+
+    if (!reaction || typeof reaction !== 'string') {
       return NextResponse.json({ success: false, error: 'Reaction is required' }, { status: 400 })
     }
 
@@ -36,6 +47,9 @@ export async function POST(request, { params }) {
     }
 
     const userId = user._id || user.userId
+    if (!userId || !isValidObjectId(userId.toString())) {
+      return NextResponse.json({ success: false, error: 'Invalid user ID' }, { status: 400 })
+    }
 
     // Check if user already reacted with this emoji
     const existingReactionIndex = message.reactions.findIndex(

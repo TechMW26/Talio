@@ -11,11 +11,27 @@ export async function GET(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
+    if (!auth.models) {
+      return NextResponse.json({ success: false, message: 'Failed to load database models' }, { status: 500 })
+    }
     const { user, models } = auth
     const { Attendance, Employee } = models
 
+    if (!Attendance || !Employee) {
+      return NextResponse.json({ success: false, message: 'Failed to load required models' }, { status: 500 })
+    }
+
     const { searchParams } = new URL(request.url)
-    const days = parseInt(searchParams.get('days')) || 7 // Default to last 7 days
+    const daysParam = searchParams.get('days')
+    const parsedDays = daysParam ? Number.parseInt(daysParam, 10) : NaN
+    const days = Number.isInteger(parsedDays) ? parsedDays : 7
+
+    if (daysParam && (!Number.isInteger(parsedDays) || parsedDays <= 0 || parsedDays > 365)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid days parameter' },
+        { status: 400 }
+      )
+    }
 
     // Calculate date range
     const endDate = new Date()

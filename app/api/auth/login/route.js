@@ -10,7 +10,11 @@ import { getTenantModels } from '@/lib/tenantModels'
 
 export async function POST(request) {
   try {
-    const { email, password } = await request.json()
+    const body = await request.json().catch(() => ({}))
+    const rawEmail = body.email
+    const password = body.password
+
+    const email = typeof rawEmail === 'string' ? rawEmail.toLowerCase().trim() : ''
 
     // Validate input
     if (!email || !password) {
@@ -25,7 +29,7 @@ export async function POST(request) {
     // ============================================
     // Look up which tenant database this user belongs to
     let tenantInfo = null;
-    let TenantUser, TenantEmployee, TenantDepartment, TenantDesignation, TenantUserSession, TenantCompanySettings;
+  let TenantUser, TenantEmployee, TenantDepartment, TenantDesignation, TenantUserSession, TenantCompanySettings, TenantNotification;
 
     // Retry logic for transient network errors (e.g., DNS timeouts)
     const MAX_RETRIES = 2;
@@ -81,7 +85,7 @@ export async function POST(request) {
 
     // Get models bound to tenant database
     const tenantModels = await getTenantModels(tenantInfo.databaseName, [
-      'User', 'Employee', 'Department', 'Designation', 'UserSession', 'CompanySettings'
+      'User', 'Employee', 'Department', 'Designation', 'UserSession', 'CompanySettings', 'Notification'
     ]);
 
     TenantUser = tenantModels.User;
@@ -90,6 +94,7 @@ export async function POST(request) {
     TenantDesignation = tenantModels.Designation;
     TenantUserSession = tenantModels.UserSession;
     TenantCompanySettings = tenantModels.CompanySettings;
+  TenantNotification = tenantModels.Notification;
 
     // Find user and include password field (forcePasswordChange and isActive are included by default)
     const user = await TenantUser.findOne({ email }).select('+password')
@@ -313,6 +318,7 @@ export async function POST(request) {
               loginTime: new Date().toISOString(),
               type: 'login',
             },
+            models: { User: TenantUser, Notification: TenantNotification }
           }
         )
       } catch (pushError) {

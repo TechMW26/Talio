@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
+import mongoose from 'mongoose';
+
+const isValidObjectId = (id) => {
+  return mongoose.Types.ObjectId.isValid(id) &&
+    (new mongoose.Types.ObjectId(id)).toString() === id
+}
 
 /**
  * POST /api/call-alert/[id]/acknowledge
@@ -16,6 +22,13 @@ export async function POST(request, { params }) {
     const { CallAlert } = models
 
     const { id } = await params;
+
+    if (!isValidObjectId(id)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid alert ID' },
+        { status: 400 }
+      );
+    }
 
     // Find the alert
     const alert = await CallAlert.findById(id);

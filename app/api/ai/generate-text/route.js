@@ -13,6 +13,13 @@ export async function POST(request) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
 
+    if (!process.env.GEMINI_API_KEY && !process.env.NEXT_PUBLIC_GEMINI_API_KEY && !process.env.OPENAI_API_KEY && !process.env.PERPLEXITY_API_KEY) {
+      return NextResponse.json({
+        success: false,
+        message: 'AI service is not configured'
+      }, { status: 503 });
+    }
+
     const body = await request.json();
     const { type, context } = body;
 
@@ -173,7 +180,7 @@ Write the complete email including greeting and sign-off.`;
     console.error('AI generate text error:', error);
     return NextResponse.json(
       { success: false, message: 'Failed to generate content', error: error.message },
-      { status: 500 }
+      { status: 502 }
     );
   }
 }

@@ -1,5 +1,18 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import mongoose from 'mongoose'
+
+// Helper to validate MongoDB ObjectId
+const isValidObjectId = (id) => {
+    return mongoose.Types.ObjectId.isValid(id) &&
+        (new mongoose.Types.ObjectId(id)).toString() === id
+}
+
+const isValidDateString = (value) => {
+    if (!value) return false
+    const parsed = new Date(value)
+    return !Number.isNaN(parsed.getTime())
+}
 
 export const dynamic = 'force-dynamic'
 
@@ -47,6 +60,34 @@ export async function GET(request) {
         const employeeId = searchParams.get('employeeId')
         const page = parseInt(searchParams.get('page')) || 1
         const limit = Math.min(parseInt(searchParams.get('limit')) || 50, 200)
+
+        if (date && !isValidDateString(date)) {
+            return NextResponse.json(
+                { success: false, message: 'Invalid date format' },
+                { status: 400 }
+            )
+        }
+
+        if (startDate && !isValidDateString(startDate)) {
+            return NextResponse.json(
+                { success: false, message: 'Invalid startDate format' },
+                { status: 400 }
+            )
+        }
+
+        if (endDate && !isValidDateString(endDate)) {
+            return NextResponse.json(
+                { success: false, message: 'Invalid endDate format' },
+                { status: 400 }
+            )
+        }
+
+        if (employeeId && !isValidObjectId(employeeId)) {
+            return NextResponse.json(
+                { success: false, message: 'Invalid employee ID' },
+                { status: 400 }
+            )
+        }
 
         // Build query
         const query = {}

@@ -1,19 +1,27 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { sendPushToUsers } from '@/lib/pushNotification'
+import mongoose from 'mongoose'
 
 // PUT - Update announcement
 export async function PUT(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Announcement', 'User'])
+  const auth = await getAuthAndModels(request, ['Announcement', 'User', 'Notification'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Announcement, User } = models
+  const { Announcement, User, Notification } = models
 
     const data = await request.json()
+
+    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid announcement ID format' },
+        { status: 400 }
+      )
+    }
 
     const announcement = await Announcement.findByIdAndUpdate(
       params.id,
@@ -45,7 +53,8 @@ export async function PUT(request, { params }) {
             type: 'announcement_update',
             data: {
               announcementId: announcement._id.toString()
-            }
+            },
+            models: { User, Notification }
           }
         )
 
@@ -79,6 +88,13 @@ export async function DELETE(request, { params }) {
     }
     const { models } = auth
     const { Announcement } = models
+
+    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid announcement ID format' },
+        { status: 400 }
+      )
+    }
 
     const announcement = await Announcement.findByIdAndDelete(params.id)
 

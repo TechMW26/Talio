@@ -13,7 +13,7 @@ export async function DELETE(request) {
     if (!auth.success) {
       return NextResponse.json({ error: auth.message }, { status: 401 })
     }
-    const { user, tenant } = auth
+  const { user, tenant } = auth
     
     // Only admin can clear all chats
     if (!['admin'].includes(user.role)) {
@@ -24,8 +24,21 @@ export async function DELETE(request) {
     }
 
     // Get tenant database connection
+    if (!tenant?.databaseName) {
+      return NextResponse.json(
+        { error: 'Tenant database is missing from session' },
+        { status: 400 }
+      );
+    }
+
     const connection = await getTenantConnection(tenant.databaseName);
     const db = connection.db;
+    if (!db) {
+      return NextResponse.json(
+        { error: 'Tenant database connection is not available' },
+        { status: 503 }
+      );
+    }
 
     // Delete all chats
     const chatsResult = await db.collection('chats').deleteMany({});

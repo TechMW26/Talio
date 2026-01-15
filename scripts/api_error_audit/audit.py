@@ -376,12 +376,22 @@ def build_report(
     log_paths: Optional[Sequence[Path]],
     base_url: Optional[str],
     live_headers: Optional[Dict[str, str]],
+    batch_size: Optional[int] = None,
+    batch_number: Optional[int] = None,
 ) -> AuditReport:
     routes: List[RouteInfo] = []
     for route_file in find_route_files(root, include):
         route = scan_route_file(route_file, root)
         route.errors = filter_errors(route.errors, only_status)
         routes.append(route)
+
+    # Batch only routes that have errors when batching is enabled
+    if batch_size and batch_number:
+        error_routes = [route for route in routes if route.errors]
+        start = (batch_number - 1) * batch_size
+        end = start + batch_size
+        routes = error_routes[start:end]
+
     summary = build_summary(routes)
     log_findings = scan_logs(log_paths or [])
     live_checks = run_live_checks(routes, base_url, live_headers or {})
@@ -647,6 +657,18 @@ def main() -> int:
         action="store_true",
         help="Print login response body on failure",
     )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=None,
+        help="Process error routes in batches of N (e.g. 10)",
+    )
+    parser.add_argument(
+        "--batch-number",
+        type=int,
+        default=None,
+        help="Batch number to process when using --batch-size (1-based)",
+    )
 
     args = parser.parse_args()
 
@@ -689,6 +711,13 @@ def main() -> int:
         headers = {**headers, "Authorization": f"Bearer {token}"}
         if "Cookie" not in {k.title(): v for k, v in headers.items()}:
             headers["Cookie"] = f"token={token}"
+    if (args.batch_size and not args.batch_number) or (args.batch_number and not args.batch_size):
+        print("--batch-size and --batch-number must be provided together.", file=sys.stderr)
+        return 2
+    if args.batch_number and args.batch_number < 1:
+        print("--batch-number must be >= 1.", file=sys.stderr)
+        return 2
+
     report = build_report(
         root,
         args.include,
@@ -696,6 +725,8 @@ def main() -> int:
         log_paths,
         args.base_url,
         headers,
+        args.batch_size,
+        args.batch_number,
     )
 
     if args.format == "json":

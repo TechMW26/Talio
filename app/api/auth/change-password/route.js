@@ -50,10 +50,11 @@ export async function POST(request) {
     const { User, Employee } = await getTenantModels(payload.databaseName, ['User', 'Employee'])
 
     // Get request body
-    const { currentPassword, newPassword } = await request.json()
+  const body = await request.json().catch(() => ({}))
+  const { currentPassword, newPassword } = body
 
     // Validate input
-    if (!currentPassword || !newPassword) {
+    if (!currentPassword || !newPassword || typeof currentPassword !== 'string' || typeof newPassword !== 'string') {
       return NextResponse.json(
         { success: false, message: 'Current password and new password are required' },
         { status: 400 }

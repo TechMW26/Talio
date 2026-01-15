@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import mongoose from 'mongoose'
+
+const isValidObjectId = (id) => {
+  return mongoose.Types.ObjectId.isValid(id) &&
+    (new mongoose.Types.ObjectId(id)).toString() === id
+}
 // GET - Fetch all chats for the current user
 export async function GET(request) {
   try {
@@ -18,6 +24,9 @@ export async function GET(request) {
 
     // Extract employee ID properly (handle both populated object and raw ObjectId)
     const employeeId = user.employeeId._id || user.employeeId
+    if (!isValidObjectId(employeeId.toString())) {
+      return NextResponse.json({ success: false, message: 'Invalid employee ID' }, { status: 400 })
+    }
     const employeeIdStr = employeeId.toString()
 
     // Fetch all chats where user is a participant
@@ -58,25 +67,36 @@ export async function POST(request) {
 
     // Extract employee ID properly (handle both populated object and raw ObjectId)
     const employeeId = user.employeeId._id || user.employeeId
+    if (!isValidObjectId(employeeId.toString())) {
+      return NextResponse.json({ success: false, message: 'Invalid employee ID' }, { status: 400 })
+    }
     const employeeIdStr = employeeId.toString()
 
-    const body = await request.json()
-    const { isGroup, participants, name } = body
+  const body = await request.json().catch(() => ({}))
+  const { isGroup, participants, name } = body
 
     // Validate participants
     if (!participants || participants.length === 0) {
       return NextResponse.json({ success: false, message: 'Participants are required' }, { status: 400 })
     }
 
+    const normalizedParticipants = participants
+      .map(id => id?.toString?.())
+      .filter(Boolean)
+
+    if (normalizedParticipants.some(id => !isValidObjectId(id))) {
+      return NextResponse.json({ success: false, message: 'Invalid participant ID' }, { status: 400 })
+    }
+
     // For direct chat, check if chat already exists
     if (!isGroup) {
-      if (participants.length !== 1) {
+      if (normalizedParticipants.length !== 1) {
         return NextResponse.json({ success: false, message: 'Direct chat must have exactly one other participant' }, { status: 400 })
       }
 
       const existingChat = await Chat.findOne({
         isGroup: false,
-        participants: { $all: [employeeId, participants[0]] }
+        participants: { $all: [employeeId, normalizedParticipants[0]] }
       })
 
       if (existingChat) {
@@ -91,7 +111,7 @@ export async function POST(request) {
     // Create new chat
     const chatData = {
       isGroup,
-      participants: isGroup ? [...participants, employeeId] : [employeeId, participants[0]],
+  participants: isGroup ? [...normalizedParticipants, employeeId] : [employeeId, normalizedParticipants[0]],
       createdBy: employeeId,
       messages: []
     }

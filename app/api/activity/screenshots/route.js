@@ -15,7 +15,7 @@ async function canViewUserScreenshots(viewerId, targetUserId, viewerRole, models
   }
 
   // Same user
-  if (viewerId === targetUserId) {
+  if (viewerId?.toString() === targetUserId?.toString()) {
     return true;
   }
 
@@ -85,16 +85,24 @@ export async function GET(request) {
     }
 
     const { searchParams } = new URL(request.url);
-    const targetUserId = searchParams.get('userId') || viewerId;
-    const date = searchParams.get('date');
-    const startDate = searchParams.get('startDate');
-    const endDate = searchParams.get('endDate');
+  const targetUserId = searchParams.get('userId') || viewerId;
+  const date = searchParams.get('date');
+  const startDate = searchParams.get('startDate');
+  const endDate = searchParams.get('endDate');
     const limit = Math.min(parseInt(searchParams.get('limit')) || 100, 500);
     const skip = parseInt(searchParams.get('skip')) || 0;
 
     // Validate targetUserId format if different from current user
     if (targetUserId !== viewerId && !mongoose.Types.ObjectId.isValid(targetUserId)) {
       return NextResponse.json({ success: false, error: 'Invalid user ID format' }, { status: 400 });
+    }
+
+    // Ensure target user exists when viewing someone else
+    if (targetUserId.toString() !== viewerId.toString()) {
+      const targetUserExists = await User.findById(targetUserId).select('_id');
+      if (!targetUserExists) {
+        return NextResponse.json({ success: false, error: 'User not found' }, { status: 404 });
+      }
     }
 
     // Check access permission
@@ -110,16 +118,33 @@ export async function GET(request) {
     const query = { user: targetUserId };
 
     if (date) {
+      const parsed = new Date(date);
+      if (Number.isNaN(parsed.getTime())) {
+        return NextResponse.json({ success: false, error: 'Invalid date format' }, { status: 400 });
+      }
       query.dateString = date;
     } else if (startDate && endDate) {
+      const startParsed = new Date(startDate);
+      const endParsed = new Date(endDate + 'T23:59:59.999Z');
+      if (Number.isNaN(startParsed.getTime()) || Number.isNaN(endParsed.getTime())) {
+        return NextResponse.json({ success: false, error: 'Invalid date range' }, { status: 400 });
+      }
       query.capturedAt = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate + 'T23:59:59.999Z')
+        $gte: startParsed,
+        $lte: endParsed
       };
     } else if (startDate) {
-      query.capturedAt = { $gte: new Date(startDate) };
+      const startParsed = new Date(startDate);
+      if (Number.isNaN(startParsed.getTime())) {
+        return NextResponse.json({ success: false, error: 'Invalid startDate format' }, { status: 400 });
+      }
+      query.capturedAt = { $gte: startParsed };
     } else if (endDate) {
-      query.capturedAt = { $lte: new Date(endDate + 'T23:59:59.999Z') };
+      const endParsed = new Date(endDate + 'T23:59:59.999Z');
+      if (Number.isNaN(endParsed.getTime())) {
+        return NextResponse.json({ success: false, error: 'Invalid endDate format' }, { status: 400 });
+      }
+      query.capturedAt = { $lte: endParsed };
     }
 
     // Get screenshots

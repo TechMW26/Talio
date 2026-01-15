@@ -65,6 +65,14 @@ export async function PUT(request, { params }) {
       )
     }
 
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Attendance'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Attendance } = models
+
     const data = await request.json()
 
     const attendance = await Attendance.findByIdAndUpdate(
@@ -106,6 +114,14 @@ export async function DELETE(request, { params }) {
         { status: 400 }
       )
     }
+
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Attendance'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Attendance } = models
 
     const attendance = await Attendance.findByIdAndDelete(id)
 

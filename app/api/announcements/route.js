@@ -7,12 +7,12 @@ import { emitDashboardRefresh, REALTIME_EVENTS } from '@/lib/realtimeEvents'
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Announcement', 'User', 'Employee'])
+  const auth = await getAuthAndModels(request, ['Announcement', 'User', 'Employee', 'Notification'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { models } = auth
-    const { Announcement, User, Employee } = models
+  const { Announcement, User, Employee, Notification } = models
 
     const { searchParams } = new URL(request.url)
     const limit = parseInt(searchParams.get('limit')) || 10
@@ -24,6 +24,9 @@ export async function GET(request) {
 
     try {
       const userId = auth.user._id || auth.user.userId
+      if (!userId) {
+        throw new Error('User ID not found')
+      }
       const userDoc = await User.findById(userId).select('role')
       const employee = await Employee.findOne({ userId }).select('department')
       
@@ -103,14 +106,21 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Announcement', 'User', 'Employee'])
+  const auth = await getAuthAndModels(request, ['Announcement', 'User', 'Employee', 'Notification'])
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Announcement, User, Employee } = models
+  const { Announcement, User, Employee, Notification } = models
 
     const data = await request.json()
+
+    if (!data?.title || !data?.content) {
+      return NextResponse.json(
+        { success: false, message: 'Title and content are required' },
+        { status: 400 }
+      )
+    }
 
     let creatorRole = user.role
     let creatorDepartment = null
@@ -233,7 +243,8 @@ export async function POST(request) {
           title: announcement.title,
           content: announcement.content,
           targetUserIds: userIds,
-          createdBy: creatorUserId
+          createdBy: creatorUserId,
+          models: { User, Employee, Notification }
         })
 
         // Emit Socket.IO event for real-time notification

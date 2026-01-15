@@ -2,6 +2,13 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { calculateEffectiveWorkHours, determineAttendanceStatus } from '@/lib/attendanceShrinkage'
 import { sendPushToUser } from '@/lib/pushNotification'
+import mongoose from 'mongoose'
+
+// Helper to validate MongoDB ObjectId
+const isValidObjectId = (id) => {
+  return mongoose.Types.ObjectId.isValid(id) &&
+    (new mongoose.Types.ObjectId(id)).toString() === id
+}
 
 /**
  * GET /api/attendance/overtime
@@ -72,6 +79,13 @@ export async function POST(request) {
 
     if (!requestId) {
       return NextResponse.json({ success: false, message: 'Request ID is required' }, { status: 400 })
+    }
+
+    if (!isValidObjectId(requestId)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid request ID' },
+        { status: 400 }
+      )
     }
 
     // Get employee ID from auth user
@@ -188,6 +202,13 @@ export async function PATCH(request) {
 
     if (!attendanceId) {
       return NextResponse.json({ success: false, message: 'Attendance ID is required' }, { status: 400 })
+    }
+
+    if (!isValidObjectId(attendanceId)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid attendance ID' },
+        { status: 400 }
+      )
     }
 
     // Find any overtime request for this attendance

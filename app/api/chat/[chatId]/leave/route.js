@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import mongoose from 'mongoose'
+
+const isValidObjectId = (id) => {
+  return mongoose.Types.ObjectId.isValid(id) &&
+    (new mongoose.Types.ObjectId(id)).toString() === id
+}
 
 // POST /api/chat/:chatId/leave
 // Kept as a dedicated route because the mobile client calls it explicitly.
@@ -18,12 +24,19 @@ export async function POST(request, { params }) {
     }
 
     const employeeId = user.employeeId._id || user.employeeId
+    if (!isValidObjectId(employeeId.toString())) {
+      return NextResponse.json({ success: false, message: 'Invalid employee ID' }, { status: 400 })
+    }
     const employee = await Employee.findById(employeeId)
     if (!employee) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
-  const { chatId } = await params
+    const { chatId } = await params
+
+    if (!isValidObjectId(chatId)) {
+      return NextResponse.json({ success: false, message: 'Invalid chat ID' }, { status: 400 })
+    }
 
     const chat = await Chat.findById(chatId)
     if (!chat) {

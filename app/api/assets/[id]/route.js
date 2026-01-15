@@ -1,16 +1,23 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import mongoose from 'mongoose'
+
+// Helper to validate MongoDB ObjectId
+const isValidObjectId = (id) => {
+  return mongoose.Types.ObjectId.isValid(id) &&
+    (new mongoose.Types.ObjectId(id)).toString() === id
+}
 
 // PUT - Update asset
 export async function PUT(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Asset', 'Employee'])
+    const auth = await getAuthAndModels(request, ['Asset', 'Employee', 'User', 'Notification'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Asset, Employee } = models
+    const { Asset, Employee, User, Notification } = models
 
     // Role check
     if (!['admin', 'hr'].includes(user.role)) {
@@ -18,6 +25,20 @@ export async function PUT(request, { params }) {
     }
 
     const data = await request.json()
+
+    if (!isValidObjectId(params.id)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid asset ID' },
+        { status: 400 }
+      )
+    }
+
+    if (data.assignedTo && !isValidObjectId(data.assignedTo)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid assigned employee ID' },
+        { status: 400 }
+      )
+    }
 
     const asset = await Asset.findByIdAndUpdate(
       params.id,
@@ -68,7 +89,8 @@ export async function PUT(request, { params }) {
                   assetId: asset._id.toString(),
                   action,
                   type: 'asset_update'
-                }
+                },
+                models: { User, Notification }
               }
             )
             console.log(`📲 [FCM] Asset notification sent to user:${employeeUserId}`)
@@ -109,6 +131,13 @@ export async function DELETE(request, { params }) {
     // Role check
     if (!['admin', 'hr'].includes(user.role)) {
       return NextResponse.json({ success: false, message: 'Forbidden: Only Admin and HR can delete assets' }, { status: 403 })
+    }
+
+    if (!isValidObjectId(params.id)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid asset ID' },
+        { status: 400 }
+      )
     }
 
     const asset = await Asset.findByIdAndDelete(params.id)

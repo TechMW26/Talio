@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
+import mongoose from 'mongoose';
+
+const isValidObjectId = (id) => {
+  return mongoose.Types.ObjectId.isValid(id) &&
+    (new mongoose.Types.ObjectId(id)).toString() === id
+}
 
 /**
  * GET /api/call-alert/recipients
@@ -22,8 +28,16 @@ export async function GET(request) {
     const { user, models } = auth
     const { User, Employee, Department } = models
 
+    const userId = user?._id || user?.userId
+    if (!userId || !isValidObjectId(userId.toString())) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid user ID' },
+        { status: 400 }
+      )
+    }
+
     // Get current user with department head fields
-    const currentUser = await User.findById(user._id || user.userId);
+  const currentUser = await User.findById(userId);
     if (!currentUser || !currentUser.isActive) {
       return NextResponse.json(
         { success: false, message: 'User not found' },
@@ -32,7 +46,9 @@ export async function GET(request) {
     }
 
     // Get current employee
-    const currentEmployee = await Employee.findById(currentUser.employeeId);
+    const currentEmployee = currentUser.employeeId && isValidObjectId(currentUser.employeeId.toString())
+      ? await Employee.findById(currentUser.employeeId)
+      : null;
     
     console.log('[CallAlert Recipients] User:', currentUser.email, 'Role:', currentUser.role);
     console.log('[CallAlert Recipients] isDepartmentHead from DB:', currentUser.isDepartmentHead);

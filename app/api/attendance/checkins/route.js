@@ -4,6 +4,12 @@ import { getAuthAndModels } from '@/lib/auth'
 // Mark this route as dynamic
 export const dynamic = 'force-dynamic'
 
+const isValidDateString = (value) => {
+  if (!value) return false
+  const parsed = new Date(value)
+  return !Number.isNaN(parsed.getTime())
+}
+
 // GET - Get employee check-ins for a specific date (Admin only)
 export async function GET(request) {
   try {
@@ -22,6 +28,13 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url)
     const dateParam = searchParams.get('date')
+
+    if (dateParam && !isValidDateString(dateParam)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid date format' },
+        { status: 400 }
+      )
+    }
 
     // Default to today if no date provided
     const targetDate = dateParam ? new Date(dateParam) : new Date()

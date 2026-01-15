@@ -12,7 +12,7 @@ export async function GET(request, { params }) {
     const { searchParams } = new URL(request.url)
     const tenantSlug = searchParams.get('tenant')
 
-    if (!token) {
+    if (!token || token === 'undefined' || token === 'null') {
       return NextResponse.json(
         { valid: false, error: 'Token is required' },
         { status: 400 }
@@ -89,28 +89,29 @@ export async function GET(request, { params }) {
 export async function POST(request, { params }) {
   try {
     const { token } = await params
-    const { password, tenant: tenantSlug } = await request.json()
+    const body = await request.json().catch(() => ({}))
+    const { password, tenant: tenantSlug } = body
 
     // Get request info for logging
     const forwarded = request.headers.get('x-forwarded-for')
     const ipAddress = forwarded ? forwarded.split(',')[0].trim() : request.headers.get('x-real-ip') || 'unknown'
     const userAgent = request.headers.get('user-agent') || 'unknown'
 
-    if (!token) {
+    if (!token || token === 'undefined' || token === 'null') {
       return NextResponse.json(
         { success: false, error: 'Token is required' },
         { status: 400 }
       )
     }
 
-    if (!password) {
+    if (!password || typeof password !== 'string') {
       return NextResponse.json(
         { success: false, error: 'Password is required' },
         { status: 400 }
       )
     }
 
-    if (!tenantSlug) {
+    if (!tenantSlug || typeof tenantSlug !== 'string') {
       return NextResponse.json(
         { success: false, error: 'Invalid reset request' },
         { status: 400 }

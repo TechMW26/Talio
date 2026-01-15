@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { emitAssetUpdate } from '@/lib/realtimeEvents'
+import mongoose from 'mongoose'
+
+// Helper to validate MongoDB ObjectId
+const isValidObjectId = (id) => {
+  return mongoose.Types.ObjectId.isValid(id) &&
+    (new mongoose.Types.ObjectId(id)).toString() === id
+}
 
 // GET - List assets
 export async function GET(request) {
@@ -20,6 +27,12 @@ export async function GET(request) {
     const query = {}
 
     if (employeeId) {
+      if (!isValidObjectId(employeeId)) {
+        return NextResponse.json(
+          { success: false, message: 'Invalid employee ID' },
+          { status: 400 }
+        )
+      }
       query.assignedTo = employeeId
     }
 
@@ -61,6 +74,13 @@ export async function POST(request) {
     }
 
     const data = await request.json()
+
+    if (data.assignedTo && !isValidObjectId(data.assignedTo)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid assigned employee ID' },
+        { status: 400 }
+      )
+    }
 
     const asset = await Asset.create(data)
 

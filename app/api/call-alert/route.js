@@ -5,6 +5,12 @@ import {
   processMessageTemplate, 
   PREBUILT_MESSAGES 
 } from '@/lib/elevenLabs';
+import mongoose from 'mongoose';
+
+const isValidObjectId = (id) => {
+  return mongoose.Types.ObjectId.isValid(id) &&
+    (new mongoose.Types.ObjectId(id)).toString() === id
+}
 
 /**
  * POST /api/call-alert
@@ -20,12 +26,27 @@ export async function POST(request) {
     const { user, models } = auth
     const { User, Employee, Department, CallAlert } = models
 
+    const userId = user?._id || user?.userId
+    if (!userId || !isValidObjectId(userId.toString())) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid user ID' },
+        { status: 400 }
+      );
+    }
+
     // Get sender user and employee data from auth
-    const senderUser = await User.findById(user._id);
+  const senderUser = await User.findById(userId);
     if (!senderUser || !senderUser.isActive) {
       return NextResponse.json(
         { success: false, message: 'User not found or inactive' },
         { status: 404 }
+      );
+    }
+
+    if (!senderUser.employeeId || !isValidObjectId(senderUser.employeeId.toString())) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid employee reference' },
+        { status: 400 }
       );
     }
 
@@ -64,7 +85,7 @@ export async function POST(request) {
     }
 
     // Parse request body
-    const body = await request.json();
+    const body = await request.json().catch(() => ({}));
     const {
       targetUserIds,
       messageTemplate,
@@ -80,6 +101,17 @@ export async function POST(request) {
     if (!targetUserIds || !Array.isArray(targetUserIds) || targetUserIds.length === 0) {
       return NextResponse.json(
         { success: false, message: 'Please select at least one recipient' },
+        { status: 400 }
+      );
+    }
+
+    const normalizedTargetIds = targetUserIds
+      .map(id => id?.toString?.())
+      .filter(Boolean)
+
+    if (normalizedTargetIds.some(id => !isValidObjectId(id))) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid recipient ID provided' },
         { status: 400 }
       );
     }
@@ -102,7 +134,7 @@ export async function POST(request) {
 
     // Get target users with their employee data
     const targetUsers = await User.find({
-      _id: { $in: targetUserIds },
+      _id: { $in: normalizedTargetIds },
       isActive: true
     }).populate({
       path: 'employeeId',
@@ -329,13 +361,29 @@ export async function GET(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
-    const { CallAlert } = models
+  const { user, models } = auth
+  const { CallAlert } = models
 
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type') || 'received'; // 'sent', 'received', or 'logs'
-    const limit = parseInt(searchParams.get('limit') || '20');
-    const skip = parseInt(searchParams.get('skip') || '0');
+    const limitParam = searchParams.get('limit') || '20'
+    const skipParam = searchParams.get('skip') || '0'
+    const limit = Number.parseInt(limitParam, 10)
+    const skip = Number.parseInt(skipParam, 10)
+
+    if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid limit value' },
+        { status: 400 }
+      )
+    }
+
+    if (!Number.isInteger(skip) || skip < 0) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid skip value' },
+        { status: 400 }
+      )
+    }
 
     const isAdmin = ['admin'].includes(user.role);
 

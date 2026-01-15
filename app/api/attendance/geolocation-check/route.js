@@ -35,9 +35,19 @@ export async function POST(request) {
 
     const { latitude, longitude } = await request.json()
 
-    if (!latitude || !longitude) {
+    if (latitude === undefined || longitude === undefined) {
       return NextResponse.json(
         { success: false, message: 'Location data required' },
+        { status: 400 }
+      )
+    }
+
+    const latNum = Number(latitude)
+    const lonNum = Number(longitude)
+
+    if (!Number.isFinite(latNum) || !Number.isFinite(lonNum)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid latitude or longitude' },
         { status: 400 }
       )
     }
@@ -115,8 +125,8 @@ export async function POST(request) {
       if (!isAllowed) continue
 
       const distance = calculateDistance(
-        latitude,
-        longitude,
+        latNum,
+        lonNum,
         location.center.latitude,
         location.center.longitude
       )
@@ -153,8 +163,8 @@ export async function POST(request) {
       attendance.location = {}
     }
     attendance.location.checkOut = {
-      latitude,
-      longitude,
+      latitude: latNum,
+      longitude: lonNum,
       address: 'Auto-checkout: Outside geofence',
       autoCheckout: true
     }

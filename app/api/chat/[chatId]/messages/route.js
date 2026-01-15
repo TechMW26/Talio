@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { sendMessageNotification } from '@/lib/notificationService'
+import mongoose from 'mongoose'
+
+const isValidObjectId = (id) => {
+  return mongoose.Types.ObjectId.isValid(id) &&
+    (new mongoose.Types.ObjectId(id)).toString() === id
+}
 
 // GET - Fetch messages for a chat
 export async function GET(request, context) {
@@ -16,12 +22,19 @@ export async function GET(request, context) {
     const params = await context.params
     const { chatId } = params
 
+    if (!isValidObjectId(chatId)) {
+      return NextResponse.json({ success: false, message: 'Invalid chat ID' }, { status: 400 })
+    }
+
     // Get employee ID from authenticated user
     if (!user || !user.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
     const employeeId = user.employeeId._id || user.employeeId
+    if (!isValidObjectId(employeeId.toString())) {
+      return NextResponse.json({ success: false, message: 'Invalid employee ID' }, { status: 400 })
+    }
 
     // Get employee details
     const employee = await Employee.findById(employeeId)
@@ -84,8 +97,12 @@ export async function POST(request, context) {
 
     const params = await context.params
     const { chatId } = params
-    const body = await request.json()
+    const body = await request.json().catch(() => ({}))
     const { content, fileUrl, fileId, fileName, fileType, fileSize, replyTo, mentions } = body
+
+    if (!isValidObjectId(chatId)) {
+      return NextResponse.json({ success: false, message: 'Invalid chat ID' }, { status: 400 })
+    }
 
     // Get employee ID from authenticated user
     if (!user || !user.employeeId) {
@@ -94,6 +111,9 @@ export async function POST(request, context) {
 
     // Extract employee ID properly (handle both populated object and raw ObjectId)
     const employeeId = user.employeeId._id || user.employeeId
+    if (!isValidObjectId(employeeId.toString())) {
+      return NextResponse.json({ success: false, message: 'Invalid employee ID' }, { status: 400 })
+    }
     const employeeIdStr = employeeId.toString()
 
     // Get employee details
@@ -119,7 +139,7 @@ export async function POST(request, context) {
     const mentionIds = Array.isArray(mentions)
       ? [...new Set(mentions.map(m => m?.toString?.()).filter(Boolean))]
       : []
-    const safeMentionIds = mentionIds.filter(id => participantSet.has(id))
+    const safeMentionIds = mentionIds.filter(id => participantSet.has(id) && isValidObjectId(id))
 
     // Create message
     const message = {
@@ -148,7 +168,11 @@ export async function POST(request, context) {
 
     // Add reply reference if present
     if (replyTo) {
-      message.replyTo = replyTo
+      const replyToId = replyTo?.toString?.()
+      if (!replyToId || !isValidObjectId(replyToId)) {
+        return NextResponse.json({ success: false, message: 'Invalid reply message ID' }, { status: 400 })
+      }
+      message.replyTo = replyToId
     }
 
     // Add message to chat

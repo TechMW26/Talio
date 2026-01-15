@@ -7,6 +7,7 @@ import { calculateEffectiveWorkHours, determineAttendanceStatus } from '@/lib/at
 import { reverseGeocode, validateLocationData } from '@/lib/geocoding'
 import { emitAttendanceUpdate, emitDashboardRefresh } from '@/lib/realtimeEvents'
 import { getAuthAndModels } from '@/lib/auth'
+import mongoose from 'mongoose'
 import { 
   getTimezone, 
   toTimezoneDate, 
@@ -14,6 +15,17 @@ import {
   getDayNameInTimezone,
   DEFAULT_TIMEZONE 
 } from '@/lib/timezone'
+
+const isValidObjectId = (id) => {
+  return mongoose.Types.ObjectId.isValid(id) &&
+    (new mongoose.Types.ObjectId(id)).toString() === id
+}
+
+const isValidDateString = (value) => {
+  if (!value) return false
+  const parsed = new Date(value)
+  return !Number.isNaN(parsed.getTime())
+}
 
 // Calculate distance between two coordinates (Haversine formula)
 function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -114,6 +126,51 @@ export async function GET(request) {
     const endDateParam = searchParams.get('endDate')
     const department = searchParams.get('department')
 
+    if (date && !isValidDateString(date)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid date format' },
+        { status: 400 }
+      )
+    }
+
+    if (startDateParam && !isValidDateString(startDateParam)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid startDate format' },
+        { status: 400 }
+      )
+    }
+
+    if (endDateParam && !isValidDateString(endDateParam)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid endDate format' },
+        { status: 400 }
+      )
+    }
+
+    if ((month && !year) || (year && !month)) {
+      return NextResponse.json(
+        { success: false, message: 'Both month and year are required' },
+        { status: 400 }
+      )
+    }
+
+    const monthValue = month ? Number.parseInt(month, 10) : null
+    const yearValue = year ? Number.parseInt(year, 10) : null
+
+    if (month && (!Number.isInteger(monthValue) || monthValue < 1 || monthValue > 12)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid month value' },
+        { status: 400 }
+      )
+    }
+
+    if (year && (!Number.isInteger(yearValue) || yearValue < 1970 || yearValue > 2100)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid year value' },
+        { status: 400 }
+      )
+    }
+
     // Generate cache key
     const cacheKey = queryCache.generateKey('attendance', date, employeeId, month, year, startDateParam, endDateParam, department)
     const cached = queryCache.get(cacheKey)
@@ -122,7 +179,7 @@ export async function GET(request) {
     }
 
     // Validate employeeId if provided
-    if (employeeId && (employeeId === 'undefined' || employeeId === 'null' || !employeeId.match(/^[0-9a-fA-F]{24}$/))) {
+    if (employeeId && (employeeId === 'undefined' || employeeId === 'null' || !isValidObjectId(employeeId))) {
       return NextResponse.json(
         { success: false, message: 'Invalid employee ID format' },
         { status: 400 }
@@ -173,6 +230,12 @@ export async function GET(request) {
 
     // Filter by department if specified
     if (department && department !== 'all') {
+      if (!isValidObjectId(department)) {
+        return NextResponse.json(
+          { success: false, message: 'Invalid department ID' },
+          { status: 400 }
+        )
+      }
       // Get employees in this department
       const deptEmployees = await TenantEmployee.find({ department }).select('_id').lean()
       const deptEmployeeIds = deptEmployees.map(e => e._id)

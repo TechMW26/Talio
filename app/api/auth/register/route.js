@@ -8,10 +8,27 @@ export async function POST(request) {
   try {
     await connectDB()
 
-    const { email, password, role, employeeData } = await request.json()
+    const body = await request.json().catch(() => ({}))
+    const { email, password, role, employeeData } = body
+
+    if (!email || typeof email !== 'string') {
+      return NextResponse.json(
+        { message: 'Please provide email and password' },
+        { status: 400 }
+      )
+    }
+
+    const normalizedEmail = email.toLowerCase().trim()
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+      return NextResponse.json(
+        { message: 'Invalid email address' },
+        { status: 400 }
+      )
+    }
 
     // Validate input
-    if (!email || !password) {
+    if (!password) {
       return NextResponse.json(
         { message: 'Please provide email and password' },
         { status: 400 }
@@ -19,7 +36,7 @@ export async function POST(request) {
     }
 
     // Check if user already exists
-    const existingUser = await User.findOne({ email })
+  const existingUser = await User.findOne({ email: normalizedEmail })
 
     if (existingUser) {
       return NextResponse.json(
@@ -41,7 +58,7 @@ export async function POST(request) {
 
     // Create user
     const user = await User.create({
-      email,
+      email: normalizedEmail,
       password,
       role: role || 'employee',
       employeeId,

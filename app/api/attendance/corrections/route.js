@@ -2,8 +2,21 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { calculateEffectiveWorkHours, determineAttendanceStatus } from '@/lib/attendanceShrinkage'
 import queryCache from '@/lib/queryCache'
+import mongoose from 'mongoose'
 
 export const dynamic = 'force-dynamic'
+
+// Helper to validate MongoDB ObjectId
+const isValidObjectId = (id) => {
+  return mongoose.Types.ObjectId.isValid(id) &&
+    (new mongoose.Types.ObjectId(id)).toString() === id
+}
+
+const isValidDateString = (value) => {
+  if (!value) return false
+  const parsed = new Date(value)
+  return !Number.isNaN(parsed.getTime())
+}
 
 /**
  * ATTENDANCE CORRECTION FLOW - STREAMLINED
@@ -44,7 +57,7 @@ async function canApproveCorrections(userId, targetEmployeeId, models) {
   }
 
   // Department heads can approve for their department members
-  if (user.employeeId) {
+  if (user.employeeId && targetEmployeeId) {
     const targetEmployee = await Employee.findById(targetEmployeeId).lean()
     if (!targetEmployee) return { canApprove: false, reason: 'Target employee not found' }
 
@@ -84,6 +97,20 @@ export async function GET(request) {
     const employeeId = searchParams.get('employeeId')
     const type = searchParams.get('type') // 'my' for own requests, 'pending' for requests to approve
     const departmentFilter = searchParams.get('department') // Department filter for admin/HR
+
+    if (employeeId && !isValidObjectId(employeeId)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid employee ID' },
+        { status: 400 }
+      )
+    }
+
+    if (departmentFilter && departmentFilter !== 'all' && !isValidObjectId(departmentFilter)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid department ID' },
+        { status: 400 }
+      )
+    }
 
     const userEmployeeId = user?.employeeId?._id?.toString() || user?.employeeId?.toString()
 
@@ -191,6 +218,34 @@ export async function POST(request) {
       attachments
     } = data
 
+    if (attendanceId && !isValidObjectId(attendanceId)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid attendance ID' },
+        { status: 400 }
+      )
+    }
+
+    if (date && !isValidDateString(date)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid date format' },
+        { status: 400 }
+      )
+    }
+
+    if (requestedCheckIn && !isValidDateString(requestedCheckIn)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid requestedCheckIn format' },
+        { status: 400 }
+      )
+    }
+
+    if (requestedCheckOut && !isValidDateString(requestedCheckOut)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid requestedCheckOut format' },
+        { status: 400 }
+      )
+    }
+
     const fullUser = await User.findById(user._id).populate({
       path: 'employeeId',
       options: { strictPopulate: false }
@@ -297,6 +352,13 @@ export async function PATCH(request) {
 
     if (!correctionId || !['approve', 'reject'].includes(action)) {
       return NextResponse.json({ success: false, message: 'Invalid request' }, { status: 400 })
+    }
+
+    if (!isValidObjectId(correctionId)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid correction ID' },
+        { status: 400 }
+      )
     }
 
     // =====================================================

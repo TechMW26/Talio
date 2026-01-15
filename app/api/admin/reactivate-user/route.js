@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import mongoose from 'mongoose'
 export const dynamic = 'force-dynamic'
 
 /**
@@ -17,7 +18,11 @@ export async function POST(request) {
     const { User } = models
 
     // Verify admin/HR role
-    const adminUser = await User.findById(user._id || user.userId).select('role')
+    const adminId = user._id || user.userId
+    if (!adminId) {
+      return NextResponse.json({ success: false, message: 'User ID not found' }, { status: 400 })
+    }
+    const adminUser = await User.findById(adminId).select('role')
     if (!adminUser || !['admin', 'hr'].includes(adminUser.role)) {
       return NextResponse.json({
         success: false,
@@ -26,12 +31,19 @@ export async function POST(request) {
     }
 
     const body = await request.json()
-    const { userId, extendDeadline = true, additionalDays = 7 } = body
+  const { userId, extendDeadline = true, additionalDays = 7 } = body
 
     if (!userId) {
       return NextResponse.json({
         success: false,
         message: 'User ID is required'
+      }, { status: 400 })
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return NextResponse.json({
+        success: false,
+        message: 'Invalid user ID format'
       }, { status: 400 })
     }
 
@@ -61,8 +73,15 @@ export async function POST(request) {
 
     // Optionally extend the profile completion deadline
     if (extendDeadline) {
+      const daysToAdd = Number(additionalDays)
+      if (Number.isNaN(daysToAdd) || daysToAdd < 0) {
+        return NextResponse.json({
+          success: false,
+          message: 'additionalDays must be a positive number'
+        }, { status: 400 })
+      }
       const newDeadline = new Date()
-      newDeadline.setDate(newDeadline.getDate() + additionalDays)
+      newDeadline.setDate(newDeadline.getDate() + daysToAdd)
       updateData['profileCompletion.profileCompletionDeadline'] = newDeadline
     }
 
@@ -105,7 +124,11 @@ export async function GET(request) {
     const { User } = models
 
     // Verify admin/HR role
-    const adminUser = await User.findById(user._id || user.userId).select('role')
+    const adminId = user._id || user.userId
+    if (!adminId) {
+      return NextResponse.json({ success: false, message: 'User ID not found' }, { status: 400 })
+    }
+    const adminUser = await User.findById(adminId).select('role')
     if (!adminUser || !['admin', 'hr'].includes(adminUser.role)) {
       return NextResponse.json({
         success: false,

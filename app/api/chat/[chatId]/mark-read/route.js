@@ -1,5 +1,11 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import mongoose from 'mongoose'
+
+const isValidObjectId = (id) => {
+  return mongoose.Types.ObjectId.isValid(id) &&
+    (new mongoose.Types.ObjectId(id)).toString() === id
+}
 
 // POST - Mark all messages in a chat as read
 export async function POST(request, context) {
@@ -26,6 +32,10 @@ export async function POST(request, context) {
 
     const params = await context.params
     const chatId = params.chatId
+
+    if (!isValidObjectId(chatId)) {
+      return NextResponse.json({ success: false, message: 'Invalid chat ID' }, { status: 400 })
+    }
 
     // Find the chat
     const chat = await Chat.findById(chatId)
