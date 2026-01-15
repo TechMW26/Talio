@@ -204,9 +204,32 @@ export async function POST(request) {
     })
 
   } catch (error) {
-    console.error('[Change Password] Error:', error)
+    // Enhanced error logging with context
+    const errorContext = {
+      timestamp: new Date().toISOString(),
+      errorName: error.name,
+      errorMessage: error.message,
+      stack: error.stack?.split('\n').slice(0, 5).join('\n'),
+    }
+    console.error('[Change Password] Error:', JSON.stringify(errorContext, null, 2))
+
+    // Differentiate error types for better debugging
+    let errorMessage = 'Failed to change password'
+    let errorCode = 'CHANGE_PASSWORD_ERROR'
+
+    if (error.name === 'MongoNetworkError' || error.message?.includes('ETIMEOUT')) {
+      errorMessage = 'Database connection issue. Please try again.'
+      errorCode = 'DB_CONNECTION_ERROR'
+    } else if (error.name === 'ValidationError') {
+      errorMessage = 'Invalid password format'
+      errorCode = 'VALIDATION_ERROR'
+    } else if (error.name === 'MongoServerError' && error.code === 11000) {
+      errorMessage = 'A conflict occurred. Please try again.'
+      errorCode = 'DB_CONFLICT_ERROR'
+    }
+
     return NextResponse.json(
-      { success: false, message: 'Failed to change password' },
+      { success: false, message: errorMessage, errorCode },
       { status: 500 }
     )
   }
@@ -266,9 +289,26 @@ export async function GET(request) {
     })
 
   } catch (error) {
-    console.error('[Check Password Change] Error:', error)
+    // Enhanced error logging with context
+    const errorContext = {
+      timestamp: new Date().toISOString(),
+      errorName: error.name,
+      errorMessage: error.message,
+      stack: error.stack?.split('\n').slice(0, 5).join('\n'),
+    }
+    console.error('[Check Password Change] Error:', JSON.stringify(errorContext, null, 2))
+
+    // Differentiate error types
+    let errorMessage = 'Failed to check password change status'
+    let errorCode = 'CHECK_PASSWORD_STATUS_ERROR'
+
+    if (error.name === 'MongoNetworkError' || error.message?.includes('ETIMEOUT')) {
+      errorMessage = 'Database connection issue. Please try again.'
+      errorCode = 'DB_CONNECTION_ERROR'
+    }
+
     return NextResponse.json(
-      { success: false, message: 'Failed to check password change status' },
+      { success: false, message: errorMessage, errorCode },
       { status: 500 }
     )
   }

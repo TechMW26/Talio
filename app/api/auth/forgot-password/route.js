@@ -137,9 +137,17 @@ export async function POST(request) {
     console.log('[forgot-password] Email result:', emailResult)
 
     if (!emailResult.success) {
-      console.error(`[forgot-password] Failed to send email: ${emailResult.error}`)
+      console.error(`[forgot-password] Failed to send email:`, {
+        error: emailResult.error,
+        userEmail: user.email,
+        timestamp: new Date().toISOString(),
+      })
       return NextResponse.json(
-        { success: false, error: 'Failed to send reset email. Please try again later or contact support.' },
+        { 
+          success: false, 
+          error: 'Failed to send reset email. Please try again later or contact support.',
+          errorCode: 'EMAIL_SEND_FAILED'
+        },
         { status: 500 }
       )
     }
@@ -147,7 +155,24 @@ export async function POST(request) {
     console.log(`[forgot-password] Reset email sent successfully to ${user.email}`)
     return successResponse
   } catch (error) {
-    console.error('[forgot-password] Error:', error)
+    // Enhanced error logging with context
+    const errorContext = {
+      timestamp: new Date().toISOString(),
+      errorName: error.name,
+      errorMessage: error.message,
+      stack: error.stack?.split('\n').slice(0, 5).join('\n'),
+    }
+    console.error('[forgot-password] Error:', JSON.stringify(errorContext, null, 2))
+
+    // Differentiate error types for internal tracking
+    let errorCode = 'FORGOT_PASSWORD_ERROR'
+
+    if (error.name === 'MongoNetworkError' || error.message?.includes('ETIMEOUT')) {
+      errorCode = 'DB_CONNECTION_ERROR'
+    } else if (error.message?.includes('ECONNREFUSED') || error.message?.includes('SMTP')) {
+      errorCode = 'EMAIL_SERVICE_ERROR'
+    }
+
     return NextResponse.json(
       { error: 'Something went wrong. Please try again later.' },
       { status: 500 }

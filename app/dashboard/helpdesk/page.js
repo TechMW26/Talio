@@ -178,8 +178,8 @@ export default function HelpdeskPage() {
   if (!mounted) {
     return (
       <div className="space-y-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-10 bg-gray-200 rounded w-1/4"></div>
+        <div className="space-y-4 animate-pulse">
+          <div className="w-1/4 h-10 bg-gray-200 rounded"></div>
           <div className="h-32 bg-gray-200 rounded"></div>
         </div>
       </div>
@@ -189,10 +189,10 @@ export default function HelpdeskPage() {
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Helpdesk</h1>
-          <p className="text-sm text-gray-600 mt-1">Submit and track support tickets</p>
+          <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Helpdesk</h1>
+          <p className="mt-1 text-sm text-gray-600">Submit and track support tickets</p>
         </div>
         <div className="flex gap-3">
           {isManager && (
@@ -215,13 +215,13 @@ export default function HelpdeskPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {stats.map((stat, index) => (
-          <div key={index} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+          <div key={index} className="p-4 bg-white border border-gray-100 shadow-sm rounded-xl">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">{stat.label}</p>
-                <p className="text-2xl sm:text-3xl font-bold text-gray-900">{stat.value}</p>
+                <p className="mb-1 text-sm text-gray-600">{stat.label}</p>
+                <p className="text-2xl font-bold text-gray-900 sm:text-3xl">{stat.value}</p>
               </div>
               <div className={`p-3 rounded-xl ${stat.bgColor}`}>
                 <stat.icon className={`w-5 h-5 sm:w-6 sm:h-6 ${stat.iconColor}`} />
@@ -232,7 +232,7 @@ export default function HelpdeskPage() {
       </div>
 
       {/* Tickets Table */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
+      <div className="overflow-hidden bg-white rounded-lg shadow-md">
         <div className="p-4 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-800">My Tickets</h2>
         </div>
@@ -245,24 +245,24 @@ export default function HelpdeskPage() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="border-b border-gray-200 bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
                     Ticket #
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
                     Subject
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
                     Category
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
                     Priority
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
                     Created
                   </th>
                 </tr>
@@ -278,20 +278,22 @@ export default function HelpdeskPage() {
                   tickets.map((ticket) => (
                     <tr 
                       key={ticket._id} 
-                      className="hover:bg-gray-50 cursor-pointer transition-colors"
+                      className="transition-colors cursor-pointer hover:bg-gray-50"
                       onClick={() => router.push(`/dashboard/helpdesk/${ticket._id}`)}
                     >
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-primary-600">
+                      <td className="px-6 py-4 text-sm font-medium whitespace-nowrap text-primary-600">
                         {ticket?.ticketNumber || 'N/A'}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">
                         {ticket?.subject || 'N/A'}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-6 py-4 text-sm text-gray-900 whitespace-nowrap">
                         {ticket?.category || 'N/A'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${ticket?.priority === 'high' ? 'bg-red-100 text-red-800' :
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            ticket?.priority === 'urgent' || ticket?.priority === 'low' ? 'bg-red-200 text-red-900' :
+                            ticket?.priority === 'high' ? 'bg-red-100 text-red-800' :
                             ticket?.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
                               'bg-green-100 text-green-800'
                           }`}>
@@ -306,7 +308,7 @@ export default function HelpdeskPage() {
                           {ticket?.status || 'open'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <td className="px-6 py-4 text-sm text-gray-500 whitespace-nowrap">
                         {ticket?.createdAt ? new Date(ticket.createdAt).toLocaleDateString() : 'N/A'}
                       </td>
                     </tr>
@@ -330,7 +332,7 @@ export default function HelpdeskPage() {
               </button>
             </div>
             <form onSubmit={handleSubmit}>
-              <div className="modal-body space-y-4">
+              <div className="space-y-4 modal-body">
                 <div>
                   <label className="modal-label">
                     Subject
