@@ -2,10 +2,9 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import queryCache from '@/lib/queryCache'
 import { logActivity } from '@/lib/activityLogger'
-import { uploadImageToImageKit, deleteFromImageKit, getImageKitFolder, generateEmployeeFolderName } from '@/lib/imagekit'
-import { optimizeImage, isValidImage } from '@/lib/imageOptimization'
 import { deleteUserFromBackup } from '@/lib/backupDb'
 import { emitEmployeeUpdate, emitDashboardRefresh } from '@/lib/realtimeEvents'
+import mongoose from 'mongoose'
 
 // Check if ImageKit is configured
 const isImageKitConfigured = () => {
@@ -16,11 +15,32 @@ const isImageKitConfigured = () => {
   )
 }
 
+// Helper to validate MongoDB ObjectId
+const isValidObjectId = (id) => {
+  return mongoose.Types.ObjectId.isValid(id) &&
+    (new mongoose.Types.ObjectId(id)).toString() === id
+}
+
 // GET - Get single employee
 export async function GET(request, { params }) {
   try {
     // Await params in Next.js 15
     const { id } = await params;
+
+    if (!id) {
+      return NextResponse.json(
+        { success: false, message: 'Employee ID is required' },
+        { status: 400 }
+      )
+    }
+
+    // Validate ObjectId
+    if (!isValidObjectId(id)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid employee ID' },
+        { status: 400 }
+      )
+    }
 
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Employee', 'User', 'Department', 'Designation', 'Company'])
@@ -29,6 +49,13 @@ export async function GET(request, { params }) {
     }
     const { models } = auth
     const { Employee, User, Department, Designation, Company } = models
+
+    if (!Employee || !User) {
+      return NextResponse.json(
+        { success: false, message: 'Employee models not initialized' },
+        { status: 500 }
+      )
+    }
 
     // Check cache first
     const cacheKey = queryCache.generateKey('employee', id)
@@ -67,7 +94,7 @@ export async function GET(request, { params }) {
 
     // If not found by employee ID, check if it's a user ID and get employee from there
     if (!employee) {
-      const userWithEmployee = await User.findById(params.id).select('employeeId').lean()
+  const userWithEmployee = await User.findById(id).select('employeeId').lean()
       if (userWithEmployee?.employeeId) {
         employee = await Employee.findById(userWithEmployee.employeeId)
           .populate({
@@ -124,6 +151,18 @@ export async function GET(request, { params }) {
   } catch (error) {
     console.error('Get employee error:', error)
     console.error('Error stack:', error.stack)
+    if (error?.name === 'CastError') {
+      return NextResponse.json(
+        { success: false, message: 'Invalid employee ID' },
+        { status: 400 }
+      )
+    }
+    if (error?.name === 'MongoNetworkError' || /buffering timed out/i.test(error?.message || '')) {
+      return NextResponse.json(
+        { success: false, message: 'Database connection unavailable' },
+        { status: 503 }
+      )
+    }
     return NextResponse.json(
       { success: false, message: 'Failed to fetch employee', error: error.message },
       { status: 500 }
@@ -137,6 +176,21 @@ export async function PUT(request, { params }) {
     // Await params in Next.js 15
     const { id } = await params;
 
+    if (!id) {
+      return NextResponse.json(
+        { success: false, message: 'Employee ID is required' },
+        { status: 400 }
+      )
+    }
+
+    // Validate ObjectId
+    if (!isValidObjectId(id)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid employee ID' },
+        { status: 400 }
+      )
+    }
+
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Employee', 'User', 'Department', 'Designation'])
     if (!auth.success) {
@@ -144,6 +198,13 @@ export async function PUT(request, { params }) {
     }
     const { models } = auth
     const { Employee, User, Department, Designation } = models
+
+    if (!Employee || !User) {
+      return NextResponse.json(
+        { success: false, message: 'Employee models not initialized' },
+        { status: 500 }
+      )
+    }
 
     const data = await request.json()
 
@@ -221,6 +282,9 @@ export async function PUT(request, { params }) {
       console.log('[Employee Update] Processing profile picture upload...')
 
       try {
+        const { uploadImageToImageKit, deleteFromImageKit, getImageKitFolder } = await import('@/lib/imagekit')
+        const { optimizeImage, isValidImage } = await import('@/lib/imageOptimization')
+
         // Extract base64 data
         const base64Data = data.profilePicture.replace(/^data:image\/\w+;base64,/, '')
         const imageBuffer = Buffer.from(base64Data, 'base64')
@@ -343,6 +407,18 @@ export async function PUT(request, { params }) {
     })
   } catch (error) {
     console.error('Update employee error:', error)
+    if (error?.name === 'CastError') {
+      return NextResponse.json(
+        { success: false, message: 'Invalid employee ID' },
+        { status: 400 }
+      )
+    }
+    if (error?.name === 'MongoNetworkError' || /buffering timed out/i.test(error?.message || '')) {
+      return NextResponse.json(
+        { success: false, message: 'Database connection unavailable' },
+        { status: 503 }
+      )
+    }
     return NextResponse.json(
       { success: false, message: error.message || 'Failed to update employee' },
       { status: 500 }
@@ -356,6 +432,21 @@ export async function DELETE(request, { params }) {
     // Await params in Next.js 15
     const { id } = await params;
 
+    if (!id) {
+      return NextResponse.json(
+        { success: false, message: 'Employee ID is required' },
+        { status: 400 }
+      )
+    }
+
+    // Validate ObjectId
+    if (!isValidObjectId(id)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid employee ID' },
+        { status: 400 }
+      )
+    }
+
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Employee', 'User'])
     if (!auth.success) {
@@ -363,6 +454,13 @@ export async function DELETE(request, { params }) {
     }
     const { models } = auth
     const { Employee, User } = models
+
+    if (!Employee || !User) {
+      return NextResponse.json(
+        { success: false, message: 'Employee models not initialized' },
+        { status: 500 }
+      )
+    }
 
     const employee = await Employee.findById(id)
     if (!employee) {
@@ -389,6 +487,7 @@ export async function DELETE(request, { params }) {
     // Delete profile picture from ImageKit if exists
     if (employee.profilePictureFileId && isImageKitConfigured()) {
       try {
+        const { deleteFromImageKit } = await import('@/lib/imagekit')
         await deleteFromImageKit(employee.profilePictureFileId)
         console.log(`[Employee Delete] Deleted profile picture: ${employee.profilePictureFileId}`)
       } catch (imgErr) {
@@ -424,6 +523,18 @@ export async function DELETE(request, { params }) {
     })
   } catch (error) {
     console.error('Delete employee error:', error)
+    if (error?.name === 'CastError') {
+      return NextResponse.json(
+        { success: false, message: 'Invalid employee ID' },
+        { status: 400 }
+      )
+    }
+    if (error?.name === 'MongoNetworkError' || /buffering timed out/i.test(error?.message || '')) {
+      return NextResponse.json(
+        { success: false, message: 'Database connection unavailable' },
+        { status: 503 }
+      )
+    }
     return NextResponse.json(
       { success: false, message: 'Failed to delete employee' },
       { status: 500 }
@@ -436,6 +547,21 @@ export async function PATCH(request, { params }) {
   try {
     const { id } = await params;
 
+    if (!id) {
+      return NextResponse.json(
+        { success: false, message: 'Employee ID is required' },
+        { status: 400 }
+      )
+    }
+
+    // Validate ObjectId
+    if (!isValidObjectId(id)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid employee ID' },
+        { status: 400 }
+      )
+    }
+
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Employee', 'User'])
     if (!auth.success) {
@@ -443,6 +569,13 @@ export async function PATCH(request, { params }) {
     }
     const { models } = auth
     const { Employee, User } = models
+
+    if (!Employee || !User) {
+      return NextResponse.json(
+        { success: false, message: 'Employee models not initialized' },
+        { status: 500 }
+      )
+    }
 
     const body = await request.json()
 
@@ -557,6 +690,18 @@ export async function PATCH(request, { params }) {
     })
   } catch (error) {
     console.error('Update employee error:', error)
+    if (error?.name === 'CastError') {
+      return NextResponse.json(
+        { success: false, message: 'Invalid employee ID' },
+        { status: 400 }
+      )
+    }
+    if (error?.name === 'MongoNetworkError' || /buffering timed out/i.test(error?.message || '')) {
+      return NextResponse.json(
+        { success: false, message: 'Database connection unavailable' },
+        { status: 503 }
+      )
+    }
     return NextResponse.json(
       { success: false, message: 'Failed to update employee', error: error.message },
       { status: 500 }
