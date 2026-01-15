@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import mongoose from 'mongoose'
 
 /**
  * GET /api/actionable-notifications
@@ -7,6 +8,7 @@ import { getAuthAndModels } from '@/lib/auth'
  */
 export async function GET(request) {
   try {
+    // Include Employee for populate('createdBy')
     const auth = await getAuthAndModels(request, ['ActionableNotification', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
@@ -58,7 +60,8 @@ export async function GET(request) {
  */
 export async function POST(request) {
   try {
-    const auth = await getAuthAndModels(request, ['ActionableNotification', 'User'])
+    // Include Employee for createdBy field
+    const auth = await getAuthAndModels(request, ['ActionableNotification', 'User', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
@@ -86,6 +89,22 @@ export async function POST(request) {
     if (!targetUserId || !title || !message || !type) {
       return NextResponse.json(
         { message: 'Missing required fields: targetUserId, title, message, type' },
+        { status: 400 }
+      )
+    }
+
+    // Validate targetUserId is a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(targetUserId)) {
+      return NextResponse.json(
+        { message: 'Invalid targetUserId format' },
+        { status: 400 }
+      )
+    }
+
+    // Validate reference.id if provided
+    if (reference?.id && !mongoose.Types.ObjectId.isValid(reference.id)) {
+      return NextResponse.json(
+        { message: 'Invalid reference.id format' },
         { status: 400 }
       )
     }

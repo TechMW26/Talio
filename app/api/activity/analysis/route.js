@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth'
 import { triggerScheduledTasks, analyzeUserDay } from '@/lib/screenshotAnalysis';
+import mongoose from 'mongoose';
 
 /**
  * Check if viewer can access target user's analysis
@@ -69,11 +70,20 @@ export async function GET(request) {
     const viewerId = user._id || user.userId;
     const viewerRole = user.role;
 
+    if (!viewerId) {
+      return NextResponse.json({ success: false, error: 'User ID not found' }, { status: 400 });
+    }
+
     const { searchParams } = new URL(request.url);
     const targetUserId = searchParams.get('userId') || viewerId;
     const date = searchParams.get('date');
     const startDate = searchParams.get('startDate');
     const endDate = searchParams.get('endDate');
+
+    // Validate userId format if provided
+    if (targetUserId && targetUserId !== viewerId && !mongoose.Types.ObjectId.isValid(targetUserId)) {
+      return NextResponse.json({ success: false, error: 'Invalid user ID format' }, { status: 400 });
+    }
 
     // Check access
     const canView = await canViewAnalysis(viewerId, targetUserId, viewerRole, models);

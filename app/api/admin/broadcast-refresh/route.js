@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
+import mongoose from 'mongoose';
 
 /**
  * POST /api/admin/broadcast-refresh
@@ -36,6 +37,33 @@ export async function POST(request) {
         { success: false, message: 'Invalid target. Must be "all", "department", or "user".' },
         { status: 400 }
       );
+    }
+
+    // Validate departmentId if target is department
+    if (target === 'department' && departmentId && !mongoose.Types.ObjectId.isValid(departmentId)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid department ID format.' },
+        { status: 400 }
+      );
+    }
+
+    // Validate userId(s) if target is user
+    if (target === 'user') {
+      if (userIds && Array.isArray(userIds)) {
+        for (const uid of userIds) {
+          if (!mongoose.Types.ObjectId.isValid(uid)) {
+            return NextResponse.json(
+              { success: false, message: 'Invalid user ID format in userIds array.' },
+              { status: 400 }
+            );
+          }
+        }
+      } else if (userId && !mongoose.Types.ObjectId.isValid(userId)) {
+        return NextResponse.json(
+          { success: false, message: 'Invalid user ID format.' },
+          { status: 400 }
+        );
+      }
     }
 
     // Check if Socket.IO is available

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import mongoose from 'mongoose'
 
 /**
  * GET /api/actionable-notifications/[id]
@@ -9,7 +10,16 @@ export async function GET(request, { params }) {
   try {
     const { id } = await params
     
-    const auth = await getAuthAndModels(request, ['ActionableNotification'])
+    // Validate ObjectId format
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { message: 'Invalid notification ID format' },
+        { status: 400 }
+      )
+    }
+    
+    // Include Employee model for populate('createdBy')
+    const auth = await getAuthAndModels(request, ['ActionableNotification', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
@@ -49,6 +59,14 @@ export async function GET(request, { params }) {
 export async function PATCH(request, { params }) {
   try {
     const { id } = await params
+    
+    // Validate ObjectId format
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { message: 'Invalid notification ID format' },
+        { status: 400 }
+      )
+    }
     
     const auth = await getAuthAndModels(request, ['ActionableNotification'])
     if (!auth.success) {
@@ -125,6 +143,14 @@ export async function PATCH(request, { params }) {
 export async function DELETE(request, { params }) {
   try {
     const { id } = await params
+    
+    // Validate ObjectId format
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { message: 'Invalid notification ID format' },
+        { status: 400 }
+      )
+    }
     
     const auth = await getAuthAndModels(request, ['ActionableNotification'])
     if (!auth.success) {

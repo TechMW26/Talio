@@ -40,11 +40,18 @@ export async function GET(request) {
         error: auth.message || 'Unauthorized' 
       }, { status: 401 })
     }
-    const { user, models } = auth
-    const { User } = models
+    const { user } = auth
 
     const userId = user._id || user.userId;
     const userRole = user.role;
+
+    if (!userId) {
+      return NextResponse.json({
+        success: false,
+        healthy: false,
+        error: 'User ID not found'
+      }, { status: 400 });
+    }
 
     // Ensure user's activity folder exists
     const folderResult = await ensureUserActivityFolder(userId.toString());

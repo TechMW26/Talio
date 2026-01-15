@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
+import mongoose from 'mongoose';
 
 // Roles that can view all team members
 const ADMIN_ROLES = ['admin', 'hr'];
@@ -25,8 +26,17 @@ export async function GET(request) {
     const currentUserId = user._id || user.userId;
     const currentUserRole = user.role;
 
+    if (!currentUserId) {
+      return NextResponse.json({ error: 'User ID not found' }, { status: 400 });
+    }
+
     const { searchParams } = new URL(request.url);
     const departmentId = searchParams.get('departmentId');
+
+    // Validate departmentId format if provided
+    if (departmentId && !mongoose.Types.ObjectId.isValid(departmentId)) {
+      return NextResponse.json({ error: 'Invalid department ID format' }, { status: 400 });
+    }
 
     // Get current user with employee info
     const currentUser = await User.findById(currentUserId).populate('employeeId');

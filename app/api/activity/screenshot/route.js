@@ -4,6 +4,7 @@ import { mkdir, writeFile, access, constants, unlink } from 'fs/promises';
 import path from 'path';
 import { uploadScreenshot, getScreenshot } from '@/lib/gridfs';
 import { uploadImageToImageKit, getImageKitFolder, generateEmployeeFolderName } from '@/lib/imagekit';
+import mongoose from 'mongoose';
 
 // Check if ImageKit is configured
 const isImageKitConfigured = () => {
@@ -252,6 +253,14 @@ export async function GET(request) {
       return NextResponse.json({
         success: false,
         error: 'Screenshot ID required'
+      }, { status: 400 });
+    }
+
+    // Validate screenshotId format
+    if (!mongoose.Types.ObjectId.isValid(screenshotId)) {
+      return NextResponse.json({
+        success: false,
+        error: 'Invalid screenshot ID format'
       }, { status: 400 });
     }
 

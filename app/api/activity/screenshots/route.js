@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth'
+import mongoose from 'mongoose';
 
 /**
  * Check if a user is a department head who can view another user's screenshots
@@ -79,6 +80,10 @@ export async function GET(request) {
     const viewerId = user._id || user.userId;
     const viewerRole = user.role;
 
+    if (!viewerId) {
+      return NextResponse.json({ success: false, error: 'User ID not found' }, { status: 400 });
+    }
+
     const { searchParams } = new URL(request.url);
     const targetUserId = searchParams.get('userId') || viewerId;
     const date = searchParams.get('date');
@@ -86,6 +91,11 @@ export async function GET(request) {
     const endDate = searchParams.get('endDate');
     const limit = Math.min(parseInt(searchParams.get('limit')) || 100, 500);
     const skip = parseInt(searchParams.get('skip')) || 0;
+
+    // Validate targetUserId format if different from current user
+    if (targetUserId !== viewerId && !mongoose.Types.ObjectId.isValid(targetUserId)) {
+      return NextResponse.json({ success: false, error: 'Invalid user ID format' }, { status: 400 });
+    }
 
     // Check access permission
     const canView = await canViewUserScreenshots(viewerId, targetUserId, viewerRole, models);

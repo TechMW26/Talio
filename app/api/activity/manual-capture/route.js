@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
+import mongoose from 'mongoose';
 
 // Roles that can initiate manual captures (in addition to department heads)
 const ALLOWED_INITIATOR_ROLES = ['admin', 'hr'];
@@ -73,6 +74,14 @@ export async function POST(request) {
     if (!targetUserId) {
       return NextResponse.json(
         { success: false, error: 'Target user ID is required' },
+        { status: 400 }
+      );
+    }
+
+    // Validate targetUserId format
+    if (!mongoose.Types.ObjectId.isValid(targetUserId)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid target user ID format' },
         { status: 400 }
       );
     }

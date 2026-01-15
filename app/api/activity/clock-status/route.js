@@ -8,16 +8,25 @@ import { getAuthAndModels } from '@/lib/auth';
  */
 export async function GET(request) {
   try {
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Attendance', 'User']);
+    // Get authenticated user and tenant-specific models - include Employee for populate
+    const auth = await getAuthAndModels(request, ['Attendance', 'User', 'Employee']);
     if (!auth.success) {
       return NextResponse.json({ error: auth.message }, { status: 401 });
     }
     const { user: authUser, models } = auth;
     const { Attendance, User } = models;
 
+    const userId = authUser._id || authUser.userId;
+    if (!userId) {
+      return NextResponse.json({
+        success: true,
+        isClockedIn: false,
+        reason: 'User ID not found'
+      });
+    }
+
     // Get user with employee reference
-    const userWithEmployee = await User.findById(authUser._id).select('employeeId');
+    const userWithEmployee = await User.findById(userId).select('employeeId');
     
     if (!userWithEmployee || !userWithEmployee.employeeId) {
       return NextResponse.json({

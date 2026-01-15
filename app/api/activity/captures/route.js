@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth'
 import { readdir, stat } from 'fs/promises';
 import path from 'path';
+import mongoose from 'mongoose';
 
 // Roles that can view all captures
 const ADMIN_ROLES = ['admin', 'hr'];
@@ -77,11 +78,20 @@ export async function GET(request) {
     const currentUserId = user._id || user.userId;
     const currentUserRole = user.role;
 
+    if (!currentUserId) {
+      return NextResponse.json({ error: 'User ID not found' }, { status: 400 });
+    }
+
     const { searchParams } = new URL(request.url);
     const targetUserId = searchParams.get('userId') || currentUserId;
     const dateParam = searchParams.get('date') || new Date().toISOString().split('T')[0];
     const captureType = searchParams.get('type'); // 'automatic', 'manual', or null
     const departmentId = searchParams.get('departmentId'); // Filter by department
+
+    // Validate targetUserId format if different from current user
+    if (targetUserId !== currentUserId && !mongoose.Types.ObjectId.isValid(targetUserId)) {
+      return NextResponse.json({ error: 'Invalid user ID format' }, { status: 400 });
+    }
     
     // Permission check
     if (targetUserId !== currentUserId) {

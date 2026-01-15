@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import mongoose from 'mongoose'
 
 /**
  * POST /api/actionable-notifications/[id]/action
@@ -9,6 +10,14 @@ import { getAuthAndModels } from '@/lib/auth'
 export async function POST(request, { params }) {
   try {
     const { id } = await params
+    
+    // Validate ObjectId format
+    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { message: 'Invalid notification ID format' },
+        { status: 400 }
+      )
+    }
     
     const auth = await getAuthAndModels(request, ['ActionableNotification'])
     if (!auth.success) {

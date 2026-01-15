@@ -1,19 +1,34 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import mongoose from 'mongoose'
 
 // GET - Fetch activities
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Activity', 'User'])
+    const auth = await getAuthAndModels(request, ['Activity', 'User', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
     const { Activity, User } = models
 
-    const currentUser = await User.findById(user._id || user.userId).select('employeeId role')
+    const userId = user._id || user.userId
+    if (!userId) {
+      return NextResponse.json({ success: false, message: 'User ID not found' }, { status: 400 })
+    }
+
+    const currentUser = await User.findById(userId).select('employeeId role')
     const employeeId = currentUser?.employeeId
+
+    if (!employeeId) {
+      return NextResponse.json({
+        success: true,
+        data: [],
+        count: 0,
+        message: 'No employee profile linked'
+      })
+    }
 
     const { searchParams } = new URL(request.url)
     const date = searchParams.get('date') // Format: YYYY-MM-DD
@@ -76,7 +91,7 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Activity', 'User'])
+    const auth = await getAuthAndModels(request, ['Activity', 'User', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
@@ -84,8 +99,16 @@ export async function POST(request) {
     const { Activity, User } = models
 
     const userId = user._id || user.userId
+    if (!userId) {
+      return NextResponse.json({ success: false, message: 'User ID not found' }, { status: 400 })
+    }
+
     const currentUser = await User.findById(userId).select('employeeId')
     const employeeId = currentUser?.employeeId
+
+    if (!employeeId) {
+      return NextResponse.json({ success: false, message: 'No employee profile linked' }, { status: 400 })
+    }
 
     const body = await request.json()
     const { type, action, details, metadata, relatedModel, relatedId } = body
