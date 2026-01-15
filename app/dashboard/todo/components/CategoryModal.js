@@ -137,11 +137,12 @@ export default function CategoryModal({ isOpen, onClose, onSuccess, category }) 
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 modal-overlay" />
+            {/* remove modal-overlay */}
+          <div className="fixed inset-0 " />
         </Transition.Child>
 
         <div className="fixed inset-0 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-4">
+          <div className="flex items-center justify-center min-h-full p-4">
             <Transition.Child
               as={Fragment}
               enter="ease-out duration-300"
@@ -151,14 +152,14 @@ export default function CategoryModal({ isOpen, onClose, onSuccess, category }) 
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white shadow-xl transition-all">
+              <Dialog.Panel className="w-full max-w-md overflow-hidden transition-all transform bg-white shadow-xl rounded-2xl">
                 <div className="flex items-center justify-between p-4 border-b border-gray-200">
                   <Dialog.Title className="text-lg font-semibold text-gray-900">
                     {category ? 'Edit Category' : 'Create Category'}
                   </Dialog.Title>
                   <button
                     onClick={onClose}
-                    className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
+                    className="p-2 text-gray-400 rounded-lg hover:text-gray-600 hover:bg-gray-100"
                   >
                     <HiOutlineXMark className="w-5 h-5" />
                   </button>
@@ -166,9 +167,9 @@ export default function CategoryModal({ isOpen, onClose, onSuccess, category }) 
 
                 <form onSubmit={handleSubmit} className="p-4 space-y-4">
                   {/* Preview */}
-                  <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
                     <div 
-                      className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold"
+                      className="flex items-center justify-center w-8 h-8 font-bold text-white rounded-lg"
                       style={{ backgroundColor: formData.color }}
                     >
                       {formData.name ? formData.name[0].toUpperCase() : '?'}
@@ -185,7 +186,7 @@ export default function CategoryModal({ isOpen, onClose, onSuccess, category }) 
 
                   {/* Name */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block mb-1 text-sm font-medium text-gray-700">
                       Name
                     </label>
                     <input
@@ -200,8 +201,8 @@ export default function CategoryModal({ isOpen, onClose, onSuccess, category }) 
 
                   {/* Color */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      <HiOutlineSwatch className="w-4 h-4 inline mr-1" />
+                    <label className="block mb-2 text-sm font-medium text-gray-700">
+                      <HiOutlineSwatch className="inline w-4 h-4 mr-1" />
                       Color
                     </label>
                     <div className="grid grid-cols-6 gap-2">
@@ -217,7 +218,7 @@ export default function CategoryModal({ isOpen, onClose, onSuccess, category }) 
                         />
                       ))}
                     </div>
-                    <div className="mt-2 flex items-center gap-2">
+                    <div className="flex items-center gap-2 mt-2">
                       <label className="text-sm text-gray-600">Custom:</label>
                       <input
                         type="color"
@@ -229,7 +230,7 @@ export default function CategoryModal({ isOpen, onClose, onSuccess, category }) 
                         type="text"
                         value={formData.color}
                         onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))}
-                        className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm font-mono"
+                        className="flex-1 px-2 py-1 font-mono text-sm border border-gray-300 rounded"
                         placeholder="#6366f1"
                       />
                     </div>
@@ -237,7 +238,7 @@ export default function CategoryModal({ isOpen, onClose, onSuccess, category }) 
 
                   {/* Description */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block mb-1 text-sm font-medium text-gray-700">
                       Description (optional)
                     </label>
                     <input
@@ -256,7 +257,7 @@ export default function CategoryModal({ isOpen, onClose, onSuccess, category }) 
                         type="button"
                         onClick={handleDelete}
                         disabled={deleting}
-                        className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg text-sm flex items-center gap-2 disabled:opacity-50"
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50"
                       >
                         {deleting ? (
                           <>
@@ -278,14 +279,14 @@ export default function CategoryModal({ isOpen, onClose, onSuccess, category }) 
                       <button
                         type="button"
                         onClick={onClose}
-                        className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                        className="px-4 py-2 text-gray-700 transition-colors bg-gray-100 rounded-lg hover:bg-gray-200"
                       >
                         Cancel
                       </button>
                       <button
                         type="submit"
                         disabled={loading || !formData.name.trim()}
-                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                        className="flex items-center gap-2 px-4 py-2 text-white transition-colors bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {loading ? (
                           <>

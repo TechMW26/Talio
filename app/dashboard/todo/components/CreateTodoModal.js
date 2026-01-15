@@ -144,11 +144,11 @@ export default function CreateTodoModal({ isOpen, onClose, onSuccess, categories
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 modal-overlay" />
+          <div className="fixed inset-0 " />
         </Transition.Child>
 
         <div className="fixed inset-0 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-4">
+          <div className="flex items-center justify-center min-h-full p-4">
             <Transition.Child
               as={Fragment}
               enter="ease-out duration-300"
@@ -158,14 +158,14 @@ export default function CreateTodoModal({ isOpen, onClose, onSuccess, categories
               leaveFrom="opacity-100 scale-100"
               leaveTo="opacity-0 scale-95"
             >
-              <Dialog.Panel className="w-full max-w-lg transform overflow-hidden rounded-2xl bg-white shadow-xl transition-all">
+              <Dialog.Panel className="w-full max-w-lg overflow-hidden transition-all transform bg-white shadow-xl rounded-2xl">
                 <div className="flex items-center justify-between p-4 border-b border-gray-200">
                   <Dialog.Title className="text-lg font-semibold text-gray-900">
                     Create New To-do
                   </Dialog.Title>
                   <button
                     onClick={onClose}
-                    className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
+                    className="p-2 text-gray-400 rounded-lg hover:text-gray-600 hover:bg-gray-100"
                   >
                     <HiOutlineXMark className="w-5 h-5" />
                   </button>
@@ -179,7 +179,7 @@ export default function CreateTodoModal({ isOpen, onClose, onSuccess, categories
                       placeholder="To-do title"
                       value={formData.title}
                       onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg text-lg font-medium focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      className="w-full px-4 py-3 text-lg font-medium border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                       autoFocus
                     />
                   </div>
@@ -187,26 +187,26 @@ export default function CreateTodoModal({ isOpen, onClose, onSuccess, categories
                   {/* Due Date & Time */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
+                      <label className="block mb-1 text-sm font-medium text-gray-700">Due Date</label>
                       <div className="relative">
-                        <HiOutlineCalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <HiOutlineCalendarDays className="absolute w-5 h-5 text-gray-400 -translate-y-1/2 left-3 top-1/2" />
                         <input
                           type="date"
                           value={formData.dueDate}
                           onChange={(e) => setFormData(prev => ({ ...prev, dueDate: e.target.value }))}
-                          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                          className="w-full py-2 pl-10 pr-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                         />
                       </div>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Time</label>
+                      <label className="block mb-1 text-sm font-medium text-gray-700">Time</label>
                       <div className="relative">
-                        <HiOutlineClock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <HiOutlineClock className="absolute w-5 h-5 text-gray-400 -translate-y-1/2 left-3 top-1/2" />
                         <input
                           type="time"
                           value={formData.dueTime}
                           onChange={(e) => setFormData(prev => ({ ...prev, dueTime: e.target.value }))}
-                          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                          className="w-full py-2 pl-10 pr-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                         />
                       </div>
                     </div>
@@ -215,13 +215,13 @@ export default function CreateTodoModal({ isOpen, onClose, onSuccess, categories
                   {/* Priority & Category */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                      <label className="block mb-1 text-sm font-medium text-gray-700">Priority</label>
                       <div className="relative">
-                        <HiOutlineFlag className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                        <HiOutlineFlag className="absolute w-5 h-5 text-gray-400 -translate-y-1/2 left-3 top-1/2" />
                         <select
                           value={formData.priority}
                           onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value }))}
-                          className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent appearance-none bg-white"
+                          className="w-full py-2 pl-10 pr-4 bg-white border border-gray-300 rounded-lg appearance-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                         >
                           {PRIORITY_OPTIONS.map(opt => (
                             <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -230,11 +230,11 @@ export default function CreateTodoModal({ isOpen, onClose, onSuccess, categories
                       </div>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                      <label className="block mb-1 text-sm font-medium text-gray-700">Category</label>
                       <select
                         value={formData.category}
                         onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+                        className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                       >
                         <option value="">No Category</option>
                         {categories.map(cat => (
@@ -247,8 +247,8 @@ export default function CreateTodoModal({ isOpen, onClose, onSuccess, categories
                   {/* Reminders */}
                   {formData.dueDate && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        <HiOutlineBell className="w-4 h-4 inline mr-1" />
+                      <label className="block mb-2 text-sm font-medium text-gray-700">
+                        <HiOutlineBell className="inline w-4 h-4 mr-1" />
                         Reminders
                       </label>
                       <div className="flex flex-wrap gap-2">
@@ -272,8 +272,8 @@ export default function CreateTodoModal({ isOpen, onClose, onSuccess, categories
 
                   {/* Tags */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      <HiOutlineTag className="w-4 h-4 inline mr-1" />
+                    <label className="block mb-1 text-sm font-medium text-gray-700">
+                      <HiOutlineTag className="inline w-4 h-4 mr-1" />
                       Tags (comma separated)
                     </label>
                     <input
@@ -290,14 +290,14 @@ export default function CreateTodoModal({ isOpen, onClose, onSuccess, categories
                     <button
                       type="button"
                       onClick={onClose}
-                      className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+                      className="px-4 py-2 text-gray-700 transition-colors bg-gray-100 rounded-lg hover:bg-gray-200"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
                       disabled={loading || !formData.title.trim()}
-                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                      className="flex items-center gap-2 px-4 py-2 text-white transition-colors bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {loading ? (
                         <>
