@@ -137,8 +137,8 @@ export default function CategoryModal({ isOpen, onClose, onSuccess, category }) 
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-            {/* remove modal-overlay */}
-          <div className="fixed inset-0 " />
+            {/* remove  */}
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
         </Transition.Child>
 
         <div className="fixed inset-0 overflow-y-auto">
