@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { FaUserPlus, FaUsers, FaTimes, FaFile, FaImage, FaFilePdf, FaUser, FaComments, FaArrowDown, FaArrowLeft } from 'react-icons/fa'
 import Loader from '@/components/ui/Loader'
@@ -29,6 +29,7 @@ export default function ChatPage() {
   const [selectedEmployees, setSelectedEmployees] = useState([])
   const [groupName, setGroupName] = useState('')
   const [currentUserId, setCurrentUserId] = useState(null)
+  const [presenceByEmployee, setPresenceByEmployee] = useState({})
   const [uploadingFile, setUploadingFile] = useState(false)
   const [lightboxImage, setLightboxImage] = useState(null)
   const [typingUsers, setTypingUsers] = useState({})
@@ -61,7 +62,7 @@ export default function ChatPage() {
 
   // Get Socket.IO context
   // Note: sendMessage is removed - server now broadcasts messages automatically
-  const { isConnected, joinChat, leaveChat, onNewMessage, sendTyping, sendStopTyping, onUserTyping, onUserStopTyping, onMessageReaction, onMessageDeleted } = useSocket()
+  const { isConnected, joinChat, leaveChat, onNewMessage, sendTyping, sendStopTyping, onUserTyping, onUserStopTyping, onMessageReaction, onMessageDeleted, requestPresence, onPresenceStatus, onPresenceUpdate } = useSocket()
 
   // Get unread messages context
   const { markChatAsRead, unreadChats } = useUnreadMessages()
@@ -206,6 +207,33 @@ export default function ChatPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedChat?._id, currentUserId])
+
+  // WebSocket: Presence updates
+  useEffect(() => {
+    const unsubscribeStatus = onPresenceStatus?.((data) => {
+      const updates = data?.employees || []
+      updatePresenceState(updates)
+    })
+
+    const unsubscribeUpdate = onPresenceUpdate?.((data) => {
+      const updates = data?.employeeId ? [data] : data?.employees || []
+      updatePresenceState(updates)
+    })
+
+    return () => {
+      unsubscribeStatus?.()
+      unsubscribeUpdate?.()
+    }
+  }, [onPresenceStatus, onPresenceUpdate])
+
+  // Request presence for selected direct chat
+  useEffect(() => {
+    if (!selectedChat || selectedChat.isGroup) return
+    const other = getOtherParticipant(selectedChat)
+    if (other?._id) {
+      requestPresence?.([other._id])
+    }
+  }, [selectedChat, requestPresence, currentUserId, getOtherParticipant])
 
   // Auto-scroll to bottom when messages change (only if user is not scrolling up)
   useEffect(() => {
@@ -522,6 +550,26 @@ export default function ChatPage() {
     }
   }
 
+  const updatePresenceState = (updates) => {
+    if (!updates || updates.length === 0) return
+    setPresenceByEmployee(prev => {
+      const next = { ...prev }
+      updates.forEach(update => {
+        if (!update?.employeeId) return
+        next[update.employeeId] = {
+          isOnline: !!update.isOnline,
+          lastSeenAt: update.lastSeenAt || null
+        }
+      })
+      return next
+    })
+  }
+
+  const getOtherParticipant = useCallback((chat) => {
+    if (!chat || chat.isGroup) return null
+    return chat.participants.find(p => p._id !== currentUserId) || null
+  }, [currentUserId])
+
   const handleCreateChat = async (employeeId) => {
     try {
       const token = localStorage.getItem('token')
@@ -565,14 +613,24 @@ export default function ChatPage() {
 
   const getChatName = (chat) => {
     if (chat.isGroup) return chat.name
-    const other = chat.participants.find(p => p._id !== currentUserId)
+    const other = getOtherParticipant(chat)
     return other ? `${other.firstName} ${other.lastName}` : 'Unknown'
   }
 
   const getChatAvatar = (chat) => {
     if (chat.isGroup) return null
-    const other = chat.participants.find(p => p._id !== currentUserId)
+    const other = getOtherParticipant(chat)
     return other?.profilePicture
+  }
+
+  const getPresenceText = (chat) => {
+    if (!chat || chat.isGroup) return null
+    const other = getOtherParticipant(chat)
+    const otherId = other?._id?.toString?.() || other?._id
+    const presence = otherId ? presenceByEmployee[otherId] : null
+    if (presence?.isOnline) return 'Online'
+    if (presence?.lastSeenAt) return `Last seen ${formatLastSeen(presence.lastSeenAt)}`
+    return 'Offline'
   }
 
   const getFileIcon = (fileType) => {
@@ -611,6 +669,22 @@ export default function ChatPage() {
     }
     // Otherwise show date
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+  }
+
+  const formatLastSeen = (date) => {
+    if (!date) return 'recently'
+    const d = new Date(date)
+    const now = new Date()
+    const diffMs = now - d
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 1) return 'just now'
+    if (diffMins < 60) return `${diffMins}m ago`
+    if (diffHours < 24) return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    if (diffDays < 7) return d.toLocaleDateString('en-US', { weekday: 'short', hour: '2-digit', minute: '2-digit' })
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   }
 
   const getDateSeparator = (date) => {
@@ -758,8 +832,10 @@ export default function ChatPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-gray-900 text-lg md:text-base truncate">{getChatName(selectedChat)}</h3>
-                    {selectedChat.isGroup && (
+                    {selectedChat.isGroup ? (
                       <p className="text-xs text-gray-500">{selectedChat.participants?.length || 0} members</p>
+                    ) : (
+                      <p className="text-xs text-gray-500">{getPresenceText(selectedChat)}</p>
                     )}
                   </div>
                   {/* View Members Button - Only for group chats */}

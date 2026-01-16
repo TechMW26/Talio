@@ -11,7 +11,7 @@ import Loader from '@/components/ui/Loader'
 
 export default function ChatPopup({ chat, index }) {
   const { closeChat, chatPositions, updateChatPosition, bringToFront, triggerSource, widgetPosition, getZIndex, focusedChatId, sidebarCollapsed, isAutoMinimized } = useChatWidget()
-  const { isConnected, joinChat, leaveChat, onNewMessage, sendTyping, sendStopTyping, onUserTyping, onUserStopTyping } = useSocket()
+  const { isConnected, joinChat, leaveChat, onNewMessage, sendTyping, sendStopTyping, onUserTyping, onUserStopTyping, requestPresence, onPresenceStatus, onPresenceUpdate } = useSocket()
   const { markChatAsRead, unreadChats } = useUnreadMessages()
   const { theme } = useTheme()
 
@@ -21,6 +21,7 @@ export default function ChatPopup({ chat, index }) {
   const [sending, setSending] = useState(false)
   const [currentUserId, setCurrentUserId] = useState(null)
   const [currentEmployeeId, setCurrentEmployeeId] = useState(null)
+  const [presenceByEmployee, setPresenceByEmployee] = useState({})
   const [isMinimized, setIsMinimized] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
   const [typingUsers, setTypingUsers] = useState({})
@@ -269,6 +270,56 @@ export default function ChatPopup({ chat, index }) {
     return otherParticipant?.profilePicture || null
   }
 
+  const getOtherParticipantId = useCallback(() => {
+    if (chat.isGroup) return null
+    const otherParticipant = chat.participants?.find(p => {
+      const pId = (p._id || p).toString()
+      const currentEmpId = currentEmployeeId?.toString()
+      return pId !== currentEmpId
+    })
+    return otherParticipant?._id?.toString?.() || otherParticipant?.toString?.() || null
+  }, [chat, currentEmployeeId])
+
+  const updatePresenceState = (updates) => {
+    if (!updates || updates.length === 0) return
+    setPresenceByEmployee(prev => {
+      const next = { ...prev }
+      updates.forEach(update => {
+        if (!update?.employeeId) return
+        next[update.employeeId] = {
+          isOnline: !!update.isOnline,
+          lastSeenAt: update.lastSeenAt || null
+        }
+      })
+      return next
+    })
+  }
+
+  const formatLastSeen = (date) => {
+    if (!date) return 'recently'
+    const d = new Date(date)
+    const now = new Date()
+    const diffMs = now - d
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 1) return 'just now'
+    if (diffMins < 60) return `${diffMins}m ago`
+    if (diffHours < 24) return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    if (diffDays < 7) return d.toLocaleDateString('en-US', { weekday: 'short', hour: '2-digit', minute: '2-digit' })
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+
+  const getPresenceText = () => {
+    if (chat.isGroup) return `${chat.participants?.length || 0} members`
+    const otherId = getOtherParticipantId()
+    const presence = otherId ? presenceByEmployee[otherId] : null
+    if (presence?.isOnline) return 'Online'
+    if (presence?.lastSeenAt) return `Last seen ${formatLastSeen(presence.lastSeenAt)}`
+    return 'Offline'
+  }
+
   // Join chat room and fetch messages
   useEffect(() => {
     if (chat._id) {
@@ -343,6 +394,33 @@ export default function ChatPopup({ chat, index }) {
       unsubStopTyping?.()
     }
   }, [chat._id, currentEmployeeId])
+
+  // Presence updates
+  useEffect(() => {
+    const unsubscribeStatus = onPresenceStatus?.((data) => {
+      const updates = data?.employees || []
+      updatePresenceState(updates)
+    })
+
+    const unsubscribeUpdate = onPresenceUpdate?.((data) => {
+      const updates = data?.employeeId ? [data] : data?.employees || []
+      updatePresenceState(updates)
+    })
+
+    return () => {
+      unsubscribeStatus?.()
+      unsubscribeUpdate?.()
+    }
+  }, [onPresenceStatus, onPresenceUpdate])
+
+  // Request presence for direct chats
+  useEffect(() => {
+    if (chat.isGroup) return
+    const otherId = getOtherParticipantId()
+    if (otherId) {
+      requestPresence?.([otherId])
+    }
+  }, [chat._id, chat.isGroup, requestPresence, currentEmployeeId, getOtherParticipantId])
 
   // Auto scroll
   useEffect(() => {
@@ -888,7 +966,7 @@ export default function ChatPopup({ chat, index }) {
             </div>
             <div className="min-w-0">
               <span className="font-medium text-sm truncate block">{getChatName()}</span>
-              <span className="text-[10px] text-white/70">{chat.isGroup ? `${chat.participants?.length || 0} members` : 'Online'}</span>
+              <span className="text-[10px] text-white/70">{getPresenceText()}</span>
             </div>
           </div>
           <div className="flex items-center gap-0.5 flex-shrink-0">

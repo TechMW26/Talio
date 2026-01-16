@@ -55,23 +55,33 @@ export function SocketProvider({ children }) {
   const [socket, setSocket] = useState(null)
   const [isConnected, setIsConnected] = useState(false)
   const [currentUserId, setCurrentUserId] = useState(null)
+  const [currentEmployeeId, setCurrentEmployeeId] = useState(null)
 
   useEffect(() => {
     // Get user ID from localStorage
     const userData = localStorage.getItem('user')
     let userId = null
+    let employeeId = null
+    let tenantDatabaseName = null
     if (userData) {
       try {
         const user = JSON.parse(userData)
         // Use the User's _id (not employeeId) for socket authentication
         // This matches how notifications are stored in the database
         userId = user.userId || user._id || user.id
+        employeeId = user.employeeId?._id || user.employeeId || user.employee?._id || user.employee || null
+        tenantDatabaseName = user.tenant?.databaseName || user.databaseName || null
         // Ensure it's a string
         if (typeof userId === 'object' && userId._id) {
           userId = userId._id
         }
+        if (typeof employeeId === 'object' && employeeId._id) {
+          employeeId = employeeId._id
+        }
         userId = userId?.toString()
+        employeeId = employeeId?.toString()
         setCurrentUserId(userId)
+        setCurrentEmployeeId(employeeId)
         console.log('🔑 [Socket.IO Client] User ID for notifications:', userId)
       } catch (parseError) {
         console.error('[Socket.IO Client] Error parsing user data:', parseError)
@@ -99,7 +109,11 @@ export function SocketProvider({ children }) {
 
       // Authenticate user if we have userId
       if (userId) {
-        socketInstance.emit('authenticate', userId)
+        socketInstance.emit('authenticate', {
+          userId,
+          employeeId,
+          tenantDatabaseName
+        })
       }
     })
 
@@ -124,7 +138,11 @@ export function SocketProvider({ children }) {
 
       // Re-authenticate after reconnection
       if (userId) {
-        socketInstance.emit('authenticate', userId)
+        socketInstance.emit('authenticate', {
+          userId,
+          employeeId,
+          tenantDatabaseName
+        })
       }
     })
 
@@ -347,6 +365,49 @@ export function SocketProvider({ children }) {
       socket.emit('mark-read', { chatId, messageId, userId })
     }
   }, [socket, isConnected])
+
+  // Request presence status for employees
+  const requestPresence = useCallback((employeeIds) => {
+    if (socket && isConnected) {
+      const normalizedIds = Array.isArray(employeeIds)
+        ? employeeIds.map(id => id?.toString?.()).filter(Boolean)
+        : []
+      if (normalizedIds.length === 0) return
+      socket.emit('presence-request', { employeeIds: normalizedIds })
+    }
+  }, [socket, isConnected])
+
+  // Subscribe to presence status responses
+  const onPresenceStatus = useCallback((callback) => {
+    if (socket) {
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in presence-status callback:', error)
+        }
+      }
+      socket.on('presence-status', wrappedCallback)
+      return () => socket.off('presence-status', wrappedCallback)
+    }
+    return () => { }
+  }, [socket])
+
+  // Subscribe to presence updates
+  const onPresenceUpdate = useCallback((callback) => {
+    if (socket) {
+      const wrappedCallback = (data) => {
+        try {
+          callback(data)
+        } catch (error) {
+          console.error('[SocketContext] Error in presence-update callback:', error)
+        }
+      }
+      socket.on('presence-update', wrappedCallback)
+      return () => socket.off('presence-update', wrappedCallback)
+    }
+    return () => { }
+  }, [socket])
 
   // Subscribe to new messages
   // CRITICAL: Callback is wrapped to prevent crashes from propagating
@@ -930,6 +991,7 @@ export function SocketProvider({ children }) {
     socket,
     isConnected,
     currentUserId,
+    currentEmployeeId,
     joinChat,
     leaveChat,
     joinProject,
@@ -938,6 +1000,9 @@ export function SocketProvider({ children }) {
     sendTyping,
     sendStopTyping,
     markAsRead,
+    requestPresence,
+    onPresenceStatus,
+    onPresenceUpdate,
     onNewMessage,
     onUserTyping,
     onUserStopTyping,

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { FaComments, FaTimes, FaUsers, FaUserPlus, FaSearch } from 'react-icons/fa'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
+import { useSocket } from '@/contexts/SocketContext'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import Loader from '@/components/ui/Loader'
@@ -20,6 +21,7 @@ export default function FloatingChatWidget() {
   } = useChatWidget()
   const { unreadChats } = useUnreadMessages()
   const { theme } = useTheme()
+  const { isConnected, requestPresence, onPresenceStatus, onPresenceUpdate } = useSocket()
   
   const [chats, setChats] = useState([])
   const [employees, setEmployees] = useState([])
@@ -30,6 +32,7 @@ export default function FloatingChatWidget() {
   const [currentUserId, setCurrentUserId] = useState(null)
   const [currentEmployeeId, setCurrentEmployeeId] = useState(null)
   const [isDesktop, setIsDesktop] = useState(false)
+  const [presenceByEmployee, setPresenceByEmployee] = useState({})
   
   const widgetRef = useRef(null)
   const isDragging = useRef(false)
@@ -194,6 +197,37 @@ export default function FloatingChatWidget() {
     return otherParticipant?.profilePicture || null
   }
 
+  const getOtherParticipantId = (chat) => {
+    if (chat.isGroup) return null
+    const otherParticipant = chat.participants?.find(p => {
+      const pId = (p._id || p).toString()
+      const currentEmpId = currentEmployeeId?.toString()
+      return pId !== currentEmpId
+    })
+    return otherParticipant?._id?.toString?.() || otherParticipant?.toString?.() || null
+  }
+
+  const updatePresenceState = (updates) => {
+    if (!updates || updates.length === 0) return
+    setPresenceByEmployee(prev => {
+      const next = { ...prev }
+      updates.forEach(update => {
+        if (!update?.employeeId) return
+        next[update.employeeId] = {
+          isOnline: !!update.isOnline,
+          lastSeenAt: update.lastSeenAt || null
+        }
+      })
+      return next
+    })
+  }
+
+  const isChatOnline = (chat) => {
+    if (!chat || chat.isGroup) return false
+    const otherId = getOtherParticipantId(chat)
+    return otherId ? !!presenceByEmployee[otherId]?.isOnline : false
+  }
+
   // Get initials from chat name
   const getChatInitials = (chat) => {
     const name = getChatName(chat)
@@ -213,6 +247,34 @@ export default function FloatingChatWidget() {
     const name = getChatName(chat).toLowerCase()
     return name.includes(searchQuery.toLowerCase())
   })
+
+  useEffect(() => {
+    const unsubscribeStatus = onPresenceStatus?.((data) => {
+      const updates = data?.employees || []
+      updatePresenceState(updates)
+    })
+
+    const unsubscribeUpdate = onPresenceUpdate?.((data) => {
+      const updates = data?.employeeId ? [data] : data?.employees || []
+      updatePresenceState(updates)
+    })
+
+    return () => {
+      unsubscribeStatus?.()
+      unsubscribeUpdate?.()
+    }
+  }, [onPresenceStatus, onPresenceUpdate])
+
+  useEffect(() => {
+    if (!isWidgetOpen || !isConnected || chats.length === 0) return
+    const employeeIds = chats
+      .filter(chat => !chat.isGroup)
+      .map(chat => getOtherParticipantId(chat))
+      .filter(Boolean)
+    if (employeeIds.length > 0) {
+      requestPresence?.(Array.from(new Set(employeeIds)))
+    }
+  }, [isWidgetOpen, isConnected, chats, currentEmployeeId, requestPresence])
 
   // Filter employees by search
   const filteredEmployees = employees.filter(emp => {
@@ -458,7 +520,9 @@ export default function FloatingChatWidget() {
                               getChatInitials(chat)
                             )}
                           </div>
-                          <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-sm"></div>
+                          {!chat.isGroup && isChatOnline(chat) && (
+                            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow-sm"></div>
+                          )}
                         </div>
                         {/* Content - takes remaining space */}
                         <div style={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>

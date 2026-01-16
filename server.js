@@ -14,6 +14,9 @@ const handle = app.getRequestHandler();
 // Global socket instance
 let io;
 
+// In-memory presence tracking (employeeId -> { sockets: Set, lastSeenAt: Date|null })
+const presenceByEmployee = new Map();
+
 app.prepare().then(() => {
   const server = createServer(async (req, res) => {
     try {
@@ -45,10 +48,33 @@ app.prepare().then(() => {
     console.log('✅ [Socket.IO] Client connected:', socket.id);
 
     // Authenticate user
-    socket.on('authenticate', (userId) => {
-      socket.userId = userId;
-      socket.join(`user:${userId}`);
-      console.log(`🔐 [Socket.IO] User ${userId} authenticated`);
+    socket.on('authenticate', (payload) => {
+      const resolvedUserId = typeof payload === 'object' ? payload?.userId || payload?.id : payload;
+      const resolvedEmployeeId = typeof payload === 'object' ? payload?.employeeId : null;
+
+      if (resolvedUserId) {
+        socket.userId = resolvedUserId.toString();
+        socket.join(`user:${socket.userId}`);
+        console.log(`🔐 [Socket.IO] User ${socket.userId} authenticated`);
+      }
+
+      if (resolvedEmployeeId) {
+        const employeeId = resolvedEmployeeId.toString();
+        socket.employeeId = employeeId;
+
+        const entry = presenceByEmployee.get(employeeId) || { sockets: new Set(), lastSeenAt: null };
+        const wasOnline = entry.sockets.size > 0;
+        entry.sockets.add(socket.id);
+        presenceByEmployee.set(employeeId, entry);
+
+        if (!wasOnline) {
+          io.emit('presence-update', {
+            employeeId,
+            isOnline: true,
+            lastSeenAt: entry.lastSeenAt || null
+          });
+        }
+      }
     });
 
     // Join user-specific notification room (for desktop apps)
@@ -56,6 +82,24 @@ app.prepare().then(() => {
       socket.userId = userId;
       socket.join(`user:${userId}`);
       console.log(`🔔 [Socket.IO] User ${userId} joined notification room`);
+    });
+
+    // Presence requests from clients
+    socket.on('presence-request', (data) => {
+      const employeeIds = Array.isArray(data?.employeeIds) ? data.employeeIds : [];
+      const statuses = employeeIds
+        .map((id) => id?.toString?.())
+        .filter(Boolean)
+        .map((employeeId) => {
+          const entry = presenceByEmployee.get(employeeId);
+          return {
+            employeeId,
+            isOnline: !!entry && entry.sockets.size > 0,
+            lastSeenAt: entry?.lastSeenAt || null
+          };
+        });
+
+      socket.emit('presence-status', { employees: statuses });
     });
 
     // Desktop app ready
@@ -258,6 +302,23 @@ app.prepare().then(() => {
 
     socket.on('disconnect', () => {
       console.log('❌ [Socket.IO] Client disconnected:', socket.id);
+
+      if (socket.employeeId) {
+        const employeeId = socket.employeeId.toString();
+        const entry = presenceByEmployee.get(employeeId);
+        if (entry) {
+          entry.sockets.delete(socket.id);
+          if (entry.sockets.size === 0) {
+            entry.lastSeenAt = new Date();
+            presenceByEmployee.set(employeeId, entry);
+            io.emit('presence-update', {
+              employeeId,
+              isOnline: false,
+              lastSeenAt: entry.lastSeenAt
+            });
+          }
+        }
+      }
       
       // If user was in a meeting, notify others
       if (socket.meetingRoom) {
