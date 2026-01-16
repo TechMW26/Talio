@@ -283,7 +283,7 @@ export default function ExpensesPage() {
 
       {/* Submit Expense Modal */}
       {showModal && (
-        <div className="fixed inset-0 modal-overlay flex items-center justify-center style={{ zIndex: 99999 }}">
+        <div className="fixed inset-0 modal-overlay flex items-center justify-center" style={{ zIndex: 99999 }}>
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h2 className="text-2xl font-bold text-gray-800 mb-4">Submit Expense</h2>
             <form onSubmit={handleSubmit}>

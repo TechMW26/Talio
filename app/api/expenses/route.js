@@ -31,10 +31,18 @@ export async function GET(request) {
       .populate('employee', 'firstName lastName employeeCode')
       .populate('approvedBy', 'firstName lastName')
       .sort({ createdAt: -1 })
+      .lean()
+
+    // Map fields for frontend compatibility (map database fields to frontend field names)
+    const mappedExpenses = expenses.map(expense => ({
+      ...expense,
+      category: expense.expenseType, // Add category as alias for expenseType
+      expenseDate: expense.date, // Add expenseDate as alias for date
+    }))
 
     return NextResponse.json({
       success: true,
-      data: expenses,
+      data: mappedExpenses,
     })
   } catch (error) {
     console.error('Get expenses error:', error)
@@ -58,10 +66,41 @@ export async function POST(request) {
 
     const data = await request.json()
 
-    // Set status to 'submitted' for approval instead of 'draft'
+    // Map field names for compatibility (support both frontend naming conventions)
+    const expenseData = {
+      employee: data.employee,
+      expenseType: data.category || data.expenseType, // Map category -> expenseType
+      amount: data.amount,
+      date: data.expenseDate || data.date, // Map expenseDate -> date
+      description: data.description,
+      project: data.project,
+      receipts: data.receipts || []
+    }
+
+    // Validate required fields
+    if (!expenseData.expenseType) {
+      return NextResponse.json(
+        { success: false, message: 'Category/Expense Type is required' },
+        { status: 400 }
+      )
+    }
+    if (!expenseData.amount) {
+      return NextResponse.json(
+        { success: false, message: 'Amount is required' },
+        { status: 400 }
+      )
+    }
+    if (!expenseData.date) {
+      return NextResponse.json(
+        { success: false, message: 'Date is required' },
+        { status: 400 }
+      )
+    }
+
+    // Set status to 'pending' for approval (note: schema uses 'pending', not 'submitted')
     const expense = await Expense.create({
-      ...data,
-      status: 'submitted',
+      ...expenseData,
+      status: 'pending',
       submittedDate: new Date()
     })
 
@@ -77,7 +116,7 @@ export async function POST(request) {
         {
           _id: expense._id,
           employee: populatedExpense.employee,
-          category: expense.category,
+          expenseType: expense.expenseType,
           amount: expense.amount,
           status: expense.status,
           description: expense.description,

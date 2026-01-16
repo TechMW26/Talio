@@ -35,20 +35,20 @@ export default function CategoryModal({ isOpen, onClose, onSuccess, category }) 
   })
 
   useEffect(() => {
-    if (category) {
+    if (isOpen && category) {
       setFormData({
         name: category.name || '',
         color: category.color || '#6366f1',
         description: category.description || ''
       })
-    } else {
+    } else if (isOpen && !category) {
       setFormData({
         name: '',
         color: '#6366f1',
         description: ''
       })
     }
-  }, [category])
+  }, [category, isOpen])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -138,7 +138,7 @@ export default function CategoryModal({ isOpen, onClose, onSuccess, category }) 
           leaveTo="opacity-0"
         >
             {/* remove  */}
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
+                    <div className="fixed inset-0 z-0 flex items-center justify-center p-4 overflow-y-auto bg-white/80" />
         </Transition.Child>
 
         <div className="fixed inset-0 overflow-y-auto">

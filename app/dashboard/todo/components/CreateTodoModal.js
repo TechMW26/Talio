@@ -144,10 +144,10 @@ export default function CreateTodoModal({ isOpen, onClose, onSuccess, categories
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
+          <div className="fixed inset-0 z-0 flex items-center justify-center p-4 overflow-y-auto bg-white/80" />
         </Transition.Child>
 
-        <div className="fixed inset-0 overflow-y-auto">
+        <div className="fixed inset-0 overflow-y-auto ">
           <div className="flex items-center justify-center min-h-full p-4">
             <Transition.Child
               as={Fragment}

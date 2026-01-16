@@ -227,6 +227,8 @@ export async function DELETE(request, { params }) {
   }
 }
 
+
+
 // PATCH - Partial update ticket
 export async function PATCH(request, { params }) {
   try {
