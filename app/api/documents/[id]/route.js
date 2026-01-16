@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import mongoose from 'mongoose'
 import { getAuthAndModels } from '@/lib/auth'
 import { sendPushToUser } from '@/lib/pushNotification'
 
@@ -129,6 +130,21 @@ export async function PUT(request, { params }) {
 // DELETE - Delete document
 export async function DELETE(request, { params }) {
   try {
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Document'])
+    if (!auth.success) {
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
+    }
+    const { Document } = auth.models
+
+    // Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid document id' },
+        { status: 400 }
+      )
+    }
+
     const document = await Document.findByIdAndDelete(params.id)
 
     if (!document) {
@@ -145,7 +161,7 @@ export async function DELETE(request, { params }) {
   } catch (error) {
     console.error('Delete document error:', error)
     return NextResponse.json(
-      { success: false, message: 'Failed to delete document' },
+      { success: false, message: error.message || 'Failed to delete document' },
       { status: 500 }
     )
   }

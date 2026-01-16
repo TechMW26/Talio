@@ -5,7 +5,7 @@ export async function POST(request, { params }) {
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Helpdesk', 'Employee'])
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
     const { Helpdesk, Employee } = models
@@ -19,21 +19,28 @@ export async function POST(request, { params }) {
       )
     }
 
+    const now = new Date()
     const ticket = await Helpdesk.findByIdAndUpdate(
       params.id,
       {
         $push: {
           comments: {
+            // Schema-consistent fields
+            content: comment,
+            author: commentedBy,
+            createdAt: now,
+            // Backward-compat fields (used by some UIs/routes)
             comment,
             commentedBy,
-            commentedAt: new Date()
+            commentedAt: now
           }
         }
       },
       { new: true }
     )
     .populate('createdBy', 'firstName lastName userId')
-    .populate('comments.commentedBy', 'firstName lastName')
+    .populate('comments.author', 'firstName lastName')
+    .populate({ path: 'comments.commentedBy', select: 'firstName lastName', strictPopulate: false })
 
     if (!ticket) {
       return NextResponse.json(

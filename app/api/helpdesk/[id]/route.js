@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import mongoose from 'mongoose'
 import { getAuthAndModels } from '@/lib/auth'
 import { sendPushToUser } from '@/lib/pushNotification'
 
@@ -8,15 +9,25 @@ export async function GET(request, { params }) {
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Helpdesk'])
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
+    const { models } = auth
     const { Helpdesk } = models
+
+    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid ticket id' },
+        { status: 400 }
+      )
+    }
 
     const ticket = await Helpdesk.findById(params.id)
       .populate('createdBy', 'firstName lastName employeeCode userId')
       .populate('assignedTo', 'firstName lastName')
-      .populate('comments.commentedBy', 'firstName lastName')
+      // Helpdesk schema defines comments as { content, author, createdAt }
+      .populate('comments.author', 'firstName lastName')
+      // Backward-compat: some data/routes may still use commentedBy
+      .populate({ path: 'comments.commentedBy', select: 'firstName lastName', strictPopulate: false })
 
     if (!ticket) {
       return NextResponse.json(
@@ -44,12 +55,20 @@ export async function PUT(request, { params }) {
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Helpdesk', 'Employee'])
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
     const { models } = auth
     const { Helpdesk, Employee } = models
 
-    const data = await request.json()
+    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid ticket id' },
+        { status: 400 }
+      )
+    }
+
+    let data = await request.json()
+    data = cleanAttachments(data)
 
     const ticket = await Helpdesk.findByIdAndUpdate(
       params.id,

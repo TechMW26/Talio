@@ -7,7 +7,7 @@ export async function POST(request, { params }) {
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Helpdesk', 'User']);
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 });
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 });
     }
     const { user, models } = auth;
     const { Helpdesk, User } = models;
@@ -38,6 +38,11 @@ export async function POST(request, { params }) {
       {
         $push: {
           comments: {
+            // Schema-consistent fields
+            content: comment.trim(),
+            author: userRecord.employeeId._id,
+            createdAt: new Date(),
+            // Backward-compat fields
             comment: comment.trim(),
             commentedBy: userRecord.employeeId._id,
             commentedAt: new Date(),
@@ -49,7 +54,8 @@ export async function POST(request, { params }) {
     )
       .populate('createdBy', 'firstName lastName employeeCode userId')
       .populate('assignedTo', 'firstName lastName')
-      .populate('comments.commentedBy', 'firstName lastName')
+      .populate('comments.author', 'firstName lastName')
+      .populate({ path: 'comments.commentedBy', select: 'firstName lastName', strictPopulate: false })
 
     if (!ticket) {
       return NextResponse.json(

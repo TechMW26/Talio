@@ -41,10 +41,10 @@ export default function TicketDetailPage() {
       })
 
       const data = await response.json()
-      if (data.success) {
+      if (response.ok && data?.success) {
         setTicket(data.data)
       } else {
-        toast.error(data.message)
+        toast.error(data?.message || data?.error || 'Failed to fetch ticket')
         router.push('/dashboard/helpdesk')
       }
     } catch (error) {
@@ -193,7 +193,12 @@ export default function TicketDetailPage() {
               )}
               
               {ticket.comments?.map((comment, index) => {
-                const isMe = comment.commentedBy?._id === getEmployeeId(user) || comment.commentedBy === getEmployeeId(user)
+                const commentBy = comment?.commentedBy || comment?.author
+                const commentText = comment?.comment ?? comment?.content ?? ''
+                const commentAt = comment?.commentedAt || comment?.createdAt
+                const currentEmployeeId = getEmployeeId(user)
+                const commenterEmployeeId = commentBy?._id || commentBy
+                const isMe = commenterEmployeeId === currentEmployeeId
                 return (
                   <div key={index} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-[80%] rounded-lg p-3 ${
@@ -201,13 +206,13 @@ export default function TicketDetailPage() {
                     }`}>
                       <div className="flex justify-between items-center gap-4 mb-1">
                         <span className={`text-xs font-bold ${isMe ? 'text-primary-100' : 'text-gray-600'}`}>
-                          {comment.commentedBy?.firstName} {comment.commentedBy?.lastName}
+                          {commentBy?.firstName} {commentBy?.lastName}
                         </span>
                         <span className={`text-xs ${isMe ? 'text-primary-200' : 'text-gray-400'}`}>
-                          {new Date(comment.commentedAt).toLocaleString()}
+                          {commentAt ? new Date(commentAt).toLocaleString() : ''}
                         </span>
                       </div>
-                      <p className="text-sm whitespace-pre-wrap">{comment.comment}</p>
+                      <p className="text-sm whitespace-pre-wrap">{commentText}</p>
                     </div>
                   </div>
                 )

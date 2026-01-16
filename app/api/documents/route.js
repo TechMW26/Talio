@@ -55,7 +55,21 @@ export async function POST(request) {
     const { models } = auth
     const { Document } = models
 
-    const data = await request.json()
+    let data = await request.json()
+
+    // Map new format fields to required schema fields
+    // Support both new format (fileUrl/fileType/fileName) and legacy format (url/type/name)
+    if (data.fileUrl) data.url = data.fileUrl
+    if (data.fileType) data.type = data.fileType
+    if (data.fileName) data.name = data.fileName
+
+    // Validate required fields
+    if (!data.name || !data.type || !data.url) {
+      return NextResponse.json(
+        { success: false, message: 'Document name, type, and url are required' },
+        { status: 400 }
+      )
+    }
 
     const document = await Document.create(data)
 

@@ -17,7 +17,7 @@ export async function POST(request, { params }) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Meeting, Employee, User } = models
+    const { Meeting, Employee, User, ActionableNotification } = models
 
     const data = await request.json();
     // Support both 'response' and older status names for compatibility
@@ -53,15 +53,30 @@ export async function POST(request, { params }) {
     const meeting = await Meeting.findById(id)
       .populate({
         path: 'organizer',
-        select: 'firstName lastName userId email',
-        populate: {
-          path: 'userId',
-          select: 'email'
-        }
+        select: 'firstName lastName userId email'
       })
+      .lean()
 
     if (!meeting) {
       return NextResponse.json({ success: false, message: 'Meeting not found' }, { status: 404 })
+    }
+
+    // Populate organizer's userId separately to avoid nested model issues
+    if (meeting.organizer?.userId) {
+      try {
+        const organizer = await Employee.findById(meeting.organizer._id)
+          .select('userId')
+          .populate({
+            path: 'userId',
+            select: 'email'
+          })
+          .lean()
+        if (organizer?.userId?.email) {
+          meeting.organizer.userEmail = organizer.userId.email
+        }
+      } catch (err) {
+        console.warn('[MeetingRespond] Warning: Could not populate organizer userId:', err.message)
+      }
     }
 
     // Find user's invitation
@@ -113,8 +128,8 @@ export async function POST(request, { params }) {
         }
       }).catch(console.error)
 
-      // Get organizer's email for notification
-      const organizerEmail = meeting.organizer?.email || meeting.organizer?.userId?.email
+      // Get organizer's email from the populated userId or direct email field
+      const organizerEmail = meeting.organizer?.userEmail || meeting.organizer?.email
       if (organizerEmail) {
         sendMeetingResponseEmail({
           to: organizerEmail,

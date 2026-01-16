@@ -9,7 +9,7 @@ export async function GET(request) {
     // Include Employee model for population
     const auth = await getAuthAndModels(request, ['Helpdesk', 'Employee'])
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
 
     // Defensive check for models
@@ -80,7 +80,7 @@ export async function POST(request) {
     // Include Employee model for population
     const auth = await getAuthAndModels(request, ['Helpdesk', 'Employee'])
     if (!auth.success) {
-      return NextResponse.json({ message: auth.message }, { status: 401 })
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
     const { models } = auth
     const { Helpdesk } = models
