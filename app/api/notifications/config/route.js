@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { buildCacheKey, getCache, setCache } from '@/lib/cache'
 import fs from 'fs'
 import path from 'path'
 
@@ -27,12 +28,28 @@ export async function GET(request) {
 
     // For public requests (service workers, client initialization), return config directly
     if (publicConfig) {
+      const cacheKey = buildCacheKey({
+        tenantId: 'public',
+        role: 'public',
+        userId: 'public',
+        namespace: 'notifications-config',
+        params: { public: true }
+      })
+      const cached = await getCache(cacheKey)
+      if (cached) {
+        return NextResponse.json(cached)
+      }
+
       const configured = !!(firebaseConfig.apiKey && firebaseConfig.projectId)
-      return NextResponse.json({
+      const response = {
         success: true,
         configured,
         config: firebaseConfig
-      })
+      }
+
+      await setCache(cacheKey, response, 30 * 60)
+
+      return NextResponse.json(response)
     }
 
     // For authenticated requests, check auth and return detailed info
@@ -41,12 +58,28 @@ export async function GET(request) {
     // If no auth header but not public request, still return basic config
     // This allows the web push registration to work without strict auth
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      const cacheKey = buildCacheKey({
+        tenantId: 'public',
+        role: 'public',
+        userId: 'public',
+        namespace: 'notifications-config',
+        params: { public: false }
+      })
+      const cached = await getCache(cacheKey)
+      if (cached) {
+        return NextResponse.json(cached)
+      }
+
       const configured = !!(firebaseConfig.apiKey && firebaseConfig.projectId)
-      return NextResponse.json({
+      const response = {
         success: true,
         configured,
         config: firebaseConfig
-      })
+      }
+
+      await setCache(cacheKey, response, 30 * 60)
+
+      return NextResponse.json(response)
     }
 
     // Get authenticated user using getAuthAndModels
@@ -54,7 +87,20 @@ export async function GET(request) {
     if (!auth.success) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
     }
-    const { user } = auth
+    const { user, tenant } = auth
+
+    const cacheKey = buildCacheKey({
+      tenantId: tenant?.databaseName || 'public',
+      role: user.role,
+      userId: user._id || user.userId || 'public',
+      namespace: 'notifications-config',
+      params: { admin: user.role === 'admin' }
+    })
+
+    const cached = await getCache(cacheKey)
+    if (cached) {
+      return NextResponse.json(cached)
+    }
 
     // Check if Firebase is configured (server-side keys)
     const firebaseProjectId = process.env.FIREBASE_PROJECT_ID
@@ -79,7 +125,7 @@ export async function GET(request) {
         ? '***CONFIGURED***'
         : ''
 
-      return NextResponse.json({
+      const response = {
         success: true,
         configured,
         config: {
@@ -90,14 +136,21 @@ export async function GET(request) {
           clientEmail: firebaseClientEmail || '',
           privateKey: maskedPrivateKey
         }
-      })
+      }
+
+      await setCache(cacheKey, response, 30 * 60)
+
+      return NextResponse.json(response)
     } else {
-      // Non-admins get the client config
-      return NextResponse.json({
+      const response = {
         success: true,
         configured,
         config: firebaseConfig
-      })
+      }
+
+      await setCache(cacheKey, response, 30 * 60)
+
+      return NextResponse.json(response)
     }
   } catch (error) {
     console.error('Get config error:', error)

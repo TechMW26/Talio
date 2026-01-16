@@ -52,21 +52,32 @@ export default function MyAssetsWidget({ user }) {
         </span>
       </div>
       <div className="space-y-2 max-h-[200px] overflow-y-auto">
-        {assets.map(asset => (
-          <div key={asset._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-gray-800 truncate">{asset.name}</p>
-              <p className="text-xs text-gray-500">{asset.assetId || asset.uin}</p>
-            </div>
-            <span className={`text-xs px-2 py-1 rounded-full capitalize ${
-              asset.status === 'active' ? 'bg-green-100 text-green-700' :
-              asset.status === 'maintenance' ? 'bg-yellow-100 text-yellow-700' :
-              'bg-gray-100 text-gray-700'
-            }`}>
-              {asset.status}
-            </span>
+        {assets.length === 0 ? (
+          <div className="flex flex-col items-center justify-center text-center py-4 text-gray-500">
+            <img
+              src="/assets/Assets.png"
+              alt="No assets"
+              className="w-28 h-28 object-contain mb-2"
+            />
+            <p className="text-sm">No assets assigned</p>
           </div>
-        ))}
+        ) : (
+          assets.map(asset => (
+            <div key={asset._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-gray-800 truncate">{asset.name}</p>
+                <p className="text-xs text-gray-500">{asset.assetId || asset.uin}</p>
+              </div>
+              <span className={`text-xs px-2 py-1 rounded-full capitalize ${
+                asset.status === 'active' ? 'bg-green-100 text-green-700' :
+                asset.status === 'maintenance' ? 'bg-yellow-100 text-yellow-700' :
+                'bg-gray-100 text-gray-700'
+              }`}>
+                {asset.status}
+              </span>
+            </div>
+          ))
+        )}
       </div>
     </div>
   )

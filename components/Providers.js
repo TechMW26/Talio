@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useCallback } from 'react'
+import { SWRConfig } from 'swr'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { AILoadingProvider } from '@/contexts/AILoadingContext'
 import GlobalAILoadingOverlay from '@/components/ui/GlobalAILoadingOverlay'
@@ -73,11 +74,20 @@ export function Providers({ children }) {
     return (
         <ThemeProvider>
             <AILoadingProvider>
-                <MiraTransitionOverlay />
-                <GlobalAILoadingOverlay />
-                <AutoRefresh />
-                <NetworkMonitor />
-                {children}
+                <SWRConfig
+                    value={{
+                        revalidateOnFocus: false,
+                        revalidateOnReconnect: true,
+                        dedupingInterval: 60_000,
+                        shouldRetryOnError: false,
+                    }}
+                >
+                    <MiraTransitionOverlay />
+                    <GlobalAILoadingOverlay />
+                    <AutoRefresh />
+                    <NetworkMonitor />
+                    {children}
+                </SWRConfig>
             </AILoadingProvider>
         </ThemeProvider>
     )

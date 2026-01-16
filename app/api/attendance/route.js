@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import queryCache from '@/lib/queryCache'
+import { buildCachePattern, clearCachePattern } from '@/lib/cache'
 import { logActivity } from '@/lib/activityLogger'
 import { sendEmail } from '@/lib/mailer'
 import { sendPushToUser } from '@/lib/pushNotification'
@@ -7,6 +8,7 @@ import { calculateEffectiveWorkHours, determineAttendanceStatus } from '@/lib/at
 import { reverseGeocode, validateLocationData } from '@/lib/geocoding'
 import { emitAttendanceUpdate, emitDashboardRefresh } from '@/lib/realtimeEvents'
 import { getAuthAndModels } from '@/lib/auth'
+import { buildSearchQuery, fetchRoleNews } from '@/lib/roleNews'
 import mongoose from 'mongoose'
 import { 
   getTimezone, 
@@ -369,13 +371,13 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     // Get auth and tenant-aware models
-    const auth = await getAuthAndModels(request, ['Attendance', 'Employee', 'Leave', 'Company', 'CompanySettings', 'Holiday', 'User', 'GeofenceLocation', 'OvertimeRequest']);
+    const auth = await getAuthAndModels(request, ['Attendance', 'Employee', 'Leave', 'Company', 'CompanySettings', 'Holiday', 'User', 'GeofenceLocation', 'OvertimeRequest', 'Notification']);
 
     if (!auth.success) {
       return NextResponse.json({ message: auth.message || 'Unauthorized' }, { status: 401 });
     }
 
-    const { models } = auth;
+  const { user, models, tenant } = auth;
     const TenantAttendance = models.Attendance;
     const TenantEmployee = models.Employee;
     const TenantLeave = models.Leave;
@@ -401,6 +403,7 @@ export async function POST(request) {
     // Get employee data first to determine company
     const employee = await TenantEmployee.findById(employeeId)
       .populate('department')
+      .populate('designation', 'title')
       .populate('company')
 
     if (!employee) {
@@ -733,6 +736,7 @@ export async function POST(request) {
                 status: checkInStatus,
                 type: 'clock-in',
               },
+              models: { User: models.User, Notification: models.Notification }
             }
           )
         }
@@ -740,7 +744,58 @@ export async function POST(request) {
         console.error('Failed to send clock-in push notification:', pushError)
       }
 
-      // Build response with optional warning
+      // Best-effort: send latest role news push (Android-targeted) on check-in
+      try {
+        const pushNotificationsEnabled =
+          settings?.notifications?.pushNotifications !== false
+
+        if (pushNotificationsEnabled && employee?.user) {
+          const designationTitle = employee.designation?.title || employee.designationLevelName || ''
+          const departmentName = employee.department?.name || ''
+          const role = user?.role || 'employee'
+
+          const searchQuery = buildSearchQuery(designationTitle, departmentName, role)
+          const latestNews = await fetchRoleNews(searchQuery, 1, {
+            freshnessMinutes: 60,
+            maxAgeMinutes: 60,
+          })
+
+          if (latestNews.length > 0) {
+            const topNews = latestNews[0]
+
+            await sendPushToUser(
+              employee.user,
+              {
+                title: '📰 Latest News for You',
+                body: topNews.title,
+              },
+              {
+                eventType: 'roleNews',
+                clickAction: topNews.link || '/dashboard',
+                icon: '/icons/icon-192x192.png',
+                data: {
+                  type: 'role-news',
+                  targetPlatform: 'android',
+                  newsTitle: topNews.title,
+                  newsLink: topNews.link,
+                  publishedAt: topNews.publishedAt,
+                },
+                models: { User: models.User, Notification: models.Notification }
+              }
+            )
+          }
+        }
+      } catch (newsPushError) {
+        console.error('Failed to send latest news push notification:', newsPushError)
+      }
+
+  const tenantId = tenant?.databaseName
+  await clearCachePattern(buildCachePattern({ tenantId, namespace: 'attendance-summary' }))
+  await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:hr-stats', userId: '*' }))
+  await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:manager-stats', userId: '*' }))
+  await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:employee-stats', userId: user._id || user.userId }))
+
+  // Build response with optional warning
       const responseData = {
         success: true,
         message: locationWarning
@@ -1060,7 +1115,13 @@ export async function POST(request) {
         console.error('Failed to send clock-out push notification:', pushError)
       }
 
-      // Build response with optional warning
+  const tenantId = tenant?.databaseName
+  await clearCachePattern(buildCachePattern({ tenantId, namespace: 'attendance-summary' }))
+  await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:hr-stats', userId: '*' }))
+  await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:manager-stats', userId: '*' }))
+  await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:employee-stats', userId: user._id || user.userId }))
+
+  // Build response with optional warning
       const checkOutResponse = {
         success: true,
         message: checkOutLocationWarning

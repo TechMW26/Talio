@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { buildCacheKey, buildCachePattern, clearCachePattern, getCache, setCache } from '@/lib/cache'
 
 // GET - Get leave balances
 export async function GET(request) {
@@ -9,7 +10,7 @@ export async function GET(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
+  const { user, models, tenant } = auth
     const { LeaveBalance, Employee, LeaveType } = models
 
     const { searchParams } = new URL(request.url)
@@ -18,28 +19,62 @@ export async function GET(request) {
 
     // If employeeId is provided, get balance for specific employee
     if (employeeId) {
+      const cacheKey = buildCacheKey({
+        tenantId: tenant?.databaseName,
+        role: user.role,
+        userId: user._id || user.userId,
+        namespace: 'leave-balance',
+        params: { employeeId, year }
+      })
+
+      const cached = await getCache(cacheKey)
+      if (cached) {
+        return NextResponse.json(cached)
+      }
+
       const leaveBalances = await LeaveBalance.find({
         employee: employeeId,
         year: year
       }).populate('leaveType', 'name color code')
 
-      return NextResponse.json({
+      const response = {
         success: true,
         data: leaveBalances,
-      })
+      }
+
+      await setCache(cacheKey, response, 5 * 60)
+
+      return NextResponse.json(response)
     }
 
     // If no employeeId and user is admin/hr, get all balances
     if (['admin', 'hr'].includes(user.role)) {
+      const cacheKey = buildCacheKey({
+        tenantId: tenant?.databaseName,
+        role: user.role,
+        userId: 'all',
+        namespace: 'leave-balance',
+        params: { year, scope: 'all' }
+      })
+
+      const cached = await getCache(cacheKey)
+      if (cached) {
+        return NextResponse.json(cached)
+      }
+
       const leaveBalances = await LeaveBalance.find({ year: year })
         .populate('employee', 'employeeCode firstName lastName email department')
         .populate('leaveType', 'name color code')
         .sort({ 'employee.employeeCode': 1 })
 
-      return NextResponse.json({
+      const response = {
         success: true,
         data: leaveBalances,
-      })
+      }
+
+      await setCache(cacheKey, response, 5 * 60)
+
+      return NextResponse.json(response)
     }
 
     // For regular employees, get their own balance
@@ -48,15 +83,32 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
+    const cacheKey = buildCacheKey({
+      tenantId: tenant?.databaseName,
+      role: user.role,
+      userId: user._id || user.userId,
+      namespace: 'leave-balance',
+      params: { employeeId: employee._id.toString(), year }
+    })
+
+    const cached = await getCache(cacheKey)
+    if (cached) {
+      return NextResponse.json(cached)
+    }
+
     const leaveBalances = await LeaveBalance.find({
       employee: employee._id,
       year: year
     }).populate('leaveType', 'name color code')
 
-    return NextResponse.json({
+    const response = {
       success: true,
       data: leaveBalances,
-    })
+    }
+
+    await setCache(cacheKey, response, 5 * 60)
+
+    return NextResponse.json(response)
   } catch (error) {
     console.error('Get leave balance error:', error)
     return NextResponse.json(
@@ -74,7 +126,7 @@ export async function POST(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
+  const { user, models, tenant } = auth
     const { LeaveBalance, Employee, LeaveType } = models
 
     // Only admin/hr can create/update leave balances
@@ -109,11 +161,15 @@ export async function POST(request) {
       await existingBalance.populate('employee', 'employeeCode firstName lastName')
       await existingBalance.populate('leaveType', 'name color code')
 
-      return NextResponse.json({
+      const response = {
         success: true,
         message: 'Leave balance updated successfully',
         data: existingBalance
-      })
+      }
+
+      await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'leave-balance', userId: '*' }))
+
+      return NextResponse.json(response)
     } else {
       // Create new balance
       const leaveBalance = new LeaveBalance({
@@ -130,11 +186,15 @@ export async function POST(request) {
       await leaveBalance.populate('employee', 'employeeCode firstName lastName')
       await leaveBalance.populate('leaveType', 'name color code')
 
-      return NextResponse.json({
+      const response = {
         success: true,
         message: 'Leave balance created successfully',
         data: leaveBalance
-      }, { status: 201 })
+      }
+
+      await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'leave-balance', userId: '*' }))
+
+      return NextResponse.json(response, { status: 201 })
     }
   } catch (error) {
     console.error('Create/Update leave balance error:', error)

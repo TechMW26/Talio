@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { buildCacheKey, getCache, setCache } from '@/lib/cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +13,7 @@ export async function GET(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
+  const { user, models, tenant } = auth
     const { Employee, Leave, Attendance, Performance, Department } = models
 
     // Check if user has employee ID
@@ -43,6 +44,20 @@ export async function GET(request) {
     const manager = await Employee.findById(user.employeeId._id || user.employeeId)
     if (!manager) {
       return NextResponse.json({ success: false, message: 'Manager not found' }, { status: 404 })
+    }
+
+    const todayKey = new Date().toISOString().slice(0, 10)
+    const cacheKey = buildCacheKey({
+      tenantId: tenant?.databaseName,
+      role: user.role,
+      userId: user._id || user.userId,
+      namespace: 'dashboard:manager-stats',
+      params: { date: todayKey }
+    })
+
+    const cached = await getCache(cacheKey)
+    if (cached) {
+      return NextResponse.json(cached)
     }
 
     // Get team members - either direct reportees OR department members if manager is department head
@@ -327,10 +342,14 @@ export async function GET(request) {
       performanceTrend: performanceTrendData
     }
 
-    return NextResponse.json({
+    const response = {
       success: true,
       data: stats
-    })
+    }
+
+    await setCache(cacheKey, response, 2 * 60)
+
+    return NextResponse.json(response)
 
   } catch (error) {
     console.error('Manager stats error:', error)

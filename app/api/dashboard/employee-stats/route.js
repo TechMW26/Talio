@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { buildCacheKey, getCache, setCache } from '@/lib/cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,7 +13,7 @@ export async function GET(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
-    const { user, models } = auth;
+  const { user, models, tenant } = auth;
     const { Attendance, LeaveBalance, LeaveType, Payroll, Employee, Designation, Department, User, Performance } = models;
 
     // Find the user first to get the employeeId
@@ -29,6 +30,20 @@ export async function GET(request) {
 
     if (!userWithEmployee.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee profile not found' }, { status: 404 });
+    }
+
+    const todayKey = new Date().toISOString().slice(0, 10)
+    const cacheKey = buildCacheKey({
+      tenantId: tenant?.databaseName,
+      role: user.role,
+      userId: user._id || user.userId,
+      namespace: 'dashboard:employee-stats',
+      params: { date: todayKey }
+    })
+
+    const cached = await getCache(cacheKey)
+    if (cached) {
+      return NextResponse.json(cached)
     }
 
     const employee = userWithEmployee.employeeId;
@@ -176,7 +191,7 @@ export async function GET(request) {
       }
     }
 
-    return NextResponse.json({
+    const response = {
       success: true,
       data: {
         stats,
@@ -191,7 +206,11 @@ export async function GET(request) {
           designation: employee.designation || null,
         }
       }
-    })
+    }
+
+    await setCache(cacheKey, response, 2 * 60)
+
+    return NextResponse.json(response)
 
   } catch (error) {
     console.error('Employee stats error:', error)

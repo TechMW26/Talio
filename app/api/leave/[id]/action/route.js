@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { sendPushToUser } from '@/lib/pushNotification'
+import { buildCachePattern, clearCachePattern } from '@/lib/cache'
 
 // PUT - Approve or reject leave request
 export async function PUT(request, { params }) {
@@ -10,7 +11,7 @@ export async function PUT(request, { params }) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
+  const { user, models, tenant } = auth
     const { Leave, LeaveBalance, User, Employee } = models
 
     const { id } = params
@@ -86,9 +87,17 @@ export async function PUT(request, { params }) {
       .populate('leaveType', 'name code')
       .populate('approvedBy', 'firstName lastName')
 
+    const tenantId = tenant?.databaseName
+    const employeeUser = await User.findOne({ employeeId: leaveRequest.employee }).select('_id')
+    const employeeUserId = employeeUser?._id?.toString() || '*'
+
+    await clearCachePattern(buildCachePattern({ tenantId, namespace: 'leave-balance', userId: employeeUserId }))
+    await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:employee-stats', userId: employeeUserId }))
+    await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:manager-stats', userId: '*' }))
+    await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:hr-stats', userId: '*' }))
+
     // Send push notification to employee
     try {
-      const employeeUser = await User.findOne({ employeeId: leaveRequest.employee }).select('_id')
       const approver = await Employee.findById(approvedBy).select('firstName lastName')
 
       if (employeeUser && approver) {

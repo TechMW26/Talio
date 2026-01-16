@@ -55,8 +55,12 @@ export default function MyHelpdeskWidget({ user }) {
         </button>
       </div>
       {tickets.length === 0 ? (
-        <div className="text-center py-6 text-gray-500">
-          <FaHeadset className="w-8 h-8 mx-auto mb-2 text-gray-400" />
+        <div className="flex flex-col items-center justify-center text-center py-4 text-gray-500">
+          <img
+            src="/assets/Helpdesk.png"
+            alt="No helpdesk tickets"
+            className="w-28 h-28 object-contain mb-2"
+          />
           <p className="text-sm">No open tickets</p>
         </div>
       ) : (

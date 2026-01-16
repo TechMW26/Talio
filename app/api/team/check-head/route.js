@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { buildCacheKey, getCache, setCache } from '@/lib/cache'
 export const dynamic = 'force-dynamic'
 
 
@@ -11,7 +12,7 @@ export async function GET(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
+  const { user, models, tenant } = auth
     const { Department, Employee } = models
 
     // Get user's employee ID from auth
@@ -33,6 +34,18 @@ export async function GET(request) {
       })
     }
 
+    const cacheKey = buildCacheKey({
+      tenantId: tenant?.databaseName,
+      role: user.role,
+      userId: user._id || user.userId,
+      namespace: 'permissions:department-head'
+    })
+
+    const cached = await getCache(cacheKey)
+    if (cached) {
+      return NextResponse.json(cached)
+    }
+
     // Check if user is a department head (via Department.head or Department.heads[] field)
     const department = await Department.findOne({ 
       $or: [
@@ -50,13 +63,17 @@ export async function GET(request) {
       departmentName: department?.name
     });
 
-    return NextResponse.json({
+    const response = {
       success: true,
       isDepartmentHead: !!department,
       department: department || null,
       departmentId: department?._id || null,
       departmentName: department?.name || null
-    })
+    }
+
+    await setCache(cacheKey, response, 10 * 60)
+
+    return NextResponse.json(response)
   } catch (error) {
     console.error('Check department head error:', error)
     return NextResponse.json({ success: false, message: error.message }, { status: 500 })

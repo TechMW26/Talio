@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import queryCache from '@/lib/queryCache'
+import { buildCachePattern, clearCachePattern } from '@/lib/cache'
 import { logActivity } from '@/lib/activityLogger'
 import { deleteUserFromBackup } from '@/lib/backupDb'
 import { emitEmployeeUpdate, emitDashboardRefresh } from '@/lib/realtimeEvents'
@@ -47,7 +48,7 @@ export async function GET(request, { params }) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+  const { models, tenant } = auth
     const { Employee, User, Department, Designation, Company } = models
 
     if (!Employee || !User) {
@@ -502,6 +503,15 @@ export async function DELETE(request, { params }) {
     // Clear cache
     queryCache.delete(queryCache.generateKey('employee', id))
 
+  const deletedUser = await User.findOne({ employeeId: id }).select('_id')
+  const deletedUserId = deletedUser?._id?.toString() || '*'
+
+  await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'auth:user', userId: deletedUserId }))
+  await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'profile', userId: deletedUserId }))
+  await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:employee-stats', userId: deletedUserId }))
+  await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:manager-stats', userId: '*' }))
+  await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:hr-stats', userId: '*' }))
+
     // Emit real-time update for employee deletion
     emitEmployeeUpdate({
       action: 'deleted',
@@ -567,7 +577,7 @@ export async function PATCH(request, { params }) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+  const { models, tenant } = auth
     const { Employee, User } = models
 
     if (!Employee || !User) {
@@ -667,6 +677,15 @@ export async function PATCH(request, { params }) {
 
     // Clear cache
     queryCache.delete(queryCache.generateKey('employee', id))
+
+  const employeeUser = await User.findOne({ employeeId: id }).select('_id')
+  const employeeUserId = employeeUser?._id?.toString() || '*'
+
+  await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'auth:user', userId: employeeUserId }))
+  await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'profile', userId: employeeUserId }))
+  await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:employee-stats', userId: employeeUserId }))
+  await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:manager-stats', userId: '*' }))
+  await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:hr-stats', userId: '*' }))
 
     // Emit real-time update for employee patch update
     emitEmployeeUpdate({

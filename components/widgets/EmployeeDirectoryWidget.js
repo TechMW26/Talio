@@ -1,35 +1,18 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { FaSearch, FaUser } from 'react-icons/fa'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
 
 export default function EmployeeDirectoryWidget() {
   const router = useRouter()
-  const [employees, setEmployees] = useState([])
   const [search, setSearch] = useState('')
-  const [loading, setLoading] = useState(true)
+  const { data, error, isLoading } = useAuthedSWR('/api/employees?limit=20&status=active', {
+    refreshInterval: 300_000,
+  })
 
-  useEffect(() => {
-    fetchEmployees()
-  }, [])
-
-  const fetchEmployees = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/employees?limit=20&status=active', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setEmployees(data.data || [])
-      }
-    } catch (error) {
-      console.error('Error fetching employees:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const employees = data?.data || []
 
   const filteredEmployees = employees.filter(emp =>
     `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(search.toLowerCase()) ||
@@ -37,7 +20,7 @@ export default function EmployeeDirectoryWidget() {
     emp.employeeCode?.toLowerCase().includes(search.toLowerCase())
   )
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="p-4 sm:p-6 animate-pulse flex-1 flex flex-col h-full">
         <div className="h-10 bg-gray-200 rounded mb-4"></div>
@@ -46,6 +29,15 @@ export default function EmployeeDirectoryWidget() {
             <div key={i} className="h-12 bg-gray-200 rounded"></div>
           ))}
         </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+        <h3 className="text-base sm:text-lg font-bold text-gray-800 mb-4">Employee Directory</h3>
+        <p className="text-sm text-gray-500">Unable to load employees.</p>
       </div>
     )
   }

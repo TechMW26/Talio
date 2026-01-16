@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { buildCacheKey, getCache, setCache } from '@/lib/cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,12 +13,26 @@ export async function GET(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
+  const { user, models, tenant } = auth
     const { Employee, Leave, Attendance, Recruitment, Performance, Payroll } = models
 
     // Check role authorization
     if (!['admin', 'hr'].includes(user.role)) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 403 })
+    }
+
+    const todayKey = new Date().toISOString().slice(0, 10)
+    const cacheKey = buildCacheKey({
+      tenantId: tenant?.databaseName,
+      role: user.role,
+      userId: 'all',
+      namespace: 'dashboard:hr-stats',
+      params: { date: todayKey }
+    })
+
+    const cached = await getCache(cacheKey)
+    if (cached) {
+      return NextResponse.json(cached)
     }
 
     // Date calculations
@@ -184,10 +199,14 @@ export async function GET(request) {
       }
     }
 
-    return NextResponse.json({
+    const response = {
       success: true,
       data: stats
-    })
+    }
+
+    await setCache(cacheKey, response, 2 * 60)
+
+    return NextResponse.json(response)
 
   } catch (error) {
     console.error('HR stats error:', error)

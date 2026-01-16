@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { buildCacheKey, getCache, setCache } from '@/lib/cache'
 export const dynamic = 'force-dynamic'
 
 
@@ -11,8 +12,20 @@ export async function GET(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
+    const { user, models, tenant } = auth
     const { Employee, User } = models
+
+    const cacheKey = buildCacheKey({
+      tenantId: tenant?.databaseName,
+      role: user.role,
+      userId: user._id || user.userId,
+      namespace: 'profile'
+    })
+
+    const cached = await getCache(cacheKey)
+    if (cached) {
+      return NextResponse.json(cached)
+    }
 
     // Fetch user with populated employee data
     const userRecord = await User.findById(user._id || user.userId)
@@ -32,7 +45,7 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
     }
 
-    return NextResponse.json({
+    const response = {
       success: true,
       data: {
         user: {
@@ -42,7 +55,11 @@ export async function GET(request) {
         },
         employee: userRecord.employeeId
       }
-    })
+    }
+
+    await setCache(cacheKey, response, 10 * 60)
+
+    return NextResponse.json(response)
   } catch (error) {
     console.error('Get profile error:', error)
     return NextResponse.json({ success: false, message: error.message }, { status: 500 })

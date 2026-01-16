@@ -1,36 +1,17 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { FaCalendarAlt } from 'react-icons/fa'
 
 export default function LeaveBalanceWidget({ employeeId }) {
-    const [balances, setBalances] = useState([])
-    const [loading, setLoading] = useState(true)
+    const { data, error, isLoading } = useAuthedSWR(
+        employeeId ? `/api/leave/balance?employeeId=${employeeId}` : null,
+        { refreshInterval: 300_000 }
+    )
 
-    useEffect(() => {
-        if (employeeId) {
-            fetchLeaveBalance()
-        }
-    }, [employeeId])
+    const balances = data?.data || []
 
-    const fetchLeaveBalance = async () => {
-        try {
-            const token = localStorage.getItem('token')
-            const response = await fetch(`/api/leave/balance?employeeId=${employeeId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
-            const data = await response.json()
-            if (data.success) {
-                setBalances(data.data || [])
-            }
-        } catch (error) {
-            console.error('Error fetching leave balance:', error)
-        } finally {
-            setLoading(false)
-        }
-    }
-
-    if (loading) {
+    if (isLoading) {
         return (
             <div className="p-4 sm:p-6 animate-pulse flex-1 flex flex-col h-full">
                 <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
@@ -39,6 +20,17 @@ export default function LeaveBalanceWidget({ employeeId }) {
                         <div key={i} className="h-16 bg-gray-200 rounded"></div>
                     ))}
                 </div>
+            </div>
+        )
+    }
+
+    if (error) {
+        return (
+            <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+                <div className="mb-4">
+                    <h3 className="text-base sm:text-lg font-bold text-gray-800">Leave Balance</h3>
+                </div>
+                <div className="text-sm text-gray-500">Unable to load leave balance.</div>
             </div>
         )
     }

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { buildCacheKey, getCache, setCache } from '@/lib/cache'
 export const dynamic = 'force-dynamic'
 
 
@@ -14,7 +15,7 @@ export async function GET(request) {
     if (!auth.models) {
       return NextResponse.json({ success: false, message: 'Failed to load database models' }, { status: 500 })
     }
-    const { user, models } = auth
+  const { user, models, tenant } = auth
     const { Attendance, Employee } = models
 
     if (!Attendance || !Employee) {
@@ -37,6 +38,19 @@ export async function GET(request) {
     const endDate = new Date()
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - days)
+
+    const cacheKey = buildCacheKey({
+      tenantId: tenant?.databaseName,
+      role: user.role,
+      userId: 'all',
+      namespace: 'attendance-summary',
+      params: { days, date: endDate.toISOString().slice(0, 10) }
+    })
+
+    const cached = await getCache(cacheKey)
+    if (cached) {
+      return NextResponse.json(cached)
+    }
 
     // Get total active employees
     const totalEmployees = await Employee.countDocuments({ status: 'active' })
@@ -148,7 +162,7 @@ export async function GET(request) {
     const todayTotal = todayStats.present + todayStats.absent + todayStats.late + todayStats.halfDay
     const todayAttendanceRate = todayTotal > 0 ? ((todayStats.present + todayStats.late + todayStats.halfDay) / todayTotal * 100).toFixed(1) : 0
 
-    return NextResponse.json({
+    const response = {
       success: true,
       data: {
         chartData,
@@ -172,7 +186,11 @@ export async function GET(request) {
           days
         }
       }
-    })
+    }
+
+    await setCache(cacheKey, response, 2 * 60)
+
+    return NextResponse.json(response)
   } catch (error) {
     console.error('Get attendance summary error:', error)
     return NextResponse.json(

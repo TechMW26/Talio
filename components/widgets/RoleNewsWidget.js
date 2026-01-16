@@ -32,7 +32,7 @@ export default function RoleNewsWidget() {
             setError(null)
 
             const token = localStorage.getItem('token')
-            const response = await fetch('/api/dashboard/role-news', {
+            const response = await fetch('/api/dashboard/role-news?fresh=true', {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
 
@@ -108,40 +108,52 @@ export default function RoleNewsWidget() {
             {/* News List */}
             <div className="flex-1 flex flex-col">
                 <div className="space-y-2 overflow-y-auto flex-1 max-h-[200px]">
-                    {news.map((item, index) => {
-                        const config = CATEGORY_CONFIG[item.category] || CATEGORY_CONFIG.tech
-                        const Icon = config.icon
+                    {news.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center text-center text-gray-500 py-4">
+                            <img
+                                src="/assets/News.png"
+                                alt="No news"
+                                className="w-28 h-28 object-contain mb-2"
+                            />
+                            <p className="text-sm">No breaking updates right now.</p>
+                            <p className="text-xs text-gray-400 mt-1">Showing the freshest items as they appear.</p>
+                        </div>
+                    ) : (
+                        news.map((item, index) => {
+                            const config = CATEGORY_CONFIG[item.category] || CATEGORY_CONFIG.tech
+                            const Icon = config.icon
 
-                        return (
-                            <a
-                                key={index}
-                                href={item.link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group"
-                            >
-                                {/* Icon */}
-                                <div className={`w-10 h-10 ${config.bg} rounded-full flex items-center justify-center flex-shrink-0`}>
-                                    <Icon className={`w-5 h-5 ${config.color}`} />
-                                </div>
-
-                                {/* Content */}
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-gray-800 line-clamp-2 group-hover:text-primary-600 transition-colors">
-                                        {item.title}
-                                    </p>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <span className="text-xs text-gray-500 truncate max-w-[100px]">{item.source}</span>
-                                        <span className="text-xs text-gray-400">•</span>
-                                        <span className="text-xs text-gray-400">{item.time}</span>
+                            return (
+                                <a
+                                    key={index}
+                                    href={item.link}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group"
+                                >
+                                    {/* Icon */}
+                                    <div className={`w-10 h-10 ${config.bg} rounded-full flex items-center justify-center flex-shrink-0`}>
+                                        <Icon className={`w-5 h-5 ${config.color}`} />
                                     </div>
-                                </div>
 
-                                {/* External link indicator */}
-                                <FaExternalLinkAlt className="w-3 h-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-                            </a>
-                        )
-                    })}
+                                    {/* Content */}
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium text-gray-800 line-clamp-2 group-hover:text-primary-600 transition-colors">
+                                            {item.title}
+                                        </p>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <span className="text-xs text-gray-500 truncate max-w-[100px]">{item.source}</span>
+                                            <span className="text-xs text-gray-400">•</span>
+                                            <span className="text-xs text-gray-400">{item.time}</span>
+                                        </div>
+                                    </div>
+
+                                    {/* External link indicator */}
+                                    <FaExternalLinkAlt className="w-3 h-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                                </a>
+                            )
+                        })
+                    )}
                 </div>
             </div>
         </div>

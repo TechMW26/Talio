@@ -55,15 +55,26 @@ export default function MyExpensesWidget({ user }) {
         </button>
       </div>
       <div className="space-y-2 max-h-[200px] overflow-y-auto">
-        {expenses.slice(0, 5).map(expense => (
-          <div key={expense._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-gray-800 capitalize truncate">{expense.category}</p>
-              <p className="text-xs text-gray-500">{new Date(expense.date || expense.createdAt).toLocaleDateString()}</p>
-            </div>
-            <span className="text-sm font-bold text-gray-700">${expense.amount}</span>
+        {expenses.length === 0 ? (
+          <div className="flex flex-col items-center justify-center text-center py-4 text-gray-500">
+            <img
+              src="/assets/Expense.png"
+              alt="No expenses"
+              className="w-28 h-28 object-contain mb-2"
+            />
+            <p className="text-sm">No expenses yet</p>
           </div>
-        ))}
+        ) : (
+          expenses.slice(0, 5).map(expense => (
+            <div key={expense._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-gray-800 capitalize truncate">{expense.category}</p>
+                <p className="text-xs text-gray-500">{new Date(expense.date || expense.createdAt).toLocaleDateString()}</p>
+              </div>
+              <span className="text-sm font-bold text-gray-700">${expense.amount}</span>
+            </div>
+          ))
+        )}
       </div>
     </div>
   )

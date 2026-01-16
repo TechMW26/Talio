@@ -209,7 +209,7 @@ export default function GlobalAILoadingOverlay() {
   const [mounted, setMounted] = useState(false)
   const [isVisible, setIsVisible] = useState(false)
   const [isAnimatingOut, setIsAnimatingOut] = useState(false)
-  const [bgOpacity, setBgOpacity] = useState(0.8)
+  const [bgOpacity, setBgOpacity] = useState(0.5)
   const [showBg, setShowBg] = useState(false) // Control background visibility
   
   // Get theme colors for particles - use primary 500 (lighter) and 800 (darker)
@@ -240,7 +240,7 @@ export default function GlobalAILoadingOverlay() {
     }
   }, [theme])
 
-  // Pulsating background opacity effect (75% - 85%) - only after transition completes
+  // Subtle background opacity pulse (45% - 55%)
   useEffect(() => {
     if (!isVisible || !showBg) return
     
@@ -249,7 +249,7 @@ export default function GlobalAILoadingOverlay() {
     
     const animateBg = () => {
       const elapsed = (Date.now() - startTime) * 0.001
-      const opacity = 0.75 + (Math.sin(elapsed * 1.5) * 0.5 + 0.5) * 0.1
+      const opacity = 0.45 + (Math.sin(elapsed * 1.5) * 0.5 + 0.5) * 0.1
       setBgOpacity(opacity)
       bgAnimFrame = requestAnimationFrame(animateBg)
     }
@@ -261,18 +261,10 @@ export default function GlobalAILoadingOverlay() {
     }
   }, [isVisible, showBg])
 
-  // Start background when transition completes - with additional delay for smoother transition
+  // Keep backdrop visible whenever the overlay is visible
   useEffect(() => {
-    if (transitionComplete && isAILoading) {
-      // Add extra delay for the background to fade in smoothly after particle sphere forms
-      const timer = setTimeout(() => {
-        setShowBg(true)
-      }, 400) // 400ms delay after transition completes
-      return () => clearTimeout(timer)
-    } else if (!isAILoading) {
-      setShowBg(false)
-    }
-  }, [transitionComplete, isAILoading])
+    setShowBg(isVisible)
+  }, [isVisible])
 
   // Handle visibility transitions - wait for transition to complete before showing
   useEffect(() => {
@@ -634,7 +626,9 @@ export default function GlobalAILoadingOverlay() {
             isAnimatingOut ? 'ai-loading-exit' : 'ai-bg-enter'
           }`}
           style={{
-            backgroundColor: `rgba(255, 255, 255, ${bgOpacity})`,
+            backgroundColor: `rgba(0, 0, 0, ${Math.min(bgOpacity, 0.5)})`,
+            backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)',
           }}
         />
       )}

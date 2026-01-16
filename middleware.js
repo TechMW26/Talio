@@ -1,6 +1,30 @@
 import { NextResponse } from 'next/server'
 import { jwtVerify } from 'jose'
 
+const TOKEN_CACHE = global.__tokenCache || new Map()
+const TOKEN_CACHE_TTL = 5 * 60 * 1000
+
+if (!global.__tokenCache) {
+  global.__tokenCache = TOKEN_CACHE
+}
+
+function getCachedPayload(token) {
+  const cached = TOKEN_CACHE.get(token)
+  if (!cached) return null
+  if (Date.now() > cached.expiresAt) {
+    TOKEN_CACHE.delete(token)
+    return null
+  }
+  return cached.payload
+}
+
+function setCachedPayload(token, payload) {
+  TOKEN_CACHE.set(token, {
+    payload,
+    expiresAt: Date.now() + TOKEN_CACHE_TTL
+  })
+}
+
 export async function middleware(request) {
   // Permanent redirect: app.talio.in/resources -> talio.in/resources
   if (request.nextUrl.pathname.startsWith('/resources')) {
@@ -80,7 +104,11 @@ export async function middleware(request) {
 
     try {
       const secret = new TextEncoder().encode(process.env.JWT_SECRET)
-      const { payload } = await jwtVerify(token, secret)
+      const cachedPayload = getCachedPayload(token)
+      const payload = cachedPayload || (await jwtVerify(token, secret)).payload
+      if (!cachedPayload) {
+        setCachedPayload(token, payload)
+      }
 
       // For API routes, we can't easily check forcePasswordChange without DB access
       // The frontend will handle the redirect, and individual API routes should check if needed
@@ -115,7 +143,11 @@ export async function middleware(request) {
   if (token && request.nextUrl.pathname.startsWith('/dashboard')) {
     try {
       const secret = new TextEncoder().encode(process.env.JWT_SECRET)
-      await jwtVerify(token, secret)
+      const cachedPayload = getCachedPayload(token)
+      if (!cachedPayload) {
+        const { payload } = await jwtVerify(token, secret)
+        setCachedPayload(token, payload)
+      }
       // Token is valid - the frontend will handle forcePasswordChange redirect
       // since middleware can't access the database
     } catch (error) {
