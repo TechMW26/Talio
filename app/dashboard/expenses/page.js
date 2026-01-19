@@ -160,7 +160,7 @@ export default function ExpensesPage() {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-start mb-2">
             <h3 className="text-sm font-medium text-gray-600">Total Expenses</h3>
             <FaMoneyBillWave className="text-primary-500" />
           </div>
@@ -170,7 +170,7 @@ export default function ExpensesPage() {
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-start mb-2">
             <h3 className="text-sm font-medium text-gray-600">Approved</h3>
             <FaCheckCircle className="text-green-500" />
           </div>
@@ -184,7 +184,7 @@ export default function ExpensesPage() {
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-start mb-2">
             <h3 className="text-sm font-medium text-gray-600">Pending</h3>
             <FaClock className="text-yellow-500" />
           </div>
@@ -198,7 +198,7 @@ export default function ExpensesPage() {
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-start mb-2">
             <h3 className="text-sm font-medium text-gray-600">Rejected</h3>
             <FaTimesCircle className="text-red-500" />
           </div>

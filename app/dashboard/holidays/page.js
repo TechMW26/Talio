@@ -442,7 +442,7 @@ export default function HolidaysPage() {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 border-l-4 border-primary-500">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-start mb-2">
             <h3 className="text-xs sm:text-sm font-medium text-gray-600">Total Holidays</h3>
             <FaCalendarAlt className="text-primary-500 text-sm sm:text-base" />
           </div>
@@ -450,7 +450,7 @@ export default function HolidaysPage() {
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 border-l-4 border-green-500">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-start mb-2">
             <h3 className="text-xs sm:text-sm font-medium text-gray-600">Public Holidays</h3>
             <FaCalendarAlt className="text-green-500 text-sm sm:text-base" />
           </div>
@@ -460,7 +460,7 @@ export default function HolidaysPage() {
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 border-l-4 border-blue-500">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-start mb-2">
             <h3 className="text-xs sm:text-sm font-medium text-gray-600">Optional Holidays</h3>
             <FaCalendarAlt className="text-blue-500 text-sm sm:text-base" />
           </div>

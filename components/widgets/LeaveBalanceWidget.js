@@ -54,7 +54,7 @@ export default function LeaveBalanceWidget({ employeeId }) {
                                 key={balance._id || index}
                                 className="p-3 bg-gray-50 rounded-lg"
                             >
-                                <div className="flex items-center justify-between mb-2">
+                                <div className="flex items-center justify-start mb-2">
                                     <span className="text-sm font-medium text-gray-800">{balance.leaveType?.name || 'Leave'}</span>
                                     <span className="text-lg font-bold text-primary-600">{balance.remaining || 0} days</span>
                                 </div>

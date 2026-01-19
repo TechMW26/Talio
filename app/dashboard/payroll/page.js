@@ -762,7 +762,7 @@ export default function PayrollPage() {
       {isAdmin && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-4 sm:mb-6">
           <div className="bg-white rounded-lg shadow-md p-3 sm:p-4">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-start mb-2">
               <h3 className="text-xs font-medium text-gray-500 uppercase">Employees</h3>
               <FaUsers className="text-blue-500 w-4 h-4" />
             </div>
@@ -770,7 +770,7 @@ export default function PayrollPage() {
           </div>
 
           <div className="bg-white rounded-lg shadow-md p-3 sm:p-4">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-start mb-2">
               <h3 className="text-xs font-medium text-gray-500 uppercase">Total Gross</h3>
               <FaChartLine className="text-blue-500 w-4 h-4" />
             </div>
@@ -778,7 +778,7 @@ export default function PayrollPage() {
           </div>
 
           <div className="bg-white rounded-lg shadow-md p-3 sm:p-4">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-start mb-2">
               <h3 className="text-xs font-medium text-gray-500 uppercase">Deductions</h3>
               <FaMoneyBillWave className="text-red-500 w-4 h-4" />
             </div>
@@ -786,7 +786,7 @@ export default function PayrollPage() {
           </div>
 
           <div className="bg-white rounded-lg shadow-md p-3 sm:p-4">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-start mb-2">
               <h3 className="text-xs font-medium text-gray-500 uppercase">Net Payable</h3>
               <FaFileInvoiceDollar className="text-green-500 w-4 h-4" />
             </div>
@@ -794,7 +794,7 @@ export default function PayrollPage() {
           </div>
 
           <div className="bg-white rounded-lg shadow-md p-3 sm:p-4">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-start mb-2">
               <h3 className="text-xs font-medium text-gray-500 uppercase">Draft</h3>
               <FaClock className="text-gray-500 w-4 h-4" />
             </div>
@@ -802,7 +802,7 @@ export default function PayrollPage() {
           </div>
 
           <div className="bg-white rounded-lg shadow-md p-3 sm:p-4">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-start mb-2">
               <h3 className="text-xs font-medium text-gray-500 uppercase">Paid</h3>
               <FaCheckCircle className="text-green-500 w-4 h-4" />
             </div>
@@ -815,7 +815,7 @@ export default function PayrollPage() {
       {!isAdmin && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
           <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-start mb-2">
               <h3 className="text-xs sm:text-sm font-medium text-gray-600">Latest Net Salary</h3>
               <FaMoneyBillWave className="text-green-500 w-5 h-5" />
             </div>
@@ -825,7 +825,7 @@ export default function PayrollPage() {
           </div>
 
           <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-start mb-2">
               <h3 className="text-xs sm:text-sm font-medium text-gray-600">Total Earnings</h3>
               <FaMoneyBillWave className="text-blue-500 w-5 h-5" />
             </div>
@@ -835,7 +835,7 @@ export default function PayrollPage() {
           </div>
 
           <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 sm:col-span-2 lg:col-span-1">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-start mb-2">
               <h3 className="text-xs sm:text-sm font-medium text-gray-600">Total Deductions</h3>
               <FaMoneyBillWave className="text-red-500 w-5 h-5" />
             </div>

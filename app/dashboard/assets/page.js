@@ -172,7 +172,7 @@ export default function AssetsPage() {
       {isAdmin ? (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-start mb-2">
               <h3 className="text-sm font-medium text-gray-600">Total Assets</h3>
               <FaLaptop className="text-primary-500" />
             </div>
@@ -180,7 +180,7 @@ export default function AssetsPage() {
           </div>
 
           <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-start mb-2">
               <h3 className="text-sm font-medium text-gray-600">Assigned</h3>
               <FaCheckCircle className="text-green-500" />
             </div>
@@ -190,7 +190,7 @@ export default function AssetsPage() {
           </div>
 
           <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-start mb-2">
               <h3 className="text-sm font-medium text-gray-600">Available</h3>
               <FaClock className="text-blue-500" />
             </div>
@@ -200,7 +200,7 @@ export default function AssetsPage() {
           </div>
 
           <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-start mb-2">
               <h3 className="text-sm font-medium text-gray-600">Under Maintenance</h3>
               <FaTools className="text-orange-500" />
             </div>
@@ -212,7 +212,7 @@ export default function AssetsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
           <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-start mb-2">
               <h3 className="text-sm font-medium text-gray-600">Assets Assigned to You</h3>
               <FaBox className="text-primary-500" />
             </div>
@@ -220,7 +220,7 @@ export default function AssetsPage() {
           </div>
 
           <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-start mb-2">
               <h3 className="text-sm font-medium text-gray-600">Under Maintenance</h3>
               <FaTools className="text-orange-500" />
             </div>

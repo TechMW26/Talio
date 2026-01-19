@@ -157,7 +157,7 @@ export default function DesignationsPage() {
       {/* Stats Card */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
         <div className="bg-white rounded-lg shadow-md p-3 sm:p-6">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-start mb-2">
             <h3 className="text-xs sm:text-sm font-medium text-gray-600 truncate">Total Designations</h3>
             <FaBriefcase className="text-primary-500 flex-shrink-0" />
           </div>
@@ -167,7 +167,7 @@ export default function DesignationsPage() {
 
 
         <div className="bg-white rounded-lg shadow-md p-3 sm:p-6">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-start mb-2">
             <h3 className="text-xs sm:text-sm font-medium text-gray-600 truncate">Active Roles</h3>
             <FaBriefcase className="text-blue-500 flex-shrink-0" />
           </div>

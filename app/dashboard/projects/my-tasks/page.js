@@ -1174,7 +1174,7 @@ export default function MyTasksPage() {
                 {/* Progress Bar */}
                 {selectedTask.subtasks && selectedTask.subtasks.length > 0 && (
                   <div className="mb-6">
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-start mb-2">
                       <h4 className="text-sm font-medium text-gray-500">Progress</h4>
                       <span className="text-sm text-gray-600">{selectedTask.progressPercentage || 0}%</span>
                     </div>

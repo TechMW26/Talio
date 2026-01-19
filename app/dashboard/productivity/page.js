@@ -658,7 +658,7 @@ export default function ProductivityPage() {
 
                   {/* Session Info */}
                   <div className="p-4">
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-start mb-2">
                       <h3 className="font-medium text-gray-800">
                         {session.sessionTitle || `Session ${sessionNumber}`}
                       </h3>

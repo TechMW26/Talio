@@ -89,7 +89,7 @@ export default function LearningDashboard() {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-start mb-2">
             <h3 className="text-sm font-medium text-gray-600">Total Courses</h3>
             <FaBook className="text-blue-500 text-xl" />
           </div>
@@ -97,7 +97,7 @@ export default function LearningDashboard() {
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-start mb-2">
             <h3 className="text-sm font-medium text-gray-600">Enrolled</h3>
             <FaGraduationCap className="text-green-500 text-xl" />
           </div>
@@ -105,7 +105,7 @@ export default function LearningDashboard() {
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-start mb-2">
             <h3 className="text-sm font-medium text-gray-600">Completed</h3>
             <FaTrophy className="text-yellow-500 text-xl" />
           </div>
@@ -113,7 +113,7 @@ export default function LearningDashboard() {
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-start mb-2">
             <h3 className="text-sm font-medium text-gray-600">Certificates</h3>
             <FaCertificate className="text-purple-500 text-xl" />
           </div>
@@ -121,7 +121,7 @@ export default function LearningDashboard() {
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-start mb-2">
             <h3 className="text-sm font-medium text-gray-600">Hours Learned</h3>
             <FaClock className="text-red-500 text-xl" />
           </div>

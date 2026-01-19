@@ -863,7 +863,7 @@ export default function ManagerDashboard({ user }) {
 
                   return (
                     <div key={index} className="border border-gray-200 rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center justify-start mb-2">
                         <h4 className="text-sm font-medium text-gray-900">
                           {leave.employee.firstName} {leave.employee.lastName}
                         </h4>

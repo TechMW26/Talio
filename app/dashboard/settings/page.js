@@ -71,22 +71,16 @@ function CompanySelector({ companies, selectedCompany, onSelect, onBack, loading
               className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-blue-200 transition-all text-left group overflow-hidden"
             >
               <div className="flex items-start gap-4">
-                <div className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0 group-hover:bg-blue-50 transition-colors">
+                <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0 group-hover:bg-blue-50 transition-colors">
                   {company.logo ? (
                     <img src={company.logo} alt={company.name} className="w-full h-full object-contain" />
                   ) : (
-                    <FaBuilding className="w-7 h-7 text-gray-400 group-hover:text-blue-500 transition-colors" />
+                    <FaBuilding className="w-6 h-6 text-gray-400 group-hover:text-blue-500 transition-colors" />
                   )}
                 </div>
-                <div className="flex-1 min-w-0 overflow-hidden">
+                <div className="flex-1 min-w-0">
                   <h4 className="font-semibold text-gray-800 truncate group-hover:text-blue-600 transition-colors">{company.name}</h4>
                   <p className="text-sm text-gray-500 uppercase">{company.code}</p>
-                  {company.address?.city && (
-                    <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
-                      <FaMapMarkerAlt className="w-3 h-3" />
-                      {company.address.city}
-                    </p>
-                  )}
                 </div>
               </div>
             </button>
@@ -2184,37 +2178,37 @@ function PersonalizationTab() {
                 )}
 
                 {/* Theme Preview */}
-                <div className="mb-4">
-                  <div className="flex gap-2 mb-3">
+                <div className="flex items-center gap-4 mb-4">
+                  <div
+                    className="w-14 h-14 rounded-lg shadow-md flex-shrink-0"
+                    style={{
+                      background: `linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 100%)`
+                    }}
+                  ></div>
+                  <div className="flex flex-col gap-1.5 flex-1">
                     <div
-                      className="w-12 h-12 rounded-lg shadow-md"
+                      className="h-3 rounded-full"
                       style={{
-                        background: `linear-gradient(135deg, ${colors.primary} 0%, ${colors.secondary} 100%)`
+                        background: `linear-gradient(90deg, ${colors.primary} 0%, ${colors.secondary} 100%)`,
+                        width: '100%'
                       }}
                     ></div>
-                    <div className="flex flex-col gap-1">
-                      <div
-                        className="w-16 h-3 rounded"
-                        style={{
-                          background: `linear-gradient(90deg, ${colors.primary} 0%, ${colors.secondary} 100%)`,
-                          opacity: 0.7
-                        }}
-                      ></div>
-                      <div
-                        className="w-12 h-3 rounded"
-                        style={{
-                          background: `linear-gradient(90deg, ${colors.primary} 0%, ${colors.secondary} 100%)`,
-                          opacity: 0.5
-                        }}
-                      ></div>
-                      <div
-                        className="w-14 h-3 rounded"
-                        style={{
-                          background: `linear-gradient(90deg, ${colors.primary} 0%, ${colors.secondary} 100%)`,
-                          opacity: 0.3
-                        }}
-                      ></div>
-                    </div>
+                    <div
+                      className="h-3 rounded-full"
+                      style={{
+                        background: `linear-gradient(90deg, ${colors.primary} 0%, ${colors.secondary} 100%)`,
+                        opacity: 0.6,
+                        width: '75%'
+                      }}
+                    ></div>
+                    <div
+                      className="h-3 rounded-full"
+                      style={{
+                        background: `linear-gradient(90deg, ${colors.primary} 0%, ${colors.secondary} 100%)`,
+                        opacity: 0.3,
+                        width: '50%'
+                      }}
+                    ></div>
                   </div>
                 </div>
 

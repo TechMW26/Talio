@@ -446,7 +446,7 @@ export default function EditProjectPage() {
 
               {/* Project Heads Section */}
               <div>
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-start mb-2">
                   <label className="block text-sm font-medium text-gray-700">
                     Project Heads <span className="text-red-500">*</span>
                   </label>

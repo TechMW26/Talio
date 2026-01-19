@@ -342,7 +342,7 @@ export default function JobDetailsPage() {
             <div className="space-y-3">
               {applications.slice(0, 3).map((app) => (
                 <div key={app._id} className="border border-gray-200 rounded-lg p-3">
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-start mb-2">
                     <p className="font-medium text-gray-800">
                       {app.candidate.firstName} {app.candidate.lastName}
                     </p>

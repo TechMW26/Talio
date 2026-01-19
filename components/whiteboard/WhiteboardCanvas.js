@@ -3934,7 +3934,7 @@ const WhiteboardCanvas = forwardRef(({
             style={panelStyle}
           >
             <div className="space-y-3">
-              <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center justify-start mb-2">
                 <span className="text-xs font-semibold text-gray-700">
                   {selectedIds.length === 1 ? (
                     <span className="capitalize">{firstObj?.type || 'Element'}</span>

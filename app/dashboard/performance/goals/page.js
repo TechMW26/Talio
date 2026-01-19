@@ -451,7 +451,7 @@ export default function PerformanceGoalsPage() {
 
                 {/* Progress Section */}
                 <div className="px-4 py-3 bg-gray-50 border-t border-gray-100">
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center justify-start mb-2">
                     <span className="text-xs font-medium text-gray-600">Progress</span>
                     <span className={'text-sm font-semibold ' + (goal.progress >= 80 ? 'text-emerald-600' : goal.progress >= 50 ? 'text-blue-600' : 'text-gray-600')}>
                       {goal.progress || 0}%

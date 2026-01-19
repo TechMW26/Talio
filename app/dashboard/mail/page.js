@@ -2377,7 +2377,7 @@ export default function MailPage() {
                   {/* Emoji Picker */}
                   {showEmojiPicker && (
                     <div className="absolute bottom-16 left-3 bg-white border border-gray-200 rounded-lg shadow-xl p-3 z-10 w-80">
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center justify-start mb-2">
                         <span className="text-sm font-medium text-gray-700">Emojis</span>
                         <button onClick={() => setShowEmojiPicker(false)} className="p-1 hover:bg-gray-100 rounded">
                           <FaTimes className="text-xs text-gray-500" />

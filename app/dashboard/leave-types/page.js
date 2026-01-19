@@ -169,7 +169,7 @@ export default function LeaveTypesPage() {
       {/* Stats Card */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-start mb-2">
             <h3 className="text-sm font-medium text-gray-600">Total Leave Types</h3>
             <FaUmbrella className="text-primary-500" />
           </div>
@@ -177,7 +177,7 @@ export default function LeaveTypesPage() {
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-start mb-2">
             <h3 className="text-sm font-medium text-gray-600">Paid Leaves</h3>
             <FaUmbrella className="text-green-500" />
           </div>
@@ -187,7 +187,7 @@ export default function LeaveTypesPage() {
         </div>
 
         <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-start mb-2">
             <h3 className="text-sm font-medium text-gray-600">Total Days</h3>
             <FaUmbrella className="text-blue-500" />
           </div>

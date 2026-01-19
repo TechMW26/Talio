@@ -705,38 +705,24 @@ body {
    BUTTON CENTERING FIX - Global
    Ensures button text stays centered when
    loading spinners or icons are added
+   NOTE: Uses lower specificity so component styles can override
    ============================================ */
-button,
-[role="button"],
 .btn,
 .btn-primary,
 .btn-secondary,
 .btn-danger,
 .btn-success,
 a.btn {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  text-align: center !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   gap: 0.5rem;
 }
 
 /* Ensure flex children don't cause shift */
-button > *,
-[role="button"] > *,
 .btn > * {
   flex-shrink: 0;
-}
-
-/* Inner flex containers in buttons should also center */
-button > span,
-button > div,
-[role="button"] > span,
-[role="button"] > div {
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  gap: 0.5rem;
 }
 
 /* Fix for buttons with loading state - prevent width change */

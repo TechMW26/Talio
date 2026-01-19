@@ -108,7 +108,7 @@ export default function LearningProgressWidget({ limit = 4 }) {
             <div className="space-y-3 max-h-48 overflow-y-auto">
             {courses.map((course, index) => (
                 <div key={index} className="p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-start mb-2">
                         <h4 className="text-sm font-medium text-gray-800 truncate pr-2 flex-1">
                             {course.course || course.title}
                         </h4>

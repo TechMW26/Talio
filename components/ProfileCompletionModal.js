@@ -163,7 +163,7 @@ export default function ProfileCompletionModal({
 
           {/* Progress Section */}
           <div className="px-6 mb-4">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-start mb-2">
               <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">
                 Progress
               </span>

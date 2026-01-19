@@ -404,7 +404,7 @@ export default function GoalDetailsPage() {
               <div className="divide-y divide-gray-100">
                 {goal.keyResults.map((kr, index) => (
                   <div key={index} className="p-4">
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-start mb-2">
                       <span className="font-medium text-gray-900">{kr.title}</span>
                       <span className="text-sm text-gray-500">{kr.current} / {kr.target} {kr.unit}</span>
                     </div>

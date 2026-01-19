@@ -255,7 +255,7 @@ export default function CoursesPage() {
 
               {/* Course Info */}
               <div className="p-6">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-start mb-2">
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                     course.level === 'Beginner' ? 'bg-green-100 text-green-700' :
                     course.level === 'Intermediate' ? 'bg-yellow-100 text-yellow-700' :

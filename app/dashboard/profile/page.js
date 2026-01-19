@@ -1487,7 +1487,7 @@ export default function ProfilePage() {
                 <div className="grid grid-cols-2 gap-3 sm:gap-4">
                   {/* Zoom */}
                   <div className="bg-white border border-slate-200 rounded-2xl p-3 col-span-2 sm:col-span-1 shadow-xs">
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-start mb-2">
                       <label className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
                         <FaSearchPlus className="text-slate-500 text-xs" />
                         Zoom
@@ -1525,7 +1525,7 @@ export default function ProfilePage() {
 
                   {/* Rotation */}
                   <div className="bg-white border border-slate-200 rounded-2xl p-3 col-span-2 sm:col-span-1 shadow-xs">
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-start mb-2">
                       <label className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
                         <FaUndo className="text-slate-500 text-xs" />
                         Rotation
@@ -1561,7 +1561,7 @@ export default function ProfilePage() {
 
                   {/* Brightness */}
                   <div className="bg-white border border-slate-200 rounded-2xl p-3 col-span-2 sm:col-span-1 shadow-xs">
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-start mb-2">
                       <label className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
                         <FaSun className="text-slate-500 text-xs" />
                         Brightness
@@ -1583,7 +1583,7 @@ export default function ProfilePage() {
 
                   {/* Contrast */}
                   <div className="bg-white border border-slate-200 rounded-2xl p-3 col-span-2 sm:col-span-1 shadow-xs">
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-start mb-2">
                       <label className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
                         <FaAdjust className="text-slate-500 text-xs" />
                         Contrast
@@ -1605,7 +1605,7 @@ export default function ProfilePage() {
 
                   {/* Saturation */}
                   <div className="bg-white border border-slate-200 rounded-2xl p-3 col-span-2 sm:col-span-1 shadow-xs">
-                    <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center justify-start mb-2">
                       <label className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
                         <FaAdjust className="text-slate-500 text-xs" />
                         Saturation
