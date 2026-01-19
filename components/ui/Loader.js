@@ -158,11 +158,6 @@ export function PageLoader({ message = 'Loading...', size = 'lg' }) {
   return (
     <div className="flex flex-col items-center justify-center min-h-[200px] w-full">
       <Loader size={size} />
-      {message && (
-        <p className="mt-4 text-sm text-gray-500 dark:text-gray-400 animate-pulse text-center">
-          {message}
-        </p>
-      )}
     </div>
   )
 }

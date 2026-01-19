@@ -476,9 +476,6 @@ export default function ProfilePage() {
       <div className="fixed inset-0 flex items-center justify-center bg-slate-50">
         <div className="flex flex-col items-center gap-3">
           <Loader size="lg" />
-          <p className="text-sm text-slate-500 font-medium tracking-wide">
-            Loading your profile…
-          </p>
         </div>
       </div>
     )

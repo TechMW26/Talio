@@ -159,7 +159,6 @@ export default function AuthCallbackPage() {
         `}</style>
         <div className="text-center">
           <Loader size="lg" className="mb-4" />
-          <p className="text-gray-600 font-medium">Loading...</p>
         </div>
       </div>
     }>

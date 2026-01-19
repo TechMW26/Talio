@@ -93,7 +93,6 @@ export default function NotificationManagement() {
     return (
       <div className="text-center py-12">
         <Loader size="lg" />
-        <p className="mt-4 text-gray-600">Loading...</p>
       </div>
     )
   }

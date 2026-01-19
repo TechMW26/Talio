@@ -285,7 +285,6 @@ export default function EditEmployeePage() {
       <div className="p-6">
         <div className="bg-white rounded-lg shadow-md p-8 text-center">
           <Loader size="lg" />
-          <p className="mt-4 text-gray-600">Loading...</p>
         </div>
       </div>
     )

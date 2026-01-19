@@ -170,9 +170,6 @@ export function FullPageLoader({ message = 'Loading...' }) {
     <div className="fixed inset-0 flex items-center justify-center z-[9998]" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
       <div className="flex flex-col items-center">
         <Loader size="xl" />
-        {message && (
-          <p className="mt-4 text-gray-600 animate-pulse">{message}</p>
-        )}
       </div>
     </div>
   )

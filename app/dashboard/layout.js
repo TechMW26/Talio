@@ -32,7 +32,6 @@ function PageTransitionOverlay() {
     <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9998]">
       <div className="flex flex-col items-center">
         <Loader size="lg" />
-        <p className="mt-4 text-sm text-gray-600 animate-pulse">Loading...</p>
       </div>
     </div>
   )
@@ -275,7 +274,6 @@ export default function DashboardLayout({ children }) {
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--color-bg-main)' }}>
         <div className="text-center">
           <Loader size="lg" />
-          <p className="mt-4 text-gray-600 dark:text-gray-300">Loading...</p>
         </div>
       </div>
     )

@@ -74,9 +74,7 @@ export default function ChatPopup({ chat, index }) {
 
   // Glass morphism styles
   const glassStyle = {
-    background: 'rgba(255, 255, 255, 0.7)',
-    backdropFilter: 'blur(24px) saturate(180%)',
-    WebkitBackdropFilter: 'blur(24px) saturate(180%)',
+    background: 'rgba(255, 255, 255, 0.85)',
     border: '1px solid rgba(255, 255, 255, 0.25)',
     boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.5)',
   }
@@ -862,7 +860,7 @@ export default function ChatPopup({ chat, index }) {
             width: '180px',
             zIndex,
             animation: 'slideIn 0.3s ease-out',
-            transition: 'left 0.4s cubic-bezier(0.4, 0, 0.2, 1), top 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s ease',
+            transition: 'transform 0.2s ease',
             ...glassStyle,
             background: 'rgba(255, 255, 255, 0.9)',
           }}
@@ -927,7 +925,7 @@ export default function ChatPopup({ chat, index }) {
           top: `${position.y}px`,
           zIndex,
           ...glassStyle,
-          transition: 'left 0.4s cubic-bezier(0.4, 0, 0.2, 1), top 0.4s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s ease, height 0.3s ease, box-shadow 0.2s ease',
+          transition: 'width 0.3s ease, height 0.3s ease, box-shadow 0.2s ease',
           animation: animationState === 'minimizing'
             ? 'genieMinimize 0.3s ease-in forwards'
             : animationState === 'maximizing'
@@ -1039,8 +1037,7 @@ export default function ChatPopup({ chat, index }) {
           <div
             className="absolute inset-x-0 top-[52px] bottom-0 z-10 overflow-hidden rounded-b-2xl"
             style={{
-              background: 'rgba(255, 255, 255, 0.95)',
-              backdropFilter: 'blur(16px)',
+              background: 'rgba(255, 255, 255, 0.98)',
               animation: 'slideIn 0.2s ease-out',
             }}
           >
@@ -1171,8 +1168,7 @@ export default function ChatPopup({ chat, index }) {
           {loading ? (
             <div className="flex items-center justify-center h-full">
               <div>
-                <Loader size="sm" />
-                <p className="text-gray-500 text-xs mt-2">Loading messages...</p>
+                <Loader size="lg" />
               </div>
             </div>
           ) : messages.length > 0 ? (

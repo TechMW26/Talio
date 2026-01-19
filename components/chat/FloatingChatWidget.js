@@ -317,9 +317,7 @@ export default function FloatingChatWidget() {
 
   // Glass morphism styles
   const glassStyle = {
-    background: 'rgba(255, 255, 255, 0.75)',
-    backdropFilter: 'blur(20px) saturate(180%)',
-    WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+    background: 'rgba(255, 255, 255, 0.9)',
     border: '1px solid rgba(255, 255, 255, 0.3)',
     boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.4)',
   }
@@ -361,7 +359,6 @@ export default function FloatingChatWidget() {
             ...glassStyle,
             ...widgetStyle,
             animation: 'slideUp 0.3s ease-out',
-            transition: 'left 0.3s ease, top 0.3s ease, right 0.3s ease, bottom 0.3s ease',
           }}
         >
           {/* Header - Draggable */}
@@ -369,7 +366,6 @@ export default function FloatingChatWidget() {
             className="px-4 py-3 flex items-center justify-between cursor-move select-none"
             style={{ 
               background: `linear-gradient(135deg, ${primaryColor}ee, ${primaryDark}ee)`,
-              backdropFilter: 'blur(10px)',
             }}
             onMouseDown={handleMouseDown}
           >
@@ -493,7 +489,6 @@ export default function FloatingChatWidget() {
                 <div className="p-8 text-center h-full flex items-center justify-center">
                   <div>
                     <Loader size="lg" />
-                    <p className="text-gray-500 text-sm mt-2">Loading chats...</p>
                   </div>
                 </div>
               ) : filteredChats.length > 0 ? (
