@@ -619,16 +619,14 @@ export default function GlobalAILoadingOverlay() {
 
   return (
     <>
-      {/* Backdrop blur layer - blurs content behind overlay - only after transition */}
+      {/* Backdrop layer - white tint without blur - only after transition */}
       {showBg && (
         <div 
           className={`fixed inset-0 z-[999998] ${
             isAnimatingOut ? 'ai-loading-exit' : 'ai-bg-enter'
           }`}
           style={{
-            backgroundColor: `rgba(0, 0, 0, ${Math.min(bgOpacity, 0.5)})`,
-            backdropFilter: 'blur(4px)',
-            WebkitBackdropFilter: 'blur(4px)',
+            backgroundColor: `rgba(255, 255, 255, ${Math.min(bgOpacity, 0.6)})`,
           }}
         />
       )}
