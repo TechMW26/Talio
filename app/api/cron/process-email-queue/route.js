@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server'
 import connectDB from '@/lib/mongodb'
 import OnboardingEmail from '@/models/OnboardingEmail'
 import { sendOnboardingEmail } from '@/lib/mailer'
-import { getTenantConnection } from '@/lib/tenantModels'
-import CompanyMapping from '@/models/CompanyMapping'
+import { getTenantConnection } from '@/lib/tenantDb'
+import getTenantCompanyModel from '@/models/TenantCompany'
+import { connectSuperadminDB } from '@/lib/superadminDb'
 
 // Rate limiting configuration
 const EMAIL_RATE_LIMIT = {
@@ -160,6 +161,7 @@ export async function GET(request) {
     }
 
     await connectDB()
+    await connectSuperadminDB()
     
     const now = new Date()
     const results = {
@@ -171,12 +173,13 @@ export async function GET(request) {
       tenants: {},
     }
 
-    // Get all company mappings to process tenant databases
-    const mappings = await CompanyMapping.find({ isActive: true }).lean()
+    // Get all active tenant companies
+    const TenantCompany = await getTenantCompanyModel()
+    const companies = await TenantCompany.find({ isActive: true }).lean()
     
-    for (const mapping of mappings) {
+    for (const company of companies) {
       try {
-        const tenantDb = await getTenantConnection(mapping.databaseName)
+        const tenantDb = await getTenantConnection(company.databaseName)
         const TenantOnboardingEmail = tenantDb.model('OnboardingEmail')
         
         // Find emails ready to process
@@ -187,7 +190,7 @@ export async function GET(request) {
 
         if (queuedEmails.length === 0) continue
 
-        results.tenants[mapping.companyCode] = {
+        results.tenants[company.slug || company.databaseName] = {
           found: queuedEmails.length,
           sent: 0,
           rescheduled: 0,
@@ -201,13 +204,13 @@ export async function GET(request) {
           
           if (processResult.success) {
             results.sent++
-            results.tenants[mapping.companyCode].sent++
+            results.tenants[company.slug || company.databaseName].sent++
           } else if (processResult.rateLimited) {
             results.rescheduled++
-            results.tenants[mapping.companyCode].rescheduled++
+            results.tenants[company.slug || company.databaseName].rescheduled++
           } else {
             results.failed++
-            results.tenants[mapping.companyCode].failed++
+            results.tenants[company.slug || company.databaseName].failed++
             results.errors.push({
               emailId: processResult.emailId,
               error: processResult.error,
@@ -218,9 +221,9 @@ export async function GET(request) {
           await new Promise(resolve => setTimeout(resolve, 3000))
         }
       } catch (tenantError) {
-        console.error(`[email-queue] Error processing tenant ${mapping.companyCode}:`, tenantError)
+        console.error(`[email-queue] Error processing tenant ${company.slug || company.databaseName}:`, tenantError)
         results.errors.push({
-          tenant: mapping.companyCode,
+          tenant: company.slug || company.databaseName,
           error: tenantError.message,
         })
       }
@@ -286,6 +289,7 @@ export async function POST(request) {
     }
 
     await connectDB()
+    await connectSuperadminDB()
     
     const { action, delayMinutes = 5 } = await request.json()
     
@@ -294,12 +298,13 @@ export async function POST(request) {
       const scheduledFor = new Date(Date.now() + delayMinutes * 60 * 1000)
       
       // Process all tenant databases
-      const mappings = await CompanyMapping.find({ isActive: true }).lean()
+      const TenantCompany = await getTenantCompanyModel()
+      const companies = await TenantCompany.find({ isActive: true }).lean()
       let totalQueued = 0
 
-      for (const mapping of mappings) {
+      for (const company of companies) {
         try {
-          const tenantDb = await getTenantConnection(mapping.databaseName)
+          const tenantDb = await getTenantConnection(company.databaseName)
           const TenantOnboardingEmail = tenantDb.model('OnboardingEmail')
           
           const result = await TenantOnboardingEmail.updateMany(
@@ -319,7 +324,7 @@ export async function POST(request) {
           
           totalQueued += result.modifiedCount
         } catch (err) {
-          console.error(`[email-queue] Error queueing failed emails for ${mapping.companyCode}:`, err)
+          console.error(`[email-queue] Error queueing failed emails for ${company.slug || company.databaseName}:`, err)
         }
       }
 
