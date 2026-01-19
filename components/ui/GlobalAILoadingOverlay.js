@@ -626,7 +626,7 @@ export default function GlobalAILoadingOverlay() {
             isAnimatingOut ? 'ai-loading-exit' : 'ai-bg-enter'
           }`}
           style={{
-            backgroundColor: `rgba(255, 255, 255, ${Math.min(bgOpacity, 0.6)})`,
+            backgroundColor: `rgba(0, 0, 0, ${Math.min(bgOpacity, 0.6)})`,
           }}
         />
       )}

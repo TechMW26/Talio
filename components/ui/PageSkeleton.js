@@ -167,7 +167,7 @@ function DefaultSkeleton() {
  */
 export function FullPageLoader({ message = 'Loading...' }) {
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-[9998]" style={{ backgroundColor: 'rgba(255,255,255,0.8)' }}>
+    <div className="fixed inset-0 flex items-center justify-center z-[9998]" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
       <div className="flex flex-col items-center">
         <Loader size="xl" />
         {message && (

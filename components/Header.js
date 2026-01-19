@@ -393,7 +393,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
             {(showSearchResults || searchQuery.length >= 2) && (
               <div 
                 className="fixed inset-0 z-[100]"
-                style={{ backgroundColor: 'rgba(255,255,255,0.8)' }}
+                style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
                 onClick={() => {
                   setSearchQuery('')
                   setShowSearchResults(false)
@@ -621,7 +621,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
 
             {showProfileMenu && (
               <>
-                <div className="fixed inset-0 z-[9998]" style={{ backgroundColor: 'rgba(255,255,255,0.8)' }} onClick={() => setShowProfileMenu(false)} />
+                <div className="fixed inset-0 z-[9998]" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }} onClick={() => setShowProfileMenu(false)} />
                 <div className="absolute right-0 mt-2 w-44 sm:w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-[9999]">
                   {/* User Info Section */}
                   <div className="px-2 md:px-4 py-3 border-b border-gray-200">

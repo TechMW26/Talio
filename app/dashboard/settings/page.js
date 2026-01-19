@@ -1324,7 +1324,7 @@ function GeofenceLocationsManager() {
       {isMounted && showModal && createPortal(
         <div
           className="fixed inset-0 flex items-center justify-center p-4 z-[99999]"
-          style={{ backgroundColor: 'rgba(255,255,255,0.8)' }}
+          style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
           onClick={() => {
             setShowModal(false)
             setEditingLocation(null)

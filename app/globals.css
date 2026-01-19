@@ -509,27 +509,21 @@ body {
   animation: fadeIn 0.3s ease-in-out;
 }
 
-/* Backdrop fade-in animation with blur and transparent white tint */
+/* Backdrop fade-in animation with transparent black tint - no blur */
 @keyframes fadeInBackdrop {
   from {
     opacity: 0;
-    backdrop-filter: blur(0px);
-    -webkit-backdrop-filter: blur(0px);
-    background-color: rgba(255, 255, 255, 0);
+    background-color: rgba(0, 0, 0, 0);
   }
   to {
     opacity: 1;
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    background-color: rgba(255, 255, 255, 0.8);
+    background-color: rgba(0, 0, 0, 0.6);
   }
 }
 
 .animate-fade-in {
   animation: fadeInBackdrop 0.5s ease-out forwards;
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  background-color: rgba(255, 255, 255, 0.8);
+  background-color: rgba(0, 0, 0, 0.6);
 }
 
 /* MIRA Modal Backdrop Animations - Light overlay without blur */
@@ -650,19 +644,19 @@ body {
    for better performance on mobile devices
    ============================================ */
 
-/* Overlay backgrounds with transparent white tint - GLOBAL STANDARD */
-/* All modals use rgba(255, 255, 255, 0.8) for consistent transparent white backdrop */
+/* Overlay backgrounds with transparent black tint - GLOBAL STANDARD */
+/* All modals use rgba(0, 0, 0, 0.6) for consistent transparent black backdrop */
 /* NO backdrop-blur - just color and transparency */
 .modal-overlay-bg {
-  background-color: rgba(255, 255, 255, 0.8);
+  background-color: rgba(0, 0, 0, 0.6);
 }
 
 .modal-overlay-dark {
-  background-color: rgba(255, 255, 255, 0.8);
+  background-color: rgba(0, 0, 0, 0.6);
 }
 
 .modal-overlay-light {
-  background-color: rgba(255, 255, 255, 0.8);
+  background-color: rgba(0, 0, 0, 0.6);
 }
 
 /* Overlay with animation - no blur */
@@ -676,7 +670,7 @@ body {
 }
 
 .modal-overlay-animated {
-  background-color: rgba(255, 255, 255, 0.8);
+  background-color: rgba(0, 0, 0, 0.6);
   animation: overlay-fade-in 0.2s ease-out;
 }
 
@@ -895,14 +889,14 @@ textarea::placeholder {
   justify-content: center;
   padding: 1rem;
   overflow-y: auto;
-  background-color: rgba(255, 255, 255, 0.8);
+  background-color: rgba(0, 0, 0, 0.6);
 }
 
-/* Modal Backdrop - Transparent white background - GLOBAL STANDARD */
+/* Modal Backdrop - Transparent black background - GLOBAL STANDARD */
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background-color: rgba(255, 255, 255, 0.8);
+  background-color: rgba(0, 0, 0, 0.6);
   z-index: 99998;
 }
 

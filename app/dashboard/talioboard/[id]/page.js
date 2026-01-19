@@ -384,7 +384,7 @@ export default function WhiteboardEditorPage() {
     <div ref={containerRef} className="h-screen flex flex-col bg-gray-50">
       {/* Saving overlay */}
       {isSaving && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(255,255,255,0.8)' }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
           <div className="bg-white rounded-xl px-6 py-4 flex items-center gap-3 shadow-xl">
             <Loader size="sm" />
             <span className="text-gray-700 font-medium">Saving...</span>
@@ -454,7 +454,7 @@ export default function WhiteboardEditorPage() {
 
       {/* Share Modal */}
       {showShareModal && (
-        <div className="fixed inset-0 z-[9100] flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(255,255,255,0.8)' }}>
+        <div className="fixed inset-0 z-[9100] flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
@@ -582,7 +582,7 @@ export default function WhiteboardEditorPage() {
 
       {/* Rename Modal */}
       {showRenameModal && (
-        <div className="fixed inset-0 z-[9200] flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(255,255,255,0.8)' }}>
+        <div className="fixed inset-0 z-[9200] flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
             <div className="p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Rename board</h2>

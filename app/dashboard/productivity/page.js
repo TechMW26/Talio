@@ -978,7 +978,7 @@ export default function ProductivityPage() {
       {/* Session Detail Modal */}
       <ModalPortal show={!!selectedSession}>
         {selectedSession && (
-        <div className="fixed inset-0 flex items-center justify-center z-[9999] p-4" style={{ backgroundColor: 'rgba(255,255,255,0.8)' }}>
+        <div className="fixed inset-0 flex items-center justify-center z-[9999] p-4" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
           <div className="bg-white rounded-2xl shadow-xl max-w-7xl w-full max-h-[95vh] overflow-hidden flex flex-col">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 border-b bg-gray-50">

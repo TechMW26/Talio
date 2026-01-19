@@ -3557,7 +3557,7 @@ export default function ProjectDetailPage() {
       {/* Reason Modal for Status Changes */}
       {showReasonModal && pendingStatusChange && (
         <Portal>
-          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(255,255,255,0.8)' }}>
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all">
               <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-amber-500 to-orange-500 rounded-t-xl">
                 <h3 className="text-lg font-semibold text-white">Reason Required</h3>
