@@ -57,6 +57,30 @@ const onboardingEmailSchema = new mongoose.Schema({
   
   lastRetryAt: Date,
   
+  // Auto-retry queue fields for rate limit handling
+  autoRetryCount: {
+    type: Number,
+    default: 0,
+  },
+  
+  // When this email should be processed (for queued/rate-limited emails)
+  scheduledFor: {
+    type: Date,
+    default: null,
+  },
+  
+  // If rate limited, when the limit expires
+  rateLimitedUntil: {
+    type: Date,
+    default: null,
+  },
+  
+  // Whether this email is in the queue awaiting processing
+  queued: {
+    type: Boolean,
+    default: false,
+  },
+  
   // Who triggered the email
   triggeredBy: {
     type: String,
@@ -82,6 +106,9 @@ onboardingEmailSchema.index({ status: 1, createdAt: -1 })
 onboardingEmailSchema.index({ employee: 1 })
 onboardingEmailSchema.index({ recipientEmail: 1 })
 onboardingEmailSchema.index({ createdAt: -1 })
+// Index for queue processing
+onboardingEmailSchema.index({ queued: 1, scheduledFor: 1 })
+onboardingEmailSchema.index({ status: 1, queued: 1, scheduledFor: 1 })
 
 // Virtual for full name
 onboardingEmailSchema.virtual('fullName').get(function() {

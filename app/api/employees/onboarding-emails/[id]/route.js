@@ -33,8 +33,8 @@ export async function POST(request, { params }) {
       return NextResponse.json({ success: false, message: 'Email not found' }, { status: 404 })
     }
     
-    // Retry sending the email
-    const result = await retryOnboardingEmail(id, user._id || user.userId)
+    // Retry sending the email - pass tenant models for multi-tenant support
+    const result = await retryOnboardingEmail(id, user._id || user.userId, models)
     
     // Get updated email log
     const updatedEmail = await OnboardingEmail.findById(id)

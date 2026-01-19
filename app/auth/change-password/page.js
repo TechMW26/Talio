@@ -381,12 +381,12 @@ export default function ChangePasswordPage() {
                   {loading ? (
                     <>
                       <Loader size="xs" />
-                      Changing Password...
+                      <span>Changing Password...</span>
                     </>
                   ) : (
                     <>
                       <FaShieldAlt className="h-4 w-4" />
-                      Change Password & Continue
+                      <span>Change Password & Continue</span>
                     </>
                   )}
                 </button>

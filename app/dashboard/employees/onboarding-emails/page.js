@@ -20,6 +20,7 @@ import {
   HiOutlinePaperAirplane,
   HiOutlinePlus,
   HiOutlineXMark,
+  HiOutlineInformationCircle,
 } from 'react-icons/hi2'
 import toast from '@/utils/toast'
 
@@ -281,8 +282,65 @@ export default function OnboardingEmailsPage() {
     }
   }
 
+  // Queue all failed emails for auto-retry
+  const [queuingFailed, setQueuingFailed] = useState(false)
+  
+  const handleQueueAllFailed = async () => {
+    if (stats.failed === 0) {
+      toast.error('No failed emails to queue')
+      return
+    }
+    
+    setQueuingFailed(true)
+    
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch('/api/employees/onboarding-emails/queue-failed', {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ delayMinutes: 5 })
+      })
+      
+      const data = await res.json()
+      
+      if (data.success) {
+        toast.success(data.message)
+        fetchEmails()
+      } else {
+        toast.error(data.message || 'Failed to queue emails')
+      }
+    } catch (error) {
+      console.error('Queue failed emails error:', error)
+      toast.error('Failed to queue emails')
+    } finally {
+      setQueuingFailed(false)
+    }
+  }
+
   // Status badge component
-  const StatusBadge = ({ status }) => {
+  const StatusBadge = ({ status, queued, scheduledFor }) => {
+    // Special handling for queued/rate-limited emails
+    if (queued && scheduledFor) {
+      const scheduledTime = new Date(scheduledFor)
+      const now = new Date()
+      const isReady = scheduledTime <= now
+      
+      return (
+        <div className="flex flex-col gap-1">
+          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${isReady ? 'text-blue-400 bg-blue-500/10 border-blue-500/20' : 'text-orange-400 bg-orange-500/10 border-orange-500/20'}`}>
+            <HiOutlineClock className="w-3.5 h-3.5" />
+            {isReady ? 'Ready to Retry' : 'Scheduled'}
+          </span>
+          <span className="text-[10px] text-theme-text-secondary">
+            {isReady ? 'Processing soon...' : `Retry at ${formatDate(scheduledFor)}`}
+          </span>
+        </div>
+      )
+    }
+    
     const config = {
       sent: { 
         icon: HiOutlineCheckCircle, 
@@ -494,7 +552,45 @@ export default function OnboardingEmailsPage() {
             )}
           </button>
         )}
+        
+        {/* Queue All Failed Button */}
+        {stats.failed > 0 && selectedEmails.length === 0 && (
+          <button
+            onClick={handleQueueAllFailed}
+            disabled={queuingFailed}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-medium transition-colors disabled:opacity-50"
+            title="Queue all failed emails for automatic retry with rate limit protection"
+          >
+            {queuingFailed ? (
+              <>
+                <Loader size="xs" />
+                Queueing...
+              </>
+            ) : (
+              <>
+                <HiOutlineClock className="w-5 h-5" />
+                Auto-Retry Failed ({stats.failed})
+              </>
+            )}
+          </button>
+        )}
       </div>
+
+      {/* Rate Limit Info */}
+      {stats.failed > 0 && (
+        <div className="mb-4 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-300 text-sm">
+          <div className="flex items-start gap-3">
+            <HiOutlineInformationCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium">Rate Limit Protection</p>
+              <p className="text-blue-300/80 mt-1">
+                Failed emails are automatically queued for retry with exponential backoff to avoid rate limits. 
+                Use "Auto-Retry Failed" to queue all failed emails, or the system will process them automatically.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Table */}
       <div className="bg-theme-bg-card rounded-2xl border border-theme-bg-hover overflow-hidden">
@@ -592,8 +688,8 @@ export default function OnboardingEmailsPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <StatusBadge status={email.status} />
-                      {email.status === 'failed' && email.errorMessage && (
+                      <StatusBadge status={email.status} queued={email.queued} scheduledFor={email.scheduledFor} />
+                      {email.status === 'failed' && email.errorMessage && !email.queued && (
                         <p className="text-xs text-red-400 mt-1 max-w-[200px] truncate" title={email.errorMessage}>
                           {email.errorMessage}
                         </p>
@@ -614,9 +710,16 @@ export default function OnboardingEmailsPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      {email.retryCount > 0 ? (
+                      {(email.retryCount > 0 || email.autoRetryCount > 0) ? (
                         <div className="text-sm">
-                          <span className="text-orange-400">{email.retryCount} retries</span>
+                          {email.retryCount > 0 && (
+                            <span className="text-orange-400">{email.retryCount} manual</span>
+                          )}
+                          {email.autoRetryCount > 0 && (
+                            <span className={`${email.retryCount > 0 ? 'ml-1' : ''} text-blue-400`}>
+                              {email.retryCount > 0 ? '+ ' : ''}{email.autoRetryCount} auto
+                            </span>
+                          )}
                           {email.lastRetryAt && (
                             <p className="text-xs text-theme-text-secondary">
                               Last: {formatDate(email.lastRetryAt)}

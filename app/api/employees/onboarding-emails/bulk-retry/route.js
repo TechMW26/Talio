@@ -42,19 +42,25 @@ export async function POST(request) {
     // Process emails sequentially to avoid overwhelming the email server
     for (const emailId of emailIds) {
       try {
-        const result = await retryOnboardingEmail(emailId, user._id || user.userId)
+        // Pass tenant models for multi-tenant support
+        const result = await retryOnboardingEmail(emailId, user._id || user.userId, models)
         
         if (result.success) {
           results.successful.push(emailId)
         } else {
-          results.failed.push({ id: emailId, error: result.error })
+          // Check if rate limited - schedule for later
+          if (result.rateLimited) {
+            results.failed.push({ id: emailId, error: result.error, rateLimited: true, scheduledFor: result.scheduledFor })
+          } else {
+            results.failed.push({ id: emailId, error: result.error })
+          }
         }
       } catch (error) {
         results.failed.push({ id: emailId, error: error.message })
       }
       
-      // Small delay between emails to prevent rate limiting
-      await new Promise(resolve => setTimeout(resolve, 500))
+      // Increased delay between emails to prevent rate limiting (2 seconds)
+      await new Promise(resolve => setTimeout(resolve, 2000))
     }
     
     return NextResponse.json({
