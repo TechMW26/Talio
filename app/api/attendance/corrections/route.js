@@ -34,9 +34,9 @@ const isValidDateString = (value) => {
  * 
  * STATUS CALCULATION:
  * - When checkIn AND checkOut exist: Status is ALWAYS calculated from work hours
- * - Formula: workHours >= 7.2h (90% of 8h) = present
- *            workHours >= 4h (50% of 8h) = half-day
- *            workHours < 4h = absent
+ * - Formula: workHours >= 6.5h (81.25% of 8h) = present (full day)
+ *            workHours >= 5h (62.5% of 8h) = present (early checkout, with shrinkage)
+ *            workHours < 5h = half-day
  */
 
 // Helper to check if user can approve corrections (tenant-aware version)
@@ -451,8 +451,8 @@ export async function PATCH(request) {
         console.log(`   CheckIn: ${attendance.checkIn}`)
         console.log(`   CheckOut: ${attendance.checkOut}`)
         console.log(`   Work Hours: ${calculatedWorkHours.toFixed(2)}h`)
-        console.log(`   Full Day Threshold: ${fullDayHours * 0.9}h (90% of ${fullDayHours}h)`)
-        console.log(`   Half Day Threshold: ${fullDayHours * 0.5}h (50% of ${fullDayHours}h)`)
+        console.log(`   Full Day Threshold: ${(fullDayHours * 0.8125).toFixed(1)}h (81.25% of ${fullDayHours}h)`)
+        console.log(`   Early Checkout Threshold: ${(fullDayHours * 0.625).toFixed(1)}h (62.5% of ${fullDayHours}h)`)
         console.log(`   Calculated Status: ${calculatedStatus}`)
         console.log(`   Reason: ${statusReason}\n`)
 

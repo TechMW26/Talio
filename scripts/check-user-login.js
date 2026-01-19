@@ -1,22 +1,44 @@
 /**
  * Debug script to check user login issues
- * Run: node scripts/check-user-login.js
+ * Run: node scripts/check-user-login.js [email]
+ * 
+ * This script dynamically looks up the tenant database from the UserTenantMapping
+ * to avoid creating hardcoded database connections.
  */
 
+require('dotenv').config();
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
-const SUPERADMIN_DB = 'mongodb+srv://admin:Mansiavi%402001@talio01.bzqh6xd.mongodb.net/talio_superadmin?retryWrites=true&w=majority';
-const TENANT_DB = 'mongodb+srv://admin:Mansiavi%402001@talio01.bzqh6xd.mongodb.net/mushroom_world_group?retryWrites=true&w=majority';
+// Get MongoDB base URI from environment
+const MONGODB_URI = process.env.MONGODB_URI;
+if (!MONGODB_URI) {
+  console.error('❌ MONGODB_URI environment variable is required');
+  process.exit(1);
+}
 
-const EMAIL = 'aviraj.sharma@mushroomworldgroup.com';
+// Extract base URI for building database-specific connections
+function getDatabaseUri(databaseName) {
+  const match = MONGODB_URI.match(/^(mongodb(?:\+srv)?:\/\/[^/]+)\/?([^?]*)?(\?.*)?$/);
+  if (!match) {
+    throw new Error('Invalid MONGODB_URI format');
+  }
+  const baseUri = match[1];
+  const options = match[3] || '';
+  return `${baseUri}/${databaseName}${options}`;
+}
+
+// Default email or take from command line
+const EMAIL = process.argv[2] || 'aviraj.sharma@mushroomworldgroup.com';
 
 async function checkUser() {
   console.log('=== Checking User Login Issue ===\n');
+  console.log('Checking email:', EMAIL, '\n');
   
   // Step 1: Check UserTenantMapping in superadmin DB
   console.log('Step 1: Checking UserTenantMapping in superadmin DB...');
-  const superadminConn = await mongoose.createConnection(SUPERADMIN_DB).asPromise();
+  const superadminUri = getDatabaseUri('talio_superadmin');
+  const superadminConn = await mongoose.createConnection(superadminUri).asPromise();
   const mapping = await superadminConn.db.collection('usertenantmappings').findOne({ 
     email: EMAIL.toLowerCase() 
   });
@@ -34,9 +56,10 @@ async function checkUser() {
   }
   await superadminConn.close();
   
-  // Step 2: Check User in tenant DB
-  console.log('\nStep 2: Checking User in tenant DB (mushroom_world_group)...');
-  const tenantConn = await mongoose.createConnection(TENANT_DB).asPromise();
+  // Step 2: Check User in tenant DB (dynamically using mapping.databaseName)
+  console.log(`\nStep 2: Checking User in tenant DB (${mapping.databaseName})...`);
+  const tenantUri = getDatabaseUri(mapping.databaseName);
+  const tenantConn = await mongoose.createConnection(tenantUri).asPromise();
   const user = await tenantConn.db.collection('users').findOne({ 
     email: EMAIL.toLowerCase() 
   });

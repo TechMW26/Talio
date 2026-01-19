@@ -238,8 +238,8 @@ export default function AttendanceReportPage() {
       if (record.status === 'late') {
         lateArrivals++
       }
-      // Check for early departure (less than 90% of full day hours on a present day)
-      if (record.status === 'present' && record.workHours && record.workHours < (fullDayHours * 0.9)) {
+      // Check for early departure (less than 81.25% of full day hours on a present day = early checkout)
+      if (record.status === 'present' && record.workHours && record.workHours < (fullDayHours * 0.8125)) {
         earlyDepartures++
       }
     })

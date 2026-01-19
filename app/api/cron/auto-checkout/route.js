@@ -153,19 +153,26 @@ function calculateWorkHours(checkIn, checkOut, breakTimings = []) {
 
 /**
  * Determine attendance status based on work hours
+ * 
+ * Thresholds (for 8-hour workday):
+ * - Present (full day): ≥6.5 hours (81.25%) - may have shrinkage deducted
+ * - Early checkout: ≥5 hours but <6.5 hours (62.5%-81.25%) - counts as present but flagged
+ * - Half-day: <5 hours (below 62.5%)
  */
 function determineStatus(workHours, fullDayHours = 8, halfDayHours = 4) {
-  // 90% of full day = present
-  const presentThreshold = fullDayHours * 0.9
-  // 50% of full day = half day
-  const halfDayThreshold = fullDayHours * 0.5
+  // New thresholds:
+  // - Full day threshold: 81.25% (6.5h for 8h day) - present with possible shrinkage
+  // - Early checkout threshold: 62.5% (5h for 8h day) - present but flagged as early
+  // - Below early checkout = half-day
+  const fullDayThreshold = fullDayHours * 0.8125 // 6.5 hours for 8-hour day
+  const earlyCheckoutThreshold = fullDayHours * 0.625 // 5 hours for 8-hour day
   
-  if (workHours >= presentThreshold) {
-    return { status: 'present', reason: `Worked ${workHours.toFixed(2)} hours (≥${presentThreshold.toFixed(1)}h threshold)` }
-  } else if (workHours >= halfDayThreshold) {
-    return { status: 'half-day', reason: `Worked ${workHours.toFixed(2)} hours (≥${halfDayThreshold.toFixed(1)}h, <${presentThreshold.toFixed(1)}h)` }
+  if (workHours >= fullDayThreshold) {
+    return { status: 'present', reason: `Worked ${workHours.toFixed(2)} hours (≥${fullDayThreshold.toFixed(1)}h threshold)`, isEarlyCheckout: false }
+  } else if (workHours >= earlyCheckoutThreshold) {
+    return { status: 'present', reason: `Worked ${workHours.toFixed(2)} hours (early checkout - ≥${earlyCheckoutThreshold.toFixed(1)}h but <${fullDayThreshold.toFixed(1)}h)`, isEarlyCheckout: true }
   } else {
-    return { status: 'absent', reason: `Worked only ${workHours.toFixed(2)} hours (<${halfDayThreshold.toFixed(1)}h threshold)` }
+    return { status: 'half-day', reason: `Worked only ${workHours.toFixed(2)} hours (<${earlyCheckoutThreshold.toFixed(1)}h threshold)`, isEarlyCheckout: false }
   }
 }
 

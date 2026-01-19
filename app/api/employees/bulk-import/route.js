@@ -8,6 +8,38 @@ import { syncUserToBackup } from '@/lib/backupDb'
 import { registerUserTenantMapping, getTenantCompanyByDbName } from '@/lib/tenantContext'
 
 /**
+ * Parse salary value from various formats (handles commas, currency symbols, etc.)
+ * Examples: "8,000" → 8000, "₹100,000" → 100000, "50000.50" → 50000.50, "Rs. 25,000" → 25000
+ */
+function parseSalaryValue(value) {
+  if (value === undefined || value === null || value === '') return 0
+  
+  // If already a number, return it
+  if (typeof value === 'number' && !isNaN(value)) return value
+  
+  // Convert to string and clean up
+  let strValue = String(value).trim()
+  
+  // Remove currency symbols (₹, $, Rs, Rs., INR, etc.)
+  strValue = strValue.replace(/^[\s₹$€£¥]*/g, '') // Leading currency symbols
+  strValue = strValue.replace(/^(rs\.?|inr|usd|eur|gbp)\s*/gi, '') // Currency codes
+  strValue = strValue.replace(/[\s₹$€£¥]*$/g, '') // Trailing currency symbols
+  
+  // Remove thousands separators (commas and spaces used as separators)
+  // Be careful not to remove decimal separators
+  // Indian format: 1,00,000 or Western format: 100,000
+  strValue = strValue.replace(/,/g, '')
+  
+  // Remove any remaining whitespace
+  strValue = strValue.trim()
+  
+  // Parse the cleaned value
+  const parsed = parseFloat(strValue)
+  
+  return isNaN(parsed) ? 0 : parsed
+}
+
+/**
  * Smart level detection based on designation/job title
  * Levels: 1=Entry, 2=Junior, 3=Mid, 4=Senior, 5=Lead, 6=Manager, 7=Director, 8=Executive
  */
@@ -162,7 +194,7 @@ function generateRandomPassword() {
  * Standard breakdown: Basic 40%, HRA 40% of Basic (16% of gross), Conveyance ₹800 fixed, Medical 5%, Special = remainder
  */
 function calculateSalaryBreakdown(grossSalary) {
-  const gross = parseFloat(grossSalary) || 0
+  const gross = parseSalaryValue(grossSalary)
   if (gross <= 0) {
     return null
   }
@@ -1370,7 +1402,8 @@ async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignatio
   if (data.designationLevelName) employeeData.designationLevelName = data.designationLevelName
 
   // Handle salary fields - auto-distribute from gross salary
-  const grossSalaryValue = parseFloat(data.grossSalary) || parseFloat(data.salary) || parseFloat(data.ctc ? data.ctc / 12 : 0)
+  // Use parseSalaryValue to handle formatted numbers (commas, currency symbols, etc.)
+  const grossSalaryValue = parseSalaryValue(data.grossSalary) || parseSalaryValue(data.salary) || parseSalaryValue(data.ctc ? data.ctc / 12 : 0)
   if (grossSalaryValue > 0) {
     const salaryBreakdown = calculateSalaryBreakdown(grossSalaryValue)
     if (salaryBreakdown) {
@@ -1383,7 +1416,7 @@ async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignatio
     // Fallback: if only basic salary provided, store it directly
     employeeData.salary = {
       ...(existingEmployee?.salary || {}),
-      basic: parseFloat(data.basicSalary),
+      basic: parseSalaryValue(data.basicSalary),
     }
   }
 
@@ -1768,7 +1801,10 @@ export async function POST(request) {
     const worksheet = workbook.Sheets[sheetName]
 
     // Convert to array of arrays (with header)
-    const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: false, dateNF: 'yyyy-mm-dd' })
+    // Using raw: true to get actual numeric values instead of formatted strings
+    // This prevents issues like "8,000" being truncated to "8" when parsed
+    // The parseSalaryValue function handles both raw numbers and formatted strings as fallback
+    const rawData = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: true, dateNF: 'yyyy-mm-dd' })
 
     if (rawData.length < 2) {
       return NextResponse.json(

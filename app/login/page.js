@@ -364,7 +364,7 @@ export default function LoginPage() {
                   {loading ? (
                     <>
                       <Loader size="xs" color="#ffffff" />
-                      <span className="ml-2">Signing in...</span>
+                      <center><span className="ml-2">Signing in...</span></center>
                     </>
                   ) : (
                     'Sign in'

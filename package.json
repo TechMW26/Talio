@@ -16,7 +16,8 @@
     "migrate:levelnames": "node scripts/migrate-designation-levelnames.js",
     "setup:activities": "node scripts/setup-activity-collection.js",
     "drop:attendance-tasks": "node scripts/drop-attendance-tasks.js",
-    "migrate:sessions": "node scripts/migrate-productivity-to-sessions.js"
+    "migrate:sessions": "node scripts/migrate-productivity-to-sessions.js",
+    "rectify:salaries": "node scripts/rectify-truncated-salaries.js"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

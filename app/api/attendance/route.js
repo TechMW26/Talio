@@ -270,11 +270,14 @@ export async function GET(request) {
       // Case 1: Has checkOut but still showing in-progress
       if (record.status === 'in-progress' && record.checkIn && record.checkOut && record.workHours) {
         // Determine correct status based on work hours
-        let correctedStatus = 'absent'
-        if (record.workHours >= 7.2) { // 90% of 8 hours
+        // New thresholds: >=6.5h = present, >=5h = present (early checkout), <5h = half-day
+        let correctedStatus = 'half-day'
+        let isEarlyCheckout = false
+        if (record.workHours >= 6.5) { // 81.25% of 8 hours
           correctedStatus = 'present'
-        } else if (record.workHours >= 4) { // 50% of 8 hours
-          correctedStatus = 'half-day'
+        } else if (record.workHours >= 5) { // 62.5% of 8 hours - early checkout
+          correctedStatus = 'present'
+          isEarlyCheckout = true
         }
 
         // Update the database in background (non-blocking)
@@ -310,13 +313,16 @@ export async function GET(request) {
         const workHours = parseFloat((totalMinutes / 60).toFixed(2))
 
         // Determine status
-        const presentThreshold = fullDayHours * 0.9
-        const halfDayThreshold = fullDayHours * 0.5
-        let autoStatus = 'absent'
-        if (workHours >= presentThreshold) {
+        // New thresholds: >=6.5h = present, >=5h = present (early checkout), <5h = half-day
+        const fullDayThreshold = fullDayHours * 0.8125 // 6.5 hours for 8-hour day
+        const earlyCheckoutThreshold = fullDayHours * 0.625 // 5 hours for 8-hour day
+        let autoStatus = 'half-day'
+        let isEarlyCheckout = false
+        if (workHours >= fullDayThreshold) {
           autoStatus = 'present'
-        } else if (workHours >= halfDayThreshold) {
-          autoStatus = 'half-day'
+        } else if (workHours >= earlyCheckoutThreshold) {
+          autoStatus = 'present'
+          isEarlyCheckout = true
         }
 
         // Update the database in background (non-blocking)
