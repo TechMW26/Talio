@@ -1584,7 +1584,7 @@ export default function MailPage() {
                         setSelectedEmail(email);
                         if (!email.isRead) toggleRead(email);
                       }}
-                      className={`flex items-center gap-2 px-2 py-2 border-b border-gray-100 cursor-pointer group transition-colors ${isSelected
+                      className={`flex items-start gap-2 px-2 py-2 border-b border-gray-100 cursor-pointer group transition-colors ${isSelected
                         ? 'bg-[#c2e7ff]'
                         : selectedEmail?.messageId === email.messageId
                           ? 'bg-[#c2dbff]'
@@ -1623,7 +1623,7 @@ export default function MailPage() {
                       </button>
 
                       {/* Content */}
-                      <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center">
+                      <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-start">
                         {/* Sender */}
                         <div className={`sm:w-44 truncate text-sm ${!email.isRead ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>
                           {email.from?.name || email.from?.email || '?'}

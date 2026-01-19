@@ -9,14 +9,11 @@ import { textToParticles, AI_MESSAGES, CHAR_WIDTH } from './particleFont'
  * Global AI Loading Animation Overlay
  * 
  * Features:
- * - Animated mesh gradient background (magenta, blue, black, red)
- * - Pulsating backdrop blur (1px - 20px) - ONLY after transition completes
+ * - Fully transparent background (no tint, no blur)
  * - Morphing 3D shapes (sphere → cube → pyramid → star → back)
  * - Particles disintegrate and reintegrate showing "thinking"
  * - Text messages formed by particles
- * 
- * NOTE: The blur effect only starts AFTER MiraTransitionOverlay completes
- * its particle-from-header animation. This is coordinated via transitionComplete.
+ * - Uses theme colors for particle coloring
  */
 
 // 3D Shape definitions
@@ -209,8 +206,6 @@ export default function GlobalAILoadingOverlay() {
   const [mounted, setMounted] = useState(false)
   const [isVisible, setIsVisible] = useState(false)
   const [isAnimatingOut, setIsAnimatingOut] = useState(false)
-  const [bgOpacity, setBgOpacity] = useState(0.5)
-  const [showBg, setShowBg] = useState(false) // Control background visibility
   
   // Get theme colors for particles - use primary 500 (lighter) and 800 (darker)
   const themeColorsRef = useRef({
@@ -240,31 +235,7 @@ export default function GlobalAILoadingOverlay() {
     }
   }, [theme])
 
-  // Subtle background opacity pulse (45% - 55%)
-  useEffect(() => {
-    if (!isVisible || !showBg) return
-    
-    let startTime = Date.now()
-    let bgAnimFrame = null
-    
-    const animateBg = () => {
-      const elapsed = (Date.now() - startTime) * 0.001
-      const opacity = 0.45 + (Math.sin(elapsed * 1.5) * 0.5 + 0.5) * 0.1
-      setBgOpacity(opacity)
-      bgAnimFrame = requestAnimationFrame(animateBg)
-    }
-    
-    animateBg()
-    
-    return () => {
-      if (bgAnimFrame) cancelAnimationFrame(bgAnimFrame)
-    }
-  }, [isVisible, showBg])
 
-  // Keep backdrop visible whenever the overlay is visible
-  useEffect(() => {
-    setShowBg(isVisible)
-  }, [isVisible])
 
   // Handle visibility transitions - wait for transition to complete before showing
   useEffect(() => {
@@ -619,21 +590,9 @@ export default function GlobalAILoadingOverlay() {
 
   return (
     <>
-      {/* Backdrop layer - white tint without blur - only after transition */}
-      {showBg && (
-        <div 
-          className={`fixed inset-0 z-[999998] ${
-            isAnimatingOut ? 'ai-loading-exit' : 'ai-bg-enter'
-          }`}
-          style={{
-            backgroundColor: `rgba(0, 0, 0, ${Math.min(bgOpacity, 0.6)})`,
-          }}
-        />
-      )}
-      
-      {/* Main overlay container */}
+      {/* Main overlay container - fully transparent background */}
       <div 
-        className={`fixed inset-0 z-[999999] pointer-events-auto ${
+        className={`fixed inset-0 z-[999999] pointer-events-none ${
           isAnimatingOut ? 'ai-loading-exit' : 'ai-loading-enter'
         }`}
       >
@@ -651,15 +610,6 @@ export default function GlobalAILoadingOverlay() {
         }
 
         @keyframes aiLoadingEnter {
-          0% { opacity: 0; }
-          100% { opacity: 1; }
-        }
-
-        .ai-bg-enter {
-          animation: aiBgEnter 0.8s ease-out forwards;
-        }
-
-        @keyframes aiBgEnter {
           0% { opacity: 0; }
           100% { opacity: 1; }
         }

@@ -86,9 +86,9 @@ export default function HolidaysWidget({ limit = 5 }) {
                         return (
                             <div
                                 key={holiday._id || index}
-                                className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                                className="flex items-center justify-between gap-2 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                             >
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
                                     <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
                                         <FaGift className="w-5 h-5 text-primary-600" />
                                     </div>

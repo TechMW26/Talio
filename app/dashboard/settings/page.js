@@ -68,7 +68,7 @@ function CompanySelector({ companies, selectedCompany, onSelect, onBack, loading
             <button
               key={company._id}
               onClick={() => onSelect(company)}
-              className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-blue-200 transition-all text-left group"
+              className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-blue-200 transition-all text-left group overflow-hidden"
             >
               <div className="flex items-start gap-4">
                 <div className="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden flex-shrink-0 group-hover:bg-blue-50 transition-colors">
@@ -78,7 +78,7 @@ function CompanySelector({ companies, selectedCompany, onSelect, onBack, loading
                     <FaBuilding className="w-7 h-7 text-gray-400 group-hover:text-blue-500 transition-colors" />
                   )}
                 </div>
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 overflow-hidden">
                   <h4 className="font-semibold text-gray-800 truncate group-hover:text-blue-600 transition-colors">{company.name}</h4>
                   <p className="text-sm text-gray-500 uppercase">{company.code}</p>
                   {company.address?.city && (
@@ -565,7 +565,7 @@ function CompanySettingsTab() {
           {companies.map((company) => (
             <div
               key={company._id}
-              className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer"
+              className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer overflow-hidden"
               onClick={() => handleOpenModal(company)}
             >
               <div className="flex items-start gap-4">
@@ -579,7 +579,7 @@ function CompanySettingsTab() {
                 </div>
 
                 {/* Company Info */}
-                <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0 overflow-hidden">
                   <h3 className="font-semibold text-lg truncate text-gray-800">{company.name}</h3>
                   <p className="text-sm text-gray-500 uppercase">{company.code}</p>
                   {company.description && (

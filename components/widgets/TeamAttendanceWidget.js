@@ -106,12 +106,12 @@ export default function TeamAttendanceWidget() {
         {teamAttendance.slice(0, 6).map((member, index) => {
           const statusDisplay = getStatusDisplay(member.status)
           return (
-            <div key={index} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 text-xs font-medium">
+            <div key={index} className="flex items-center justify-between gap-2 py-2 border-b border-gray-100 last:border-0">
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 text-xs font-medium flex-shrink-0">
                   {member.firstName?.charAt(0)}{member.lastName?.charAt(0)}
                 </div>
-                <span className="text-sm text-gray-700">{member.firstName} {member.lastName}</span>
+                <span className="text-sm text-gray-700 truncate">{member.firstName} {member.lastName}</span>
               </div>
               <span className={`px-2 py-0.5 text-xs rounded-full ${statusDisplay.bgColor} ${statusDisplay.textColor}`}>
                 {statusDisplay.label}
