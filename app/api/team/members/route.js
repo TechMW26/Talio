@@ -75,6 +75,58 @@ export async function GET(request) {
         .select('firstName lastName employeeCode email phone dateOfJoining designation designationLevel designationLevelName department reportingManager profilePicture skills')
         .sort({ firstName: 1 })
         .lean()
+
+      // Also include department heads who might not be in the department directly
+      const deptDetails = await Department.find({ _id: { $in: filteredDepartmentIds } })
+        .populate('head', 'firstName lastName employeeCode email phone dateOfJoining designation designationLevel designationLevelName department reportingManager profilePicture skills')
+        .populate('heads', 'firstName lastName employeeCode email phone dateOfJoining designation designationLevel designationLevelName department reportingManager profilePicture skills')
+        .lean()
+
+      // Collect all department head employee IDs
+      const existingMemberIds = new Set(teamMembers.map(m => m._id.toString()))
+      const additionalHeads = []
+
+      for (const dept of deptDetails) {
+        // Add single head if exists and not already in list
+        if (dept.head && !existingMemberIds.has(dept.head._id.toString())) {
+          const headEmployee = await Employee.findById(dept.head._id)
+            .populate('designation', 'title level levelName')
+            .populate('department', 'name code')
+            .populate('reportingManager', 'firstName lastName employeeCode')
+            .select('firstName lastName employeeCode email phone dateOfJoining designation designationLevel designationLevelName department reportingManager profilePicture skills')
+            .lean()
+          if (headEmployee && headEmployee.status !== 'inactive') {
+            headEmployee.isDepartmentHead = true
+            headEmployee.headOfDepartment = dept.name
+            additionalHeads.push(headEmployee)
+            existingMemberIds.add(headEmployee._id.toString())
+          }
+        }
+        // Add multiple heads if exist
+        if (dept.heads && dept.heads.length > 0) {
+          for (const head of dept.heads) {
+            if (head && !existingMemberIds.has(head._id.toString())) {
+              const headEmployee = await Employee.findById(head._id)
+                .populate('designation', 'title level levelName')
+                .populate('department', 'name code')
+                .populate('reportingManager', 'firstName lastName employeeCode')
+                .select('firstName lastName employeeCode email phone dateOfJoining designation designationLevel designationLevelName department reportingManager profilePicture skills')
+                .lean()
+              if (headEmployee && headEmployee.status !== 'inactive') {
+                headEmployee.isDepartmentHead = true
+                headEmployee.headOfDepartment = dept.name
+                additionalHeads.push(headEmployee)
+                existingMemberIds.add(headEmployee._id.toString())
+              }
+            }
+          }
+        }
+      }
+
+      // Combine and sort
+      teamMembers = [...additionalHeads, ...teamMembers].sort((a, b) => 
+        (a.firstName || '').localeCompare(b.firstName || '')
+      )
     } else {
       // Fallback: Check if user is a department head via Department.head or Department.heads reference
       const headDepartments = await Department.find({
@@ -83,7 +135,10 @@ export async function GET(request) {
           { head: userRecord.employeeId },
           { heads: userRecord.employeeId }
         ]
-      }).lean()
+      })
+        .populate('head', 'firstName lastName employeeCode email phone dateOfJoining designation designationLevel designationLevelName department reportingManager profilePicture skills')
+        .populate('heads', 'firstName lastName employeeCode email phone dateOfJoining designation designationLevel designationLevelName department reportingManager profilePicture skills')
+        .lean()
 
       if (headDepartments.length > 0) {
         isDepartmentHead = true
@@ -101,6 +156,52 @@ export async function GET(request) {
           .select('firstName lastName employeeCode email phone dateOfJoining designation designationLevel designationLevelName department reportingManager profilePicture skills')
           .sort({ firstName: 1 })
           .lean()
+
+        // Also include department heads who might not be in the department directly
+        const existingMemberIds = new Set(teamMembers.map(m => m._id.toString()))
+        const additionalHeads = []
+
+        for (const dept of headDepartments) {
+          // Add single head if exists and not already in list
+          if (dept.head && !existingMemberIds.has(dept.head._id.toString())) {
+            const headEmployee = await Employee.findById(dept.head._id)
+              .populate('designation', 'title level levelName')
+              .populate('department', 'name code')
+              .populate('reportingManager', 'firstName lastName employeeCode')
+              .select('firstName lastName employeeCode email phone dateOfJoining designation designationLevel designationLevelName department reportingManager profilePicture skills')
+              .lean()
+            if (headEmployee && headEmployee.status !== 'inactive') {
+              headEmployee.isDepartmentHead = true
+              headEmployee.headOfDepartment = dept.name
+              additionalHeads.push(headEmployee)
+              existingMemberIds.add(headEmployee._id.toString())
+            }
+          }
+          // Add multiple heads if exist
+          if (dept.heads && dept.heads.length > 0) {
+            for (const head of dept.heads) {
+              if (head && !existingMemberIds.has(head._id.toString())) {
+                const headEmployee = await Employee.findById(head._id)
+                  .populate('designation', 'title level levelName')
+                  .populate('department', 'name code')
+                  .populate('reportingManager', 'firstName lastName employeeCode')
+                  .select('firstName lastName employeeCode email phone dateOfJoining designation designationLevel designationLevelName department reportingManager profilePicture skills')
+                  .lean()
+                if (headEmployee && headEmployee.status !== 'inactive') {
+                  headEmployee.isDepartmentHead = true
+                  headEmployee.headOfDepartment = dept.name
+                  additionalHeads.push(headEmployee)
+                  existingMemberIds.add(headEmployee._id.toString())
+                }
+              }
+            }
+          }
+        }
+
+        // Combine and sort
+        teamMembers = [...additionalHeads, ...teamMembers].sort((a, b) => 
+          (a.firstName || '').localeCompare(b.firstName || '')
+        )
       } else if (userRole === 'department_head' || userRole === 'manager') {
         // Check user's own department as final fallback
         const userEmployee = await Employee.findById(userRecord.employeeId).select('department').lean()

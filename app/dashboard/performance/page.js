@@ -152,7 +152,7 @@ export default function PerformancePage() {
         {canManagePerformance() && (
           <div className="flex space-x-3">
             <button
-              onClick={() => router.push('/dashboard/team')}
+              onClick={() => router.push('/dashboard/team/members')}
               className="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors flex items-center space-x-2"
             >
               <FaPlus className="w-4 h-4" />

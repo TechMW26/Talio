@@ -393,7 +393,7 @@ export default function ManagerDashboard({ user }) {
         icon: FaUsers,
         color: 'stat-icon-blue',
         trend: 'neutral',
-        href: '/dashboard/team'
+        href: '/dashboard/team/members'
       },
       {
         title: 'Present Today',

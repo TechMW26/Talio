@@ -133,9 +133,11 @@ const ContentSection = ({
   onSaveEdit,
   editValue,
   setEditValue,
-  isLoading
+  isLoading,
+  loadingSectionIndex
 }) => {
   const textareaRef = useRef(null);
+  const isThisSectionLoading = loadingSectionIndex === index;
 
   useEffect(() => {
     if (isEditing && textareaRef.current) {
@@ -150,7 +152,7 @@ const ContentSection = ({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.1 }}
-      className={`rounded-xl border ${section.color?.border || 'border-gray-200'} bg-white overflow-hidden`}
+      className={`rounded-xl border ${section.color?.border || 'border-gray-200'} bg-white overflow-hidden ${isThisSectionLoading ? 'ring-2 ring-violet-300 ring-opacity-50' : ''}`}
     >
       {/* Section Header */}
       <div 
@@ -262,11 +264,26 @@ const ContentSection = ({
                       disabled={isLoading}
                       className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg bg-violet-50 hover:bg-violet-100 text-violet-600 transition-colors disabled:opacity-50"
                     >
-                      <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M1 4v6h6M23 20v-6h-6" />
-                        <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" />
-                      </svg>
-                      Regenerate
+                      {isThisSectionLoading ? (
+                        <motion.svg 
+                          className="w-3 h-3" 
+                          viewBox="0 0 24 24" 
+                          fill="none" 
+                          stroke="currentColor" 
+                          strokeWidth="2"
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        >
+                          <path d="M1 4v6h6M23 20v-6h-6" />
+                          <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" />
+                        </motion.svg>
+                      ) : (
+                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M1 4v6h6M23 20v-6h-6" />
+                          <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" />
+                        </svg>
+                      )}
+                      {isThisSectionLoading ? 'Regenerating...' : 'Regenerate'}
                     </button>
                   </>
                 )}
@@ -392,6 +409,8 @@ export default function MiraAgentSidebar({
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [chatInput, setChatInput] = useState('');
   const [error, setError] = useState(null);
+  const [loadingSectionIndex, setLoadingSectionIndex] = useState(null);
+  const [isChatLoading, setIsChatLoading] = useState(false);
   
   // Track content modifications after plotting
   const [contentModifiedAfterPlot, setContentModifiedAfterPlot] = useState(false);
@@ -624,7 +643,7 @@ export default function MiraAgentSidebar({
   const handleRegenerateSection = async (sectionIndex) => {
     if (!preparedContent?.sections?.[sectionIndex]) return;
 
-    setIsLoading(true);
+    setLoadingSectionIndex(sectionIndex);
     setError(null);
 
     try {
@@ -662,7 +681,7 @@ export default function MiraAgentSidebar({
     } catch (err) {
       setError(err.message);
     } finally {
-      setIsLoading(false);
+      setLoadingSectionIndex(null);
     }
   };
 
@@ -682,7 +701,7 @@ export default function MiraAgentSidebar({
   const handleChatEdit = async () => {
     if (!chatInput.trim() || !preparedContent) return;
 
-    setIsLoading(true);
+    setIsChatLoading(true);
     setError(null);
 
     try {
@@ -715,7 +734,7 @@ export default function MiraAgentSidebar({
     } catch (err) {
       setError(err.message);
     } finally {
-      setIsLoading(false);
+      setIsChatLoading(false);
     }
   };
 
@@ -1121,6 +1140,7 @@ export default function MiraAgentSidebar({
                     editValue={editValue}
                     setEditValue={setEditValue}
                     isLoading={isLoading}
+                    loadingSectionIndex={loadingSectionIndex}
                   />
                 ))}
               </div>
@@ -1140,8 +1160,23 @@ export default function MiraAgentSidebar({
               )}
 
               {/* Chat edit input */}
-              <div className="pt-3 border-t border-gray-200">
-                <p className="text-xs text-gray-500 mb-2">Ask MIRA to make changes:</p>
+              <div className={`pt-3 border-t border-gray-200 transition-all ${isChatLoading ? 'opacity-75' : ''}`}>
+                <p className="text-xs text-gray-500 mb-2">
+                  {isChatLoading ? (
+                    <span className="flex items-center gap-2">
+                      <motion.span
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="inline-block"
+                      >
+                        ✨
+                      </motion.span>
+                      MIRA is updating content...
+                    </span>
+                  ) : (
+                    'Ask MIRA to make changes:'
+                  )}
+                </p>
                 <div className="flex gap-2">
                   <input
                     ref={chatInputRef}
@@ -1155,22 +1190,35 @@ export default function MiraAgentSidebar({
                       }
                     }}
                     placeholder="e.g., Add more details to the first section..."
-                    className="flex-1 px-3 py-2 rounded-lg bg-white border border-gray-200 
-                      text-sm text-gray-800 placeholder-gray-400
+                    className={`flex-1 px-3 py-2 rounded-lg bg-white border text-sm text-gray-800 placeholder-gray-400
                       focus:outline-none focus:ring-2 focus:ring-violet-400/40
-                      transition-all"
-                    disabled={isLoading}
+                      transition-all ${isChatLoading ? 'border-violet-300 animate-pulse' : 'border-gray-200'}`}
+                    disabled={isChatLoading}
                   />
                   <button
                     onClick={handleChatEdit}
-                    disabled={!chatInput.trim() || isLoading}
+                    disabled={!chatInput.trim() || isChatLoading}
                     className="px-4 py-2 rounded-lg bg-violet-500 text-white 
                       disabled:opacity-50 disabled:cursor-not-allowed
                       hover:bg-violet-600 transition-colors"
                   >
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
-                    </svg>
+                    {isChatLoading ? (
+                      <motion.svg 
+                        className="w-4 h-4" 
+                        viewBox="0 0 24 24" 
+                        fill="none" 
+                        stroke="currentColor" 
+                        strokeWidth="2"
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      >
+                        <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="12" />
+                      </motion.svg>
+                    ) : (
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
+                      </svg>
+                    )}
                   </button>
                 </div>
               </div>

@@ -42,8 +42,8 @@ const getBoundingBox = (obj) => {
   // Connectors have points array or element references - calculate bbox from points
   if (obj.type === 'connector') {
     if (obj.points && obj.points.length >= 2) {
-      const xs = obj.points.map(p => p.x);
-      const ys = obj.points.map(p => p.y);
+      const xs = obj.points.map(p => Number(p.x) || 0);
+      const ys = obj.points.map(p => Number(p.y) || 0);
       const minX = Math.min(...xs);
       const minY = Math.min(...ys);
       return { x: minX, y: minY, width: Math.max(...xs) - minX || 10, height: Math.max(...ys) - minY || 10 };
@@ -54,16 +54,16 @@ const getBoundingBox = (obj) => {
 
   if (obj.type === 'pencil' || obj.type === 'line' || obj.type.includes('rrow')) {
     if (!obj.points || obj.points.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
-    const xs = obj.points.map(p => p.x);
-    const ys = obj.points.map(p => p.y);
+    const xs = obj.points.map(p => Number(p.x) || 0);
+    const ys = obj.points.map(p => Number(p.y) || 0);
     const minX = Math.min(...xs);
     const minY = Math.min(...ys);
     return { x: minX, y: minY, width: Math.max(...xs) - minX, height: Math.max(...ys) - minY };
   }
 
-  // Ensure x and y have default values
-  const x = obj.x ?? 0;
-  const y = obj.y ?? 0;
+  // Ensure x and y have default values - use Number() to handle NaN
+  const x = Number(obj.x) || 0;
+  const y = Number(obj.y) || 0;
 
   // For text objects, calculate dimensions based on actual text content and font size
   if (obj.type === 'text') {
@@ -71,8 +71,8 @@ const getBoundingBox = (obj) => {
     return {
       x,
       y,
-      width: Math.max(obj.width || 0, measured.width, 50),
-      height: Math.max(obj.height || 0, measured.height, 20)
+      width: Math.max(Number(obj.width) || 0, measured.width, 50),
+      height: Math.max(Number(obj.height) || 0, measured.height, 20)
     };
   }
 
@@ -81,12 +81,12 @@ const getBoundingBox = (obj) => {
     return {
       x,
       y,
-      width: obj.width || 200,
-      height: obj.height || 200
+      width: Number(obj.width) || 200,
+      height: Number(obj.height) || 200
     };
   }
 
-  return { x, y, width: obj.width || 0, height: obj.height || 0 };
+  return { x, y, width: Number(obj.width) || 0, height: Number(obj.height) || 0 };
 };
 
 // Get connection points on element edges
@@ -258,6 +258,40 @@ const COLORS = [
   '#0d99ff', '#9747ff', '#ffffff', '#b3b3b3', '#757575'
 ];
 
+// Normalize object coordinates to ensure they're valid numbers (prevents drag/resize issues)
+const normalizeObjectCoordinates = (obj) => {
+  if (!obj) return obj;
+  
+  const normalized = { ...obj };
+  
+  // Normalize x, y, width, height to be valid numbers
+  if ('x' in normalized) normalized.x = Number(normalized.x) || 0;
+  if ('y' in normalized) normalized.y = Number(normalized.y) || 0;
+  if ('width' in normalized) normalized.width = Number(normalized.width) || 0;
+  if ('height' in normalized) normalized.height = Number(normalized.height) || 0;
+  
+  // Normalize points array if present
+  if (normalized.points && Array.isArray(normalized.points)) {
+    normalized.points = normalized.points.map(p => ({
+      ...p,
+      x: Number(p.x) || 0,
+      y: Number(p.y) || 0,
+    }));
+  }
+  
+  return normalized;
+};
+
+// Normalize all objects in a pages array
+const normalizePages = (pages) => {
+  if (!pages || !Array.isArray(pages)) return pages;
+  
+  return pages.map(page => ({
+    ...page,
+    objects: (page.objects || []).map(normalizeObjectCoordinates)
+  }));
+};
+
 const WhiteboardCanvas = forwardRef(({
   boardId,
   initialData = null,
@@ -269,7 +303,10 @@ const WhiteboardCanvas = forwardRef(({
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
 
-  const [pages, setPages] = useState(initialData?.pages || [{ id: generateId(), objects: [] }]);
+  // Normalize initial pages to ensure coordinates are valid numbers
+  const [pages, setPages] = useState(() => 
+    normalizePages(initialData?.pages) || [{ id: generateId(), objects: [] }]
+  );
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [showGrid, setShowGrid] = useState(true);
 
@@ -298,6 +335,8 @@ const WhiteboardCanvas = forwardRef(({
   
   // Ref to track drag targets immediately (avoids React state timing issues)
   const dragTargetIdsRef = useRef([]);
+  // Ref to track drag start point immediately (avoids React state timing issues)
+  const dragStartRef = useRef(null);
 
   const [history, setHistory] = useState([]);
   const [future, setFuture] = useState([]);
@@ -438,6 +477,7 @@ const WhiteboardCanvas = forwardRef(({
     setShowElementOptions(false);
     setDebouncedPanelPosition(null);
     dragTargetIdsRef.current = [];
+    dragStartRef.current = null;
   }, [boardId, currentPageIndex]);
 
   // Reset debounced panel position when selection changes
@@ -1822,6 +1862,10 @@ const WhiteboardCanvas = forwardRef(({
 
       const hit = hitTest(point);
       if (hit) {
+        // Clear any stale selection box state
+        setSelectionBox(null);
+        setStartPoint(null);
+        
         // Determine which IDs we're going to drag
         let targetIds;
         if (!selectedIds.includes(hit.id)) {
@@ -1836,8 +1880,9 @@ const WhiteboardCanvas = forwardRef(({
           // Already selected - use current selection
           targetIds = selectedIds;
         }
-        // Store target IDs in ref immediately (fixes React state timing issue for drag)
+        // Store target IDs and drag start in refs immediately (fixes React state timing issues for drag)
         dragTargetIdsRef.current = targetIds;
+        dragStartRef.current = point;
         // Save initial positions for drag calculation
         saveHistory();
         setDragStart(point);
@@ -1845,6 +1890,7 @@ const WhiteboardCanvas = forwardRef(({
       } else {
         setSelectedIds([]);
         dragTargetIdsRef.current = [];
+        dragStartRef.current = null;
         // Set startPoint for selection box drawing
         setStartPoint(point);
         setSelectionBox({ x: point.x, y: point.y, width: 0, height: 0 });
@@ -2179,11 +2225,12 @@ const WhiteboardCanvas = forwardRef(({
       return;
     }
 
-    // Use dragTargetIdsRef for immediate access (avoids React state timing issues)
+    // Use refs for immediate access (avoids React state timing issues)
     const dragIds = dragTargetIdsRef.current.length > 0 ? dragTargetIdsRef.current : selectedIds;
-    if (dragIds.length > 0 && dragStart) {
-      const dx = point.x - dragStart.x;
-      const dy = point.y - dragStart.y;
+    const currentDragStart = dragStartRef.current || dragStart;
+    if (dragIds.length > 0 && currentDragStart) {
+      const dx = point.x - currentDragStart.x;
+      const dy = point.y - currentDragStart.y;
       updateObjects(objects.map(obj => {
         if (!dragIds.includes(obj.id)) return obj;
         if (obj.points) return { ...obj, points: obj.points.map(p => ({ x: p.x + dx, y: p.y + dy })) };
@@ -2192,6 +2239,8 @@ const WhiteboardCanvas = forwardRef(({
         const currentY = Number(obj.y) || 0;
         return { ...obj, x: currentX + dx, y: currentY + dy };
       }));
+      // Update both ref and state
+      dragStartRef.current = point;
       setDragStart(point);
       return;
     }
@@ -2356,6 +2405,7 @@ const WhiteboardCanvas = forwardRef(({
     setDragStart(null);
     setStartPoint(null);
     dragTargetIdsRef.current = []; // Clear drag target ref
+    dragStartRef.current = null; // Clear drag start ref
   }, [currentPath, selectionBox, objects, updateObjects, straightenLine, recognizeShape, resizeHandle, saveHistory, connectorDrawing]);
 
   const handleTextSubmit = useCallback(() => {
@@ -3111,7 +3161,8 @@ const WhiteboardCanvas = forwardRef(({
         body: JSON.stringify({
           action: 'plot-from-content',
           preparedContent,
-          templateType
+          templateType,
+          targetPageIndex: currentPageIndex // Plot on the currently active page
         })
       });
 
@@ -3122,9 +3173,10 @@ const WhiteboardCanvas = forwardRef(({
       }
 
       // Update canvas with generated objects
-      if (data.pages && data.pages[0]) {
+      if (data.pages) {
         saveHistory();
-        setPages(data.pages);
+        // Normalize coordinates to ensure drag/resize works properly
+        setPages(normalizePages(data.pages));
 
         // Animate new objects and zoom to fit
         if (data.generatedObjects && data.generatedObjects.length > 0) {
@@ -3180,7 +3232,7 @@ const WhiteboardCanvas = forwardRef(({
       setAiLoading(false);
       stopAILoading();
     }
-  }, [boardId, saveHistory, setPages, animateNewObjects, smoothZoomToFitContent, startScanAnimation, startAILoading, stopAILoading]);
+  }, [boardId, currentPageIndex, saveHistory, setPages, animateNewObjects, smoothZoomToFitContent, startScanAnimation, startAILoading, stopAILoading]);
 
   // Handle content update from sidebar (for sync)
   const handleSidebarContentUpdate = useCallback((updatedContent) => {
@@ -3204,7 +3256,10 @@ const WhiteboardCanvas = forwardRef(({
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ action: 'continue' })
+        body: JSON.stringify({ 
+          action: 'continue',
+          targetPageIndex: currentPageIndex // Continue on the currently active page
+        })
       });
 
       const data = await response.json();
@@ -3214,9 +3269,10 @@ const WhiteboardCanvas = forwardRef(({
       }
 
       // Update canvas with new objects
-      if (data.pages && data.pages[0]) {
+      if (data.pages) {
         saveHistory();
-        setPages(data.pages);
+        // Normalize coordinates to ensure drag/resize works properly
+        setPages(normalizePages(data.pages));
 
         // Animate but don't select
         if (data.generatedObjects && data.generatedObjects.length > 0) {
@@ -3242,7 +3298,7 @@ const WhiteboardCanvas = forwardRef(({
       setAiLoading(false);
       stopAILoading();
     }
-  }, [boardId, saveHistory, setPages, animateNewObjects, smoothZoomToFitContent, startAILoading, stopAILoading]);
+  }, [boardId, currentPageIndex, saveHistory, setPages, animateNewObjects, smoothZoomToFitContent, startAILoading, stopAILoading]);
 
   // Restructure the canvas - clean up layout, align elements, fix spacing
   const restructureCanvas = useCallback(async () => {
@@ -3275,7 +3331,8 @@ const WhiteboardCanvas = forwardRef(({
       // Replace all objects with restructured version
       if (data.pages && data.pages[0]) {
         saveHistory();
-        setPages(data.pages);
+        // Normalize coordinates to ensure drag/resize works properly
+        setPages(normalizePages(data.pages));
       }
 
       setAiAnalysis(data.aiAnalysis);
@@ -5380,7 +5437,8 @@ const WhiteboardCanvas = forwardRef(({
                 const data = JSON.parse(event.target.result);
                 if (data.pages) {
                   saveHistory();
-                  setPages(data.pages);
+                  // Normalize coordinates to ensure drag/resize works properly
+                  setPages(normalizePages(data.pages));
                   setCurrentPageIndex(0);
                 }
               } catch (err) {

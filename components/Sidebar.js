@@ -224,9 +224,8 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
       const teamMenuItem = {
         name: 'Team',
         icon: HiOutlineUsers,
-        path: '/dashboard/team',
+        path: '/dashboard/team/members',
         submenu: [
-          { name: 'Team Dashboard', path: '/dashboard/team' },
           { name: 'Team Members', path: '/dashboard/team/members' },
           { name: 'Team Ratings', path: '/dashboard/performance/ratings' },
           { name: 'Team Goals', path: '/dashboard/performance/goals' },

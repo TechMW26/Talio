@@ -99,12 +99,14 @@ export default function TeamMemberDetailsPage() {
 
   const getStatusColor = (status) => {
     const colors = {
-      assigned: 'bg-blue-100 text-blue-800',
-      in_progress: 'bg-yellow-100 text-yellow-800',
-      review: 'bg-purple-100 text-purple-800',
-      completed: 'bg-green-100 text-green-800',
-      on_hold: 'bg-gray-100 text-gray-800',
-      cancelled: 'bg-red-100 text-red-800'
+      'todo': 'bg-gray-100 text-gray-800',
+      'in-progress': 'bg-yellow-100 text-yellow-800',
+      'review': 'bg-purple-100 text-purple-800',
+      'completed': 'bg-green-100 text-green-800',
+      'completed-pending-approval': 'bg-purple-100 text-purple-800',
+      'rejected': 'bg-red-100 text-red-800',
+      'blocked': 'bg-orange-100 text-orange-800',
+      'archived': 'bg-gray-100 text-gray-600'
     }
     return colors[status] || 'bg-gray-100 text-gray-800'
   }
@@ -292,8 +294,8 @@ export default function TeamMemberDetailsPage() {
                   <div key={task._id} className="border border-gray-200 rounded-lg p-3">
                     <div className="flex items-start justify-between mb-2">
                       <h3 className="font-medium text-gray-900 flex-1">{task.title}</h3>
-                      <span className={`px-2 py-1 text-xs rounded ${getStatusColor(task.status)}`}>
-                        {task.status.replace('_', ' ')}
+                      <span className={`px-2 py-1 text-xs rounded capitalize ${getStatusColor(task.status)}`}>
+                        {task.status.replace(/-/g, ' ')}
                       </span>
                     </div>
                     {task.project && (
@@ -302,7 +304,7 @@ export default function TeamMemberDetailsPage() {
                       </p>
                     )}
                     <div className="flex items-center justify-between text-xs text-gray-500">
-                      <span>Assigned by: {task.assignedBy?.firstName} {task.assignedBy?.lastName}</span>
+                      <span>Assigned by: {task.assignedBy?.firstName || 'Unknown'} {task.assignedBy?.lastName || ''}</span>
                       {task.dueDate && (
                         <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
                       )}

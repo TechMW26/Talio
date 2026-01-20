@@ -6,7 +6,7 @@ import toast from '@/utils/toast'
 import Loader from '@/components/ui/Loader'
 import {
   FaUsers, FaSearch, FaUser, FaEnvelope, FaPhone, FaCalendarAlt,
-  FaBriefcase, FaStar, FaChartLine, FaFilter
+  FaBriefcase, FaStar, FaChartLine, FaFilter, FaCrown
 } from 'react-icons/fa'
 import { formatDesignation } from '@/lib/formatters'
 
@@ -156,22 +156,34 @@ export default function TeamMembersPage() {
             >
               {/* Profile Picture */}
               <div className="flex items-center mb-4">
-                <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xl mr-4">
-                  {member.profilePicture ? (
-                    <img
-                      src={member.profilePicture}
-                      alt={`${member.firstName} ${member.lastName}`}
-                      className="w-16 h-16 rounded-full object-cover"
-                    />
-                  ) : (
-                    `${member.firstName.charAt(0)}${member.lastName.charAt(0)}`
+                <div className="relative">
+                  <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xl">
+                    {member.profilePicture ? (
+                      <img
+                        src={member.profilePicture}
+                        alt={`${member.firstName} ${member.lastName}`}
+                        className="w-16 h-16 rounded-full object-cover"
+                      />
+                    ) : (
+                      `${member.firstName.charAt(0)}${member.lastName.charAt(0)}`
+                    )}
+                  </div>
+                  {member.isDepartmentHead && (
+                    <div className="absolute -top-1 -right-1 w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center" title={`Head of ${member.headOfDepartment || 'Department'}`}>
+                      <FaCrown className="text-white text-xs" />
+                    </div>
                   )}
                 </div>
-                <div className="flex-1">
+                <div className="flex-1 ml-4">
                   <h3 className="text-lg font-bold text-gray-900">
                     {member.firstName} {member.lastName}
                   </h3>
                   <p className="text-sm text-gray-600">{member.employeeCode}</p>
+                  {member.isDepartmentHead && (
+                    <span className="inline-block mt-1 px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs rounded-full font-medium">
+                      Dept Head{member.headOfDepartment ? ` - ${member.headOfDepartment}` : ''}
+                    </span>
+                  )}
                 </div>
               </div>
 

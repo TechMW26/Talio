@@ -121,15 +121,7 @@ export default function EmployeeRatingsPage() {
           <h1 className="text-3xl font-bold text-gray-800">Employee Ratings</h1>
           <p className="text-gray-600 mt-1">Manage employee performance ratings and reviews</p>
         </div>
-        {canManageRatings() && (
-          <button
-            onClick={() => router.push('/dashboard/team')} // Redirect to team dashboard to add rating via member profile
-            className="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors flex items-center space-x-2"
-          >
-            <FaPlus className="w-4 h-4" />
-            <span>Add Rating (via Team)</span>
-          </button>
-        )}
+
       </div>
 
       {/* Stats Cards */}

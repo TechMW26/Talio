@@ -1160,29 +1160,35 @@ Return ONLY valid JSON array. No explanations.`;
 
       const templateType = body.templateType || 'mindmap';
       
-      // Enhanced template-specific structure definitions with deep research focus
+      // Enhanced template-specific structure definitions - DYNAMIC with no hardcoded limits
       const templateStructures = {
         mindmap: {
-          description: 'comprehensive radial thought map with central topic and extensively branching ideas',
+          description: 'comprehensive radial thought map with central topic and extensively branching ideas - unlimited depth and breadth',
           minSections: 6,
-          maxSections: 8,
-          itemsPerSection: '5-8',
+          maxSections: 15,
+          itemsPerSection: '10-50',
+          dynamicLayout: true,
           sections: [
             { type: 'central', title: 'Core Concept & Definition', purpose: 'The fundamental definition, scope, and significance of the topic' },
-            { type: 'branch', title: 'Key Dimensions & Components', purpose: '6-8 primary aspects, pillars, or dimensions of the topic' },
+            { type: 'branch', title: 'Key Dimensions & Components', purpose: 'All primary aspects, pillars, or dimensions of the topic' },
             { type: 'context', title: 'Market/Industry Context', purpose: 'Current landscape, trends, statistics, and relevant data points' },
             { type: 'stakeholders', title: 'Stakeholders & Audience', purpose: 'Who is affected, target demographics, user personas, decision makers' },
             { type: 'strategies', title: 'Strategies & Approaches', purpose: 'Methodologies, frameworks, best practices, proven techniques' },
             { type: 'challenges', title: 'Challenges & Solutions', purpose: 'Common obstacles, risks, mitigation strategies, and workarounds' },
             { type: 'metrics', title: 'Success Metrics & KPIs', purpose: 'How to measure success, benchmarks, industry standards' },
             { type: 'action', title: 'Implementation Roadmap', purpose: 'Concrete next steps, priorities, quick wins, long-term initiatives' },
+            { type: 'dependencies', title: 'Dependencies & Prerequisites', purpose: 'What needs to be in place, blockers, enablers' },
+            { type: 'alternatives', title: 'Alternatives & Options', purpose: 'Other approaches, plan B scenarios, contingencies' },
+            { type: 'resources', title: 'Resources & Tools', purpose: 'Required tools, platforms, documentation, references' },
+            { type: 'timeline', title: 'Timeline & Milestones', purpose: 'Key dates, phases, checkpoints' },
           ]
         },
         flowchart: {
-          description: 'detailed process flow with comprehensive steps, decision logic, and exception handling',
+          description: 'detailed process flow with comprehensive steps, decision logic, exception handling, and all possible paths',
           minSections: 5,
-          maxSections: 7,
-          itemsPerSection: '4-7',
+          maxSections: 15,
+          itemsPerSection: '10-50',
+          dynamicLayout: true,
           sections: [
             { type: 'prerequisites', title: 'Prerequisites & Inputs', purpose: 'Required resources, data, approvals, or conditions needed before starting' },
             { type: 'start', title: 'Initiation Phase', purpose: 'Entry points, triggers, and initial setup steps' },
@@ -1191,13 +1197,17 @@ Return ONLY valid JSON array. No explanations.`;
             { type: 'parallel', title: 'Parallel Workflows', purpose: 'Concurrent activities, dependencies, synchronization points' },
             { type: 'exceptions', title: 'Exception Handling', purpose: 'Error scenarios, fallback procedures, escalation paths' },
             { type: 'outputs', title: 'Outputs & Deliverables', purpose: 'Expected results, quality criteria, handoff points' },
+            { type: 'loops', title: 'Iteration & Loops', purpose: 'Repeat conditions, loop exits, retry logic' },
+            { type: 'validation', title: 'Validation & Quality Gates', purpose: 'Checkpoints, verification steps, approval stages' },
+            { type: 'rollback', title: 'Rollback & Recovery', purpose: 'Undo procedures, recovery paths, fallback options' },
           ]
         },
         planning: {
-          description: 'comprehensive project plan with strategic objectives, detailed tasks, and resource allocation',
+          description: 'comprehensive project plan with strategic objectives, detailed tasks, resource allocation, and full timeline',
           minSections: 6,
-          maxSections: 8,
-          itemsPerSection: '5-8',
+          maxSections: 15,
+          itemsPerSection: '10-50',
+          dynamicLayout: true,
           sections: [
             { type: 'vision', title: 'Vision & Objectives', purpose: 'Strategic goals, success criteria, alignment with broader initiatives' },
             { type: 'scope', title: 'Scope Definition', purpose: 'In-scope items, out-of-scope items, boundaries and constraints' },
@@ -1207,39 +1217,57 @@ Return ONLY valid JSON array. No explanations.`;
             { type: 'risks', title: 'Risks & Mitigation', purpose: 'Identified risks, probability, impact, mitigation strategies' },
             { type: 'milestones', title: 'Milestones & Deadlines', purpose: 'Key dates, dependencies, critical path items' },
             { type: 'governance', title: 'Governance & Review', purpose: 'Review cadence, stakeholder updates, decision authority' },
+            { type: 'communication', title: 'Communication Plan', purpose: 'Stakeholder updates, reporting frequency, channels' },
+            { type: 'quality', title: 'Quality Assurance', purpose: 'Testing approach, acceptance criteria, sign-off process' },
+            { type: 'dependencies', title: 'Dependencies & Blockers', purpose: 'External dependencies, internal blockers, resolution paths' },
+            { type: 'success_criteria', title: 'Success Criteria & KPIs', purpose: 'Measurable outcomes, metrics, benchmarks' },
           ]
         },
         eventcircuit: {
-          description: 'comprehensive decision chain reaction analysis with consequence mapping, probability assessment, and optimal path calculation',
-          minSections: 8,
-          maxSections: 10,
-          itemsPerSection: '4-6',
+          description: 'exhaustive decision chain reaction analysis mapping ALL possible permutations, branching outcomes, probability assessments, and convergent conclusions',
+          minSections: 12,
+          maxSections: 20,
+          itemsPerSection: '10-50',
+          dynamicChainDepth: true,
           sections: [
-            { type: 'decision_point', title: 'Decision/Goal Definition', purpose: 'The core decision to analyze or goal to achieve, with full context and constraints' },
-            { type: 'immediate_outcomes', title: 'Immediate Outcomes (T+0)', purpose: 'Direct first-order effects that happen immediately upon decision/action' },
-            { type: 'chain_level_1', title: 'First Chain Reactions (T+1)', purpose: 'Second-order effects triggered by immediate outcomes, branching possibilities' },
-            { type: 'chain_level_2', title: 'Deep Chain Reactions (T+2+)', purpose: 'Third and fourth-order cascading effects, long-term consequences' },
-            { type: 'probability_paths', title: 'Probability Assessment', purpose: 'Likelihood percentages for each branch, confidence levels, key assumptions' },
-            { type: 'risk_pathways', title: 'Risk Pathways & Failure Modes', purpose: 'Worst-case scenarios, failure chains, negative spirals to avoid' },
-            { type: 'opportunity_branches', title: 'Opportunity Branches', purpose: 'Best-case scenarios, success amplifiers, positive feedback loops' },
-            { type: 'critical_dependencies', title: 'Critical Dependencies', purpose: 'Key factors that determine which path actualizes, decision points, triggers' },
-            { type: 'optimal_path', title: 'Optimal Path Analysis', purpose: 'Recommended route with highest success probability and best risk/reward ratio' },
-            { type: 'contingency_routes', title: 'Alternative Routes & Pivots', purpose: 'Backup paths, pivot points, course corrections if primary path fails' },
+            { type: 'root_decision', title: 'Core Decision/Goal', purpose: 'The central decision or goal being analyzed - the single starting point of the entire chain reaction' },
+            { type: 'context_constraints', title: 'Context & Constraints', purpose: 'Environmental factors, limitations, resources available, stakeholders involved, timeline pressures' },
+            { type: 'possible_actions', title: 'Possible Actions/Choices', purpose: 'All distinct action paths that can be taken from the root decision - each becomes a major branch' },
+            { type: 'immediate_outcomes_t0', title: 'Immediate Outcomes (T+0)', purpose: 'Direct first-order effects for EACH action choice - what happens within hours/days of decision' },
+            { type: 'chain_reactions_t1', title: 'Chain Reactions (T+1)', purpose: 'Second-order effects triggered by T+0 outcomes - branching possibilities within weeks' },
+            { type: 'chain_reactions_t2', title: 'Chain Reactions (T+2)', purpose: 'Third-order cascading effects from T+1 - compound consequences within months' },
+            { type: 'chain_reactions_t3', title: 'Chain Reactions (T+3)', purpose: 'Fourth-order deep cascade effects - long-term ramifications within 6-12 months' },
+            { type: 'chain_reactions_t4_plus', title: 'Deep Cascade (T+4+)', purpose: 'Fifth-order and beyond - ultimate long-term consequences, generational effects if applicable' },
+            { type: 'decision_nodes', title: 'Critical Decision Points', purpose: 'Key branching moments where choices must be made - IF/THEN decision diamonds in the flow' },
+            { type: 'probability_matrix', title: 'Probability Matrix', purpose: 'Likelihood percentages for each branch path with confidence levels and key assumptions' },
+            { type: 'risk_cascade', title: 'Risk Cascade Pathways', purpose: 'Failure chains showing how small risks compound into major problems - worst-case scenario mapping' },
+            { type: 'opportunity_cascade', title: 'Opportunity Cascade Pathways', purpose: 'Success amplifier chains showing how wins compound - best-case scenario mapping' },
+            { type: 'convergence_points', title: 'Convergence Points', purpose: 'Where multiple branches merge back together - common outcomes from different paths' },
+            { type: 'terminal_outcomes', title: 'Terminal Outcomes', purpose: 'ALL possible final conclusions/endpoints of the chain reaction - multiple end states' },
+            { type: 'optimal_path', title: 'Optimal Path Analysis', purpose: 'The recommended route with highest probability-weighted success - step by step actions' },
+            { type: 'alternative_paths', title: 'Alternative Viable Paths', purpose: 'Backup routes and pivot strategies if primary path encounters obstacles' },
+            { type: 'early_warning_indicators', title: 'Early Warning Indicators', purpose: 'Signals that indicate which branch path is actualizing - monitoring triggers' },
+            { type: 'action_items', title: 'Immediate Action Items', purpose: 'Concrete next steps to execute with owners, deadlines, and success metrics' },
           ]
         },
         ideas: {
-          description: 'extensive creative brainstorm with categorized concepts, feasibility analysis, and prioritization',
+          description: 'extensive creative brainstorm with categorized concepts, feasibility analysis, prioritization, and actionable next steps - unlimited ideas',
           minSections: 6,
-          maxSections: 8,
-          itemsPerSection: '5-8',
+          maxSections: 15,
+          itemsPerSection: '10-50',
+          dynamicLayout: true,
           sections: [
             { type: 'theme', title: 'Central Theme & Context', purpose: 'Core problem statement, opportunity space, constraints' },
             { type: 'research', title: 'Research & Insights', purpose: 'Data points, user insights, market research, competitor analysis' },
             { type: 'categories', title: 'Idea Categories', purpose: 'Grouped concepts by theme, approach, or target segment' },
             { type: 'innovative', title: 'Innovative Concepts', purpose: 'Bold, disruptive, or unconventional ideas worth exploring' },
             { type: 'practical', title: 'Practical Solutions', purpose: 'Immediately actionable, low-risk, quick-win ideas' },
+            { type: 'moonshots', title: 'Moonshot Ideas', purpose: 'High-risk high-reward transformational concepts' },
+            { type: 'incremental', title: 'Incremental Improvements', purpose: 'Small optimizations that compound over time' },
             { type: 'evaluation', title: 'Feasibility Analysis', purpose: 'Pros/cons, resource requirements, implementation complexity' },
             { type: 'priorities', title: 'Prioritized Recommendations', purpose: 'Top picks with rationale, suggested sequencing' },
+            { type: 'validation', title: 'Validation Methods', purpose: 'How to test each idea, experiments, MVPs' },
+            { type: 'resources', title: 'Required Resources', purpose: 'What is needed to execute - people, tools, budget' },
             { type: 'next_steps', title: 'Exploration Paths', purpose: 'Questions to answer, experiments to run, validation needed' },
           ]
         }
@@ -1250,74 +1278,178 @@ Return ONLY valid JSON array. No explanations.`;
       // Template-specific deep research instructions
       const templateSpecificInstructions = {
         eventcircuit: `
-=== EVENT CIRCUIT ANALYSIS - SPECIAL INSTRUCTIONS ===
-This is a CHAIN REACTION CALCULATOR for decisions and goals. You MUST think like a systems theorist, decision scientist, and risk analyst combined.
+=== EVENT CIRCUIT CHAIN REACTION ANALYSIS - COMPREHENSIVE INSTRUCTIONS ===
 
-CRITICAL ANALYSIS REQUIREMENTS:
-1. CAUSALITY MAPPING: For every outcome, ask "AND THEN WHAT?" at least 3 levels deep
-2. BRANCHING LOGIC: Every decision can lead to 2-4 distinct pathways - map ALL of them
-3. PROBABILITY WEIGHTING: Assign realistic probability estimates (%) to each branch
-4. TEMPORAL PROGRESSION: Clearly show T+0 (immediate), T+1 (short-term), T+2+ (long-term) effects
-5. FEEDBACK LOOPS: Identify where outcomes can reinforce or dampen other effects
-6. CRITICAL NODES: Mark decision points where small changes create large divergence
+You are building a COMPLETE DECISION TREE that maps EVERY possible permutation and combination of outcomes. Think like a chess grandmaster calculating 20 moves ahead combined with a probability theorist.
 
-FOR GOALS: Calculate the optimal sequence of actions with highest success probability
-FOR DECISIONS: Map all possible futures with their likelihood and impact
+🎯 CORE MANDATE: Generate an EXHAUSTIVE chain reaction analysis until ALL branches reach natural conclusions. Do NOT artificially limit the depth or breadth.
 
-CHAIN REACTION DEPTH:
-- Level 0: The decision/action itself
-- Level 1: Immediate direct consequences (happens within hours/days)
-- Level 2: Secondary effects triggered by Level 1 (happens within weeks)
-- Level 3+: Cascade effects, compound consequences (months to years)
+═══════════════════════════════════════════════════════════════════════════════
+CHAIN REACTION RULES - FOLLOW EXACTLY:
+═══════════════════════════════════════════════════════════════════════════════
 
-RISK PATHWAY ANALYSIS:
-- Identify failure modes at each level
-- Show how small risks can cascade into major problems
-- Provide early warning indicators
+1. SINGLE ROOT: Start with ONE clear decision/goal as the root node
 
-OPPORTUNITY PATHWAY ANALYSIS:
-- Identify success amplifiers
-- Show how positive outcomes can compound
-- Highlight timing-sensitive opportunities
+2. BRANCHING LOGIC:
+   - Every action creates 2-6 possible outcome branches
+   - Every outcome can trigger new decisions (IF this happens, THEN these options...)
+   - Label each branch with: "IF [condition] → THEN [outcome] (X% probability)"
+   - Continue branching until you reach terminal states (conclusions)
 
-OPTIMAL PATH CALCULATION:
-- Consider probability × impact for each path
-- Account for reversibility of decisions
-- Identify the minimum viable path to success
+3. TEMPORAL CHAIN DEPTH:
+   - T+0: Immediate (hours/days) - What happens RIGHT after the decision?
+   - T+1: Short-term (weeks) - What does T+0 trigger?
+   - T+2: Medium-term (months) - What does T+1 cascade into?
+   - T+3: Long-term (6-12 months) - Compound effects
+   - T+4+: Ultimate outcomes (1+ years) - Final state
+   - KEEP GOING until natural conclusion - do NOT stop artificially
+
+4. DECISION NODE FORMAT:
+   Each decision point must specify:
+   - The decision/choice to be made
+   - All possible options (minimum 2, typically 3-5)
+   - Probability % for each option being chosen/occurring
+   - Key factors that influence which option manifests
+
+5. OUTCOME NODE FORMAT:
+   Each outcome must include:
+   - Clear description of what happens
+   - Probability % of this outcome
+   - Impact rating (1-10 scale)
+   - Time to manifest
+   - What it triggers next (next decision or terminal state)
+
+6. TERMINAL OUTCOMES:
+   - Multiple endpoints are EXPECTED (rarely single conclusion)
+   - Each terminal outcome should have:
+     • Final state description
+     • Cumulative probability to reach this state
+     • Overall impact assessment (positive/negative/neutral)
+     • Path summary (key decisions that led here)
+
+═══════════════════════════════════════════════════════════════════════════════
+CONTENT DENSITY REQUIREMENTS:
+═══════════════════════════════════════════════════════════════════════════════
+
+- MINIMUM 10 items per section (target 10-15 per section, NEVER less than 8)
+- For complex chain reactions, aim for 15-25 items per section
+- Be SPECIFIC with numbers, percentages, timeframes, and metrics
+- Include ACTIONABLE details - who does what, when, how
+- Every probability must be justified with reasoning
+- Map ALL failure modes AND success amplifiers
+- Identify convergence points where different paths lead to same outcome
+- Include probability percentages on EVERY branch (must sum to 100% for siblings)
+
+═══════════════════════════════════════════════════════════════════════════════
+ITEM FORMAT - USE THIS EXACTLY:
+═══════════════════════════════════════════════════════════════════════════════
+
+For decision nodes:
+"[DECISION] {Decision description} | Options: {Option A (X%), Option B (Y%), Option C (Z%)} | Factors: {key influencing factors}"
+
+For outcome nodes:
+"[OUTCOME] {What happens} | Probability: {X%} | Impact: {1-10} | Timeframe: {when} | Triggers: {what happens next}"
+
+For terminal outcomes:
+"[TERMINAL] {Final state} | Cumulative Probability: {X%} | Net Impact: {positive/negative/neutral, 1-10} | Path: {key decisions}"
+
+═══════════════════════════════════════════════════════════════════════════════
+EXAMPLE CHAIN STRUCTURE:
+═══════════════════════════════════════════════════════════════════════════════
+
+ROOT: "Launch new product in competitive market"
+├── [DECISION] Market entry timing | Options: Q1 Launch (40%), Q2 Launch (35%), Delay to Q3 (25%) | Factors: competitor moves, resource readiness
+│   ├── IF Q1 Launch (40%):
+│   │   ├── [OUTCOME] First mover advantage captured | Probability: 60% | Impact: 8 | Timeframe: 2 weeks | Triggers: competitor response decision
+│   │   │   ├── [DECISION] Competitor response | Options: Price war (30%), Feature race (45%), Market segmentation (25%)
+│   │   │   │   ├── IF Price war → [OUTCOME] Margin compression | Probability: 70% | Impact: -6 | Timeframe: 1 month | Triggers: sustainability assessment
+│   │   │   │   │   └── [TERMINAL] Market consolidation - 2 players remain | Cumulative: 8.4% | Net Impact: +3 | Path: Q1→FirstMover→PriceWar→Consolidation
+│   │   │   │   └── [continues branching...]
+│   │   └── [OUTCOME] Market resistance | Probability: 40% | Impact: -4 | Timeframe: 1 month | Triggers: pivot decision
+│   └── [continues for other timing options...]
+
+═══════════════════════════════════════════════════════════════════════════════
+PROBABILITY RULES:
+═══════════════════════════════════════════════════════════════════════════════
+
+- Sibling branches from same decision node must sum to 100%
+- Cumulative path probability = product of all probabilities along path
+- Flag any path with <5% cumulative probability as "Edge Case"
+- Highlight paths with >25% cumulative probability as "Primary Scenario"
+- Mark paths with >40% cumulative probability as "Most Likely Outcome"
+
+OUTPUT ALL SECTIONS FULLY - DO NOT TRUNCATE OR SUMMARIZE. CONTINUE UNTIL NATURAL CONCLUSIONS.
 `,
         mindmap: `
 === MINDMAP DEEP DIVE INSTRUCTIONS ===
 Create a comprehensive knowledge map that serves as a single source of truth for this topic.
+
+⚠️ MANDATORY ITEM COUNT - NON-NEGOTIABLE:
+- Each section MUST have 10-15 items (minimum 8, target 12)
+- If you write only 5 items, STOP and add 5-7 more
+- 5 items per section is UNACCEPTABLE and will be rejected
+
+CONTENT REQUIREMENTS:
 - Central concept should capture the ESSENCE in 3-5 words
 - Each branch should represent a DISTINCT dimension (not overlapping)
 - Sub-branches should drill down to SPECIFIC, actionable insights
 - Include real data, benchmarks, and industry standards where applicable
+- Cover ALL angles: who, what, when, where, why, how
+- Include contrarian views and edge cases
+- DO NOT artificially limit content - explore every relevant aspect
 `,
         flowchart: `
 === FLOWCHART PROCESS ANALYSIS INSTRUCTIONS ===
-Map the process with PRECISION - every step matters.
+Map the process with PRECISION and COMPLETENESS.
+
+⚠️ MANDATORY ITEM COUNT - NON-NEGOTIABLE:
+- Each section MUST have 10-15 items (minimum 8, target 12)
+- If you write only 5 items, STOP and add 5-7 more
+- 5 items per section is UNACCEPTABLE and will be rejected
+
+CONTENT REQUIREMENTS:
 - Include ALL decision points, not just the happy path
-- Show exception handling and error recovery
+- Show exception handling and error recovery for EVERY failure mode
 - Add time estimates where relevant
 - Identify bottlenecks and optimization opportunities
 - Include parallel processes that can run simultaneously
+- Map edge cases and rare scenarios
+- Document prerequisites and post-conditions for each step
 `,
         planning: `
 === PROJECT PLANNING INSTRUCTIONS ===
-Create a BATTLE-READY project plan.
-- Every task should be specific enough to be assigned
-- Include dependencies and blockers
-- Estimate effort realistically (include buffer)
-- Identify critical path items
+Create a BATTLE-READY, COMPREHENSIVE project plan.
+
+⚠️ MANDATORY ITEM COUNT - NON-NEGOTIABLE:
+- Each section MUST have 10-15 items (minimum 8, target 12)
+- If you write only 5 items, STOP and add 5-7 more
+- 5 items per section is UNACCEPTABLE and will be rejected
+
+CONTENT REQUIREMENTS:
+- Every task should be specific enough to be assigned to someone
+- Include dependencies and blockers for EACH task
+- Estimate effort realistically (include buffer for unknowns)
+- Identify ALL critical path items
 - Plan for risks before they happen
+- Include communication touchpoints
+- Document success criteria and acceptance tests
 `,
         ideas: `
 === BRAINSTORMING DEEP DIVE INSTRUCTIONS ===
 Generate ideas that span the FULL spectrum from safe to revolutionary.
-- Include at least 2 "crazy" ideas that challenge assumptions
+
+⚠️ MANDATORY ITEM COUNT - NON-NEGOTIABLE:
+- Each section MUST have 10-15 items (minimum 8, target 12)
+- If you write only 5 items, STOP and add 5-7 more
+- 5 items per section is UNACCEPTABLE and will be rejected
+
+CONTENT REQUIREMENTS:
+- Include at least 5 "crazy" ideas that challenge assumptions
 - Ground innovative ideas in feasibility assessment
 - Cross-pollinate ideas from adjacent industries
 - Include quick wins AND long-term moonshots
+- Rate each idea on effort/impact
+- Include ideas from different stakeholder perspectives
 `
       };
 
@@ -1379,10 +1511,33 @@ For the topic "${message}", you must explore:
 Generate ${structure.minSections}-${structure.maxSections} comprehensive sections:
 ${structure.sections.map((s, i) => `${i + 1}. ${s.title} - ${s.purpose}`).join('\n')}
 
-For EACH section, provide:
+═══════════════════════════════════════════════════════════════════════════════
+ITEM COUNT GUIDANCE - CRITICAL - MUST FOLLOW
+═══════════════════════════════════════════════════════════════════════════════
+
+⚠️ STRICT REQUIREMENT - YOUR RESPONSE WILL BE REJECTED IF NOT MET:
+
+For EACH section, you MUST provide:
 - A clear, specific title (not generic)
-- ${structure.itemsPerSection} detailed, actionable items (each should be a complete thought, 10-20 words)
-- A concise summary capturing the key insight
+- MINIMUM 10 items per section (absolute minimum 8, NEVER 5 or fewer)
+- TARGET: 10-15 items per section
+- Each item should be a complete, specific thought (10-25 words)
+- A concise summary
+
+❌ UNACCEPTABLE: Sections with only 4-6 items - this is insufficient depth
+✅ ACCEPTABLE: Sections with 10-15 items showing comprehensive analysis
+
+If you find yourself writing only 5-6 items, STOP and add more by:
+1. Breaking down points into more specific sub-aspects
+2. Adding "what NOT to do" versions of items  
+3. Including stakeholder-specific perspectives
+4. Adding measurement/metrics for abstract items
+5. Including real-world examples or case study references
+6. Adding prerequisites or dependencies
+7. Including common mistakes to avoid
+8. Adding best practice variations
+
+═══════════════════════════════════════════════════════════════════════════════
 
 === CRITICAL GUIDELINES ===
 - NO generic filler content - every item must be specific to this topic
@@ -1392,6 +1547,7 @@ For EACH section, provide:
 - Include contrarian or non-obvious perspectives
 - Make connections between sections explicit
 - The conclusion should synthesize key insights into strategic recommendations
+- Focus on COMPLETENESS - cover all angles, not just the obvious ones
 
 Return ONLY this JSON structure (no markdown, no explanation):
 {
@@ -1403,9 +1559,21 @@ Return ONLY this JSON structure (no markdown, no explanation):
       "type": "section_type",
       "title": "Specific Section Title",
       "items": [
-        "Detailed, specific, actionable item with concrete guidance (10-20 words each)",
-        "Another specific item that provides real value",
-        "Continue with ${structure.itemsPerSection} items per section"
+        "1. First detailed, specific, actionable item with concrete guidance",
+        "2. Second specific item that provides real insight and value",
+        "3. Third item with specific data point or benchmark",
+        "4. Fourth item covering another angle of this topic",
+        "5. Fifth item with actionable recommendation",
+        "6. Sixth item exploring edge cases or exceptions",
+        "7. Seventh item with best practice guidance",
+        "8. Eighth item covering common mistakes to avoid",
+        "9. Ninth item with specific tool or method recommendation",
+        "10. Tenth item with measurement or success criteria (MINIMUM REQUIRED)",
+        "11. Eleventh item with stakeholder consideration",
+        "12. Twelfth item with resource or budget implication",
+        "13. Thirteenth item with timeline or milestone guidance",
+        "14. Fourteenth item with risk or mitigation strategy",
+        "15. Fifteenth item completing comprehensive coverage (TARGET)"
       ],
       "summary": "Key insight or takeaway from this section (1-2 sentences)",
       "color": {
@@ -1417,21 +1585,22 @@ Return ONLY this JSON structure (no markdown, no explanation):
   ],
   "conclusion": "Strategic synthesis: What are the 3-5 most important takeaways and recommended next steps? Be specific and actionable.",
   "metadata": {
-    "itemCount": total_number_of_items,
-    "estimatedElements": approximate_canvas_elements_needed,
+    "itemCount": "total_items_should_be_120_plus_for_12_sections",
+    "estimatedElements": "approximate_canvas_elements_needed",
     "researchDepth": "comprehensive"
   }
 }`;
 
-      try {
-        const aiResponse = await generateSmartContent(preparePrompt, {
-          userId: user._id || user.userId,
-          feature: 'whiteboard-prepare',
-          skipRefinement: true
-        });
-
-        // Parse the response
-        let jsonStr = aiResponse.trim();
+      // ═══════════════════════════════════════════════════════════════
+      // ROBUST CONTENT GENERATION WITH RETRY & FALLBACK
+      // ═══════════════════════════════════════════════════════════════
+      const MAX_RETRIES = 3;
+      const RETRY_DELAY = 1000; // ms
+      
+      const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+      
+      const parseAIResponse = (response) => {
+        let jsonStr = response.trim();
         if (jsonStr.startsWith('```json')) jsonStr = jsonStr.slice(7);
         else if (jsonStr.startsWith('```')) jsonStr = jsonStr.slice(3);
         if (jsonStr.endsWith('```')) jsonStr = jsonStr.slice(0, -3);
@@ -1440,17 +1609,99 @@ Return ONLY this JSON structure (no markdown, no explanation):
         const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
         if (jsonMatch) jsonStr = jsonMatch[0];
 
-        let preparedContent;
         try {
-          preparedContent = JSON.parse(jsonStr);
+          return JSON.parse(jsonStr);
         } catch (e) {
           // Try to fix common JSON issues
           let fixedJson = jsonStr
             .replace(/,\s*}/g, '}')
             .replace(/,\s*\]/g, ']')
-            .replace(/[\r\n]+/g, ' ');
-          preparedContent = JSON.parse(fixedJson);
+            .replace(/[\r\n]+/g, ' ')
+            .replace(/\n/g, '\\n')
+            .replace(/\t/g, '\\t');
+          return JSON.parse(fixedJson);
         }
+      };
+
+      let preparedContent = null;
+      let lastError = null;
+      let retryCount = 0;
+
+      while (retryCount < MAX_RETRIES && !preparedContent) {
+        try {
+          console.log(`[MIRA] Content generation attempt ${retryCount + 1}/${MAX_RETRIES} for ${templateType}...`);
+          
+          const aiResponse = await generateSmartContent(preparePrompt, {
+            userId: user._id || user.userId,
+            feature: 'whiteboard-prepare',
+            skipRefinement: true
+          });
+
+          if (!aiResponse || aiResponse.trim().length === 0) {
+            throw new Error('Empty response from AI');
+          }
+
+          preparedContent = parseAIResponse(aiResponse);
+          
+          // Validate the parsed content
+          if (!preparedContent.sections || !Array.isArray(preparedContent.sections)) {
+            throw new Error('Invalid content structure - missing sections array');
+          }
+          
+          if (preparedContent.sections.length === 0) {
+            throw new Error('Invalid content structure - empty sections');
+          }
+          
+          // ═══════════════════════════════════════════════════════════════
+          // VALIDATE ITEM COUNTS - Reject if too few items per section
+          // ═══════════════════════════════════════════════════════════════
+          const MIN_ITEMS_PER_SECTION = 8;
+          const sectionsWithTooFewItems = preparedContent.sections.filter(
+            s => (s.items?.length || 0) < MIN_ITEMS_PER_SECTION
+          );
+          
+          if (sectionsWithTooFewItems.length > 0) {
+            const itemCounts = preparedContent.sections.map(s => s.items?.length || 0);
+            const avgItems = itemCounts.reduce((a, b) => a + b, 0) / itemCounts.length;
+            
+            // If average is below 7, reject and retry
+            if (avgItems < 7) {
+              console.warn(`[MIRA] Insufficient item density: avg ${avgItems.toFixed(1)} items/section. Sections: ${itemCounts.join(', ')}`);
+              throw new Error(`Insufficient content depth - only ${avgItems.toFixed(1)} items per section on average. Need at least 8.`);
+            } else {
+              // Log warning but accept if average is reasonable
+              console.warn(`[MIRA] Some sections have fewer than ${MIN_ITEMS_PER_SECTION} items: ${sectionsWithTooFewItems.map(s => `${s.title}: ${s.items?.length || 0}`).join(', ')}`);
+            }
+          }
+          
+          const totalItems = preparedContent.sections.reduce((sum, s) => sum + (s.items?.length || 0), 0);
+          console.log(`[MIRA] Successfully generated content with ${preparedContent.sections.length} sections, ${totalItems} total items (avg ${(totalItems / preparedContent.sections.length).toFixed(1)}/section)`);
+          
+        } catch (error) {
+          lastError = error;
+          retryCount++;
+          console.error(`[MIRA] Attempt ${retryCount} failed:`, error.message);
+          
+          if (retryCount < MAX_RETRIES) {
+            console.log(`[MIRA] Retrying in ${RETRY_DELAY}ms...`);
+            await sleep(RETRY_DELAY * retryCount); // Exponential backoff
+          }
+        }
+      }
+
+      // If all retries failed, return error
+      if (!preparedContent) {
+        console.error('[MIRA] All content generation attempts failed:', lastError);
+        return NextResponse.json({
+          error: `Failed to generate content after ${MAX_RETRIES} attempts. Please try rephrasing your request or try again later.`,
+          details: lastError?.message || 'Unknown error'
+        }, { status: 500 });
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // PROCESS SUCCESSFUL CONTENT
+      // ═══════════════════════════════════════════════════════════════
+      try {
 
         // Assign colors to sections if not provided
         const sectionColors = [
@@ -1531,11 +1782,12 @@ Return ONLY this JSON structure (no markdown, no explanation):
           generationId: prepareId
         });
 
-      } catch (parseError) {
-        console.error('Failed to prepare content:', parseError);
+      } catch (processError) {
+        console.error('[MIRA] Failed to process prepared content:', processError);
         return NextResponse.json({
-          error: 'Failed to prepare content. Please try describing your topic differently.'
-        }, { status: 400 });
+          error: 'Failed to process generated content. The content was generated but could not be saved. Please try again.',
+          details: processError?.message || 'Processing error'
+        }, { status: 500 });
       }
 
     } else if (action === 'expand-section') {
@@ -1753,17 +2005,44 @@ Return ONLY the updated JSON structure (same format as input, but modified):
 
     } else if (action === 'plot-from-content') {
       // Generate canvas objects from prepared content using COLLISION-AWARE SEQUENTIAL PLACEMENT
-      const { preparedContent, templateType } = body;
+      const { preparedContent, templateType, targetPageIndex = 0 } = body;
 
       if (!preparedContent) {
         return NextResponse.json({ error: 'Prepared content required' }, { status: 400 });
       }
 
-      // Get existing canvas layout to find safe starting position
-      const existingObjects = whiteboard.pages[0]?.objects || [];
-      const layout = analyzeLayout(existingObjects);
+      // Validate targetPageIndex and ensure the page exists
+      const pageIndex = Math.max(0, Math.min(targetPageIndex, whiteboard.pages.length - 1));
+      
+      // ═══════════════════════════════════════════════════════════════
+      // REMOVE PREVIOUS MIRA-GENERATED ELEMENTS (for update/re-plot)
+      // ═══════════════════════════════════════════════════════════════
+      const existingObjects = whiteboard.pages[pageIndex]?.objects || [];
+      
+      // Check if this is an update (has previous generation ID or replaceExisting flag)
+      const replaceExisting = body.replaceExisting !== false; // Default to true
+      const previousGenerationId = body.previousGenerationId || preparedContent.id?.replace('prep-', 'gen-');
+      
+      // Filter out previous MIRA-generated elements
+      let filteredObjects = existingObjects;
+      if (replaceExisting) {
+        // Remove ALL MIRA-generated elements (any element with id starting with 'mira-' or has generationId)
+        const previousCount = existingObjects.length;
+        filteredObjects = existingObjects.filter(obj => {
+          // Keep if not a MIRA element
+          const isMiraElement = obj.id?.startsWith('mira-') || obj.generationId;
+          return !isMiraElement;
+        });
+        const removedCount = previousCount - filteredObjects.length;
+        if (removedCount > 0) {
+          console.log(`[MIRA] Removed ${removedCount} previous MIRA-generated elements from page ${pageIndex} for clean re-plot`);
+        }
+      }
+      
+      // Analyze layout from remaining (non-MIRA) objects
+      const layout = analyzeLayout(filteredObjects);
 
-      // Calculate safe starting position
+      // Calculate starting position - if we removed elements, start fresh; otherwise offset
       const baseX = layout.hasContent ? Math.round(layout.bounds.maxX + 300) : 300;
       const baseY = layout.hasContent ? Math.round(layout.bounds.minY) : 300;
 
@@ -1845,22 +2124,41 @@ Return ONLY the updated JSON structure (same format as input, but modified):
       };
 
       // Place an element with collision detection
+      // Ensures all coordinate values are proper numbers to prevent drag/resize issues
       const placeElement = (element, isConnector = false) => {
+        // Normalize coordinates to ensure they're valid numbers
+        const normalizedElement = {
+          ...element,
+          x: Number(element.x) || 0,
+          y: Number(element.y) || 0,
+          width: Number(element.width) || (element.type === 'text' ? 100 : element.type === 'sticky' ? 200 : 100),
+          height: Number(element.height) || (element.type === 'text' ? 30 : element.type === 'sticky' ? 200 : 50),
+        };
+        
+        // Normalize points array for connectors
+        if (normalizedElement.points && Array.isArray(normalizedElement.points)) {
+          normalizedElement.points = normalizedElement.points.map(p => ({
+            ...p,
+            x: Number(p.x) || 0,
+            y: Number(p.y) || 0,
+          }));
+        }
+        
         if (isConnector) {
-          connectorElements.push(element);
+          connectorElements.push(normalizedElement);
         } else {
           // Register the element's bounding box
           const bounds = {
-            x: element.x,
-            y: element.y,
-            width: element.width || 100,
-            height: element.height || 50,
-            id: element.id
+            x: normalizedElement.x,
+            y: normalizedElement.y,
+            width: normalizedElement.width,
+            height: normalizedElement.height,
+            id: normalizedElement.id
           };
           placedElements.push(bounds);
-          contentElements.push(element);
+          contentElements.push(normalizedElement);
         }
-        return element;
+        return normalizedElement;
       };
 
       // ========== TEXT UTILITIES ==========
@@ -2113,27 +2411,36 @@ Return ONLY the updated JSON structure (same format as input, but modified):
               groupId: sectionGroupId
             });
 
-            // 3. PLACE ITEMS FOR THIS SECTION
+            // 3. PLACE ALL ITEMS FOR THIS SECTION - NO LIMIT
             const items = section.items || [];
-            const itemCount = Math.min(items.length, 6);
+            const itemCount = items.length; // No limit - use all items
             
             if (itemCount > 0) {
               // Determine item placement direction based on section position
               const angleFromCenter = Math.atan2(sectionCenterY - actualCenterY, sectionCenterX - actualCenterX);
               
-              // Items fan out in the direction away from center
-              const itemStartAngle = angleFromCenter - Math.PI/4;
-              const itemEndAngle = angleFromCenter + Math.PI/4;
+              // Items fan out in direction away from center - expand spread for more items
+              const spreadAngle = Math.min(Math.PI / 2, Math.PI / 6 + (itemCount * Math.PI / 40));
+              const itemStartAngle = angleFromCenter - spreadAngle / 2;
+              const itemEndAngle = angleFromCenter + spreadAngle / 2;
               const itemAngleStep = itemCount > 1 ? (itemEndAngle - itemStartAngle) / (itemCount - 1) : 0;
               
-              items.slice(0, 6).forEach((item, itemIdx) => {
+              // Place items in expanding rings if there are many
+              const itemsPerRing = 8;
+              items.forEach((item, itemIdx) => {
                 const itemText = wrapText(item, 180, 13);
                 const stickyWidth = 200;
                 const stickyHeight = Math.max(90, calculateTextHeight(itemText, 13) + 30);
                 
-                // Calculate preferred position
-                const itemAngle = itemCount === 1 ? angleFromCenter : itemStartAngle + itemAngleStep * itemIdx;
-                const itemDistance = 200 + (itemIdx % 2) * 50; // Stagger distances
+                // Calculate ring and position within ring
+                const ring = Math.floor(itemIdx / itemsPerRing);
+                const posInRing = itemIdx % itemsPerRing;
+                const ringItemCount = Math.min(itemsPerRing, itemCount - ring * itemsPerRing);
+                
+                // Calculate preferred position with expanding rings
+                const ringAngleStep = ringItemCount > 1 ? (itemEndAngle - itemStartAngle) / (ringItemCount - 1) : 0;
+                const itemAngle = ringItemCount === 1 ? angleFromCenter : itemStartAngle + ringAngleStep * posInRing;
+                const itemDistance = 200 + ring * 120 + (posInRing % 2) * 40; // Expand outward for each ring
                 const preferredX = sectionCenterX + Math.cos(itemAngle) * itemDistance - stickyWidth/2;
                 const preferredY = sectionCenterY + Math.sin(itemAngle) * itemDistance - stickyHeight/2;
                 
@@ -2601,15 +2908,16 @@ Return ONLY the updated JSON structure (same format as input, but modified):
                 opacity: 1
               });
 
-              // Place step items to the side
+              // Place step items to the side - NO LIMIT, dynamically position all items
               const items = section.items || [];
               if (items.length > 0) {
-                items.slice(0, 4).forEach((item, itemIdx) => {
+                items.forEach((item, itemIdx) => {
                   const itemText = wrapText(item, 160, 12);
                   const itemWidth = 180;
                   const itemHeight = Math.max(60, calculateTextHeight(itemText, 12) + 15);
                   const side = itemIdx % 2 === 0 ? 1 : -1;
-                  const offsetY = Math.floor(itemIdx / 2) * (itemHeight + 20);
+                  const row = Math.floor(itemIdx / 2);
+                  const offsetY = row * (itemHeight + 15);
                   
                   const itemPos = findValidPosition(
                     stepCenterX + side * (stepWidth/2 + 80) - itemWidth/2,
@@ -3020,19 +3328,31 @@ Return ONLY the updated JSON structure (same format as input, but modified):
               opacity: 0.5
             });
 
-            // 3. PLACE ITEMS SCATTERED AROUND SECTION
+            // 3. PLACE ALL ITEMS SCATTERED AROUND SECTION - NO LIMIT
             const items = section.items || [];
-            const itemRadius = 160;
-            const itemAngleSpread = Math.PI * 0.6;
-            const itemStartAngle = angle - itemAngleSpread/2;
-            const itemAngleStep = items.length > 1 ? itemAngleSpread / (items.length - 1) : 0;
-
-            items.slice(0, 5).forEach((item, itemIdx) => {
+            const itemCount = items.length;
+            
+            // Expand radius and angle spread for more items
+            const itemsPerRing = 6;
+            const baseRadius = 160;
+            
+            items.forEach((item, itemIdx) => {
               const itemText = wrapText(item, 150, 12);
               const itemWidth = 170;
               const itemHeight = Math.max(70, calculateTextHeight(itemText, 12) + 20);
               
-              const itemAngle = items.length === 1 ? angle : itemStartAngle + itemAngleStep * itemIdx;
+              // Calculate ring and position
+              const ring = Math.floor(itemIdx / itemsPerRing);
+              const posInRing = itemIdx % itemsPerRing;
+              const ringItemCount = Math.min(itemsPerRing, itemCount - ring * itemsPerRing);
+              
+              // Calculate angle and radius
+              const ringAngleSpread = Math.PI * 0.7;
+              const ringStartAngle = angle - ringAngleSpread / 2;
+              const ringAngleStep = ringItemCount > 1 ? ringAngleSpread / (ringItemCount - 1) : 0;
+              const itemAngle = ringItemCount === 1 ? angle : ringStartAngle + ringAngleStep * posInRing;
+              const itemRadius = baseRadius + ring * 100;
+              
               const preferredX = sectionCenterX + Math.cos(itemAngle) * itemRadius - itemWidth/2;
               const preferredY = sectionCenterY + Math.sin(itemAngle) * itemRadius - itemHeight/2;
               
@@ -3108,401 +3428,612 @@ Return ONLY the updated JSON structure (same format as input, but modified):
           }
         },
 
-        // ========== EVENT CIRCUIT LAYOUT ==========
+        // ========== EVENT CIRCUIT LAYOUT - FULLY DYNAMIC ==========
         eventcircuit: () => {
           const sections = preparedContent.sections || [];
           if (sections.length === 0) return;
 
           // ═══════════════════════════════════════════════════════════════
-          // LAYOUT CONFIGURATION - Using larger dimensions for clarity
+          // DYNAMIC LAYOUT CONFIGURATION
           // ═══════════════════════════════════════════════════════════════
-          const CARD_WIDTH = 280;
-          const CARD_MIN_HEIGHT = 100;
-          const CARD_GAP_X = 40;
-          const SECTION_GAP_Y = 120;
-          const CARDS_PER_ROW = 4;
+          const NODE_WIDTH = 220;
+          const NODE_MIN_HEIGHT = 60;
+          const DECISION_SIZE = 90;
+          const CIRCLE_RADIUS = 50;
+          const SIBLING_GAP_X = 25;
+          const ROW_GAP_Y = 40;
+          const SECTION_GAP_Y = 70;
           
+          // Dynamic center based on content width
+          const maxItemsPerRow = 6;
+          const estimatedWidth = maxItemsPerRow * (NODE_WIDTH + SIBLING_GAP_X);
+          const centerX = baseX + estimatedWidth / 2 + 200;
           let currentY = baseY + 50;
-          const centerX = baseX + 1400;
 
-          // COLOR SCHEMES
-          const colors = {
-            decision_point: { fill: '#DC2626', stroke: '#991B1B', light: '#FEE2E2', text: '#FFFFFF' },
-            immediate_outcomes: { fill: '#EA580C', stroke: '#C2410C', light: '#FFEDD5', text: '#FFFFFF' },
-            chain_level_1: { fill: '#D97706', stroke: '#B45309', light: '#FEF3C7', text: '#FFFFFF' },
-            chain_level_2: { fill: '#65A30D', stroke: '#4D7C0F', light: '#ECFCCB', text: '#FFFFFF' },
-            probability_paths: { fill: '#0891B2', stroke: '#0E7490', light: '#CFFAFE', text: '#FFFFFF' },
-            risk_pathways: { fill: '#DB2777', stroke: '#BE185D', light: '#FCE7F3', text: '#FFFFFF' },
-            opportunity_branches: { fill: '#059669', stroke: '#047857', light: '#D1FAE5', text: '#FFFFFF' },
-            critical_dependencies: { fill: '#7C3AED', stroke: '#6D28D9', light: '#EDE9FE', text: '#FFFFFF' },
-            optimal_path: { fill: '#0D9488', stroke: '#0F766E', light: '#CCFBF1', text: '#FFFFFF' },
-            contingency_routes: { fill: '#64748B', stroke: '#475569', light: '#F1F5F9', text: '#FFFFFF' }
+          // Generate colors dynamically for any section type
+          const colorPalette = [
+            { fill: '#DC2626', stroke: '#991B1B', light: '#FEE2E2', text: '#FFFFFF' },
+            { fill: '#EA580C', stroke: '#C2410C', light: '#FFEDD5', text: '#FFFFFF' },
+            { fill: '#D97706', stroke: '#B45309', light: '#FEF3C7', text: '#FFFFFF' },
+            { fill: '#65A30D', stroke: '#4D7C0F', light: '#ECFCCB', text: '#FFFFFF' },
+            { fill: '#059669', stroke: '#047857', light: '#D1FAE5', text: '#FFFFFF' },
+            { fill: '#0D9488', stroke: '#0F766E', light: '#CCFBF1', text: '#FFFFFF' },
+            { fill: '#0891B2', stroke: '#0E7490', light: '#CFFAFE', text: '#FFFFFF' },
+            { fill: '#6366F1', stroke: '#4F46E5', light: '#E0E7FF', text: '#FFFFFF' },
+            { fill: '#8B5CF6', stroke: '#7C3AED', light: '#EDE9FE', text: '#FFFFFF' },
+            { fill: '#DB2777', stroke: '#BE185D', light: '#FCE7F3', text: '#FFFFFF' },
+            { fill: '#F59E0B', stroke: '#D97706', light: '#FEF3C7', text: '#1F2937' },
+            { fill: '#10B981', stroke: '#059669', light: '#D1FAE5', text: '#FFFFFF' },
+            { fill: '#3B82F6', stroke: '#2563EB', light: '#DBEAFE', text: '#FFFFFF' },
+            { fill: '#EF4444', stroke: '#DC2626', light: '#FEE2E2', text: '#FFFFFF' },
+            { fill: '#1F2937', stroke: '#111827', light: '#F3F4F6', text: '#FFFFFF' },
+            { fill: '#64748B', stroke: '#475569', light: '#F1F5F9', text: '#FFFFFF' },
+            { fill: '#22C55E', stroke: '#16A34A', light: '#DCFCE7', text: '#FFFFFF' },
+            { fill: '#7C3AED', stroke: '#6D28D9', light: '#EDE9FE', text: '#FFFFFF' },
+          ];
+
+          // Special type colors (override palette for known types)
+          const typeColors = {
+            root_decision: colorPalette[0],
+            decision_nodes: colorPalette[10],
+            terminal_outcomes: colorPalette[14],
+            optimal_path: colorPalette[16],
+            risk_cascade: colorPalette[9],
+            opportunity_cascade: colorPalette[11],
+            action_items: colorPalette[12],
+            early_warning_indicators: colorPalette[13],
           };
 
-          const getColor = (type) => colors[type] || colors.decision_point;
-          const getSection = (type) => sections.find(s => s.type === type);
+          const getColor = (type, index) => typeColors[type] || colorPalette[index % colorPalette.length];
 
-          // Helper to place a row of cards and return the bottom Y position
-          const placeCardsRow = (items, startY, color, maxCards = CARDS_PER_ROW) => {
-            const cardCount = Math.min(items.length, maxCards);
-            if (cardCount === 0) return startY;
+          // Track all nodes for dynamic connections
+          const allNodes = new Map(); // sectionType -> nodes[]
+          let previousSectionNodes = [];
+
+          // ═══════════════════════════════════════════════════════════════
+          // HELPER: Create a sticky note node
+          // ═══════════════════════════════════════════════════════════════
+          const createNode = (x, y, text, color, badge = '') => {
+            const nodeId = generateId();
+            const wrappedText = wrapText(text, NODE_WIDTH - 20, 10);
+            const textHeight = calculateTextHeight(wrappedText, 10);
+            const nodeHeight = Math.max(NODE_MIN_HEIGHT, textHeight + (badge ? 40 : 25));
+            const displayText = badge ? `${badge}\n${wrappedText}` : wrappedText;
             
-            const totalWidth = cardCount * CARD_WIDTH + (cardCount - 1) * CARD_GAP_X;
-            let cardX = centerX - totalWidth / 2;
-            let maxBottomY = startY;
+            placeElement({
+              id: nodeId,
+              type: 'sticky',
+              x, y,
+              width: NODE_WIDTH,
+              height: nodeHeight,
+              text: displayText,
+              fillColor: color.light,
+              strokeColor: color.stroke,
+              strokeWidth: 2,
+              borderRadius: 8,
+              fontSize: 10,
+              opacity: 1
+            });
 
-            items.slice(0, maxCards).forEach((item, idx) => {
-              const text = wrapText(item, CARD_WIDTH - 30, 12);
-              const cardH = Math.max(CARD_MIN_HEIGHT, calculateTextHeight(text, 12) + 40);
+            return {
+              id: nodeId, x, y,
+              width: NODE_WIDTH,
+              height: nodeHeight,
+              centerX: x + NODE_WIDTH / 2,
+              centerY: y + nodeHeight / 2,
+              bottomY: y + nodeHeight,
+              topY: y
+            };
+          };
+
+          // ═══════════════════════════════════════════════════════════════
+          // HELPER: Create a decision diamond (with label below)
+          // ═══════════════════════════════════════════════════════════════
+          const createDiamond = (x, y, text, color) => {
+            const nodeId = generateId();
+            const size = DECISION_SIZE;
+            
+            placeElement({
+              id: nodeId,
+              type: 'diamond',
+              x, y,
+              width: size,
+              height: size,
+              fillColor: color.fill,
+              strokeColor: color.stroke,
+              strokeWidth: 3,
+              opacity: 1
+            });
+
+            // Place label BELOW the diamond to avoid overflow
+            const labelWidth = Math.max(size + 40, 140);
+            const labelText = text.length > 60 ? text.substring(0, 57) + '...' : text;
+            const wrappedLabel = wrapText(labelText, labelWidth - 10, 9);
+            const labelHeight = calculateTextHeight(wrappedLabel, 9) + 8;
+            
+            placeElement({
+              id: generateId(),
+              type: 'sticky',
+              x: x + size / 2 - labelWidth / 2,
+              y: y + size + 8,
+              width: labelWidth,
+              height: Math.max(30, labelHeight),
+              text: wrappedLabel,
+              fillColor: color.light,
+              strokeColor: color.stroke,
+              strokeWidth: 1,
+              borderRadius: 6,
+              fontSize: 9,
+              textAlign: 'center',
+              opacity: 1
+            });
+
+            const totalHeight = size + 8 + Math.max(30, labelHeight);
+            return {
+              id: nodeId, x, y,
+              width: size,
+              height: totalHeight,
+              centerX: x + size / 2,
+              centerY: y + size / 2,
+              bottomY: y + totalHeight,
+              topY: y
+            };
+          };
+
+          // ═══════════════════════════════════════════════════════════════
+          // HELPER: Create a circle node (for terminals/outcomes) with label below
+          // ═══════════════════════════════════════════════════════════════
+          const createCircle = (x, y, text, color, index = 0) => {
+            const nodeId = generateId();
+            const r = CIRCLE_RADIUS + 15; // Larger radius for text
+            
+            placeElement({
+              id: nodeId,
+              type: 'ellipse',
+              x, y,
+              width: r * 2,
+              height: r * 2,
+              fillColor: color.fill,
+              strokeColor: color.stroke,
+              strokeWidth: 3,
+              opacity: 1
+            });
+
+            // Extract first few words for inside the circle (max 25 chars)
+            const words = text.split(' ');
+            let innerText = '';
+            for (const word of words) {
+              if ((innerText + ' ' + word).trim().length <= 22) {
+                innerText = (innerText + ' ' + word).trim();
+              } else break;
+            }
+            if (innerText.length === 0) innerText = text.substring(0, 20);
+            if (innerText.length < text.length) innerText += '...';
+            
+            // Wrap text to fit inside circle
+            const innerWrapped = wrapText(innerText, r * 2 - 20, 10);
+            const innerHeight = calculateTextHeight(innerWrapped, 10);
+            
+            placeElement({
+              id: generateId(),
+              type: 'text',
+              x: x + 10,
+              y: y + r - innerHeight / 2,
+              text: innerWrapped,
+              fontSize: 10,
+              fontWeight: 'bold',
+              fillColor: color.text,
+              width: r * 2 - 20,
+              height: innerHeight + 4,
+              textAlign: 'center',
+              opacity: 1
+            });
+
+            // Full label BELOW the circle as a sticky note (only if text is longer)
+            let totalHeight = r * 2;
+            if (text.length > 25) {
+              const labelWidth = Math.max(r * 2 + 20, 180);
+              const wrappedLabel = wrapText(text, labelWidth - 16, 9);
+              const labelHeight = calculateTextHeight(wrappedLabel, 9) + 12;
               
               placeElement({
                 id: generateId(),
                 type: 'sticky',
-                x: cardX,
-                y: startY,
-                width: CARD_WIDTH,
-                height: cardH,
-                text: text,
+                x: x + r - labelWidth / 2,
+                y: y + r * 2 + 8,
+                width: labelWidth,
+                height: Math.max(40, labelHeight),
+                text: wrappedLabel,
                 fillColor: color.light,
                 strokeColor: color.stroke,
-                strokeWidth: 2,
-                borderRadius: 12,
-                fontSize: 12,
-                opacity: 1
-              });
-
-              // Number badge
-              placeElement({
-                id: generateId(),
-                type: 'ellipse',
-                x: cardX - 14,
-                y: startY - 14,
-                width: 28,
-                height: 28,
-                fillColor: color.fill,
-                strokeColor: color.stroke,
-                strokeWidth: 2,
-                opacity: 1
-              });
-              placeElement({
-                id: generateId(),
-                type: 'text',
-                x: cardX - 14,
-                y: startY - 6,
-                text: `${idx + 1}`,
-                fontSize: 13,
-                fontWeight: 'bold',
-                fillColor: '#FFFFFF',
-                width: 28,
-                height: 18,
+                strokeWidth: 1,
+                borderRadius: 6,
+                fontSize: 9,
                 textAlign: 'center',
                 opacity: 1
               });
+              totalHeight = r * 2 + 8 + Math.max(40, labelHeight);
+            }
 
-              maxBottomY = Math.max(maxBottomY, startY + cardH);
-              cardX += CARD_WIDTH + CARD_GAP_X;
-            });
-
-            return maxBottomY;
+            return {
+              id: nodeId, x, y,
+              width: r * 2,
+              height: totalHeight,
+              centerX: x + r,
+              centerY: y + r,
+              bottomY: y + totalHeight,
+              topY: y
+            };
           };
 
-          // Helper to place a section header
-          const placeSectionHeader = (title, y, color, width = 320) => {
+          // ═══════════════════════════════════════════════════════════════
+          // HELPER: Create hexagon (for root/central nodes) with label below
+          // ═══════════════════════════════════════════════════════════════
+          const createHexagon = (x, y, text, color, size = 140) => {
+            const nodeId = generateId();
+            
+            placeElement({
+              id: nodeId,
+              type: 'hexagon',
+              x, y,
+              width: size,
+              height: size,
+              fillColor: color.fill,
+              strokeColor: color.stroke,
+              strokeWidth: 4,
+              opacity: 1
+            });
+
+            // Short title inside hexagon (truncated)
+            const innerText = text.length > 20 ? text.substring(0, 17) + '...' : text;
+            placeElement({
+              id: generateId(),
+              type: 'text',
+              x: x + 20,
+              y: y + size / 2 - 12,
+              text: innerText,
+              fontSize: 12,
+              fontWeight: 'bold',
+              fillColor: color.text,
+              width: size - 40,
+              height: 24,
+              textAlign: 'center',
+              opacity: 1
+            });
+
+            // Full text label BELOW hexagon if text is longer
+            let totalHeight = size;
+            if (text.length > 20) {
+              const labelWidth = Math.max(size + 40, 200);
+              const wrappedLabel = wrapText(text, labelWidth - 16, 10);
+              const labelHeight = calculateTextHeight(wrappedLabel, 10) + 12;
+              
+              placeElement({
+                id: generateId(),
+                type: 'sticky',
+                x: x + size / 2 - labelWidth / 2,
+                y: y + size + 10,
+                width: labelWidth,
+                height: Math.max(35, labelHeight),
+                text: wrappedLabel,
+                fillColor: color.light,
+                strokeColor: color.stroke,
+                strokeWidth: 1,
+                borderRadius: 8,
+                fontSize: 10,
+                textAlign: 'center',
+                opacity: 1
+              });
+              totalHeight = size + 10 + Math.max(35, labelHeight);
+            }
+
+            return {
+              id: nodeId, x, y,
+              width: size,
+              height: totalHeight,
+              centerX: x + size / 2,
+              centerY: y + size / 2,
+              bottomY: y + totalHeight,
+              topY: y
+            };
+          };
+
+          // ═══════════════════════════════════════════════════════════════
+          // HELPER: Connect two nodes with bezier curve
+          // ═══════════════════════════════════════════════════════════════
+          const connectNodes = (fromNode, toNode, color) => {
+            if (!fromNode || !toNode) return;
+            
+            connectorElements.push({
+              id: generateId(),
+              type: 'connector',
+              startElementId: fromNode.id,
+              endElementId: toNode.id,
+              startPoint: { x: fromNode.centerX, y: fromNode.bottomY, edge: 'bottom' },
+              endPoint: { x: toNode.centerX, y: toNode.topY, edge: 'top' },
+              points: [
+                { x: fromNode.centerX, y: fromNode.bottomY },
+                { x: fromNode.centerX, y: fromNode.bottomY + 15 },
+                { x: toNode.centerX, y: toNode.topY - 15 },
+                { x: toNode.centerX, y: toNode.topY }
+              ],
+              strokeColor: color,
+              strokeWidth: 2,
+              connectorStyle: 'bezier',
+              curvature: 0.5,
+              arrowEnd: true,
+              opacity: 0.8
+            });
+          };
+
+          // ═══════════════════════════════════════════════════════════════
+          // HELPER: Connect horizontally
+          // ═══════════════════════════════════════════════════════════════
+          const connectHorizontal = (fromNode, toNode, color) => {
+            if (!fromNode || !toNode) return;
+            connectorElements.push({
+              id: generateId(),
+              type: 'connector',
+              startElementId: fromNode.id,
+              endElementId: toNode.id,
+              startPoint: { x: fromNode.x + fromNode.width, y: fromNode.centerY, edge: 'right' },
+              endPoint: { x: toNode.x, y: toNode.centerY, edge: 'left' },
+              points: [
+                { x: fromNode.x + fromNode.width, y: fromNode.centerY },
+                { x: toNode.x, y: toNode.centerY }
+              ],
+              strokeColor: color,
+              strokeWidth: 2,
+              connectorStyle: 'bezier',
+              curvature: 0.3,
+              arrowEnd: true,
+              opacity: 0.8
+            });
+          };
+
+          // ═══════════════════════════════════════════════════════════════
+          // HELPER: Place section header
+          // ═══════════════════════════════════════════════════════════════
+          const placeSectionHeader = (title, color) => {
+            const headerWidth = Math.min(500, title.length * 10 + 60);
             placeElement({
               id: generateId(),
               type: 'rect',
-              x: centerX - width / 2,
-              y: y,
-              width: width,
-              height: 45,
+              x: centerX - headerWidth / 2,
+              y: currentY,
+              width: headerWidth,
+              height: 32,
               fillColor: color.fill,
               strokeColor: color.stroke,
               strokeWidth: 2,
-              borderRadius: 22,
+              borderRadius: 16,
               opacity: 1
             });
             placeElement({
               id: generateId(),
               type: 'text',
-              x: centerX - width / 2 + 20,
-              y: y + 12,
+              x: centerX - headerWidth / 2 + 10,
+              y: currentY + 7,
               text: title,
-              fontSize: 14,
+              fontSize: 12,
               fontWeight: 'bold',
               fillColor: color.text,
-              width: width - 40,
-              height: 22,
+              width: headerWidth - 20,
+              height: 20,
               textAlign: 'center',
               opacity: 1
             });
-            return y + 60;
+            currentY += 45;
           };
 
           // ═══════════════════════════════════════════════════════════════
-          // 1. TITLE
+          // HELPER: Place ALL items from a section dynamically
           // ═══════════════════════════════════════════════════════════════
-          const titleText = preparedContent.title || 'Event Circuit Analysis';
-          placeElement({
-            id: generateId(),
-            type: 'text',
-            x: centerX - 450,
-            y: currentY,
-            text: titleText,
-            fontSize: 32,
-            fontWeight: 'bold',
-            fillColor: '#1F2937',
-            width: 900,
-            height: 50,
-            textAlign: 'center',
-            opacity: 1
-          });
-          currentY += 60;
+          const placeAllItems = (items, color, nodeType = 'sticky', badge = '', maxPerRow = 5) => {
+            const nodes = [];
+            if (!items || items.length === 0) return { nodes, endY: currentY };
 
-          // Description
-          if (preparedContent.description) {
-            const descText = wrapText(preparedContent.description, 800, 14);
-            const descH = calculateTextHeight(descText, 14);
-            placeElement({
-              id: generateId(),
-              type: 'text',
-              x: centerX - 420,
-              y: currentY,
-              text: descText,
-              fontSize: 14,
-              fillColor: '#6B7280',
-              width: 840,
-              height: descH,
-              textAlign: 'center',
-              opacity: 0.9
+            const itemCount = items.length;
+            const rows = Math.ceil(itemCount / maxPerRow);
+
+            for (let r = 0; r < rows; r++) {
+              const rowItems = items.slice(r * maxPerRow, (r + 1) * maxPerRow);
+              // Account for larger circle/diamond with labels below
+              const itemWidth = nodeType === 'diamond' ? DECISION_SIZE + 50 : 
+                               nodeType === 'circle' ? (CIRCLE_RADIUS + 10) * 2 + 40 : NODE_WIDTH;
+              const gap = nodeType === 'diamond' || nodeType === 'circle' ? 60 : SIBLING_GAP_X;
+              const rowWidth = rowItems.length * (itemWidth + gap) - gap;
+              let itemX = centerX - rowWidth / 2;
+
+              let maxNodeHeight = 0;
+              rowItems.forEach((item, idx) => {
+                const globalIdx = r * maxPerRow + idx;
+                const itemBadge = badge ? `${badge}${globalIdx + 1}` : '';
+                
+                let node;
+                if (nodeType === 'diamond') {
+                  node = createDiamond(itemX, currentY, item, color);
+                } else if (nodeType === 'circle') {
+                  node = createCircle(itemX, currentY, item, color);
+                } else {
+                  node = createNode(itemX, currentY, item, color, itemBadge);
+                }
+                nodes.push(node);
+                maxNodeHeight = Math.max(maxNodeHeight, node.height);
+
+                // Connect to appropriate parent from previous section
+                if (previousSectionNodes.length > 0) {
+                  const parentIdx = Math.floor(globalIdx * previousSectionNodes.length / itemCount);
+                  const parent = previousSectionNodes[Math.min(parentIdx, previousSectionNodes.length - 1)];
+                  connectNodes(parent, node, color.stroke);
+                }
+
+                itemX += itemWidth + gap;
+              });
+
+              // Use actual max height from this row for proper spacing
+              currentY += maxNodeHeight + ROW_GAP_Y;
+            }
+
+            return { nodes, endY: currentY };
+          };
+
+          // ═══════════════════════════════════════════════════════════════
+          // HELPER: Place items in horizontal flow (for optimal path, etc.)
+          // ═══════════════════════════════════════════════════════════════
+          const placeHorizontalFlow = (items, color, badge = 'Step ') => {
+            const nodes = [];
+            if (!items || items.length === 0) return { nodes, endY: currentY };
+
+            const nodeWidth = 180;
+            const gap = 30;
+            const totalWidth = items.length * nodeWidth + (items.length - 1) * gap;
+            let itemX = centerX - totalWidth / 2;
+            let prevNode = null;
+            let maxHeight = NODE_MIN_HEIGHT;
+
+            items.forEach((item, idx) => {
+              const nodeId = generateId();
+              const text = wrapText(item, nodeWidth - 16, 9);
+              const h = Math.max(55, calculateTextHeight(text, 9) + 30);
+              maxHeight = Math.max(maxHeight, h);
+              
+              placeElement({
+                id: nodeId,
+                type: 'sticky',
+                x: itemX,
+                y: currentY,
+                width: nodeWidth,
+                height: h,
+                text: `${badge}${idx + 1}\n${text}`,
+                fillColor: color.light,
+                strokeColor: color.stroke,
+                strokeWidth: 2,
+                borderRadius: 8,
+                fontSize: 9,
+                opacity: 1
+              });
+
+              const node = {
+                id: nodeId,
+                x: itemX,
+                y: currentY,
+                width: nodeWidth,
+                height: h,
+                centerX: itemX + nodeWidth / 2,
+                centerY: currentY + h / 2,
+                bottomY: currentY + h,
+                topY: currentY
+              };
+              nodes.push(node);
+
+              if (prevNode) {
+                connectHorizontal(prevNode, node, color.stroke);
+              }
+
+              prevNode = node;
+              itemX += nodeWidth + gap;
             });
-            currentY += descH + 50;
-          }
+
+            currentY += maxHeight + ROW_GAP_Y;
+            return { nodes, endY: currentY };
+          };
 
           // ═══════════════════════════════════════════════════════════════
-          // 2. DECISION POINT - Central hexagon with context cards below
+          // HELPER: Place side-by-side columns (risk vs opportunity)
           // ═══════════════════════════════════════════════════════════════
-          const decisionSection = getSection('decision_point') || sections[0];
-          const decisionColor = getColor('decision_point');
-          
-          // Main decision hexagon
-          const hexSize = 200;
-          const decisionId = generateId();
-          placeElement({
-            id: decisionId,
-            type: 'hexagon',
-            x: centerX - hexSize / 2,
-            y: currentY,
-            width: hexSize,
-            height: hexSize,
-            fillColor: decisionColor.fill,
-            strokeColor: decisionColor.stroke,
-            strokeWidth: 4,
-            opacity: 1
-          });
-
-          // Decision title inside hexagon
-          const decTitle = wrapText(decisionSection?.title || 'Core Decision', hexSize - 60, 14);
-          placeElement({
-            id: generateId(),
-            type: 'text',
-            x: centerX - hexSize / 2 + 30,
-            y: currentY + hexSize / 2 - 25,
-            text: decTitle,
-            fontSize: 14,
-            fontWeight: 'bold',
-            fillColor: '#FFFFFF',
-            width: hexSize - 60,
-            height: 50,
-            textAlign: 'center',
-            opacity: 1
-          });
-          currentY += hexSize + 40;
-
-          // Decision context cards
-          const decisionItems = decisionSection?.items || [];
-          if (decisionItems.length > 0) {
-            currentY = placeCardsRow(decisionItems, currentY, decisionColor, 6);
-            currentY += SECTION_GAP_Y;
-          }
-
-          // ═══════════════════════════════════════════════════════════════
-          // 3. IMMEDIATE OUTCOMES
-          // ═══════════════════════════════════════════════════════════════
-          const immediateSection = getSection('immediate_outcomes');
-          if (immediateSection && immediateSection.items?.length > 0) {
-            const color = getColor('immediate_outcomes');
-            currentY = placeSectionHeader(immediateSection.title || 'Immediate Outcomes', currentY, color);
-            currentY = placeCardsRow(immediateSection.items, currentY, color, 6);
-            currentY += SECTION_GAP_Y;
-          }
-
-          // ═══════════════════════════════════════════════════════════════
-          // 4. CHAIN LEVEL 1
-          // ═══════════════════════════════════════════════════════════════
-          const chain1Section = getSection('chain_level_1');
-          if (chain1Section && chain1Section.items?.length > 0) {
-            const color = getColor('chain_level_1');
-            currentY = placeSectionHeader(chain1Section.title || 'Chain Reactions - Level 1', currentY, color, 380);
-            currentY = placeCardsRow(chain1Section.items, currentY, color, 6);
-            currentY += SECTION_GAP_Y;
-          }
-
-          // ═══════════════════════════════════════════════════════════════
-          // 5. CHAIN LEVEL 2
-          // ═══════════════════════════════════════════════════════════════
-          const chain2Section = getSection('chain_level_2');
-          if (chain2Section && chain2Section.items?.length > 0) {
-            const color = getColor('chain_level_2');
-            currentY = placeSectionHeader(chain2Section.title || 'Chain Reactions - Level 2', currentY, color, 380);
-            currentY = placeCardsRow(chain2Section.items, currentY, color, 6);
-            currentY += SECTION_GAP_Y;
-          }
-
-          // ═══════════════════════════════════════════════════════════════
-          // 6. PROBABILITY ASSESSMENT
-          // ═══════════════════════════════════════════════════════════════
-          const probSection = getSection('probability_paths');
-          if (probSection && probSection.items?.length > 0) {
-            const color = getColor('probability_paths');
-            currentY = placeSectionHeader(probSection.title || 'Probability Assessment', currentY, color, 340);
-            currentY = placeCardsRow(probSection.items, currentY, color, 6);
-            currentY += SECTION_GAP_Y;
-          }
-
-          // ═══════════════════════════════════════════════════════════════
-          // 7. RISK vs OPPORTUNITY - Side by side
-          // ═══════════════════════════════════════════════════════════════
-          const riskSection = getSection('risk_pathways');
-          const oppSection = getSection('opportunity_branches');
-
-          if (riskSection || oppSection) {
-            const sideWidth = 580;
-            const gap = 80;
-            const leftX = centerX - gap / 2 - sideWidth;
-            const rightX = centerX + gap / 2;
+          const placeSideBySide = (leftItems, rightItems, leftColor, rightColor, leftTitle, rightTitle) => {
+            const colWidth = 450;
+            const gap = 60;
+            const leftX = centerX - gap / 2 - colWidth + 100;
+            const rightX = centerX + gap / 2 + 100;
             const startY = currentY;
             let leftY = startY;
             let rightY = startY;
 
-            // RISK PATHWAYS (Left)
-            if (riskSection && riskSection.items?.length > 0) {
-              const rColor = getColor('risk_pathways');
-              
-              // Risk header
+            // Left column header
+            if (leftItems?.length > 0) {
               placeElement({
                 id: generateId(),
                 type: 'rect',
-                x: leftX + sideWidth / 2 - 130,
+                x: leftX + colWidth / 2 - 100,
                 y: leftY,
-                width: 260,
-                height: 45,
-                fillColor: rColor.fill,
-                strokeColor: rColor.stroke,
+                width: 200,
+                height: 28,
+                fillColor: leftColor.fill,
+                strokeColor: leftColor.stroke,
                 strokeWidth: 2,
-                borderRadius: 22,
+                borderRadius: 14,
                 opacity: 1
               });
               placeElement({
                 id: generateId(),
                 type: 'text',
-                x: leftX + sideWidth / 2 - 110,
-                y: leftY + 12,
-                text: '⚠️ Risk Pathways',
-                fontSize: 14,
+                x: leftX + colWidth / 2 - 90,
+                y: leftY + 5,
+                text: leftTitle,
+                fontSize: 11,
                 fontWeight: 'bold',
-                fillColor: rColor.text,
-                width: 220,
-                height: 22,
+                fillColor: leftColor.text,
+                width: 180,
+                height: 18,
                 textAlign: 'center',
                 opacity: 1
               });
-              leftY += 60;
+              leftY += 38;
 
-              // Risk items (vertical list)
-              riskSection.items.slice(0, 6).forEach((item, idx) => {
-                const text = wrapText(item, sideWidth - 50, 12);
-                const itemH = Math.max(80, calculateTextHeight(text, 12) + 30);
-                
-                placeElement({
-                  id: generateId(),
-                  type: 'sticky',
-                  x: leftX + 20,
-                  y: leftY,
-                  width: sideWidth - 40,
-                  height: itemH,
-                  text: `${idx + 1}. ${text}`,
-                  fillColor: rColor.light,
-                  strokeColor: rColor.stroke,
-                  strokeWidth: 2,
-                  borderRadius: 10,
-                  fontSize: 12,
-                  opacity: 1
-                });
-                leftY += itemH + 15;
+              let prevNode = null;
+              leftItems.forEach((item, idx) => {
+                const node = createNode(leftX + 20, leftY, item, leftColor, `${idx + 1}.`);
+                if (prevNode) connectNodes(prevNode, node, leftColor.stroke);
+                prevNode = node;
+                leftY += node.height + 20;
               });
             }
 
-            // OPPORTUNITY BRANCHES (Right)
-            if (oppSection && oppSection.items?.length > 0) {
-              const oColor = getColor('opportunity_branches');
-              
-              // Opportunity header
+            // Right column header
+            if (rightItems?.length > 0) {
               placeElement({
                 id: generateId(),
                 type: 'rect',
-                x: rightX + sideWidth / 2 - 130,
+                x: rightX + colWidth / 2 - 100,
                 y: rightY,
-                width: 260,
-                height: 45,
-                fillColor: oColor.fill,
-                strokeColor: oColor.stroke,
+                width: 200,
+                height: 28,
+                fillColor: rightColor.fill,
+                strokeColor: rightColor.stroke,
                 strokeWidth: 2,
-                borderRadius: 22,
+                borderRadius: 14,
                 opacity: 1
               });
               placeElement({
                 id: generateId(),
                 type: 'text',
-                x: rightX + sideWidth / 2 - 110,
-                y: rightY + 12,
-                text: '✓ Opportunities',
-                fontSize: 14,
+                x: rightX + colWidth / 2 - 90,
+                y: rightY + 5,
+                text: rightTitle,
+                fontSize: 11,
                 fontWeight: 'bold',
-                fillColor: oColor.text,
-                width: 220,
-                height: 22,
+                fillColor: rightColor.text,
+                width: 180,
+                height: 18,
                 textAlign: 'center',
                 opacity: 1
               });
-              rightY += 60;
+              rightY += 38;
 
-              // Opportunity items (vertical list)
-              oppSection.items.slice(0, 6).forEach((item, idx) => {
-                const text = wrapText(item, sideWidth - 50, 12);
-                const itemH = Math.max(80, calculateTextHeight(text, 12) + 30);
-                
-                placeElement({
-                  id: generateId(),
-                  type: 'sticky',
-                  x: rightX + 20,
-                  y: rightY,
-                  width: sideWidth - 40,
-                  height: itemH,
-                  text: `${idx + 1}. ${text}`,
-                  fillColor: oColor.light,
-                  strokeColor: oColor.stroke,
-                  strokeWidth: 2,
-                  borderRadius: 10,
-                  fontSize: 12,
-                  opacity: 1
-                });
-                rightY += itemH + 15;
+              let prevNode = null;
+              rightItems.forEach((item, idx) => {
+                const node = createNode(rightX + 20, rightY, item, rightColor, `${idx + 1}.`);
+                if (prevNode) connectNodes(prevNode, node, rightColor.stroke);
+                prevNode = node;
+                rightY += node.height + 20;
               });
             }
 
-            // Vertical divider
+            // Divider
             const maxY = Math.max(leftY, rightY);
-            if (riskSection && oppSection) {
+            if (leftItems?.length > 0 && rightItems?.length > 0) {
               placeElement({
                 id: generateId(),
                 type: 'rect',
@@ -3510,216 +4041,245 @@ Return ONLY the updated JSON structure (same format as input, but modified):
                 y: startY,
                 width: 4,
                 height: maxY - startY,
-                fillColor: '#E5E7EB',
-                strokeColor: '#E5E7EB',
+                fillColor: '#D1D5DB',
+                strokeColor: '#D1D5DB',
                 strokeWidth: 0,
                 borderRadius: 2,
-                opacity: 0.7
+                opacity: 0.5
               });
             }
 
             currentY = maxY + SECTION_GAP_Y;
-          }
+          };
 
           // ═══════════════════════════════════════════════════════════════
-          // 8. CRITICAL DEPENDENCIES
+          // 1. TITLE & DESCRIPTION
           // ═══════════════════════════════════════════════════════════════
-          const depSection = getSection('critical_dependencies');
-          if (depSection && depSection.items?.length > 0) {
-            const color = getColor('critical_dependencies');
-            currentY = placeSectionHeader(depSection.title || 'Critical Dependencies', currentY, color, 340);
-            currentY = placeCardsRow(depSection.items, currentY, color, 6);
-            currentY += SECTION_GAP_Y;
-          }
+          placeElement({
+            id: generateId(),
+            type: 'text',
+            x: centerX - 450,
+            y: currentY,
+            text: preparedContent.title || 'Event Circuit Analysis',
+            fontSize: 26,
+            fontWeight: 'bold',
+            fillColor: '#1F2937',
+            width: 900,
+            height: 36,
+            textAlign: 'center',
+            opacity: 1
+          });
+          currentY += 45;
 
-          // ═══════════════════════════════════════════════════════════════
-          // 9. OPTIMAL PATH - Horizontal flow with arrows
-          // ═══════════════════════════════════════════════════════════════
-          const optimalSection = getSection('optimal_path');
-          if (optimalSection && optimalSection.items?.length > 0) {
-            const color = getColor('optimal_path');
-            
-            // Prominent header
-            const headerW = 380;
-            placeElement({
-              id: generateId(),
-              type: 'hexagon',
-              x: centerX - headerW / 2,
-              y: currentY,
-              width: headerW,
-              height: 55,
-              fillColor: color.fill,
-              strokeColor: color.stroke,
-              strokeWidth: 3,
-              opacity: 1
-            });
+          if (preparedContent.description) {
             placeElement({
               id: generateId(),
               type: 'text',
-              x: centerX - headerW / 2 + 40,
-              y: currentY + 16,
-              text: '★ OPTIMAL PATH ★',
-              fontSize: 18,
-              fontWeight: 'bold',
-              fillColor: '#FFFFFF',
-              width: headerW - 80,
-              height: 24,
+              x: centerX - 400,
+              y: currentY,
+              text: wrapText(preparedContent.description, 750, 11),
+              fontSize: 11,
+              fillColor: '#6B7280',
+              width: 800,
+              height: 35,
               textAlign: 'center',
-              opacity: 1
+              opacity: 0.9
             });
-            currentY += 75;
+            currentY += 45;
+          }
 
-            // Optimal steps - horizontal flow
-            const stepWidth = 300;
-            const stepGap = 80;
-            const stepCount = Math.min(optimalSection.items.length, 5);
-            const totalW = stepCount * stepWidth + (stepCount - 1) * stepGap;
-            let stepX = centerX - totalW / 2;
-            let prevStepId = null;
-            let prevStepEndX = null;
-            let maxStepH = 0;
+          // ═══════════════════════════════════════════════════════════════
+          // 2. DYNAMICALLY PROCESS ALL SECTIONS
+          // ═══════════════════════════════════════════════════════════════
+          
+          // Section type configurations for visual representation
+          const sectionTypeConfig = {
+            root_decision: { nodeType: 'hexagon', isRoot: true },
+            decision_nodes: { nodeType: 'diamond', maxPerRow: 4 },
+            terminal_outcomes: { nodeType: 'circle', maxPerRow: 5 },
+            optimal_path: { layout: 'horizontal' },
+            risk_cascade: { layout: 'column', side: 'left' },
+            opportunity_cascade: { layout: 'column', side: 'right' },
+          };
 
-            optimalSection.items.slice(0, 5).forEach((item, idx) => {
-              const text = wrapText(item, stepWidth - 40, 13);
-              const stepH = Math.max(100, calculateTextHeight(text, 13) + 50);
-              maxStepH = Math.max(maxStepH, stepH);
+          // Find paired sections for side-by-side layout
+          const riskSection = sections.find(s => s.type === 'risk_cascade');
+          const oppSection = sections.find(s => s.type === 'opportunity_cascade');
+          const pairedSections = new Set();
+          if (riskSection) pairedSections.add('risk_cascade');
+          if (oppSection) pairedSections.add('opportunity_cascade');
 
-              const stepId = generateId();
-              
-              // Step rectangle
-              placeElement({
-                id: stepId,
-                type: 'rect',
-                x: stepX,
-                y: currentY,
-                width: stepWidth,
-                height: stepH,
-                fillColor: color.light,
-                strokeColor: color.fill,
-                strokeWidth: 4,
-                borderRadius: 14,
-                opacity: 1
-              });
+          // Process each section in order
+          sections.forEach((section, sectionIdx) => {
+            if (!section.items || section.items.length === 0) return;
+            if (pairedSections.has(section.type) && section.type === 'opportunity_cascade') return; // handled with risk
 
-              // Step text
-              placeElement({
-                id: generateId(),
-                type: 'text',
-                x: stepX + 20,
-                y: currentY + 30,
-                text: text,
-                fontSize: 13,
-                fillColor: '#134E4A',
-                width: stepWidth - 40,
-                height: stepH - 50,
-                opacity: 1
-              });
+            const color = getColor(section.type, sectionIdx);
+            const config = sectionTypeConfig[section.type] || {};
+            const title = section.title || section.type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            const items = section.items; // No limit - plot ALL items
 
-              // Step number badge
-              placeElement({
-                id: generateId(),
-                type: 'ellipse',
-                x: stepX - 20,
-                y: currentY - 20,
-                width: 42,
-                height: 42,
-                fillColor: color.fill,
-                strokeColor: color.stroke,
-                strokeWidth: 2,
-                opacity: 1
-              });
-              placeElement({
-                id: generateId(),
-                type: 'text',
-                x: stepX - 20,
-                y: currentY - 10,
-                text: `${idx + 1}`,
-                fontSize: 18,
-                fontWeight: 'bold',
-                fillColor: '#FFFFFF',
-                width: 42,
-                height: 24,
-                textAlign: 'center',
-                opacity: 1
-              });
+            // Handle root/central node specially
+            if (config.isRoot) {
+              const rootSize = 140;
+              const rootNode = createHexagon(centerX - rootSize / 2, currentY, title, color, rootSize);
+              currentY += rootSize + 30;
+              previousSectionNodes = [rootNode];
+              allNodes.set(section.type, [rootNode]);
 
-              // Arrow from previous step
-              if (prevStepId && prevStepEndX) {
-                connectorElements.push({
-                  id: generateId(),
-                  type: 'connector',
-                  startElementId: prevStepId,
-                  endElementId: stepId,
-                  startPoint: { x: prevStepEndX, y: currentY + stepH / 2, edge: 'right' },
-                  endPoint: { x: stepX, y: currentY + stepH / 2, edge: 'left' },
-                  points: [
-                    { x: prevStepEndX, y: currentY + stepH / 2 },
-                    { x: stepX, y: currentY + stepH / 2 }
-                  ],
-                  strokeColor: color.fill,
-                  strokeWidth: 5,
-                  connectorStyle: 'straight',
-                  arrowEnd: true,
-                  opacity: 1
-                });
+              // Place root items below
+              if (items.length > 0) {
+                placeSectionHeader(`📋 ${title} Details`, color);
+                const result = placeAllItems(items, color, 'sticky', '', 5);
+                previousSectionNodes = result.nodes;
+                allNodes.set(section.type + '_items', result.nodes);
+                currentY = result.endY + SECTION_GAP_Y;
               }
+              return;
+            }
 
-              prevStepId = stepId;
-              prevStepEndX = stepX + stepWidth;
-              stepX += stepWidth + stepGap;
-            });
+            // Handle paired side-by-side sections
+            if (section.type === 'risk_cascade' && (riskSection || oppSection)) {
+              const rColor = getColor('risk_cascade', sectionIdx);
+              const oColor = getColor('opportunity_cascade', sectionIdx + 1);
+              placeSideBySide(
+                riskSection?.items || [],
+                oppSection?.items || [],
+                rColor, oColor,
+                '⚠️ Risk Cascade',
+                '✅ Opportunity Cascade'
+              );
+              return;
+            }
 
-            currentY += maxStepH + SECTION_GAP_Y;
+            // Handle horizontal flow layout
+            if (config.layout === 'horizontal') {
+              placeSectionHeader(`🌟 ${title}`, color);
+              const result = placeHorizontalFlow(items, color, 'Step ');
+              previousSectionNodes = result.nodes;
+              allNodes.set(section.type, result.nodes);
+              currentY = result.endY + SECTION_GAP_Y;
+              return;
+            }
+
+            // Standard section with header and items
+            placeSectionHeader(getIcon(section.type) + ' ' + title, color);
+            
+            const nodeType = config.nodeType || 'sticky';
+            const maxPerRow = config.maxPerRow || 5;
+            const badge = getBadge(section.type);
+            
+            const result = placeAllItems(items, color, nodeType, badge, maxPerRow);
+            previousSectionNodes = result.nodes;
+            allNodes.set(section.type, result.nodes);
+            currentY = result.endY + SECTION_GAP_Y;
+          });
+
+          // ═══════════════════════════════════════════════════════════════
+          // HELPER: Get icon for section type
+          // ═══════════════════════════════════════════════════════════════
+          function getIcon(type) {
+            const icons = {
+              root_decision: '🎯',
+              context_constraints: '📋',
+              possible_actions: '🎯',
+              immediate_outcomes_t0: '⚡',
+              chain_reactions_t1: '🔗',
+              chain_reactions_t2: '🌊',
+              chain_reactions_t3: '📈',
+              chain_reactions_t4_plus: '🎯',
+              decision_nodes: '⚖️',
+              probability_matrix: '📊',
+              risk_cascade: '⚠️',
+              opportunity_cascade: '✅',
+              convergence_points: '🔀',
+              terminal_outcomes: '🏁',
+              optimal_path: '🌟',
+              alternative_paths: '↪️',
+              early_warning_indicators: '🚨',
+              action_items: '✅',
+            };
+            return icons[type] || '📌';
           }
 
           // ═══════════════════════════════════════════════════════════════
-          // 10. CONTINGENCY ROUTES
+          // HELPER: Get badge prefix for section type
           // ═══════════════════════════════════════════════════════════════
-          const contSection = getSection('contingency_routes');
-          if (contSection && contSection.items?.length > 0) {
-            const color = getColor('contingency_routes');
-            currentY = placeSectionHeader(contSection.title || 'Contingency Plans', currentY, color, 300);
-
-            // Contingency cards with Plan A, B, C labels
-            const contItems = contSection.items.map((item, idx) => 
-              `Plan ${String.fromCharCode(65 + idx)}: ${item}`
-            );
-            currentY = placeCardsRow(contItems, currentY, color, 6);
-            currentY += SECTION_GAP_Y;
+          function getBadge(type) {
+            const badges = {
+              possible_actions: 'Option ',
+              chain_reactions_t1: 'Effect ',
+              chain_reactions_t2: 'Effect ',
+              chain_reactions_t3: 'Effect ',
+              chain_reactions_t4_plus: 'Effect ',
+              action_items: '→ ',
+              alternative_paths: 'Plan ',
+              early_warning_indicators: '⚠️ ',
+            };
+            return badges[type] || '';
           }
 
           // ═══════════════════════════════════════════════════════════════
-          // 11. CONCLUSION
+          // CONCLUSION
           // ═══════════════════════════════════════════════════════════════
           if (preparedContent.conclusion) {
-            const conclText = wrapText(preparedContent.conclusion, 800, 14);
-            const conclH = Math.max(130, calculateTextHeight(conclText, 14) + 70);
+            const conclText = wrapText(preparedContent.conclusion, 700, 12);
+            const conclH = Math.max(80, calculateTextHeight(conclText, 12) + 40);
             
             placeElement({
               id: generateId(),
               type: 'sticky',
-              x: centerX - 430,
+              x: centerX - 380,
               y: currentY,
-              width: 860,
+              width: 760,
               height: conclH,
-              text: `🎯 KEY TAKEAWAY\n\n${conclText}`,
+              text: `🎯 KEY INSIGHT\n\n${conclText}`,
               fillColor: '#FEF3C7',
               strokeColor: '#F59E0B',
               strokeWidth: 3,
-              borderRadius: 18,
-              fontSize: 14,
+              borderRadius: 14,
+              fontSize: 12,
               opacity: 1
             });
           }
         }
       };
 
-      // Execute the appropriate layout generator
-      const generator = layoutGenerators[templateType] || layoutGenerators.mindmap;
-      generator();
+      // ═══════════════════════════════════════════════════════════════
+      // EXECUTE LAYOUT GENERATOR WITH ERROR HANDLING
+      // ═══════════════════════════════════════════════════════════════
+      try {
+        // Execute the appropriate layout generator
+        const generator = layoutGenerators[templateType] || layoutGenerators.mindmap;
+        generator();
+      } catch (layoutError) {
+        console.error('[MIRA] Layout generation failed:', layoutError);
+        
+        // Attempt fallback to mindmap layout
+        try {
+          console.log('[MIRA] Attempting fallback to mindmap layout...');
+          layoutGenerators.mindmap();
+          console.log('[MIRA] Fallback to mindmap layout succeeded');
+        } catch (fallbackError) {
+          console.error('[MIRA] Fallback layout also failed:', fallbackError);
+          return NextResponse.json({
+            error: 'Failed to generate canvas layout. Please try a different template or simplify your content.',
+            details: layoutError?.message || 'Layout generation error'
+          }, { status: 500 });
+        }
+      }
 
       // Combine content elements and connectors (connectors last)
       const generatedObjects = [...contentElements, ...connectorElements];
+      
+      // Validate that we have objects
+      if (generatedObjects.length === 0) {
+        console.error('[MIRA] No objects generated');
+        return NextResponse.json({
+          error: 'No content elements were generated. Please ensure your content has sections with items.',
+          details: 'Empty output'
+        }, { status: 400 });
+      }
 
       // Generate a unique ID for this generation
       const generationId = `gen-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
@@ -3729,10 +4289,12 @@ Return ONLY the updated JSON structure (same format as input, but modified):
         obj.generationId = generationId;
       });
 
-      // Add to page
-      const currentPage = whiteboard.pages[0] || { objects: [] };
-      currentPage.objects = [...(currentPage.objects || []), ...generatedObjects];
-      whiteboard.pages[0] = currentPage;
+      // Add to target page - use filtered objects (previous MIRA elements removed) + new generated objects
+      const currentPage = whiteboard.pages[pageIndex] || { objects: [] };
+      currentPage.objects = [...filteredObjects, ...generatedObjects];
+      whiteboard.pages[pageIndex] = currentPage;
+      
+      console.log(`[MIRA] Page ${pageIndex} updated: ${filteredObjects.length} existing + ${generatedObjects.length} new = ${currentPage.objects.length} total elements`);
 
       // Create generation record for history
       const generationRecord = {
@@ -3771,7 +4333,32 @@ Return ONLY the updated JSON structure (same format as input, but modified):
         { role: 'assistant', content: `Created ${generatedObjects.length} elements from your prepared content as a ${templateType}. The content is now visualized on the canvas!`, timestamp: new Date() }
       );
 
-      await whiteboard.save();
+      // Save with retry logic
+      const MAX_SAVE_RETRIES = 3;
+      let saveSuccess = false;
+      let saveError = null;
+      
+      for (let i = 0; i < MAX_SAVE_RETRIES && !saveSuccess; i++) {
+        try {
+          await whiteboard.save();
+          saveSuccess = true;
+          console.log(`[MIRA] Whiteboard saved successfully (attempt ${i + 1})`);
+        } catch (err) {
+          saveError = err;
+          console.error(`[MIRA] Save attempt ${i + 1} failed:`, err.message);
+          if (i < MAX_SAVE_RETRIES - 1) {
+            await new Promise(resolve => setTimeout(resolve, 500 * (i + 1)));
+          }
+        }
+      }
+      
+      if (!saveSuccess) {
+        console.error('[MIRA] All save attempts failed:', saveError);
+        return NextResponse.json({
+          error: 'Failed to save canvas after multiple attempts. Your content was generated but could not be saved. Please try again.',
+          details: saveError?.message || 'Save error'
+        }, { status: 500 });
+      }
 
       return NextResponse.json({
         success: true,
