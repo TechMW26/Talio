@@ -111,9 +111,9 @@ const MiraSphere = memo(function MiraSphere({
     
     const cx = canvas.width / 2
     const cy = canvas.height / 2
-    const baseRadius = size * 0.30 * dpr
+    const baseRadius = size * 0.28 * dpr  // Slightly smaller base radius
     const Z_PERSPECTIVE = size * 3
-    const MAX_DISTANCE = size * 0.45 * dpr
+    const MAX_DISTANCE = size * 0.38 * dpr  // Reduced to keep particles within canvas
 
     const SPRING_TENSION = 0.07
     const SPRING_DAMPING = 0.86
@@ -257,10 +257,10 @@ const MiraSphere = memo(function MiraSphere({
           p.y += p.vy * dt
           p.z += p.vz * dt
           
-          // Contain particles - slightly larger spread in thinking mode but not too much
-          const distMultiplier = thinking ? 1.15 + thinkingOscillation * 0.15 : 1
+          // Contain particles - keep within bounds even in thinking mode
+          const distMultiplier = thinking ? 1.08 + thinkingOscillation * 0.08 : 1
           const dist = Math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z)
-          const maxDist = MAX_DISTANCE * (1 + intensity * 0.2) * distMultiplier
+          const maxDist = MAX_DISTANCE * (1 + intensity * 0.15) * distMultiplier
           if (dist > maxDist) {
             const scale = maxDist / dist
             p.x *= scale
