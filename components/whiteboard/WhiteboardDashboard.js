@@ -243,7 +243,6 @@ export default function WhiteboardDashboard() {
         {loading ? (
           <div className="loading-container py-20">
             <Loader size="lg" />
-            <p className="loading-text">Loading boards...</p>
           </div>
         ) : error ? (
           <div className="empty-state py-20">

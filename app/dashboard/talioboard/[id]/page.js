@@ -350,8 +350,7 @@ export default function WhiteboardEditorPage() {
     return (
       <div className="h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <Loader size="md" />
-          <p className="mt-4 text-gray-500">Loading board...</p>
+          <Loader size="lg" />
         </div>
       </div>
     );

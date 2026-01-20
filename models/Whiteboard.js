@@ -4,7 +4,7 @@ const WhiteboardObjectSchema = new mongoose.Schema({
   id: { type: String, required: true },
   type: {
     type: String,
-    enum: ['pencil', 'highlighter', 'line', 'arrow', 'curvedArrow', 'dottedArrow', 'pigtailArrow', 'rect', 'ellipse', 'diamond', 'triangle', 'star', 'hexagon', 'pentagon', 'polygon', 'sticky', 'text', 'image'],
+    enum: ['pencil', 'highlighter', 'line', 'arrow', 'curvedArrow', 'dottedArrow', 'pigtailArrow', 'connector', 'rect', 'ellipse', 'diamond', 'triangle', 'star', 'hexagon', 'pentagon', 'polygon', 'sticky', 'text', 'image'],
     required: true
   },
   // Common properties
@@ -28,6 +28,17 @@ const WhiteboardObjectSchema = new mongoose.Schema({
   lineStyle: { type: String, enum: ['solid', 'dashed', 'dotted'], default: 'solid' },
   controlPoint: { type: mongoose.Schema.Types.Mixed }, // {x: Number, y: Number} for curved arrows
   pathPoints: [{ x: Number, y: Number }], // Temporary drawing path (cleared after save)
+
+  // Connector-specific properties (for dynamic element-to-element connections)
+  startElementId: { type: String }, // ID of the element where connector starts
+  endElementId: { type: String }, // ID of the element where connector ends
+  startPoint: { type: mongoose.Schema.Types.Mixed }, // {x, y, edge: 'top'|'bottom'|'left'|'right'|'auto'}
+  endPoint: { type: mongoose.Schema.Types.Mixed }, // {x, y, edge: 'top'|'bottom'|'left'|'right'|'auto'}
+  curvature: { type: Number, default: 0.5 }, // 0-1, how curved the connector is
+  connectorStyle: { type: String, enum: ['bezier', 'straight', 'step'], default: 'bezier' },
+
+  // Grouping
+  groupId: { type: String },
 
   // Text properties
   text: { type: String },
@@ -57,7 +68,10 @@ const WhiteboardObjectSchema = new mongoose.Schema({
   locked: { type: Boolean, default: false },
 
   // Layer order
-  zIndex: { type: Number, default: 0 }
+  zIndex: { type: Number, default: 0 },
+
+  // Generation tracking (for AI-plotted elements)
+  generationId: { type: String } // Links element to a specific AI generation
 }, { _id: false });
 
 const WhiteboardPageSchema = new mongoose.Schema({
@@ -75,12 +89,41 @@ const AIMessageSchema = new mongoose.Schema({
 }, { _id: false });
 
 // AI Analysis Schema
+// Agent Generation Schema (for sidebar persistence with history support)
+const AgentGenerationSchema = new mongoose.Schema({
+  id: { type: String, required: true }, // Unique ID for this generation
+  templateType: { type: String, enum: ['mindmap', 'flowchart', 'planning', 'ideas'] },
+  title: { type: String },
+  description: { type: String },
+  sections: [{
+    title: { type: String },
+    summary: { type: String },
+    items: [{ type: String }],
+    color: { type: mongoose.Schema.Types.Mixed } // {fill, stroke, text, border, bg}
+  }],
+  conclusion: { type: String },
+  userPrompt: { type: String },
+  isPlotted: { type: Boolean, default: false },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+}, { _id: false });
+
+// Agent Content State Schema (tracks current and history)
+const AgentContentStateSchema = new mongoose.Schema({
+  currentGenerationId: { type: String }, // ID of the currently active generation
+  generations: [AgentGenerationSchema] // All generations (history)
+}, { _id: false });
+
 const AIAnalysisSchema = new mongoose.Schema({
   summary: { type: String, default: '' },
   messages: [AIMessageSchema],
   lastAnalyzedAt: { type: Date },
   notes: [{ type: String }],
-  keyPoints: [{ type: String }]
+  keyPoints: [{ type: String }],
+  // Agent content state with history support
+  agentContent: { type: AgentContentStateSchema, default: null },
+  // Legacy field for backward compatibility (will migrate to agentContent)
+  agentPreparedContent: { type: mongoose.Schema.Types.Mixed, default: null }
 }, { _id: false });
 
 const WhiteboardShareSchema = new mongoose.Schema({

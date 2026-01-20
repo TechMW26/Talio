@@ -4,6 +4,7 @@ import React, { useRef, useEffect, useState, useCallback, forwardRef, useImperat
 import MiraLoadingOverlay from '@/components/ui/MiraLoadingOverlay';
 import Loader from '@/components/ui/Loader';
 import { useAILoading } from '@/contexts/AILoadingContext';
+import MiraAgentSidebar from './MiraAgentSidebar';
 
 // Utility functions
 const generateId = () => `obj-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -36,6 +37,19 @@ const measureText = (text, fontSize, fontFamily, fontWeight) => {
 
 const getBoundingBox = (obj) => {
   if (!obj) return { x: 0, y: 0, width: 0, height: 0 };
+
+  // Connectors have points array or element references - calculate bbox from points
+  if (obj.type === 'connector') {
+    if (obj.points && obj.points.length >= 2) {
+      const xs = obj.points.map(p => p.x);
+      const ys = obj.points.map(p => p.y);
+      const minX = Math.min(...xs);
+      const minY = Math.min(...ys);
+      return { x: minX, y: minY, width: Math.max(...xs) - minX || 10, height: Math.max(...ys) - minY || 10 };
+    }
+    // Connector without valid points - return empty bbox so it's not selectable by click
+    return { x: 0, y: 0, width: 0, height: 0 };
+  }
 
   if (obj.type === 'pencil' || obj.type === 'line' || obj.type.includes('rrow')) {
     if (!obj.points || obj.points.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
@@ -72,6 +86,169 @@ const getBoundingBox = (obj) => {
   }
 
   return { x, y, width: obj.width || 0, height: obj.height || 0 };
+};
+
+// Get connection points on element edges
+const getElementConnectionPoints = (obj, numPoints = 8) => {
+  const bbox = getBoundingBox(obj);
+  const points = [];
+  const cx = bbox.x + bbox.width / 2;
+  const cy = bbox.y + bbox.height / 2;
+
+  // For ellipses, use circular edge points
+  if (obj.type === 'ellipse') {
+    for (let i = 0; i < numPoints; i++) {
+      const angle = (i / numPoints) * 2 * Math.PI - Math.PI / 2;
+      points.push({
+        x: cx + (bbox.width / 2) * Math.cos(angle),
+        y: cy + (bbox.height / 2) * Math.sin(angle),
+        edge: getEdgeFromAngle(angle)
+      });
+    }
+  } else {
+    // For rectangles and other shapes, use edge midpoints and corners
+    // Top edge
+    points.push({ x: cx, y: bbox.y, edge: 'top' });
+    // Bottom edge
+    points.push({ x: cx, y: bbox.y + bbox.height, edge: 'bottom' });
+    // Left edge
+    points.push({ x: bbox.x, y: cy, edge: 'left' });
+    // Right edge
+    points.push({ x: bbox.x + bbox.width, y: cy, edge: 'right' });
+    // Corners (optional for more connection points)
+    points.push({ x: bbox.x, y: bbox.y, edge: 'top-left' });
+    points.push({ x: bbox.x + bbox.width, y: bbox.y, edge: 'top-right' });
+    points.push({ x: bbox.x, y: bbox.y + bbox.height, edge: 'bottom-left' });
+    points.push({ x: bbox.x + bbox.width, y: bbox.y + bbox.height, edge: 'bottom-right' });
+  }
+
+  return points;
+};
+
+// Get edge name from angle
+const getEdgeFromAngle = (angle) => {
+  const normalized = ((angle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  if (normalized < Math.PI / 4 || normalized >= 7 * Math.PI / 4) return 'right';
+  if (normalized < 3 * Math.PI / 4) return 'bottom';
+  if (normalized < 5 * Math.PI / 4) return 'left';
+  return 'top';
+};
+
+// Find closest connection point on element edge to a given point
+const findClosestConnectionPoint = (obj, point, existingConnections = []) => {
+  const bbox = getBoundingBox(obj);
+  const cx = bbox.x + bbox.width / 2;
+  const cy = bbox.y + bbox.height / 2;
+  
+  // Calculate angle from center to point
+  const angle = Math.atan2(point.y - cy, point.x - cx);
+  
+  let connectionPoint;
+  
+  if (obj.type === 'ellipse') {
+    // For ellipses, project point onto ellipse edge
+    connectionPoint = {
+      x: cx + (bbox.width / 2) * Math.cos(angle),
+      y: cy + (bbox.height / 2) * Math.sin(angle),
+      edge: getEdgeFromAngle(angle)
+    };
+  } else {
+    // For rectangles, find intersection with edge
+    const halfW = bbox.width / 2;
+    const halfH = bbox.height / 2;
+    
+    // Calculate intersection with rectangle edges
+    const tanAngle = Math.tan(angle);
+    let edgeX, edgeY, edge;
+    
+    // Check which edge the ray intersects
+    if (Math.abs(Math.cos(angle)) * halfH > Math.abs(Math.sin(angle)) * halfW) {
+      // Intersects left or right edge
+      edgeX = Math.cos(angle) > 0 ? bbox.x + bbox.width : bbox.x;
+      edgeY = cy + (edgeX - cx) * tanAngle;
+      edge = Math.cos(angle) > 0 ? 'right' : 'left';
+    } else {
+      // Intersects top or bottom edge
+      edgeY = Math.sin(angle) > 0 ? bbox.y + bbox.height : bbox.y;
+      edgeX = cx + (edgeY - cy) / tanAngle;
+      edge = Math.sin(angle) > 0 ? 'bottom' : 'top';
+    }
+    
+    connectionPoint = { x: edgeX, y: edgeY, edge };
+  }
+  
+  // Check if point is too close to existing connections, if so offset it
+  const minDistance = 20;
+  for (const existing of existingConnections) {
+    const dist = Math.sqrt(Math.pow(connectionPoint.x - existing.x, 2) + Math.pow(connectionPoint.y - existing.y, 2));
+    if (dist < minDistance) {
+      // Offset along the edge
+      const offset = minDistance - dist + 5;
+      if (connectionPoint.edge === 'top' || connectionPoint.edge === 'bottom') {
+        connectionPoint.x += offset;
+      } else {
+        connectionPoint.y += offset;
+      }
+    }
+  }
+  
+  return connectionPoint;
+};
+
+// Calculate bezier control points for connector curve
+const calculateConnectorPath = (start, end, startElement, endElement, objects, curvature = 0.5) => {
+  // Calculate control points based on edges
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  
+  // Determine curve direction based on edge positions
+  let cp1, cp2;
+  const curveFactor = Math.min(dist * curvature, 150);
+  
+  // Use edge info to determine control point direction
+  if (start.edge === 'right') {
+    cp1 = { x: start.x + curveFactor, y: start.y };
+  } else if (start.edge === 'left') {
+    cp1 = { x: start.x - curveFactor, y: start.y };
+  } else if (start.edge === 'bottom') {
+    cp1 = { x: start.x, y: start.y + curveFactor };
+  } else if (start.edge === 'top') {
+    cp1 = { x: start.x, y: start.y - curveFactor };
+  } else {
+    // Default: curve towards end
+    cp1 = { x: start.x + dx * 0.3, y: start.y + dy * 0.1 };
+  }
+  
+  if (end.edge === 'right') {
+    cp2 = { x: end.x + curveFactor, y: end.y };
+  } else if (end.edge === 'left') {
+    cp2 = { x: end.x - curveFactor, y: end.y };
+  } else if (end.edge === 'bottom') {
+    cp2 = { x: end.x, y: end.y + curveFactor };
+  } else if (end.edge === 'top') {
+    cp2 = { x: end.x, y: end.y - curveFactor };
+  } else {
+    // Default: curve from start
+    cp2 = { x: end.x - dx * 0.3, y: end.y - dy * 0.1 };
+  }
+  
+  return { start, cp1, cp2, end };
+};
+
+// Get dynamic connection point between two elements (recalculates based on current positions)
+const getDynamicConnectionPoint = (fromElement, toElement) => {
+  const fromBbox = getBoundingBox(fromElement);
+  const toBbox = getBoundingBox(toElement);
+  
+  // Get center of target element
+  const targetCenter = {
+    x: toBbox.x + toBbox.width / 2,
+    y: toBbox.y + toBbox.height / 2
+  };
+  
+  // Find connection point on fromElement facing the target
+  return findClosestConnectionPoint(fromElement, targetCenter);
 };
 
 // FigJam-style color palette
@@ -202,9 +379,39 @@ const WhiteboardCanvas = forwardRef(({
   
   // Global AI loading animation
   const { startAILoading, stopAILoading } = useAILoading();
-  const [showAgentMode, setShowAgentMode] = useState(false);
   const aiPanelRef = useRef(null);
   const aiMessagesEndRef = useRef(null);
+
+  // MIRA Agent Sidebar state
+  const [showAgentSidebar, setShowAgentSidebar] = useState(false);
+  // Support both new agentContent.generations structure and legacy agentPreparedContent
+  const getInitialAgentContent = () => {
+    const aiAnalysis = initialData?.aiAnalysis;
+    if (aiAnalysis?.agentContent?.generations?.length > 0) {
+      const currentId = aiAnalysis.agentContent.currentGenerationId;
+      return aiAnalysis.agentContent.generations.find(g => g.id === currentId) 
+        || aiAnalysis.agentContent.generations[0] 
+        || null;
+    }
+    // Legacy fallback
+    return aiAnalysis?.agentPreparedContent || null;
+  };
+  const [agentSidebarContent, setAgentSidebarContent] = useState(getInitialAgentContent);
+  const [agentGenerations, setAgentGenerations] = useState(initialData?.aiAnalysis?.agentContent?.generations || []);
+  const [currentGenerationId, setCurrentGenerationId] = useState(initialData?.aiAnalysis?.agentContent?.currentGenerationId || null);
+  const [isContentPlotted, setIsContentPlotted] = useState(getInitialAgentContent()?.isPlotted || false);
+  const [contentElementMapping, setContentElementMapping] = useState({});
+
+  // Connector tool state
+  const [connectorStart, setConnectorStart] = useState(null); // {elementId, point: {x, y}, edge}
+  const [connectorPreview, setConnectorPreview] = useState(null); // Current mouse position during connector drawing
+  const [connectorDrawing, setConnectorDrawing] = useState(null); // Active connector being drawn
+  const [showConnectionPoints, setShowConnectionPoints] = useState(false); // Show connection point dots on elements
+  const [hoveredElement, setHoveredElement] = useState(null); // Element being hovered for connection
+  const [hoveredConnectionPoint, setHoveredConnectionPoint] = useState(null); // {x, y, edge} - specific point on element edge
+  const [showConnectorOptions, setShowConnectorOptions] = useState(false);
+  const [connectorColor, setConnectorColor] = useState('#6366F1'); // Default indigo
+  const [connectorThickness, setConnectorThickness] = useState(2);
 
   // AI-generated object animation state
   const [animatingIds, setAnimatingIds] = useState(new Set());
@@ -288,6 +495,16 @@ const WhiteboardCanvas = forwardRef(({
   const isAnyPanelOpen = showPenOptions || showHighlighterOptions || showLineOptions ||
     showArrowMenu || showArrowOptions || showShapesMenu || showEraserOptions || showTextOptions ||
     showShapeOptions || showElementOptions;
+
+  // Handle tool changes for connector
+  useEffect(() => {
+    if (tool === 'connector') {
+      setShowConnectionPoints(true);
+    } else {
+      setShowConnectionPoints(false);
+      setConnectorDrawing(null);
+    }
+  }, [tool]);
 
   // Click outside to close panels (except element options which is managed by selection)
   useEffect(() => {
@@ -392,6 +609,50 @@ const WhiteboardCanvas = forwardRef(({
     return () => window.removeEventListener('resize', resizeCanvas);
   }, []);
 
+  // Wheel event with passive: false to allow preventDefault
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const wheelHandler = (e) => {
+      // Stop zoom animation if user manually zooms
+      if (isAnimatingZoom) {
+        setIsAnimatingZoom(false);
+      }
+
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        const canvasX = (mouseX - panX) / zoom;
+        const canvasY = (mouseY - panY) / zoom;
+
+        const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
+        const newZoom = Math.min(5, Math.max(0.1, zoom * zoomFactor));
+
+        const newPanX = mouseX - canvasX * newZoom;
+        const newPanY = mouseY - canvasY * newZoom;
+
+        setZoom(newZoom);
+        setPanX(newPanX);
+        setPanY(newPanY);
+      } else {
+        // Allow normal scrolling but prevent default to enable pan
+        e.preventDefault();
+        setPanX(prev => prev - e.deltaX);
+        setPanY(prev => prev - e.deltaY);
+      }
+    };
+
+    container.addEventListener('wheel', wheelHandler, { passive: false });
+    return () => container.removeEventListener('wheel', wheelHandler);
+  }, [zoom, panX, panY, isAnimatingZoom]);
+
   // Sync rotation state when selection changes
   useEffect(() => {
     if (selectedIds.length === 1) {
@@ -415,6 +676,517 @@ const WhiteboardCanvas = forwardRef(({
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (!ctx) return;
+
+    // ============================================
+    // INLINE drawObject function - defined inside draw() to always have fresh `objects`
+    // ============================================
+    const drawObject = (ctx, obj) => {
+      ctx.save();
+
+      // Check if this object is being animated (AI-generated fade-in)
+      const isAnimating = animatingIds.has(obj.id);
+      const progress = animationProgress[obj.id] || 1;
+
+      // Apply animation effects
+      if (isAnimating && progress < 1) {
+        ctx.globalAlpha = (obj.opacity ?? 1) * progress * progress;
+        const scale = 0.85 + (0.15 * progress);
+        const bbox = getBoundingBox(obj);
+        const centerX = bbox.x + bbox.width / 2;
+        const centerY = bbox.y + bbox.height / 2;
+        ctx.translate(centerX, centerY);
+        ctx.scale(scale, scale);
+        ctx.translate(-centerX, -centerY);
+        if (progress < 0.5) {
+          const blur = (1 - progress * 2) * 3;
+          ctx.shadowColor = obj.fillColor || obj.strokeColor || '#888';
+          ctx.shadowBlur = blur;
+        }
+      } else {
+        ctx.globalAlpha = obj.opacity ?? 1;
+      }
+
+      ctx.strokeStyle = obj.strokeColor || strokeColor;
+      ctx.fillStyle = obj.fillColor || 'transparent';
+      ctx.lineWidth = obj.strokeWidth || strokeWidth;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      // Apply rotation if object has rotation property
+      if (obj.rotation && obj.rotation !== 0) {
+        const bbox = getBoundingBox(obj);
+        const centerX = bbox.x + bbox.width / 2;
+        const centerY = bbox.y + bbox.height / 2;
+        ctx.translate(centerX, centerY);
+        ctx.rotate((obj.rotation * Math.PI) / 180);
+        ctx.translate(-centerX, -centerY);
+      }
+
+      switch (obj.type) {
+        case 'pencil':
+        case 'highlighter':
+          if (obj.points && obj.points.length > 1) {
+            ctx.beginPath();
+            ctx.moveTo(obj.points[0].x, obj.points[0].y);
+            for (let i = 1; i < obj.points.length; i++) {
+              const p0 = obj.points[i - 1];
+              const p1 = obj.points[i];
+              const mid = getMidpoint(p0, p1);
+              ctx.quadraticCurveTo(p0.x, p0.y, mid.x, mid.y);
+            }
+            ctx.stroke();
+          } else if (obj.points && obj.points.length === 1) {
+            ctx.beginPath();
+            ctx.arc(obj.points[0].x, obj.points[0].y, ctx.lineWidth / 2, 0, Math.PI * 2);
+            ctx.fillStyle = obj.strokeColor || strokeColor;
+            ctx.fill();
+          }
+          break;
+
+        case 'line':
+          if (obj.points && obj.points.length >= 2) {
+            ctx.beginPath();
+            ctx.moveTo(obj.points[0].x, obj.points[0].y);
+            ctx.lineTo(obj.points[obj.points.length - 1].x, obj.points[obj.points.length - 1].y);
+            ctx.stroke();
+          }
+          break;
+
+        case 'arrow':
+          if (obj.points && obj.points.length >= 2) {
+            const start = obj.points[0];
+            const end = obj.points[obj.points.length - 1];
+            const lineStyle = obj.lineStyle || 'solid';
+            if (lineStyle === 'dashed') ctx.setLineDash([12, 6]);
+            else if (lineStyle === 'dotted') ctx.setLineDash([3, 6]);
+            else ctx.setLineDash([]);
+
+            if (obj.arrowType === 'curved') {
+              let controlX, controlY;
+              if (obj.controlPoint) {
+                controlX = obj.controlPoint.x;
+                controlY = obj.controlPoint.y;
+              } else if (obj.pathPoints && obj.pathPoints.length > 3) {
+                const midIndex = Math.floor(obj.pathPoints.length / 2);
+                controlX = obj.pathPoints[midIndex].x;
+                controlY = obj.pathPoints[midIndex].y;
+              } else {
+                controlX = (start.x + end.x) / 2 + (end.y - start.y) * 0.25;
+                controlY = (start.y + end.y) / 2 - (end.x - start.x) * 0.25;
+              }
+              ctx.beginPath();
+              ctx.moveTo(start.x, start.y);
+              ctx.quadraticCurveTo(controlX, controlY, end.x, end.y);
+              ctx.stroke();
+              const t = 0.99;
+              const tangentX = 2 * (1 - t) * (controlX - start.x) + 2 * t * (end.x - controlX);
+              const tangentY = 2 * (1 - t) * (controlY - start.y) + 2 * t * (end.y - controlY);
+              const angle = Math.atan2(tangentY, tangentX);
+              ctx.setLineDash([]);
+              const arrowLength = 12;
+              ctx.beginPath();
+              ctx.moveTo(end.x, end.y);
+              ctx.lineTo(end.x - arrowLength * Math.cos(angle - Math.PI / 6), end.y - arrowLength * Math.sin(angle - Math.PI / 6));
+              ctx.moveTo(end.x, end.y);
+              ctx.lineTo(end.x - arrowLength * Math.cos(angle + Math.PI / 6), end.y - arrowLength * Math.sin(angle + Math.PI / 6));
+              ctx.stroke();
+            } else if (obj.arrowType === 'elbow') {
+              const deltaX = Math.abs(end.x - start.x);
+              const deltaY = Math.abs(end.y - start.y);
+              const isHorizontalFirst = deltaX >= deltaY;
+              ctx.beginPath();
+              ctx.moveTo(start.x, start.y);
+              let angle;
+              if (isHorizontalFirst) {
+                const midX = end.x;
+                ctx.lineTo(midX, start.y);
+                ctx.lineTo(midX, end.y);
+                ctx.lineTo(end.x, end.y);
+                angle = end.y > start.y ? Math.PI / 2 : -Math.PI / 2;
+              } else {
+                const midY = end.y;
+                ctx.lineTo(start.x, midY);
+                ctx.lineTo(end.x, midY);
+                ctx.lineTo(end.x, end.y);
+                angle = end.x > start.x ? 0 : Math.PI;
+              }
+              ctx.stroke();
+              ctx.setLineDash([]);
+              const arrowLength = 12;
+              ctx.beginPath();
+              ctx.moveTo(end.x, end.y);
+              ctx.lineTo(end.x - arrowLength * Math.cos(angle - Math.PI / 6), end.y - arrowLength * Math.sin(angle - Math.PI / 6));
+              ctx.moveTo(end.x, end.y);
+              ctx.lineTo(end.x - arrowLength * Math.cos(angle + Math.PI / 6), end.y - arrowLength * Math.sin(angle + Math.PI / 6));
+              ctx.stroke();
+            } else {
+              ctx.beginPath();
+              ctx.moveTo(start.x, start.y);
+              ctx.lineTo(end.x, end.y);
+              ctx.stroke();
+              ctx.setLineDash([]);
+              const angle = Math.atan2(end.y - start.y, end.x - start.x);
+              const arrowLength = 12;
+              ctx.beginPath();
+              ctx.moveTo(end.x, end.y);
+              ctx.lineTo(end.x - arrowLength * Math.cos(angle - Math.PI / 6), end.y - arrowLength * Math.sin(angle - Math.PI / 6));
+              ctx.moveTo(end.x, end.y);
+              ctx.lineTo(end.x - arrowLength * Math.cos(angle + Math.PI / 6), end.y - arrowLength * Math.sin(angle + Math.PI / 6));
+              ctx.stroke();
+            }
+            ctx.setLineDash([]);
+          }
+          break;
+
+        case 'connector':
+          // Dynamic connector line between two elements
+          // Uses `objects` from the outer scope (draw function) - always fresh!
+          if (obj.startElementId && obj.endElementId) {
+            const startElement = objects.find(o => o.id === obj.startElementId);
+            const endElement = objects.find(o => o.id === obj.endElementId);
+            
+            if (startElement && endElement) {
+              // Recalculate connection points dynamically based on current element positions
+              const startPoint = getDynamicConnectionPoint(startElement, endElement);
+              const endPoint = getDynamicConnectionPoint(endElement, startElement);
+              
+              // Calculate bezier curve with dynamic points
+              const path = calculateConnectorPath(startPoint, endPoint, startElement, endElement, objects, obj.curvature || 0.5);
+              
+              const lineStyle = obj.lineStyle || 'solid';
+              if (lineStyle === 'dashed') ctx.setLineDash([10, 5]);
+              else if (lineStyle === 'dotted') ctx.setLineDash([3, 5]);
+              else ctx.setLineDash([]);
+              
+              ctx.strokeStyle = obj.strokeColor || '#6366F1';
+              ctx.lineWidth = obj.strokeWidth || 2;
+              
+              ctx.beginPath();
+              ctx.moveTo(path.start.x, path.start.y);
+              ctx.bezierCurveTo(path.cp1.x, path.cp1.y, path.cp2.x, path.cp2.y, path.end.x, path.end.y);
+              ctx.stroke();
+              
+              ctx.setLineDash([]);
+              
+              // Draw arrow head at end if arrowEnd is true
+              if (obj.arrowEnd) {
+                const arrowSize = Math.max(8, obj.strokeWidth * 3);
+                // Calculate angle at the end of the bezier curve
+                // For bezier, the tangent at end is from cp2 to end
+                const angle = Math.atan2(path.end.y - path.cp2.y, path.end.x - path.cp2.x);
+                
+                ctx.fillStyle = obj.strokeColor || '#6366F1';
+                ctx.beginPath();
+                ctx.moveTo(path.end.x, path.end.y);
+                ctx.lineTo(
+                  path.end.x - arrowSize * Math.cos(angle - Math.PI / 6),
+                  path.end.y - arrowSize * Math.sin(angle - Math.PI / 6)
+                );
+                ctx.lineTo(
+                  path.end.x - arrowSize * Math.cos(angle + Math.PI / 6),
+                  path.end.y - arrowSize * Math.sin(angle + Math.PI / 6)
+                );
+                ctx.closePath();
+                ctx.fill();
+              } else {
+                // Draw end point circle if no arrow
+                ctx.fillStyle = obj.strokeColor || '#6366F1';
+                ctx.beginPath();
+                ctx.arc(path.end.x, path.end.y, 4, 0, Math.PI * 2);
+                ctx.fill();
+              }
+              
+              // Draw start point circle
+              ctx.fillStyle = obj.strokeColor || '#6366F1';
+              ctx.beginPath();
+              ctx.arc(path.start.x, path.start.y, 4, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          } else if (obj.points && obj.points.length >= 2) {
+            // Preview/drawing mode
+            ctx.setLineDash([]);
+            ctx.strokeStyle = obj.strokeColor || '#6366F1';
+            ctx.lineWidth = obj.strokeWidth || 2;
+            
+            const start = obj.points[0];
+            const end = obj.points[1];
+            const dx = end.x - start.x;
+            const dy = end.y - start.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const curveFactor = Math.min(dist * 0.3, 80);
+            
+            let cp1x, cp1y, cp2x, cp2y;
+            if (obj.startConnectionPoint?.edge === 'right') { cp1x = start.x + curveFactor; cp1y = start.y; }
+            else if (obj.startConnectionPoint?.edge === 'left') { cp1x = start.x - curveFactor; cp1y = start.y; }
+            else if (obj.startConnectionPoint?.edge === 'bottom') { cp1x = start.x; cp1y = start.y + curveFactor; }
+            else if (obj.startConnectionPoint?.edge === 'top') { cp1x = start.x; cp1y = start.y - curveFactor; }
+            else { cp1x = start.x + dx * 0.3; cp1y = start.y; }
+            cp2x = end.x - dx * 0.3;
+            cp2y = end.y;
+            
+            ctx.beginPath();
+            ctx.moveTo(start.x, start.y);
+            ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, end.x, end.y);
+            ctx.stroke();
+            
+            ctx.fillStyle = obj.strokeColor || '#6366F1';
+            ctx.beginPath();
+            ctx.arc(start.x, start.y, 4, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          break;
+
+        case 'rect':
+          const rectRadius = obj.borderRadius ?? 0;
+          ctx.beginPath();
+          ctx.roundRect(obj.x, obj.y, obj.width, obj.height, rectRadius);
+          if (obj.fillColor && obj.fillColor !== 'transparent') ctx.fill();
+          ctx.stroke();
+          break;
+
+        case 'ellipse':
+          ctx.beginPath();
+          ctx.ellipse(obj.x + obj.width / 2, obj.y + obj.height / 2, Math.abs(obj.width / 2), Math.abs(obj.height / 2), 0, 0, Math.PI * 2);
+          if (obj.fillColor && obj.fillColor !== 'transparent') ctx.fill();
+          ctx.stroke();
+          break;
+
+        case 'diamond':
+          ctx.beginPath();
+          ctx.moveTo(obj.x + obj.width / 2, obj.y);
+          ctx.lineTo(obj.x + obj.width, obj.y + obj.height / 2);
+          ctx.lineTo(obj.x + obj.width / 2, obj.y + obj.height);
+          ctx.lineTo(obj.x, obj.y + obj.height / 2);
+          ctx.closePath();
+          if (obj.fillColor && obj.fillColor !== 'transparent') ctx.fill();
+          ctx.stroke();
+          break;
+
+        case 'triangle':
+          ctx.beginPath();
+          ctx.moveTo(obj.x + obj.width / 2, obj.y);
+          ctx.lineTo(obj.x + obj.width, obj.y + obj.height);
+          ctx.lineTo(obj.x, obj.y + obj.height);
+          ctx.closePath();
+          if (obj.fillColor && obj.fillColor !== 'transparent') ctx.fill();
+          ctx.stroke();
+          break;
+
+        case 'star':
+          const starCx = obj.x + obj.width / 2;
+          const starCy = obj.y + obj.height / 2;
+          const outerRadius = Math.min(obj.width, obj.height) / 2;
+          const innerRadius = outerRadius * 0.4;
+          const spikes = 5;
+          ctx.beginPath();
+          for (let i = 0; i < spikes * 2; i++) {
+            const r = i % 2 === 0 ? outerRadius : innerRadius;
+            const angle = (Math.PI / spikes) * i - Math.PI / 2;
+            const px = starCx + Math.cos(angle) * r;
+            const py = starCy + Math.sin(angle) * r;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+          }
+          ctx.closePath();
+          if (obj.fillColor && obj.fillColor !== 'transparent') ctx.fill();
+          ctx.stroke();
+          break;
+
+        case 'hexagon':
+          const hexCx = obj.x + obj.width / 2;
+          const hexCy = obj.y + obj.height / 2;
+          const hexRadius = Math.min(obj.width, obj.height) / 2;
+          ctx.beginPath();
+          for (let i = 0; i < 6; i++) {
+            const angle = (Math.PI / 3) * i - Math.PI / 2;
+            const px = hexCx + Math.cos(angle) * hexRadius;
+            const py = hexCy + Math.sin(angle) * hexRadius;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+          }
+          ctx.closePath();
+          if (obj.fillColor && obj.fillColor !== 'transparent') ctx.fill();
+          ctx.stroke();
+          break;
+
+        case 'pentagon':
+          const pentCx = obj.x + obj.width / 2;
+          const pentCy = obj.y + obj.height / 2;
+          const pentRadius = Math.min(obj.width, obj.height) / 2;
+          ctx.beginPath();
+          for (let i = 0; i < 5; i++) {
+            const angle = (Math.PI * 2 / 5) * i - Math.PI / 2;
+            const px = pentCx + Math.cos(angle) * pentRadius;
+            const py = pentCy + Math.sin(angle) * pentRadius;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+          }
+          ctx.closePath();
+          if (obj.fillColor && obj.fillColor !== 'transparent') ctx.fill();
+          ctx.stroke();
+          break;
+
+        case 'sticky':
+          ctx.shadowColor = 'rgba(0,0,0,0.1)';
+          ctx.shadowBlur = 8;
+          ctx.shadowOffsetY = 2;
+          ctx.fillStyle = obj.fillColor || '#ffc700';
+          const stickyWidth = obj.width || 200;
+          const padding = 12;
+          const fontSize = obj.fontSize || 14;
+          const lineHeight = fontSize * 1.4;
+          let calculatedHeight = obj.height || 120;
+          const objFontFamily = obj.fontFamily || 'Poppins';
+          if (obj.text) {
+            ctx.font = `${obj.fontWeight || 'normal'} ${fontSize}px '${objFontFamily}', system-ui, sans-serif`;
+            const maxWidth = stickyWidth - padding * 2;
+            const words = obj.text.split(/\s+/);
+            let line = '';
+            let lineCount = 1;
+            for (let i = 0; i < words.length; i++) {
+              const testLine = line + words[i] + ' ';
+              const metrics = ctx.measureText(testLine);
+              if (metrics.width > maxWidth && line !== '') {
+                line = words[i] + ' ';
+                lineCount++;
+              } else {
+                line = testLine;
+              }
+            }
+            const textHeight = lineCount * lineHeight + padding * 2;
+            calculatedHeight = Math.max(obj.height || 80, textHeight);
+          }
+          ctx.beginPath();
+          ctx.roundRect(obj.x, obj.y, stickyWidth, calculatedHeight, obj.borderRadius || 4);
+          ctx.fill();
+          ctx.shadowColor = 'transparent';
+          if (obj.text) {
+            ctx.fillStyle = obj.strokeColor || '#1a1a1a';
+            ctx.font = `${obj.fontWeight || 'normal'} ${fontSize}px '${objFontFamily}', system-ui, sans-serif`;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'top';
+            const maxWidth = stickyWidth - padding * 2;
+            const words = obj.text.split(/\s+/);
+            let line = '';
+            let y = obj.y + padding;
+            for (let i = 0; i < words.length; i++) {
+              const testLine = line + words[i] + ' ';
+              const metrics = ctx.measureText(testLine);
+              if (metrics.width > maxWidth && line !== '') {
+                ctx.fillText(line.trim(), obj.x + padding, y);
+                line = words[i] + ' ';
+                y += lineHeight;
+              } else {
+                line = testLine;
+              }
+            }
+            ctx.fillText(line.trim(), obj.x + padding, y);
+          }
+          break;
+
+        case 'text':
+          const textFontFamily = obj.fontFamily || 'Poppins';
+          ctx.font = `${obj.fontWeight || 'normal'} ${obj.fontSize || 16}px '${textFontFamily}', system-ui, sans-serif`;
+          ctx.fillStyle = obj.fillColor || obj.strokeColor || strokeColor;
+          const textLines = (obj.text || '').split('\n');
+          const textLineHeight = (obj.fontSize || 16) * 1.4;
+          const totalTextHeight = textLines.length * textLineHeight;
+          
+          // Handle horizontal alignment
+          const textWidth = obj.width || 100;
+          let textStartX = obj.x;
+          if (obj.textAlign === 'center') {
+            ctx.textAlign = 'center';
+            textStartX = obj.x + textWidth / 2;
+          } else if (obj.textAlign === 'right') {
+            ctx.textAlign = 'right';
+            textStartX = obj.x + textWidth;
+          } else {
+            ctx.textAlign = 'left';
+          }
+          
+          // Handle vertical alignment
+          let textStartY = obj.y;
+          if (obj.verticalAlign === 'middle' && obj.height) {
+            textStartY = obj.y + (obj.height - totalTextHeight) / 2;
+            ctx.textBaseline = 'top';
+          } else {
+            ctx.textBaseline = 'top';
+          }
+          
+          textLines.forEach((line, i) => {
+            ctx.fillText(line, textStartX, textStartY + i * textLineHeight);
+          });
+          break;
+
+        case 'image':
+          if (obj.image) {
+            try {
+              let img = imageCache.current.get(obj.image);
+              if (img && img.complete && img.naturalWidth > 0) {
+                ctx.drawImage(img, obj.x, obj.y, obj.width, obj.height);
+              } else if (!img) {
+                img = new Image();
+                img.onload = () => {
+                  imageCache.current.set(obj.image, img);
+                  setImagesLoaded(prev => prev + 1);
+                };
+                img.src = obj.image;
+                imageCache.current.set(obj.image, img);
+                ctx.fillStyle = '#f5f5f5';
+                ctx.strokeStyle = '#e0e0e0';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([8, 4]);
+                ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
+                ctx.strokeRect(obj.x, obj.y, obj.width, obj.height);
+                ctx.setLineDash([]);
+                ctx.fillStyle = '#9e9e9e';
+                ctx.font = '14px Inter, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('Loading...', obj.x + obj.width / 2, obj.y + obj.height / 2);
+              }
+            } catch (e) {
+              console.error('Failed to draw image', e);
+            }
+          } else if (obj.isPlaceholder) {
+            ctx.fillStyle = '#f5f5f5';
+            ctx.strokeStyle = '#e0e0e0';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([8, 4]);
+            ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
+            ctx.strokeRect(obj.x, obj.y, obj.width, obj.height);
+            ctx.setLineDash([]);
+            const iconSize = Math.min(obj.width, obj.height) * 0.3;
+            const iconX = obj.x + obj.width / 2;
+            const iconY = obj.y + obj.height / 2;
+            ctx.strokeStyle = '#9e9e9e';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(iconX - iconSize / 2, iconY + iconSize / 3);
+            ctx.lineTo(iconX - iconSize / 4, iconY - iconSize / 6);
+            ctx.lineTo(iconX, iconY + iconSize / 6);
+            ctx.lineTo(iconX + iconSize / 4, iconY - iconSize / 3);
+            ctx.lineTo(iconX + iconSize / 2, iconY + iconSize / 3);
+            ctx.closePath();
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(iconX - iconSize / 3, iconY - iconSize / 4, iconSize / 8, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.fillStyle = '#9e9e9e';
+            ctx.font = `${Math.min(14, obj.width / 10)}px Inter, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('Click to add image', iconX, iconY + iconSize / 2 + 10);
+          }
+          break;
+      }
+
+      ctx.restore();
+    };
+    // ============================================
+    // END of inline drawObject function
+    // ============================================
 
     // Light cream background like FigJam
     ctx.fillStyle = '#fffbf5';
@@ -468,7 +1240,6 @@ const WhiteboardCanvas = forwardRef(({
 
     // Draw eraser cursor and preview
     if (tool === 'eraser' && lastCanvasPoint) {
-      // Draw eraser circle at the actual canvas point
       ctx.beginPath();
       ctx.arc(lastCanvasPoint.x, lastCanvasPoint.y, eraserRadius, 0, Math.PI * 2);
       ctx.strokeStyle = '#ff0000';
@@ -476,465 +1247,51 @@ const WhiteboardCanvas = forwardRef(({
       ctx.setLineDash([5 / zoom, 5 / zoom]);
       ctx.stroke();
       ctx.setLineDash([]);
-
-      // Draw semi-transparent red fill showing what will be erased
       if (eraserPreviewPath.length > 0) {
         ctx.fillStyle = 'rgba(255, 0, 0, 0.2)';
         ctx.fill();
       }
     }
 
-    ctx.restore();
-  }, [objects, currentPath, selectedIds, selectionBox, showGrid, zoom, panX, panY, tool, eraserRadius, lastCanvasPoint, eraserPreviewPath, animatingIds, animationProgress, imagesLoaded]);
-
-  const drawObject = useCallback((ctx, obj) => {
-    ctx.save();
-
-    // Check if this object is being animated (AI-generated fade-in)
-    const isAnimating = animatingIds.has(obj.id);
-    const progress = animationProgress[obj.id] || 1;
-
-    // Apply animation effects
-    if (isAnimating && progress < 1) {
-      // Smoky particle fade-in effect
-      ctx.globalAlpha = (obj.opacity ?? 1) * progress * progress; // Quadratic easing
-
-      // Subtle scale effect (starts slightly smaller)
-      const scale = 0.85 + (0.15 * progress);
-      const bbox = getBoundingBox(obj);
-      const centerX = bbox.x + bbox.width / 2;
-      const centerY = bbox.y + bbox.height / 2;
-      ctx.translate(centerX, centerY);
-      ctx.scale(scale, scale);
-      ctx.translate(-centerX, -centerY);
-
-      // Add blur-like effect by drawing multiple times with slight offsets
-      if (progress < 0.5) {
-        const blur = (1 - progress * 2) * 3;
-        ctx.shadowColor = obj.fillColor || obj.strokeColor || '#888';
-        ctx.shadowBlur = blur;
-      }
-    } else {
-      ctx.globalAlpha = obj.opacity ?? 1;
-    }
-
-    ctx.strokeStyle = obj.strokeColor || strokeColor;
-    ctx.fillStyle = obj.fillColor || 'transparent';
-    ctx.lineWidth = obj.strokeWidth || strokeWidth;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    // Apply rotation if object has rotation property
-    if (obj.rotation && obj.rotation !== 0) {
-      const bbox = getBoundingBox(obj);
-      const centerX = bbox.x + bbox.width / 2;
-      const centerY = bbox.y + bbox.height / 2;
-      ctx.translate(centerX, centerY);
-      ctx.rotate((obj.rotation * Math.PI) / 180);
-      ctx.translate(-centerX, -centerY);
-    }
-
-    switch (obj.type) {
-      case 'pencil':
-      case 'highlighter':
-        if (obj.points && obj.points.length > 1) {
+    // Draw connection points when connector tool is active
+    if (tool === 'connector' && showConnectionPoints) {
+      objects.forEach(obj => {
+        if (obj.type === 'connector') return;
+        
+        const isHovered = hoveredElement === obj.id;
+        const isStart = connectorDrawing?.startElementId === obj.id;
+        const connectionPoints = getElementConnectionPoints(obj);
+        
+        connectionPoints.forEach(point => {
           ctx.beginPath();
-          ctx.moveTo(obj.points[0].x, obj.points[0].y);
-          for (let i = 1; i < obj.points.length; i++) {
-            const p0 = obj.points[i - 1];
-            const p1 = obj.points[i];
-            const mid = getMidpoint(p0, p1);
-            ctx.quadraticCurveTo(p0.x, p0.y, mid.x, mid.y);
+          ctx.arc(point.x, point.y, (isHovered ? 6 : 4) / zoom, 0, Math.PI * 2);
+          
+          if (isStart) {
+            ctx.fillStyle = '#22c55e';
+          } else if (isHovered) {
+            ctx.fillStyle = '#3b82f6';
+          } else {
+            ctx.fillStyle = 'rgba(59, 130, 246, 0.5)';
           }
-          ctx.stroke();
-        } else if (obj.points && obj.points.length === 1) {
-          // Draw a dot for single point (tap)
-          ctx.beginPath();
-          ctx.arc(obj.points[0].x, obj.points[0].y, ctx.lineWidth / 2, 0, Math.PI * 2);
-          ctx.fillStyle = obj.strokeColor || strokeColor;
           ctx.fill();
-        }
-        break;
-
-      case 'line':
-        if (obj.points && obj.points.length >= 2) {
-          ctx.beginPath();
-          ctx.moveTo(obj.points[0].x, obj.points[0].y);
-          ctx.lineTo(obj.points[obj.points.length - 1].x, obj.points[obj.points.length - 1].y);
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = (isHovered ? 2 : 1.5) / zoom;
           ctx.stroke();
-        }
-        break;
-
-      case 'arrow':
-        if (obj.points && obj.points.length >= 2) {
-          const start = obj.points[0];
-          const end = obj.points[obj.points.length - 1];
-
-          // Apply line style (solid, dashed, dotted)
-          const lineStyle = obj.lineStyle || 'solid';
-          if (lineStyle === 'dashed') {
-            ctx.setLineDash([12, 6]);
-          } else if (lineStyle === 'dotted') {
-            ctx.setLineDash([3, 6]);
-          } else {
-            ctx.setLineDash([]);
-          }
-
-          if (obj.arrowType === 'curved') {
-            // Draw curved arrow using stored control point or calculate from path
-            let controlX, controlY;
-
-            if (obj.controlPoint) {
-              // Use stored control point from drawn path
-              controlX = obj.controlPoint.x;
-              controlY = obj.controlPoint.y;
-            } else if (obj.pathPoints && obj.pathPoints.length > 3) {
-              // Use middle of drawing path as live control point
-              const midIndex = Math.floor(obj.pathPoints.length / 2);
-              controlX = obj.pathPoints[midIndex].x;
-              controlY = obj.pathPoints[midIndex].y;
-            } else {
-              // Fallback to calculated control point
-              controlX = (start.x + end.x) / 2 + (end.y - start.y) * 0.25;
-              controlY = (start.y + end.y) / 2 - (end.x - start.x) * 0.25;
-            }
-
-            ctx.beginPath();
-            ctx.moveTo(start.x, start.y);
-            ctx.quadraticCurveTo(controlX, controlY, end.x, end.y);
-            ctx.stroke();
-
-            // Calculate angle at end point for arrowhead
-            const t = 0.99;
-            const tangentX = 2 * (1 - t) * (controlX - start.x) + 2 * t * (end.x - controlX);
-            const tangentY = 2 * (1 - t) * (controlY - start.y) + 2 * t * (end.y - controlY);
-            const angle = Math.atan2(tangentY, tangentX);
-
-            // Draw arrowhead (always solid)
-            ctx.setLineDash([]);
-            const arrowLength = 12;
-            ctx.beginPath();
-            ctx.moveTo(end.x, end.y);
-            ctx.lineTo(end.x - arrowLength * Math.cos(angle - Math.PI / 6), end.y - arrowLength * Math.sin(angle - Math.PI / 6));
-            ctx.moveTo(end.x, end.y);
-            ctx.lineTo(end.x - arrowLength * Math.cos(angle + Math.PI / 6), end.y - arrowLength * Math.sin(angle + Math.PI / 6));
-            ctx.stroke();
-          } else if (obj.arrowType === 'elbow') {
-            // Draw elbow arrow (right-angled) - direction aware
-            const deltaX = Math.abs(end.x - start.x);
-            const deltaY = Math.abs(end.y - start.y);
-            const isHorizontalFirst = deltaX >= deltaY; // Determine primary direction
-
-            ctx.beginPath();
-            ctx.moveTo(start.x, start.y);
-
-            let angle;
-            if (isHorizontalFirst) {
-              // Go horizontal first, then vertical
-              const midX = end.x;
-              ctx.lineTo(midX, start.y);
-              ctx.lineTo(midX, end.y);
-              ctx.lineTo(end.x, end.y);
-              // Arrow points in the final segment direction (vertical)
-              angle = end.y > start.y ? Math.PI / 2 : -Math.PI / 2;
-            } else {
-              // Go vertical first, then horizontal
-              const midY = end.y;
-              ctx.lineTo(start.x, midY);
-              ctx.lineTo(end.x, midY);
-              ctx.lineTo(end.x, end.y);
-              // Arrow points in the final segment direction (horizontal)
-              angle = end.x > start.x ? 0 : Math.PI;
-            }
-            ctx.stroke();
-
-            // Draw arrowhead (always solid)
-            ctx.setLineDash([]);
-            const arrowLength = 12;
-            ctx.beginPath();
-            ctx.moveTo(end.x, end.y);
-            ctx.lineTo(end.x - arrowLength * Math.cos(angle - Math.PI / 6), end.y - arrowLength * Math.sin(angle - Math.PI / 6));
-            ctx.moveTo(end.x, end.y);
-            ctx.lineTo(end.x - arrowLength * Math.cos(angle + Math.PI / 6), end.y - arrowLength * Math.sin(angle + Math.PI / 6));
-            ctx.stroke();
-          } else {
-            // Straight arrow
-            ctx.beginPath();
-            ctx.moveTo(start.x, start.y);
-            ctx.lineTo(end.x, end.y);
-            ctx.stroke();
-
-            // Draw arrowhead (always solid)
-            ctx.setLineDash([]);
-            const angle = Math.atan2(end.y - start.y, end.x - start.x);
-            const arrowLength = 12;
-            ctx.beginPath();
-            ctx.moveTo(end.x, end.y);
-            ctx.lineTo(end.x - arrowLength * Math.cos(angle - Math.PI / 6), end.y - arrowLength * Math.sin(angle - Math.PI / 6));
-            ctx.moveTo(end.x, end.y);
-            ctx.lineTo(end.x - arrowLength * Math.cos(angle + Math.PI / 6), end.y - arrowLength * Math.sin(angle + Math.PI / 6));
-            ctx.stroke();
-          }
-
-          // Reset line dash
-          ctx.setLineDash([]);
-        }
-        break;
-
-      case 'rect':
-        const rectRadius = obj.borderRadius ?? 0;
-        ctx.beginPath();
-        ctx.roundRect(obj.x, obj.y, obj.width, obj.height, rectRadius);
-        if (obj.fillColor && obj.fillColor !== 'transparent') ctx.fill();
-        ctx.stroke();
-        break;
-
-      case 'ellipse':
-        ctx.beginPath();
-        ctx.ellipse(obj.x + obj.width / 2, obj.y + obj.height / 2, Math.abs(obj.width / 2), Math.abs(obj.height / 2), 0, 0, Math.PI * 2);
-        if (obj.fillColor && obj.fillColor !== 'transparent') ctx.fill();
-        ctx.stroke();
-        break;
-
-      case 'diamond':
-        ctx.beginPath();
-        ctx.moveTo(obj.x + obj.width / 2, obj.y);
-        ctx.lineTo(obj.x + obj.width, obj.y + obj.height / 2);
-        ctx.lineTo(obj.x + obj.width / 2, obj.y + obj.height);
-        ctx.lineTo(obj.x, obj.y + obj.height / 2);
-        ctx.closePath();
-        if (obj.fillColor && obj.fillColor !== 'transparent') ctx.fill();
-        ctx.stroke();
-        break;
-
-      case 'triangle':
-        ctx.beginPath();
-        ctx.moveTo(obj.x + obj.width / 2, obj.y);
-        ctx.lineTo(obj.x + obj.width, obj.y + obj.height);
-        ctx.lineTo(obj.x, obj.y + obj.height);
-        ctx.closePath();
-        if (obj.fillColor && obj.fillColor !== 'transparent') ctx.fill();
-        ctx.stroke();
-        break;
-
-      case 'star':
-        const starCx = obj.x + obj.width / 2;
-        const starCy = obj.y + obj.height / 2;
-        const outerRadius = Math.min(obj.width, obj.height) / 2;
-        const innerRadius = outerRadius * 0.4;
-        const spikes = 5;
-        ctx.beginPath();
-        for (let i = 0; i < spikes * 2; i++) {
-          const r = i % 2 === 0 ? outerRadius : innerRadius;
-          const angle = (Math.PI / spikes) * i - Math.PI / 2;
-          const px = starCx + Math.cos(angle) * r;
-          const py = starCy + Math.sin(angle) * r;
-          if (i === 0) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
-        }
-        ctx.closePath();
-        if (obj.fillColor && obj.fillColor !== 'transparent') ctx.fill();
-        ctx.stroke();
-        break;
-
-      case 'hexagon':
-        const hexCx = obj.x + obj.width / 2;
-        const hexCy = obj.y + obj.height / 2;
-        const hexRadius = Math.min(obj.width, obj.height) / 2;
-        ctx.beginPath();
-        for (let i = 0; i < 6; i++) {
-          const angle = (Math.PI / 3) * i - Math.PI / 2;
-          const px = hexCx + Math.cos(angle) * hexRadius;
-          const py = hexCy + Math.sin(angle) * hexRadius;
-          if (i === 0) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
-        }
-        ctx.closePath();
-        if (obj.fillColor && obj.fillColor !== 'transparent') ctx.fill();
-        ctx.stroke();
-        break;
-
-      case 'pentagon':
-        const pentCx = obj.x + obj.width / 2;
-        const pentCy = obj.y + obj.height / 2;
-        const pentRadius = Math.min(obj.width, obj.height) / 2;
-        ctx.beginPath();
-        for (let i = 0; i < 5; i++) {
-          const angle = (Math.PI * 2 / 5) * i - Math.PI / 2;
-          const px = pentCx + Math.cos(angle) * pentRadius;
-          const py = pentCy + Math.sin(angle) * pentRadius;
-          if (i === 0) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
-        }
-        ctx.closePath();
-        if (obj.fillColor && obj.fillColor !== 'transparent') ctx.fill();
-        ctx.stroke();
-        break;
-
-      case 'sticky':
-        // Sticky note with shadow and auto-height
-        ctx.shadowColor = 'rgba(0,0,0,0.1)';
-        ctx.shadowBlur = 8;
-        ctx.shadowOffsetY = 2;
-        ctx.fillStyle = obj.fillColor || '#ffc700';
-        const stickyWidth = obj.width || 200;
-        const padding = 12;
-        const fontSize = obj.fontSize || 14;
-        const lineHeight = fontSize * 1.4;
-
-        // Calculate required height based on text content
-        let calculatedHeight = obj.height || 120;
-        const objFontFamily = obj.fontFamily || 'Poppins';
-        if (obj.text) {
-          ctx.font = `${obj.fontWeight || 'normal'} ${fontSize}px '${objFontFamily}', system-ui, sans-serif`;
-          const maxWidth = stickyWidth - padding * 2;
-          const words = obj.text.split(/\s+/);
-          let line = '';
-          let lineCount = 1;
-
-          for (let i = 0; i < words.length; i++) {
-            const testLine = line + words[i] + ' ';
-            const metrics = ctx.measureText(testLine);
-            if (metrics.width > maxWidth && line !== '') {
-              line = words[i] + ' ';
-              lineCount++;
-            } else {
-              line = testLine;
-            }
-          }
-
-          // Calculate height with padding
-          const textHeight = lineCount * lineHeight + padding * 2;
-          calculatedHeight = Math.max(obj.height || 80, textHeight);
-        }
-
-        // Draw the sticky note background
-        ctx.beginPath();
-        ctx.roundRect(obj.x, obj.y, stickyWidth, calculatedHeight, obj.borderRadius || 4);
-        ctx.fill();
-        ctx.shadowColor = 'transparent';
-
-        // Draw text with word wrap
-        if (obj.text) {
-          ctx.fillStyle = obj.strokeColor || '#1a1a1a';
-          ctx.font = `${obj.fontWeight || 'normal'} ${fontSize}px '${objFontFamily}', system-ui, sans-serif`;
-          ctx.textAlign = 'left';
-          ctx.textBaseline = 'top';
-
-          const maxWidth = stickyWidth - padding * 2;
-          const words = obj.text.split(/\s+/);
-          let line = '';
-          let y = obj.y + padding;
-
-          for (let i = 0; i < words.length; i++) {
-            const testLine = line + words[i] + ' ';
-            const metrics = ctx.measureText(testLine);
-            if (metrics.width > maxWidth && line !== '') {
-              ctx.fillText(line.trim(), obj.x + padding, y);
-              line = words[i] + ' ';
-              y += lineHeight;
-            } else {
-              line = testLine;
-            }
-          }
-          ctx.fillText(line.trim(), obj.x + padding, y);
-        }
-        break;
-
-      case 'text':
-        const textFontFamily = obj.fontFamily || 'Poppins';
-        ctx.font = `${obj.fontWeight || 'normal'} ${obj.fontSize || 16}px '${textFontFamily}', system-ui, sans-serif`;
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'top';
-        ctx.fillStyle = obj.strokeColor || strokeColor;
-
-        const textLines = (obj.text || '').split('\n');
-        const textLineHeight = (obj.fontSize || 16) * 1.4;
-        textLines.forEach((line, i) => {
-          ctx.fillText(line, obj.x, obj.y + i * textLineHeight);
         });
-        break;
-
-      case 'image':
-        if (obj.image) {
-          try {
-            // Use cached image if available
-            let img = imageCache.current.get(obj.image);
-            if (img && img.complete && img.naturalWidth > 0) {
-              ctx.drawImage(img, obj.x, obj.y, obj.width, obj.height);
-            } else if (!img) {
-              // Start loading if not in cache
-              img = new Image();
-              img.onload = () => {
-                imageCache.current.set(obj.image, img);
-                setImagesLoaded(prev => prev + 1);
-              };
-              img.src = obj.image;
-              imageCache.current.set(obj.image, img); // Store immediately to prevent re-loading
-
-              // Draw placeholder while loading
-              ctx.fillStyle = '#f5f5f5';
-              ctx.strokeStyle = '#e0e0e0';
-              ctx.lineWidth = 2;
-              ctx.setLineDash([8, 4]);
-              ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
-              ctx.strokeRect(obj.x, obj.y, obj.width, obj.height);
-              ctx.setLineDash([]);
-
-              // Loading indicator
-              ctx.fillStyle = '#9e9e9e';
-              ctx.font = '14px Inter, sans-serif';
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-              ctx.fillText('Loading...', obj.x + obj.width / 2, obj.y + obj.height / 2);
-            }
-          } catch (e) {
-            console.error('Failed to draw image', e);
-          }
-        } else if (obj.isPlaceholder) {
-          // Draw image placeholder
-          ctx.fillStyle = '#f5f5f5';
-          ctx.strokeStyle = '#e0e0e0';
-          ctx.lineWidth = 2;
-          ctx.setLineDash([8, 4]);
-          ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
-          ctx.strokeRect(obj.x, obj.y, obj.width, obj.height);
+        
+        if (isHovered) {
+          const bbox = getBoundingBox(obj);
+          ctx.strokeStyle = '#3b82f6';
+          ctx.lineWidth = 2 / zoom;
+          ctx.setLineDash([5 / zoom, 3 / zoom]);
+          ctx.strokeRect(bbox.x - 4, bbox.y - 4, bbox.width + 8, bbox.height + 8);
           ctx.setLineDash([]);
-
-          // Draw image icon in center
-          const iconSize = Math.min(obj.width, obj.height) * 0.3;
-          const iconX = obj.x + obj.width / 2;
-          const iconY = obj.y + obj.height / 2;
-
-          ctx.strokeStyle = '#9e9e9e';
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          // Mountain icon
-          ctx.moveTo(iconX - iconSize / 2, iconY + iconSize / 3);
-          ctx.lineTo(iconX - iconSize / 4, iconY - iconSize / 6);
-          ctx.lineTo(iconX, iconY + iconSize / 6);
-          ctx.lineTo(iconX + iconSize / 4, iconY - iconSize / 3);
-          ctx.lineTo(iconX + iconSize / 2, iconY + iconSize / 3);
-          ctx.closePath();
-          ctx.stroke();
-
-          // Sun circle
-          ctx.beginPath();
-          ctx.arc(iconX - iconSize / 3, iconY - iconSize / 4, iconSize / 8, 0, Math.PI * 2);
-          ctx.stroke();
-
-          // "Click to add" text
-          ctx.fillStyle = '#9e9e9e';
-          ctx.font = `${Math.min(14, obj.width / 10)}px Inter, sans-serif`;
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.fillText('Click to add image', iconX, iconY + iconSize / 2 + 10);
         }
-        break;
+      });
     }
 
     ctx.restore();
-  }, [strokeColor, strokeWidth, animatingIds, animationProgress]);
+  }, [objects, currentPath, selectedIds, selectionBox, showGrid, zoom, panX, panY, tool, eraserRadius, lastCanvasPoint, eraserPreviewPath, animatingIds, animationProgress, imagesLoaded, showConnectionPoints, hoveredElement, connectorDrawing, strokeColor, strokeWidth]);
 
   const drawSelectionOverlay = useCallback((ctx) => {
     const selectedObjects = objects.filter(o => selectedIds.includes(o.id));
@@ -1124,6 +1481,8 @@ const WhiteboardCanvas = forwardRef(({
     for (let i = objects.length - 1; i >= 0; i--) {
       const obj = objects[i];
       if (!obj) continue;
+      // Skip connectors in hit test - they're selected via their connected elements
+      if (obj.type === 'connector') continue;
       const bbox = getBoundingBox(obj);
       // Increase padding for text and sticky for easier selection
       const basePadding = (obj.strokeWidth || 2) / 2 + 5;
@@ -1513,6 +1872,85 @@ const WhiteboardCanvas = forwardRef(({
         arrowType: tool === 'arrow' ? arrowType : undefined,
         lineStyle: tool === 'arrow' ? arrowLineStyle : undefined
       });
+    } else if (tool === 'connector') {
+      // Connector tool - connect two elements
+      // First check if we're near any element (with expanded hit area for easier snapping)
+      const hit = hitTest(point);
+      
+      // Also check for nearby elements with snap distance
+      const SNAP_DISTANCE = 30;
+      let nearestElement = hit;
+      let nearestDist = hit ? 0 : Infinity;
+      
+      if (!hit) {
+        // No direct hit, look for nearby elements to snap to
+        for (const obj of objects) {
+          if (obj.type === 'connector') continue;
+          const bbox = getBoundingBox(obj);
+          // Calculate distance to element edge
+          const closestX = Math.max(bbox.x, Math.min(point.x, bbox.x + bbox.width));
+          const closestY = Math.max(bbox.y, Math.min(point.y, bbox.y + bbox.height));
+          const dist = Math.sqrt(Math.pow(point.x - closestX, 2) + Math.pow(point.y - closestY, 2));
+          if (dist < SNAP_DISTANCE && dist < nearestDist) {
+            nearestDist = dist;
+            nearestElement = obj;
+          }
+        }
+      }
+      
+      if (nearestElement && nearestElement.type !== 'connector') {
+        // Find the nearest connection point on the element (snaps to edge)
+        const connectionPoint = findClosestConnectionPoint(nearestElement, point);
+        
+        if (connectorDrawing) {
+          // We have a start element, now complete the connection
+          if (nearestElement.id !== connectorDrawing.startElementId) {
+            // Create connector between start and end elements
+            // Only store element IDs - connection points are calculated dynamically at render time
+            const newConnector = {
+              id: generateId(),
+              type: 'connector',
+              startElementId: connectorDrawing.startElementId,
+              endElementId: nearestElement.id,
+              strokeColor,
+              strokeWidth,
+              lineStyle: arrowLineStyle || 'solid',
+              curvature: 0.5,
+              opacity: 1
+            };
+            updateObjects([...objects, newConnector]);
+            setConnectorDrawing(null);
+            setCurrentPath(null);
+            setIsDrawing(false);
+          }
+        } else {
+          // Start new connector from this element
+          setConnectorDrawing({
+            startElementId: nearestElement.id,
+            startConnectionPoint: connectionPoint
+          });
+          // Start a temporary path to visualize the connector being drawn
+          setCurrentPath({
+            id: generateId(),
+            type: 'connector',
+            startElementId: nearestElement.id,
+            startConnectionPoint: connectionPoint,
+            points: [connectionPoint, point],
+            strokeColor,
+            strokeWidth,
+            lineStyle: arrowLineStyle || 'solid',
+            opacity: 1,
+            isDrawing: true
+          });
+          setIsDrawing(true);
+        }
+      } else if (!nearestElement && connectorDrawing) {
+        // Clicked on empty space - cancel connector drawing
+        setConnectorDrawing(null);
+        setCurrentPath(null);
+        setIsDrawing(false);
+      }
+      return;
     } else if (['rect', 'ellipse', 'diamond', 'triangle', 'star', 'hexagon', 'pentagon'].includes(tool)) {
       setCurrentPath({
         id: generateId(), type: tool, x: point.x, y: point.y, width: 0, height: 0,
@@ -1520,7 +1958,7 @@ const WhiteboardCanvas = forwardRef(({
         borderRadius: tool === 'rect' ? borderRadius : undefined
       });
     }
-  }, [isReadOnly, tool, getCanvasPoint, hitTest, getResizeHandle, getRotationHandle, selectedIds, panX, panY, saveHistory, strokeColor, strokeWidth, fillColor, objects, updateObjects, arrowType, arrowLineStyle, borderRadius, highlighterColor, highlighterOpacity, eraserRadius]);
+  }, [isReadOnly, tool, getCanvasPoint, hitTest, getResizeHandle, getRotationHandle, selectedIds, panX, panY, saveHistory, strokeColor, strokeWidth, fillColor, objects, updateObjects, arrowType, arrowLineStyle, borderRadius, highlighterColor, highlighterOpacity, eraserRadius, connectorDrawing]);
 
   const handlePointerMove = useCallback((e) => {
     if (!isDrawing) return;
@@ -1755,13 +2193,46 @@ const WhiteboardCanvas = forwardRef(({
         } else {
           setCurrentPath(prev => ({ ...prev, points: [prev.points[0], point] }));
         }
+      } else if (tool === 'connector' && connectorDrawing) {
+        // Update connector preview line while drawing
+        // Check if cursor is near an element and snap to its connection point
+        const SNAP_DISTANCE = 30;
+        let snapPoint = point;
+        let targetElement = null;
+        
+        for (const obj of objects) {
+          if (obj.type === 'connector' || obj.id === connectorDrawing.startElementId) continue;
+          const bbox = getBoundingBox(obj);
+          const closestX = Math.max(bbox.x, Math.min(point.x, bbox.x + bbox.width));
+          const closestY = Math.max(bbox.y, Math.min(point.y, bbox.y + bbox.height));
+          const dist = Math.sqrt(Math.pow(point.x - closestX, 2) + Math.pow(point.y - closestY, 2));
+          if (dist < SNAP_DISTANCE) {
+            // Snap to this element's nearest connection point
+            const connPoint = findClosestConnectionPoint(obj, point);
+            snapPoint = connPoint;
+            targetElement = obj;
+            break;
+          }
+        }
+        
+        setCurrentPath(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            points: [prev.startConnectionPoint, snapPoint],
+            snapTarget: targetElement ? targetElement.id : null
+          };
+        });
+        
+        // Update hovered element for visual feedback
+        setHoveredElement(targetElement ? targetElement.id : null);
       } else if (['rect', 'ellipse', 'diamond', 'triangle', 'star', 'hexagon', 'pentagon'].includes(tool)) {
         setCurrentPath(prev => ({
           ...prev, width: point.x - prev.x, height: e.shiftKey ? point.x - prev.x : point.y - prev.y
         }));
       }
     }
-  }, [isDrawing, tool, getCanvasPoint, dragStart, currentPath, selectionBox, selectedIds, startPoint, objects, updateObjects, resizeHandle, eraserRadius, isRotating, rotationCenter, isAnimatingZoom, arrowType, zoom, panX, panY]);
+  }, [isDrawing, tool, getCanvasPoint, dragStart, currentPath, selectionBox, selectedIds, startPoint, objects, updateObjects, resizeHandle, eraserRadius, isRotating, rotationCenter, isAnimatingZoom, arrowType, zoom, panX, panY, connectorDrawing]);
 
   const handlePointerUp = useCallback((e) => {
     // Release pointer capture
@@ -1796,6 +2267,34 @@ const WhiteboardCanvas = forwardRef(({
 
     if (currentPath) {
       let finalPath = { ...currentPath };
+
+      // Handle connector tool - complete or cancel
+      if (finalPath.type === 'connector' && finalPath.isDrawing) {
+        // Connector is being drawn - check if we have a valid snap target
+        if (finalPath.snapTarget && connectorDrawing) {
+          // Complete the connector - create finalized connector with both element IDs
+          const newConnector = {
+            id: generateId(),
+            type: 'connector',
+            startElementId: connectorDrawing.startElementId,
+            endElementId: finalPath.snapTarget,
+            strokeColor: finalPath.strokeColor,
+            strokeWidth: finalPath.strokeWidth,
+            lineStyle: finalPath.lineStyle || 'solid',
+            curvature: 0.5,
+            opacity: 1
+          };
+          updateObjects([...objects, newConnector]);
+        }
+        // Always clear connector drawing state after pointer up
+        setConnectorDrawing(null);
+        setCurrentPath(null);
+        setIsDrawing(false);
+        setHoveredElement(null);
+        setDragStart(null);
+        setStartPoint(null);
+        return;
+      }
 
       // Calculate control point for curved arrows from drawn path
       if (finalPath.type === 'arrow' && finalPath.arrowType === 'curved' && finalPath.pathPoints && finalPath.pathPoints.length > 3) {
@@ -1833,7 +2332,7 @@ const WhiteboardCanvas = forwardRef(({
     setIsDrawing(false);
     setDragStart(null);
     setStartPoint(null);
-  }, [currentPath, selectionBox, objects, updateObjects, straightenLine, recognizeShape, resizeHandle, saveHistory]);
+  }, [currentPath, selectionBox, objects, updateObjects, straightenLine, recognizeShape, resizeHandle, saveHistory, connectorDrawing]);
 
   const handleTextSubmit = useCallback(() => {
     if (textEditing && textValue.trim()) {
@@ -2027,6 +2526,7 @@ const WhiteboardCanvas = forwardRef(({
           case 'e': setTool('eraser'); break;
           case 'l': case '3': setTool('line'); break;
           case 'a': case '4': setTool('arrow'); break;
+          case 'c': case '8': setTool('connector'); setShowConnectionPoints(true); break;
           case 'r': case '5': setTool('rect'); break;
           case 'o': case '6': setTool('ellipse'); break;
           case 'd': setTool('diamond'); break;
@@ -2040,43 +2540,6 @@ const WhiteboardCanvas = forwardRef(({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [textEditing, handleTextSubmit, undo, redo, selectedIds, objects, updateObjects, saveHistory, copySelected, pasteFromClipboard, duplicateSelected, selectAll]);
-
-  const handleWheel = useCallback((e) => {
-    // Stop zoom animation if user manually zooms
-    if (isAnimatingZoom) {
-      setIsAnimatingZoom(false);
-    }
-
-    if (e.ctrlKey || e.metaKey) {
-      e.preventDefault();
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-
-      const rect = canvas.getBoundingClientRect();
-      // Use mouse position as zoom center
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-
-      // Calculate point in canvas coordinates before zoom
-      const canvasX = (mouseX - panX) / zoom;
-      const canvasY = (mouseY - panY) / zoom;
-
-      // Calculate new zoom level
-      const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-      const newZoom = Math.min(5, Math.max(0.1, zoom * zoomFactor));
-
-      // Adjust pan to keep the mouse point stationary
-      const newPanX = mouseX - canvasX * newZoom;
-      const newPanY = mouseY - canvasY * newZoom;
-
-      setZoom(newZoom);
-      setPanX(newPanX);
-      setPanY(newPanY);
-    } else {
-      setPanX(prev => prev - e.deltaX);
-      setPanY(prev => prev - e.deltaY);
-    }
-  }, [zoom, panX, panY, isAnimatingZoom]);
 
   // Touch gesture handlers
   const getTouchCenter = (touches) => {
@@ -2537,17 +3000,9 @@ const WhiteboardCanvas = forwardRef(({
   const sendAIMessage = useCallback(async (message) => {
     if (!message.trim()) return;
 
-    // Check if there's a pending template
-    const templateType = window.__miraTemplateType;
-    if (templateType) {
-      window.__miraTemplateType = null;
-      window.__miraTemplatePrompt = null;
-    }
-
     setAiLoading(true);
     setAiError(null);
-    startAILoading(showAgentMode ? 'MIRA is generating your diagram...' : 'MIRA is thinking...');
-    startAILoading(showAgentMode ? 'MIRA is generating your diagram...' : 'MIRA is thinking...');
+    startAILoading('MIRA is thinking...');
 
     // Start scanning animation for visual processing
     startScanAnimation();
@@ -2565,72 +3020,24 @@ const WhiteboardCanvas = forwardRef(({
     try {
       const token = localStorage.getItem('token');
 
-      // Use 'generate' action for agent mode to create actual canvas objects
-      if (showAgentMode) {
-        const requestBody = { action: 'generate', message, canvasScreenshot };
-        if (templateType) {
-          requestBody.templateType = templateType;
-        }
+      // Regular chat mode - send screenshot for visual context
+      const response = await fetch(`/api/whiteboard/${boardId}/analyze`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ action: 'chat', message, canvasScreenshot })
+      });
 
-        const response = await fetch(`/api/whiteboard/${boardId}/analyze`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(requestBody)
-        });
+      const data = await response.json();
 
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to generate diagram');
-        }
-
-        // Update canvas with generated objects
-        if (data.pages && data.pages[0]) {
-          saveHistory();
-          setPages(data.pages);
-
-          // Animate new objects and zoom to fit - DON'T select them
-          if (data.generatedObjects && data.generatedObjects.length > 0) {
-            const newIds = data.generatedObjects.map(o => o.id);
-            animateNewObjects(newIds);
-            smoothZoomToFitContent(data.generatedObjects);
-            setSelectedIds([]); // Clear any selection
-          }
-        }
-
-        setAiAnalysis(data.aiAnalysis);
-        setIsDirty(true);
-
-        // Auto-continue if there's more content to generate
-        if (data.hasMore && data.nextPrompt) {
-          // Small delay before auto-continuing
-          setTimeout(() => {
-            continueGeneration();
-          }, 1500);
-        }
-      } else {
-        // Regular chat mode - also send screenshot for visual context
-        const response = await fetch(`/api/whiteboard/${boardId}/analyze`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ action: 'chat', message, canvasScreenshot })
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.error || 'Failed to send message');
-        }
-
-        setAiAnalysis(data.aiAnalysis);
-        setIsDirty(true);
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send message');
       }
+
+      setAiAnalysis(data.aiAnalysis);
+      setIsDirty(true);
     } catch (error) {
       setAiError(error.message);
       // Remove the optimistic message on error
@@ -2641,29 +3048,122 @@ const WhiteboardCanvas = forwardRef(({
     } finally {
       setAiLoading(false);
     }
-  }, [boardId, showAgentMode, saveHistory, setPages, animateNewObjects, smoothZoomToFitContent, startScanAnimation, captureCanvasScreenshot]);
+  }, [boardId, saveHistory, setPages, animateNewObjects, smoothZoomToFitContent, startScanAnimation, captureCanvasScreenshot]);
 
-  // Send AI message with a template type (mindmap, flowchart, planning, ideas)
+  // Legacy: Send AI message with a template type - now redirects to sidebar
+  // Kept for backward compatibility but templates now use sidebar
   const sendAIMessageWithTemplate = useCallback(async (templateType, promptMessage) => {
-    if (!promptMessage.trim()) return;
+    // Open sidebar with template instead of old direct flow
+    window.__miraSidebarTemplateType = templateType;
+    setShowAgentSidebar(true);
+    setIsContentPlotted(false);
+  }, []);
+
+  // Open MIRA Agent Sidebar with a selected template
+  const openAgentSidebarWithTemplate = useCallback((templateType) => {
+    // Store the template type for the sidebar
+    window.__miraSidebarTemplateType = templateType;
+    setShowAgentSidebar(true);
+    setIsContentPlotted(false);
+  }, []);
+
+  // Handle starting plotting from sidebar prepared content
+  const handleStartPlotting = useCallback(async (preparedContent, templateType) => {
+    if (!preparedContent) return;
 
     setAiLoading(true);
     setAiError(null);
+    startAILoading('MIRA is plotting your content on the canvas...');
+    startScanAnimation();
 
-    // Add assistant message asking for content
-    setAiAnalysis(prev => ({
-      ...prev,
-      messages: [...prev.messages, { role: 'assistant', content: promptMessage, timestamp: new Date() }]
-    }));
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/whiteboard/${boardId}/analyze`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          action: 'plot-from-content',
+          preparedContent,
+          templateType
+        })
+      });
 
-    // Store template type for next user message
-    setAiInput('');
+      const data = await response.json();
 
-    // Set a flag to indicate we're waiting for user content
-    window.__miraTemplateType = templateType;
-    window.__miraTemplatePrompt = promptMessage;
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to plot content');
+      }
 
-    setAiLoading(false);
+      // Update canvas with generated objects
+      if (data.pages && data.pages[0]) {
+        saveHistory();
+        setPages(data.pages);
+
+        // Animate new objects and zoom to fit
+        if (data.generatedObjects && data.generatedObjects.length > 0) {
+          const newIds = data.generatedObjects.map(o => o.id);
+          animateNewObjects(newIds);
+          smoothZoomToFitContent(data.generatedObjects);
+          setSelectedIds([]);
+        }
+      }
+
+      // Store mapping for content sync
+      if (data.sectionMapping) {
+        setContentElementMapping(data.sectionMapping);
+      }
+
+      setAiAnalysis(data.aiAnalysis);
+      
+      // Update generation history state from the response
+      if (data.aiAnalysis?.agentContent) {
+        setAgentGenerations(data.aiAnalysis.agentContent.generations || []);
+        setCurrentGenerationId(data.aiAnalysis.agentContent.currentGenerationId || data.generationId);
+        
+        // Update sidebar content with the current generation
+        const currentGen = data.aiAnalysis.agentContent.generations?.find(
+          g => g.id === (data.aiAnalysis.agentContent.currentGenerationId || data.generationId)
+        );
+        if (currentGen) {
+          setAgentSidebarContent({
+            title: currentGen.title,
+            description: currentGen.description,
+            sections: currentGen.sections,
+            conclusion: currentGen.conclusion,
+            templateType: currentGen.templateType,
+            userPrompt: currentGen.userPrompt,
+            isPlotted: true,
+          });
+        }
+      }
+      
+      setIsDirty(true);
+      setIsContentPlotted(true);
+      
+      // Switch to select tool after plotting so user can interact with elements
+      setTool('select');
+
+      // Minimize sidebar after plotting
+      // setShowAgentSidebar(false);
+
+    } catch (error) {
+      console.error('Plotting error:', error);
+      setAiError(error.message);
+    } finally {
+      setAiLoading(false);
+      stopAILoading();
+    }
+  }, [boardId, saveHistory, setPages, animateNewObjects, smoothZoomToFitContent, startScanAnimation, startAILoading, stopAILoading]);
+
+  // Handle content update from sidebar (for sync)
+  const handleSidebarContentUpdate = useCallback((updatedContent) => {
+    setAgentSidebarContent(updatedContent);
+    
+    // If content is already plotted, we could sync changes here
+    // For now, just update the state
   }, []);
 
   // Continue generation - called automatically or via button
@@ -3152,7 +3652,6 @@ const WhiteboardCanvas = forwardRef(({
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
-          onWheel={handleWheel}
           className="absolute inset-0 touch-none"
           style={{ cursor: tool === 'pan' ? 'grab' : tool === 'eraser' ? 'none' : tool === 'select' ? 'default' : 'crosshair' }}
         />
@@ -3233,6 +3732,15 @@ const WhiteboardCanvas = forwardRef(({
         <ToolButton id="arrow" shortcut="A" label="Arrow" icon={
           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <line x1="5" y1="19" x2="19" y2="5" /><polyline points="9 5 19 5 19 15" />
+          </svg>
+        } />
+
+        <ToolButton id="connector" shortcut="C" label="Connector" icon={
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="5" cy="5" r="2" fill="currentColor" />
+            <circle cx="19" cy="19" r="2" fill="currentColor" />
+            <path d="M5 7c0 6 8 6 8 12" strokeLinecap="round" />
+            <path d="M13 19h6" strokeLinecap="round" />
           </svg>
         } />
 
@@ -4961,15 +5469,15 @@ const WhiteboardCanvas = forwardRef(({
         <div
           ref={aiPanelRef}
           className="fixed bottom-20 sm:bottom-36 right-4 sm:right-6 z-50 w-[calc(100vw-2rem)] sm:w-96 max-h-[calc(100vh-120px)] sm:max-h-[calc(100vh-180px)] flex flex-col
-            bg-white/25
-            border border-white/40
+            bg-white
+            border border-gray-200
             rounded-2xl
-            shadow-[0_8px_40px_rgba(0,0,0,0.1)]
+            shadow-[0_8px_40px_rgba(0,0,0,0.12)]
             overflow-hidden
             animate-in slide-in-from-bottom-4 fade-in duration-300"
         >
           {/* Header */}
-          <div className="relative px-5 py-4 border-b border-white/20 bg-white/10">
+          <div className="relative px-5 py-4 border-b border-gray-100 bg-gray-50/50">
             <div className="relative flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-md">
@@ -4987,7 +5495,7 @@ const WhiteboardCanvas = forwardRef(({
                 {aiAnalysis.messages.length > 0 && (
                   <button
                     onClick={clearAIHistory}
-                    className="p-2 rounded-xl hover:bg-white/40 transition-colors text-gray-400 hover:text-red-500"
+                    className="p-2 rounded-xl hover:bg-gray-100 transition-colors text-gray-400 hover:text-red-500"
                     title="Clear history"
                   >
                     <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -4997,7 +5505,7 @@ const WhiteboardCanvas = forwardRef(({
                 )}
                 <button
                   onClick={() => setShowAIPanel(false)}
-                  className="p-2 rounded-xl hover:bg-white/40 transition-colors text-gray-400 hover:text-gray-600"
+                  className="p-2 rounded-xl hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-600"
                 >
                   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -5008,7 +5516,7 @@ const WhiteboardCanvas = forwardRef(({
           </div>
 
           {/* Messages area */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-[120px] sm:min-h-[180px] bg-white/5">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-[120px] sm:min-h-[180px] bg-white">
             {aiAnalysis.messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full py-6 text-center">
                 <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-100/80 to-purple-100/80 flex items-center justify-center mb-3">
@@ -5029,7 +5537,7 @@ const WhiteboardCanvas = forwardRef(({
                     disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100
                     transition-all duration-200"
                 >
-                  {aiLoading ? 'Analysing...' : objects.length === 0 ? 'Canvas is empty' : '✨ Analyse Canvas'}
+                  {aiLoading ? 'Analysing...' : objects.length === 0 ? 'Canvas is empty' : 'Analyse Canvas'}
                 </button>
               </div>
             ) : (
@@ -5042,7 +5550,7 @@ const WhiteboardCanvas = forwardRef(({
                     <div
                       className={`max-w-[85%] rounded-2xl px-4 py-3 ${msg.role === 'user'
                           ? 'bg-gradient-to-r from-violet-500 to-purple-600 text-white rounded-br-md'
-                          : 'bg-white/60 text-gray-800 border border-white/40 rounded-bl-md'
+                          : 'bg-gray-50 text-gray-800 border border-gray-200 rounded-bl-md'
                         }`}
                     >
                       <div className="text-sm whitespace-pre-wrap leading-relaxed">
@@ -5103,7 +5611,7 @@ const WhiteboardCanvas = forwardRef(({
           )}
 
           {/* Input area */}
-          <div className="p-3 sm:p-4 border-t border-white/20 bg-white/10">
+          <div className="p-3 sm:p-4 border-t border-gray-100 bg-gray-50/50">
             <div className="flex gap-2">
               <textarea
                 value={aiInput}
@@ -5115,13 +5623,13 @@ const WhiteboardCanvas = forwardRef(({
                     sendAIMessage(aiInput);
                   }
                 }}
-                placeholder={showAgentMode ? "Describe what to create...\n(Ctrl+Enter to send)" : "Ask MIRA about your canvas...\n(Ctrl+Enter to send)"}
+                placeholder="Ask MIRA about your canvas...\n(Ctrl+Enter to send)"
                 rows={2}
                 className="flex-1 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl
-                  bg-white/50
-                  border border-white/40
+                  bg-white
+                  border border-gray-200
                   text-sm text-gray-800 placeholder-gray-400
-                  focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-300/50
+                  focus:outline-none focus:ring-2 focus:ring-violet-400/40 focus:border-violet-300
                   transition-all duration-200 resize-none"
               />
               <button
@@ -5142,150 +5650,71 @@ const WhiteboardCanvas = forwardRef(({
               </button>
             </div>
 
-            {/* Agent Mode toggle */}
-            <div className="mt-3 pt-3 border-t border-gray-200/40">
+            {/* Agent Mode button - Opens MIRA Agent Sidebar directly */}
+            <div className="mt-3 pt-3 border-t border-gray-200">
               <button
-                onClick={() => setShowAgentMode?.(prev => !prev)}
-                className={`w-full flex items-center justify-center gap-2 text-xs px-4 py-2.5 rounded-lg transition-all border ${showAgentMode
-                    ? 'bg-violet-500 text-white border-violet-500 shadow-md'
-                    : 'bg-white/50 hover:bg-white/70 text-gray-600 border-gray-200/60'
-                  }`}
+                onClick={() => {
+                  setShowAgentSidebar(true);
+                }}
+                className="w-full flex items-center justify-center gap-2 text-xs px-4 py-2.5 rounded-lg transition-all border bg-gradient-to-r from-violet-500 to-purple-600 text-white border-violet-500 shadow-md hover:shadow-lg"
               >
                 <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="12" cy="12" r="3" />
                   <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
                 </svg>
-                {showAgentMode ? '✨ Agent Mode Active' : 'Agent Mode Off'}
+                Open Agent Mode
               </button>
 
-              {showAgentMode && (
-                <>
-                  {/* Template buttons for agent mode */}
-                  <p className="mt-3 text-xs text-gray-500 font-medium">Quick Templates:</p>
-                  <div className="grid grid-cols-2 gap-2 mt-2">
-                    <button
-                      onClick={() => sendAIMessageWithTemplate('mindmap', 'Create a mindmap. What topic would you like me to map out?')}
-                      disabled={aiLoading}
-                      className="flex flex-col items-center gap-1 text-xs px-3 py-3 rounded-lg bg-gradient-to-br from-purple-50 to-violet-100 hover:from-purple-100 hover:to-violet-200 text-violet-700 transition-all border border-violet-200/60"
-                    >
-                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <circle cx="12" cy="12" r="3" />
-                        <path d="M12 2v4m0 12v4m10-10h-4M6 12H2m15.5-7.5l-2.8 2.8m-5.4 5.4l-2.8 2.8m0-11l2.8 2.8m5.4 5.4l2.8 2.8" />
-                      </svg>
-                      Mindmap
-                    </button>
-                    <button
-                      onClick={() => sendAIMessageWithTemplate('flowchart', 'Create a flowchart. Describe the process you want to visualize.')}
-                      disabled={aiLoading}
-                      className="flex flex-col items-center gap-1 text-xs px-3 py-3 rounded-lg bg-gradient-to-br from-blue-50 to-cyan-100 hover:from-blue-100 hover:to-cyan-200 text-blue-700 transition-all border border-blue-200/60"
-                    >
-                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <rect x="3" y="3" width="6" height="6" rx="1" />
-                        <rect x="15" y="3" width="6" height="6" rx="1" />
-                        <rect x="9" y="15" width="6" height="6" rx="1" />
-                        <path d="M6 9v3h6m6-3v3h-6m0 0v3" />
-                      </svg>
-                      Flowchart
-                    </button>
-                    <button
-                      onClick={() => sendAIMessageWithTemplate('planning', 'Create a planning board. What project or tasks do you want to organize?')}
-                      disabled={aiLoading}
-                      className="flex flex-col items-center gap-1 text-xs px-3 py-3 rounded-lg bg-gradient-to-br from-emerald-50 to-green-100 hover:from-emerald-100 hover:to-green-200 text-emerald-700 transition-all border border-emerald-200/60"
-                    >
-                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <rect x="3" y="3" width="18" height="18" rx="2" />
-                        <path d="M3 9h18M9 21V9" />
-                      </svg>
-                      Planning
-                    </button>
-                    <button
-                      onClick={() => sendAIMessageWithTemplate('ideas', 'Create an ideas board. What theme do you want to brainstorm?')}
-                      disabled={aiLoading}
-                      className="flex flex-col items-center gap-1 text-xs px-3 py-3 rounded-lg bg-gradient-to-br from-amber-50 to-yellow-100 hover:from-amber-100 hover:to-yellow-200 text-amber-700 transition-all border border-amber-200/60"
-                    >
-                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M12 2a7 7 0 017 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 01-2 2h-4a2 2 0 01-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 017-7z" />
-                        <path d="M9 21h6" />
-                      </svg>
-                      Ideas
-                    </button>
-                  </div>
-
-                  {/* Generate More button */}
-                  <button
-                    onClick={continueGeneration}
-                    disabled={aiLoading}
-                    className="mt-3 w-full flex items-center justify-center gap-2 text-xs px-4 py-2.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-600 transition-all border border-emerald-200/60"
-                  >
-                    {aiLoading ? (
-                      <>
-                        <Loader size="xs" />
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <path d="M12 5v14M5 12h14" />
-                        </svg>
-                        Generate More Content
-                      </>
-                    )}
-                  </button>
-                </>
-              )}
-
-              {/* Non-agent mode buttons */}
-              {!showAgentMode && (
-                <div className="grid grid-cols-2 gap-2 mt-3">
-                  <button
-                    onClick={() => sendAIMessage('Create key points and notes from this canvas')}
-                    disabled={aiLoading}
-                    className="flex items-center justify-center gap-2 text-xs px-3 py-2.5 rounded-lg bg-white/50 hover:bg-white/70 text-gray-600 transition-all border border-gray-200/60"
-                  >
-                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                      <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
-                    </svg>
-                    Make Notes
-                  </button>
-                  <button
-                    onClick={() => sendAIMessage('What improvements can be made to this canvas?')}
-                    disabled={aiLoading}
-                    className="flex items-center justify-center gap-2 text-xs px-3 py-2.5 rounded-lg bg-white/50 hover:bg-white/70 text-gray-600 transition-all border border-gray-200/60"
-                  >
-                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M12 2a10 10 0 1010 10A10 10 0 0012 2z" />
-                      <path d="M12 16v-4M12 8h.01" />
-                    </svg>
-                    Suggestions
-                  </button>
-                  <button
-                    onClick={analyzeCanvas}
-                    disabled={aiLoading}
-                    className="flex items-center justify-center gap-2 text-xs px-3 py-2.5 rounded-lg bg-white/50 hover:bg-white/70 text-gray-600 transition-all border border-gray-200/60"
-                  >
-                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M1 4v6h6M23 20v-6h-6" />
-                      <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" />
-                    </svg>
-                    Re-analyse
-                  </button>
-                  <button
-                    onClick={restructureCanvas}
-                    disabled={aiLoading || objects.length === 0}
-                    className="flex items-center justify-center gap-2 text-xs px-3 py-2.5 rounded-lg bg-violet-50 hover:bg-violet-100 text-violet-600 transition-all border border-violet-200/60"
-                    title="Clean up layout: align elements, fix spacing, straighten lines"
-                  >
-                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <rect x="3" y="3" width="7" height="7" />
-                      <rect x="14" y="3" width="7" height="7" />
-                      <rect x="14" y="14" width="7" height="7" />
-                      <rect x="3" y="14" width="7" height="7" />
-                    </svg>
-                    Restructure
-                  </button>
-                </div>
-              )}
+              {/* Quick action buttons */}
+              <div className="grid grid-cols-2 gap-2 mt-3">
+                <button
+                  onClick={() => sendAIMessage('Create key points and notes from this canvas')}
+                  disabled={aiLoading}
+                  className="flex items-center justify-center gap-2 text-xs px-3 py-2.5 rounded-lg bg-white hover:bg-gray-50 text-gray-600 transition-all border border-gray-200"
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                    <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8" />
+                  </svg>
+                  Make Notes
+                </button>
+                <button
+                  onClick={() => sendAIMessage('What improvements can be made to this canvas?')}
+                  disabled={aiLoading}
+                  className="flex items-center justify-center gap-2 text-xs px-3 py-2.5 rounded-lg bg-white hover:bg-gray-50 text-gray-600 transition-all border border-gray-200"
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 2a10 10 0 1010 10A10 10 0 0012 2z" />
+                    <path d="M12 16v-4M12 8h.01" />
+                  </svg>
+                  Suggestions
+                </button>
+                <button
+                  onClick={analyzeCanvas}
+                  disabled={aiLoading}
+                  className="flex items-center justify-center gap-2 text-xs px-3 py-2.5 rounded-lg bg-white hover:bg-gray-50 text-gray-600 transition-all border border-gray-200"
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M1 4v6h6M23 20v-6h-6" />
+                    <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 013.51 15" />
+                  </svg>
+                  Re-analyse
+                </button>
+                <button
+                  onClick={restructureCanvas}
+                  disabled={aiLoading || objects.length === 0}
+                  className="flex items-center justify-center gap-2 text-xs px-3 py-2.5 rounded-lg bg-violet-50 hover:bg-violet-100 text-violet-600 transition-all border border-violet-200"
+                  title="Clean up layout: align elements, fix spacing, straighten lines"
+                >
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="7" height="7" />
+                    <rect x="14" y="3" width="7" height="7" />
+                    <rect x="14" y="14" width="7" height="7" />
+                    <rect x="3" y="14" width="7" height="7" />
+                  </svg>
+                  Restructure
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -5334,6 +5763,40 @@ const WhiteboardCanvas = forwardRef(({
           )}
         </div>
       )}
+
+      {/* MIRA Agent Sidebar */}
+      <MiraAgentSidebar
+        isOpen={showAgentSidebar}
+        onClose={() => setShowAgentSidebar(false)}
+        boardId={boardId}
+        onStartPlotting={handleStartPlotting}
+        existingContent={agentSidebarContent}
+        onContentUpdate={handleSidebarContentUpdate}
+        isPlotted={isContentPlotted}
+        generations={agentGenerations}
+        currentGenerationId={currentGenerationId}
+        onNewGeneration={() => {
+          // Create a fresh generation - move current to history
+          setAgentSidebarContent(null);
+          setIsContentPlotted(false);
+        }}
+        onSelectGeneration={(genId) => {
+          setCurrentGenerationId(genId);
+          const gen = agentGenerations.find(g => g.id === genId);
+          if (gen) {
+            setAgentSidebarContent({
+              title: gen.title,
+              description: gen.description,
+              sections: gen.sections,
+              conclusion: gen.conclusion,
+              templateType: gen.templateType,
+              userPrompt: gen.userPrompt,
+              isPlotted: gen.isPlotted,
+            });
+            setIsContentPlotted(gen.isPlotted || false);
+          }
+        }}
+      />
     </div>
   );
 });
