@@ -9,12 +9,12 @@ export const dynamic = 'force-dynamic'
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Employee', 'Leave', 'Attendance', 'Performance', 'Department'])
+    const auth = await getAuthAndModels(request, ['Employee', 'Leave', 'Attendance', 'Performance', 'Department', 'User'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
   const { user, models, tenant } = auth
-    const { Employee, Leave, Attendance, Performance, Department } = models
+    const { Employee, Leave, Attendance, Performance, Department, User } = models
 
     // Check if user has employee ID
     if (!user.employeeId) {
@@ -60,20 +60,37 @@ export async function GET(request) {
       return NextResponse.json(cached)
     }
 
-    // Get team members - either direct reportees OR department members if manager is department head
+    // Get team members - support multi-department heads
     let teamMembers = []
     let teamMemberIds = []
+    let departmentIds = []
 
-    // Check if user is a department head
-    const department = await Department.findOne({
-      head: manager._id,
-      isActive: true
-    })
+    // Get user record to check headOfDepartments
+    const userRecord = await User.findById(user._id || user.userId)
+      .select('isDepartmentHead headOfDepartments')
+      .lean()
 
-    if (department) {
-      // If department head, get all employees in the department
+    // First check User.headOfDepartments (supports multiple departments)
+    if (userRecord?.isDepartmentHead && userRecord?.headOfDepartments?.length > 0) {
+      departmentIds = userRecord.headOfDepartments.map(d => d.toString())
+    }
+
+    // Fallback: Check Department.head or Department.heads
+    if (departmentIds.length === 0) {
+      const headDepartments = await Department.find({
+        isActive: true,
+        $or: [
+          { head: manager._id },
+          { heads: manager._id }
+        ]
+      }).select('_id').lean()
+      departmentIds = headDepartments.map(d => d._id.toString())
+    }
+
+    if (departmentIds.length > 0) {
+      // If department head, get all employees in ALL departments they head
       teamMembers = await Employee.find({
-        department: department._id,
+        department: { $in: departmentIds },
         status: 'active'
       })
     } else {

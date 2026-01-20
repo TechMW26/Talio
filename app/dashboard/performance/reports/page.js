@@ -126,6 +126,7 @@ export default function PerformanceReportsPage() {
   const [dateRange, setDateRange] = useState(getDefaultDateRange())
   const [selectedDepartment, setSelectedDepartment] = useState('all')
   const [departments, setDepartments] = useState([])
+  const [headedDepartments, setHeadedDepartments] = useState([]) // Departments user heads
   const [aiInsights, setAiInsights] = useState(null)
   const [generatingInsights, setGeneratingInsights] = useState(false)
   const [expandedSections, setExpandedSections] = useState({
@@ -166,9 +167,14 @@ export default function PerformanceReportsPage() {
       const data = await response.json()
       if (data.success) {
         setIsDepartmentHead(data.isDepartmentHead)
+        // Support multiple departments
+        const depts = data.departments || []
+        setHeadedDepartments(depts)
+        // Backward compatibility - set first department ID
         setUserDepartmentId(data.departmentId)
-        if (data.isDepartmentHead) {
-          setSelectedDepartment(data.departmentId)
+        if (data.isDepartmentHead && depts.length > 0) {
+          // Default to 'all' if multiple departments, else the single department
+          setSelectedDepartment(depts.length > 1 ? 'all' : depts[0]._id)
         }
       }
     } catch (error) {
@@ -202,11 +208,18 @@ export default function PerformanceReportsPage() {
       setLoading(true)
       const token = localStorage.getItem('token')
 
-      // Build department filter - department heads MUST use their department ID
+      // Build department filter
       let deptFilter = ''
-      if (isDepartmentHead && userDepartmentId) {
-        // Department heads can ONLY see their own department
-        deptFilter = `&department=${userDepartmentId}`
+      if (isDepartmentHead && headedDepartments.length > 0) {
+        // Department heads can filter their departments
+        if (selectedDepartment === 'all') {
+          // Show all headed departments
+          const deptIds = headedDepartments.map(d => d._id).join(',')
+          deptFilter = `&departments=${deptIds}`
+        } else {
+          // Filter to specific department they head
+          deptFilter = `&department=${selectedDepartment}`
+        }
       } else if (selectedDepartment !== 'all') {
         // Admins can select any department
         deptFilter = `&department=${selectedDepartment}`
@@ -884,17 +897,24 @@ export default function PerformanceReportsPage() {
             <select
               value={selectedDepartment}
               onChange={(e) => setSelectedDepartment(e.target.value)}
-              disabled={isDepartmentHead}
+              disabled={isDepartmentHead && headedDepartments.length === 1}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
             >
-              {!isDepartmentHead && <option value="all">All Departments</option>}
-              {departments
-                .filter(dept => !isDepartmentHead || dept._id === userDepartmentId)
-                .map(dept => (
-                  <option key={dept._id} value={dept._id}>{dept.name}</option>
-                ))}
+              {/* Admin/HR see all departments, multi-dept heads see "All My Departments" */}
+              {(!isDepartmentHead || headedDepartments.length > 1) && (
+                <option value="all">{isDepartmentHead ? 'All My Departments' : 'All Departments'}</option>
+              )}
+              {/* Show departments based on role */}
+              {isDepartmentHead 
+                ? headedDepartments.map(dept => (
+                    <option key={dept._id} value={dept._id}>{dept.name}</option>
+                  ))
+                : departments.map(dept => (
+                    <option key={dept._id} value={dept._id}>{dept.name}</option>
+                  ))
+              }
             </select>
-            {isDepartmentHead && (
+            {isDepartmentHead && headedDepartments.length === 1 && (
               <p className="text-xs text-gray-500 mt-1">You can only view your department's performance</p>
             )}
           </div>

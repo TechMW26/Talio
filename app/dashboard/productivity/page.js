@@ -64,8 +64,38 @@ export default function ProductivityPage() {
   }, [])
 
   const userRole = user?.role
-  const isDepartmentHead = user?.isDepartmentHead === true
+  const [actualDepartmentHead, setActualDepartmentHead] = useState(false)
+  const isDepartmentHead = user?.isDepartmentHead === true || actualDepartmentHead
   const isAdminOrHR = ['admin', 'hr'].includes(userRole)
+
+  // Check if user is department head via API (more reliable than localStorage)
+  const checkDepartmentHead = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const res = await fetch('/api/team/check-head', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.success && data.isDepartmentHead) {
+          setActualDepartmentHead(true)
+          // Also set departments for filter if multiple
+          if (data.departments?.length > 0) {
+            setDepartments(data.departments)
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error checking department head:', error)
+    }
+  }, [])
+
+  // Check department head status on mount
+  useEffect(() => {
+    if (user) {
+      checkDepartmentHead()
+    }
+  }, [user, checkDepartmentHead])
 
   // Check if user can view team (admin, hr, manager, dept_head, or actual department head)
   useEffect(() => {
@@ -89,7 +119,7 @@ export default function ProductivityPage() {
     }
   }, [])
 
-  // Fetch departments when admin/HR
+  // Fetch departments when admin/HR (department heads get theirs from team API)
   useEffect(() => {
     if (isAdminOrHR) {
       fetchDepartments()
@@ -100,7 +130,12 @@ export default function ProductivityPage() {
   const fetchSessions = useCallback(async () => {
     try {
       setLoading(true)
-      const res = await fetch(`/api/productivity/sessions?date=${selectedDate}`)
+      const token = localStorage.getItem('token')
+      const res = await fetch(`/api/productivity/sessions?date=${selectedDate}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
       if (res.ok) {
         const data = await res.json()
         setSessions(data.data || data.sessions || [])
@@ -116,11 +151,17 @@ export default function ProductivityPage() {
   const fetchTeamSessions = useCallback(async () => {
     if (!canViewTeam) return
     try {
+      const token = localStorage.getItem('token')
       let url = `/api/productivity/team?date=${selectedDate}`
-      if (isAdminOrHR && selectedDepartment && selectedDepartment !== 'all') {
+      // Apply department filter for admin/HR or department heads
+      if ((isAdminOrHR || isDepartmentHead) && selectedDepartment && selectedDepartment !== 'all') {
         url += `&department=${selectedDepartment}`
       }
-      const res = await fetch(url)
+      const res = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
       if (res.ok) {
         const data = await res.json()
         // Transform API response to frontend format
@@ -131,11 +172,16 @@ export default function ProductivityPage() {
           sessions: m.sessionsSummary?.sessions || []
         }))
         setTeamSessions(members)
+        
+        // For department heads, get departments from API response
+        if (isDepartmentHead && !isAdminOrHR && data.departments && data.departments.length > 0) {
+          setDepartments(data.departments)
+        }
       }
     } catch (error) {
       console.error('Error fetching team sessions:', error)
     }
-  }, [selectedDate, canViewTeam, isAdminOrHR, selectedDepartment])
+  }, [selectedDate, canViewTeam, isAdminOrHR, isDepartmentHead, selectedDepartment])
 
   useEffect(() => {
     fetchSessions()
@@ -182,12 +228,18 @@ export default function ProductivityPage() {
     try {
       setLoadingEmployeeSessions(true)
       const targetDate = dateOverride || selectedDate
-      const res = await fetch(`/api/productivity/sessions?userId=${userId}&date=${targetDate}`)
+      const token = localStorage.getItem('token')
+      const res = await fetch(`/api/productivity/sessions?userId=${userId}&date=${targetDate}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
       if (res.ok) {
         const data = await res.json()
         setEmployeeSessions(data.data || data.sessions || [])
       } else {
-        console.error('Failed to fetch employee sessions:', res.status)
+        const errorData = await res.json().catch(() => ({}))
+        console.error('Failed to fetch employee sessions:', res.status, errorData)
         setEmployeeSessions([])
       }
     } catch (error) {
@@ -222,7 +274,12 @@ export default function ProductivityPage() {
       }
       
       // Fetch from API
-      const res = await fetch(`/api/productivity/sessions/${sessionId}`)
+      const token = localStorage.getItem('token')
+      const res = await fetch(`/api/productivity/sessions/${sessionId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
       if (res.ok) {
         const data = await res.json()
         const session = data.data || data.session || data
@@ -459,8 +516,8 @@ export default function ProductivityPage() {
               </button>
             </div>
             
-            {/* Department Filter for Admin/HR */}
-            {isAdminOrHR && activeTab === 'team' && departments.length > 0 && (
+            {/* Department Filter for Admin/HR or Department Heads with multiple departments */}
+            {(isAdminOrHR || (isDepartmentHead && departments.length > 1)) && activeTab === 'team' && departments.length > 0 && (
               <div className="flex items-center gap-2">
                 <HiOutlineBuildingOffice2 className="w-5 h-5 text-gray-400" />
                 <select

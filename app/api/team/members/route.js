@@ -15,8 +15,15 @@ export async function GET(request) {
     const { user, models } = auth
     const { Employee, Department, Designation, User } = models
 
-    // Get user to find employee ID
-    const userRecord = await User.findById(user._id || user.userId).select('employeeId').lean()
+    // Parse query params for department filter
+    const { searchParams } = new URL(request.url)
+    const departmentFilter = searchParams.get('department')
+
+    // Get user to find employee ID and department head info
+    const userRecord = await User.findById(user._id || user.userId)
+      .select('employeeId isDepartmentHead headOfDepartments')
+      .populate('headOfDepartments', 'name code _id')
+      .lean()
 
     if (!userRecord || !userRecord.employeeId) {
       // Return empty data for users without employee records
@@ -25,7 +32,7 @@ export async function GET(request) {
         data: [],
         meta: {
           total: 0,
-          department: null,
+          departments: [],
           role: null,
           message: 'No employee record linked to this user'
         }
@@ -36,36 +43,99 @@ export async function GET(request) {
     const userRole = user.role
 
     let teamMembers = []
-    let department = null
+    let departments = []
     let isDepartmentHead = false
+    let filteredDepartmentIds = []
 
-    // Check if user is a department head (by Department.head reference OR by role)
-    department = await Department.findOne({
-      head: userRecord.employeeId,
-      isActive: true
-    }).lean()
-
-    // Also check if user has department_head role
-    if (!department && (userRole === 'department_head' || userRole === 'manager')) {
-      // Get the user's department
-      const userEmployee = await Employee.findById(userRecord.employeeId).select('department').lean()
-      if (userEmployee?.department) {
-        department = await Department.findById(userEmployee.department).lean()
-      }
-    }
-
-    if (department) {
+    // Check if user is a department head via User.headOfDepartments (supports multiple departments)
+    if (userRecord.isDepartmentHead && userRecord.headOfDepartments?.length > 0) {
       isDepartmentHead = true
-      // User is department head - get all team members in the department
+      departments = userRecord.headOfDepartments
+      let departmentIds = departments.map(d => d._id.toString())
+      
+      // Apply department filter if specified
+      if (departmentFilter && departmentFilter !== 'all') {
+        if (departmentIds.includes(departmentFilter)) {
+          filteredDepartmentIds = [departmentFilter]
+        } else {
+          return NextResponse.json({ success: false, message: 'Not authorized to view this department' }, { status: 403 })
+        }
+      } else {
+        filteredDepartmentIds = departmentIds
+      }
+      
+      // Get all team members from filtered departments
       teamMembers = await Employee.find({
-        department: department._id,
+        department: { $in: filteredDepartmentIds },
         status: 'active'
       })
         .populate('designation', 'title level levelName')
+        .populate('department', 'name code')
         .populate('reportingManager', 'firstName lastName employeeCode')
-        .select('firstName lastName employeeCode email phone dateOfJoining designation designationLevel designationLevelName reportingManager profilePicture skills')
+        .select('firstName lastName employeeCode email phone dateOfJoining designation designationLevel designationLevelName department reportingManager profilePicture skills')
         .sort({ firstName: 1 })
         .lean()
+    } else {
+      // Fallback: Check if user is a department head via Department.head or Department.heads reference
+      const headDepartments = await Department.find({
+        isActive: true,
+        $or: [
+          { head: userRecord.employeeId },
+          { heads: userRecord.employeeId }
+        ]
+      }).lean()
+
+      if (headDepartments.length > 0) {
+        isDepartmentHead = true
+        departments = headDepartments
+        const departmentIds = departments.map(d => d._id)
+        
+        // Get all team members from ALL departments user heads
+        teamMembers = await Employee.find({
+          department: { $in: departmentIds },
+          status: 'active'
+        })
+          .populate('designation', 'title level levelName')
+          .populate('department', 'name code')
+          .populate('reportingManager', 'firstName lastName employeeCode')
+          .select('firstName lastName employeeCode email phone dateOfJoining designation designationLevel designationLevelName department reportingManager profilePicture skills')
+          .sort({ firstName: 1 })
+          .lean()
+      } else if (userRole === 'department_head' || userRole === 'manager') {
+        // Check user's own department as final fallback
+        const userEmployee = await Employee.findById(userRecord.employeeId).select('department').lean()
+        if (userEmployee?.department) {
+          const dept = await Department.findById(userEmployee.department).lean()
+          if (dept) {
+            isDepartmentHead = true
+            departments = [dept]
+            
+            teamMembers = await Employee.find({
+              department: dept._id,
+              status: 'active'
+            })
+              .populate('designation', 'title level levelName')
+              .populate('department', 'name code')
+              .populate('reportingManager', 'firstName lastName employeeCode')
+              .select('firstName lastName employeeCode email phone dateOfJoining designation designationLevel designationLevelName department reportingManager profilePicture skills')
+              .sort({ firstName: 1 })
+              .lean()
+          }
+        }
+      }
+    }
+
+    if (isDepartmentHead) {
+      return NextResponse.json({
+        success: true,
+        data: teamMembers,
+        meta: {
+          total: teamMembers.length,
+          departments: departments,
+          department: departments[0] || null, // backward compatibility
+          role: userRole
+        }
+      })
     } else if (userRole === 'manager') {
       // User is manager - get direct reports
       teamMembers = await Employee.find({

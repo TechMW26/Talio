@@ -14,28 +14,46 @@ export async function GET(request) {
     const { user, models } = auth
     const { Department, Employee, Leave, User } = models
 
-    // Get user's employee ID
-    const userRecord = await User.findById(user._id || user.userId).select('employeeId')
+    // Get user's employee ID and department head info
+    const userRecord = await User.findById(user._id || user.userId)
+      .select('employeeId isDepartmentHead headOfDepartments')
+      .lean()
     if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
-    // Check if user is a department head
-    const department = await Department.findOne({ 
-      head: userRecord.employeeId,
-      isActive: true 
-    })
+    // Check if user is a department head - support multiple departments
+    let departmentIds = []
+    let departments = []
 
-    if (!department) {
+    // First check User.headOfDepartments (supports multiple departments)
+    if (userRecord?.isDepartmentHead && userRecord?.headOfDepartments?.length > 0) {
+      departmentIds = userRecord.headOfDepartments.map(d => d.toString())
+      departments = await Department.find({ _id: { $in: departmentIds }, isActive: true }).lean()
+    }
+
+    // Fallback: Check Department.head or Department.heads
+    if (departmentIds.length === 0) {
+      departments = await Department.find({ 
+        isActive: true,
+        $or: [
+          { head: userRecord.employeeId },
+          { heads: userRecord.employeeId }
+        ]
+      }).lean()
+      departmentIds = departments.map(d => d._id.toString())
+    }
+
+    if (departmentIds.length === 0) {
       return NextResponse.json({ 
         success: false, 
         message: 'You are not a department head' 
       }, { status: 403 })
     }
 
-    // Get all team members (employees in the department)
+    // Get all team members (employees in ALL departments)
     const teamMembers = await Employee.find({ 
-      department: department._id,
+      department: { $in: departmentIds },
       status: 'active'
     }).select('_id')
 
@@ -46,7 +64,11 @@ export async function GET(request) {
       employee: { $in: teamMemberIds },
       status: 'pending'
     })
-      .populate('employee', 'firstName lastName employeeCode profilePicture')
+      .populate('employee', 'firstName lastName employeeCode profilePicture department')
+      .populate({
+        path: 'employee',
+        populate: { path: 'department', select: 'name code' }
+      })
       .populate('leaveType', 'name')
       .sort({ createdAt: -1 })
       .limit(10)
@@ -54,11 +76,8 @@ export async function GET(request) {
     return NextResponse.json({
       success: true,
       data: {
-        department: {
-          id: department._id,
-          name: department.name,
-          code: department.code
-        },
+        departments: departments.map(d => ({ id: d._id, name: d.name, code: d.code })),
+        department: departments[0] ? { id: departments[0]._id, name: departments[0].name, code: departments[0].code } : null, // backward compatibility
         teamMembersCount: teamMemberIds.length,
         pendingLeaves: pendingLeaves.length,
         recentLeaves: pendingLeaves.slice(0, 5)

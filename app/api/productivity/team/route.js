@@ -25,12 +25,15 @@ export async function GET(request) {
     const dateEnd = new Date(date.getTime() + 24 * 60 * 60 * 1000);
     
     // Get current user with employee info
-    const currentUser = await User.findById(currentUserId).populate('employeeId');
+    const currentUser = await User.findById(currentUserId)
+      .select('role employeeId isDepartmentHead headOfDepartments')
+      .populate('employeeId');
     
     const isAdminOrHR = ['admin', 'hr'].includes(currentUserRole);
     
     let teamMembers = [];
     let departmentName = null;
+    let departments = [];
     
     if (isAdminOrHR) {
       // Admin/HR can see all employees, optionally filtered by department
@@ -59,7 +62,7 @@ export async function GET(request) {
       
       console.log(`[Team API] Admin/HR viewing ${teamMembers.length} employees from ${departmentName}`);
     } else {
-      // Check if user is department head
+      // Check if user is department head - support multiple departments
       const currentEmployeeId = currentUser?.employeeId?._id;
       
       if (!currentEmployeeId) {
@@ -70,36 +73,67 @@ export async function GET(request) {
         });
       }
       
-      // Find department where user is head
-      const department = await Department.findOne({
-        $or: [
-          { head: currentEmployeeId },
-          { heads: currentEmployeeId }
-        ],
-        isActive: true
-      });
+      let departmentIds = [];
+
+      // First check User.headOfDepartments (supports multiple departments)
+      if (currentUser?.isDepartmentHead && currentUser?.headOfDepartments?.length > 0) {
+        departmentIds = currentUser.headOfDepartments.map(d => d.toString());
+        departments = await Department.find({ _id: { $in: departmentIds }, isActive: true }).lean();
+      }
       
-      if (!department) {
+      // Fallback: Check Department.head or Department.heads
+      if (departmentIds.length === 0) {
+        departments = await Department.find({
+          $or: [
+            { head: currentEmployeeId },
+            { heads: currentEmployeeId }
+          ],
+          isActive: true
+        }).lean();
+        departmentIds = departments.map(d => d._id.toString());
+      }
+      
+      if (departmentIds.length === 0) {
         return NextResponse.json({
           success: true,
           data: [],
+          departments: [],
           message: 'You are not a department head'
         });
       }
       
-      departmentName = department.name;
+      // Apply department filter if specified and user is authorized for that department
+      if (departmentFilter && departmentFilter !== 'all') {
+        if (departmentIds.includes(departmentFilter)) {
+          departmentIds = [departmentFilter];
+          const filteredDept = departments.find(d => d._id.toString() === departmentFilter);
+          departmentName = filteredDept?.name || 'Filtered Department';
+        } else {
+          return NextResponse.json({
+            success: false,
+            message: 'Not authorized to view this department'
+          }, { status: 403 });
+        }
+      } else {
+        departmentName = departments.length > 1 
+          ? departments.map(d => d.name).join(', ') 
+          : departments[0]?.name || 'Department';
+      }
       
-      // Get all employees in this department
+      // Get all employees in filtered/all departments user heads
       const employees = await Employee.find({ 
-        department: department._id,
-        status: 'active'
+        status: 'active',
+        $or: [
+          { department: { $in: departmentIds } },
+          { departments: { $in: departmentIds } }
+        ]
       })
         .select('firstName lastName email profilePicture department designation userId')
         .populate('department', 'name')
         .populate('designation', 'title')
         .lean();
       
-      console.log(`[Team API] Found ${employees.length} employees in department ${departmentName}`);
+      console.log(`[Team API] Found ${employees.length} employees in department(s) ${departmentName}`);
       
       // Filter only employees with userId and map for consistency
       teamMembers = employees.filter(e => e.userId).map(e => ({
@@ -178,11 +212,18 @@ export async function GET(request) {
     
     console.log(`[Team API] Returning ${teamWithSessions.length} team members for ${departmentName}`);
     
+    // Build departments list for filter (only for multi-department heads)
+    let availableDepartments = [];
+    if (!isAdminOrHR && departments && departments.length > 1) {
+      availableDepartments = departments.map(d => ({ _id: d._id, name: d.name, code: d.code }));
+    }
+    
     return NextResponse.json({
       success: true,
       data: teamWithSessions,
       date: dateParam,
       department: departmentName,
+      departments: availableDepartments,
       totalMembers: teamWithSessions.length
     });
     

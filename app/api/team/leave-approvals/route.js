@@ -6,12 +6,12 @@ import { logActivity } from '@/lib/activityLogger'
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Department', 'Employee', 'Leave'])
+    const auth = await getAuthAndModels(request, ['Department', 'Employee', 'Leave', 'User'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Department, Employee, Leave } = models
+    const { Department, Employee, Leave, User } = models
 
     // Get user's employee ID from auth
     const employeeId = user?.employeeId?._id || user?.employeeId
@@ -24,13 +24,34 @@ export async function GET(request) {
       })
     }
 
-    // Check if user is a department head
-    const department = await Department.findOne({ 
-      head: employeeId,
-      isActive: true 
-    })
+    // Get user record to check headOfDepartments
+    const userRecord = await User.findById(user._id || user.userId)
+      .select('isDepartmentHead headOfDepartments')
+      .lean()
 
-    if (!department) {
+    // Check if user is a department head - support multiple departments
+    let departmentIds = []
+    let departments = []
+
+    // First check User.headOfDepartments (supports multiple departments)
+    if (userRecord?.isDepartmentHead && userRecord?.headOfDepartments?.length > 0) {
+      departmentIds = userRecord.headOfDepartments.map(d => d.toString())
+      departments = await Department.find({ _id: { $in: departmentIds }, isActive: true }).lean()
+    }
+
+    // Fallback: Check Department.head or Department.heads
+    if (departmentIds.length === 0) {
+      departments = await Department.find({ 
+        isActive: true,
+        $or: [
+          { head: employeeId },
+          { heads: employeeId }
+        ]
+      }).lean()
+      departmentIds = departments.map(d => d._id.toString())
+    }
+
+    if (departmentIds.length === 0) {
       return NextResponse.json({ 
         success: true, 
         data: [],
@@ -38,9 +59,9 @@ export async function GET(request) {
       })
     }
 
-    // Get all team members
+    // Get all team members from ALL departments
     const teamMembers = await Employee.find({ 
-      department: department._id,
+      department: { $in: departmentIds },
       status: 'active'
     }).select('_id')
 
@@ -51,20 +72,24 @@ export async function GET(request) {
       employee: { $in: teamMemberIds },
       status: 'pending'
     })
-      .populate('employee', 'firstName lastName employeeCode profilePicture email designation')
+      .populate('employee', 'firstName lastName employeeCode profilePicture email designation department')
       .populate({
         path: 'employee',
-        populate: {
-          path: 'designation',
-          select: 'title'
-        }
+        populate: [
+          { path: 'designation', select: 'title' },
+          { path: 'department', select: 'name code' }
+        ]
       })
       .populate('leaveType', 'name code')
       .sort({ createdAt: -1 })
 
     return NextResponse.json({
       success: true,
-      data: pendingLeaves
+      data: pendingLeaves,
+      meta: {
+        departments: departments,
+        totalDepartments: departments.length
+      }
     })
   } catch (error) {
     console.error('Get leave approvals error:', error)
@@ -89,13 +114,32 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
-    // Check if user is a department head
-    const department = await Department.findOne({ 
-      head: employeeId,
-      isActive: true 
-    })
+    // Get user record to check headOfDepartments
+    const userRecord = await User.findById(user._id || user.userId)
+      .select('isDepartmentHead headOfDepartments')
+      .lean()
 
-    if (!department) {
+    // Check if user is a department head - support multiple departments
+    let departmentIds = []
+
+    // First check User.headOfDepartments (supports multiple departments)
+    if (userRecord?.isDepartmentHead && userRecord?.headOfDepartments?.length > 0) {
+      departmentIds = userRecord.headOfDepartments.map(d => d.toString())
+    }
+
+    // Fallback: Check Department.head or Department.heads
+    if (departmentIds.length === 0) {
+      const headDepartments = await Department.find({ 
+        isActive: true,
+        $or: [
+          { head: employeeId },
+          { heads: employeeId }
+        ]
+      }).select('_id').lean()
+      departmentIds = headDepartments.map(d => d._id.toString())
+    }
+
+    if (departmentIds.length === 0) {
       return NextResponse.json({ 
         success: false, 
         message: 'You are not a department head' 
@@ -129,8 +173,9 @@ export async function POST(request) {
       }, { status: 404 })
     }
 
-    // Verify the employee belongs to the department
-    if (leave.employee.department.toString() !== department._id.toString()) {
+    // Verify the employee belongs to one of the departments the user heads
+    const leaveDeptId = leave.employee.department?.toString()
+    if (!departmentIds.includes(leaveDeptId)) {
       return NextResponse.json({ 
         success: false, 
         message: 'This leave request is not from your department' 

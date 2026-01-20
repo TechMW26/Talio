@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import toast from '@/utils/toast'
-import { FaUsers, FaBuilding, FaArrowLeft, FaCalendarAlt, FaClock, FaChevronLeft, FaChevronRight, FaSearch, FaUserCircle, FaMapMarkerAlt } from 'react-icons/fa'
+import { FaUsers, FaBuilding, FaArrowLeft, FaCalendarAlt, FaClock, FaChevronLeft, FaChevronRight, FaSearch, FaUserCircle, FaMapMarkerAlt, FaFilter } from 'react-icons/fa'
 import Loader from '@/components/ui/Loader'
 
 export default function TeamAttendancePage() {
@@ -10,8 +10,10 @@ export default function TeamAttendancePage() {
   const [user, setUser] = useState(null)
   const [view, setView] = useState('initial') // 'initial', 'department', 'employees', 'calendar'
   const [departments, setDepartments] = useState([])
+  const [headedDepartments, setHeadedDepartments] = useState([]) // Departments user heads
   const [employees, setEmployees] = useState([])
   const [selectedDepartment, setSelectedDepartment] = useState(null)
+  const [selectedDepartmentFilter, setSelectedDepartmentFilter] = useState('all') // Filter for multi-dept heads
   const [selectedEmployee, setSelectedEmployee] = useState(null)
   const [attendance, setAttendance] = useState([])
   const [currentMonth, setCurrentMonth] = useState(new Date())
@@ -40,12 +42,22 @@ export default function TeamAttendancePage() {
 
       if (checkHeadData.success && checkHeadData.isDepartmentHead) {
         setIsDepartmentHead(true)
-        setDepartmentInfo({
-          id: checkHeadData.departmentId,
-          name: checkHeadData.departmentName
-        })
-        // Department head - show employees directly
-        await fetchDepartmentEmployees(checkHeadData.departmentId)
+        
+        // Support multiple departments
+        const depts = checkHeadData.departments || []
+        setHeadedDepartments(depts)
+        
+        // For backward compatibility, set departmentInfo to first department
+        if (depts.length > 0) {
+          setDepartmentInfo({
+            id: depts[0]._id,
+            name: depts.length > 1 ? 'Multiple Departments' : depts[0].name
+          })
+        }
+        
+        // Fetch employees from all headed departments
+        const deptIds = depts.map(d => d._id)
+        await fetchDepartmentEmployees(deptIds)
         setView('employees')
       } else if (['admin', 'hr'].includes(parsedUser.role)) {
         // Admin/HR - show departments first
@@ -78,17 +90,32 @@ export default function TeamAttendancePage() {
     }
   }
 
-  const fetchDepartmentEmployees = async (departmentId) => {
+  const fetchDepartmentEmployees = async (departmentIdOrIds) => {
     try {
       setLoading(true)
       const token = localStorage.getItem('token')
-      const response = await fetch(`/api/employees?department=${departmentId}&status=active&limit=500`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setEmployees(data.data || [])
+      
+      // Support single ID or array of IDs
+      let departmentIds = Array.isArray(departmentIdOrIds) ? departmentIdOrIds : [departmentIdOrIds]
+      
+      // Fetch employees for all departments
+      const allEmployees = []
+      for (const deptId of departmentIds) {
+        const response = await fetch(`/api/employees?department=${deptId}&status=active&limit=500`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+        const data = await response.json()
+        if (data.success) {
+          allEmployees.push(...(data.data || []))
+        }
       }
+      
+      // Remove duplicates (in case an employee is in multiple departments somehow)
+      const uniqueEmployees = allEmployees.filter((emp, index, self) => 
+        index === self.findIndex(e => e._id === emp._id)
+      )
+      
+      setEmployees(uniqueEmployees)
     } catch (error) {
       console.error('Error fetching employees:', error)
       toast.error('Failed to fetch employees')
@@ -248,7 +275,15 @@ export default function TeamAttendancePage() {
   const filteredEmployees = employees.filter(emp => {
     const fullName = `${emp.firstName} ${emp.lastName}`.toLowerCase()
     const code = (emp.employeeCode || '').toLowerCase()
-    return fullName.includes(searchTerm.toLowerCase()) || code.includes(searchTerm.toLowerCase())
+    const matchesSearch = fullName.includes(searchTerm.toLowerCase()) || code.includes(searchTerm.toLowerCase())
+    
+    // Apply department filter for multi-department heads
+    if (isDepartmentHead && headedDepartments.length > 1 && selectedDepartmentFilter !== 'all') {
+      const empDeptId = emp.department?._id || emp.department
+      return matchesSearch && empDeptId?.toString() === selectedDepartmentFilter
+    }
+    
+    return matchesSearch
   })
 
   const filteredDepartments = departments.filter(dept =>
@@ -291,18 +326,40 @@ export default function TeamAttendancePage() {
         </div>
       </div>
 
-      {/* Search Bar */}
+      {/* Search Bar and Department Filter */}
       {(view === 'departments' || view === 'employees') && (
         <div className="mb-6">
-          <div className="relative">
-            <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder={view === 'departments' ? 'Search departments...' : 'Search employees...'}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            />
+          <div className="flex flex-col sm:flex-row gap-4">
+            {/* Search Input */}
+            <div className="relative flex-1">
+              <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder={view === 'departments' ? 'Search departments...' : 'Search employees...'}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+            </div>
+            
+            {/* Department Filter for multi-department heads */}
+            {isDepartmentHead && headedDepartments.length > 1 && view === 'employees' && (
+              <div className="relative sm:w-64">
+                <FaFilter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <select
+                  value={selectedDepartmentFilter}
+                  onChange={(e) => setSelectedDepartmentFilter(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent appearance-none bg-white"
+                >
+                  <option value="all">All Departments</option>
+                  {headedDepartments.map((dept) => (
+                    <option key={dept._id} value={dept._id}>
+                      {dept.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </div>
       )}

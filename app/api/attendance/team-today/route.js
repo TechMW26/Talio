@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Attendance', 'Employee', 'User', 'Leave', 'CompanySettings'])
+    const auth = await getAuthAndModels(request, ['Attendance', 'Employee', 'User', 'Leave', 'CompanySettings', 'Department'])
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
@@ -15,17 +15,20 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'Failed to load database models' }, { status: 500 })
     }
     const { user, models } = auth
-    const { Attendance, Employee, User, Leave, CompanySettings } = models
+    const { Attendance, Employee, User, Leave, CompanySettings, Department } = models
 
     if (!Attendance || !Employee || !User || !Leave || !CompanySettings) {
       return NextResponse.json({ success: false, message: 'Failed to load required models' }, { status: 500 })
     }
 
-    // Get the requesting user with employee info
-    const requestingUser = await User.findById(user._id).populate({
-      path: 'employeeId',
-      options: { strictPopulate: false }
-    }).lean()
+    // Get the requesting user with employee info and department head data
+    const requestingUser = await User.findById(user._id)
+      .populate({
+        path: 'employeeId',
+        options: { strictPopulate: false }
+      })
+      .select('role employeeId isDepartmentHead headOfDepartments')
+      .lean()
     if (!requestingUser) {
       return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
     }
@@ -62,21 +65,52 @@ export async function GET(request) {
         .select('firstName lastName profilePicture department')
         .lean()
     } else {
-      // Get team members for managers
+      // Get team members for department heads and managers
       const requestingEmployee = requestingUser.employeeId
       if (!requestingEmployee) {
         return NextResponse.json({ success: true, data: [] })
       }
 
-      employees = await Employee.find({
-        status: 'active',
-        $or: [
-          { reportingManager: requestingEmployee._id },
-          { department: requestingEmployee.department }
-        ]
-      })
-        .select('firstName lastName profilePicture department')
-        .lean()
+      // Check if user is a department head via User.headOfDepartments (supports multiple departments)
+      let departmentIds = []
+      
+      if (requestingUser.isDepartmentHead && requestingUser.headOfDepartments?.length > 0) {
+        departmentIds = requestingUser.headOfDepartments.map(d => d.toString())
+      } else {
+        // Fallback: Check Department.head or Department.heads
+        const headDepartments = await Department.find({
+          isActive: true,
+          $or: [
+            { head: requestingEmployee._id },
+            { heads: requestingEmployee._id }
+          ]
+        }).select('_id').lean()
+        
+        if (headDepartments.length > 0) {
+          departmentIds = headDepartments.map(d => d._id.toString())
+        }
+      }
+
+      if (departmentIds.length > 0) {
+        // User is department head - get employees from ALL departments they head
+        employees = await Employee.find({
+          status: 'active',
+          department: { $in: departmentIds }
+        })
+          .select('firstName lastName profilePicture department')
+          .lean()
+      } else {
+        // Fallback for managers: get direct reports and same department
+        employees = await Employee.find({
+          status: 'active',
+          $or: [
+            { reportingManager: requestingEmployee._id },
+            { department: requestingEmployee.department }
+          ]
+        })
+          .select('firstName lastName profilePicture department')
+          .lean()
+      }
     }
 
     if (!employees || employees.length === 0) {

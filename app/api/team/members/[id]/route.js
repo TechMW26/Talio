@@ -14,8 +14,10 @@ export async function GET(request, { params }) {
 
     const { id } = params
 
-    // Get user to find employee ID
-    const userRecord = await User.findById(user._id || user.userId).select('employeeId').lean()
+    // Get user to find employee ID and department head info
+    const userRecord = await User.findById(user._id || user.userId)
+      .select('employeeId isDepartmentHead headOfDepartments')
+      .lean()
     
     if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json(
@@ -24,13 +26,27 @@ export async function GET(request, { params }) {
       )
     }
 
-    // Check if user is a department head
-    const department = await Department.findOne({ 
-      head: userRecord.employeeId,
-      isActive: true 
-    }).lean()
+    // Check if user is a department head - support multiple departments
+    let departmentIds = []
 
-    if (!department) {
+    // First check User.headOfDepartments (supports multiple departments)
+    if (userRecord?.isDepartmentHead && userRecord?.headOfDepartments?.length > 0) {
+      departmentIds = userRecord.headOfDepartments.map(d => d.toString())
+    }
+
+    // Fallback: Check Department.head or Department.heads
+    if (departmentIds.length === 0) {
+      const headDepartments = await Department.find({ 
+        isActive: true,
+        $or: [
+          { head: userRecord.employeeId },
+          { heads: userRecord.employeeId }
+        ]
+      }).select('_id').lean()
+      departmentIds = headDepartments.map(d => d._id.toString())
+    }
+
+    if (departmentIds.length === 0) {
       return NextResponse.json(
         { success: false, message: 'Access denied. Only department heads can view team member details.' },
         { status: 403 }
@@ -51,8 +67,9 @@ export async function GET(request, { params }) {
       )
     }
 
-    // Verify team member is in the same department
-    if (teamMember.department._id.toString() !== department._id.toString()) {
+    // Verify team member is in one of the departments user heads
+    const memberDeptId = teamMember.department?._id?.toString()
+    if (!departmentIds.includes(memberDeptId)) {
       return NextResponse.json(
         { success: false, message: 'Access denied. This employee is not in your department.' },
         { status: 403 }
@@ -98,8 +115,10 @@ export async function POST(request, { params }) {
       )
     }
 
-    // Get user to find employee ID
-    const userRecord = await User.findById(user._id || user.userId).select('employeeId').lean()
+    // Get user to find employee ID and department head info
+    const userRecord = await User.findById(user._id || user.userId)
+      .select('employeeId isDepartmentHead headOfDepartments')
+      .lean()
     
     if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json(
@@ -108,13 +127,27 @@ export async function POST(request, { params }) {
       )
     }
 
-    // Check if user is a department head
-    const department = await Department.findOne({ 
-      head: userRecord.employeeId,
-      isActive: true 
-    }).lean()
+    // Check if user is a department head - support multiple departments
+    let departmentIds = []
 
-    if (!department) {
+    // First check User.headOfDepartments (supports multiple departments)
+    if (userRecord?.isDepartmentHead && userRecord?.headOfDepartments?.length > 0) {
+      departmentIds = userRecord.headOfDepartments.map(d => d.toString())
+    }
+
+    // Fallback: Check Department.head or Department.heads
+    if (departmentIds.length === 0) {
+      const headDepartments = await Department.find({ 
+        isActive: true,
+        $or: [
+          { head: userRecord.employeeId },
+          { heads: userRecord.employeeId }
+        ]
+      }).select('_id').lean()
+      departmentIds = headDepartments.map(d => d._id.toString())
+    }
+
+    if (departmentIds.length === 0) {
       return NextResponse.json(
         { success: false, message: 'Access denied. Only department heads can add reviews.' },
         { status: 403 }
@@ -131,8 +164,9 @@ export async function POST(request, { params }) {
       )
     }
 
-    // Verify team member is in the same department
-    if (teamMember.department.toString() !== department._id.toString()) {
+    // Verify team member is in one of the departments user heads
+    const memberDeptId = teamMember.department?.toString()
+    if (!departmentIds.includes(memberDeptId)) {
       return NextResponse.json(
         { success: false, message: 'Access denied. This employee is not in your department.' },
         { status: 403 }

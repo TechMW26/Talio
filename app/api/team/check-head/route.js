@@ -8,12 +8,12 @@ export const dynamic = 'force-dynamic'
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Department', 'Employee'])
+    const auth = await getAuthAndModels(request, ['Department', 'Employee', 'User'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
   const { user, models, tenant } = auth
-    const { Department, Employee } = models
+    const { Department, Employee, User } = models
 
     // Get user's employee ID from auth
     let employeeId = user?.employeeId?._id || user?.employeeId;
@@ -28,6 +28,7 @@ export async function GET(request) {
       return NextResponse.json({ 
         success: true, 
         isDepartmentHead: false,
+        departments: [],
         department: null,
         departmentId: null,
         message: 'Employee not found' 
@@ -46,29 +47,48 @@ export async function GET(request) {
       return NextResponse.json(cached)
     }
 
-    // Check if user is a department head (via Department.head or Department.heads[] field)
-    const department = await Department.findOne({ 
-      $or: [
-        { head: employeeId },
-        { heads: employeeId }
-      ],
-      isActive: true 
-    }).select('name code _id')
+    // Get user record to check headOfDepartments (supports multiple departments)
+    const userRecord = await User.findById(user._id || user.userId)
+      .select('isDepartmentHead headOfDepartments')
+      .lean()
+
+    let departments = []
+
+    // First check User.headOfDepartments (supports multiple departments)
+    if (userRecord?.isDepartmentHead && userRecord?.headOfDepartments?.length > 0) {
+      departments = await Department.find({
+        _id: { $in: userRecord.headOfDepartments },
+        isActive: true
+      }).select('name code _id').lean()
+    }
+
+    // Fallback: Check Department.head or Department.heads
+    if (departments.length === 0) {
+      departments = await Department.find({ 
+        $or: [
+          { head: employeeId },
+          { heads: employeeId }
+        ],
+        isActive: true 
+      }).select('name code _id').lean()
+    }
 
     console.log('[Check Head API] Result:', { 
       userId: user._id, 
       employeeId: employeeId?.toString(), 
-      isDepartmentHead: !!department,
-      departmentId: department?._id?.toString(),
-      departmentName: department?.name
+      isDepartmentHead: departments.length > 0,
+      departmentCount: departments.length,
+      departmentNames: departments.map(d => d.name).join(', ')
     });
 
     const response = {
       success: true,
-      isDepartmentHead: !!department,
-      department: department || null,
-      departmentId: department?._id || null,
-      departmentName: department?.name || null
+      isDepartmentHead: departments.length > 0,
+      departments: departments,
+      // Backward compatibility - return first department
+      department: departments[0] || null,
+      departmentId: departments[0]?._id || null,
+      departmentName: departments[0]?.name || null
     }
 
     await setCache(cacheKey, response, 10 * 60)

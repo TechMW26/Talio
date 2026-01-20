@@ -6,7 +6,7 @@ import toast from '@/utils/toast'
 import Loader from '@/components/ui/Loader'
 import {
   FaUsers, FaSearch, FaUser, FaEnvelope, FaPhone, FaCalendarAlt,
-  FaBriefcase, FaStar, FaChartLine
+  FaBriefcase, FaStar, FaChartLine, FaFilter
 } from 'react-icons/fa'
 import { formatDesignation } from '@/lib/formatters'
 
@@ -15,18 +15,24 @@ export default function TeamMembersPage() {
   const [loading, setLoading] = useState(true)
   const [teamMembers, setTeamMembers] = useState([])
   const [department, setDepartment] = useState(null)
+  const [departments, setDepartments] = useState([])
+  const [selectedDepartment, setSelectedDepartment] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
 
   useEffect(() => {
     fetchTeamMembers()
-  }, [])
+  }, [selectedDepartment])
 
   const fetchTeamMembers = async () => {
     try {
       setLoading(true)
       const token = localStorage.getItem('token')
 
-      const response = await fetch('/api/team/members', {
+      const url = selectedDepartment && selectedDepartment !== 'all' 
+        ? `/api/team/members?department=${selectedDepartment}`
+        : '/api/team/members'
+
+      const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -36,6 +42,10 @@ export default function TeamMembersPage() {
       if (data.success) {
         setTeamMembers(data.data)
         setDepartment(data.meta.department)
+        // Set departments list for filter (only on first load)
+        if (data.meta.departments && data.meta.departments.length > 0) {
+          setDepartments(data.meta.departments)
+        }
       } else {
         toast.error(data.message || 'Failed to fetch team members')
       }
@@ -67,7 +77,9 @@ export default function TeamMembersPage() {
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Team Members</h1>
             <p className="text-gray-600 text-sm sm:text-base">
-              {department?.name} Department
+              {selectedDepartment === 'all' 
+                ? (departments.length > 1 ? 'All Departments' : department?.name + ' Department')
+                : departments.find(d => d._id === selectedDepartment)?.name + ' Department'}
             </p>
           </div>
         </div>
@@ -84,17 +96,39 @@ export default function TeamMembersPage() {
         </div>
       </div>
 
-      {/* Search */}
+      {/* Search and Filter */}
       <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-        <div className="relative">
-          <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search by name, employee code, or email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
+        <div className="flex flex-col sm:flex-row gap-4">
+          {/* Search Input */}
+          <div className="relative flex-1">
+            <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search by name, employee code, or email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          
+          {/* Department Filter - show only if multiple departments */}
+          {departments.length > 1 && (
+            <div className="relative sm:w-64">
+              <FaFilter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <select
+                value={selectedDepartment}
+                onChange={(e) => setSelectedDepartment(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white"
+              >
+                <option value="all">All Departments</option>
+                {departments.map((dept) => (
+                  <option key={dept._id} value={dept._id}>
+                    {dept.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 
