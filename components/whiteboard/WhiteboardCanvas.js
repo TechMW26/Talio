@@ -2,6 +2,7 @@
 
 import React, { useRef, useEffect, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import MiraLoadingOverlay from '@/components/ui/MiraLoadingOverlay';
+import MiraSphere from '@/components/ui/MiraSphere';
 import Loader from '@/components/ui/Loader';
 import { useAILoading } from '@/contexts/AILoadingContext';
 import MiraAgentSidebar from './MiraAgentSidebar';
@@ -294,6 +295,9 @@ const WhiteboardCanvas = forwardRef(({
   const [selectionBox, setSelectionBox] = useState(null);
   const [dragStart, setDragStart] = useState(null);
   const [resizeHandle, setResizeHandle] = useState(null); // { corner, startBounds, originalBounds, startPoint }
+  
+  // Ref to track drag targets immediately (avoids React state timing issues)
+  const dragTargetIdsRef = useRef([]);
 
   const [history, setHistory] = useState([]);
   const [future, setFuture] = useState([]);
@@ -433,6 +437,7 @@ const WhiteboardCanvas = forwardRef(({
     setIsDrawing(false);
     setShowElementOptions(false);
     setDebouncedPanelPosition(null);
+    dragTargetIdsRef.current = [];
   }, [boardId, currentPageIndex]);
 
   // Reset debounced panel position when selection changes
@@ -1795,7 +1800,9 @@ const WhiteboardCanvas = forwardRef(({
       const handle = getResizeHandle(point);
       if (handle) {
         // Store original object states for proper resize calculation
-        const selectedObjs = objects.filter(o => selectedIds.includes(o.id));
+        // Use dragTargetIdsRef as fallback to handle React state timing issues
+        const idsToUse = selectedIds.length > 0 ? selectedIds : dragTargetIdsRef.current;
+        const selectedObjs = objects.filter(o => idsToUse.includes(o.id));
         const originalObjectStates = selectedObjs.map(obj => ({
           id: obj.id,
           ...JSON.parse(JSON.stringify(obj)) // Deep clone
@@ -1806,7 +1813,8 @@ const WhiteboardCanvas = forwardRef(({
           corner: handle.corner,
           originalBounds: handle.originalBounds,
           startPoint: point,
-          originalObjects: originalObjectStates
+          originalObjects: originalObjectStates,
+          targetIds: idsToUse // Store which IDs we're resizing
         });
         setIsDrawing(true);
         return;
@@ -1814,21 +1822,29 @@ const WhiteboardCanvas = forwardRef(({
 
       const hit = hitTest(point);
       if (hit) {
+        // Determine which IDs we're going to drag
+        let targetIds;
         if (!selectedIds.includes(hit.id)) {
           // If the hit object is part of a group, select all objects in that group
           if (hit.groupId && !e.shiftKey) {
-            const groupIds = objects.filter(o => o.groupId === hit.groupId).map(o => o.id);
-            setSelectedIds(groupIds);
+            targetIds = objects.filter(o => o.groupId === hit.groupId).map(o => o.id);
           } else {
-            setSelectedIds(e.shiftKey ? [...selectedIds, hit.id] : [hit.id]);
+            targetIds = e.shiftKey ? [...selectedIds, hit.id] : [hit.id];
           }
+          setSelectedIds(targetIds);
+        } else {
+          // Already selected - use current selection
+          targetIds = selectedIds;
         }
+        // Store target IDs in ref immediately (fixes React state timing issue for drag)
+        dragTargetIdsRef.current = targetIds;
         // Save initial positions for drag calculation
         saveHistory();
         setDragStart(point);
         setShowElementOptions(true);
       } else {
         setSelectedIds([]);
+        dragTargetIdsRef.current = [];
         // Set startPoint for selection box drawing
         setStartPoint(point);
         setSelectionBox({ x: point.x, y: point.y, width: 0, height: 0 });
@@ -1984,7 +2000,7 @@ const WhiteboardCanvas = forwardRef(({
 
     // Handle resize - cursor directly controls the corner position
     if (resizeHandle) {
-      const { originalBounds, corner, originalObjects } = resizeHandle;
+      const { originalBounds, corner, originalObjects, targetIds } = resizeHandle;
 
       if (!originalObjects || originalObjects.length === 0) return;
 
@@ -2027,8 +2043,11 @@ const WhiteboardCanvas = forwardRef(({
       // Create a map of original object states for quick lookup
       const originalMap = new Map(originalObjects.map(o => [o.id, o]));
 
+      // Use stored targetIds or fall back to selectedIds
+      const idsToResize = targetIds || selectedIds;
+
       const updatedObjects = objects.map(obj => {
-        if (!selectedIds.includes(obj.id)) return obj;
+        if (!idsToResize.includes(obj.id)) return obj;
 
         // Get the ORIGINAL state of this object (not the current state)
         const origObj = originalMap.get(obj.id);
@@ -2064,7 +2083,9 @@ const WhiteboardCanvas = forwardRef(({
     }
 
     // Handle panning - allow even during zoom animation for better UX
-    if (tool === 'pan' || (dragStart && !currentPath && selectedIds.length === 0 && !selectionBox && !resizeHandle && !isRotating)) {
+    // Use dragTargetIdsRef to check if we're dragging elements (avoids React state timing issues)
+    const hasDragTargets = dragTargetIdsRef.current.length > 0 || selectedIds.length > 0;
+    if (tool === 'pan' || (dragStart && !currentPath && !hasDragTargets && !selectionBox && !resizeHandle && !isRotating)) {
       // Stop zoom animation if user tries to pan
       if (isAnimatingZoom) {
         setIsAnimatingZoom(false);
@@ -2158,11 +2179,13 @@ const WhiteboardCanvas = forwardRef(({
       return;
     }
 
-    if (selectedIds.length > 0 && dragStart) {
+    // Use dragTargetIdsRef for immediate access (avoids React state timing issues)
+    const dragIds = dragTargetIdsRef.current.length > 0 ? dragTargetIdsRef.current : selectedIds;
+    if (dragIds.length > 0 && dragStart) {
       const dx = point.x - dragStart.x;
       const dy = point.y - dragStart.y;
       updateObjects(objects.map(obj => {
-        if (!selectedIds.includes(obj.id)) return obj;
+        if (!dragIds.includes(obj.id)) return obj;
         if (obj.points) return { ...obj, points: obj.points.map(p => ({ x: p.x + dx, y: p.y + dy })) };
         // Ensure x and y are numbers before adding
         const currentX = Number(obj.x) || 0;
@@ -2332,6 +2355,7 @@ const WhiteboardCanvas = forwardRef(({
     setIsDrawing(false);
     setDragStart(null);
     setStartPoint(null);
+    dragTargetIdsRef.current = []; // Clear drag target ref
   }, [currentPath, selectionBox, objects, updateObjects, straightenLine, recognizeShape, resizeHandle, saveHistory, connectorDrawing]);
 
   const handleTextSubmit = useCallback(() => {
@@ -5440,22 +5464,10 @@ const WhiteboardCanvas = forwardRef(({
             hover:scale-[1.02] active:scale-[0.98]
             ${showAIPanel ? 'ring-2 ring-violet-400/40 bg-white/30' : ''}
           `}
-          title="Analyse with MIRA"
+          title="Mira"
         >
-          {/* Icon */}
-          <div className="relative flex items-center justify-center w-6 h-6">
-            {aiLoading ? (
-              <Loader size="xs" />
-            ) : (
-              <svg className="w-5 h-5 text-violet-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707" />
-                <circle cx="12" cy="12" r="4" />
-              </svg>
-            )}
-          </div>
-
           {/* Text */}
-          <span className="text-sm font-medium text-gray-700">Analyse with MIRA</span>
+          <span className="text-sm font-medium text-gray-700">Mira</span>
 
           {/* Pulse effect when has content */}
           {aiAnalysis.messages.length > 0 && (
@@ -5480,11 +5492,8 @@ const WhiteboardCanvas = forwardRef(({
           <div className="relative px-5 py-4 border-b border-gray-100 bg-gray-50/50">
             <div className="relative flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-md">
-                  <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707" />
-                    <circle cx="12" cy="12" r="4" />
-                  </svg>
+                <div className="w-10 h-10 flex items-center justify-center">
+                  <MiraSphere size={40} particleCount={100} enableProximity={true} enableRandomPulse={true} proximityRadius={100} />
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-gray-800">MIRA Canvas Analysis</h3>
@@ -5519,11 +5528,6 @@ const WhiteboardCanvas = forwardRef(({
           <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-[120px] sm:min-h-[180px] bg-white">
             {aiAnalysis.messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full py-6 text-center">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-100/80 to-purple-100/80 flex items-center justify-center mb-3">
-                  <svg className="w-7 h-7 text-violet-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                  </svg>
-                </div>
                 <h4 className="text-sm font-medium text-gray-700 mb-1">Analyse Your Canvas</h4>
                 <p className="text-xs text-gray-500 max-w-[180px] mb-4">
                   Get AI insights about your whiteboard content

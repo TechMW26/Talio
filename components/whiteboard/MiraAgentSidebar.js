@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import MiraSphere from '@/components/ui/MiraSphere';
 
 // Quirky loading messages for different phases
 const LOADING_PHASES = {
@@ -797,11 +798,8 @@ export default function MiraAgentSidebar({
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg">
-            <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-            </svg>
+          <div className="w-12 h-12 flex items-center justify-center">
+            <MiraSphere size={48} particleCount={120} enableProximity={true} enableRandomPulse={true} proximityRadius={120} />
           </div>
           <div>
             <h2 className="font-semibold text-gray-800">MIRA Agent</h2>
@@ -1055,17 +1053,26 @@ export default function MiraAgentSidebar({
               exit={{ opacity: 0 }}
               className="p-6 flex flex-col items-center justify-center min-h-[400px]"
             >
-              <div className="w-20 h-20 mb-6 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg">
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-                >
-                  <svg className="w-10 h-10 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="3" />
-                    <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-                  </svg>
-                </motion.div>
-              </div>
+              {/* MiraSphere with aggressive thinking animation */}
+              <motion.div 
+                className="mb-6"
+                animate={{ 
+                  scale: [1, 1.05, 1],
+                }}
+                transition={{ 
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+              >
+                <MiraSphere 
+                  size={90}
+                  particleCount={180}
+                  isThinking={true}
+                  enableProximity={false}
+                  enableRandomPulse={false}
+                />
+              </motion.div>
 
               <div className="w-full max-w-xs">
                 <LoadingProgress 
