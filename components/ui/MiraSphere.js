@@ -227,13 +227,13 @@ const MiraSphere = memo(function MiraSphere({
           if (thinking) {
             // Add per-particle randomization for chaotic effect
             const particlePhase = thinkingPhaseRef.current + pIndex * 0.1
-            vibMultiplier = 1.8 + Math.sin(particlePhase * 11) * 0.8
-            forceMultiplier = 1.5 + thinkingChaos * 1.5
-            randomFactor = Math.sin(particlePhase * 17 + p.phaseOffset) * 0.15
+            vibMultiplier = 1.5 + Math.sin(particlePhase * 11) * 0.5
+            forceMultiplier = 1.2 + thinkingChaos * 0.8
+            randomFactor = Math.sin(particlePhase * 17 + p.phaseOffset) * 0.1
             
-            // Occasionally give particles sudden bursts
-            if (Math.sin(particlePhase * 23 + pIndex) > 0.92) {
-              forceMultiplier *= 2.5
+            // Occasionally give particles sudden bursts (less intense)
+            if (Math.sin(particlePhase * 23 + pIndex) > 0.95) {
+              forceMultiplier *= 1.8
             }
           }
           
@@ -247,7 +247,7 @@ const MiraSphere = memo(function MiraSphere({
           p.vz += (p.randZ * DISINTEGRATE_FORCE * intensity * forceMultiplier + vibZ * 0.05 + randomFactor) * dt
           
           // Less dampening in thinking mode for more sustained chaos
-          const baseDamp = thinking ? 0.88 : 0.91
+          const baseDamp = thinking ? 0.90 : 0.91
           const dampening = Math.pow(baseDamp, dt)
           p.vx *= dampening
           p.vy *= dampening
@@ -257,10 +257,10 @@ const MiraSphere = memo(function MiraSphere({
           p.y += p.vy * dt
           p.z += p.vz * dt
           
-          // Allow particles to spread further in thinking mode
-          const distMultiplier = thinking ? 1.5 + thinkingOscillation * 0.5 : 1
+          // Contain particles - slightly larger spread in thinking mode but not too much
+          const distMultiplier = thinking ? 1.15 + thinkingOscillation * 0.15 : 1
           const dist = Math.sqrt(p.x * p.x + p.y * p.y + p.z * p.z)
-          const maxDist = MAX_DISTANCE * (1 + intensity * 0.3) * distMultiplier
+          const maxDist = MAX_DISTANCE * (1 + intensity * 0.2) * distMultiplier
           if (dist > maxDist) {
             const scale = maxDist / dist
             p.x *= scale

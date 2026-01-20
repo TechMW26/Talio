@@ -796,10 +796,10 @@ export default function MiraAgentSidebar({
         flex flex-col overflow-hidden"
     >
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 flex items-center justify-center">
-            <MiraSphere size={48} particleCount={120} enableProximity={true} enableRandomPulse={true} proximityRadius={120} />
+      <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50 overflow-visible">
+        <div className="flex items-center gap-3 overflow-visible">
+          <div className="w-14 h-14 flex items-center justify-center overflow-visible">
+            <MiraSphere size={44} particleCount={100} enableProximity={true} enableRandomPulse={true} proximityRadius={100} />
           </div>
           <div>
             <h2 className="font-semibold text-gray-800">MIRA Agent</h2>
@@ -1051,30 +1051,32 @@ export default function MiraAgentSidebar({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="p-6 flex flex-col items-center justify-center min-h-[400px]"
+              className="flex-1 flex flex-col items-center justify-center w-full overflow-visible"
             >
-              {/* MiraSphere with aggressive thinking animation */}
-              <motion.div 
-                className="mb-6"
-                animate={{ 
-                  scale: [1, 1.05, 1],
-                }}
-                transition={{ 
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: "easeInOut"
-                }}
-              >
-                <MiraSphere 
-                  size={90}
-                  particleCount={180}
-                  isThinking={true}
-                  enableProximity={false}
-                  enableRandomPulse={false}
-                />
-              </motion.div>
+              {/* MiraSphere with aggressive thinking animation - large container to prevent clipping */}
+              <div className="relative w-full flex items-center justify-center overflow-visible" style={{ minHeight: '200px' }}>
+                <motion.div 
+                  className="overflow-visible"
+                  animate={{ 
+                    scale: [1, 1.05, 1],
+                  }}
+                  transition={{ 
+                    duration: 2,
+                    repeat: Infinity,
+                    ease: "easeInOut"
+                  }}
+                >
+                  <MiraSphere 
+                    size={100}
+                    particleCount={160}
+                    isThinking={true}
+                    enableProximity={false}
+                    enableRandomPulse={false}
+                  />
+                </motion.div>
+              </div>
 
-              <div className="w-full max-w-xs">
+              <div className="w-full max-w-xs mt-4">
                 <LoadingProgress 
                   phase={loadingPhase} 
                   progress={loadingProgress}
