@@ -131,8 +131,40 @@ export async function POST(request, { params }) {
       tags,
       estimatedHours,
       parentTask,
-      subtasks = []
+      subtasks = [],
+      attachments: rawAttachments
     } = body
+
+    // Safely normalize attachments - handle any malformed input gracefully
+    let normalizedAttachments = []
+    try {
+      if (rawAttachments && Array.isArray(rawAttachments)) {
+        // Already an array - extract only the fields we need
+        normalizedAttachments = rawAttachments
+          .filter(item => item && typeof item === 'object' && item.name && item.url)
+          .map(item => ({
+            name: String(item.name || ''),
+            url: String(item.url || ''),
+            type: item.type ? String(item.type) : undefined,
+            size: typeof item.size === 'number' ? item.size : undefined
+          }))
+      }
+    } catch (attachmentError) {
+      console.warn('[Tasks] Failed to process attachments, skipping:', attachmentError)
+      normalizedAttachments = []
+    }
+    
+    // Build final attachments array explicitly BEFORE Task.create
+    const finalAttachments = normalizedAttachments.length > 0
+      ? normalizedAttachments.map((file) => ({
+          name: String(file.name || ''),
+          url: String(file.url || ''),
+          type: file.type ? String(file.type) : undefined,
+          size: typeof file.size === 'number' ? file.size : undefined,
+          uploadedBy: userRecord.employeeId,
+          uploadedAt: new Date()
+        })).filter(file => file.name && file.url)
+      : [];
 
     if (!title) {
       return NextResponse.json({ success: false, message: 'Task title is required' }, { status: 400 })
@@ -167,7 +199,7 @@ export async function POST(request, { params }) {
       calculatedDueDate.setDate(calculatedDueDate.getDate() + workDays)
     }
 
-    // Create the task
+    // Create the task with explicit attachments array
     const task = await Task.create({
       project: projectId,
       title,
@@ -183,7 +215,8 @@ export async function POST(request, { params }) {
       parentTask,
       order,
       subtasks: formattedSubtasks,
-      progressPercentage
+      progressPercentage,
+      attachments: finalAttachments
     })
 
     const creatorEmployee = await Employee.findById(userRecord.employeeId)

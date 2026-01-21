@@ -38,9 +38,10 @@ export async function POST(request, { params }) {
     }
 
     // Find the notification
+    const currentUserId = user?._id || user?.userId
     const notification = await ActionableNotification.findOne({
       _id: id,
-      user: user.userId
+      user: currentUserId
     })
 
     if (!notification) {
@@ -108,7 +109,7 @@ export async function POST(request, { params }) {
     if (action.endpoint) {
       try {
         // Build the full URL
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+        const baseUrl = new URL(request.url).origin
         const fullUrl = `${baseUrl}${action.endpoint}`
 
         // Build payload

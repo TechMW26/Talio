@@ -80,6 +80,13 @@ export default function MyTasksPage() {
   const [mounted, setMounted] = useState(false)
   const [user, setUser] = useState(null)
 
+  const formatFileSize = useCallback((bytes = 0) => {
+    if (!bytes || Number.isNaN(bytes)) return '0 B'
+    const sizes = ['B', 'KB', 'MB', 'GB']
+    const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), sizes.length - 1)
+    return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${sizes[i]}`
+  }, [])
+
   useEffect(() => {
     setMounted(true)
   }, [])
@@ -1135,6 +1142,30 @@ export default function MyTasksPage() {
                   <div className="mb-6">
                     <h4 className="text-sm font-medium text-gray-500 mb-2">Description</h4>
                     <p className="text-gray-700 whitespace-pre-wrap">{selectedTask.description}</p>
+                  </div>
+                )}
+
+                {/* Attachments */}
+                {selectedTask.attachments && selectedTask.attachments.length > 0 && (
+                  <div className="mb-6">
+                    <h4 className="text-sm font-medium text-gray-500 mb-2">Attachments</h4>
+                    <div className="space-y-2">
+                      {selectedTask.attachments.map((file, index) => (
+                        <a
+                          key={`${file.url}-${index}`}
+                          href={file.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-800 truncate">{file.name || 'Attachment'}</p>
+                            <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+                          </div>
+                          <span className="text-xs text-blue-600">Open</span>
+                        </a>
+                      ))}
+                    </div>
                   </div>
                 )}
 

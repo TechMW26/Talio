@@ -563,6 +563,11 @@ export default function ProfilePage() {
   const handleUseAadhaarData = async (field, value) => {
     if (!value) return
 
+    if (!employee?._id) {
+      toast.error('Employee profile not loaded yet. Please try again.')
+      return
+    }
+
     // Map field names to employee fields
     const fieldMapping = {
       'name': null, // Name changes require HR approval
@@ -594,7 +599,7 @@ export default function ProfilePage() {
       }
 
       const token = localStorage.getItem('token')
-      const response = await fetch('/api/profile', {
+      const response = await fetch(`/api/employees/${employee._id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

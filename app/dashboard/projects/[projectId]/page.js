@@ -137,13 +137,67 @@ export default function ProjectDetailPage() {
     priority: 'medium',
     dueDate: '',
     assigneeIds: [],
-    subtasks: []
+    subtasks: [],
+    attachments: []
   })
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('')
   const [showTaskEtaModal, setShowTaskEtaModal] = useState(false)
   const [taskEta, setTaskEta] = useState({ days: '', hours: '' })
   const [subtaskEtas, setSubtaskEtas] = useState({}) // { subtaskIndex: { days: '', hours: '' } }
   const [pendingTaskData, setPendingTaskData] = useState(null)
+  const [uploadingTaskAttachments, setUploadingTaskAttachments] = useState(false)
+  const taskAttachmentInputRef = useRef(null)
+
+  const formatFileSize = useCallback((bytes = 0) => {
+    if (!bytes || Number.isNaN(bytes)) return '0 B'
+    const sizes = ['B', 'KB', 'MB', 'GB']
+    const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), sizes.length - 1)
+    return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${sizes[i]}`
+  }, [])
+
+  const handleTaskAttachmentUpload = async (files) => {
+    if (!files || files.length === 0) return
+    try {
+      setUploadingTaskAttachments(true)
+      const token = localStorage.getItem('token')
+      const uploads = await Promise.all(Array.from(files).map(async (file) => {
+        const formData = new FormData()
+        formData.append('file', file)
+        formData.append('folder', 'tasks')
+
+        const response = await fetch('/api/upload', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          body: formData
+        })
+
+        const result = await response.json()
+        if (!result.success) {
+          throw new Error(result.message || 'Upload failed')
+        }
+
+        return {
+          name: result.data.fileName || file.name,
+          url: result.data.fileUrl,
+          type: result.data.fileType || file.type,
+          size: result.data.fileSize || file.size
+        }
+      }))
+
+      setTaskForm(prev => ({
+        ...prev,
+        attachments: [...(prev.attachments || []), ...uploads]
+      }))
+    } catch (error) {
+      console.error('Task attachment upload error:', error)
+      toast.error(error.message || 'Failed to upload attachment')
+    } finally {
+      setUploadingTaskAttachments(false)
+      if (taskAttachmentInputRef.current) taskAttachmentInputRef.current.value = ''
+    }
+  }
 
   // Fetch functions with silent refresh support
   const fetchProject = useCallback(async (silent = false) => {
@@ -560,7 +614,7 @@ export default function ProjectDetailPage() {
       setSubmitting(true)
       const token = localStorage.getItem('token')
       
-      // Prepare task data with ETA if provided
+      // Start with current form data
       const taskData = { ...taskForm }
       
       // Handle subtask-wise ETAs
@@ -584,13 +638,39 @@ export default function ProjectDetailPage() {
         taskData.estimatedHours = (days * 8) + hours
       }
       
+      // Sanitize attachments - ensure it's a clean array of plain objects
+      const attachmentsToSend = Array.isArray(taskForm.attachments)
+        ? taskForm.attachments
+            .filter((file) => file && typeof file === 'object' && file.name && file.url)
+            .map((file) => ({
+              name: String(file.name),
+              url: String(file.url),
+              type: file.type ? String(file.type) : undefined,
+              size: typeof file.size === 'number' ? file.size : undefined
+            }))
+        : []
+
+      // Build final payload
+      const payload = {
+        title: taskData.title,
+        description: taskData.description,
+        priority: taskData.priority,
+        dueDate: taskData.dueDate,
+        assigneeIds: taskData.assigneeIds,
+        subtasks: taskData.subtasks,
+        estimatedHours: taskData.estimatedHours,
+        attachments: attachmentsToSend
+      }
+      
+      console.log('[CreateTask] Sending payload:', JSON.stringify(payload, null, 2))
+
       const response = await fetch(`/api/projects/${projectId}/tasks`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(taskData)
+        body: JSON.stringify(payload)
       })
 
       const data = await response.json()
@@ -598,7 +678,7 @@ export default function ProjectDetailPage() {
         // Close modal and reset form FIRST to ensure UI responds immediately
         setShowCreateTask(false)
         setShowTaskEtaModal(false)
-        setTaskForm({ title: '', description: '', priority: 'medium', dueDate: '', assigneeIds: [], subtasks: [] })
+        setTaskForm({ title: '', description: '', priority: 'medium', dueDate: '', assigneeIds: [], subtasks: [], attachments: [] })
         setNewSubtaskTitle('')
         setPendingTaskData(null)
         setTaskEta({ days: '', hours: '' })
@@ -2339,6 +2419,52 @@ export default function ProjectDetailPage() {
                 </div>
               </div>
 
+              {/* Attachments */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Attachments</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    ref={taskAttachmentInputRef}
+                    type="file"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => handleTaskAttachmentUpload(e.target.files)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => taskAttachmentInputRef.current?.click()}
+                    disabled={uploadingTaskAttachments}
+                    className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm disabled:opacity-50"
+                  >
+                    {uploadingTaskAttachments ? 'Uploading...' : 'Add Attachments'}
+                  </button>
+                  <span className="text-xs text-gray-500">Any file type • Max 10MB each</span>
+                </div>
+
+                {taskForm.attachments?.length > 0 && (
+                  <div className="mt-3 space-y-2">
+                    {taskForm.attachments.map((file, index) => (
+                      <div key={`${file.url}-${index}`} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg border border-gray-200">
+                        <div className="min-w-0">
+                          <p className="text-sm text-gray-700 truncate">{file.name}</p>
+                          <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setTaskForm(prev => ({
+                            ...prev,
+                            attachments: prev.attachments.filter((_, i) => i !== index)
+                          }))}
+                          className="p-1.5 text-red-500 hover:text-red-700"
+                        >
+                          <FaTimes className="text-sm" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {/* Subtasks */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -2411,10 +2537,12 @@ export default function ProjectDetailPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={submitting}
+                  disabled={submitting || uploadingTaskAttachments}
                   className="btn-primary"
                 >
-                  {submitting ? 'Creating...' : 'Create Task'}
+                  {uploadingTaskAttachments
+                    ? 'Uploading attachments...'
+                    : (submitting ? 'Creating...' : 'Create Task')}
                 </button>
               </div>
             </form>
@@ -2934,6 +3062,30 @@ export default function ProjectDetailPage() {
                 <div className="mb-6">
                   <h4 className="text-sm font-medium text-gray-500 mb-2">Description</h4>
                   <p className="text-gray-700">{selectedTask.description}</p>
+                </div>
+              )}
+
+              {/* Attachments */}
+              {selectedTask.attachments && selectedTask.attachments.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="text-sm font-medium text-gray-500 mb-2">Attachments</h4>
+                  <div className="space-y-2">
+                    {selectedTask.attachments.map((file, index) => (
+                      <a
+                        key={`${file.url}-${index}`}
+                        href={file.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-800 truncate">{file.name || 'Attachment'}</p>
+                          <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+                        </div>
+                        <span className="text-xs text-blue-600">Open</span>
+                      </a>
+                    ))}
+                  </div>
                 </div>
               )}
 

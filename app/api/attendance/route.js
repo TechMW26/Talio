@@ -650,6 +650,13 @@ export async function POST(request) {
         await attendance.save()
       }
 
+      // Clear cached attendance queries for this employee to prevent stale UI
+      try {
+        queryCache.clearPattern(`\\["attendance".*${employeeId}.*\\]`)
+      } catch (cacheError) {
+        console.warn('[Attendance] Failed to clear query cache:', cacheError)
+      }
+
       // Log activity
       await logActivity({
         employeeId: employeeId,
@@ -1007,6 +1014,13 @@ export async function POST(request) {
       }
 
       await attendance.save()
+
+      // Clear cached attendance queries for this employee to prevent stale UI
+      try {
+        queryCache.clearPattern(`\\["attendance".*${employeeId}.*\\]`)
+      } catch (cacheError) {
+        console.warn('[Attendance] Failed to clear query cache:', cacheError)
+      }
 
       // Log activity
       await logActivity({

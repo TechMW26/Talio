@@ -298,7 +298,7 @@ export default function Lanyard({ employee, onImageClick, uploadingImage }) {
   const empId = employee?.employeeId || "MG-0247";
   const photo = employee?.photo || null;
   const phone = employee?.phone || "+91 98765 43210";
-  const bloodGroup = employee?.bloodGroup || "B+";
+  const bloodGroup = employee?.bloodGroup ? employee.bloodGroup : "-";
   const email = employee?.email || "user@example.com";
   const address = employee?.address || "Not Provided";
 

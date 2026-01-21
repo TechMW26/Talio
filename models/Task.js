@@ -1,5 +1,24 @@
 import mongoose from 'mongoose';
 
+/**
+ * Task Attachment Schema
+ * Separate schema for task attachments to ensure proper type handling
+ */
+const TaskAttachmentSchema = new mongoose.Schema({
+  name: String,
+  url: String,
+  type: String,
+  size: Number,
+  uploadedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Employee'
+  },
+  uploadedAt: {
+    type: Date,
+    default: Date.now
+  }
+}, { _id: false });
+
 const TaskSchema = new mongoose.Schema({
   project: {
     type: mongoose.Schema.Types.ObjectId,
@@ -217,21 +236,8 @@ const TaskSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Task'
   },
-  // Attachments (URLs)
-  attachments: [{
-    name: String,
-    url: String,
-    type: String,
-    size: Number,
-    uploadedBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Employee'
-    },
-    uploadedAt: {
-      type: Date,
-      default: Date.now
-    }
-  }],
+  // Attachments
+  attachments: [TaskAttachmentSchema],
   // Metadata for additional info
   metadata: {
     type: mongoose.Schema.Types.Mixed,

@@ -153,13 +153,16 @@ export default function TeamRegularisationPage() {
     }
   }
 
-  const formatTime = (dateString) => {
+  const formatTime = (dateString, { timeZone } = {}) => {
     if (!dateString) return 'N/A'
     return new Date(dateString).toLocaleTimeString('en-US', {
       hour: '2-digit',
       minute: '2-digit',
+      ...(timeZone ? { timeZone } : {})
     })
   }
+
+  const formatRequestedTime = (dateString) => formatTime(dateString, { timeZone: 'UTC' })
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -402,13 +405,13 @@ export default function TeamRegularisationPage() {
                         {correction.requestedCheckIn && (
                           <p className="text-sm">
                             <span className="text-blue-500">In:</span>{' '}
-                            <span className="font-medium text-blue-800">{formatTime(correction.requestedCheckIn)}</span>
+                            <span className="font-medium text-blue-800">{formatRequestedTime(correction.requestedCheckIn)}</span>
                           </p>
                         )}
                         {correction.requestedCheckOut && (
                           <p className="text-sm">
                             <span className="text-blue-500">Out:</span>{' '}
-                            <span className="font-medium text-blue-800">{formatTime(correction.requestedCheckOut)}</span>
+                            <span className="font-medium text-blue-800">{formatRequestedTime(correction.requestedCheckOut)}</span>
                           </p>
                         )}
                         {correction.requestedStatus && (

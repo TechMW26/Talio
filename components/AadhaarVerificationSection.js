@@ -540,7 +540,7 @@ export default function AadhaarVerificationSection({
                       <p className="text-xs font-medium text-red-700">{mismatch.field}</p>
                       {onUseAadhaarData && mismatch.aadhaarValue && (
                         <button
-                          onClick={() => onUseAadhaarData(mismatch.field.toLowerCase().replace(' ', ''), mismatch.aadhaarValue)}
+                          onClick={() => onUseAadhaarData(mismatch.field.toLowerCase().replace(/\s+/g, ''), mismatch.aadhaarValue)}
                           className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors font-medium"
                         >
                           Use Aadhaar Value
