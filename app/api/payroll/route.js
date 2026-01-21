@@ -79,21 +79,34 @@ export async function POST(request) {
     let totalDeductions = data.totalDeductions
     let netSalary = data.netSalary
 
-    // If not pre-calculated, calculate from earnings/deductions
-    if (!grossSalary || !netSalary) {
-      const earnings = data.earnings || {}
-      const deductions = data.deductions || {}
-      grossSalary = Object.values(earnings).reduce((sum, val) => sum + (parseFloat(val) || 0), 0)
-      totalDeductions = Object.values(deductions).reduce((sum, val) => sum + (parseFloat(val) || 0), 0)
+    // Handle deductions - could be a number (new format) or object (old format)
+    if (typeof data.deductions === 'object' && data.deductions !== null) {
+      totalDeductions = Object.values(data.deductions).reduce((sum, val) => sum + (parseFloat(val) || 0), 0)
+    } else if (typeof data.deductions === 'number') {
+      totalDeductions = data.deductions
+    }
+
+    // Handle earnings - could be a number or object
+    if (!grossSalary) {
+      if (typeof data.earnings === 'object' && data.earnings !== null) {
+        grossSalary = Object.values(data.earnings).reduce((sum, val) => sum + (parseFloat(val) || 0), 0)
+      } else if (data.basic !== undefined) {
+        // New format: basic + allowances
+        grossSalary = (parseFloat(data.basic) || 0) + (parseFloat(data.allowances) || 0)
+      }
+    }
+
+    // Calculate net salary if not provided
+    if (!netSalary && grossSalary !== undefined && totalDeductions !== undefined) {
       netSalary = grossSalary - totalDeductions
     }
 
     // Ensure required fields have defaults
     const payrollData = {
       ...data,
-      grossSalary,
-      totalDeductions,
-      netSalary,
+      grossSalary: grossSalary || 0,
+      totalDeductions: totalDeductions || 0,
+      netSalary: netSalary || 0,
       workingDays: data.workingDays || 26,
       presentDays: data.presentDays || 0,
       absentDays: data.absentDays || 0,

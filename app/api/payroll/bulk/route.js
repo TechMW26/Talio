@@ -137,6 +137,14 @@ export async function POST(request) {
 // DELETE - Bulk delete payrolls
 export async function DELETE(request) {
   try {
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Payroll'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Payroll } = models
+
     const { payrollIds } = await request.json()
 
     if (!payrollIds || !Array.isArray(payrollIds) || payrollIds.length === 0) {

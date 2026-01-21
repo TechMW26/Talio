@@ -658,86 +658,124 @@ export default function GeneratePayrollPage() {
     try {
       const token = localStorage.getItem('token')
 
-      const promises = calculatedPayrollData.map(async (payroll) => {
-        // Build payroll data matching the Payroll model schema - SIMPLIFIED
-        const payrollData = {
-          employee: payroll.employee._id,
-          month: formData.month,
-          year: formData.year,
-          // Earnings object - using earned (proportional) values
-          earnings: {
+      const results = await Promise.all(
+        calculatedPayrollData.map(async (payroll) => {
+          // Build payroll data matching the tenant Payroll model schema
+          // The tenant schema uses simple Number fields, not nested objects
+          const payrollData = {
+            employee: payroll.employee._id,
+            month: formData.month,
+            year: formData.year,
+            // Basic salary fields (simple numbers for tenant schema)
             basic: payroll.earnedBasic,
-            hra: payroll.earnedHRA,
-            conveyance: payroll.earnedConveyance,
-            medicalAllowance: payroll.earnedMedical,
-            specialAllowance: payroll.earnedSpecial,
-            overtime: 0, // No overtime in new system
-            bonus: 0,
-            incentives: 0,
-            other: 0,
-          },
-          // Deductions object - only statutory deductions
-          deductions: {
-            pf: payroll.pf,
-            esi: payroll.esi,
-            professionalTax: payroll.professionalTax,
-            tds: payroll.tds,
-            lateDeduction: 0, // No attendance deductions in new system
-            loanRepayment: 0,
-            advance: 0,
-            other: 0,
-          },
-          // Required fields
-          grossSalary: payroll.earnedSalary, // Use earned salary as gross
-          totalDeductions: payroll.totalDeductions,
-          netSalary: payroll.netSalary,
-          workingDays: payroll.workingDays,
-          presentDays: payroll.paidDays.present,
-          absentDays: payroll.attendance.absentDays + payroll.attendance.noRecordDays,
-          leaveDays: payroll.paidDays.approvedLeaves,
-          // Attendance details
-          attendanceDetails: {
-            lateDays: 0,
-            halfDays: payroll.attendance.halfDays,
-            overtimeHours: 0,
-            holidaysWorked: 0,
-            holidaysPaid: payroll.paidDays.holidays,
-            deniedLeaveDays: payroll.leaves.deniedDays,
-            pendingLeaveDays: payroll.leaves.pendingDays,
-            wfhDays: payroll.attendance.wfhDays,
-            noRecordDays: payroll.attendance.noRecordDays,
-          },
-          // Paid days breakdown (new field)
-          paidDaysBreakdown: {
+            allowances: (payroll.earnedHRA || 0) + (payroll.earnedConveyance || 0) + 
+                       (payroll.earnedMedical || 0) + (payroll.earnedSpecial || 0),
+            deductions: payroll.totalDeductions, // Total deductions as a number
+            grossSalary: payroll.earnedSalary,
+            netSalary: payroll.netSalary,
+            status: 'draft',
+            // Additional fields stored via strict: false
+            workingDays: payroll.workingDays,
             presentDays: payroll.paidDays.present,
-            approvedLeaves: payroll.paidDays.approvedLeaves,
-            holidays: payroll.paidDays.holidays,
-            totalPaidDays: payroll.paidDays.total,
-            perDaySalary: payroll.perDaySalary,
-          },
-          // Pay period
-          payPeriod: {
-            startDate: new Date(formData.year, formData.month - 1, 1),
-            endDate: new Date(formData.year, formData.month, 0),
-          },
-          paymentDate: formData.paymentDate,
-          status: 'draft',
-        }
+            absentDays: payroll.attendance.absentDays + payroll.attendance.noRecordDays,
+            leaveDays: payroll.paidDays.approvedLeaves,
+            totalDeductions: payroll.totalDeductions,
+            // Earnings breakdown (stored as extra field)
+            earningsBreakdown: {
+              basic: payroll.earnedBasic,
+              hra: payroll.earnedHRA,
+              conveyance: payroll.earnedConveyance,
+              medicalAllowance: payroll.earnedMedical,
+              specialAllowance: payroll.earnedSpecial,
+              overtime: 0,
+              bonus: 0,
+              incentives: 0,
+              other: 0,
+            },
+            // Deductions breakdown (stored as extra field)
+            deductionsBreakdown: {
+              pf: payroll.pf,
+              esi: payroll.esi,
+              professionalTax: payroll.professionalTax,
+              tds: payroll.tds,
+              lateDeduction: 0,
+              loanRepayment: 0,
+              advance: 0,
+              other: 0,
+            },
+            // Attendance details
+            attendanceDetails: {
+              lateDays: 0,
+              halfDays: payroll.attendance.halfDays,
+              overtimeHours: 0,
+              holidaysWorked: 0,
+              holidaysPaid: payroll.paidDays.holidays,
+              deniedLeaveDays: payroll.leaves.deniedDays,
+              pendingLeaveDays: payroll.leaves.pendingDays,
+              wfhDays: payroll.attendance.wfhDays,
+              noRecordDays: payroll.attendance.noRecordDays,
+            },
+            // Paid days breakdown
+            paidDaysBreakdown: {
+              presentDays: payroll.paidDays.present,
+              approvedLeaves: payroll.paidDays.approvedLeaves,
+              holidays: payroll.paidDays.holidays,
+              totalPaidDays: payroll.paidDays.total,
+              perDaySalary: payroll.perDaySalary,
+            },
+            // Pay period
+            payPeriod: {
+              startDate: new Date(formData.year, formData.month - 1, 1),
+              endDate: new Date(formData.year, formData.month, 0),
+            },
+            paymentDate: formData.paymentDate,
+          }
 
-        return fetch('/api/payroll', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer ' + token,
-          },
-          body: JSON.stringify(payrollData),
+          try {
+            const response = await fetch('/api/payroll', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token,
+              },
+              body: JSON.stringify(payrollData),
+            })
+            const data = await response.json()
+            return {
+              success: response.ok && data.success,
+              employeeName: `${payroll.employee.firstName} ${payroll.employee.lastName}`,
+              message: data.message || (response.ok ? 'Success' : 'Failed'),
+            }
+          } catch (err) {
+            return {
+              success: false,
+              employeeName: `${payroll.employee.firstName} ${payroll.employee.lastName}`,
+              message: err.message || 'Network error',
+            }
+          }
         })
-      })
+      )
 
-      await Promise.all(promises)
+      // Count successes and failures
+      const successCount = results.filter(r => r.success).length
+      const failures = results.filter(r => !r.success)
 
-      toast.success('Payroll generated for ' + selectedEmployees.length + ' employees!')
-      router.push('/dashboard/payroll')
+      if (successCount > 0 && failures.length === 0) {
+        // All succeeded
+        toast.success(`Payroll generated for ${successCount} employee${successCount > 1 ? 's' : ''}!`)
+        router.push('/dashboard/payroll')
+      } else if (successCount > 0 && failures.length > 0) {
+        // Partial success
+        toast.success(`Payroll generated for ${successCount} employee${successCount > 1 ? 's' : ''}`)
+        const failedNames = failures.slice(0, 3).map(f => f.employeeName).join(', ')
+        const moreCount = failures.length > 3 ? ` and ${failures.length - 3} more` : ''
+        toast.error(`Failed for: ${failedNames}${moreCount}. ${failures[0].message}`)
+        router.push('/dashboard/payroll')
+      } else {
+        // All failed
+        const firstError = failures[0]?.message || 'Unknown error'
+        toast.error(`Failed to generate payroll: ${firstError}`)
+      }
     } catch (error) {
       console.error('Generate payroll error:', error)
       toast.error('Failed to generate payroll')
