@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import toast from '@/utils/toast'
 import { FaArrowLeft, FaSave, FaTrash, FaPlus, FaTimes, FaUsers, FaArchive, FaChevronDown, FaChevronRight, FaCheckSquare } from 'react-icons/fa'
+import { Button, Select, SelectItem } from '@heroui/react'
 import Portal from '@/components/ui/Portal'
 import Loader from '@/components/ui/Loader'
 
@@ -388,31 +389,33 @@ export default function EditProjectPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                  <select
-                    value={form.status}
+                  <Select
+                    selectedKeys={[form.status]}
                     onChange={(e) => setForm(prev => ({ ...prev, status: e.target.value }))}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    aria-label="Status"
+                    classNames={{ trigger: "bg-white" }}
                   >
-                    <option value="planned">Planned</option>
-                    <option value="ongoing">Ongoing</option>
-                    <option value="on_hold">On Hold</option>
-                    <option value="completed">Completed</option>
-                    <option value="archived">Archived</option>
-                  </select>
+                    <SelectItem key="planned">Planned</SelectItem>
+                    <SelectItem key="ongoing">Ongoing</SelectItem>
+                    <SelectItem key="on_hold">On Hold</SelectItem>
+                    <SelectItem key="completed">Completed</SelectItem>
+                    <SelectItem key="archived">Archived</SelectItem>
+                  </Select>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
-                  <select
-                    value={form.priority}
+                  <Select
+                    selectedKeys={[form.priority]}
                     onChange={(e) => setForm(prev => ({ ...prev, priority: e.target.value }))}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    aria-label="Priority"
+                    classNames={{ trigger: "bg-white" }}
                   >
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                    <option value="critical">Critical</option>
-                  </select>
+                    <SelectItem key="low">Low</SelectItem>
+                    <SelectItem key="medium">Medium</SelectItem>
+                    <SelectItem key="high">High</SelectItem>
+                    <SelectItem key="critical">Critical</SelectItem>
+                  </Select>
                 </div>
               </div>
 
@@ -501,21 +504,21 @@ export default function EditProjectPage() {
               </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-                <button
+                <Button
                   type="button"
-                  onClick={() => router.push(`/dashboard/projects/${projectId}`)}
-                  className="btn-secondary"
+                  onPress={() => router.push(`/dashboard/projects/${projectId}`)}
+                  variant="flat"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
-                  disabled={saving}
-                  className="btn-primary flex items-center"
+                  isDisabled={saving}
+                  color="primary"
+                  startContent={<FaSave className="mr-2" />}
                 >
-                  <FaSave className="mr-2" />
                   {saving ? 'Saving...' : 'Save Changes'}
-                </button>
+                </Button>
               </div>
             </div>
           </form>
@@ -689,19 +692,19 @@ export default function EditProjectPage() {
             </div>
             
             <div className="p-4 border-t border-gray-200 flex justify-end gap-3 flex-shrink-0">
-              <button
-                onClick={() => { setShowAddMemberModal(false); setSelectedNewMembers([]) }}
-                className="btn-secondary"
+              <Button
+                onPress={() => { setShowAddMemberModal(false); setSelectedNewMembers([]) }}
+                variant="flat"
               >
                 Cancel
-              </button>
-              <button
-                onClick={handleAddMembers}
-                disabled={saving || selectedNewMembers.length === 0}
-                className="btn-primary"
+              </Button>
+              <Button
+                onPress={handleAddMembers}
+                isDisabled={saving || selectedNewMembers.length === 0}
+                color="primary"
               >
                 {saving ? 'Adding...' : `Add ${selectedNewMembers.length} Member${selectedNewMembers.length !== 1 ? 's' : ''}`}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

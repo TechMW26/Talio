@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { Button, Input, Select, SelectItem } from '@heroui/react'
 import {
   HiOutlineListBullet,
   HiOutlinePlus,
@@ -306,24 +307,22 @@ export default function TodoPage() {
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowAnalytics(!showAnalytics)}
-            className={`p-2.5 rounded-lg border transition-colors ${
-              showAnalytics 
-                ? 'bg-indigo-100 border-indigo-200 text-indigo-600' 
-                : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-            }`}
+          <Button
+            isIconOnly
+            variant={showAnalytics ? "flat" : "bordered"}
+            color={showAnalytics ? "primary" : "default"}
+            onPress={() => setShowAnalytics(!showAnalytics)}
             title="View Analytics"
           >
             <HiOutlineChartBar className="w-5 h-5" />
-          </button>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="btn-primary flex items-center gap-2"
+          </Button>
+          <Button
+            color="primary"
+            onPress={() => setShowCreateModal(true)}
+            startContent={<HiOutlinePlus className="w-5 h-5" />}
           >
-            <HiOutlinePlus className="w-5 h-5" />
             Add To-do
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -475,16 +474,18 @@ export default function TodoPage() {
             {/* Categories */}
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">Categories</h3>
-              <button
-                onClick={() => {
+              <Button
+                isIconOnly
+                size="sm"
+                variant="light"
+                onPress={() => {
                   setEditingCategory(null)
                   setShowCategoryModal(true)
                 }}
-                className="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded"
                 title="Add Category"
               >
                 <HiOutlinePlus className="w-4 h-4" />
-              </button>
+              </Button>
             </div>
 
             <div className="space-y-1">
@@ -542,44 +543,54 @@ export default function TodoPage() {
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
             <div className="flex flex-col sm:flex-row gap-4">
               {/* Search */}
-              <div className="relative flex-1">
-                <HiOutlineMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
+              <div className="flex-1">
+                <Input
                   type="text"
                   placeholder="Search to-dos..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  startContent={<HiOutlineMagnifyingGlass className="w-5 h-5 text-gray-400" />}
+                  classNames={{
+                    inputWrapper: "bg-white"
+                  }}
                 />
               </div>
 
               {/* Sort */}
-              <select
-                value={sortBy}
+              <Select
+                selectedKeys={[sortBy]}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="px-4 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                aria-label="Sort by"
+                className="w-48"
+                classNames={{
+                  trigger: "bg-white"
+                }}
               >
-                <option value="dueDate">Sort by Due Date</option>
-                <option value="priority">Sort by Priority</option>
-                <option value="createdAt">Sort by Created</option>
-                <option value="title">Sort by Title</option>
-              </select>
+                <SelectItem key="dueDate">Sort by Due Date</SelectItem>
+                <SelectItem key="priority">Sort by Priority</SelectItem>
+                <SelectItem key="createdAt">Sort by Created</SelectItem>
+                <SelectItem key="title">Sort by Title</SelectItem>
+              </Select>
 
               {/* Mobile category filter */}
-              <select
-                value={activeTab}
+              <Select
+                selectedKeys={[activeTab]}
                 onChange={(e) => setActiveTab(e.target.value)}
-                className="md:hidden px-4 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                aria-label="Filter category"
+                className="md:hidden w-48"
+                classNames={{
+                  trigger: "bg-white"
+                }}
               >
-                <option value="all">All To-dos</option>
-                <option value="today">Today</option>
-                <option value="upcoming">Upcoming</option>
-                <option value="overdue">Overdue</option>
-                <option value="completed">Completed</option>
+                <SelectItem key="all">All To-dos</SelectItem>
+                <SelectItem key="today">Today</SelectItem>
+                <SelectItem key="upcoming">Upcoming</SelectItem>
+                <SelectItem key="overdue">Overdue</SelectItem>
+                <SelectItem key="completed">Completed</SelectItem>
                 {categories.map(cat => (
-                  <option key={cat._id} value={cat._id}>{cat.name}</option>
+                  <SelectItem key={cat._id}>{cat.name}</SelectItem>
                 ))}
-              </select>
+              </Select>
             </div>
           </div>
 
@@ -611,13 +622,13 @@ export default function TodoPage() {
                 }
               </p>
               {activeTab !== 'completed' && (
-                <button
-                  onClick={() => setShowCreateModal(true)}
-                  className="btn-primary inline-flex items-center gap-2"
+                <Button
+                  color="primary"
+                  onPress={() => setShowCreateModal(true)}
+                  startContent={<HiOutlinePlus className="w-5 h-5" />}
                 >
-                  <HiOutlinePlus className="w-5 h-5" />
                   Add To-do
-                </button>
+                </Button>
               )}
             </div>
           ) : (

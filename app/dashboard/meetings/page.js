@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { Button } from '@heroui/react'
 import { 
   HiOutlineCalendarDays, 
   HiOutlinePlus, 
@@ -204,13 +205,13 @@ export default function MeetingsPage() {
           </p>
         </div>
 
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="btn-primary flex items-center gap-2"
+        <Button
+          onPress={() => setShowCreateModal(true)}
+          color="primary"
+          startContent={<HiOutlinePlus className="w-5 h-5" />}
         >
-          <HiOutlinePlus className="w-5 h-5" />
           Schedule Meeting
-        </button>
+        </Button>
       </div>
 
       {/* Stats Cards */}
@@ -380,13 +381,13 @@ export default function MeetingsPage() {
             <p className="text-gray-500 mb-4">
               {searchQuery ? 'Try adjusting your search' : 'Schedule your first meeting to get started'}
             </p>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="btn-primary inline-flex items-center gap-2"
+            <Button
+              onPress={() => setShowCreateModal(true)}
+              color="primary"
+              startContent={<HiOutlinePlus className="w-5 h-5" />}
             >
-              <HiOutlinePlus className="w-5 h-5" />
               Schedule Meeting
-            </button>
+            </Button>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

@@ -15,7 +15,7 @@ import {
   HiOutlinePlayCircle,
   HiOutlineDocumentText
 } from 'react-icons/hi2'
-import ModalPortal from '@/components/ui/ModalPortal'
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Textarea } from '@heroui/react'
 
 export default function MeetingCard({ meeting, onRespond, showResponseActions = false }) {
   const [showRejectModal, setShowRejectModal] = useState(false)
@@ -267,46 +267,41 @@ export default function MeetingCard({ meeting, onRespond, showResponseActions = 
       </div>
 
       {/* Reject Reason Modal */}
-      <ModalPortal isOpen={showRejectModal}>
-        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setShowRejectModal(false)}>
-          <div className="modal-backdrop" />
-          <div className="modal-container modal-md">
-            <div className="modal-header">
-              <h3 className="modal-title">Decline Meeting</h3>
-              <button onClick={() => setShowRejectModal(false)} className="modal-close-btn">
-                <HiOutlineXMark className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="modal-body">
-              <p className="text-sm text-gray-600 mb-4">
-                Please provide a reason for declining this meeting invitation (optional):
-              </p>
-              <textarea
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="Reason for declining..."
-                className="modal-textarea"
-                rows={3}
-              />
-            </div>
-            <div className="modal-footer">
-              <button
-                onClick={() => setShowRejectModal(false)}
-                className="modal-btn modal-btn-secondary"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleRejectSubmit}
-                disabled={responding}
-                className="modal-btn modal-btn-danger"
-              >
-                {responding ? 'Declining...' : 'Decline'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </ModalPortal>
+      <Modal isOpen={showRejectModal} onOpenChange={setShowRejectModal} size="md">
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>Decline Meeting</ModalHeader>
+              <ModalBody>
+                <p className="text-sm text-default-600 mb-4">
+                  Please provide a reason for declining this meeting invitation (optional):
+                </p>
+                <Textarea
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder="Reason for declining..."
+                  minRows={3}
+                />
+              </ModalBody>
+              <ModalFooter>
+                <Button
+                  variant="light"
+                  onPress={onClose}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  color="danger"
+                  onPress={handleRejectSubmit}
+                  isLoading={responding}
+                >
+                  {responding ? 'Declining...' : 'Decline'}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
     </>
   )
 }

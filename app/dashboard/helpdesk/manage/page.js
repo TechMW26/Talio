@@ -8,7 +8,7 @@ import {
   FaUser, FaArrowRight, FaComment, FaTimes, FaChevronDown
 } from 'react-icons/fa'
 import { getCurrentUser } from '@/utils/userHelper'
-import ModalPortal from '@/components/ui/ModalPortal'
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Select, SelectItem, Input } from '@heroui/react'
 import Loader from '@/components/ui/Loader'
 
 export default function HelpdeskManagePage() {
@@ -404,153 +404,133 @@ export default function HelpdeskManagePage() {
       </div>
 
       {/* Ticket Detail Modal */}
-      <ModalPortal isOpen={showDetailModal}>
-        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setShowDetailModal(false)}>
-          <div className="modal-backdrop" />
-          <div className="modal-container modal-lg max-h-[90vh] overflow-y-auto">
-            <div className="modal-header">
-              <h2 className="modal-title">
+      <Modal isOpen={showDetailModal} onOpenChange={setShowDetailModal} size="2xl" scrollBehavior="inside">
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader className="flex flex-col gap-1">
                 Ticket: {selectedTicket?.ticketNumber}
-              </h2>
-              <button onClick={() => setShowDetailModal(false)} className="modal-close-btn">
-                <FaTimes className="w-5 h-5" />
-              </button>
-            </div>
+              </ModalHeader>
 
-            {selectedTicket && (
-              <div className="modal-body space-y-6">
-                {/* Ticket Info */}
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h3 className="font-semibold text-lg text-gray-900 mb-2">{selectedTicket.subject}</h3>
-                  <p className="text-gray-600 mb-4">{selectedTicket.description}</p>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-500">Category:</span>
-                      <p className="font-medium capitalize">{selectedTicket.category?.replace('-', ' ')}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Priority:</span>
-                      <p className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${getPriorityColor(selectedTicket.priority)}`}>
-                        {selectedTicket.priority}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Raised By:</span>
-                      <p className="font-medium">
-                        {selectedTicket.createdBy?.firstName} {selectedTicket.createdBy?.lastName}
-                      </p>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Created:</span>
-                      <p className="font-medium">
-                        {new Date(selectedTicket.createdAt).toLocaleDateString()}
-                      </p>
+              {selectedTicket && (
+                <ModalBody className="space-y-6">
+                  {/* Ticket Info */}
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h3 className="font-semibold text-lg text-gray-900 mb-2">{selectedTicket.subject}</h3>
+                    <p className="text-gray-600 mb-4">{selectedTicket.description}</p>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-500">Category:</span>
+                        <p className="font-medium capitalize">{selectedTicket.category?.replace('-', ' ')}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Priority:</span>
+                        <p className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${getPriorityColor(selectedTicket.priority)}`}>
+                          {selectedTicket.priority}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Raised By:</span>
+                        <p className="font-medium">
+                          {selectedTicket.createdBy?.firstName} {selectedTicket.createdBy?.lastName}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Created:</span>
+                        <p className="font-medium">
+                          {new Date(selectedTicket.createdAt).toLocaleDateString()}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Status & Assignment */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Update Status
-                    </label>
-                    <select
-                      value={newStatus}
-                      onChange={(e) => setNewStatus(e.target.value)}
-                      className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2.5"
+                  {/* Status & Assignment */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Select
+                      label="Update Status"
+                      selectedKeys={newStatus ? [newStatus] : []}
+                      onSelectionChange={(keys) => setNewStatus(Array.from(keys)[0] || '')}
                     >
-                      <option value="open">Open</option>
-                      <option value="in-progress">In Progress</option>
-                      <option value="resolved">Resolved</option>
-                      <option value="closed">Closed</option>
-                      <option value="reopened">Reopened</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Assign To
-                    </label>
-                    <select
-                      value={assignTo}
-                      onChange={(e) => setAssignTo(e.target.value)}
-                      className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2.5"
+                      <SelectItem key="open">Open</SelectItem>
+                      <SelectItem key="in-progress">In Progress</SelectItem>
+                      <SelectItem key="resolved">Resolved</SelectItem>
+                      <SelectItem key="closed">Closed</SelectItem>
+                      <SelectItem key="reopened">Reopened</SelectItem>
+                    </Select>
+                    <Select
+                      label="Assign To"
+                      selectedKeys={assignTo ? [assignTo] : []}
+                      onSelectionChange={(keys) => setAssignTo(Array.from(keys)[0] || '')}
+                      placeholder="Unassigned"
                     >
-                      <option value="">Unassigned</option>
                       {employees.map(emp => (
-                        <option key={emp._id} value={emp._id}>
+                        <SelectItem key={emp._id}>
                           {emp.firstName} {emp.lastName}
-                        </option>
+                        </SelectItem>
                       ))}
-                    </select>
+                    </Select>
                   </div>
-                </div>
 
-                {/* Comments Thread */}
-                <div>
-                  <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
-                    <FaComment className="text-gray-400" />
-                    Comments ({selectedTicket.comments?.length || 0})
-                  </h4>
-                  <div className="space-y-3 max-h-48 overflow-y-auto mb-4">
-                    {selectedTicket.comments?.length === 0 ? (
-                      <p className="text-gray-500 text-sm text-center py-4">No comments yet</p>
-                    ) : (
-                      selectedTicket.comments?.map((comment, idx) => (
-                        <div key={idx} className="bg-gray-50 rounded-lg p-3">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="font-medium text-sm">
-                              {comment.commentedBy?.firstName || 'User'} {comment.commentedBy?.lastName || ''}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              {new Date(comment.commentedAt).toLocaleString()}
-                            </span>
+                  {/* Comments Thread */}
+                  <div>
+                    <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2">
+                      <FaComment className="text-gray-400" />
+                      Comments ({selectedTicket.comments?.length || 0})
+                    </h4>
+                    <div className="space-y-3 max-h-48 overflow-y-auto mb-4">
+                      {selectedTicket.comments?.length === 0 ? (
+                        <p className="text-gray-500 text-sm text-center py-4">No comments yet</p>
+                      ) : (
+                        selectedTicket.comments?.map((comment, idx) => (
+                          <div key={idx} className="bg-gray-50 rounded-lg p-3">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="font-medium text-sm">
+                                {comment.commentedBy?.firstName || 'User'} {comment.commentedBy?.lastName || ''}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                {new Date(comment.commentedAt).toLocaleString()}
+                              </span>
+                            </div>
+                            <p className="text-gray-700 text-sm">{comment.comment}</p>
                           </div>
-                          <p className="text-gray-700 text-sm">{comment.comment}</p>
-                        </div>
-                      ))
-                    )}
-                  </div>
+                        ))
+                      )}
+                    </div>
 
-                  {/* Add Comment */}
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
-                      placeholder="Add a comment..."
-                      className="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 border p-2.5"
-                      onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}
-                    />
-                    <button
-                      onClick={handleAddComment}
-                      disabled={!newComment.trim()}
-                      className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                      Add
-                    </button>
+                    {/* Add Comment */}
+                    <div className="flex gap-2">
+                      <Input
+                        type="text"
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        placeholder="Add a comment..."
+                        className="flex-1"
+                        onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}
+                      />
+                      <Button
+                        onPress={handleAddComment}
+                        isDisabled={!newComment.trim()}
+                        variant="flat"
+                      >
+                        Add
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              </div>
-            )}
+                </ModalBody>
+              )}
 
-            <div className="modal-footer">
-              <button
-                onClick={() => setShowDetailModal(false)}
-                className="modal-btn modal-btn-secondary"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleUpdateTicket}
-                className="modal-btn modal-btn-primary"
-              >
-                Update Ticket
-              </button>
-            </div>
-          </div>
-        </div>
-      </ModalPortal>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose}>
+                  Cancel
+                </Button>
+                <Button color="primary" onPress={handleUpdateTicket}>
+                  Update Ticket
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
     </div>
   )
 }

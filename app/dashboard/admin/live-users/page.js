@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { Button } from '@heroui/react'
 import { useSocket } from '@/contexts/SocketContext'
 import toast from '@/utils/toast'
 import Loader from '@/components/ui/Loader'
@@ -238,12 +239,12 @@ export default function LiveUsersPage() {
           <HiOutlineExclamationCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-800 mb-2">Error Loading Data</h3>
           <p className="text-gray-600 mb-4">{error}</p>
-          <button
-            onClick={handleRefresh}
-            className="btn-primary"
+          <Button
+            onPress={handleRefresh}
+            color="primary"
           >
             Try Again
-          </button>
+          </Button>
         </div>
       </div>
     )
@@ -276,14 +277,14 @@ export default function LiveUsersPage() {
           </button>
           {/* Broadcast All Button - Admin Only */}
           {permissions.canRefresh && (
-            <button
-              onClick={() => handleBroadcastRefresh('all')}
-              disabled={broadcastLoading}
-              className="btn-primary flex items-center gap-2"
+            <Button
+              onPress={() => handleBroadcastRefresh('all')}
+              isDisabled={broadcastLoading}
+              color="primary"
+              startContent={<HiOutlineSignal className="h-5 w-5" />}
             >
-              <HiOutlineSignal className="h-5 w-5" />
               <span className="hidden sm:inline">Refresh All Users</span>
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -345,14 +346,14 @@ export default function LiveUsersPage() {
           )}
           {/* Selected Users Actions - Admin Only */}
           {permissions.canRefresh && selectedUsers.length > 0 && (
-            <button
-              onClick={() => handleBroadcastRefresh('selected')}
-              disabled={broadcastLoading}
-              className="btn-primary flex items-center gap-2"
+            <Button
+              onPress={() => handleBroadcastRefresh('selected')}
+              isDisabled={broadcastLoading}
+              color="primary"
+              startContent={<HiOutlineSignal className="h-5 w-5" />}
             >
-              <HiOutlineSignal className="h-5 w-5" />
               Refresh Selected ({selectedUsers.length})
-            </button>
+            </Button>
           )}
         </div>
       </div>

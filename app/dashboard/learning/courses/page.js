@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { FaBook, FaClock, FaUsers, FaStar, FaPlay, FaFilter, FaSearch, FaGraduationCap } from 'react-icons/fa'
 import toast from '@/utils/toast'
 import Loader from '@/components/ui/Loader'
+import { Select, SelectItem, Input } from '@heroui/react'
 
 export default function CoursesPage() {
   const [courses, setCourses] = useState([])
@@ -172,46 +173,47 @@ export default function CoursesPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Search */}
           <div className="relative">
-            <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search courses..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+            <div className="relative flex-1">
+              <Input
+                type="text"
+                placeholder="Search courses..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                startContent={<FaSearch className="text-gray-400" />}
+              />
+            </div>
           </div>
 
           {/* Category Filter */}
-          <div className="relative">
-            <FaFilter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            <select
-              value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          <div className="flex-1">
+            <Select
+              selectedKeys={[categoryFilter]}
+              onSelectionChange={(keys) => setCategoryFilter(Array.from(keys)[0] || 'all')}
+              startContent={<FaFilter className="text-gray-400" />}
+              aria-label="Filter by category"
             >
               {categories.map(cat => (
-                <option key={cat} value={cat}>
+                <SelectItem key={cat}>
                   {cat === 'all' ? 'All Categories' : cat}
-                </option>
+                </SelectItem>
               ))}
-            </select>
+            </Select>
           </div>
 
           {/* Level Filter */}
-          <div className="relative">
-            <FaGraduationCap className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            <select
-              value={levelFilter}
-              onChange={(e) => setLevelFilter(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          <div className="flex-1">
+            <Select
+              selectedKeys={[levelFilter]}
+              onSelectionChange={(keys) => setLevelFilter(Array.from(keys)[0] || 'all')}
+              startContent={<FaGraduationCap className="text-gray-400" />}
+              aria-label="Filter by level"
             >
               {levels.map(level => (
-                <option key={level} value={level}>
+                <SelectItem key={level}>
                   {level === 'all' ? 'All Levels' : level}
-                </option>
+                </SelectItem>
               ))}
-            </select>
+            </Select>
           </div>
         </div>
       </div>

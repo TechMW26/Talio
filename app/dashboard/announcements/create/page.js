@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
+import { Select, SelectItem } from '@heroui/react'
 import { FaBullhorn, FaUsers, FaCalendarAlt, FaExclamationTriangle } from 'react-icons/fa'
 import Loader from '@/components/ui/Loader'
 
@@ -221,15 +222,16 @@ export default function CreateAnnouncementPage() {
               <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                 Priority *
               </label>
-              <select
-                value={formData.priority}
+              <Select
+                selectedKeys={[formData.priority]}
                 onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                aria-label="Priority"
+                classNames={{ trigger: "bg-white" }}
               >
-                <option value="low">Low Priority</option>
-                <option value="medium">Medium Priority</option>
-                <option value="high">High Priority</option>
-              </select>
+                <SelectItem key="low">Low Priority</SelectItem>
+                <SelectItem key="medium">Medium Priority</SelectItem>
+                <SelectItem key="high">High Priority</SelectItem>
+              </Select>
               <div className="mt-2 flex items-center space-x-2">
                 {React.createElement(getPriorityIcon(formData.priority), {
                   className: `w-3 h-3 sm:w-4 sm:h-4 ${getPriorityColor(formData.priority)}`
@@ -257,14 +259,15 @@ export default function CreateAnnouncementPage() {
                   </div>
                 ) : (
                   <>
-                    <select
-                      value={formData.targetAudience}
+                    <Select
+                      selectedKeys={[formData.targetAudience]}
                       onChange={(e) => setFormData({ ...formData, targetAudience: e.target.value })}
-                      className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      aria-label="Target Audience"
+                      classNames={{ trigger: "bg-white" }}
                     >
-                      <option value="all">All Employees</option>
-                      <option value="department">Specific Department(s)</option>
-                    </select>
+                      <SelectItem key="all">All Employees</SelectItem>
+                      <SelectItem key="department">Specific Department(s)</SelectItem>
+                    </Select>
                     {formData.targetAudience === 'department' && departments.length > 0 && (
                       <div className="mt-2 sm:mt-3 space-y-2">
                         <label className="block text-xs sm:text-sm font-medium text-gray-700">

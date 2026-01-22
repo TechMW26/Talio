@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { Select, SelectItem } from '@heroui/react'
 import {
   HiOutlineCamera,
   HiOutlinePhoto,
@@ -196,15 +197,17 @@ export default function RawCaptureViewer({ userId = null, date = null, showFilte
         {showFilters && (
           <div className="mt-3 flex items-center gap-2">
             <HiOutlineFunnel className="w-4 h-4 text-gray-400" />
-            <select
-              value={captureType}
+            <Select
+              selectedKeys={[captureType]}
               onChange={(e) => setCaptureType(e.target.value)}
-              className="text-sm border rounded-lg px-3 py-1.5 focus:ring-blue-500 focus:border-blue-500"
+              aria-label="Capture Type Filter"
+              size="sm"
+              classNames={{ trigger: "bg-white" }}
             >
-              <option value="all">All Captures</option>
-              <option value="automatic">Automatic Only</option>
-              <option value="manual">Manual Only</option>
-            </select>
+              <SelectItem key="all">All Captures</SelectItem>
+              <SelectItem key="automatic">Automatic Only</SelectItem>
+              <SelectItem key="manual">Manual Only</SelectItem>
+            </Select>
           </div>
         )}
       </div>

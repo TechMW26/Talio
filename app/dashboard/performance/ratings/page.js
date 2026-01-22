@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { FaPlus, FaEye, FaEdit, FaTrash, FaStar, FaSearch, FaFilter, FaUser } from 'react-icons/fa'
 import Loader from '@/components/ui/Loader'
+import { Select, SelectItem, Input } from '@heroui/react'
 
 export default function EmployeeRatingsPage() {
   const router = useRouter()
@@ -176,29 +177,31 @@ export default function EmployeeRatingsPage() {
       <div className="bg-white rounded-lg shadow-md p-4 mb-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
           <div className="flex items-center space-x-4">
-            <div className="relative">
-              <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
+            <div className="w-64">
+              <Input
                 type="text"
                 placeholder="Search employees..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                startContent={<FaSearch className="text-gray-400 w-4 h-4" />}
+                size="sm"
               />
             </div>
             <div className="flex items-center space-x-2">
               <FaFilter className="text-gray-400 w-4 h-4" />
-              <select
-                value={filterCategory}
-                onChange={(e) => setFilterCategory(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent capitalize"
+              <Select
+                selectedKeys={[filterCategory]}
+                onSelectionChange={(keys) => setFilterCategory(Array.from(keys)[0] || 'all')}
+                className="w-44"
+                size="sm"
+                aria-label="Filter by category"
               >
-                <option value="all">All Categories</option>
-                <option value="performance">Performance</option>
-                <option value="behavior">Behavior</option>
-                <option value="skills">Skills</option>
-                <option value="general">General</option>
-              </select>
+                <SelectItem key="all">All Categories</SelectItem>
+                <SelectItem key="performance">Performance</SelectItem>
+                <SelectItem key="behavior">Behavior</SelectItem>
+                <SelectItem key="skills">Skills</SelectItem>
+                <SelectItem key="general">General</SelectItem>
+              </Select>
             </div>
           </div>
           <div className="text-sm text-gray-500">

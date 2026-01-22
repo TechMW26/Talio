@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { Select, SelectItem } from '@heroui/react'
 import { FaPlus, FaTrash, FaUser, FaUsers, FaSearch, FaCheck, FaTimes, FaChevronDown } from 'react-icons/fa'
 import { formatDesignation } from '@/lib/formatters'
 import Loader from '@/components/ui/Loader'
@@ -456,16 +457,18 @@ const TaskAssignment = ({ taskId, currentAssignees = [], onAssignmentChange, mod
 
                   <div className="flex items-center space-x-2">
                     {/* Role Selector */}
-                    <select
-                      value={assignee.role}
+                    <Select
+                      selectedKeys={[assignee.role]}
                       onChange={(e) => updateAssigneeRole(assignee.employee, e.target.value)}
-                      className="text-xs border border-gray-300 rounded px-2 py-1 focus:ring-2 focus:ring-blue-500"
+                      aria-label="Assignee Role"
+                      size="sm"
+                      classNames={{ trigger: "bg-white min-w-[120px]" }}
                     >
-                      <option value="owner">Owner</option>
-                      <option value="collaborator">Collaborator</option>
-                      <option value="reviewer">Reviewer</option>
-                      <option value="observer">Observer</option>
-                    </select>
+                      <SelectItem key="owner">Owner</SelectItem>
+                      <SelectItem key="collaborator">Collaborator</SelectItem>
+                      <SelectItem key="reviewer">Reviewer</SelectItem>
+                      <SelectItem key="observer">Observer</SelectItem>
+                    </Select>
 
                     {/* Status Badge */}
                     {assignee.status && (

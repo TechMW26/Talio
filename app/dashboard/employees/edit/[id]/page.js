@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { FaSave, FaArrowLeft, FaChevronDown, FaTimes, FaExclamationTriangle } from 'react-icons/fa'
-import Loader from '@/components/ui/Loader'
+import { Card, CardBody, Button, Skeleton, Select, SelectItem } from '@heroui/react'
 
 export default function EditEmployeePage() {
   const params = useParams()
@@ -261,20 +261,20 @@ export default function EditEmployeePage() {
     return (
       <div className="p-6">
         <div className="flex flex-col items-center justify-center min-h-[60vh]">
-          <div className="bg-red-50 rounded-full p-6 mb-6">
-            <FaExclamationTriangle className="w-16 h-16 text-red-500" />
+          <div className="bg-danger-50 rounded-full p-6 mb-6">
+            <FaExclamationTriangle className="w-16 h-16 text-danger" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">Access Denied</h1>
-          <p className="text-gray-600 text-center max-w-md mb-6">
+          <h1 className="text-2xl font-bold text-default-800 mb-2">Access Denied</h1>
+          <p className="text-default-500 text-center max-w-md mb-6">
             You don't have permission to edit employees. 
             This page is restricted to Admin and HR users only.
           </p>
-          <button
-            onClick={() => router.push('/dashboard')}
-            className="btn-primary"
+          <Button
+            color="primary"
+            onPress={() => router.push('/dashboard')}
           >
             Go to Dashboard
-          </button>
+          </Button>
         </div>
       </div>
     )
@@ -283,9 +283,24 @@ export default function EditEmployeePage() {
   if (loading) {
     return (
       <div className="p-6">
-        <div className="bg-white rounded-lg shadow-md p-8 text-center">
-          <Loader size="lg" />
-        </div>
+        <Card shadow="sm">
+          <CardBody className="p-8">
+            <div className="space-y-6">
+              <Skeleton className="w-1/3 h-8 rounded-lg" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Skeleton className="h-12 rounded-lg" />
+                <Skeleton className="h-12 rounded-lg" />
+                <Skeleton className="h-12 rounded-lg" />
+                <Skeleton className="h-12 rounded-lg" />
+              </div>
+              <Skeleton className="w-1/4 h-8 rounded-lg" />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Skeleton className="h-12 rounded-lg" />
+                <Skeleton className="h-12 rounded-lg" />
+              </div>
+            </div>
+          </CardBody>
+        </Card>
       </div>
     )
   }
@@ -295,27 +310,28 @@ export default function EditEmployeePage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Edit Employee</h1>
-          <p className="text-gray-600 mt-1">Update employee information</p>
+          <h1 className="text-3xl font-bold text-default-800">Edit Employee</h1>
+          <p className="text-default-500 mt-1">Update employee information</p>
         </div>
-        <button
-          onClick={() => router.push('/dashboard/employees')}
-          className="btn-secondary flex items-center space-x-2"
+        <Button
+          variant="bordered"
+          onPress={() => router.push('/dashboard/employees')}
+          startContent={<FaArrowLeft />}
         >
-          <FaArrowLeft />
-          <span>Back</span>
-        </button>
+          Back
+        </Button>
       </div>
 
       {/* Form */}
-      <div className="bg-white rounded-lg shadow-md p-6">
+      <Card shadow="sm">
+        <CardBody className="p-6">
         <form onSubmit={handleSubmit}>
           {/* Personal Information */}
           <div className="mb-8">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Personal Information</h2>
+            <h2 className="text-xl font-bold text-default-800 mb-4">Personal Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-default-700 mb-2">
                   First Name *
                 </label>
                 <input
@@ -323,12 +339,12 @@ export default function EditEmployeePage() {
                   required
                   value={formData.firstName}
                   onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-default-700 mb-2">
                   Last Name *
                 </label>
                 <input
@@ -336,12 +352,12 @@ export default function EditEmployeePage() {
                   required
                   value={formData.lastName}
                   onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-default-700 mb-2">
                   Email *
                 </label>
                 <input
@@ -349,59 +365,60 @@ export default function EditEmployeePage() {
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-default-700 mb-2">
                   Phone
                 </label>
                 <input
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-default-700 mb-2">
                   Date of Birth
                 </label>
                 <input
                   type="date"
                   value={formData.dateOfBirth}
                   onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-default-700 mb-2">
                   Gender
                 </label>
-                <select
-                  value={formData.gender}
+                <Select
+                  selectedKeys={formData.gender ? [formData.gender] : []}
                   onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  aria-label="Gender"
+                  placeholder="Select Gender"
+                  classNames={{ trigger: "bg-white" }}
                 >
-                  <option value="">Select Gender</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="other">Other</option>
-                </select>
+                  <SelectItem key="male">Male</SelectItem>
+                  <SelectItem key="female">Female</SelectItem>
+                  <SelectItem key="other">Other</SelectItem>
+                </Select>
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-default-700 mb-2">
                   Address
                 </label>
                 <textarea
                   rows="2"
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
               </div>
             </div>
@@ -409,12 +426,12 @@ export default function EditEmployeePage() {
 
           {/* Employment Information */}
           <div className="mb-8">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Employment Information</h2>
+            <h2 className="text-xl font-bold text-default-800 mb-4">Employment Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Department - Multi-select */}
               <div className="md:col-span-2" ref={deptDropdownRef}>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Departments <span className="text-gray-400 text-xs">(can select multiple)</span>
+                <label className="block text-sm font-medium text-default-700 mb-2">
+                  Departments <span className="text-default-400 text-xs">(can select multiple)</span>
                 </label>
 
                 {/* Selected Departments Tags */}
@@ -426,7 +443,7 @@ export default function EditEmployeePage() {
                       return dept ? (
                         <span
                           key={deptIdStr}
-                          className="inline-flex items-center gap-1 px-3 py-1 bg-primary-100 text-primary-700 rounded-full text-sm"
+                          className="inline-flex items-center gap-1 px-3 py-1 bg-primary-100 text-primary rounded-full text-sm"
                         >
                           {dept.name}
                           <button
@@ -439,7 +456,7 @@ export default function EditEmployeePage() {
                                 department: newDepts.length > 0 ? newDepts[0] : '',
                               })
                             }}
-                            className="ml-1 text-primary-500 hover:text-primary-700"
+                            className="ml-1 text-primary hover:text-primary-700"
                           >
                             <FaTimes className="w-3 h-3" />
                           </button>
@@ -454,21 +471,21 @@ export default function EditEmployeePage() {
                   <button
                     type="button"
                     onClick={() => setShowDeptDropdown(!showDeptDropdown)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-left flex items-center justify-between bg-white"
+                    className="w-full px-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-left flex items-center justify-between bg-white"
                   >
-                    <span className={formData.departments?.length > 0 ? 'text-gray-700' : 'text-gray-400'}>
+                    <span className={formData.departments?.length > 0 ? 'text-default-700' : 'text-default-400'}>
                       {formData.departments?.length > 0
                         ? `${formData.departments.length} department(s) selected`
                         : 'Select Departments'}
                     </span>
-                    <FaChevronDown className={`text-gray-400 transition-transform ${showDeptDropdown ? 'rotate-180' : ''}`} />
+                    <FaChevronDown className={`text-default-400 transition-transform ${showDeptDropdown ? 'rotate-180' : ''}`} />
                   </button>
 
                   {/* Dropdown List */}
                   {showDeptDropdown && (
-                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-default-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                       {departments.length === 0 ? (
-                        <div className="px-4 py-2 text-gray-500 text-sm">No departments available</div>
+                        <div className="px-4 py-2 text-default-500 text-sm">No departments available</div>
                       ) : (
                         departments.map(dept => {
                           const deptId = dept._id?.toString() || dept._id
@@ -476,7 +493,7 @@ export default function EditEmployeePage() {
                           return (
                             <label
                               key={dept._id}
-                              className="flex items-center px-4 py-2 hover:bg-gray-50 cursor-pointer"
+                              className="flex items-center px-4 py-2 hover:bg-default-50 cursor-pointer"
                             >
                               <input
                                 type="checkbox"
@@ -496,11 +513,11 @@ export default function EditEmployeePage() {
                                     department: newDepts.length > 0 ? newDepts[0] : '',
                                   })
                                 }}
-                                className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                                className="w-4 h-4 text-primary border-default-300 rounded focus:ring-primary"
                               />
-                              <span className="ml-3 text-gray-700">{dept.name}</span>
+                              <span className="ml-3 text-default-700">{dept.name}</span>
                               {dept.code && (
-                                <span className="ml-2 text-xs text-gray-400">({dept.code})</span>
+                                <span className="ml-2 text-xs text-default-400">({dept.code})</span>
                               )}
                             </label>
                           )
@@ -513,30 +530,31 @@ export default function EditEmployeePage() {
 
               {/* Designation & Level - Side by Side */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-default-700 mb-2">
                   Designation *
                 </label>
-                <select
-                  required
-                  value={formData.designation}
+                <Select
+                  isRequired
+                  selectedKeys={formData.designation ? [formData.designation] : []}
                   onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  aria-label="Designation"
+                  placeholder="Select Designation"
+                  classNames={{ trigger: "bg-white" }}
                 >
-                  <option value="">Select Designation</option>
                   {designations.map((desig) => (
-                    <option key={desig._id} value={desig._id}>
+                    <SelectItem key={desig._id}>
                       {desig.title}
-                    </option>
+                    </SelectItem>
                   ))}
-                </select>
+                </Select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-default-700 mb-2">
                   Level
                 </label>
-                <select
-                  value={formData.designationLevel}
+                <Select
+                  selectedKeys={formData.designationLevel ? [String(formData.designationLevel)] : []}
                   onChange={(e) => {
                     const selectedLevel = levels.find(l => l.level === parseInt(e.target.value))
                     setFormData({
@@ -545,19 +563,20 @@ export default function EditEmployeePage() {
                       designationLevelName: selectedLevel?.levelName || '',
                     })
                   }}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  aria-label="Level"
+                  placeholder="Select Level"
+                  classNames={{ trigger: "bg-white" }}
                 >
-                  <option value="">Select Level</option>
                   {levels.map((level) => (
-                    <option key={level.level} value={level.level}>
+                    <SelectItem key={String(level.level)}>
                       {level.levelName}
-                    </option>
+                    </SelectItem>
                   ))}
-                </select>
+                </Select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-default-700 mb-2">
                   Date of Joining *
                 </label>
                 <input
@@ -565,72 +584,75 @@ export default function EditEmployeePage() {
                   required
                   value={formData.dateOfJoining}
                   onChange={(e) => setFormData({ ...formData, dateOfJoining: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-default-700 mb-2">
                   Employment Type
                 </label>
-                <select
-                  value={formData.employmentType}
+                <Select
+                  selectedKeys={formData.employmentType ? [formData.employmentType] : []}
                   onChange={(e) => setFormData({ ...formData, employmentType: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  aria-label="Employment Type"
+                  placeholder="Select Type"
+                  classNames={{ trigger: "bg-white" }}
                 >
-                  <option value="">Select Type</option>
-                  <option value="full-time">Full Time</option>
-                  <option value="part-time">Part Time</option>
-                  <option value="contract">Contract</option>
-                  <option value="intern">Intern</option>
-                </select>
+                  <SelectItem key="full-time">Full Time</SelectItem>
+                  <SelectItem key="part-time">Part Time</SelectItem>
+                  <SelectItem key="contract">Contract</SelectItem>
+                  <SelectItem key="intern">Intern</SelectItem>
+                </Select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-default-700 mb-2">
                   Work Location
                 </label>
                 <input
                   type="text"
                   value={formData.workLocation}
                   onChange={(e) => setFormData({ ...formData, workLocation: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-default-700 mb-2">
                   Status *
                 </label>
-                <select
-                  required
-                  value={formData.status}
+                <Select
+                  isRequired
+                  selectedKeys={[formData.status]}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  aria-label="Status"
+                  classNames={{ trigger: "bg-white" }}
                 >
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="terminated">Terminated</option>
-                </select>
+                  <SelectItem key="active">Active</SelectItem>
+                  <SelectItem key="inactive">Inactive</SelectItem>
+                  <SelectItem key="terminated">Terminated</SelectItem>
+                </Select>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-default-700 mb-2">
                   System Role
-                  <span className="text-xs text-gray-400 ml-2">(Access level)</span>
+                  <span className="text-xs text-default-400 ml-2">(Access level)</span>
                 </label>
-                <select
-                  value={formData.systemRole}
+                <Select
+                  selectedKeys={[formData.systemRole]}
                   onChange={(e) => setFormData({ ...formData, systemRole: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  aria-label="System Role"
+                  classNames={{ trigger: "bg-white" }}
                 >
-                  <option value="employee">Employee</option>
-                  <option value="manager">Manager</option>
-                  <option value="department_head">Department Head</option>
-                  <option value="hr">HR</option>
-                  <option value="admin">Admin</option>
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
+                  <SelectItem key="employee">Employee</SelectItem>
+                  <SelectItem key="manager">Manager</SelectItem>
+                  <SelectItem key="department_head">Department Head</SelectItem>
+                  <SelectItem key="hr">HR</SelectItem>
+                  <SelectItem key="admin">Admin</SelectItem>
+                </Select>
+                <p className="text-xs text-default-500 mt-1">
                   Controls what features this user can access in the system
                 </p>
               </div>
@@ -639,134 +661,134 @@ export default function EditEmployeePage() {
 
           {/* Salary & Statutory Details */}
           <div className="mb-8">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">Salary & Statutory Details</h2>
+            <h2 className="text-xl font-bold text-default-800 mb-4">Salary & Statutory Details</h2>
             
             {/* Salary Fields */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-default-700 mb-2">
                   CTC (Cost to Company)
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">₹</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-default-500">₹</span>
                   <input
                     type="number"
                     value={formData.salary.ctc}
                     onChange={(e) => setFormData({ ...formData, salary: { ...formData.salary, ctc: e.target.value } })}
                     placeholder="Annual CTC"
-                    className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="w-full pl-8 pr-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-default-700 mb-2">
                   Gross Salary (Monthly)
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">₹</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-default-500">₹</span>
                   <input
                     type="number"
                     value={formData.salary.grossSalary}
                     onChange={(e) => setFormData({ ...formData, salary: { ...formData.salary, grossSalary: e.target.value } })}
                     placeholder="Monthly gross salary"
-                    className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="w-full pl-8 pr-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-default-700 mb-2">
                   Basic Salary
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">₹</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-default-500">₹</span>
                   <input
                     type="number"
                     value={formData.salary.basic}
                     onChange={(e) => setFormData({ ...formData, salary: { ...formData.salary, basic: e.target.value } })}
                     placeholder="Basic salary"
-                    className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="w-full pl-8 pr-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-default-700 mb-2">
                   HRA
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">₹</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-default-500">₹</span>
                   <input
                     type="number"
                     value={formData.salary.hra}
                     onChange={(e) => setFormData({ ...formData, salary: { ...formData.salary, hra: e.target.value } })}
                     placeholder="House rent allowance"
-                    className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="w-full pl-8 pr-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-default-700 mb-2">
                   Conveyance
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">₹</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-default-500">₹</span>
                   <input
                     type="number"
                     value={formData.salary.conveyance}
                     onChange={(e) => setFormData({ ...formData, salary: { ...formData.salary, conveyance: e.target.value } })}
                     placeholder="Conveyance allowance"
-                    className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="w-full pl-8 pr-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-default-700 mb-2">
                   Medical Allowance
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">₹</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-default-500">₹</span>
                   <input
                     type="number"
                     value={formData.salary.medical}
                     onChange={(e) => setFormData({ ...formData, salary: { ...formData.salary, medical: e.target.value } })}
                     placeholder="Medical allowance"
-                    className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="w-full pl-8 pr-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-default-700 mb-2">
                   Special Allowance
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">₹</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-default-500">₹</span>
                   <input
                     type="number"
                     value={formData.salary.special}
                     onChange={(e) => setFormData({ ...formData, salary: { ...formData.salary, special: e.target.value } })}
                     placeholder="Special allowance"
-                    className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="w-full pl-8 pr-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                 </div>
               </div>
             </div>
 
             {/* Statutory Details */}
-            <h3 className="text-lg font-semibold text-gray-700 mb-3">Statutory Compliance</h3>
+            <h3 className="text-lg font-semibold text-default-700 mb-3">Statutory Compliance</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
               {/* PF Enrollment */}
-              <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="bg-default-50 p-4 rounded-lg">
                 <div className="flex items-center justify-between mb-3">
-                  <label className="text-sm font-medium text-gray-700">PF Enrolled</label>
+                  <label className="text-sm font-medium text-default-700">PF Enrolled</label>
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, statutory: { ...formData.statutory, pfEnrolled: !formData.statutory.pfEnrolled } })}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${formData.statutory.pfEnrolled ? 'bg-green-500' : 'bg-red-400'}`}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${formData.statutory.pfEnrolled ? 'bg-green-500' : 'bg-red-400'}`}
                   >
                     <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${formData.statutory.pfEnrolled ? 'translate-x-5' : 'translate-x-0'}`} />
                   </button>
@@ -774,23 +796,23 @@ export default function EditEmployeePage() {
                 {formData.statutory.pfEnrolled && (
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-xs text-gray-600 mb-1">PF Number</label>
+                      <label className="block text-xs text-default-600 mb-1">PF Number</label>
                       <input
                         type="text"
                         value={formData.statutory.pfNumber}
                         onChange={(e) => setFormData({ ...formData, statutory: { ...formData.statutory, pfNumber: e.target.value } })}
                         placeholder="e.g., ABCDE1234567000123"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        className="w-full px-3 py-2 text-sm border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs text-gray-600 mb-1">UAN Number</label>
+                      <label className="block text-xs text-default-600 mb-1">UAN Number</label>
                       <input
                         type="text"
                         value={formData.statutory.uanNumber}
                         onChange={(e) => setFormData({ ...formData, statutory: { ...formData.statutory, uanNumber: e.target.value } })}
                         placeholder="e.g., 100012345678"
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        className="w-full px-3 py-2 text-sm border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                       />
                     </div>
                   </div>
@@ -798,26 +820,26 @@ export default function EditEmployeePage() {
               </div>
 
               {/* ESI Enrollment */}
-              <div className="bg-gray-50 p-4 rounded-lg">
+              <div className="bg-default-50 p-4 rounded-lg">
                 <div className="flex items-center justify-between mb-3">
-                  <label className="text-sm font-medium text-gray-700">ESI Enrolled</label>
+                  <label className="text-sm font-medium text-default-700">ESI Enrolled</label>
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, statutory: { ...formData.statutory, esiEnrolled: !formData.statutory.esiEnrolled } })}
-                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 ${formData.statutory.esiEnrolled ? 'bg-green-500' : 'bg-red-400'}`}
+                    className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${formData.statutory.esiEnrolled ? 'bg-green-500' : 'bg-red-400'}`}
                   >
                     <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${formData.statutory.esiEnrolled ? 'translate-x-5' : 'translate-x-0'}`} />
                   </button>
                 </div>
                 {formData.statutory.esiEnrolled && (
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1">ESI Number</label>
+                    <label className="block text-xs text-default-600 mb-1">ESI Number</label>
                     <input
                       type="text"
                       value={formData.statutory.esiNumber}
                       onChange={(e) => setFormData({ ...formData, statutory: { ...formData.statutory, esiNumber: e.target.value } })}
                       placeholder="e.g., 1234567890"
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      className="w-full px-3 py-2 text-sm border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     />
                   </div>
                 )}
@@ -827,7 +849,7 @@ export default function EditEmployeePage() {
             {/* PAN Number */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-default-700 mb-2">
                   PAN Number
                 </label>
                 <input
@@ -836,15 +858,15 @@ export default function EditEmployeePage() {
                   onChange={(e) => setFormData({ ...formData, statutory: { ...formData.statutory, panNumber: e.target.value.toUpperCase() } })}
                   placeholder="e.g., ABCDE1234F"
                   maxLength={10}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent uppercase"
+                  className="w-full px-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent uppercase"
                 />
               </div>
             </div>
 
             {/* Corporate Health Insurance */}
-            <div className="mt-4 p-4 bg-gray-50 rounded-lg border">
+            <div className="mt-4 p-4 bg-default-50 rounded-lg border border-default-200">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                <label className="text-sm font-medium text-default-700 flex items-center gap-2">
                   🏥 Corporate Health Insurance
                 </label>
                 <div className="flex items-center gap-4">
@@ -859,29 +881,29 @@ export default function EditEmployeePage() {
                       className="pointer-events-none inline-block h-5 w-5 rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out" 
                     />
                   </button>
-                  <span className="text-sm text-gray-600">{formData.healthInsurance.enrolled ? 'Enrolled' : 'Not Enrolled'}</span>
+                  <span className="text-sm text-default-600">{formData.healthInsurance.enrolled ? 'Enrolled' : 'Not Enrolled'}</span>
                 </div>
               </div>
               {formData.healthInsurance.enrolled && (
                 <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1">Policy Provider</label>
+                    <label className="block text-xs text-default-600 mb-1">Policy Provider</label>
                     <input
                       type="text"
                       value={formData.healthInsurance.provider || ''}
                       onChange={(e) => setFormData({ ...formData, healthInsurance: { ...formData.healthInsurance, provider: e.target.value } })}
                       placeholder="e.g., ICICI Lombard, Star Health"
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      className="w-full px-3 py-2 text-sm border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-gray-600 mb-1">Policy Number</label>
+                    <label className="block text-xs text-default-600 mb-1">Policy Number</label>
                     <input
                       type="text"
                       value={formData.healthInsurance.policyNumber}
                       onChange={(e) => setFormData({ ...formData, healthInsurance: { ...formData.healthInsurance, policyNumber: e.target.value } })}
                       placeholder="Enter policy number"
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      className="w-full px-3 py-2 text-sm border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     />
                   </div>
                 </div>
@@ -891,25 +913,25 @@ export default function EditEmployeePage() {
 
           {/* Submit Button */}
           <div className="flex justify-end space-x-4">
-            <button
-              type="button"
-              onClick={() => router.push('/dashboard/employees')}
-              className="btn-secondary"
-              disabled={submitting}
+            <Button
+              variant="bordered"
+              onPress={() => router.push('/dashboard/employees')}
+              isDisabled={submitting}
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
-              className="btn-primary flex items-center space-x-2"
-              disabled={submitting}
+              color="primary"
+              isLoading={submitting}
+              startContent={!submitting && <FaSave />}
             >
-              <FaSave />
-              <span>{submitting ? 'Updating...' : 'Update Employee'}</span>
-            </button>
+              {submitting ? 'Updating...' : 'Update Employee'}
+            </Button>
           </div>
         </form>
-      </div>
+        </CardBody>
+      </Card>
     </div>
   )
 }

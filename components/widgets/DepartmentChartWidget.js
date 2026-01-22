@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { FaBuilding } from 'react-icons/fa'
+import { Card, CardBody } from '@heroui/react'
 
 // Bright, vibrant color palette for departments
 const CHART_COLORS = [
@@ -50,11 +51,13 @@ export default function DepartmentChartWidget({ departmentStats = [] }) {
     return (
       <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
         <div className="mb-4">
-          <h3 className="text-base sm:text-lg font-bold text-gray-800">Department Distribution</h3>
+          <h3 className="text-base sm:text-lg font-bold text-default-900">Department Distribution</h3>
         </div>
-        <div className="text-center py-6 text-gray-500">
-          <FaBuilding className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-          <p className="text-sm">No department data available</p>
+        <div className="flex flex-col items-center justify-center text-center py-6">
+          <div className="w-14 h-14 rounded-full bg-default-100 flex items-center justify-center mb-3">
+            <FaBuilding className="w-7 h-7 text-default-400" />
+          </div>
+          <p className="text-sm text-default-500">No department data available</p>
         </div>
       </div>
     )
@@ -83,7 +86,7 @@ export default function DepartmentChartWidget({ departmentStats = [] }) {
   return (
     <div ref={widgetRef} className="p-4 sm:p-6 flex-1 flex flex-col h-full relative">
       <div className="mb-4">
-        <h3 className="text-base sm:text-lg font-bold text-gray-800">Department Distribution</h3>
+        <h3 className="text-base sm:text-lg font-bold text-default-900">Department Distribution</h3>
       </div>
       
       {/* Centralized Tooltip - always positioned in center of widget */}
@@ -94,10 +97,10 @@ export default function DepartmentChartWidget({ departmentStats = [] }) {
         
         return (
           <div className="absolute left-1/2 top-12 -translate-x-1/2 z-20 pointer-events-none">
-            <div className="bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden min-w-[140px]">
+            <Card className="min-w-[140px] shadow-lg">
               {/* Tooltip Header with department color */}
               <div 
-                className="px-3 py-2 border-b border-gray-200"
+                className="px-3 py-2 border-b border-default-200"
                 style={{ backgroundColor: color }}
               >
                 <p className="text-xs sm:text-sm font-semibold text-white truncate">
@@ -106,31 +109,25 @@ export default function DepartmentChartWidget({ departmentStats = [] }) {
               </div>
               
               {/* Tooltip Content */}
-              <div className="px-3 py-2 bg-white">
+              <CardBody className="px-3 py-2">
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs sm:text-sm text-gray-600">
+                  <span className="text-xs sm:text-sm text-default-600">
                     Employees:
                   </span>
-                  <span className="text-xs sm:text-sm font-semibold text-gray-900">
+                  <span className="text-xs sm:text-sm font-semibold text-default-900">
                     {dept.value}
                   </span>
                 </div>
                 <div className="flex items-center justify-between gap-3 mt-1">
-                  <span className="text-xs sm:text-sm text-gray-600">
+                  <span className="text-xs sm:text-sm text-default-600">
                     Percentage:
                   </span>
-                  <span className="text-xs sm:text-sm font-semibold text-gray-900">
+                  <span className="text-xs sm:text-sm font-semibold text-default-900">
                     {percentage.toFixed(1)}%
                   </span>
                 </div>
-              </div>
-            </div>
-            {/* Arrow */}
-            <div className="flex justify-center -mt-[1px]">
-              <div 
-                className="w-3 h-3 bg-white border-r border-b border-gray-200 transform rotate-45"
-              />
-            </div>
+              </CardBody>
+            </Card>
           </div>
         )
       })()}
@@ -183,8 +180,8 @@ export default function DepartmentChartWidget({ departmentStats = [] }) {
       </div>
       
       {/* Summary line at bottom */}
-      <div className="mt-3 pt-3 border-t border-gray-100">
-        <p className="text-xs text-gray-500 text-center">
+      <div className="mt-3 pt-3 border-t border-default-100">
+        <p className="text-xs text-default-500 text-center">
           {departmentStats.length} departments • {total} total employees
         </p>
       </div>

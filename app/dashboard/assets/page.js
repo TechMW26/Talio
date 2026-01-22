@@ -6,6 +6,7 @@ import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaLaptop, FaCheckCircle, FaClock, FaTools, FaTimes, FaBox } from 'react-icons/fa'
 import { getCurrentUser } from '@/utils/userHelper'
 import Loader from '@/components/ui/Loader'
+import { Select, SelectItem, Input, Textarea, Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@heroui/react'
 
 export default function AssetsPage() {
   const [assets, setAssets] = useState([])
@@ -158,13 +159,13 @@ export default function AssetsPage() {
           </p>
         </div>
         {['admin', 'hr'].includes(userRole) && (
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className="btn-primary flex items-center space-x-2"
+          <Button 
+            onPress={() => setIsModalOpen(true)}
+            color="primary"
+            startContent={<FaPlus />}
           >
-            <FaPlus />
-            <span>Add Asset</span>
-          </button>
+            Add Asset
+          </Button>
         )}
       </div>
 
@@ -377,25 +378,23 @@ export default function AssetsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Category *</label>
-                  <select
-                    name="category"
-                    value={formData.category}
-                    onChange={handleInputChange}
-                    required
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 border p-2"
+                  <Select
+                    label="Category *"
+                    isRequired
+                    selectedKeys={[formData.category]}
+                    onSelectionChange={(keys) => handleInputChange({ target: { name: 'category', value: Array.from(keys)[0] || 'laptop' }})}
                   >
-                    <option value="laptop">Laptop</option>
-                    <option value="desktop">Desktop</option>
-                    <option value="mobile">Mobile</option>
-                    <option value="tablet">Tablet</option>
-                    <option value="monitor">Monitor</option>
-                    <option value="keyboard">Keyboard</option>
-                    <option value="mouse">Mouse</option>
-                    <option value="furniture">Furniture</option>
-                    <option value="vehicle">Vehicle</option>
-                    <option value="other">Other</option>
-                  </select>
+                    <SelectItem key="laptop">Laptop</SelectItem>
+                    <SelectItem key="desktop">Desktop</SelectItem>
+                    <SelectItem key="mobile">Mobile</SelectItem>
+                    <SelectItem key="tablet">Tablet</SelectItem>
+                    <SelectItem key="monitor">Monitor</SelectItem>
+                    <SelectItem key="keyboard">Keyboard</SelectItem>
+                    <SelectItem key="mouse">Mouse</SelectItem>
+                    <SelectItem key="furniture">Furniture</SelectItem>
+                    <SelectItem key="vehicle">Vehicle</SelectItem>
+                    <SelectItem key="other">Other</SelectItem>
+                  </Select>
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700">Description</label>
@@ -419,35 +418,31 @@ export default function AssetsPage() {
                   ></textarea>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Assigned To</label>
-                  <select
-                    name="assignedTo"
-                    value={formData.assignedTo}
-                    onChange={handleInputChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 border p-2"
+                  <Select
+                    label="Assigned To"
+                    selectedKeys={formData.assignedTo ? [formData.assignedTo] : []}
+                    onSelectionChange={(keys) => handleInputChange({ target: { name: 'assignedTo', value: Array.from(keys)[0] || '' }})}
+                    placeholder="Unassigned"
                   >
-                    <option value="">Unassigned</option>
                     {employees.map(emp => (
-                      <option key={emp._id} value={emp._id}>
+                      <SelectItem key={emp._id}>
                         {emp.firstName} {emp.lastName} ({emp.employeeCode})
-                      </option>
+                      </SelectItem>
                     ))}
-                  </select>
+                  </Select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Status</label>
-                  <select
-                    name="status"
-                    value={formData.status}
-                    onChange={handleInputChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 border p-2"
+                  <Select
+                    label="Status"
+                    selectedKeys={[formData.status]}
+                    onSelectionChange={(keys) => handleInputChange({ target: { name: 'status', value: Array.from(keys)[0] || 'available' }})}
                   >
-                    <option value="available">Available</option>
-                    <option value="assigned">Assigned</option>
-                    <option value="under-maintenance">Under Maintenance</option>
-                    <option value="damaged">Damaged</option>
-                    <option value="disposed">Disposed</option>
-                  </select>
+                    <SelectItem key="available">Available</SelectItem>
+                    <SelectItem key="assigned">Assigned</SelectItem>
+                    <SelectItem key="under-maintenance">Under Maintenance</SelectItem>
+                    <SelectItem key="damaged">Damaged</SelectItem>
+                    <SelectItem key="disposed">Disposed</SelectItem>
+                  </Select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Purchase Date</label>

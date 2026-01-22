@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { FaArrowLeft, FaSave, FaTimes, FaPlus } from 'react-icons/fa'
+import { Card, CardBody, CardHeader, Button, Input, Select, SelectItem, Textarea, Checkbox } from '@heroui/react'
 
 export default function CreateJobPage() {
   const router = useRouter()
@@ -192,23 +193,20 @@ export default function CreateJobPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Department *
-              </label>
-              <select
-                name="department"
-                value={formData.department}
-                onChange={handleInputChange}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              <Select
+                label="Department"
+                isRequired
+                selectedKeys={formData.department ? [formData.department] : []}
+                onSelectionChange={(keys) => {
+                  const value = Array.from(keys)[0] || ''
+                  setFormData(prev => ({ ...prev, department: value }))
+                }}
+                placeholder="Select Department"
               >
-                <option value="">Select Department</option>
                 {departments.map((dept) => (
-                  <option key={dept._id} value={dept._id}>
-                    {dept.name}
-                  </option>
+                  <SelectItem key={dept._id}>{dept.name}</SelectItem>
                 ))}
-              </select>
+              </Select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -224,54 +222,49 @@ export default function CreateJobPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Employment Type
-              </label>
-              <select
-                name="employmentType"
-                value={formData.employmentType}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              <Select
+                label="Employment Type"
+                selectedKeys={[formData.employmentType]}
+                onSelectionChange={(keys) => {
+                  const value = Array.from(keys)[0] || 'full-time'
+                  setFormData(prev => ({ ...prev, employmentType: value }))
+                }}
               >
-                <option value="full-time">Full-time</option>
-                <option value="part-time">Part-time</option>
-                <option value="contract">Contract</option>
-                <option value="internship">Internship</option>
-              </select>
+                <SelectItem key="full-time">Full-time</SelectItem>
+                <SelectItem key="part-time">Part-time</SelectItem>
+                <SelectItem key="contract">Contract</SelectItem>
+                <SelectItem key="internship">Internship</SelectItem>
+              </Select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Experience Level
-              </label>
-              <select
-                name="experienceLevel"
-                value={formData.experienceLevel}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              <Select
+                label="Experience Level"
+                selectedKeys={[formData.experienceLevel]}
+                onSelectionChange={(keys) => {
+                  const value = Array.from(keys)[0] || 'mid-level'
+                  setFormData(prev => ({ ...prev, experienceLevel: value }))
+                }}
               >
-                <option value="entry-level">Entry Level</option>
-                <option value="mid-level">Mid Level</option>
-                <option value="senior-level">Senior Level</option>
-                <option value="executive">Executive</option>
-              </select>
+                <SelectItem key="entry-level">Entry Level</SelectItem>
+                <SelectItem key="mid-level">Mid Level</SelectItem>
+                <SelectItem key="senior-level">Senior Level</SelectItem>
+                <SelectItem key="executive">Executive</SelectItem>
+              </Select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Hiring Manager
-              </label>
-              <select
-                name="hiringManager"
-                value={formData.hiringManager}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              <Select
+                label="Hiring Manager"
+                selectedKeys={formData.hiringManager ? [formData.hiringManager] : []}
+                onSelectionChange={(keys) => {
+                  const value = Array.from(keys)[0] || ''
+                  setFormData(prev => ({ ...prev, hiringManager: value }))
+                }}
+                placeholder="Select Hiring Manager"
               >
-                <option value="">Select Hiring Manager</option>
                 {employees.map((emp) => (
-                  <option key={emp._id} value={emp._id}>
-                    {emp.firstName} {emp.lastName}
-                  </option>
+                  <SelectItem key={emp._id}>{emp.firstName} {emp.lastName}</SelectItem>
                 ))}
-              </select>
+              </Select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -286,35 +279,30 @@ export default function CreateJobPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Status
-              </label>
-              <select
-                name="status"
-                value={formData.status}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              <Select
+                label="Status"
+                selectedKeys={[formData.status]}
+                onSelectionChange={(keys) => {
+                  const value = Array.from(keys)[0] || 'active'
+                  setFormData(prev => ({ ...prev, status: value }))
+                }}
               >
-                <option value="active">Active</option>
-                <option value="draft">Draft</option>
-                <option value="closed">Closed</option>
-                <option value="on-hold">On Hold</option>
-              </select>
+                <SelectItem key="active">Active</SelectItem>
+                <SelectItem key="draft">Draft</SelectItem>
+                <SelectItem key="closed">Closed</SelectItem>
+                <SelectItem key="on-hold">On Hold</SelectItem>
+              </Select>
             </div>
           </div>
           
           {/* Remote Work Option */}
           <div className="mt-4">
-            <label className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                name="remote"
-                checked={formData.remote}
-                onChange={handleInputChange}
-                className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-              />
-              <span className="text-sm font-medium text-gray-700">Remote work available</span>
-            </label>
+            <Checkbox
+              isSelected={formData.remote}
+              onValueChange={(checked) => setFormData(prev => ({ ...prev, remote: checked }))}
+            >
+              Remote work available
+            </Checkbox>
           </div>
         </div>
 
@@ -349,20 +337,19 @@ export default function CreateJobPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Currency
-              </label>
-              <select
-                name="salaryRange.currency"
-                value={formData.salaryRange.currency}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              <Select
+                label="Currency"
+                selectedKeys={[formData.salaryRange.currency]}
+                onSelectionChange={(keys) => {
+                  const value = Array.from(keys)[0] || 'USD'
+                  setFormData(prev => ({ ...prev, salaryRange: { ...prev.salaryRange, currency: value } }))
+                }}
               >
-                <option value="USD">USD</option>
-                <option value="EUR">EUR</option>
-                <option value="GBP">GBP</option>
-                <option value="INR">INR</option>
-              </select>
+                <SelectItem key="USD">USD</SelectItem>
+                <SelectItem key="EUR">EUR</SelectItem>
+                <SelectItem key="GBP">GBP</SelectItem>
+                <SelectItem key="INR">INR</SelectItem>
+              </Select>
             </div>
           </div>
         </div>
@@ -383,22 +370,21 @@ export default function CreateJobPage() {
 
         {/* Action Buttons */}
         <div className="flex justify-end space-x-4">
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-2"
+          <Button
+            variant="bordered"
+            onPress={() => router.back()}
+            startContent={<FaTimes className="w-4 h-4" />}
           >
-            <FaTimes className="w-4 h-4" />
-            <span>Cancel</span>
-          </button>
-          <button
+            Cancel
+          </Button>
+          <Button
             type="submit"
-            disabled={loading}
-            className="px-6 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors flex items-center space-x-2 disabled:opacity-50"
+            color="primary"
+            isLoading={loading}
+            startContent={!loading && <FaSave className="w-4 h-4" />}
           >
-            <FaSave className="w-4 h-4" />
-            <span>{loading ? 'Creating...' : 'Create Job Posting'}</span>
-          </button>
+            {loading ? 'Creating...' : 'Create Job Posting'}
+          </Button>
         </div>
       </form>
     </div>

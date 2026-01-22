@@ -1,6 +1,7 @@
 'use client'
 
 import { FaFileAlt, FaDownload, FaChartBar } from 'react-icons/fa'
+import { Button, Select, SelectItem, Card, CardBody, Input } from '@heroui/react'
 import MobilePageWrapper, { MobileGrid } from '@/components/mobile/MobileComponents'
 
 export default function ReportsPage() {
@@ -75,60 +76,54 @@ export default function ReportsPage() {
                 {report.name}
               </h3>
               <p className="text-sm text-gray-600 mb-4">{report.description}</p>
-              <button className="w-full btn-mobile bg-blue-600 text-white hover:bg-blue-700 flex items-center justify-center gap-2">
-                <FaDownload className="w-4 h-4" />
-                <span>Generate Report</span>
-              </button>
+              <Button color="primary" className="w-full" startContent={<FaDownload className="w-4 h-4" />}>
+                Generate Report
+              </Button>
             </div>
           )
         })}
       </MobileGrid>
 
       {/* Custom Report Section */}
-      <div className="card-mobile">
-        <h2 className="text-responsive-xl font-bold text-gray-800 mb-4">Custom Report</h2>
-        <p className="text-responsive-sm text-gray-600 mb-6">
-          Create a custom report with specific parameters
-        </p>
-        <MobileGrid cols={3} className="mb-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Report Type
-            </label>
-            <select className="input-mobile w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-              <option>Select Type</option>
-              <option>Attendance</option>
-              <option>Leave</option>
-              <option>Payroll</option>
-              <option>Performance</option>
-            </select>
+      <Card className="mb-8">
+        <CardBody className="p-6">
+          <h2 className="text-xl font-bold text-default-800 mb-4">Custom Report</h2>
+          <p className="text-sm text-default-500 mb-6">
+            Create a custom report with specific parameters
+          </p>
+          <MobileGrid cols={3} className="mb-6">
+            <div>
+              <Select
+                label="Report Type"
+                placeholder="Select Type"
+                aria-label="Report Type"
+              >
+                <SelectItem key="attendance">Attendance</SelectItem>
+                <SelectItem key="leave">Leave</SelectItem>
+                <SelectItem key="payroll">Payroll</SelectItem>
+                <SelectItem key="performance">Performance</SelectItem>
+              </Select>
+            </div>
+            <div>
+              <Input
+                type="date"
+                label="Start Date"
+              />
+            </div>
+            <div>
+              <Input
+                type="date"
+                label="End Date"
+              />
+            </div>
+          </MobileGrid>
+          <div className="flex justify-end">
+            <Button color="primary" startContent={<FaDownload className="w-4 h-4" />}>
+              Generate Custom Report
+            </Button>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Start Date
-            </label>
-            <input
-              type="date"
-              className="input-mobile w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              End Date
-            </label>
-            <input
-              type="date"
-              className="input-mobile w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-        </MobileGrid>
-        <div className="flex justify-end">
-          <button className="btn-mobile bg-blue-600 text-white hover:bg-blue-700 flex items-center gap-2">
-            <FaDownload className="w-4 h-4" />
-            <span>Generate Custom Report</span>
-          </button>
-        </div>
-      </div>
+        </CardBody>
+      </Card>
     </MobilePageWrapper>
   )
 }

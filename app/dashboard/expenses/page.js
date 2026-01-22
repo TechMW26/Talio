@@ -6,6 +6,7 @@ import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaMoneyBillWave, FaCheckCircle, FaClock, FaTimesCircle } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
 import Loader from '@/components/ui/Loader'
+import { Select, SelectItem, Input, Textarea, Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@heroui/react'
 
 export default function ExpensesPage() {
   const [expenses, setExpenses] = useState([])
@@ -148,13 +149,13 @@ export default function ExpensesPage() {
           <h1 className="text-3xl font-bold text-gray-800">Expenses</h1>
           <p className="text-gray-600 mt-1">Submit and track your expense claims</p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="btn-primary flex items-center space-x-2"
+        <Button
+          onPress={() => setShowModal(true)}
+          color="primary"
+          startContent={<FaPlus />}
         >
-          <FaPlus />
-          <span>Submit Expense</span>
-        </button>
+          Submit Expense
+        </Button>
       </div>
 
       {/* Stats Cards */}
@@ -289,26 +290,22 @@ export default function ExpensesPage() {
             <form onSubmit={handleSubmit}>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Category
-                  </label>
-                  <select
-                    name="category"
-                    value={formData.category}
-                    onChange={handleInputChange}
-                    required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  <Select
+                    label="Category"
+                    isRequired
+                    selectedKeys={formData.category ? [formData.category] : []}
+                    onSelectionChange={(keys) => handleInputChange({ target: { name: 'category', value: Array.from(keys)[0] || '' }})}
+                    placeholder="Select Category"
                   >
-                    <option value="">Select Category</option>
-                    <option value="travel">Travel</option>
-                    <option value="food">Food</option>
-                    <option value="accommodation">Accommodation</option>
-                    <option value="fuel">Fuel</option>
-                    <option value="office-supplies">Office Supplies</option>
-                    <option value="client-entertainment">Client Entertainment</option>
-                    <option value="training">Training</option>
-                    <option value="other">Other</option>
-                  </select>
+                    <SelectItem key="travel">Travel</SelectItem>
+                    <SelectItem key="food">Food</SelectItem>
+                    <SelectItem key="accommodation">Accommodation</SelectItem>
+                    <SelectItem key="fuel">Fuel</SelectItem>
+                    <SelectItem key="office-supplies">Office Supplies</SelectItem>
+                    <SelectItem key="client-entertainment">Client Entertainment</SelectItem>
+                    <SelectItem key="training">Training</SelectItem>
+                    <SelectItem key="other">Other</SelectItem>
+                  </Select>
                 </div>
 
                 <div>
@@ -358,16 +355,16 @@ export default function ExpensesPage() {
               </div>
 
               <div className="flex justify-end space-x-4 mt-6">
-                <button
+                <Button
                   type="button"
-                  onClick={() => setShowModal(false)}
-                  className="btn-secondary"
+                  onPress={() => setShowModal(false)}
+                  variant="flat"
                 >
                   Cancel
-                </button>
-                <button type="submit" className="btn-primary">
+                </Button>
+                <Button type="submit" color="primary">
                   Submit
-                </button>
+                </Button>
               </div>
             </form>
           </div>

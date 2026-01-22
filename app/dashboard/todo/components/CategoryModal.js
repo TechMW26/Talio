@@ -1,13 +1,19 @@
 'use client'
 
-import { useState, useEffect, Fragment } from 'react'
-import { Dialog, Transition } from '@headlessui/react'
+import { useState, useEffect } from 'react'
 import {
-  HiOutlineXMark,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  Button,
+  Input
+} from '@heroui/react'
+import {
   HiOutlineTrash,
   HiOutlineSwatch
 } from 'react-icons/hi2'
-import Loader from '@/components/ui/Loader'
 import toast from '@/utils/toast'
 
 const PRESET_COLORS = [
@@ -126,185 +132,121 @@ export default function CategoryModal({ isOpen, onClose, onSuccess, category }) 
   }
 
   return (
-    <Transition appear show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={onClose}>
-        <Transition.Child
-          as={Fragment}
-          enter="ease-out duration-300"
-          enterFrom="opacity-0"
-          enterTo="opacity-100"
-          leave="ease-in duration-200"
-          leaveFrom="opacity-100"
-          leaveTo="opacity-0"
-        >
-            {/* remove  */}
-                    <div className="fixed inset-0 z-0 flex items-center justify-center p-4 overflow-y-auto bg-white/80" />
-        </Transition.Child>
-
-        <div className="fixed inset-0 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-full p-4">
-            <Transition.Child
-              as={Fragment}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0 scale-95"
-              enterTo="opacity-100 scale-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100 scale-100"
-              leaveTo="opacity-0 scale-95"
-            >
-              <Dialog.Panel className="w-full max-w-md overflow-hidden transition-all transform bg-white shadow-xl rounded-2xl">
-                <div className="flex items-center justify-between p-4 border-b border-gray-200">
-                  <Dialog.Title className="text-lg font-semibold text-gray-900">
-                    {category ? 'Edit Category' : 'Create Category'}
-                  </Dialog.Title>
-                  <button
-                    onClick={onClose}
-                    className="p-2 text-gray-400 rounded-lg hover:text-gray-600 hover:bg-gray-100"
+    <Modal isOpen={isOpen} onOpenChange={(open) => !open && onClose()} size="md">
+      <ModalContent>
+        {(onModalClose) => (
+          <>
+            <ModalHeader className="flex flex-col gap-1">
+              {category ? 'Edit Category' : 'Create Category'}
+            </ModalHeader>
+            <ModalBody>
+              <form id="category-form" onSubmit={handleSubmit} className="space-y-4">
+                {/* Preview */}
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-default-100">
+                  <div 
+                    className="flex items-center justify-center w-8 h-8 font-bold text-white rounded-lg"
+                    style={{ backgroundColor: formData.color }}
                   >
-                    <HiOutlineXMark className="w-5 h-5" />
-                  </button>
+                    {formData.name ? formData.name[0].toUpperCase() : '?'}
+                  </div>
+                  <div>
+                    <p className="font-medium text-default-800">
+                      {formData.name || 'Category Name'}
+                    </p>
+                    <p className="text-sm text-default-500">
+                      {formData.description || 'No description'}
+                    </p>
+                  </div>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-4 space-y-4">
-                  {/* Preview */}
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50">
-                    <div 
-                      className="flex items-center justify-center w-8 h-8 font-bold text-white rounded-lg"
-                      style={{ backgroundColor: formData.color }}
-                    >
-                      {formData.name ? formData.name[0].toUpperCase() : '?'}
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-800">
-                        {formData.name || 'Category Name'}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {formData.description || 'No description'}
-                      </p>
-                    </div>
-                  </div>
+                {/* Name */}
+                <Input
+                  label="Name"
+                  placeholder="e.g., Work, Personal, Shopping"
+                  value={formData.name}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  autoFocus
+                  isRequired
+                />
 
-                  {/* Name */}
-                  <div>
-                    <label className="block mb-1 text-sm font-medium text-gray-700">
-                      Name
-                    </label>
+                {/* Color */}
+                <div>
+                  <p className="text-sm font-medium text-default-700 mb-2">
+                    <HiOutlineSwatch className="inline w-4 h-4 mr-1" />
+                    Color
+                  </p>
+                  <div className="grid grid-cols-6 gap-2">
+                    {PRESET_COLORS.map(color => (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => setFormData(prev => ({ ...prev, color }))}
+                        className={`w-10 h-10 rounded-lg transition-transform hover:scale-110 ${
+                          formData.color === color ? 'ring-2 ring-offset-2 ring-primary scale-110' : ''
+                        }`}
+                        style={{ backgroundColor: color }}
+                      />
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2 mt-2">
+                    <span className="text-sm text-default-600">Custom:</span>
                     <input
-                      type="text"
-                      placeholder="e.g., Work, Personal, Shopping"
-                      value={formData.name}
-                      onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                      autoFocus
+                      type="color"
+                      value={formData.color}
+                      onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))}
+                      className="w-8 h-8 rounded cursor-pointer"
+                    />
+                    <Input
+                      size="sm"
+                      value={formData.color}
+                      onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))}
+                      placeholder="#6366f1"
+                      classNames={{ base: "flex-1" }}
                     />
                   </div>
+                </div>
 
-                  {/* Color */}
-                  <div>
-                    <label className="block mb-2 text-sm font-medium text-gray-700">
-                      <HiOutlineSwatch className="inline w-4 h-4 mr-1" />
-                      Color
-                    </label>
-                    <div className="grid grid-cols-6 gap-2">
-                      {PRESET_COLORS.map(color => (
-                        <button
-                          key={color}
-                          type="button"
-                          onClick={() => setFormData(prev => ({ ...prev, color }))}
-                          className={`w-10 h-10 rounded-lg transition-transform hover:scale-110 ${
-                            formData.color === color ? 'ring-2 ring-offset-2 ring-gray-400 scale-110' : ''
-                          }`}
-                          style={{ backgroundColor: color }}
-                        />
-                      ))}
-                    </div>
-                    <div className="flex items-center gap-2 mt-2">
-                      <label className="text-sm text-gray-600">Custom:</label>
-                      <input
-                        type="color"
-                        value={formData.color}
-                        onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))}
-                        className="w-8 h-8 rounded cursor-pointer"
-                      />
-                      <input
-                        type="text"
-                        value={formData.color}
-                        onChange={(e) => setFormData(prev => ({ ...prev, color: e.target.value }))}
-                        className="flex-1 px-2 py-1 font-mono text-sm border border-gray-300 rounded"
-                        placeholder="#6366f1"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Description */}
-                  <div>
-                    <label className="block mb-1 text-sm font-medium text-gray-700">
-                      Description (optional)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Brief description..."
-                      value={formData.description}
-                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                    {category ? (
-                      <button
-                        type="button"
-                        onClick={handleDelete}
-                        disabled={deleting}
-                        className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 rounded-lg hover:bg-red-50 disabled:opacity-50"
-                      >
-                        {deleting ? (
-                          <>
-                            <Loader size="xs" />
-                            Deleting...
-                          </>
-                        ) : (
-                          <>
-                            <HiOutlineTrash className="w-4 h-4" />
-                            Delete
-                          </>
-                        )}
-                      </button>
-                    ) : (
-                      <div></div>
-                    )}
-
-                    <div className="flex gap-3">
-                      <button
-                        type="button"
-                        onClick={onClose}
-                        className="px-4 py-2 text-gray-700 transition-colors bg-gray-100 rounded-lg hover:bg-gray-200"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={loading || !formData.name.trim()}
-                        className="flex items-center gap-2 px-4 py-2 text-white transition-colors bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {loading ? (
-                          <>
-                            <Loader size="xs" />
-                            Saving...
-                          </>
-                        ) : (
-                          category ? 'Save Changes' : 'Create'
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </form>
-              </Dialog.Panel>
-            </Transition.Child>
-          </div>
-        </div>
-      </Dialog>
-    </Transition>
+                {/* Description */}
+                <Input
+                  label="Description (optional)"
+                  placeholder="Brief description..."
+                  value={formData.description}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                />
+              </form>
+            </ModalBody>
+            <ModalFooter className="flex justify-between">
+              <div>
+                {category && (
+                  <Button
+                    color="danger"
+                    variant="light"
+                    onPress={handleDelete}
+                    isLoading={deleting}
+                    startContent={!deleting && <HiOutlineTrash className="w-4 h-4" />}
+                  >
+                    Delete
+                  </Button>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button variant="light" onPress={onModalClose}>
+                  Cancel
+                </Button>
+                <Button
+                  color="primary"
+                  type="submit"
+                  form="category-form"
+                  isLoading={loading}
+                  isDisabled={!formData.name.trim()}
+                >
+                  {category ? 'Save Changes' : 'Create'}
+                </Button>
+              </div>
+            </ModalFooter>
+          </>
+        )}
+      </ModalContent>
+    </Modal>
   )
 }

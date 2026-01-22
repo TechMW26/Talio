@@ -5,7 +5,7 @@ import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaFile, FaDownload, FaEye, FaTrash, FaTimes, FaUpload } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
-import ModalPortal from '@/components/ui/ModalPortal'
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Select, SelectItem } from '@heroui/react'
 import Loader from '@/components/ui/Loader'
 
 export default function DocumentsPage() {
@@ -246,13 +246,13 @@ export default function DocumentsPage() {
           <h1 className="text-3xl font-bold text-gray-800">Documents</h1>
           <p className="text-gray-600 mt-1">Manage your documents and files</p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="btn-primary flex items-center space-x-2"
+        <Button
+          onPress={() => setShowModal(true)}
+          color="primary"
+          startContent={<FaPlus />}
         >
-          <FaPlus />
-          <span>Upload Document</span>
-        </button>
+          Upload Document
+        </Button>
       </div>
 
       {/* Document Categories */}
@@ -371,122 +371,88 @@ export default function DocumentsPage() {
       </div>
 
       {/* Upload Modal */}
-      <ModalPortal isOpen={showModal}>
-        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && !uploading && setShowModal(false)}>
-          <div className="modal-backdrop" />
-          <div className="modal-container modal-md">
-            <div className="modal-header">
-              <h2 className="modal-title">Upload Document</h2>
-              <button
-                onClick={() => {
-                  if (!uploading) {
-                    setShowModal(false)
-                    resetUploadForm()
-                  }
-                }}
-                className="modal-close-btn"
-                disabled={uploading}
-              >
-                <FaTimes className="w-5 h-5" />
-              </button>
-            </div>
-            <form onSubmit={handleUpload}>
-              <div className="modal-body space-y-4">
-                <div>
-                  <label className="modal-label">
-                    Document Name *
-                  </label>
-                  <input
+      <Modal isOpen={showModal} onOpenChange={(open) => { if (!open && !uploading) { setShowModal(false); resetUploadForm(); } }} size="lg">
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>Upload Document</ModalHeader>
+              <form onSubmit={handleUpload}>
+                <ModalBody className="space-y-4">
+                  <Input
                     type="text"
-                    className="modal-input"
+                    label="Document Name"
+                    isRequired
                     placeholder="Enter document name"
                     value={uploadForm.fileName}
                     onChange={(e) => setUploadForm(prev => ({ ...prev, fileName: e.target.value }))}
-                    disabled={uploading}
-                    required
+                    isDisabled={uploading}
                   />
-                </div>
 
-                <div>
-                  <label className="modal-label">
-                    Category *
-                  </label>
-                  <select
-                    className="modal-select"
-                    value={uploadForm.category}
-                    onChange={(e) => setUploadForm(prev => ({ ...prev, category: e.target.value }))}
-                    disabled={uploading}
-                    required
+                  <Select
+                    label="Category"
+                    isRequired
+                    selectedKeys={uploadForm.category ? [uploadForm.category] : []}
+                    onSelectionChange={(keys) => setUploadForm(prev => ({ ...prev, category: Array.from(keys)[0] || '' }))}
+                    isDisabled={uploading}
+                    placeholder="Select Category"
                   >
-                    <option value="">Select Category</option>
-                    <option value="personal">Personal</option>
-                    <option value="employment">Employment</option>
-                    <option value="tax">Tax</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
+                    <SelectItem key="personal">Personal</SelectItem>
+                    <SelectItem key="employment">Employment</SelectItem>
+                    <SelectItem key="tax">Tax</SelectItem>
+                    <SelectItem key="other">Other</SelectItem>
+                  </Select>
 
-                <div>
-                  <label className="modal-label">
-                    File *
-                  </label>
-                  <div className="relative">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      className="modal-input file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
-                      onChange={handleFileSelect}
-                      disabled={uploading}
-                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.xls,.xlsx,.txt"
-                    />
-                    {selectedFile && (
-                      <p className="text-sm text-gray-500 mt-1">
-                        Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
-                      </p>
-                    )}
+                  <div>
+                    <label className="text-sm font-medium text-default-700 mb-2 block">File *</label>
+                    <div className="relative">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        className="w-full p-2 border border-default-200 rounded-lg file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
+                        onChange={handleFileSelect}
+                        disabled={uploading}
+                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.xls,.xlsx,.txt"
+                      />
+                      {selectedFile && (
+                        <p className="text-sm text-default-500 mt-1">
+                          Selected: {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
+                        </p>
+                      )}
+                    </div>
+                    <p className="text-xs text-default-400 mt-1">
+                      Supported: PDF, DOC, DOCX, Images, Excel, TXT (Max 10MB)
+                    </p>
                   </div>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Supported: PDF, DOC, DOCX, Images, Excel, TXT (Max 10MB)
-                  </p>
-                </div>
-              </div>
+                </ModalBody>
 
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!uploading) {
-                      setShowModal(false)
-                      resetUploadForm()
-                    }
-                  }}
-                  className="modal-btn modal-btn-secondary"
-                  disabled={uploading}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="modal-btn modal-btn-primary flex items-center gap-2"
-                  disabled={uploading || !selectedFile}
-                >
-                  {uploading ? (
-                    <>
-                      <Loader size="xs" />
-                      Uploading...
-                    </>
-                  ) : (
-                    <>
-                      <FaUpload />
-                      Upload
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </ModalPortal>
+                <ModalFooter>
+                  <Button
+                    variant="light"
+                    onPress={() => {
+                      if (!uploading) {
+                        onClose()
+                        resetUploadForm()
+                      }
+                    }}
+                    isDisabled={uploading}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    color="primary"
+                    isLoading={uploading}
+                    isDisabled={uploading || !selectedFile}
+                    startContent={!uploading && <FaUpload />}
+                  >
+                    {uploading ? 'Uploading...' : 'Upload'}
+                  </Button>
+                </ModalFooter>
+              </form>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
     </div>
   )
 }

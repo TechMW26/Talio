@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { FaBullseye, FaCheckCircle, FaHourglassHalf, FaExclamationTriangle } from 'react-icons/fa'
+import { Card, CardBody, Button, Chip, Skeleton, ScrollShadow } from '@heroui/react'
 
 export default function GoalsWidget({ userId }) {
     const [goals, setGoals] = useState([])
@@ -41,14 +42,19 @@ export default function GoalsWidget({ userId }) {
         }
     }
 
-        if (loading) {
-            return (
-                <div className="p-4 sm:p-6 animate-pulse flex-1 flex flex-col h-full">
-                <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
+    if (loading) {
+        return (
+            <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+                <Skeleton className="h-6 w-1/3 rounded-lg mb-4" />
+                <div className="grid grid-cols-4 gap-2 mb-4">
+                    {[1, 2, 3, 4].map(i => (
+                        <Skeleton key={i} className="h-16 rounded-xl" />
+                    ))}
+                </div>
                 <div className="space-y-3">
-                    <div className="h-16 bg-gray-200 rounded"></div>
-                    <div className="h-16 bg-gray-200 rounded"></div>
-                    <div className="h-16 bg-gray-200 rounded"></div>
+                    {[1, 2, 3].map(i => (
+                        <Skeleton key={i} className="h-16 rounded-xl" />
+                    ))}
                 </div>
             </div>
         )
@@ -57,73 +63,94 @@ export default function GoalsWidget({ userId }) {
     return (
         <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
             <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base sm:text-lg font-bold text-gray-800">My Goals</h3>
-                <a
+                <h3 className="text-base sm:text-lg font-bold text-default-900">My Goals</h3>
+                <Button
+                    variant="light"
+                    color="primary"
+                    size="sm"
+                    as="a"
                     href="/dashboard/performance/goals"
-                    className="text-primary-600 hover:text-primary-800 text-sm font-medium"
                 >
                     View All
-                </a>
+                </Button>
             </div>
 
             {/* Stats Grid */}
             <div className="grid grid-cols-4 gap-2 mb-4">
-                <div className="bg-gray-50 rounded-lg p-2 text-center">
-                    <p className="text-lg font-bold text-primary-600">{stats.total}</p>
-                    <p className="text-xs text-gray-600">Total</p>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-2 text-center">
-                    <p className="text-lg font-bold text-green-600">{stats.completed}</p>
-                    <p className="text-xs text-gray-600">Done</p>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-2 text-center">
-                    <p className="text-lg font-bold text-blue-600">{stats.inProgress}</p>
-                    <p className="text-xs text-gray-600">Active</p>
-                </div>
-                <div className="bg-gray-50 rounded-lg p-2 text-center">
-                    <p className="text-lg font-bold text-red-600">{stats.overdue}</p>
-                    <p className="text-xs text-gray-600">Overdue</p>
-                </div>
+                <Card className="bg-primary-50 border border-primary-100">
+                    <CardBody className="p-2 text-center">
+                        <p className="text-lg font-bold text-primary-600">{stats.total}</p>
+                        <p className="text-xs text-default-600">Total</p>
+                    </CardBody>
+                </Card>
+                <Card className="bg-success-50 border border-success-100">
+                    <CardBody className="p-2 text-center">
+                        <p className="text-lg font-bold text-success-600">{stats.completed}</p>
+                        <p className="text-xs text-default-600">Done</p>
+                    </CardBody>
+                </Card>
+                <Card className="bg-primary-50 border border-primary-100">
+                    <CardBody className="p-2 text-center">
+                        <p className="text-lg font-bold text-primary-600">{stats.inProgress}</p>
+                        <p className="text-xs text-default-600">Active</p>
+                    </CardBody>
+                </Card>
+                <Card className="bg-danger-50 border border-danger-100">
+                    <CardBody className="p-2 text-center">
+                        <p className="text-lg font-bold text-danger-600">{stats.overdue}</p>
+                        <p className="text-xs text-default-600">Overdue</p>
+                    </CardBody>
+                </Card>
             </div>
 
             {/* Goals List */}
             {goals.length === 0 ? (
-                <div className="text-center py-6 text-gray-500">
-                    <FaBullseye className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                    <p className="text-sm">No goals set yet</p>
-                    <p className="text-xs mt-1">Visit Performance section to create goals</p>
+                <div className="flex flex-col items-center justify-center text-center py-6">
+                    <div className="w-14 h-14 rounded-full bg-primary-100 flex items-center justify-center mb-3">
+                        <FaBullseye className="w-7 h-7 text-primary-400" />
+                    </div>
+                    <p className="text-sm text-default-500">No goals set yet</p>
+                    <p className="text-xs text-default-400 mt-1">Visit Performance section to create goals</p>
                 </div>
             ) : (
-                <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                <ScrollShadow className="space-y-2 max-h-[200px]">
                     {goals.map((goal) => (
-                        <div key={goal._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                            <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-gray-800 truncate">{goal.title}</p>
-                                <div className="flex items-center gap-2 mt-1">
-                                    <span className={`text-xs px-2 py-0.5 rounded-full ${goal.status === 'completed' ? 'bg-green-100 text-green-700' :
-                                            goal.status === 'in_progress' ? 'bg-blue-100 text-blue-700' :
-                                                goal.isOverdue ? 'bg-red-100 text-red-700' :
-                                                    'bg-gray-100 text-gray-700'
-                                        }`}>
-                                        {goal.status === 'completed' ? 'Completed' :
-                                            goal.status === 'in_progress' ? 'In Progress' :
-                                                goal.isOverdue ? 'Overdue' : 'Pending'}
-                                    </span>
-                                    <span className="text-xs text-gray-500">{goal.progress || 0}%</span>
+                        <Card key={goal._id} className="bg-default-50 border border-default-100">
+                            <CardBody className="p-3">
+                                <div className="flex items-center justify-between gap-2">
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-default-900 truncate">{goal.title}</p>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <Chip 
+                                                size="sm" 
+                                                variant="flat"
+                                                color={
+                                                    goal.status === 'completed' ? 'success' :
+                                                    goal.status === 'in_progress' ? 'primary' :
+                                                    goal.isOverdue ? 'danger' : 'default'
+                                                }
+                                            >
+                                                {goal.status === 'completed' ? 'Completed' :
+                                                    goal.status === 'in_progress' ? 'In Progress' :
+                                                        goal.isOverdue ? 'Overdue' : 'Pending'}
+                                            </Chip>
+                                            <span className="text-xs text-default-500">{goal.progress || 0}%</span>
+                                        </div>
+                                    </div>
+                                    <div className="ml-3">
+                                        {goal.status === 'completed' ? (
+                                            <FaCheckCircle className="w-5 h-5 text-success-600" />
+                                        ) : goal.isOverdue ? (
+                                            <FaExclamationTriangle className="w-5 h-5 text-danger-600" />
+                                        ) : (
+                                            <FaHourglassHalf className="w-5 h-5 text-primary-600" />
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                            <div className="ml-3">
-                                {goal.status === 'completed' ? (
-                                    <FaCheckCircle className="w-5 h-5 text-green-600" />
-                                ) : goal.isOverdue ? (
-                                    <FaExclamationTriangle className="w-5 h-5 text-red-600" />
-                                ) : (
-                                    <FaHourglassHalf className="w-5 h-5 text-primary-600" />
-                                )}
-                            </div>
-                        </div>
+                            </CardBody>
+                        </Card>
                     ))}
-                </div>
+                </ScrollShadow>
             )}
         </div>
     )

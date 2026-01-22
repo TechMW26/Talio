@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { Select, SelectItem } from '@heroui/react'
 import toast from '@/utils/toast'
 
 export default function CompaniesPage() {
@@ -131,29 +132,31 @@ export default function CompaniesPage() {
           </form>
 
           {/* Status Filter */}
-          <select
-            value={statusFilter}
+          <Select
+            selectedKeys={statusFilter ? [statusFilter] : []}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            aria-label="Status Filter"
+            placeholder="All Status"
+            classNames={{ trigger: "bg-gray-50 min-w-[140px]" }}
           >
-            <option value="">All Status</option>
-            <option value="active">Active</option>
-            <option value="paused">Paused</option>
-            <option value="suspended">Suspended</option>
-          </select>
+            <SelectItem key="active">Active</SelectItem>
+            <SelectItem key="paused">Paused</SelectItem>
+            <SelectItem key="suspended">Suspended</SelectItem>
+          </Select>
 
           {/* Subscription Filter */}
-          <select
-            value={subscriptionFilter}
+          <Select
+            selectedKeys={subscriptionFilter ? [subscriptionFilter] : []}
             onChange={(e) => setSubscriptionFilter(e.target.value)}
-            className="px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            aria-label="Subscription Filter"
+            placeholder="All Subscriptions"
+            classNames={{ trigger: "bg-gray-50 min-w-[160px]" }}
           >
-            <option value="">All Subscriptions</option>
-            <option value="active">Active</option>
-            <option value="pending">Pending</option>
-            <option value="expired">Expired</option>
-            <option value="cancelled">Cancelled</option>
-          </select>
+            <SelectItem key="active">Active</SelectItem>
+            <SelectItem key="pending">Pending</SelectItem>
+            <SelectItem key="expired">Expired</SelectItem>
+            <SelectItem key="cancelled">Cancelled</SelectItem>
+          </Select>
         </div>
       </div>
 

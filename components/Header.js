@@ -11,6 +11,7 @@ import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
 import UnreadBadge from '@/components/UnreadBadge'
 import { formatDesignation as formatDesignationLib, formatDepartments, getLevelNameFromNumber } from '@/lib/formatters'
+import { Button, Input, Avatar, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, DropdownSection, Skeleton, ScrollShadow, Modal, ModalContent, ModalBody, Divider } from '@heroui/react'
 
 export default function Header({ toggleSidebar, sidebarCollapsed }) {
   const { theme } = useTheme()
@@ -344,13 +345,15 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
   if (!mounted) {
     return (
       <header 
-        className="h-[60.5px] bg-white w-full z-[50] border-b border-gray-200 transition-all duration-300 flex-shrink-0"
+        className="h-[60.5px] bg-content1 w-full z-[50] border-b border-divider transition-all duration-300 flex-shrink-0"
       >
         <div className="flex items-center justify-between px-1 sm:px-4 lg:px-0 h-[45px] lg:h-[60px]">
           <div className="flex items-center space-x-2 sm:space-x-4">
-            <button
-              onClick={toggleSidebar}
-              className="md:!hidden focus:outline-none p-1"
+            <Button
+              isIconOnly
+              variant="light"
+              onPress={toggleSidebar}
+              className="md:!hidden"
             >
               <img
                 src="/hamburger.png"
@@ -358,10 +361,10 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                 className="w-5 h-5"
                 style={{ filter: 'brightness(0) saturate(100%) invert(44%) sepia(8%) saturate(400%) hue-rotate(180deg)' }}
               />
-            </button>
+            </Button>
           </div>
           <div className="flex items-center space-x-2 sm:space-x-4">
-            <div className="w-8 h-8 bg-gray-200 rounded-full animate-pulse"></div>
+            <Skeleton className="w-8 h-8 rounded-full" />
           </div>
         </div>
       </header>
@@ -370,14 +373,16 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
 
   return (
     <header 
-      className="h-[60.5px] bg-white w-full z-[50] border-b border-gray-200 transition-all duration-300 flex-shrink-0"
+      className="h-[60.5px] bg-content1 w-full z-[50] border-b border-divider transition-all duration-300 flex-shrink-0"
     >
       <div className="flex items-center justify-between px-1 sm:px-4 lg:px-6 h-[60.5px] lg:h-[60px]">
         {/* Left side */}
         <div className="flex items-center space-x-2 sm:space-x-4 flex-1">
-          <button
-            onClick={toggleSidebar}
-            className="md:!hidden focus:outline-none p-1"
+          <Button
+            isIconOnly
+            variant="light"
+            onPress={toggleSidebar}
+            className="md:!hidden"
           >
             <img
               src="/hamburger.png"
@@ -385,15 +390,14 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
               className="w-5 h-5"
               style={{ filter: 'brightness(0) saturate(100%) invert(44%) sepia(8%) saturate(400%) hue-rotate(180deg)' }}
             />
-          </button>
+          </Button>
 
           {/* Search bar - Desktop */}
           <div ref={searchRef} className="hidden lg:block relative w-64 lg:w-96">
             {/* Backdrop overlay when search is active */}
             {(showSearchResults || searchQuery.length >= 2) && (
               <div 
-                className="fixed inset-0 z-[100]"
-                style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
+                className="fixed inset-0 z-[100] bg-black/60"
                 onClick={() => {
                   setSearchQuery('')
                   setShowSearchResults(false)
@@ -402,63 +406,63 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
             )}
             
             {/* Unified Search Container */}
-            <div className={`z-[101] ${(showSearchResults || searchQuery.length >= 2) ? 'fixed left-1/2 -translate-x-1/2 top-4 w-[90%] max-w-xl bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden' : 'relative'}`}>
+            <div className={`z-[101] ${(showSearchResults || searchQuery.length >= 2) ? 'fixed left-1/2 -translate-x-1/2 top-4 w-[90%] max-w-xl bg-content1 rounded-xl shadow-2xl border border-divider overflow-hidden' : 'relative'}`}>
               <div className="relative flex items-center">
-                <FaSearch className="absolute left-3 text-gray-400 w-4 h-4 pointer-events-none z-10" />
-                <input
-                  type="text"
+                <Input
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onValueChange={setSearchQuery}
                   placeholder="Search everything..."
-                  className={`w-full pl-10 pr-10 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:outline-none transition-all ${(showSearchResults || searchQuery.length >= 2) ? 'bg-transparent border-b border-gray-200' : 'bg-gray-50 border border-gray-100 rounded-lg focus:ring-1 focus:border-transparent'}`}
-                  style={{ '--tw-ring-color': primaryMedium }}
+                  startContent={<FaSearch className="text-default-400 w-4 h-4" />}
+                  endContent={
+                    searching ? <Loader size="xs" /> :
+                    searchQuery ? (
+                      <Button
+                        isIconOnly
+                        size="sm"
+                        variant="light"
+                        onPress={() => {
+                          setSearchQuery('')
+                          setShowSearchResults(false)
+                        }}
+                      >
+                        <FaTimes className="w-4 h-4" />
+                      </Button>
+                    ) : null
+                  }
+                  classNames={{
+                    inputWrapper: (showSearchResults || searchQuery.length >= 2) ? 'bg-transparent border-b border-divider rounded-none' : 'bg-default-100'
+                  }}
                 />
-                {searching && (
-                  <div className="absolute right-3 z-10">
-                    <Loader size="xs" />
-                  </div>
-                )}
-                {searchQuery && !searching && (
-                  <button
-                    onClick={() => {
-                      setSearchQuery('')
-                      setShowSearchResults(false)
-                    }}
-                    className="absolute right-3 text-gray-400 hover:text-gray-600 transition-colors z-10"
-                  >
-                    <FaTimes className="w-4 h-4" />
-                  </button>
-                )}
               </div>
 
               {/* Search Results - Integrated */}
               {showSearchResults && searchResults && (
-                <div className="max-h-[60vh] overflow-y-auto scrollbar-hide">
+                <ScrollShadow className="max-h-[60vh]">
                   {Object.entries(searchResults).map(([category, items]) => {
                     if (items.length === 0) return null
                     return (
-                      <div key={category} className="border-b border-gray-100 last:border-b-0">
-                        <div className="px-4 py-2 bg-gray-50 font-semibold text-xs text-gray-600 uppercase sticky top-0">
-                          {getCategoryLabel(category)} <span className="text-gray-400">({items.length})</span>
+                      <div key={category} className="border-b border-divider last:border-b-0">
+                        <div className="px-4 py-2 bg-default-50 font-semibold text-xs text-default-600 uppercase sticky top-0">
+                          {getCategoryLabel(category)} <span className="text-default-400">({items.length})</span>
                         </div>
                         {items.map((item, index) => (
                           <div
                             key={item._id || index}
                             onClick={() => handleSearchResultClick(item.link)}
-                            className="px-4 py-3 cursor-pointer transition-colors hover:bg-gray-50"
+                            className="px-4 py-3 cursor-pointer transition-colors hover:bg-default-100"
                           >
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-0.5">
-                                <h4 className="font-medium text-sm text-gray-900 truncate">{item.title}</h4>
+                                <h4 className="font-medium text-sm text-default-900 truncate">{item.title}</h4>
                                 {item.meta && item.type !== 'page' && (
-                                  <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded">{item.meta}</span>
+                                  <span className="text-xs text-default-500 bg-default-100 px-2 py-0.5 rounded">{item.meta}</span>
                                 )}
                               </div>
                               {item.subtitle && (
-                                <p className="text-xs text-gray-500">{item.subtitle}</p>
+                                <p className="text-xs text-default-500">{item.subtitle}</p>
                               )}
                               {item.description && (
-                                <p className="text-xs text-gray-400 line-clamp-1 mt-0.5">{item.description}</p>
+                                <p className="text-xs text-default-400 line-clamp-1 mt-0.5">{item.description}</p>
                               )}
                             </div>
                           </div>
@@ -467,12 +471,12 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                     )
                   })}
                   {Object.values(searchResults).every(arr => arr.length === 0) && (
-                    <div className="px-4 py-8 text-center text-gray-500">
+                    <div className="px-4 py-8 text-center text-default-500">
                       <p className="text-sm font-medium">No results found for "{searchQuery}"</p>
-                      <p className="text-xs text-gray-400 mt-1">Try different keywords</p>
+                      <p className="text-xs text-default-400 mt-1">Try different keywords</p>
                     </div>
                   )}
-                </div>
+                </ScrollShadow>
               )}
             </div>
           </div>
@@ -494,27 +498,25 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
             onMouseLeave={() => setIsMiraHovered(false)}
           >
             <MiraSphere size={55} isHovered={isMiraHovered} />
-            <span className="absolute top-full left-1/2 -translate-x-1/2 mt-1 px-2 py-1 text-xs font-medium text-white bg-gray-900 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+            <span className="absolute top-full left-1/2 -translate-x-1/2 mt-1 px-2 py-1 text-xs font-medium text-white bg-default-900 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
               MIRA Cloud
             </span>
           </div>
 
           {/* Real-time Clock - Desktop Only */}
-          <div className="hidden md:flex items-center gap-2 px-4 py-2.5 " style={{ color: 'var(--color-text-secondary)' }}>
+          <div className="hidden md:flex items-center gap-2 px-4 py-2.5 text-default-600">
             <RealTimeClock timezone={timezone} />
           </div>
 
           {/* Refresh Button - Desktop Only */}
-          <button
-            onClick={() => window.location.reload()}
-            className="hidden md:flex items-center justify-center p-2.5 rounded-xl transition-all duration-200 hover:bg-white hover:shadow-sm group relative"
-            style={{ color: 'var(--color-text-secondary)' }}
+          <Button
+            isIconOnly
+            variant="light"
+            className="hidden md:flex group"
+            onPress={() => window.location.reload()}
           >
             <FaSyncAlt className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
-            <span className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2 py-1 text-xs font-medium text-white bg-gray-900 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
-              Refresh
-            </span>
-          </button>
+          </Button>
 
           {/* PWA Status - Hidden */}
           {/* <PWAStatus /> */}
@@ -559,18 +561,17 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
 
           {/* Ideas Button - Desktop Only */}
           <div className="hidden md:block relative group">
-            <button
-              onClick={() => router.push('/dashboard/sandbox')}
-              className="relative p-2.5 rounded-xl transition-all duration-300 group-hover:bg-gradient-to-br group-hover:from-yellow-50 group-hover:to-orange-50"
-              style={{
-                color: 'var(--color-text-secondary)',
-              }}
+            <Button
+              isIconOnly
+              variant="light"
+              onPress={() => router.push('/dashboard/sandbox')}
+              className="group-hover:bg-gradient-to-br group-hover:from-warning-50 group-hover:to-warning-100"
             >
               {/* Animated lightbulb container */}
               <div className="relative">
                 {/* Main lightbulb icon */}
                 <svg 
-                  className="w-5 h-5 transition-all duration-300 group-hover:text-yellow-500 group-hover:scale-110"
+                  className="w-5 h-5 transition-all duration-300 group-hover:text-warning-500 group-hover:scale-110"
                   fill="currentColor"
                   viewBox="0 0 24 24"
                 >
@@ -578,154 +579,136 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                 </svg>
                 
                 {/* Sparkle effects on hover */}
-                <span className="absolute -top-1 -right-1 w-2 h-2 bg-yellow-400 rounded-full opacity-0 group-hover:opacity-100 group-hover:animate-ping transition-opacity" />
-                <span className="absolute -bottom-0.5 -left-0.5 w-1.5 h-1.5 bg-orange-400 rounded-full opacity-0 group-hover:opacity-100 group-hover:animate-ping transition-opacity" style={{ animationDelay: '0.2s' }} />
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-warning-400 rounded-full opacity-0 group-hover:opacity-100 group-hover:animate-ping transition-opacity" />
+                <span className="absolute -bottom-0.5 -left-0.5 w-1.5 h-1.5 bg-warning-500 rounded-full opacity-0 group-hover:opacity-100 group-hover:animate-ping transition-opacity" style={{ animationDelay: '0.2s' }} />
               </div>
-              
-              {/* Tooltip */}
-              <span className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-2 py-1 text-xs font-medium text-white bg-gray-900 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
-                Ideas Sandbox
-              </span>
-            </button>
+            </Button>
           </div>
 
           {/* Profile menu */}
           <div ref={profileRef} className="relative mt-1 md:mt-0">
-            <button
-              onClick={() => {
-                // On mobile, go directly to profile
-                if (window.innerWidth < 768) {
-                  router.push('/dashboard/profile')
-                } else {
-                  setShowProfileMenu(!showProfileMenu)
-                }
-              }}
-              className="flex items-center space-x-2 sm:space-x-3 p-1.5 sm:p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <div className="relative">
-                <div className="w-[30px] h-[30px] sm:w-8 sm:h-8 bg-primary-500 rounded-full flex items-center justify-center overflow-hidden">
-                  {employeeData?.profilePicture ? (
-                    <img
-                      src={employeeData.profilePicture}
-                      alt="Profile"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span className="text-white text-xs sm:text-sm font-medium">{getUserInitials()}</span>
-                  )}
-                </div>
-                {/* Notification badge placeholder - can be added here if needed */}
-                {/* Example: {hasNotifications && <UnreadBadge count={notificationCount} className="top-0 right-0" />} */}
-              </div>
-            </button>
-
-            {showProfileMenu && (
-              <>
-                <div className="fixed inset-0 z-[9998]" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }} onClick={() => setShowProfileMenu(false)} />
-                <div className="absolute right-0 mt-2 w-44 sm:w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-[9999]">
-                  {/* User Info Section */}
-                  <div className="px-2 md:px-4 py-3 border-b border-gray-200">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-10 h-10 bg-primary-500 rounded-full flex items-center justify-center overflow-hidden flex-shrink-0">
-                        {(employeeData?.profilePicture || user?.profilePicture) ? (
-                          <img
-                            src={employeeData?.profilePicture || user?.profilePicture}
-                            alt="Profile"
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <span className="text-white text-sm font-medium">{getUserInitials()}</span>
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-gray-900 truncate">
+            <Dropdown isOpen={showProfileMenu && window.innerWidth >= 768} onOpenChange={(open) => {
+              if (window.innerWidth >= 768) setShowProfileMenu(open)
+            }}>
+              <DropdownTrigger>
+                <Button
+                  variant="light"
+                  onPress={() => {
+                    if (window.innerWidth < 768) {
+                      router.push('/dashboard/profile')
+                    } else {
+                      setShowProfileMenu(!showProfileMenu)
+                    }
+                  }}
+                  className="p-1.5 sm:p-2"
+                >
+                  <Avatar
+                    size="sm"
+                    src={employeeData?.profilePicture}
+                    name={getUserInitials()}
+                    className="bg-primary-500 text-white"
+                  />
+                </Button>
+              </DropdownTrigger>
+              <DropdownMenu aria-label="Profile Actions">
+                <DropdownSection showDivider>
+                  <DropdownItem key="profile-info" className="h-auto gap-2" textValue="Profile Info">
+                    <div className="flex items-center gap-3 py-2">
+                      <Avatar
+                        src={employeeData?.profilePicture || user?.profilePicture}
+                        name={getUserInitials()}
+                        className="bg-primary-500 text-white"
+                      />
+                      <div className="flex flex-col">
+                        <p className="text-sm font-semibold">
                           {employeeData ? `${employeeData.firstName} ${employeeData.lastName}` :
                             user?.firstName ? `${user.firstName} ${user.lastName}` :
                               user?.email || 'User'}
                         </p>
-                        <p className="text-xs text-gray-500 truncate">
+                        <p className="text-xs text-default-500">
                           {formatDesignation(employeeData?.designation || user?.designation, employeeData) || user?.role || 'Employee'}
                         </p>
                       </div>
                     </div>
-                  </div>
-
-                  <a
+                  </DropdownItem>
+                </DropdownSection>
+                <DropdownSection showDivider>
+                  <DropdownItem
+                    key="my-profile"
+                    startContent={<FaUser className="w-4 h-4" />}
                     href="/dashboard/profile"
-                    className="flex items-center space-x-2 px-2 md:px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                   >
-                    <FaUser className="w-4 h-4" />
-                    <span>My Profile</span>
-                  </a>
-                  <a
+                    My Profile
+                  </DropdownItem>
+                  <DropdownItem
+                    key="settings"
+                    startContent={<FaCog className="w-4 h-4" />}
                     href="/dashboard/settings"
-                    className="flex items-center space-x-2 px-2 py-2 md:px-4 text-sm text-gray-700 hover:bg-gray-100"
                   >
-                    <FaCog className="w-4 h-4" />
-                    <span>Settings</span>
-                  </a>
-                  <hr className="my-2" />
-                  <button
-                    onClick={handleLogout}
-                    className="flex items-center space-x-2 px-2 md:px-4 py-2 md:pl-4  text-sm text-red-600 hover:bg-gray-100 w-full text-left"
+                    Settings
+                  </DropdownItem>
+                </DropdownSection>
+                <DropdownSection>
+                  <DropdownItem
+                    key="logout"
+                    color="danger"
+                    startContent={<FaSignOutAlt className="w-4 h-4" />}
+                    onPress={handleLogout}
                   >
-                    <FaSignOutAlt className="w-4 h-4" />
-                    <span>Logout</span>
-                  </button>
-                </div>
-              </>
-            )}
+                    Logout
+                  </DropdownItem>
+                </DropdownSection>
+              </DropdownMenu>
+            </Dropdown>
           </div>
         </div>
       </div>
 
       {/* Mobile Search Fullscreen Modal */}
       {showMobileSearch && (
-        <div className="fixed inset-0 bg-white z-[100] md:!hidden">
+        <div className="fixed inset-0 bg-content1 z-[100] md:!hidden">
           <div className="flex flex-col h-full">
             {/* Search Header - Match header height */}
-            <div className="flex items-center gap-3 px-3 h-16 border-b border-gray-200 bg-white">
-              <button
-                onClick={closeMobileSearch}
-                className="p-2 text-gray-600 hover:text-gray-800 flex-shrink-0"
+            <div className="flex items-center gap-3 px-3 h-16 border-b border-divider bg-content1">
+              <Button
+                isIconOnly
+                variant="light"
+                onPress={closeMobileSearch}
               >
                 <FaTimes className="w-5 h-5" />
-              </button>
-              <div className="flex-1 relative">
-                <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input
-                  type="text"
+              </Button>
+              <div className="flex-1">
+                <Input
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onValueChange={setSearchQuery}
                   placeholder="Search everything..."
-                  className="w-full h-11 pl-10 pr-10 bg-gray-50 border border-gray-100 rounded-lg focus:ring-1 focus:border-transparent text-sm"
-                  style={{ '--tw-ring-color': primaryMedium }}
+                  startContent={<FaSearch className="text-default-400 w-4 h-4" />}
+                  endContent={
+                    searching ? <Loader size="xs" /> :
+                    searchQuery ? (
+                      <Button
+                        isIconOnly
+                        size="sm"
+                        variant="light"
+                        onPress={() => {
+                          setSearchQuery('')
+                          setSearchResults(null)
+                        }}
+                      >
+                        <FaTimes className="w-4 h-4" />
+                      </Button>
+                    ) : null
+                  }
                   autoFocus
                 />
-                {searchQuery && !searching && (
-                  <button
-                    onClick={() => {
-                      setSearchQuery('')
-                      setSearchResults(null)
-                    }}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    <FaTimes className="w-4 h-4" />
-                  </button>
-                )}
-                {searching && (
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                    <Loader size="xs" />
-                  </div>
-                )}
               </div>
             </div>
 
             {/* Search Results */}
-            <div className="flex-1 overflow-y-auto">
+            <ScrollShadow className="flex-1">
               {searchQuery.length < 2 ? (
-                <div className="flex flex-col items-center justify-center h-full text-gray-400 px-4">
-                  <FaSearch className="w-16 h-16 mb-4 text-gray-300" />
+                <div className="flex flex-col items-center justify-center h-full text-default-400 px-4">
+                  <FaSearch className="w-16 h-16 mb-4 text-default-300" />
                   <p className="text-lg font-medium">Search Everything</p>
                   <p className="text-sm text-center mt-2">
                     Find pages, tasks, leaves, announcements, and more...
@@ -740,43 +723,28 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                   {Object.entries(searchResults).map(([category, items]) => {
                     if (items.length === 0) return null
                     return (
-                      <div key={category} className="border-b border-gray-100">
-                        <div className="px-4 py-3 bg-gradient-to-r from-gray-50 to-gray-100 font-semibold text-sm text-gray-700 uppercase sticky top-0 z-10">
-                          {getCategoryLabel(category)} <span className="text-gray-500">({items.length})</span>
+                      <div key={category} className="border-b border-divider">
+                        <div className="px-4 py-3 bg-gradient-to-r from-default-50 to-default-100 font-semibold text-sm text-default-700 uppercase sticky top-0 z-10">
+                          {getCategoryLabel(category)} <span className="text-default-500">({items.length})</span>
                         </div>
                         {items.map((item, index) => (
                           <div
                             key={item._id || index}
                             onClick={() => handleSearchResultClick(item.link)}
-                            className="px-4 py-4 cursor-pointer border-b border-gray-50 transition-colors"
-                            style={{
-                              backgroundColor: 'transparent',
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.backgroundColor = primaryLight
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.backgroundColor = 'transparent'
-                            }}
-                            onTouchStart={(e) => {
-                              e.currentTarget.style.backgroundColor = theme?.primary?.[100] || '#DBEAFE'
-                            }}
-                            onTouchEnd={(e) => {
-                              e.currentTarget.style.backgroundColor = 'transparent'
-                            }}
+                            className="px-4 py-4 cursor-pointer border-b border-default-50 transition-colors hover:bg-default-100"
                           >
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1">
-                                <h4 className="font-semibold text-base text-gray-900">{item.title}</h4>
+                                <h4 className="font-semibold text-base text-default-900">{item.title}</h4>
                               </div>
                                 {item.subtitle && (
-                                  <p className="text-sm mb-1" style={{ color: primaryColor }}>{item.subtitle}</p>
+                                  <p className="text-sm mb-1 text-primary-600">{item.subtitle}</p>
                                 )}
                                 {item.description && (
-                                  <p className="text-sm text-gray-500 line-clamp-2">{item.description}</p>
+                                  <p className="text-sm text-default-500 line-clamp-2">{item.description}</p>
                                 )}
                                 {item.meta && item.type !== 'page' && (
-                                  <span className="inline-block text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded mt-2">
+                                  <span className="inline-block text-xs text-default-500 bg-default-100 px-2 py-1 rounded mt-2">
                                     {item.meta}
                                   </span>
                                 )}
@@ -787,17 +755,17 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                     )
                   })}
                   {Object.values(searchResults).every(arr => arr.length === 0) && (
-                    <div className="flex flex-col items-center justify-center h-full text-gray-400 px-4 py-12">
-                      <FaSearch className="w-16 h-16 mb-4 text-gray-300" />
+                    <div className="flex flex-col items-center justify-center h-full text-default-400 px-4 py-12">
+                      <FaSearch className="w-16 h-16 mb-4 text-default-300" />
                       <p className="text-lg font-medium">No results found</p>
-                      <p className="text-sm text-center mt-2 text-gray-500">
+                      <p className="text-sm text-center mt-2 text-default-500">
                         Try different keywords or check spelling
                       </p>
                     </div>
                   )}
                 </div>
               ) : null}
-            </div>
+            </ScrollShadow>
           </div>
         </div>
       )}
@@ -806,7 +774,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
       {/* Backdrop overlay with blur animation - renders below iframe */}
       {(showMiraModal || miraModalClosing) && (
         <div 
-          className={`fixed inset-0 ${miraModalClosing ? 'animate-mira-backdrop-out' : 'animate-mira-backdrop-in'}`}
+          className={`fixed inset-0 bg-black/60 ${miraModalClosing ? 'animate-mira-backdrop-out' : 'animate-mira-backdrop-in'}`}
           style={{ zIndex: 99998, pointerEvents: 'none' }}
           onAnimationEnd={() => {
             if (miraModalClosing) {
@@ -838,15 +806,15 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
       
       {/* Close button - separate from backdrop for proper click handling */}
       {(showMiraModal || miraModalClosing) && (
-        <button
-          onClick={() => {
-            setMiraModalClosing(true)
-          }}
-          className="fixed top-4 right-4 p-3 bg-gray-900/80 hover:bg-gray-900 rounded-full transition-all duration-200 group shadow-lg"
+        <Button
+          isIconOnly
+          variant="solid"
+          className="fixed top-4 right-4 bg-default-900/80 hover:bg-default-900"
           style={{ zIndex: 100000 }}
+          onPress={() => setMiraModalClosing(true)}
         >
-          <FaTimes className="w-6 h-6 text-white group-hover:scale-110 transition-transform" />
-        </button>
+          <FaTimes className="w-6 h-6 text-white" />
+        </Button>
       )}
     </header>
   )
@@ -885,10 +853,10 @@ function RealTimeClock({ timezone = 'Asia/Kolkata' }) {
 
   return (
     <div className="flex flex-col items-center">
-      <div className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+      <div className="text-sm font-semibold text-default-900">
         {formatTime(time)}
       </div>
-      <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+      <div className="text-xs text-default-500">
         {formatDate(time)}
       </div>
     </div>

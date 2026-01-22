@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import toast from '@/utils/toast'
 import { FaUsers, FaBuilding, FaArrowLeft, FaCalendarAlt, FaClock, FaChevronLeft, FaChevronRight, FaSearch, FaUserCircle, FaMapMarkerAlt, FaFilter } from 'react-icons/fa'
-import Loader from '@/components/ui/Loader'
+import { Card, CardBody, Button, Chip, Skeleton, Input, Select, SelectItem } from '@heroui/react'
 
 export default function TeamAttendancePage() {
   const [loading, setLoading] = useState(true)
@@ -237,30 +237,30 @@ export default function TeamAttendancePage() {
   }, [currentMonth, attendance])
 
   const getStatusColor = (record, isFuture) => {
-    if (isFuture) return 'bg-gray-50'
-    if (!record) return 'bg-gray-100'
+    if (isFuture) return 'bg-default-50'
+    if (!record) return 'bg-default-100'
     switch (record.status) {
-      case 'present': return 'bg-green-100 border-green-400'
-      case 'in-progress': return 'bg-orange-100 border-orange-400'
-      case 'half-day': return 'bg-yellow-100 border-yellow-400'
-      case 'late': return 'bg-amber-100 border-amber-400'
-      case 'absent': return 'bg-red-100 border-red-400'
-      case 'on-leave': return 'bg-blue-100 border-blue-400'
-      case 'holiday': return 'bg-purple-100 border-purple-400'
-      default: return 'bg-gray-100'
+      case 'present': return 'bg-success-100 border-success'
+      case 'in-progress': return 'bg-warning-100 border-warning'
+      case 'half-day': return 'bg-warning-100 border-warning'
+      case 'late': return 'bg-warning-100 border-warning'
+      case 'absent': return 'bg-danger-100 border-danger'
+      case 'on-leave': return 'bg-primary-100 border-primary'
+      case 'holiday': return 'bg-secondary-100 border-secondary'
+      default: return 'bg-default-100'
     }
   }
 
   const getStatusTextColor = (status) => {
     switch (status) {
-      case 'present': return 'text-green-700'
-      case 'in-progress': return 'text-orange-700'
-      case 'half-day': return 'text-yellow-700'
-      case 'late': return 'text-amber-700'
-      case 'absent': return 'text-red-700'
-      case 'on-leave': return 'text-blue-700'
-      case 'holiday': return 'text-purple-700'
-      default: return 'text-gray-700'
+      case 'present': return 'text-success-700'
+      case 'in-progress': return 'text-warning-700'
+      case 'half-day': return 'text-warning-700'
+      case 'late': return 'text-warning-700'
+      case 'absent': return 'text-danger-700'
+      case 'on-leave': return 'text-primary-700'
+      case 'holiday': return 'text-secondary-700'
+      default: return 'text-default-700'
     }
   }
 
@@ -292,8 +292,15 @@ export default function TeamAttendancePage() {
 
   if (loading && view === 'initial') {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader size="lg" />
+      <div className="page-container space-y-6">
+        <div className="flex flex-col gap-3">
+          <Skeleton className="h-8 w-64 rounded-lg" />
+          <Skeleton className="h-4 w-96 rounded-lg" />
+        </div>
+        <Skeleton className="h-12 rounded-lg" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1,2,3,4,5,6].map(i => <Skeleton key={i} className="h-32 rounded-xl" />)}
+        </div>
       </div>
     )
   }
@@ -304,20 +311,21 @@ export default function TeamAttendancePage() {
       <div className="mb-6">
         <div className="flex items-center space-x-4 mb-2">
           {(view === 'employees' && !isDepartmentHead) || view === 'calendar' ? (
-            <button
-              onClick={handleBack}
-              className="p-2 rounded-lg hover:bg-gray-100 text-gray-600"
+            <Button
+              isIconOnly
+              variant="flat"
+              onPress={handleBack}
             >
               <FaArrowLeft className="w-5 h-5" />
-            </button>
+            </Button>
           ) : null}
           <div>
-            <h1 className="text-3xl font-bold text-gray-800">
+            <h1 className="text-3xl font-bold text-default-800">
               {view === 'departments' && 'Team Attendance'}
               {view === 'employees' && (isDepartmentHead ? `${departmentInfo?.name || 'My Team'} Attendance` : `${selectedDepartment?.name || ''} Department`)}
               {view === 'calendar' && `${selectedEmployee?.firstName} ${selectedEmployee?.lastName}`}
             </h1>
-            <p className="text-gray-600 mt-1">
+            <p className="text-default-500 mt-1">
               {view === 'departments' && 'Select a department to view employee attendance'}
               {view === 'employees' && 'Select an employee to view their attendance calendar'}
               {view === 'calendar' && 'View attendance calendar and work hours'}
@@ -331,33 +339,37 @@ export default function TeamAttendancePage() {
         <div className="mb-6">
           <div className="flex flex-col sm:flex-row gap-4">
             {/* Search Input */}
-            <div className="relative flex-1">
-              <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              <input
+            <div className="flex-1">
+              <Input
                 type="text"
                 placeholder={view === 'departments' ? 'Search departments...' : 'Search employees...'}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                startContent={<FaSearch className="text-default-400" />}
+                classNames={{
+                  input: "bg-transparent",
+                  inputWrapper: "bg-content1 shadow-sm"
+                }}
               />
             </div>
             
             {/* Department Filter for multi-department heads */}
             {isDepartmentHead && headedDepartments.length > 1 && view === 'employees' && (
-              <div className="relative sm:w-64">
-                <FaFilter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                <select
-                  value={selectedDepartmentFilter}
+              <div className="sm:w-64">
+                <Select
+                  selectedKeys={[selectedDepartmentFilter]}
                   onChange={(e) => setSelectedDepartmentFilter(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent appearance-none bg-white"
+                  aria-label="Department Filter"
+                  startContent={<FaFilter className="text-default-400" />}
+                  classNames={{ trigger: "bg-content1" }}
                 >
-                  <option value="all">All Departments</option>
+                  <SelectItem key="all">All Departments</SelectItem>
                   {headedDepartments.map((dept) => (
-                    <option key={dept._id} value={dept._id}>
+                    <SelectItem key={dept._id}>
                       {dept.name}
-                    </option>
+                    </SelectItem>
                   ))}
-                </select>
+                </Select>
               </div>
             )}
           </div>
@@ -368,40 +380,41 @@ export default function TeamAttendancePage() {
       {view === 'departments' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredDepartments.length === 0 ? (
-            <div className="col-span-full text-center py-12 text-gray-500">
-              <FaBuilding className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+            <div className="col-span-full text-center py-12 text-default-500">
+              <FaBuilding className="w-12 h-12 mx-auto mb-4 text-default-300" />
               <p>No departments found</p>
             </div>
           ) : (
             filteredDepartments.map((dept) => (
-              <div
+              <Card
                 key={dept._id}
-                onClick={() => handleDepartmentClick(dept)}
-                className="bg-white rounded-xl shadow-md p-6 cursor-pointer hover:shadow-lg transition-all duration-200 border-2 border-transparent hover:border-primary-500"
+                isPressable
+                onPress={() => handleDepartmentClick(dept)}
+                className="shadow-md hover:shadow-lg transition-all duration-200 border-2 border-transparent hover:border-primary"
               >
-                <div className="flex items-center space-x-4">
-                  <div className="bg-primary-100 p-4 rounded-lg">
-                    <FaBuilding className="w-8 h-8 text-primary-600" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-800">{dept.name}</h3>
-                    <p className="text-sm text-gray-500">{dept.description || 'No description'}</p>
-                    {dept.head && (
-                      <p className="text-xs text-gray-400 mt-1">
-                        Head: {dept.head.firstName} {dept.head.lastName}
-                      </p>
-                    )}
-                  </div>
-                  <div className="text-right">
-                    <div className="bg-gray-100 px-3 py-1 rounded-full">
-                      <span className="text-sm font-medium text-gray-600">
+                <CardBody className="p-6">
+                  <div className="flex items-center space-x-4">
+                    <div className="bg-primary-100 p-4 rounded-lg">
+                      <FaBuilding className="w-8 h-8 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold text-default-800">{dept.name}</h3>
+                      <p className="text-sm text-default-500">{dept.description || 'No description'}</p>
+                      {dept.head && (
+                        <p className="text-xs text-default-400 mt-1">
+                          Head: {dept.head.firstName} {dept.head.lastName}
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <Chip variant="flat" color="default" size="sm">
                         <FaUsers className="inline mr-1" />
                         {dept.employeeCount || 0}
-                      </span>
+                      </Chip>
                     </div>
                   </div>
-                </div>
-              </div>
+                </CardBody>
+              </Card>
             ))
           )}
         </div>
@@ -411,48 +424,51 @@ export default function TeamAttendancePage() {
       {view === 'employees' && (
         <>
           {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader size="lg" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {[1,2,3,4,5,6,7,8].map(i => <Skeleton key={i} className="h-48 rounded-xl" />)}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {filteredEmployees.length === 0 ? (
-                <div className="col-span-full text-center py-12 text-gray-500">
-                  <FaUsers className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                <div className="col-span-full text-center py-12 text-default-500">
+                  <FaUsers className="w-12 h-12 mx-auto mb-4 text-default-300" />
                   <p>No employees found</p>
                 </div>
               ) : (
                 filteredEmployees.map((emp) => (
-                  <div
+                  <Card
                     key={emp._id}
-                    onClick={() => handleEmployeeClick(emp)}
-                    className="bg-white rounded-xl shadow-md p-6 cursor-pointer hover:shadow-lg transition-all duration-200 border-2 border-transparent hover:border-primary-500"
+                    isPressable
+                    onPress={() => handleEmployeeClick(emp)}
+                    className="shadow-md hover:shadow-lg transition-all duration-200 border-2 border-transparent hover:border-primary"
                   >
-                    <div className="flex flex-col items-center text-center">
-                      {emp.avatar ? (
-                        <img
-                          src={emp.avatar}
-                          alt={`${emp.firstName} ${emp.lastName}`}
-                          className="w-20 h-20 rounded-full object-cover mb-4"
-                        />
-                      ) : (
-                        <div className="w-20 h-20 rounded-full bg-primary-100 flex items-center justify-center mb-4">
-                          <span className="text-2xl font-bold text-primary-600">
-                            {emp.firstName?.[0]}{emp.lastName?.[0]}
-                          </span>
+                    <CardBody className="p-6">
+                      <div className="flex flex-col items-center text-center">
+                        {emp.avatar ? (
+                          <img
+                            src={emp.avatar}
+                            alt={`${emp.firstName} ${emp.lastName}`}
+                            className="w-20 h-20 rounded-full object-cover mb-4"
+                          />
+                        ) : (
+                          <div className="w-20 h-20 rounded-full bg-primary-100 flex items-center justify-center mb-4">
+                            <span className="text-2xl font-bold text-primary">
+                              {emp.firstName?.[0]}{emp.lastName?.[0]}
+                            </span>
+                          </div>
+                        )}
+                        <h3 className="text-lg font-semibold text-default-800">
+                          {emp.firstName} {emp.lastName}
+                        </h3>
+                        <p className="text-sm text-default-500">{emp.designation?.title || 'No Designation'}</p>
+                        <p className="text-xs text-default-400 mt-1">{emp.employeeCode || ''}</p>
+                        <div className="mt-3 flex items-center space-x-1 text-primary">
+                          <FaCalendarAlt className="w-4 h-4" />
+                          <span className="text-sm">View Attendance</span>
                         </div>
-                      )}
-                      <h3 className="text-lg font-semibold text-gray-800">
-                        {emp.firstName} {emp.lastName}
-                      </h3>
-                      <p className="text-sm text-gray-500">{emp.designation?.title || 'No Designation'}</p>
-                      <p className="text-xs text-gray-400 mt-1">{emp.employeeCode || ''}</p>
-                      <div className="mt-3 flex items-center space-x-1 text-primary-600">
-                        <FaCalendarAlt className="w-4 h-4" />
-                        <span className="text-sm">View Attendance</span>
                       </div>
-                    </div>
-                  </div>
+                    </CardBody>
+                  </Card>
                 ))
               )}
             </div>
@@ -462,222 +478,226 @@ export default function TeamAttendancePage() {
 
       {/* Employee Attendance Calendar */}
       {view === 'calendar' && selectedEmployee && (
-        <div className="bg-white rounded-lg shadow-md p-6">
-          {/* Employee Info Card */}
-          <div className="flex items-center space-x-4 mb-6 p-4 bg-gray-50 rounded-lg">
-            {selectedEmployee.avatar ? (
-              <img
-                src={selectedEmployee.avatar}
-                alt={`${selectedEmployee.firstName} ${selectedEmployee.lastName}`}
-                className="w-16 h-16 rounded-full object-cover"
-              />
-            ) : (
-              <div className="w-16 h-16 rounded-full bg-primary-100 flex items-center justify-center">
-                <span className="text-xl font-bold text-primary-600">
-                  {selectedEmployee.firstName?.[0]}{selectedEmployee.lastName?.[0]}
-                </span>
+        <Card className="shadow-md">
+          <CardBody className="p-6">
+            {/* Employee Info Card */}
+            <div className="flex items-center space-x-4 mb-6 p-4 bg-default-50 rounded-lg">
+              {selectedEmployee.avatar ? (
+                <img
+                  src={selectedEmployee.avatar}
+                  alt={`${selectedEmployee.firstName} ${selectedEmployee.lastName}`}
+                  className="w-16 h-16 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-primary-100 flex items-center justify-center">
+                  <span className="text-xl font-bold text-primary">
+                    {selectedEmployee.firstName?.[0]}{selectedEmployee.lastName?.[0]}
+                  </span>
+                </div>
+              )}
+              <div>
+                <h2 className="text-xl font-semibold text-default-800">
+                  {selectedEmployee.firstName} {selectedEmployee.lastName}
+                </h2>
+                <p className="text-sm text-default-500">{selectedEmployee.designation?.title || 'No Designation'}</p>
+                <p className="text-xs text-default-400">{selectedEmployee.employeeCode || ''} • {selectedEmployee.email}</p>
               </div>
-            )}
-            <div>
-              <h2 className="text-xl font-semibold text-gray-800">
-                {selectedEmployee.firstName} {selectedEmployee.lastName}
-              </h2>
-              <p className="text-sm text-gray-500">{selectedEmployee.designation?.title || 'No Designation'}</p>
-              <p className="text-xs text-gray-400">{selectedEmployee.employeeCode || ''} • {selectedEmployee.email}</p>
             </div>
-          </div>
 
-          {/* Month Navigation */}
-          <div className="flex justify-between items-center mb-6">
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={goToPreviousMonth}
-                className="p-2 rounded-lg hover:bg-gray-100 text-gray-600"
-              >
-                <FaChevronLeft />
-              </button>
-              <span className="text-lg font-medium text-gray-800 min-w-[160px] text-center">
-                {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-              </span>
-              <button
-                onClick={goToNextMonth}
-                className="p-2 rounded-lg hover:bg-gray-100 text-gray-600"
-              >
-                <FaChevronRight />
-              </button>
+            {/* Month Navigation */}
+            <div className="flex justify-between items-center mb-6">
+              <div className="flex items-center space-x-2">
+                <Button
+                  isIconOnly
+                  variant="flat"
+                  onPress={goToPreviousMonth}
+                >
+                  <FaChevronLeft />
+                </Button>
+                <span className="text-lg font-medium text-default-800 min-w-[160px] text-center">
+                  {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                </span>
+                <Button
+                  isIconOnly
+                  variant="flat"
+                  onPress={goToNextMonth}
+                >
+                  <FaChevronRight />
+                </Button>
+              </div>
             </div>
-          </div>
 
-          {/* Status Legend */}
-          <div className="flex flex-wrap gap-3 mb-6 p-3 bg-gray-50 rounded-lg">
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 rounded bg-green-100 border border-green-400"></div>
-              <span className="text-xs text-gray-600">Present</span>
+            {/* Status Legend */}
+            <div className="flex flex-wrap gap-3 mb-6 p-3 bg-default-50 rounded-lg">
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 rounded bg-success-100 border border-success"></div>
+                <span className="text-xs text-default-600">Present</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 rounded bg-warning-100 border border-warning"></div>
+                <span className="text-xs text-default-600">In Progress</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 rounded bg-warning-100 border border-warning"></div>
+                <span className="text-xs text-default-600">Half Day</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 rounded bg-warning-100 border border-warning"></div>
+                <span className="text-xs text-default-600">Late</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 rounded bg-danger-100 border border-danger"></div>
+                <span className="text-xs text-default-600">Absent</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 rounded bg-primary-100 border border-primary"></div>
+                <span className="text-xs text-default-600">On Leave</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 rounded bg-secondary-100 border border-secondary"></div>
+                <span className="text-xs text-default-600">Holiday</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 rounded bg-default-100 border border-default-300"></div>
+                <span className="text-xs text-default-600">No Record</span>
+              </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 rounded bg-orange-100 border border-orange-400"></div>
-              <span className="text-xs text-gray-600">In Progress</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 rounded bg-yellow-100 border border-yellow-400"></div>
-              <span className="text-xs text-gray-600">Half Day</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 rounded bg-amber-100 border border-amber-400"></div>
-              <span className="text-xs text-gray-600">Late</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 rounded bg-red-100 border border-red-400"></div>
-              <span className="text-xs text-gray-600">Absent</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 rounded bg-blue-100 border border-blue-400"></div>
-              <span className="text-xs text-gray-600">On Leave</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 rounded bg-purple-100 border border-purple-400"></div>
-              <span className="text-xs text-gray-600">Holiday</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-4 h-4 rounded bg-gray-100 border border-gray-300"></div>
-              <span className="text-xs text-gray-600">No Record</span>
-            </div>
-          </div>
 
           {/* Calendar Grid */}
           {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader size="lg" />
-            </div>
-          ) : (
-            <div className="overflow-x-auto overflow-y-visible p-2 -m-2">
-              {/* Day Headers */}
-              <div className="grid grid-cols-7 gap-1 mb-2">
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                  <div key={day} className="text-center text-sm font-semibold text-gray-500 py-2">
-                    {day}
-                  </div>
-                ))}
+              <div className="grid grid-cols-7 gap-2">
+                {[...Array(35)].map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)}
               </div>
+            ) : (
+              <div className="overflow-x-auto overflow-y-visible p-2 -m-2">
+                {/* Day Headers */}
+                <div className="grid grid-cols-7 gap-1 mb-2">
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                    <div key={day} className="text-center text-sm font-semibold text-default-500 py-2">
+                      {day}
+                    </div>
+                  ))}
+                </div>
 
-              {/* Calendar Grid */}
-              <div className="grid grid-cols-7 gap-1">
-                {calendarData.map((dayData, index) => (
-                  <div
-                    key={index}
-                    className={`
-                      min-h-[100px] p-2 rounded-lg border-2 transition-all
-                      ${dayData.day === null ? 'bg-transparent border-transparent' :
-                        `${getStatusColor(dayData.record, dayData.isFuture)}`
-                      }
-                      ${dayData.isToday ? 'ring-2 ring-blue-500 ring-offset-2' : ''}
-                    `}
-                  >
-                    {dayData.day && (
-                      <>
-                        <div className="flex justify-between items-start mb-1">
-                          <span className={`text-sm font-bold ${dayData.isToday ? 'text-blue-600' : 'text-gray-700'}`}>
-                            {dayData.day}
-                          </span>
-                        </div>
-
-                        {dayData.record ? (
-                          <div className="space-y-1">
-                            <span className={`text-xs font-medium capitalize ${getStatusTextColor(dayData.record.status)}`}>
-                              {dayData.record.status === 'in-progress' ? 'In Progress' : dayData.record.status}
+                {/* Calendar Grid */}
+                <div className="grid grid-cols-7 gap-1">
+                  {calendarData.map((dayData, index) => (
+                    <div
+                      key={index}
+                      className={`
+                        min-h-[100px] p-2 rounded-lg border-2 transition-all
+                        ${dayData.day === null ? 'bg-transparent border-transparent' :
+                          `${getStatusColor(dayData.record, dayData.isFuture)}`
+                        }
+                        ${dayData.isToday ? 'ring-2 ring-primary ring-offset-2' : ''}
+                      `}
+                    >
+                      {dayData.day && (
+                        <>
+                          <div className="flex justify-between items-start mb-1">
+                            <span className={`text-sm font-bold ${dayData.isToday ? 'text-primary' : 'text-default-700'}`}>
+                              {dayData.day}
                             </span>
-                            <div className="text-[10px] text-gray-500">
-                              {dayData.record.checkIn && (
-                                <div>In: {formatTime(dayData.record.checkIn)}</div>
-                              )}
-                              {dayData.record.checkOut && (
-                                <div>Out: {formatTime(dayData.record.checkOut)}</div>
-                              )}
-                              {dayData.record.workHours && (
-                                <div className="font-medium">{dayData.record.workHours}h</div>
-                              )}
-                            </div>
-                            {/* Location indicators */}
-                            {(dayData.record.location?.checkIn?.address || dayData.record.location?.checkOut?.address) && (
-                              <div className="text-[9px] text-gray-400 mt-1 space-y-0.5">
-                                {dayData.record.location?.checkIn?.address && (
-                                  <div className="flex items-start gap-0.5" title={dayData.record.location.checkIn.address}>
-                                    <FaMapMarkerAlt className="text-green-500 w-2 h-2 mt-0.5 flex-shrink-0" />
-                                    <span className="truncate max-w-[60px]">
-                                      {dayData.record.location.checkIn.addressDetails?.city ||
-                                        dayData.record.location.checkIn.address.split(',')[0]}
-                                    </span>
-                                  </div>
+                          </div>
+
+                          {dayData.record ? (
+                            <div className="space-y-1">
+                              <span className={`text-xs font-medium capitalize ${getStatusTextColor(dayData.record.status)}`}>
+                                {dayData.record.status === 'in-progress' ? 'In Progress' : dayData.record.status}
+                              </span>
+                              <div className="text-[10px] text-default-500">
+                                {dayData.record.checkIn && (
+                                  <div>In: {formatTime(dayData.record.checkIn)}</div>
                                 )}
-                                {dayData.record.location?.checkOut?.address && (
-                                  <div className="flex items-start gap-0.5" title={dayData.record.location.checkOut.address}>
-                                    <FaMapMarkerAlt className="text-red-500 w-2 h-2 mt-0.5 flex-shrink-0" />
-                                    <span className="truncate max-w-[60px]">
-                                      {dayData.record.location.checkOut.addressDetails?.city ||
-                                        dayData.record.location.checkOut.address.split(',')[0]}
-                                    </span>
-                                  </div>
+                                {dayData.record.checkOut && (
+                                  <div>Out: {formatTime(dayData.record.checkOut)}</div>
+                                )}
+                                {dayData.record.workHours && (
+                                  <div className="font-medium">{dayData.record.workHours}h</div>
                                 )}
                               </div>
-                            )}
-                          </div>
-                        ) : !dayData.isFuture ? (
-                          <div className="text-xs text-gray-400 mt-1">
-                            No record
-                          </div>
-                        ) : null}
-                      </>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Monthly Summary */}
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Monthly Summary</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-green-50 rounded-lg p-4 text-center">
-                <p className="text-2xl font-bold text-green-600">
-                  {attendance.filter(r => r.status === 'present').length}
-                </p>
-                <p className="text-sm text-green-700">Present Days</p>
-              </div>
-              <div className="bg-red-50 rounded-lg p-4 text-center">
-                <p className="text-2xl font-bold text-red-600">
-                  {attendance.filter(r => r.status === 'absent').length}
-                </p>
-                <p className="text-sm text-red-700">Absent Days</p>
-              </div>
-              <div className="bg-amber-50 rounded-lg p-4 text-center">
-                <p className="text-2xl font-bold text-amber-600">
-                  {attendance.filter(r => r.status === 'late').length}
-                </p>
-                <p className="text-sm text-amber-700">Late Days</p>
-              </div>
-              <div className="bg-yellow-50 rounded-lg p-4 text-center">
-                <p className="text-2xl font-bold text-yellow-600">
-                  {attendance.filter(r => r.status === 'half-day').length}
-                </p>
-                <p className="text-sm text-yellow-700">Half Days</p>
-              </div>
-            </div>
-
-            {/* Total Work Hours */}
-            <div className="mt-4 bg-blue-50 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <FaClock className="text-blue-600" />
-                  <span className="text-blue-700 font-medium">Total Work Hours</span>
+                              {/* Location indicators */}
+                              {(dayData.record.location?.checkIn?.address || dayData.record.location?.checkOut?.address) && (
+                                <div className="text-[9px] text-default-400 mt-1 space-y-0.5">
+                                  {dayData.record.location?.checkIn?.address && (
+                                    <div className="flex items-start gap-0.5" title={dayData.record.location.checkIn.address}>
+                                      <FaMapMarkerAlt className="text-success w-2 h-2 mt-0.5 flex-shrink-0" />
+                                      <span className="truncate max-w-[60px]">
+                                        {dayData.record.location.checkIn.addressDetails?.city ||
+                                          dayData.record.location.checkIn.address.split(',')[0]}
+                                      </span>
+                                    </div>
+                                  )}
+                                  {dayData.record.location?.checkOut?.address && (
+                                    <div className="flex items-start gap-0.5" title={dayData.record.location.checkOut.address}>
+                                      <FaMapMarkerAlt className="text-danger w-2 h-2 mt-0.5 flex-shrink-0" />
+                                      <span className="truncate max-w-[60px]">
+                                        {dayData.record.location.checkOut.addressDetails?.city ||
+                                          dayData.record.location.checkOut.address.split(',')[0]}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          ) : !dayData.isFuture ? (
+                            <div className="text-xs text-default-400 mt-1">
+                              No record
+                            </div>
+                          ) : null}
+                        </>
+                      )}
+                    </div>
+                  ))}
                 </div>
-                <span className="text-2xl font-bold text-blue-600">
-                  {attendance.reduce((sum, r) => sum + (r.workHours || 0), 0).toFixed(1)}h
-                </span>
+              </div>
+            )}
+
+            {/* Monthly Summary */}
+            <div className="mt-6 pt-6 border-t border-default-200">
+              <h3 className="text-lg font-semibold text-default-800 mb-4">Monthly Summary</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="bg-success-50 rounded-lg p-4 text-center">
+                  <p className="text-2xl font-bold text-success-600">
+                    {attendance.filter(r => r.status === 'present').length}
+                  </p>
+                  <p className="text-sm text-success-700">Present Days</p>
+                </div>
+                <div className="bg-danger-50 rounded-lg p-4 text-center">
+                  <p className="text-2xl font-bold text-danger-600">
+                    {attendance.filter(r => r.status === 'absent').length}
+                  </p>
+                  <p className="text-sm text-danger-700">Absent Days</p>
+                </div>
+                <div className="bg-warning-50 rounded-lg p-4 text-center">
+                  <p className="text-2xl font-bold text-warning-600">
+                    {attendance.filter(r => r.status === 'late').length}
+                  </p>
+                  <p className="text-sm text-warning-700">Late Days</p>
+                </div>
+                <div className="bg-secondary-50 rounded-lg p-4 text-center">
+                  <p className="text-2xl font-bold text-secondary-600">
+                    {attendance.filter(r => r.status === 'half-day').length}
+                  </p>
+                  <p className="text-sm text-secondary-700">Half Days</p>
+                </div>
+              </div>
+
+              {/* Total Work Hours */}
+              <div className="mt-4 bg-primary-50 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <FaClock className="text-primary" />
+                    <span className="text-primary-700 font-medium">Total Work Hours</span>
+                  </div>
+                  <span className="text-2xl font-bold text-primary">
+                    {attendance.reduce((sum, r) => sum + (r.workHours || 0), 0).toFixed(1)}h
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
+          </CardBody>
+        </Card>
       )}
     </div>
   )

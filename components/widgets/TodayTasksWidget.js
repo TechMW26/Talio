@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { FaTasks, FaExclamationTriangle, FaCheckCircle, FaSpinner } from 'react-icons/fa'
+import { Card, CardBody, Button, Chip, Skeleton, ScrollShadow, Spinner } from '@heroui/react'
 
 export default function TodayTasksWidget({ limit = 5 }) {
     const [tasks, setTasks] = useState([])
@@ -33,38 +34,44 @@ export default function TodayTasksWidget({ limit = 5 }) {
 
     const getStatusColor = (status) => {
         switch (status) {
-            case 'completed': return 'bg-green-100 text-green-800'
-            case 'in_progress': return 'bg-blue-100 text-blue-800'
-            case 'assigned': return 'bg-yellow-100 text-yellow-800'
-            case 'review': return 'bg-purple-100 text-purple-800'
-            default: return 'bg-gray-100 text-gray-800'
+            case 'completed': return 'success'
+            case 'in_progress': return 'primary'
+            case 'assigned': return 'warning'
+            case 'review': return 'secondary'
+            default: return 'default'
         }
     }
 
     const getStatusIcon = (status) => {
         switch (status) {
-            case 'completed': return <FaCheckCircle className="text-green-500" />
-            case 'in_progress': return <FaSpinner className="text-blue-500 animate-spin" />
-            default: return <FaTasks className="text-gray-500" />
+            case 'completed': return <FaCheckCircle className="text-success-500" />
+            case 'in_progress': return <Spinner size="sm" color="primary" />
+            default: return <FaTasks className="text-default-500" />
         }
     }
 
     const getPriorityColor = (priority) => {
         switch (priority) {
-            case 'high': return 'text-red-600'
-            case 'medium': return 'text-yellow-600'
-            case 'low': return 'text-green-600'
-            default: return 'text-gray-600'
+            case 'high': return 'danger'
+            case 'medium': return 'warning'
+            case 'low': return 'success'
+            default: return 'default'
         }
     }
 
     if (loading) {
         return (
-            <div className="p-4 sm:p-6 animate-pulse flex-1 flex flex-col h-full">
-                <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
+            <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+                <Skeleton className="h-6 w-1/3 rounded-lg mb-4" />
                 <div className="space-y-3">
                     {[1, 2, 3].map(i => (
-                        <div key={i} className="h-16 bg-gray-200 rounded"></div>
+                        <div key={i} className="flex items-center gap-3">
+                            <Skeleton className="w-8 h-8 rounded-full" />
+                            <div className="flex-1 space-y-2">
+                                <Skeleton className="h-4 w-3/4 rounded-lg" />
+                                <Skeleton className="h-3 w-1/2 rounded-lg" />
+                            </div>
+                        </div>
                     ))}
                 </div>
             </div>
@@ -74,58 +81,63 @@ export default function TodayTasksWidget({ limit = 5 }) {
     return (
         <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
             <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base sm:text-lg font-bold text-gray-800">Today's Tasks</h3>
-                <a
+                <h3 className="text-base sm:text-lg font-bold text-default-900">Today's Tasks</h3>
+                <Button
+                    variant="light"
+                    color="primary"
+                    size="sm"
+                    as="a"
                     href="/dashboard/projects"
-                    className="text-primary-600 hover:text-primary-800 text-sm font-medium"
                 >
                     View All
-                </a>
+                </Button>
             </div>
             
-            <div className="space-y-2 max-h-[200px] overflow-y-auto">
+            <ScrollShadow className="space-y-2 max-h-[200px]">
                 {tasks.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center text-center py-4 text-gray-500">
-                        <img
-                            src="/assets/Task.png"
-                            alt="No tasks today"
-                            className="w-28 h-28 object-contain mb-2"
-                        />
-                        <p className="text-sm">No tasks due today</p>
+                    <div className="flex flex-col items-center justify-center text-center py-6">
+                        <div className="w-14 h-14 rounded-full bg-primary-100 flex items-center justify-center mb-3">
+                            <FaTasks className="w-7 h-7 text-primary-400" />
+                        </div>
+                        <p className="text-sm text-default-500">No tasks due today</p>
                     </div>
                 ) : (
                     tasks.map((task, index) => (
-                        <div
+                        <Card
                             key={task._id || index}
-                            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                            className="bg-default-50 border border-default-100"
                         >
-                            <div className="flex items-center gap-3 min-w-0 flex-1">
-                                <div className="flex-shrink-0">
-                                    {getStatusIcon(task.status)}
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-medium text-gray-800 truncate">
-                                        #{task.taskNumber} - {task.title}
-                                    </p>
-                                    <div className="flex items-center gap-2 mt-1">
-                                        {task.priority && (
-                                            <span className={`text-xs font-medium ${getPriorityColor(task.priority)}`}>
-                                                {task.priority.toUpperCase()}
-                                            </span>
-                                        )}
-                                        <span className="text-xs text-gray-500">
-                                            {task.progress || 0}% complete
-                                        </span>
+                            <CardBody className="p-3">
+                                <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                                        <div className="flex-shrink-0">
+                                            {getStatusIcon(task.status)}
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-semibold text-default-900 truncate">
+                                                #{task.taskNumber} - {task.title}
+                                            </p>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                {task.priority && (
+                                                    <Chip size="sm" color={getPriorityColor(task.priority)} variant="flat">
+                                                        {task.priority.toUpperCase()}
+                                                    </Chip>
+                                                )}
+                                                <span className="text-xs text-default-500">
+                                                    {task.progress || 0}% complete
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
+                                    <Chip size="sm" color={getStatusColor(task.status)} variant="flat" className="ml-2">
+                                        {task.status?.replace('_', ' ')}
+                                    </Chip>
                                 </div>
-                            </div>
-                            <span className={`text-xs px-2 py-1 rounded-full ml-2 ${getStatusColor(task.status)}`}>
-                                {task.status?.replace('_', ' ')}
-                            </span>
-                        </div>
+                            </CardBody>
+                        </Card>
                     ))
                 )}
-            </div>
+            </ScrollShadow>
         </div>
     )
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import toast from '@/utils/toast'
+import { Select, SelectItem, Button } from '@heroui/react'
 import Loader from '@/components/ui/Loader'
 import {
   FaArrowLeft, FaUser, FaEnvelope, FaPhone, FaCalendarAlt,
@@ -335,32 +336,34 @@ export default function TeamMemberDetailsPage() {
               {/* Type Selection */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
-                <select
-                  value={reviewForm.type}
+                <Select
+                  selectedKeys={[reviewForm.type]}
                   onChange={(e) => setReviewForm({ ...reviewForm, type: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  aria-label="Type"
+                  classNames={{ trigger: "bg-white" }}
                 >
-                  <option value="review">Review</option>
-                  <option value="remark">Remark</option>
-                  <option value="feedback">Feedback</option>
-                  <option value="warning">Warning</option>
-                  <option value="appreciation">Appreciation</option>
-                </select>
+                  <SelectItem key="review">Review</SelectItem>
+                  <SelectItem key="remark">Remark</SelectItem>
+                  <SelectItem key="feedback">Feedback</SelectItem>
+                  <SelectItem key="warning">Warning</SelectItem>
+                  <SelectItem key="appreciation">Appreciation</SelectItem>
+                </Select>
               </div>
 
               {/* Category Selection */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-                <select
-                  value={reviewForm.category}
+                <Select
+                  selectedKeys={[reviewForm.category]}
                   onChange={(e) => setReviewForm({ ...reviewForm, category: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  aria-label="Category"
+                  classNames={{ trigger: "bg-white" }}
                 >
-                  <option value="general">General</option>
-                  <option value="performance">Performance</option>
-                  <option value="behavior">Behavior</option>
-                  <option value="skills">Skills</option>
-                </select>
+                  <SelectItem key="general">General</SelectItem>
+                  <SelectItem key="performance">Performance</SelectItem>
+                  <SelectItem key="behavior">Behavior</SelectItem>
+                  <SelectItem key="skills">Skills</SelectItem>
+                </Select>
               </div>
 
               {/* Rating (only for reviews) */}

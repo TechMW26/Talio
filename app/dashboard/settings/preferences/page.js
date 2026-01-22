@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import toast from '@/utils/toast'
 import { FaCog, FaMoneyBillWave, FaClock, FaCalendarAlt, FaSave } from 'react-icons/fa'
 import Loader from '@/components/ui/Loader'
+import { Card, CardBody, CardHeader, Button, Select, SelectItem, Input, Textarea, Checkbox } from '@heroui/react'
 
 export default function PreferencesPage() {
   const [user, setUser] = useState(null)
@@ -129,14 +130,14 @@ export default function PreferencesPage() {
           <h1 className="text-3xl font-bold text-gray-800">System Preferences</h1>
           <p className="text-gray-600 mt-1">Configure system-wide settings and preferences</p>
         </div>
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="px-6 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
+        <Button
+          onPress={handleSave}
+          isLoading={saving}
+          color="primary"
+          startContent={!saving && <FaSave className="w-4 h-4" />}
         >
-          <FaSave className="w-4 h-4" />
-          <span>{saving ? 'Saving...' : 'Save Changes'}</span>
-        </button>
+          {saving ? 'Saving...' : 'Save Changes'}
+        </Button>
       </div>
 
       <div className="space-y-6">
@@ -148,29 +149,26 @@ export default function PreferencesPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Currency</label>
-              <select
-                value={preferences.currency}
-                onChange={(e) => {
-                  const currency = e.target.value
+              <Select
+                label="Currency"
+                selectedKeys={[preferences.currency]}
+                onSelectionChange={(keys) => {
+                  const currency = Array.from(keys)[0]
                   const symbol = currency === 'INR' ? '₹' : currency === 'USD' ? '$' : '€'
                   handleChange('currency', currency)
                   handleChange('currencySymbol', symbol)
                 }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               >
-                <option value="INR">Indian Rupee (INR)</option>
-                <option value="USD">US Dollar (USD)</option>
-                <option value="EUR">Euro (EUR)</option>
-              </select>
+                <SelectItem key="INR">Indian Rupee (INR)</SelectItem>
+                <SelectItem key="USD">US Dollar (USD)</SelectItem>
+                <SelectItem key="EUR">Euro (EUR)</SelectItem>
+              </Select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Currency Symbol</label>
-              <input
-                type="text"
+              <Input
+                label="Currency Symbol"
                 value={preferences.currencySymbol}
                 onChange={(e) => handleChange('currencySymbol', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 placeholder="₹"
               />
             </div>
@@ -185,50 +183,46 @@ export default function PreferencesPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Time Format</label>
-              <select
-                value={preferences.timeFormat}
-                onChange={(e) => handleChange('timeFormat', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              <Select
+                label="Time Format"
+                selectedKeys={[preferences.timeFormat]}
+                onSelectionChange={(keys) => handleChange('timeFormat', Array.from(keys)[0])}
               >
-                <option value="12">12 Hour (AM/PM)</option>
-                <option value="24">24 Hour</option>
-              </select>
+                <SelectItem key="12">12 Hour (AM/PM)</SelectItem>
+                <SelectItem key="24">24 Hour</SelectItem>
+              </Select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Date Format</label>
-              <select
-                value={preferences.dateFormat}
-                onChange={(e) => handleChange('dateFormat', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              <Select
+                label="Date Format"
+                selectedKeys={[preferences.dateFormat]}
+                onSelectionChange={(keys) => handleChange('dateFormat', Array.from(keys)[0])}
               >
-                <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-                <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-                <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-              </select>
+                <SelectItem key="DD/MM/YYYY">DD/MM/YYYY</SelectItem>
+                <SelectItem key="MM/DD/YYYY">MM/DD/YYYY</SelectItem>
+                <SelectItem key="YYYY-MM-DD">YYYY-MM-DD</SelectItem>
+              </Select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Timezone</label>
-              <select
-                value={preferences.timezone}
-                onChange={(e) => handleChange('timezone', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              <Select
+                label="Timezone"
+                selectedKeys={[preferences.timezone]}
+                onSelectionChange={(keys) => handleChange('timezone', Array.from(keys)[0])}
               >
-                <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
-                <option value="America/New_York">America/New_York (EST)</option>
-                <option value="Europe/London">Europe/London (GMT)</option>
-              </select>
+                <SelectItem key="Asia/Kolkata">Asia/Kolkata (IST)</SelectItem>
+                <SelectItem key="America/New_York">America/New_York (EST)</SelectItem>
+                <SelectItem key="Europe/London">Europe/London (GMT)</SelectItem>
+              </Select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Week Starts On</label>
-              <select
-                value={preferences.weekStartsOn}
-                onChange={(e) => handleChange('weekStartsOn', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              <Select
+                label="Week Starts On"
+                selectedKeys={[preferences.weekStartsOn]}
+                onSelectionChange={(keys) => handleChange('weekStartsOn', Array.from(keys)[0])}
               >
-                <option value="monday">Monday</option>
-                <option value="sunday">Sunday</option>
-              </select>
+                <SelectItem key="monday">Monday</SelectItem>
+                <SelectItem key="sunday">Sunday</SelectItem>
+              </Select>
             </div>
           </div>
         </div>
@@ -241,25 +235,23 @@ export default function PreferencesPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Working Days Per Week</label>
-              <input
+              <Input
+                label="Working Days Per Week"
                 type="number"
-                min="1"
-                max="7"
-                value={preferences.workingDaysPerWeek}
+                min={1}
+                max={7}
+                value={String(preferences.workingDaysPerWeek)}
                 onChange={(e) => handleChange('workingDaysPerWeek', parseInt(e.target.value))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Working Hours Per Day</label>
-              <input
+              <Input
+                label="Working Hours Per Day"
                 type="number"
-                min="1"
-                max="24"
-                value={preferences.workingHoursPerDay}
+                min={1}
+                max={24}
+                value={String(preferences.workingHoursPerDay)}
                 onChange={(e) => handleChange('workingHoursPerDay', parseInt(e.target.value))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
             </div>
           </div>
@@ -273,37 +265,32 @@ export default function PreferencesPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Late Threshold (Minutes)</label>
-              <input
+              <Input
+                label="Late Threshold (Minutes)"
                 type="number"
-                min="0"
-                value={preferences.lateThresholdMinutes}
+                min={0}
+                value={String(preferences.lateThresholdMinutes)}
                 onChange={(e) => handleChange('lateThresholdMinutes', parseInt(e.target.value))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Half Day Threshold (Hours)</label>
-              <input
+              <Input
+                label="Half Day Threshold (Hours)"
                 type="number"
-                min="1"
-                max="12"
-                value={preferences.halfDayThresholdHours}
+                min={1}
+                max={12}
+                value={String(preferences.halfDayThresholdHours)}
                 onChange={(e) => handleChange('halfDayThresholdHours', parseInt(e.target.value))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
             </div>
           </div>
           <div className="mt-4">
-            <label className="flex items-center">
-              <input
-                type="checkbox"
-                checked={preferences.autoMarkAbsent}
-                onChange={(e) => handleChange('autoMarkAbsent', e.target.checked)}
-                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-              />
-              <span className="ml-2 text-sm text-gray-900">Automatically mark employees as absent if no check-in</span>
-            </label>
+            <Checkbox
+              isSelected={preferences.autoMarkAbsent}
+              onValueChange={(checked) => handleChange('autoMarkAbsent', checked)}
+            >
+              Automatically mark employees as absent if no check-in
+            </Checkbox>
           </div>
         </div>
 
@@ -315,43 +302,38 @@ export default function PreferencesPage() {
           </div>
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Company Name</label>
-              <input
-                type="text"
+              <Input
+                label="Company Name"
                 value={preferences.companyName}
                 onChange={(e) => handleChange('companyName', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 placeholder="Your Company Name"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Company Address</label>
-              <textarea
+              <Textarea
+                label="Company Address"
                 value={preferences.companyAddress}
                 onChange={(e) => handleChange('companyAddress', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                rows="3"
+                minRows={3}
                 placeholder="Company Address"
               />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Company Phone</label>
-                <input
+                <Input
+                  label="Company Phone"
                   type="tel"
                   value={preferences.companyPhone}
                   onChange={(e) => handleChange('companyPhone', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   placeholder="+91 12345 67890"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Company Email</label>
-                <input
+                <Input
+                  label="Company Email"
                   type="email"
                   value={preferences.companyEmail}
                   onChange={(e) => handleChange('companyEmail', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   placeholder="info@company.com"
                 />
               </div>

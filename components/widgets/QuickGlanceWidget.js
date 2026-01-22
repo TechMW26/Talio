@@ -2,28 +2,29 @@
 
 import { FaClock, FaSignInAlt, FaSignOutAlt, FaCheckCircle } from 'react-icons/fa'
 import { useMemo, useState, useEffect } from 'react'
+import { Card, CardBody, Chip } from '@heroui/react'
 
 // Helper to calculate displayed status based on time and settings
 function getDisplayedStatus(todayAttendance, companySettings) {
   // If user has an attendance record with check-in, show actual status
   if (todayAttendance?.checkIn) {
-    if (todayAttendance.workFromHome) return { status: 'wfh', label: 'WFH', bgColor: 'bg-purple-100' }
-    if (todayAttendance.status === 'present') return { status: 'present', label: 'Present', bgColor: 'bg-green-100' }
-    if (todayAttendance.status === 'half-day') return { status: 'half-day', label: 'Half Day', bgColor: 'bg-yellow-100' }
-    if (todayAttendance.status === 'in-progress') return { status: 'in-progress', label: 'In Progress', bgColor: 'bg-blue-100' }
-    if (todayAttendance.status === 'on-leave') return { status: 'on-leave', label: 'On Leave', bgColor: 'bg-orange-100' }
-    if (todayAttendance.status === 'absent') return { status: 'absent', label: 'Absent', bgColor: 'bg-red-100' }
-    return { status: 'in-progress', label: 'In Progress', bgColor: 'bg-blue-100' }
+    if (todayAttendance.workFromHome) return { status: 'wfh', label: 'WFH', color: 'secondary' }
+    if (todayAttendance.status === 'present') return { status: 'present', label: 'Present', color: 'success' }
+    if (todayAttendance.status === 'half-day') return { status: 'half-day', label: 'Half Day', color: 'warning' }
+    if (todayAttendance.status === 'in-progress') return { status: 'in-progress', label: 'In Progress', color: 'primary' }
+    if (todayAttendance.status === 'on-leave') return { status: 'on-leave', label: 'On Leave', color: 'warning' }
+    if (todayAttendance.status === 'absent') return { status: 'absent', label: 'Absent', color: 'danger' }
+    return { status: 'in-progress', label: 'In Progress', color: 'primary' }
   }
 
   // If on approved leave
   if (todayAttendance?.status === 'on-leave') {
-    return { status: 'on-leave', label: 'On Leave', bgColor: 'bg-orange-100' }
+    return { status: 'on-leave', label: 'On Leave', color: 'warning' }
   }
 
   // If attendance record exists with absent status (e.g., auto-marked)
   if (todayAttendance?.status === 'absent') {
-    return { status: 'absent', label: 'Absent', bgColor: 'bg-red-100' }
+    return { status: 'absent', label: 'Absent', color: 'danger' }
   }
 
   // No check-in yet - calculate based on time and thresholds
@@ -44,16 +45,16 @@ function getDisplayedStatus(todayAttendance, companySettings) {
 
   // If it's before office hours, show "Not Started"
   if (now < officeStart) {
-    return { status: 'not-started', label: 'Not Started', bgColor: 'bg-gray-100' }
+    return { status: 'not-started', label: 'Not Started', color: 'default' }
   }
 
   // If current time is past the absent threshold, show "Absent"
   if (now >= absentThresholdTime) {
-    return { status: 'absent', label: 'Absent', bgColor: 'bg-red-100' }
+    return { status: 'absent', label: 'Absent', color: 'danger' }
   }
 
   // Between office start and absent threshold - show "Not Checked In"
-  return { status: 'not-checked-in', label: 'Not Checked In', bgColor: 'bg-amber-100' }
+  return { status: 'not-checked-in', label: 'Not Checked In', color: 'warning' }
 }
 
 export default function QuickGlanceWidget({
@@ -137,102 +138,97 @@ export default function QuickGlanceWidget({
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <FaClock className="w-5 h-5 text-primary-500" />
-          <h3 className="text-base sm:text-lg font-bold text-gray-800">Quick Glance</h3>
+          <h3 className="text-base sm:text-lg font-bold text-default-900">Quick Glance</h3>
         </div>
         <div className="flex items-center gap-2">
-          <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg ${isCountingDown
-              ? remainingTime > 3600 ? 'bg-green-100'
-                : remainingTime > 1800 ? 'bg-yellow-100'
-                  : 'bg-red-100'
-              : 'bg-gray-100'
-            }`}>
-            <FaClock className={`w-3.5 h-3.5 ${isCountingDown
-                ? remainingTime > 3600 ? 'text-green-600'
-                  : remainingTime > 1800 ? 'text-yellow-600'
-                    : 'text-red-600'
-                : 'text-gray-600'
-              }`} />
-            <span className={`text-sm font-bold ${isCountingDown
-                ? remainingTime > 3600 ? 'text-green-700'
-                  : remainingTime > 1800 ? 'text-yellow-700'
-                    : 'text-red-700'
-                : 'text-gray-700'
-              }`}>
-              {formatCountdown(remainingTime)}
-            </span>
-          </div>
+          <Chip
+            size="sm"
+            variant="flat"
+            color={isCountingDown
+              ? remainingTime > 3600 ? 'success'
+                : remainingTime > 1800 ? 'warning'
+                  : 'danger'
+              : 'default'
+            }
+            startContent={<FaClock className="w-3 h-3" />}
+          >
+            {formatCountdown(remainingTime)}
+          </Chip>
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-2 flex-1">
         {/* Check In Time */}
-        <div className="bg-gray-50 rounded-lg p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
-              <FaSignInAlt className="w-3 h-3 text-green-600" />
+        <Card className="bg-success-50 border border-success-100">
+          <CardBody className="p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-6 h-6 rounded-full bg-success-100 flex items-center justify-center">
+                <FaSignInAlt className="w-3 h-3 text-success-600" />
+              </div>
+              <p className="text-xs font-medium text-default-600">Check In</p>
             </div>
-            <p className="text-xs font-medium text-gray-600">Check In</p>
-          </div>
-          <p className="text-lg font-bold text-gray-800">
-            {todayAttendance?.checkIn
-              ? new Date(todayAttendance.checkIn).toLocaleTimeString('en-IN', {
+            <p className="text-lg font-bold text-default-900">
+              {todayAttendance?.checkIn
+                ? new Date(todayAttendance.checkIn).toLocaleTimeString('en-IN', {
                 hour: '2-digit',
                 minute: '2-digit',
                 hour12: true
               })
               : '--:--'}
-          </p>
-        </div>
+            </p>
+          </CardBody>
+        </Card>
 
         {/* Check Out Time */}
-        <div className="bg-gray-50 rounded-lg p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center">
-              <FaSignOutAlt className="w-3 h-3 text-red-600" />
+        <Card className="bg-danger-50 border border-danger-100">
+          <CardBody className="p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-6 h-6 rounded-full bg-danger-100 flex items-center justify-center">
+                <FaSignOutAlt className="w-3 h-3 text-danger-600" />
+              </div>
+              <p className="text-xs font-medium text-default-600">Check Out</p>
             </div>
-            <p className="text-xs font-medium text-gray-600">Check Out</p>
-          </div>
-          <p className="text-lg font-bold text-gray-800">
-            {todayAttendance?.checkOut
-              ? new Date(todayAttendance.checkOut).toLocaleTimeString('en-IN', {
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: true
-              })
-              : '--:--'}
-          </p>
-        </div>
+            <p className="text-lg font-bold text-default-900">
+              {todayAttendance?.checkOut
+                ? new Date(todayAttendance.checkOut).toLocaleTimeString('en-IN', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: true
+                })
+                : '--:--'}
+            </p>
+          </CardBody>
+        </Card>
 
         {/* Work Hours */}
-        <div className="bg-gray-50 rounded-lg p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center">
-              <FaClock className="w-3 h-3 text-primary-600" />
+        <Card className="bg-primary-50 border border-primary-100">
+          <CardBody className="p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center">
+                <FaClock className="w-3 h-3 text-primary-600" />
+              </div>
+              <p className="text-xs font-medium text-default-600">Work Hours</p>
             </div>
-            <p className="text-xs font-medium text-gray-600">Work Hours</p>
-          </div>
-          <p className="text-lg font-bold text-gray-800">
-            {currentWorkHours}
-          </p>
-        </div>
+            <p className="text-lg font-bold text-default-900">
+              {currentWorkHours}
+            </p>
+          </CardBody>
+        </Card>
 
         {/* Work Status */}
-        <div className="bg-gray-50 rounded-lg p-3">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center">
-              <FaCheckCircle className="w-3 h-3 text-purple-600" />
+        <Card className="bg-secondary-50 border border-secondary-100">
+          <CardBody className="p-3">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-6 h-6 rounded-full bg-secondary-100 flex items-center justify-center">
+                <FaCheckCircle className="w-3 h-3 text-secondary-600" />
+              </div>
+              <p className="text-xs font-medium text-default-600">Status</p>
             </div>
-            <p className="text-xs font-medium text-gray-600">Status</p>
-          </div>
-          <p className={`text-sm font-bold capitalize ${
-            displayedStatus.status === 'present' || displayedStatus.status === 'in-progress' ? 'text-green-700' :
-            displayedStatus.status === 'absent' ? 'text-red-700' :
-            displayedStatus.status === 'on-leave' ? 'text-orange-700' :
-            'text-gray-700'
-          }`}>
-            {displayedStatus.label}
-          </p>
-        </div>
+            <Chip size="sm" color={displayedStatus.color} variant="flat" className="capitalize">
+              {displayedStatus.label}
+            </Chip>
+          </CardBody>
+        </Card>
       </div>
     </div>
   )

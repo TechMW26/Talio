@@ -1,4 +1,4 @@
-import { Raleway, Poppins, Caveat, Dancing_Script, Indie_Flower, Patrick_Hand, Shadows_Into_Light } from 'next/font/google'
+import { Inter, Raleway, Poppins, Montserrat, Caveat, Dancing_Script, Indie_Flower, Patrick_Hand, Shadows_Into_Light } from 'next/font/google'
 import Script from 'next/script'
 import './globals.css'
 import '../styles/mobile-responsive.css'
@@ -11,13 +11,22 @@ import { Providers } from '@/components/Providers'
 import ErrorPageCache from '@/components/ErrorPageCache'
 import SplashVideo from '@/components/SplashVideo'
 
-// Primary font - preload for faster rendering
-const raleway = Raleway({ 
+// Primary font - Montserrat (preload for faster rendering)
+const montserrat = Montserrat({ 
+  weight: ['300', '400', '500', '600', '700'],
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-  variable: '--font-raleway',
+  variable: '--font-montserrat',
   display: 'swap',
   preload: true,
+})
+
+// Secondary font - Inter
+const inter = Inter({ 
+  weight: ['400', '500', '600', '700'],
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+  preload: false,
 })
 
 // Secondary fonts - lazy load with display swap
@@ -25,6 +34,14 @@ const poppins = Poppins({
   weight: ['400', '500', '600', '700'],
   subsets: ['latin'],
   variable: '--font-poppins',
+  display: 'swap',
+  preload: false,
+})
+
+const raleway = Raleway({ 
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-raleway',
   display: 'swap',
   preload: false,
 })
@@ -154,7 +171,7 @@ export default function RootLayout({ children }) {
         }} />
       </head>
 
-      <body className={`${raleway.className} ${raleway.variable} ${poppins.variable} ${caveat.variable} ${dancingScript.variable} ${indieFlower.variable} ${patrickHand.variable} ${shadowsIntoLight.variable}`} suppressHydrationWarning>
+      <body className={`${montserrat.className} ${montserrat.variable} ${inter.variable} ${poppins.variable} ${raleway.variable} ${caveat.variable} ${dancingScript.variable} ${indieFlower.variable} ${patrickHand.variable} ${shadowsIntoLight.variable}`} suppressHydrationWarning>
         {/* Socket.IO Client - Load after interactive for faster initial paint */}
         <Script 
           src="https://cdn.socket.io/4.8.1/socket.io.min.js" 

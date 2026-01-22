@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { Select, SelectItem } from '@heroui/react'
 import toast from '@/utils/toast'
 import Loader from '@/components/ui/Loader'
 
@@ -167,18 +168,19 @@ export default function EmailPage() {
             {/* Company Selector */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Select Company</label>
-              <select
-                value={selectedCompany?._id || 'custom'}
+              <Select
+                selectedKeys={[selectedCompany?._id || 'custom']}
                 onChange={(e) => handleCompanySelect(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                aria-label="Select Company"
+                classNames={{ trigger: "bg-gray-50" }}
               >
-                <option value="custom">Custom Recipient</option>
+                <SelectItem key="custom">Custom Recipient</SelectItem>
                 {companies.map((company) => (
-                  <option key={company._id} value={company._id}>
+                  <SelectItem key={company._id}>
                     {company.name} ({company.primaryContact?.email})
-                  </option>
+                  </SelectItem>
                 ))}
-              </select>
+              </Select>
             </div>
 
             {/* To */}

@@ -1,25 +1,47 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { Spinner, Skeleton, Card, CardBody } from '@heroui/react'
 import UnifiedDashboard from '@/components/dashboards/UnifiedDashboard'
 
-// Lightweight skeleton for faster perceived loading
+// Modern skeleton loader for dashboard using Hero UI
 function DashboardSkeleton() {
   return (
-    <div className="min-h-screen bg-gray-50 p-4 sm:p-6">
-      <div className="animate-pulse space-y-4">
+    <div className="min-h-screen bg-background p-4 sm:p-6">
+      <div className="space-y-6">
         {/* Header skeleton */}
-        <div className="h-16 bg-white rounded-xl shadow-sm"></div>
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-8 w-48 rounded-lg" />
+          <Skeleton className="h-10 w-32 rounded-lg" />
+        </div>
+        
         {/* KPI cards skeleton */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map(i => (
-            <div key={i} className="h-24 bg-white rounded-xl shadow-sm"></div>
+            <Card key={i} className="shadow-sm">
+              <CardBody className="p-4">
+                <div className="space-y-3">
+                  <Skeleton className="h-3 w-20 rounded-lg" />
+                  <Skeleton className="h-8 w-24 rounded-lg" />
+                  <Skeleton className="h-3 w-16 rounded-lg" />
+                </div>
+              </CardBody>
+            </Card>
           ))}
         </div>
+        
         {/* Widget grid skeleton */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3, 4, 5, 6].map(i => (
-            <div key={i} className="h-48 bg-white rounded-xl shadow-sm"></div>
+            <Card key={i} className="shadow-sm">
+              <CardBody className="p-4">
+                <Skeleton className="h-4 w-32 rounded-lg mb-4" />
+                <div className="space-y-3">
+                  <Skeleton className="h-20 w-full rounded-lg" />
+                  <Skeleton className="h-4 w-3/4 rounded-lg" />
+                </div>
+              </CardBody>
+            </Card>
           ))}
         </div>
       </div>

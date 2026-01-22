@@ -1,16 +1,25 @@
 'use client'
 
-import { useState, useEffect, Fragment } from 'react'
-import { Dialog, Transition } from '@headlessui/react'
+import { useState, useEffect } from 'react'
 import {
-  HiOutlineXMark,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  Button,
+  Input,
+  Select,
+  SelectItem,
+  Chip
+} from '@heroui/react'
+import {
   HiOutlineFlag,
   HiOutlineCalendarDays,
   HiOutlineClock,
   HiOutlineBell,
   HiOutlineTag
 } from 'react-icons/hi2'
-import Loader from '@/components/ui/Loader'
 import toast from '@/utils/toast'
 
 const PRIORITY_OPTIONS = [
@@ -133,188 +142,123 @@ export default function CreateTodoModal({ isOpen, onClose, onSuccess, categories
   }
 
   return (
-    <Transition appear show={isOpen} as={Fragment}>
-      <Dialog as="div" className="relative z-50" onClose={onClose}>
-        <Transition.Child
-          as={Fragment}
-          enter="ease-out duration-300"
-          enterFrom="opacity-0"
-          enterTo="opacity-100"
-          leave="ease-in duration-200"
-          leaveFrom="opacity-100"
-          leaveTo="opacity-0"
-        >
-          <div className="fixed inset-0 z-0 flex items-center justify-center p-4 overflow-y-auto bg-white/80" />
-        </Transition.Child>
+    <Modal isOpen={isOpen} onOpenChange={(open) => !open && onClose()} size="lg">
+      <ModalContent>
+        {(onModalClose) => (
+          <>
+            <ModalHeader className="flex flex-col gap-1">
+              Create New To-do
+            </ModalHeader>
+            <ModalBody>
+              <form id="create-todo-form" onSubmit={handleSubmit} className="space-y-4">
+                {/* Title */}
+                <Input
+                  label="To-do title"
+                  placeholder="Enter to-do title"
+                  value={formData.title}
+                  onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+                  autoFocus
+                  isRequired
+                  size="lg"
+                />
 
-        <div className="fixed inset-0 overflow-y-auto ">
-          <div className="flex items-center justify-center min-h-full p-4">
-            <Transition.Child
-              as={Fragment}
-              enter="ease-out duration-300"
-              enterFrom="opacity-0 scale-95"
-              enterTo="opacity-100 scale-100"
-              leave="ease-in duration-200"
-              leaveFrom="opacity-100 scale-100"
-              leaveTo="opacity-0 scale-95"
-            >
-              <Dialog.Panel className="w-full max-w-lg overflow-hidden transition-all transform bg-white shadow-xl rounded-2xl">
-                <div className="flex items-center justify-between p-4 border-b border-gray-200">
-                  <Dialog.Title className="text-lg font-semibold text-gray-900">
-                    Create New To-do
-                  </Dialog.Title>
-                  <button
-                    onClick={onClose}
-                    className="p-2 text-gray-400 rounded-lg hover:text-gray-600 hover:bg-gray-100"
-                  >
-                    <HiOutlineXMark className="w-5 h-5" />
-                  </button>
+                {/* Due Date & Time */}
+                <div className="grid grid-cols-2 gap-3">
+                  <Input
+                    type="date"
+                    label="Due Date"
+                    value={formData.dueDate}
+                    onChange={(e) => setFormData(prev => ({ ...prev, dueDate: e.target.value }))}
+                    startContent={<HiOutlineCalendarDays className="text-default-400" />}
+                  />
+                  <Input
+                    type="time"
+                    label="Time"
+                    value={formData.dueTime}
+                    onChange={(e) => setFormData(prev => ({ ...prev, dueTime: e.target.value }))}
+                    startContent={<HiOutlineClock className="text-default-400" />}
+                  />
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-4 space-y-4">
-                  {/* Title */}
+                {/* Priority & Category */}
+                <div className="grid grid-cols-2 gap-3">
+                  <Select
+                    label="Priority"
+                    placeholder="Select priority"
+                    selectedKeys={formData.priority ? [formData.priority] : []}
+                    onSelectionChange={(keys) => setFormData(prev => ({ ...prev, priority: Array.from(keys)[0] || '' }))}
+                    startContent={<HiOutlineFlag className="text-default-400" />}
+                  >
+                    {PRIORITY_OPTIONS.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </Select>
+                  <Select
+                    label="Category"
+                    placeholder="Select category"
+                    selectedKeys={formData.category ? [formData.category] : []}
+                    onSelectionChange={(keys) => setFormData(prev => ({ ...prev, category: Array.from(keys)[0] || '' }))}
+                  >
+                    {categories.map(cat => (
+                      <SelectItem key={cat._id} value={cat._id}>
+                        {cat.name}
+                      </SelectItem>
+                    ))}
+                  </Select>
+                </div>
+
+                {/* Reminders */}
+                {formData.dueDate && (
                   <div>
-                    <input
-                      type="text"
-                      placeholder="To-do title"
-                      value={formData.title}
-                      onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
-                      className="w-full px-4 py-3 text-lg font-medium border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                      autoFocus
-                    />
-                  </div>
-
-                  {/* Due Date & Time */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block mb-1 text-sm font-medium text-gray-700">Due Date</label>
-                      <div className="relative">
-                        <HiOutlineCalendarDays className="absolute w-5 h-5 text-gray-400 -translate-y-1/2 left-3 top-1/2" />
-                        <input
-                          type="date"
-                          value={formData.dueDate}
-                          onChange={(e) => setFormData(prev => ({ ...prev, dueDate: e.target.value }))}
-                          className="w-full py-2 pl-10 pr-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block mb-1 text-sm font-medium text-gray-700">Time</label>
-                      <div className="relative">
-                        <HiOutlineClock className="absolute w-5 h-5 text-gray-400 -translate-y-1/2 left-3 top-1/2" />
-                        <input
-                          type="time"
-                          value={formData.dueTime}
-                          onChange={(e) => setFormData(prev => ({ ...prev, dueTime: e.target.value }))}
-                          className="w-full py-2 pl-10 pr-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Priority & Category */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block mb-1 text-sm font-medium text-gray-700">Priority</label>
-                      <div className="relative">
-                        <HiOutlineFlag className="absolute w-5 h-5 text-gray-400 -translate-y-1/2 left-3 top-1/2" />
-                        <select
-                          value={formData.priority}
-                          onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value }))}
-                          className="w-full py-2 pl-10 pr-4 bg-white border border-gray-300 rounded-lg appearance-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    <p className="text-sm font-medium text-default-700 mb-2">
+                      <HiOutlineBell className="inline w-4 h-4 mr-1" />
+                      Reminders
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {REMINDER_OPTIONS.map(opt => (
+                        <Chip
+                          key={opt.value}
+                          variant={formData.reminders.includes(opt.value) ? "solid" : "bordered"}
+                          color={formData.reminders.includes(opt.value) ? "primary" : "default"}
+                          className="cursor-pointer"
+                          onClick={() => toggleReminder(opt.value)}
                         >
-                          {PRIORITY_OPTIONS.map(opt => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block mb-1 text-sm font-medium text-gray-700">Category</label>
-                      <select
-                        value={formData.category}
-                        onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-                        className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                      >
-                        <option value="">No Category</option>
-                        {categories.map(cat => (
-                          <option key={cat._id} value={cat._id}>{cat.name}</option>
-                        ))}
-                      </select>
+                          {opt.label}
+                        </Chip>
+                      ))}
                     </div>
                   </div>
+                )}
 
-                  {/* Reminders */}
-                  {formData.dueDate && (
-                    <div>
-                      <label className="block mb-2 text-sm font-medium text-gray-700">
-                        <HiOutlineBell className="inline w-4 h-4 mr-1" />
-                        Reminders
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        {REMINDER_OPTIONS.map(opt => (
-                          <button
-                            key={opt.value}
-                            type="button"
-                            onClick={() => toggleReminder(opt.value)}
-                            className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
-                              formData.reminders.includes(opt.value)
-                                ? 'bg-indigo-100 border-indigo-300 text-indigo-700'
-                                : 'bg-white border-gray-300 text-gray-600 hover:border-indigo-300'
-                            }`}
-                          >
-                            {opt.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Tags */}
-                  <div>
-                    <label className="block mb-1 text-sm font-medium text-gray-700">
-                      <HiOutlineTag className="inline w-4 h-4 mr-1" />
-                      Tags (comma separated)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="work, urgent, follow-up"
-                      value={formData.tags}
-                      onChange={(e) => setFormData(prev => ({ ...prev, tags: e.target.value }))}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-                    <button
-                      type="button"
-                      onClick={onClose}
-                      className="px-4 py-2 text-gray-700 transition-colors bg-gray-100 rounded-lg hover:bg-gray-200"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={loading || !formData.title.trim()}
-                      className="flex items-center gap-2 px-4 py-2 text-white transition-colors bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {loading ? (
-                        <>
-                          <Loader size="xs" />
-                          Creating...
-                        </>
-                      ) : (
-                        'Create To-do'
-                      )}
-                    </button>
-                  </div>
-                </form>
-              </Dialog.Panel>
-            </Transition.Child>
-          </div>
-        </div>
-      </Dialog>
-    </Transition>
+                {/* Tags */}
+                <Input
+                  label="Tags (comma separated)"
+                  placeholder="work, urgent, follow-up"
+                  value={formData.tags}
+                  onChange={(e) => setFormData(prev => ({ ...prev, tags: e.target.value }))}
+                  startContent={<HiOutlineTag className="text-default-400" />}
+                />
+              </form>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="light" onPress={onModalClose}>
+                Cancel
+              </Button>
+              <Button
+                color="primary"
+                type="submit"
+                form="create-todo-form"
+                isLoading={loading}
+                isDisabled={!formData.title.trim()}
+              >
+                Create To-do
+              </Button>
+            </ModalFooter>
+          </>
+        )}
+      </ModalContent>
+    </Modal>
   )
 }

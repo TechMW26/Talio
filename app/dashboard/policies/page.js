@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaFileAlt, FaEdit, FaTrash, FaCheckCircle, FaExclamationCircle } from 'react-icons/fa'
-import ModalPortal from '@/components/ModalPortal'
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Select, SelectItem, Textarea, Checkbox } from '@heroui/react'
 import Loader from '@/components/ui/Loader'
 
 export default function PoliciesPage() {
@@ -241,13 +241,13 @@ export default function PoliciesPage() {
           <p className="text-gray-600 mt-1">View and manage company policies</p>
         </div>
         {currentUser?.role === 'admin' && (
-          <button
-            onClick={() => setShowModal(true)}
-            className="btn-primary flex items-center space-x-2"
+          <Button
+            onPress={() => setShowModal(true)}
+            color="primary"
+            startContent={<FaPlus />}
           >
-            <FaPlus />
-            <span>Add Policy</span>
-          </button>
+            Add Policy
+          </Button>
         )}
       </div>
 
@@ -350,202 +350,165 @@ export default function PoliciesPage() {
       </div>
 
       {/* Add/Edit Modal */}
-      <ModalPortal show={showModal}>
-        <div className="fixed inset-0 modal-overlay flex items-center justify-center" style={{ zIndex: 99999 }}>
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">
-              {editingPolicy ? 'Edit Policy' : 'Add Policy'}
-            </h2>
-            <form onSubmit={handleSubmit}>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Policy Title *
-                    </label>
-                    <input
+      <Modal isOpen={showModal} onOpenChange={setShowModal} size="2xl">
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>
+                {editingPolicy ? 'Edit Policy' : 'Add Policy'}
+              </ModalHeader>
+              <form onSubmit={handleSubmit}>
+                <ModalBody className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <Input
                       type="text"
-                      required
+                      isRequired
+                      label="Policy Title"
                       value={formData.title}
                       onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                       placeholder="e.g., Work From Home Policy"
                     />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Policy Code
-                    </label>
-                    <input
+                    <Input
                       type="text"
+                      label="Policy Code"
                       value={formData.code}
                       onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                       placeholder="Auto-generated if empty"
                     />
                   </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Category *
-                    </label>
-                    <select
-                      required
-                      value={formData.category}
-                      onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  <div className="grid grid-cols-2 gap-4">
+                    <Select
+                      isRequired
+                      label="Category"
+                      selectedKeys={formData.category ? [formData.category] : []}
+                      onSelectionChange={(keys) => setFormData({ ...formData, category: Array.from(keys)[0] || '' })}
+                      placeholder="Select Category"
                     >
-                      <option value="">Select Category</option>
-                      <option value="hr">HR</option>
-                      <option value="it">IT</option>
-                      <option value="finance">Finance</option>
-                      <option value="general">General</option>
-                      <option value="security">Security</option>
-                      <option value="compliance">Compliance</option>
-                      <option value="code-of-conduct">Code of Conduct</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Effective Date *
-                    </label>
-                    <input
+                      <SelectItem key="hr">HR</SelectItem>
+                      <SelectItem key="it">IT</SelectItem>
+                      <SelectItem key="finance">Finance</SelectItem>
+                      <SelectItem key="general">General</SelectItem>
+                      <SelectItem key="security">Security</SelectItem>
+                      <SelectItem key="compliance">Compliance</SelectItem>
+                      <SelectItem key="code-of-conduct">Code of Conduct</SelectItem>
+                    </Select>
+                    <Input
                       type="date"
-                      required
+                      isRequired
+                      label="Effective Date"
                       value={formData.effectiveDate}
-                      onChange={(e) =>
-                        setFormData({ ...formData, effectiveDate: e.target.value })
-                      }
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      onChange={(e) => setFormData({ ...formData, effectiveDate: e.target.value })}
                     />
                   </div>
-                </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Description
-                  </label>
-                  <textarea
-                    rows="2"
+                  <Textarea
+                    label="Description"
+                    minRows={2}
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     placeholder="Brief summary of the policy"
                   />
-                </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Policy Content *
-                  </label>
-                  <textarea
-                    rows="8"
-                    required
+                  <Textarea
+                    label="Policy Content"
+                    isRequired
+                    minRows={8}
                     value={formData.content}
                     onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     placeholder="Full policy content..."
                   />
-                </div>
 
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="requiresAcknowledgment"
-                    checked={formData.requiresAcknowledgment}
-                    onChange={(e) => setFormData({ ...formData, requiresAcknowledgment: e.target.checked })}
-                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                  />
-                  <label htmlFor="requiresAcknowledgment" className="text-sm text-gray-700">
+                  <Checkbox
+                    isSelected={formData.requiresAcknowledgment}
+                    onValueChange={(checked) => setFormData({ ...formData, requiresAcknowledgment: checked })}
+                  >
                     Requires Employee Acknowledgment
-                  </label>
-                </div>
-              </div>
+                  </Checkbox>
+                </ModalBody>
 
-              <div className="flex justify-end space-x-4 mt-6">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowModal(false)
-                    setEditingPolicy(null)
-                    setFormData({ 
-                      title: '', 
-                      code: '', 
-                      category: '', 
-                      content: '', 
-                      description: '', 
-                      effectiveDate: '',
-                      requiresAcknowledgment: true,
-                      applicableTo: 'all'
-                    })
-                  }}
-                  className="btn-secondary"
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary">
-                  {editingPolicy ? 'Update' : 'Create'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </ModalPortal>
+                <ModalFooter>
+                  <Button
+                    variant="light"
+                    onPress={() => {
+                      onClose()
+                      setEditingPolicy(null)
+                      setFormData({ 
+                        title: '', 
+                        code: '', 
+                        category: '', 
+                        content: '', 
+                        description: '', 
+                        effectiveDate: '',
+                        requiresAcknowledgment: true,
+                        applicableTo: 'all'
+                      })
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button color="primary" type="submit">
+                    {editingPolicy ? 'Update' : 'Create'}
+                  </Button>
+                </ModalFooter>
+              </form>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
 
       {/* Acknowledgment Modal */}
-      <ModalPortal show={showAckModal}>
-        <div className="fixed inset-0 modal-overlay flex items-center justify-center" style={{ zIndex: 99999 }}>
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold text-gray-800 flex items-center">
-                <FaExclamationCircle className="text-yellow-500 mr-2" />
+      <Modal isOpen={showAckModal} onOpenChange={setShowAckModal} size="2xl" isDismissable={pendingPolicies.length === 0}>
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader className="flex items-center gap-2">
+                <FaExclamationCircle className="text-yellow-500" />
                 Pending Acknowledgments
-              </h2>
-            </div>
-            
-            <p className="text-gray-600 mb-6">
-              Please review and acknowledge the following policies to continue.
-            </p>
+              </ModalHeader>
+              <ModalBody>
+                <p className="text-default-600 mb-6">
+                  Please review and acknowledge the following policies to continue.
+                </p>
 
-            <div className="space-y-6">
-              {pendingPolicies.map((policy) => (
-                <div key={policy._id} className="border border-gray-200 rounded-lg p-4">
-                  <h3 className="text-lg font-bold text-gray-800 mb-2">{policy.title}</h3>
-                  <p className="text-sm text-gray-500 mb-2">Effective: {new Date(policy.effectiveDate).toLocaleDateString()}</p>
-                  <div className="bg-gray-50 p-4 rounded text-sm text-gray-700 mb-4 max-h-40 overflow-y-auto whitespace-pre-wrap">
-                    {policy.content}
-                  </div>
-                  <div className="flex justify-end">
-                    <button
-                      onClick={() => handleAcknowledge(policy._id)}
-                      className="btn-primary flex items-center space-x-2"
-                    >
-                      <FaCheckCircle />
-                      <span>I Acknowledge & Accept</span>
-                    </button>
-                  </div>
+                <div className="space-y-6">
+                  {pendingPolicies.map((policy) => (
+                    <div key={policy._id} className="border border-default-200 rounded-lg p-4">
+                      <h3 className="text-lg font-bold text-default-800 mb-2">{policy.title}</h3>
+                      <p className="text-sm text-default-500 mb-2">Effective: {new Date(policy.effectiveDate).toLocaleDateString()}</p>
+                      <div className="bg-default-50 p-4 rounded text-sm text-default-700 mb-4 max-h-40 overflow-y-auto whitespace-pre-wrap">
+                        {policy.content}
+                      </div>
+                      <div className="flex justify-end">
+                        <Button
+                          color="primary"
+                          onPress={() => handleAcknowledge(policy._id)}
+                          startContent={<FaCheckCircle />}
+                        >
+                          I Acknowledge & Accept
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
 
-            {pendingPolicies.length === 0 && (
-              <div className="text-center py-4">
-                <p className="text-green-600 font-medium">All policies acknowledged!</p>
-                <button 
-                  onClick={() => setShowAckModal(false)}
-                  className="mt-4 btn-secondary"
-                >
-                  Close
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </ModalPortal>
+                {pendingPolicies.length === 0 && (
+                  <div className="text-center py-4">
+                    <p className="text-success font-medium">All policies acknowledged!</p>
+                    <Button 
+                      onPress={onClose}
+                      className="mt-4"
+                      variant="light"
+                    >
+                      Close
+                    </Button>
+                  </div>
+                )}
+              </ModalBody>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
     </div>
   )
 }
-
-

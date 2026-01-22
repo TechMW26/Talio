@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
+import { Spinner } from '@heroui/react'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import BottomNav from '@/components/BottomNav'
@@ -10,7 +11,6 @@ import OutOfPremisesPopup from '@/components/OutOfPremisesPopup'
 import ChatWidgetContainer from '@/components/chat/ChatWidgetContainer'
 import ProfileCompletionModal from '@/components/ProfileCompletionModal'
 import { WebPushPrompt } from '@/components/WebPushNotification'
-import Loader from '@/components/ui/Loader'
 
 import useGeofencing from '@/hooks/useGeofencing'
 import { SocketProvider } from '@/contexts/SocketContext'
@@ -29,9 +29,9 @@ function PageTransitionOverlay() {
   if (!isNavigating) return null
   
   return (
-    <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9998]">
+    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-[9998]">
       <div className="flex flex-col items-center">
-        <Loader size="lg" />
+        <Spinner size="lg" color="primary" />
       </div>
     </div>
   )
@@ -271,9 +271,10 @@ export default function DashboardLayout({ children }) {
   // Show loading state while checking auth
   if (isCheckingAuth) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: 'var(--color-bg-main)' }}>
-        <div className="text-center">
-          <Loader size="lg" />
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center flex flex-col items-center gap-3">
+          <Spinner size="lg" color="primary" />
+          <p className="text-default-500 text-sm font-medium">Loading...</p>
         </div>
       </div>
     )

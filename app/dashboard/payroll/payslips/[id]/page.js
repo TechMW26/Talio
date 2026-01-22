@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import { Button } from '@heroui/react'
 import toast from '@/utils/toast'
 import { FaDownload, FaArrowLeft, FaPrint, FaEnvelope } from 'react-icons/fa'
 import Loader from '@/components/ui/Loader'
@@ -351,9 +352,9 @@ export default function PayslipDetailPage() {
     return (
       <div className="p-6 text-center">
         <p className="text-gray-500">Payslip not found</p>
-        <button onClick={() => router.back()} className="mt-4 btn-primary">
+        <Button onPress={() => router.back()} color="primary" className="mt-4">
           Go Back
-        </button>
+        </Button>
       </div>
     )
   }
@@ -383,23 +384,14 @@ export default function PayslipDetailPage() {
           </div>
         </div>
         <div className="flex items-center space-x-3">
-          <button
-            onClick={downloadPDF}
-            disabled={downloading}
-            className="btn-primary flex items-center space-x-2"
+          <Button
+            onPress={downloadPDF}
+            isDisabled={downloading}
+            color="primary"
+            startContent={downloading ? <Loader size="xs" /> : <FaDownload />}
           >
-            {downloading ? (
-              <>
-                <Loader size="xs" />
-                <span>Generating...</span>
-              </>
-            ) : (
-              <>
-                <FaDownload />
-                <span>Download PDF</span>
-              </>
-            )}
-          </button>
+            {downloading ? 'Generating...' : 'Download PDF'}
+          </Button>
         </div>
       </div>
 

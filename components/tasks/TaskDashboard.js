@@ -8,6 +8,7 @@ import {
   FaCalendarAlt, FaHourglassHalf, FaArrowUp, FaArrowDown
 } from 'react-icons/fa'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts'
+import { Select, SelectItem, Button } from '@heroui/react'
 import CustomTooltip, { CustomPieTooltip } from '@/components/charts/CustomTooltip'
 import Loader from '@/components/ui/Loader'
 
@@ -110,36 +111,40 @@ const TaskDashboard = () => {
         </div>
         <div className="flex space-x-4">
           {/* View Selector */}
-          <select
-            value={view}
+          <Select
+            selectedKeys={[view]}
             onChange={(e) => setView(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            aria-label="View"
+            className="w-40"
+            classNames={{ trigger: "bg-white" }}
           >
-            <option value="personal">My Tasks</option>
-            {user?.role !== 'employee' && <option value="team">My Team</option>}
-            {['hr', 'admin'].includes(user?.role) && <option value="department">Department</option>}
-            {user?.role === 'admin' && <option value="organization">Organization</option>}
-          </select>
+            <SelectItem key="personal">My Tasks</SelectItem>
+            {user?.role !== 'employee' && <SelectItem key="team">My Team</SelectItem>}
+            {['hr', 'admin'].includes(user?.role) && <SelectItem key="department">Department</SelectItem>}
+            {user?.role === 'admin' && <SelectItem key="organization">Organization</SelectItem>}
+          </Select>
 
           {/* Timeframe Selector */}
-          <select
-            value={timeframe}
+          <Select
+            selectedKeys={[timeframe]}
             onChange={(e) => setTimeframe(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            aria-label="Timeframe"
+            className="w-40"
+            classNames={{ trigger: "bg-white" }}
           >
-            <option value="7">Last 7 days</option>
-            <option value="30">Last 30 days</option>
-            <option value="90">Last 90 days</option>
-          </select>
+            <SelectItem key="7">Last 7 days</SelectItem>
+            <SelectItem key="30">Last 30 days</SelectItem>
+            <SelectItem key="90">Last 90 days</SelectItem>
+          </Select>
 
           {/* Create Task Button */}
-          <button
-            onClick={() => router.push('/tasks/create')}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center space-x-2"
+          <Button
+            color="primary"
+            onPress={() => router.push('/tasks/create')}
+            startContent={<FaPlus className="w-4 h-4" />}
           >
-            <FaPlus className="w-4 h-4" />
-            <span>Create Task</span>
-          </button>
+            Create Task
+          </Button>
         </div>
       </div>
 

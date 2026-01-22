@@ -6,6 +6,7 @@ import toast from '@/utils/toast'
 import { FaArrowLeft, FaUser, FaPaperPlane, FaClock, FaTag, FaExclamationCircle, FaCheckCircle } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
 import Loader from '@/components/ui/Loader'
+import { Select, SelectItem } from '@heroui/react'
 
 export default function TicketDetailPage() {
   const params = useParams()
@@ -270,16 +271,17 @@ export default function TicketDetailPage() {
               {canManageTicket && (
                 <div className="pt-4 border-t border-gray-100 mt-4">
                   <label className="text-xs text-gray-500 uppercase font-bold block mb-2">Update Status</label>
-                  <select
-                    value={ticket.status}
-                    onChange={(e) => handleStatusChange(e.target.value)}
-                    className="w-full border border-gray-300 rounded-md p-2 text-sm"
+                  <Select
+                    selectedKeys={[ticket.status]}
+                    onSelectionChange={(keys) => handleStatusChange(Array.from(keys)[0] || ticket.status)}
+                    size="sm"
+                    aria-label="Update status"
                   >
-                    <option value="open">Open</option>
-                    <option value="in-progress">In Progress</option>
-                    <option value="resolved">Resolved</option>
-                    <option value="closed">Closed</option>
-                  </select>
+                    <SelectItem key="open">Open</SelectItem>
+                    <SelectItem key="in-progress">In Progress</SelectItem>
+                    <SelectItem key="resolved">Resolved</SelectItem>
+                    <SelectItem key="closed">Closed</SelectItem>
+                  </Select>
                 </div>
               )}
             </div>

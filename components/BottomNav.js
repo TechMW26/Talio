@@ -4,6 +4,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import UnreadBadge from './UnreadBadge'
+import { Button } from '@heroui/react'
 
 export default function BottomNav() {
   const pathname = usePathname()
@@ -60,12 +61,10 @@ export default function BottomNav() {
 
   return (
     <div
-      className="fixed bottom-0 left-0 right-0 z-[40] md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-[40] md:hidden bg-content1 border-t border-divider"
       style={{
-        backgroundColor: '#FFFFFF',
         paddingBottom: 'max(6px, env(safe-area-inset-bottom))',
-        paddingTop: '6px',
-        borderTop: '1px solid rgba(0, 0, 0, 0.08)'
+        paddingTop: '6px'
       }}
     >
       <div className="flex items-center justify-between px-3 gap-1">
@@ -75,23 +74,21 @@ export default function BottomNav() {
           const isChat = item.name === 'Chat'
           return (
             <div key={item.path} className="relative flex-1 flex justify-center">
-              <button
-                onClick={() => router.push(item.path)}
-                className={`relative p-0 h-14 w-14 rounded-full flex items-center justify-center ${
-                  isChat ? 'border-[1px] border-slate-300' : ''
+              <Button
+                isIconOnly
+                radius="full"
+                onPress={() => router.push(item.path)}
+                className={`h-14 w-14 ${
+                  isChat ? 'border border-default-300' : ''
                 } ${
                   item.active && !isChat
                     ? '-translate-y-[24px]'
-                    : item.active && isChat
-                    ? ''
-                    : 'text-gray-600'
+                    : ''
                 }`}
                 style={{
-                  margin: 0,
                   backgroundColor: item.active ? activeButtonColor : 'transparent',
                   boxShadow: item.active && !isChat && shouldShowRing ? '0 0 0 10px var(--color-bg-main)' : 'none',
-                  opacity: 1,
-                  transition: 'background-color 0.6s ease-in-out, box-shadow 0.6s ease-in-out, border-color 0.6s ease-in-out, transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.6s ease-in-out'
+                  transition: 'background-color 0.6s ease-in-out, box-shadow 0.6s ease-in-out, transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)'
                 }}
               >
                 <img
@@ -106,7 +103,7 @@ export default function BottomNav() {
                     transform: item.active ? 'scale(1.1)' : 'scale(1)'
                   }}
                 />
-              </button>
+              </Button>
               {isChat && unreadCount > 0 && (
                 <UnreadBadge count={unreadCount} className="top-0 right-0" />
               )}

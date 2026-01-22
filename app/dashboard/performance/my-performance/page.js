@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { Button } from '@heroui/react'
 import toast from '@/utils/toast'
 import {
   FaChartLine, FaStar, FaTrophy, FaBullseye, FaCalendarAlt,
@@ -194,13 +195,14 @@ export default function MyPerformancePage() {
             Track your goals, reviews, and overall performance
           </p>
         </div>
-        <button
-          onClick={() => router.push('/dashboard/performance/goals')}
-          className="btn-primary flex items-center justify-center space-x-2 w-full sm:w-auto"
+        <Button
+          onPress={() => router.push('/dashboard/performance/goals')}
+          color="primary"
+          startContent={<FaPlus />}
+          className="w-full sm:w-auto"
         >
-          <FaPlus />
-          <span>Set New Goal</span>
-        </button>
+          Set New Goal
+        </Button>
       </div>
 
       {/* Performance Score Card */}
@@ -372,12 +374,13 @@ export default function MyPerformancePage() {
                         </div>
                         <h4 className="text-gray-700 font-medium mb-1">No goals set yet</h4>
                         <p className="text-gray-500 text-sm mb-4">Start tracking your progress by setting goals</p>
-                        <button 
-                          onClick={() => router.push('/dashboard/performance/goals')}
-                          className="btn-primary text-sm px-4 py-2"
+                        <Button 
+                          onPress={() => router.push('/dashboard/performance/goals')}
+                          color="primary"
+                          size="sm"
                         >
                           Set your first goal
-                        </button>
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -439,13 +442,14 @@ export default function MyPerformancePage() {
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
                 <h3 className="text-lg font-semibold text-gray-800">My Goals ({goals.length})</h3>
-                <button
-                  onClick={() => router.push('/dashboard/performance/goals')}
-                  className="btn-primary text-sm flex items-center space-x-2"
+                <Button
+                  onPress={() => router.push('/dashboard/performance/goals')}
+                  color="primary"
+                  size="sm"
+                  startContent={<FaPlus className="w-3 h-3" />}
                 >
-                  <FaPlus className="w-3 h-3" />
-                  <span>Add Goal</span>
-                </button>
+                  Add Goal
+                </Button>
               </div>
 
               {goals.length === 0 ? (
@@ -455,12 +459,13 @@ export default function MyPerformancePage() {
                   </div>
                   <h3 className="text-xl font-semibold text-gray-800 mb-2">No Goals Set Yet</h3>
                   <p className="text-gray-500 mb-6 max-w-md mx-auto">Set personal and professional goals to track your progress and achieve more</p>
-                  <button
-                    onClick={() => router.push('/dashboard/performance/goals')}
-                    className="btn-primary px-6 py-2.5"
+                  <Button
+                    onPress={() => router.push('/dashboard/performance/goals')}
+                    color="primary"
+                    startContent={<FaPlus />}
                   >
-                    <FaPlus className="inline mr-2" /> Set Your First Goal
-                  </button>
+                    Set Your First Goal
+                  </Button>
                 </div>
               ) : (
                 <div className="space-y-4">

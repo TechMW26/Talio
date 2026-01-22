@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { Button } from '@heroui/react'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaEdit, FaTrash, FaBuilding, FaUsers, FaTimes, FaUserTie, FaSearch } from 'react-icons/fa'
@@ -276,13 +277,13 @@ export default function DepartmentsPage() {
           </p>
         </div>
         {canManageDepartments() && (
-          <button
-            onClick={() => setShowModal(true)}
-            className="btn-primary flex items-center space-x-2"
+          <Button
+            onPress={() => setShowModal(true)}
+            color="primary"
+            startContent={<FaPlus />}
           >
-            <FaPlus />
-            <span>Add Department</span>
-          </button>
+            Add Department
+          </Button>
         )}
       </div>
 
@@ -548,16 +549,16 @@ export default function DepartmentsPage() {
               </div>
 
               <div className="flex justify-end space-x-4 mt-6">
-                <button
+                <Button
                   type="button"
-                  onClick={handleCloseModal}
-                  className="btn-secondary"
+                  onPress={handleCloseModal}
+                  variant="flat"
                 >
                   Cancel
-                </button>
-                <button type="submit" className="btn-primary">
+                </Button>
+                <Button type="submit" color="primary">
                   {editingDept ? 'Update' : 'Create'}
-                </button>
+                </Button>
               </div>
             </form>
           </div>

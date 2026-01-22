@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { FaCheck, FaTimes, FaCalendarCheck } from 'react-icons/fa'
+import { Card, CardBody, Button, Chip, Avatar, ScrollShadow } from '@heroui/react'
 
 export default function LeaveRequestsWidget({
   leaveRequests = [],
@@ -10,75 +11,94 @@ export default function LeaveRequestsWidget({
 }) {
   const router = useRouter()
 
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'pending': return 'warning'
+      case 'approved': return 'success'
+      case 'rejected': return 'danger'
+      default: return 'default'
+    }
+  }
+
   return (
     <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-base sm:text-lg font-bold text-gray-800">Leave Requests</h3>
-        <button
-          onClick={() => router.push('/dashboard/leave/approvals')}
-          className="text-primary-600 hover:text-primary-800 text-sm font-medium"
+        <h3 className="text-base sm:text-lg font-bold text-default-900">Leave Requests</h3>
+        <Button
+          variant="light"
+          color="primary"
+          size="sm"
+          onPress={() => router.push('/dashboard/leave/approvals')}
         >
           View All
-        </button>
+        </Button>
       </div>
 
-      <div className="space-y-2 overflow-y-auto flex-1 max-h-[200px]">
+      <ScrollShadow className="space-y-2 flex-1 max-h-[200px]">
         {leaveRequests.length === 0 ? (
-          <div className="text-center py-6 text-gray-500 flex-1 flex flex-col justify-center">
-            <FaCalendarCheck className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-            <p className="text-sm">No leave requests found</p>
+          <div className="flex flex-col items-center justify-center text-center py-6 flex-1">
+            <div className="w-14 h-14 rounded-full bg-primary-100 flex items-center justify-center mb-3">
+              <FaCalendarCheck className="w-7 h-7 text-primary-400" />
+            </div>
+            <p className="text-sm text-default-500">No leave requests found</p>
           </div>
         ) : (
           leaveRequests.slice(0, 5).map((request) => (
-          <div
-            key={request._id}
-            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
-          >
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center text-primary-600 font-semibold text-sm flex-shrink-0">
-                {request.employee?.firstName?.charAt(0)}{request.employee?.lastName?.charAt(0)}
-              </div>
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-gray-800 truncate">
-                  {request.employee?.firstName} {request.employee?.lastName}
-                </p>
-                <p className="text-xs text-gray-500">
-                  {request.leaveType?.name} - {request.numberOfDays} day(s)
-                </p>
-              </div>
-            </div>
+            <Card key={request._id} className="bg-default-50 border border-default-100">
+              <CardBody className="p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <Avatar
+                      name={`${request.employee?.firstName?.charAt(0) || ''}${request.employee?.lastName?.charAt(0) || ''}`}
+                      size="sm"
+                      className="bg-primary-100 text-primary-600"
+                    />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-default-900 truncate">
+                        {request.employee?.firstName} {request.employee?.lastName}
+                      </p>
+                      <p className="text-xs text-default-500">
+                        {request.leaveType?.name} - {request.numberOfDays} day(s)
+                      </p>
+                    </div>
+                  </div>
 
-            <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-              <span className={`px-2 py-1 text-xs rounded-full ${request.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                  request.status === 'approved' ? 'bg-green-100 text-green-700' :
-                    'bg-red-100 text-red-700'
-                }`}>
-                {request.status}
-              </span>
+                  <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                    <Chip size="sm" color={getStatusColor(request.status)} variant="flat">
+                      {request.status}
+                    </Chip>
 
-              {request.status === 'pending' && onApprove && onReject && (
-                <div className="flex gap-1">
-                  <button
-                    onClick={() => onApprove(request._id)}
-                    className="p-1.5 bg-green-100 text-green-600 rounded hover:bg-green-200 transition-colors"
-                    title="Approve"
-                  >
-                    <FaCheck className="w-3 h-3" />
-                  </button>
-                  <button
-                    onClick={() => onReject(request._id)}
-                    className="p-1.5 bg-red-100 text-red-600 rounded hover:bg-red-200 transition-colors"
-                    title="Reject"
-                  >
-                    <FaTimes className="w-3 h-3" />
-                  </button>
+                    {request.status === 'pending' && onApprove && onReject && (
+                      <div className="flex gap-1">
+                        <Button
+                          isIconOnly
+                          size="sm"
+                          color="success"
+                          variant="flat"
+                          onPress={() => onApprove(request._id)}
+                          aria-label="Approve"
+                        >
+                          <FaCheck className="w-3 h-3" />
+                        </Button>
+                        <Button
+                          isIconOnly
+                          size="sm"
+                          color="danger"
+                          variant="flat"
+                          onPress={() => onReject(request._id)}
+                          aria-label="Reject"
+                        >
+                          <FaTimes className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
-            </div>
-          </div>
-        ))
+              </CardBody>
+            </Card>
+          ))
         )}
-      </div>
+      </ScrollShadow>
     </div>
   )
 }

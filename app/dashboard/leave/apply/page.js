@@ -1,11 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { Card, CardBody, Button, Skeleton, Input, Textarea, Select, SelectItem, Checkbox } from '@heroui/react'
 import toast from '@/utils/toast'
 import { FaCalendarAlt, FaPlus, FaArrowLeft, FaCheck } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
-import Loader from '@/components/ui/Loader'
 
 export default function ApplyLeavePage() {
   const [leaveTypes, setLeaveTypes] = useState([])
@@ -217,8 +217,16 @@ export default function ApplyLeavePage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader size="lg" />
+      <div className="page-container space-y-4 sm:space-y-6 pb-24 md:pb-6">
+        <Skeleton className="h-10 w-1/3 rounded-lg" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <Skeleton className="h-96 rounded-lg" />
+          </div>
+          <div>
+            <Skeleton className="h-64 rounded-lg" />
+          </div>
+        </div>
       </div>
     )
   }
@@ -227,270 +235,230 @@ export default function ApplyLeavePage() {
     <div className="page-container space-y-4 sm:space-y-6 pb-24 md:pb-6">
       {/* Header */}
       <div className="flex items-center space-x-3 sm:space-x-4">
-        <button
-          onClick={() => router.back()}
-          className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
+        <Button
+          isIconOnly
+          variant="flat"
+          onPress={() => router.back()}
+          className="flex-shrink-0"
         >
           <FaArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
-        </button>
+        </Button>
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 truncate">Apply for Leave</h1>
-          <p className="text-gray-600 mt-1 text-sm sm:text-base">Submit your leave application for approval</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-default-800 truncate">Apply for Leave</h1>
+          <p className="text-default-500 mt-1 text-sm sm:text-base">Submit your leave application for approval</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Leave Application Form */}
         <div className="lg:col-span-2">
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <form onSubmit={handleSubmit}>
-              <div className="space-y-6">
-                {/* Leave Type */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Leave Type <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    name="leaveType"
-                    value={formData.leaveType}
-                    onChange={handleChange}
-                    required={!formData.isHalfDay && !formData.workFromHome}
-                    disabled={formData.isHalfDay || formData.workFromHome}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <option value="">{formData.isHalfDay || formData.workFromHome ? 'Not applicable for Half Day/WFH' : 'Select Leave Type'}</option>
-                    {leaveTypes.map((type) => (
-                      <option key={type._id} value={type._id}>
-                        {type.name} ({type.code})
-                      </option>
-                    ))}
-                  </select>
-                  {(formData.isHalfDay || formData.workFromHome) && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      Leave type is not required for {formData.isHalfDay ? 'Half Day' : 'Work From Home'} requests
-                    </p>
-                  )}
-                </div>
-
-                {/* Half Day Option */}
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    name="isHalfDay"
-                    checked={formData.isHalfDay}
-                    onChange={handleChange}
-                    disabled={formData.workFromHome}
-                    className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                  />
-                  <label className={`text-sm font-medium ${formData.workFromHome ? 'text-gray-400' : 'text-gray-700'}`}>
-                    Half Day Leave
-                  </label>
-                </div>
-
-                {/* Work From Home Option */}
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    name="workFromHome"
-                    checked={formData.workFromHome}
-                    onChange={handleChange}
-                    disabled={formData.isHalfDay}
-                    className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                  />
-                  <label className={`text-sm font-medium ${formData.isHalfDay ? 'text-gray-400' : 'text-gray-700'}`}>
-                    Work From Home
-                  </label>
-                </div>
-
-                {/* Half Day Period */}
-                {formData.isHalfDay && (
+          <Card shadow="sm">
+            <CardBody className="p-6">
+              <form onSubmit={handleSubmit}>
+                <div className="space-y-6">
+                  {/* Leave Type */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Half Day Period
-                    </label>
-                    <select
-                      name="halfDayPeriod"
-                      value={formData.halfDayPeriod}
-                      onChange={handleChange}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    <Select
+                      label="Leave Type"
+                      placeholder={formData.isHalfDay || formData.workFromHome ? 'Not applicable for Half Day/WFH' : 'Select Leave Type'}
+                      selectedKeys={formData.leaveType ? [formData.leaveType] : []}
+                      onSelectionChange={(keys) => setFormData({ ...formData, leaveType: Array.from(keys)[0] || '' })}
+                      isRequired={!formData.isHalfDay && !formData.workFromHome}
+                      isDisabled={formData.isHalfDay || formData.workFromHome}
                     >
-                      <option value="morning">Morning (First Half)</option>
-                      <option value="afternoon">Afternoon (Second Half)</option>
-                    </select>
+                      {leaveTypes.map((type) => (
+                        <SelectItem key={type._id}>
+                          {type.name} ({type.code})
+                        </SelectItem>
+                      ))}
+                    </Select>
+                    {(formData.isHalfDay || formData.workFromHome) && (
+                      <p className="text-xs text-default-500 mt-1">
+                        Leave type is not required for {formData.isHalfDay ? 'Half Day' : 'Work From Home'} requests
+                      </p>
+                    )}
                   </div>
-                )}
 
-                {/* Date Range */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Start Date <span className="text-red-500">*</span>
-                    </label>
-                    <input
+                  {/* Half Day Option */}
+                  <Checkbox
+                    isSelected={formData.isHalfDay}
+                    onValueChange={(checked) => {
+                      if (checked) {
+                        setFormData(prev => ({ ...prev, isHalfDay: true, leaveType: '', workFromHome: false }))
+                      } else {
+                        setFormData(prev => ({ ...prev, isHalfDay: false }))
+                      }
+                    }}
+                    isDisabled={formData.workFromHome}
+                  >
+                    Half Day Leave
+                  </Checkbox>
+
+                  {/* Work From Home Option */}
+                  <Checkbox
+                    isSelected={formData.workFromHome}
+                    onValueChange={(checked) => {
+                      if (checked) {
+                        setFormData(prev => ({ ...prev, workFromHome: true, leaveType: '', isHalfDay: false }))
+                      } else {
+                        setFormData(prev => ({ ...prev, workFromHome: false }))
+                      }
+                    }}
+                    isDisabled={formData.isHalfDay}
+                  >
+                    Work From Home
+                  </Checkbox>
+
+                  {/* Half Day Period */}
+                  {formData.isHalfDay && (
+                    <Select
+                      label="Half Day Period"
+                      selectedKeys={[formData.halfDayPeriod]}
+                      onSelectionChange={(keys) => setFormData({ ...formData, halfDayPeriod: Array.from(keys)[0] })}
+                    >
+                      <SelectItem key="morning">Morning (First Half)</SelectItem>
+                      <SelectItem key="afternoon">Afternoon (Second Half)</SelectItem>
+                    </Select>
+                  )}
+
+                  {/* Date Range */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Input
                       type="date"
+                      label="Start Date"
                       name="startDate"
                       value={formData.startDate}
                       onChange={handleChange}
-                      required
                       min={new Date().toISOString().split('T')[0]}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      isRequired
                     />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      End Date <span className="text-red-500">*</span>
-                    </label>
-                    <input
+                    <Input
                       type="date"
+                      label="End Date"
                       name="endDate"
                       value={formData.endDate}
                       onChange={handleChange}
-                      required
                       min={formData.startDate || new Date().toISOString().split('T')[0]}
-                      disabled={formData.isHalfDay}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-100"
+                      isDisabled={formData.isHalfDay}
+                      isRequired
                     />
                   </div>
-                </div>
 
-                {/* Days Calculation */}
-                {formData.startDate && formData.endDate && (
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-blue-800">
-                        Total Days: {calculateDays()} day{calculateDays() !== 1 ? 's' : ''}
-                      </span>
-                      <span className="text-sm text-blue-600">
-                        Available Balance: {getAvailableBalance()} days
-                      </span>
+                  {/* Days Calculation */}
+                  {formData.startDate && formData.endDate && (
+                    <div className="bg-primary-50 p-4 rounded-lg">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-primary-800">
+                          Total Days: {calculateDays()} day{calculateDays() !== 1 ? 's' : ''}
+                        </span>
+                        <span className="text-sm text-primary-600">
+                          Available Balance: {getAvailableBalance()} days
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* Reason */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Reason for Leave <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
+                  {/* Reason */}
+                  <Textarea
+                    label="Reason for Leave"
                     name="reason"
                     value={formData.reason}
                     onChange={handleChange}
-                    required
-                    rows={4}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    minRows={4}
                     placeholder="Please provide a detailed reason for your leave..."
+                    isRequired
                   />
-                </div>
 
-                {/* Emergency Contact */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Emergency Contact (Optional)
-                  </label>
-                  <input
-                    type="text"
+                  {/* Emergency Contact */}
+                  <Input
+                    label="Emergency Contact (Optional)"
                     name="emergencyContact"
                     value={formData.emergencyContact}
                     onChange={handleChange}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     placeholder="Contact number during leave"
                   />
-                </div>
 
-                {/* Handover Notes */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Work Handover Notes (Optional)
-                  </label>
-                  <textarea
+                  {/* Handover Notes */}
+                  <Textarea
+                    label="Work Handover Notes (Optional)"
                     name="handoverNotes"
                     value={formData.handoverNotes}
                     onChange={handleChange}
-                    rows={3}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    minRows={3}
                     placeholder="Any important work handover instructions..."
                   />
-                </div>
 
-                {/* Submit Button */}
-                <div className="flex justify-end space-x-3">
-                  <button
-                    type="button"
-                    onClick={() => router.back()}
-                    className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    className="px-6 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-                  >
-                    {submitting ? (
-                      <>
-                        <Loader size="xs" />
-                        <span>Submitting...</span>
-                      </>
-                    ) : (
-                      <>
-                        <FaCheck className="w-4 h-4" />
-                        <span>Submit Application</span>
-                      </>
-                    )}
-                  </button>
+                  {/* Submit Button */}
+                  <div className="flex justify-end gap-3">
+                    <Button
+                      variant="flat"
+                      onPress={() => router.back()}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      color="primary"
+                      isLoading={submitting}
+                      startContent={!submitting && <FaCheck className="w-4 h-4" />}
+                    >
+                      {submitting ? 'Submitting...' : 'Submit Application'}
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </form>
-          </div>
+              </form>
+            </CardBody>
+          </Card>
         </div>
 
         {/* Leave Balance Sidebar */}
         <div className="lg:col-span-1">
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Leave Balance</h3>
-            {leaveBalance.length === 0 ? (
-              <p className="text-gray-500 text-sm">No leave balance found</p>
-            ) : (
-              <div className="space-y-4">
-                {leaveBalance.map((balance) => (
-                  <div key={balance._id} className="border border-gray-200 rounded-lg p-4">
-                    <div className="flex justify-between items-center mb-2">
-                      <h4 className="font-medium text-gray-800">{balance.leaveType?.name}</h4>
-                      <span className="text-sm text-gray-500">{balance.leaveType?.code}</span>
+          <Card shadow="sm">
+            <CardBody className="p-6">
+              <h3 className="text-lg font-semibold text-default-800 mb-4">Leave Balance</h3>
+              {leaveBalance.length === 0 ? (
+                <p className="text-default-500 text-sm">No leave balance found</p>
+              ) : (
+                <div className="space-y-4">
+                  {leaveBalance.map((balance) => (
+                    <div key={balance._id} className="border border-default-200 rounded-lg p-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <h4 className="font-medium text-default-800">{balance.leaveType?.name}</h4>
+                        <span className="text-sm text-default-500">{balance.leaveType?.code}</span>
+                      </div>
+                      <div className="space-y-1 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-default-600">Total:</span>
+                          <span className="font-medium">{balance.totalDays} days</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-default-600">Used:</span>
+                          <span className="text-danger">{balance.usedDays} days</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-default-600">Remaining:</span>
+                          <span className="text-success font-medium">{balance.remainingDays} days</span>
+                        </div>
+                      </div>
+                      <div className="mt-2">
+                        <div className="w-full bg-default-200 rounded-full h-2">
+                          <div 
+                            className="bg-primary h-2 rounded-full" 
+                            style={{ width: `${(balance.usedDays / balance.totalDays) * 100}%` }}
+                          ></div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="space-y-1 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Total:</span>
-                        <span className="font-medium">{balance.totalDays} days</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Used:</span>
-                        <span className="text-red-600">{balance.usedDays} days</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Remaining:</span>
-                        <span className="text-green-600 font-medium">{balance.remainingDays} days</span>
-                      </div>
-                    </div>
-                    <div className="mt-2">
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div 
-                          className="bg-primary-500 h-2 rounded-full" 
-                          style={{ width: `${(balance.usedDays / balance.totalDays) * 100}%` }}
-                        ></div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                  ))}
+                </div>
+              )}
+            </CardBody>
+          </Card>
 
           {/* Quick Tips */}
-          <div className="bg-yellow-50 rounded-lg p-4 mt-6">
-            <h4 className="font-medium text-yellow-800 mb-2">Quick Tips</h4>
-            <ul className="text-sm text-yellow-700 space-y-1">
+          <div className="bg-warning-50 rounded-lg p-4 mt-6">
+            <h4 className="font-medium text-warning-800 mb-2">Quick Tips</h4>
+            <ul className="text-sm text-warning-700 space-y-1">
               <li>• Apply for leave at least 2 days in advance</li>
               <li>• Check your leave balance before applying</li>
               <li>• Provide detailed reason for approval</li>

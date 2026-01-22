@@ -8,7 +8,7 @@ import {
   FaCheckCircle, FaTimesCircle, FaChartPie, FaDownload, FaFileExcel,
   FaSearch, FaBuilding, FaUserTie, FaChevronDown, FaChevronUp
 } from 'react-icons/fa'
-import Loader from '@/components/ui/Loader'
+import { Card, CardBody, CardHeader, Button, Chip, Skeleton, Input, Select, SelectItem } from '@heroui/react'
 
 export default function AttendanceReportPage() {
   const [loading, setLoading] = useState(true)
@@ -537,8 +537,16 @@ export default function AttendanceReportPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader size="lg" />
+      <div className="page-container space-y-6">
+        <div className="flex flex-col gap-3">
+          <Skeleton className="h-8 w-72 rounded-lg" />
+          <Skeleton className="h-4 w-96 rounded-lg" />
+        </div>
+        <Skeleton className="h-20 rounded-lg" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[1,2,3,4].map(i => <Skeleton key={i} className="h-28 rounded-lg" />)}
+        </div>
+        <Skeleton className="h-64 rounded-lg" />
       </div>
     )
   }
@@ -547,9 +555,9 @@ export default function AttendanceReportPage() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <FaExclamationTriangle className="mx-auto h-12 w-12 text-yellow-500 mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Restricted</h2>
-          <p className="text-gray-600">This report is only available to administrators and HR.</p>
+          <FaExclamationTriangle className="mx-auto h-12 w-12 text-warning mb-4" />
+          <h2 className="text-2xl font-bold text-default-800 mb-2">Access Restricted</h2>
+          <p className="text-default-500">This report is only available to administrators and HR.</p>
         </div>
       </div>
     )
@@ -561,381 +569,394 @@ export default function AttendanceReportPage() {
       <div className="mb-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-800">Attendance Report & Analytics</h1>
-            <p className="text-gray-600 mt-1">Comprehensive attendance KPIs, shrinkage analysis, and employee metrics</p>
+            <h1 className="text-3xl font-bold text-default-800">Attendance Report & Analytics</h1>
+            <p className="text-default-500 mt-1">Comprehensive attendance KPIs, shrinkage analysis, and employee metrics</p>
           </div>
           <div className="flex items-center space-x-3">
-            <button
-              onClick={exportToExcel}
-              disabled={!reportData}
-              className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            <Button
+              color="success"
+              onPress={exportToExcel}
+              isDisabled={!reportData}
+              startContent={<FaFileExcel />}
             >
-              <FaFileExcel />
-              <span>Export Excel</span>
-            </button>
-            <button
-              onClick={exportToCSV}
-              disabled={!reportData}
-              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              Export Excel
+            </Button>
+            <Button
+              color="primary"
+              onPress={exportToCSV}
+              isDisabled={!reportData}
+              startContent={<FaDownload />}
             >
-              <FaDownload />
-              <span>Export CSV</span>
-            </button>
+              Export CSV
+            </Button>
           </div>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
-            <select
-              value={dateRange}
-              onChange={(e) => setDateRange(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="today">Today</option>
-              <option value="yesterday">Yesterday</option>
-              <option value="week">Last 7 Days</option>
-              <option value="month">This Month</option>
-              <option value="custom">Custom Range</option>
-            </select>
-          </div>
+      <Card className="shadow-md mb-6">
+        <CardBody className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-default-700 mb-2">Date Range</label>
+              <Select
+                selectedKeys={[dateRange]}
+                onChange={(e) => setDateRange(e.target.value)}
+                aria-label="Date Range"
+                classNames={{ trigger: "bg-content1" }}
+              >
+                <SelectItem key="today">Today</SelectItem>
+                <SelectItem key="yesterday">Yesterday</SelectItem>
+                <SelectItem key="week">Last 7 Days</SelectItem>
+                <SelectItem key="month">This Month</SelectItem>
+                <SelectItem key="custom">Custom Range</SelectItem>
+              </Select>
+            </div>
 
-          {dateRange === 'custom' && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
-                <input
-                  type="date"
-                  value={customStartDate}
-                  onChange={(e) => setCustomStartDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
-                <input
-                  type="date"
-                  value={customEndDate}
-                  onChange={(e) => setCustomEndDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-            </>
-          )}
+            {dateRange === 'custom' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-default-700 mb-2">Start Date</label>
+                  <input
+                    type="date"
+                    value={customStartDate}
+                    onChange={(e) => setCustomStartDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary bg-content1"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-default-700 mb-2">End Date</label>
+                  <input
+                    type="date"
+                    value={customEndDate}
+                    onChange={(e) => setCustomEndDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary bg-content1"
+                  />
+                </div>
+              </>
+            )}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Department</label>
-            <select
-              value={selectedDepartment}
-              onChange={(e) => setSelectedDepartment(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="all">All Departments</option>
-              {departments.map(dept => (
-                <option key={dept._id} value={dept._id}>{dept.name}</option>
-              ))}
-            </select>
+            <div>
+              <label className="block text-sm font-medium text-default-700 mb-2">Department</label>
+              <Select
+                selectedKeys={[selectedDepartment]}
+                onChange={(e) => setSelectedDepartment(e.target.value)}
+                aria-label="Department"
+                classNames={{ trigger: "bg-content1" }}
+              >
+                <SelectItem key="all">All Departments</SelectItem>
+                {departments.map(dept => (
+                  <SelectItem key={dept._id}>{dept.name}</SelectItem>
+                ))}
+              </Select>
+            </div>
           </div>
-        </div>
-      </div>
+        </CardBody>
+      </Card>
 
       {reportData && (
         <>
           {/* Overview KPIs */}
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <div 
-              className="flex items-center justify-between cursor-pointer mb-4"
-              onClick={() => toggleSection('overview')}
-            >
-              <h2 className="text-xl font-bold text-gray-800 flex items-center space-x-2">
-                <FaChartLine className="text-primary-600" />
-                <span>Overview Metrics</span>
-              </h2>
-              {expandedSections.overview ? <FaChevronUp /> : <FaChevronDown />}
-            </div>
-            
-            {expandedSections.overview && (
-              <>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                  <div className="bg-blue-50 rounded-lg p-4">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <FaUsers className="text-blue-600" />
-                      <span className="text-sm text-blue-700 font-medium">Total Employees</span>
+          <Card className="shadow-md mb-6">
+            <CardBody className="p-6">
+              <div 
+                className="flex items-center justify-between cursor-pointer mb-4"
+                onClick={() => toggleSection('overview')}
+              >
+                <h2 className="text-xl font-bold text-default-800 flex items-center space-x-2">
+                  <FaChartLine className="text-primary" />
+                  <span>Overview Metrics</span>
+                </h2>
+                {expandedSections.overview ? <FaChevronUp /> : <FaChevronDown />}
+              </div>
+              
+              {expandedSections.overview && (
+                <>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div className="bg-primary-50 rounded-lg p-4">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <FaUsers className="text-primary" />
+                        <span className="text-sm text-primary-700 font-medium">Total Employees</span>
+                      </div>
+                      <p className="text-3xl font-bold text-primary">{reportData.overview.totalEmployees}</p>
                     </div>
-                    <p className="text-3xl font-bold text-blue-600">{reportData.overview.totalEmployees}</p>
+
+                    <div className="bg-success-50 rounded-lg p-4">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <FaCheckCircle className="text-success" />
+                        <span className="text-sm text-success-700 font-medium">Attendance Rate</span>
+                      </div>
+                      <p className="text-3xl font-bold text-success">{reportData.overview.attendanceRate}%</p>
+                    </div>
+
+                    <div className="bg-danger-50 rounded-lg p-4">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <FaTimesCircle className="text-danger" />
+                        <span className="text-sm text-danger-700 font-medium">Absenteeism Rate</span>
+                      </div>
+                      <p className="text-3xl font-bold text-danger">{reportData.overview.absenteeismRate}%</p>
+                    </div>
+
+                    <div className="bg-warning-50 rounded-lg p-4">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <FaClock className="text-warning" />
+                        <span className="text-sm text-warning-700 font-medium">Punctuality Rate</span>
+                      </div>
+                      <p className="text-3xl font-bold text-warning">{reportData.overview.punctualityRate}%</p>
+                    </div>
                   </div>
 
-                  <div className="bg-green-50 rounded-lg p-4">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <FaCheckCircle className="text-green-600" />
-                      <span className="text-sm text-green-700 font-medium">Attendance Rate</span>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                    <div className="bg-secondary-50 rounded-lg p-4 text-center">
+                      <p className="text-2xl font-bold text-secondary">{reportData.statusCounts.present}</p>
+                      <p className="text-sm text-secondary-700">Present</p>
                     </div>
-                    <p className="text-3xl font-bold text-green-600">{reportData.overview.attendanceRate}%</p>
-                  </div>
-
-                  <div className="bg-red-50 rounded-lg p-4">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <FaTimesCircle className="text-red-600" />
-                      <span className="text-sm text-red-700 font-medium">Absenteeism Rate</span>
+                    <div className="bg-danger-50 rounded-lg p-4 text-center">
+                      <p className="text-2xl font-bold text-danger">{reportData.statusCounts.absent}</p>
+                      <p className="text-sm text-danger-700">Absent</p>
                     </div>
-                    <p className="text-3xl font-bold text-red-600">{reportData.overview.absenteeismRate}%</p>
-                  </div>
-
-                  <div className="bg-amber-50 rounded-lg p-4">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <FaClock className="text-amber-600" />
-                      <span className="text-sm text-amber-700 font-medium">Punctuality Rate</span>
+                    <div className="bg-warning-50 rounded-lg p-4 text-center">
+                      <p className="text-2xl font-bold text-warning">{reportData.statusCounts['half-day']}</p>
+                      <p className="text-sm text-warning-700">Half Day</p>
                     </div>
-                    <p className="text-3xl font-bold text-amber-600">{reportData.overview.punctualityRate}%</p>
+                    <div className="bg-warning-50 rounded-lg p-4 text-center">
+                      <p className="text-2xl font-bold text-warning">{reportData.statusCounts.late}</p>
+                      <p className="text-sm text-warning-700">Late</p>
+                    </div>
+                    <div className="bg-primary-50 rounded-lg p-4 text-center">
+                      <p className="text-2xl font-bold text-primary">{reportData.statusCounts['on-leave']}</p>
+                      <p className="text-sm text-primary-700">On Leave</p>
+                    </div>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                  <div className="bg-purple-50 rounded-lg p-4 text-center">
-                    <p className="text-2xl font-bold text-purple-600">{reportData.statusCounts.present}</p>
-                    <p className="text-sm text-purple-700">Present</p>
-                  </div>
-                  <div className="bg-red-50 rounded-lg p-4 text-center">
-                    <p className="text-2xl font-bold text-red-600">{reportData.statusCounts.absent}</p>
-                    <p className="text-sm text-red-700">Absent</p>
-                  </div>
-                  <div className="bg-yellow-50 rounded-lg p-4 text-center">
-                    <p className="text-2xl font-bold text-yellow-600">{reportData.statusCounts['half-day']}</p>
-                    <p className="text-sm text-yellow-700">Half Day</p>
-                  </div>
-                  <div className="bg-orange-50 rounded-lg p-4 text-center">
-                    <p className="text-2xl font-bold text-orange-600">{reportData.statusCounts.late}</p>
-                    <p className="text-sm text-orange-700">Late</p>
-                  </div>
-                  <div className="bg-blue-50 rounded-lg p-4 text-center">
-                    <p className="text-2xl font-bold text-blue-600">{reportData.statusCounts['on-leave']}</p>
-                    <p className="text-sm text-blue-700">On Leave</p>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
+                </>
+              )}
+            </CardBody>
+          </Card>
 
           {/* Shrinkage Analysis */}
-          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-            <div 
-              className="flex items-center justify-between cursor-pointer mb-4"
-              onClick={() => toggleSection('shrinkage')}
-            >
-              <h2 className="text-xl font-bold text-gray-800 flex items-center space-x-2">
-                <FaChartPie className="text-red-600" />
-                <span>Shrinkage Analysis</span>
-              </h2>
-              {expandedSections.shrinkage ? <FaChevronUp /> : <FaChevronDown />}
-            </div>
-            
-            {expandedSections.shrinkage && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <div className="bg-red-50 rounded-lg p-6 mb-4">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-medium text-red-700">Total Shrinkage</span>
-                      <span className="text-3xl font-bold text-red-600">{reportData.shrinkage.percentage}%</span>
-                    </div>
-                    <p className="text-sm text-red-600">{reportData.shrinkage.totalHours} hours lost</p>
-                    <div className="mt-2 bg-red-200 rounded-full h-3">
-                      <div 
-                        className="bg-red-600 h-3 rounded-full" 
-                        style={{ width: `${Math.min(reportData.shrinkage.percentage, 100)}%` }}
-                      ></div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                      <span className="text-sm text-gray-700">Scheduled Hours</span>
-                      <span className="font-semibold text-gray-900">{reportData.workHours.scheduled}h</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg">
-                      <span className="text-sm text-green-700">Actual Work Hours</span>
-                      <span className="font-semibold text-green-900">{reportData.workHours.total}h</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                      <span className="text-sm text-blue-700">Avg Hours/Employee/Day</span>
-                      <span className="font-semibold text-blue-900">{reportData.workHours.average}h</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-800 mb-4">Shrinkage Breakdown</h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
-                      <span className="text-sm text-red-700">Absent Days</span>
-                      <span className="font-semibold text-red-900">{reportData.shrinkage.breakdown.absent}h</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-yellow-50 rounded-lg">
-                      <span className="text-sm text-yellow-700">Half Days</span>
-                      <span className="font-semibold text-yellow-900">{reportData.shrinkage.breakdown.halfDay}h</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
-                      <span className="text-sm text-orange-700">Late Arrivals</span>
-                      <span className="font-semibold text-orange-900">{reportData.shrinkage.breakdown.late} instances</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-amber-50 rounded-lg">
-                      <span className="text-sm text-amber-700">Early Departures</span>
-                      <span className="font-semibold text-amber-900">{reportData.shrinkage.breakdown.earlyDeparture} instances</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                      <span className="text-sm text-gray-700">Other Unproductive</span>
-                      <span className="font-semibold text-gray-900">{reportData.shrinkage.breakdown.unproductive}h</span>
-                    </div>
-                  </div>
-                </div>
+          <Card className="shadow-md mb-6">
+            <CardBody className="p-6">
+              <div 
+                className="flex items-center justify-between cursor-pointer mb-4"
+                onClick={() => toggleSection('shrinkage')}
+              >
+                <h2 className="text-xl font-bold text-default-800 flex items-center space-x-2">
+                  <FaChartPie className="text-danger" />
+                  <span>Shrinkage Analysis</span>
+                </h2>
+                {expandedSections.shrinkage ? <FaChevronUp /> : <FaChevronDown />}
               </div>
-            )}
-          </div>
+              
+              {expandedSections.shrinkage && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <div className="bg-danger-50 rounded-lg p-6 mb-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-medium text-danger-700">Total Shrinkage</span>
+                        <span className="text-3xl font-bold text-danger">{reportData.shrinkage.percentage}%</span>
+                      </div>
+                      <p className="text-sm text-danger">{reportData.shrinkage.totalHours} hours lost</p>
+                      <div className="mt-2 bg-danger-200 rounded-full h-3">
+                        <div 
+                          className="bg-danger h-3 rounded-full" 
+                          style={{ width: `${Math.min(reportData.shrinkage.percentage, 100)}%` }}
+                        ></div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center p-3 bg-default-50 rounded-lg">
+                        <span className="text-sm text-default-700">Scheduled Hours</span>
+                        <span className="font-semibold text-default-800">{reportData.workHours.scheduled}h</span>
+                      </div>
+                      <div className="flex justify-between items-center p-3 bg-success-50 rounded-lg">
+                        <span className="text-sm text-success-700">Actual Work Hours</span>
+                        <span className="font-semibold text-success-800">{reportData.workHours.total}h</span>
+                      </div>
+                      <div className="flex justify-between items-center p-3 bg-primary-50 rounded-lg">
+                        <span className="text-sm text-primary-700">Avg Hours/Employee/Day</span>
+                        <span className="font-semibold text-primary-800">{reportData.workHours.average}h</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-lg font-semibold text-default-800 mb-4">Shrinkage Breakdown</h3>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center p-3 bg-danger-50 rounded-lg">
+                        <span className="text-sm text-danger-700">Absent Days</span>
+                        <span className="font-semibold text-danger-800">{reportData.shrinkage.breakdown.absent}h</span>
+                      </div>
+                      <div className="flex justify-between items-center p-3 bg-warning-50 rounded-lg">
+                        <span className="text-sm text-warning-700">Half Days</span>
+                        <span className="font-semibold text-warning-800">{reportData.shrinkage.breakdown.halfDay}h</span>
+                      </div>
+                      <div className="flex justify-between items-center p-3 bg-warning-50 rounded-lg">
+                        <span className="text-sm text-warning-700">Late Arrivals</span>
+                        <span className="font-semibold text-warning-800">{reportData.shrinkage.breakdown.late} instances</span>
+                      </div>
+                      <div className="flex justify-between items-center p-3 bg-warning-50 rounded-lg">
+                        <span className="text-sm text-warning-700">Early Departures</span>
+                        <span className="font-semibold text-warning-800">{reportData.shrinkage.breakdown.earlyDeparture} instances</span>
+                      </div>
+                      <div className="flex justify-between items-center p-3 bg-default-50 rounded-lg">
+                        <span className="text-sm text-default-700">Other Unproductive</span>
+                        <span className="font-semibold text-default-800">{reportData.shrinkage.breakdown.unproductive}h</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardBody>
+          </Card>
 
           {/* Department Breakdown */}
           {reportData.departments.length > 0 && (
-            <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-              <div 
-                className="flex items-center justify-between cursor-pointer mb-4"
-                onClick={() => toggleSection('departmentBreakdown')}
-              >
-                <h2 className="text-xl font-bold text-gray-800 flex items-center space-x-2">
-                  <FaBuilding className="text-primary-600" />
-                  <span>Department Breakdown</span>
-                </h2>
-                {expandedSections.departmentBreakdown ? <FaChevronUp /> : <FaChevronDown />}
-              </div>
-              
-              {expandedSections.departmentBreakdown && (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50 border-b">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employees</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Present</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Absent</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Late</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Half Day</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Hours</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {reportData.departments.map((dept, idx) => (
-                        <tr key={idx} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{dept.name}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-gray-600">{dept.totalEmployees}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-green-600 font-semibold">{dept.present}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-red-600 font-semibold">{dept.absent}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-orange-600 font-semibold">{dept.late}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-yellow-600 font-semibold">{dept['half-day']}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-blue-600 font-semibold">{dept.totalHours.toFixed(2)}h</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+            <Card className="shadow-md mb-6">
+              <CardBody className="p-6">
+                <div 
+                  className="flex items-center justify-between cursor-pointer mb-4"
+                  onClick={() => toggleSection('departmentBreakdown')}
+                >
+                  <h2 className="text-xl font-bold text-default-800 flex items-center space-x-2">
+                    <FaBuilding className="text-primary" />
+                    <span>Department Breakdown</span>
+                  </h2>
+                  {expandedSections.departmentBreakdown ? <FaChevronUp /> : <FaChevronDown />}
                 </div>
-              )}
-            </div>
+                
+                {expandedSections.departmentBreakdown && (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-default-50 border-b border-divider">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase">Department</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase">Employees</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase">Present</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase">Absent</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase">Late</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase">Half Day</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase">Total Hours</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-divider">
+                        {reportData.departments.map((dept, idx) => (
+                          <tr key={idx} className="hover:bg-default-50">
+                            <td className="px-6 py-4 whitespace-nowrap font-medium text-default-800">{dept.name}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-default-600">{dept.totalEmployees}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-success font-semibold">{dept.present}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-danger font-semibold">{dept.absent}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-warning font-semibold">{dept.late}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-warning font-semibold">{dept['half-day']}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-primary font-semibold">{dept.totalHours.toFixed(2)}h</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardBody>
+            </Card>
           )}
 
           {/* Employee Details */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div 
-              className="flex items-center justify-between cursor-pointer mb-4"
-              onClick={() => toggleSection('employeeDetails')}
-            >
-              <h2 className="text-xl font-bold text-gray-800 flex items-center space-x-2">
-                <FaUserTie className="text-primary-600" />
-                <span>Individual Employee Metrics</span>
-              </h2>
-              {expandedSections.employeeDetails ? <FaChevronUp /> : <FaChevronDown />}
-            </div>
-            
-            {expandedSections.employeeDetails && (
-              <>
-                <div className="mb-4">
-                  <div className="relative">
-                    <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-                    <input
+          <Card className="shadow-md">
+            <CardBody className="p-6">
+              <div 
+                className="flex items-center justify-between cursor-pointer mb-4"
+                onClick={() => toggleSection('employeeDetails')}
+              >
+                <h2 className="text-xl font-bold text-default-800 flex items-center space-x-2">
+                  <FaUserTie className="text-primary" />
+                  <span>Individual Employee Metrics</span>
+                </h2>
+                {expandedSections.employeeDetails ? <FaChevronUp /> : <FaChevronDown />}
+              </div>
+              
+              {expandedSections.employeeDetails && (
+                <>
+                  <div className="mb-4">
+                    <Input
                       type="text"
                       placeholder="Search by name, code, or department..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                      startContent={<FaSearch className="text-default-400" />}
+                      classNames={{
+                        input: "bg-transparent",
+                        inputWrapper: "bg-default-100"
+                      }}
                     />
                   </div>
-                </div>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-50 border-b">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Present</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Absent</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Late</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Half Day</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Hours</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avg Hours/Day</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Attendance %</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {filteredEmployees.map((emp) => (
-                        <tr key={emp.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center space-x-3">
-                              {emp.avatar ? (
-                                <img src={emp.avatar} alt={emp.name} className="w-8 h-8 rounded-full" />
-                              ) : (
-                                <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
-                                  <span className="text-xs font-medium text-primary-600">
-                                    {emp.name.split(' ').map(n => n[0]).join('')}
-                                  </span>
-                                </div>
-                              )}
-                              <div>
-                                <p className="font-medium text-gray-900">{emp.name}</p>
-                                <p className="text-xs text-gray-500">{emp.designation}</p>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{emp.employeeCode}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{emp.department}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-semibold">{emp.present}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600 font-semibold">{emp.absent}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600 font-semibold">{emp.late}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-yellow-600 font-semibold">{emp.halfDay}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-semibold">{emp.totalHours}h</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{emp.avgHours}h</td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                              parseFloat(emp.attendanceRate) >= 95 ? 'bg-green-100 text-green-800' :
-                              parseFloat(emp.attendanceRate) >= 80 ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-red-100 text-red-800'
-                            }`}>
-                              {emp.attendanceRate}%
-                            </span>
-                          </td>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-default-50 border-b border-divider">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase">Employee</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase">Code</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase">Department</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase">Present</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase">Absent</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase">Late</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase">Half Day</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase">Total Hours</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase">Avg Hours/Day</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase">Attendance %</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            )}
-          </div>
+                      </thead>
+                      <tbody className="divide-y divide-divider">
+                        {filteredEmployees.map((emp) => (
+                          <tr key={emp.id} className="hover:bg-default-50">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center space-x-3">
+                                {emp.avatar ? (
+                                  <img src={emp.avatar} alt={emp.name} className="w-8 h-8 rounded-full" />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
+                                    <span className="text-xs font-medium text-primary">
+                                      {emp.name.split(' ').map(n => n[0]).join('')}
+                                    </span>
+                                  </div>
+                                )}
+                                <div>
+                                  <p className="font-medium text-default-800">{emp.name}</p>
+                                  <p className="text-xs text-default-500">{emp.designation}</p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-default-600">{emp.employeeCode}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-default-600">{emp.department}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-success font-semibold">{emp.present}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-danger font-semibold">{emp.absent}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-warning font-semibold">{emp.late}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-warning font-semibold">{emp.halfDay}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-primary font-semibold">{emp.totalHours}h</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-default-600">{emp.avgHours}h</td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <Chip 
+                                color={parseFloat(emp.attendanceRate) >= 95 ? 'success' : parseFloat(emp.attendanceRate) >= 80 ? 'warning' : 'danger'}
+                                variant="flat"
+                                size="sm"
+                              >
+                                {emp.attendanceRate}%
+                              </Chip>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </CardBody>
+          </Card>
         </>
       )}
 
       {!reportData && !loading && (
-        <div className="text-center py-12 text-gray-500">
-          <FaCalendarAlt className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+        <div className="text-center py-12 text-default-500">
+          <FaCalendarAlt className="w-12 h-12 mx-auto mb-4 text-default-300" />
           <p>Select filters above to generate the attendance report</p>
         </div>
       )}

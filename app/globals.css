@@ -3,9 +3,11 @@
 @tailwind utilities;
 
 /* ============================================
-   GLOBAL FONT FAMILY - Raleway
+   GLOBAL FONT FAMILY - Montserrat
    ============================================ */
 :root {
+  --font-montserrat: 'Montserrat', system-ui, sans-serif;
+  --font-inter: 'Inter', system-ui, sans-serif;
   --font-raleway: 'Raleway', system-ui, sans-serif;
   --font-poppins: 'Poppins', system-ui, sans-serif;
   --font-caveat: 'Caveat', cursive;
@@ -15,9 +17,9 @@
   --font-shadows-into-light: 'Shadows Into Light', cursive;
 }
 
-/* Apply Raleway globally */
+/* Apply Montserrat globally */
 html, body {
-  font-family: var(--font-raleway);
+  font-family: var(--font-montserrat);
 }
 
 * {

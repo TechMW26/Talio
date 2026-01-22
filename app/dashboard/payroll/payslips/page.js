@@ -4,7 +4,13 @@ import { useState, useEffect } from 'react'
 import toast from '@/utils/toast'
 import { FaMoneyBillWave, FaDownload, FaEye, FaCalendarAlt, FaFilter, FaTimes } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
-import Loader from '@/components/ui/Loader'
+import { useDisclosure, Divider, Chip } from '@heroui/react'
+import { PageLoader } from '@/components/ui/heroui/Loading'
+import { HRMSCard, HRMSCardHeader, HRMSCardBody, KPICard } from '@/components/ui/heroui/Card'
+import { HRMSSelect, HRMSSelectItem } from '@/components/ui/heroui/Input'
+import { PrimaryButton, SecondaryButton, GhostButton } from '@/components/ui/heroui/Button'
+import { HRMSTable, HRMSTableHeader, HRMSTableColumn, HRMSTableBody, HRMSTableRow, HRMSTableCell, StatusBadge } from '@/components/ui/heroui/Table'
+import { HRMSModal, HRMSModalContent, HRMSModalHeader, HRMSModalBody, HRMSModalFooter } from '@/components/ui/heroui/Modal'
 
 export default function PayslipsPage() {
   const [payslips, setPayslips] = useState([])
@@ -12,7 +18,7 @@ export default function PayslipsPage() {
   const [user, setUser] = useState(null)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [selectedPayslip, setSelectedPayslip] = useState(null)
-  const [showModal, setShowModal] = useState(false)
+  const { isOpen: showModal, onOpen: openModal, onClose: closeModal } = useDisclosure()
 
   useEffect(() => {
     const parsedUser = getCurrentUser()
@@ -112,307 +118,258 @@ Generated on: ${new Date().toLocaleDateString()}
   }
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader size="lg" />
-      </div>
-    )
+    return <PageLoader message="Loading payslips..." />
   }
 
   return (
-    <div className="p-6">
+    <div className="p-3 sm:p-6 pb-20 md:pb-6 space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">My Payslips</h1>
-          <p className="text-gray-600 mt-1">View and download your salary statements</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">My Payslips</h1>
+          <p className="text-default-500 mt-1">View and download your salary statements</p>
         </div>
-        <div className="flex items-center space-x-4">
-          <select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+        <div className="flex items-center gap-4">
+          <HRMSSelect
+            label="Year"
+            size="sm"
+            className="w-32"
+            selectedKeys={[selectedYear.toString()]}
+            onSelectionChange={(keys) => setSelectedYear(parseInt(Array.from(keys)[0]))}
           >
             {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(year => (
-              <option key={year} value={year}>{year}</option>
+              <HRMSSelectItem key={year.toString()} textValue={year.toString()}>{year}</HRMSSelectItem>
             ))}
-          </select>
+          </HRMSSelect>
         </div>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-        {[
-          { 
-            title: 'Total Payslips', 
-            value: payslips.length, 
-            color: 'bg-blue-500', 
-            icon: FaCalendarAlt 
-          },
-          { 
-            title: 'YTD Gross', 
-            value: formatCurrency(payslips.reduce((sum, p) => sum + (p.grossSalary || 0), 0)), 
-            color: 'bg-green-500', 
-            icon: FaMoneyBillWave 
-          },
-          { 
-            title: 'YTD Deductions', 
-            value: formatCurrency(payslips.reduce((sum, p) => sum + (p.totalDeductions || 0), 0)), 
-            color: 'bg-red-500', 
-            icon: FaMoneyBillWave 
-          },
-          { 
-            title: 'YTD Net Pay', 
-            value: formatCurrency(payslips.reduce((sum, p) => sum + (p.netSalary || 0), 0)), 
-            color: 'bg-purple-500', 
-            icon: FaMoneyBillWave 
-          },
-        ].map((stat, index) => (
-          <div key={index} className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-500 text-sm font-medium">{stat.title}</p>
-                <h3 className="text-2xl font-bold text-gray-900 mt-2">{stat.value}</h3>
-              </div>
-              <div className={`${stat.color} p-4 rounded-lg`}>
-                <stat.icon className="w-6 h-6 text-white" />
-              </div>
-            </div>
-          </div>
-        ))}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <KPICard
+          title="Total Payslips"
+          value={payslips.length}
+          icon={<FaCalendarAlt />}
+          color="primary"
+        />
+        <KPICard
+          title="YTD Gross"
+          value={formatCurrency(payslips.reduce((sum, p) => sum + (p.grossSalary || 0), 0))}
+          icon={<FaMoneyBillWave />}
+          color="success"
+        />
+        <KPICard
+          title="YTD Deductions"
+          value={formatCurrency(payslips.reduce((sum, p) => sum + (p.totalDeductions || 0), 0))}
+          icon={<FaMoneyBillWave />}
+          color="danger"
+        />
+        <KPICard
+          title="YTD Net Pay"
+          value={formatCurrency(payslips.reduce((sum, p) => sum + (p.netSalary || 0), 0))}
+          icon={<FaMoneyBillWave />}
+          color="secondary"
+        />
       </div>
 
       {/* Payslips List */}
-      <div className="bg-white rounded-lg shadow-md">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Payslips for {selectedYear}</h3>
-        </div>
-        {payslips.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">
-            <FaMoneyBillWave className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-            <p>No payslips found for {selectedYear}</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Month
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Gross Salary
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Deductions
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Net Salary
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+      <HRMSCard>
+        <HRMSCardHeader>
+          <h3 className="text-lg font-semibold text-foreground">Payslips for {selectedYear}</h3>
+        </HRMSCardHeader>
+        <Divider />
+        <HRMSCardBody className="p-0">
+          {payslips.length === 0 ? (
+            <div className="p-8 text-center text-default-500">
+              <FaMoneyBillWave className="w-12 h-12 mx-auto mb-4 text-default-300" />
+              <p>No payslips found for {selectedYear}</p>
+            </div>
+          ) : (
+            <HRMSTable aria-label="Payslips table">
+              <HRMSTableHeader>
+                <HRMSTableColumn>Month</HRMSTableColumn>
+                <HRMSTableColumn>Gross Salary</HRMSTableColumn>
+                <HRMSTableColumn>Deductions</HRMSTableColumn>
+                <HRMSTableColumn>Net Salary</HRMSTableColumn>
+                <HRMSTableColumn>Status</HRMSTableColumn>
+                <HRMSTableColumn>Actions</HRMSTableColumn>
+              </HRMSTableHeader>
+              <HRMSTableBody>
                 {payslips.map((payslip) => (
-                  <tr key={payslip._id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
+                  <HRMSTableRow key={payslip._id}>
+                    <HRMSTableCell>
+                      <span className="font-medium text-foreground">
                         {getMonthName(payslip.month)} {payslip.year}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatCurrency(payslip.grossSalary)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600">
-                      {formatCurrency(payslip.totalDeductions)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
-                      {formatCurrency(payslip.netSalary)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        payslip.status === 'paid' ? 'bg-green-100 text-green-800' :
-                        payslip.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {payslip.status?.charAt(0).toUpperCase() + payslip.status?.slice(1)}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => {
+                    </HRMSTableCell>
+                    <HRMSTableCell>
+                      <span className="text-foreground">{formatCurrency(payslip.grossSalary)}</span>
+                    </HRMSTableCell>
+                    <HRMSTableCell>
+                      <span className="text-danger">{formatCurrency(payslip.totalDeductions)}</span>
+                    </HRMSTableCell>
+                    <HRMSTableCell>
+                      <span className="font-medium text-success">{formatCurrency(payslip.netSalary)}</span>
+                    </HRMSTableCell>
+                    <HRMSTableCell>
+                      <StatusBadge status={payslip.status || 'pending'} />
+                    </HRMSTableCell>
+                    <HRMSTableCell>
+                      <div className="flex items-center gap-2">
+                        <GhostButton
+                          size="sm"
+                          onPress={() => {
                             setSelectedPayslip(payslip)
-                            setShowModal(true)
+                            openModal()
                           }}
-                          className="text-primary-600 hover:text-primary-900 flex items-center space-x-1"
+                          startContent={<FaEye className="w-4 h-4" />}
                         >
-                          <FaEye className="w-4 h-4" />
-                          <span>View</span>
-                        </button>
-                        <button
-                          onClick={() => downloadPayslip(payslip)}
-                          className="text-green-600 hover:text-green-900 flex items-center space-x-1"
+                          View
+                        </GhostButton>
+                        <GhostButton
+                          size="sm"
+                          color="success"
+                          onPress={() => downloadPayslip(payslip)}
+                          startContent={<FaDownload className="w-4 h-4" />}
                         >
-                          <FaDownload className="w-4 h-4" />
-                          <span>Download</span>
-                        </button>
+                          Download
+                        </GhostButton>
                       </div>
-                    </td>
-                  </tr>
+                    </HRMSTableCell>
+                  </HRMSTableRow>
                 ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+              </HRMSTableBody>
+            </HRMSTable>
+          )}
+        </HRMSCardBody>
+      </HRMSCard>
 
       {/* Payslip Details Modal */}
-      {showModal && selectedPayslip && (
-        <div className="fixed inset-0 modal-overlay flex items-center justify-center style={{ zIndex: 99999 }}">
-          <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-screen overflow-y-auto">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-800">
-                Payslip - {getMonthName(selectedPayslip.month)} {selectedPayslip.year}
-              </h2>
-              <button
-                onClick={() => setShowModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <FaTimes className="w-6 h-6" />
-              </button>
-            </div>
+      <HRMSModal isOpen={showModal} onClose={closeModal} size="4xl">
+        <HRMSModalContent>
+          {selectedPayslip && (
+            <>
+              <HRMSModalHeader>
+                <h2 className="text-xl font-bold text-foreground">
+                  Payslip - {getMonthName(selectedPayslip.month)} {selectedPayslip.year}
+                </h2>
+              </HRMSModalHeader>
+              <HRMSModalBody>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Employee Details */}
+                  <div className="bg-default-50 p-6 rounded-lg">
+                    <h3 className="text-lg font-semibold text-foreground mb-4">Employee Details</h3>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-default-500">Name:</span>
+                        <span className="font-medium text-foreground">{user?.employeeId?.firstName} {user?.employeeId?.lastName}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-default-500">Employee ID:</span>
+                        <span className="font-medium text-foreground">{user?.employeeId?.employeeCode}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-default-500">Department:</span>
+                        <span className="font-medium text-foreground">{user?.employeeId?.department?.name || 'N/A'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-default-500">Designation:</span>
+                        <span className="font-medium text-foreground">{user?.employeeId?.designation?.name || 'N/A'}</span>
+                      </div>
+                    </div>
+                  </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Employee Details */}
-              <div className="bg-gray-50 p-6 rounded-lg">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Employee Details</h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Name:</span>
-                    <span className="font-medium">{user?.employeeId?.firstName} {user?.employeeId?.lastName}</span>
+                  {/* Earnings */}
+                  <div className="bg-success-50 p-6 rounded-lg">
+                    <h3 className="text-lg font-semibold text-foreground mb-4">Earnings</h3>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-default-600">Basic Salary:</span>
+                        <span className="font-medium text-foreground">{formatCurrency(selectedPayslip.basicSalary)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-default-600">HRA:</span>
+                        <span className="font-medium text-foreground">{formatCurrency(selectedPayslip.hra)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-default-600">Allowances:</span>
+                        <span className="font-medium text-foreground">{formatCurrency(selectedPayslip.allowances)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-default-600">Overtime:</span>
+                        <span className="font-medium text-foreground">{formatCurrency(selectedPayslip.overtime)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-default-600">Bonus:</span>
+                        <span className="font-medium text-foreground">{formatCurrency(selectedPayslip.bonus)}</span>
+                      </div>
+                      <Divider className="my-2" />
+                      <div className="flex justify-between font-bold">
+                        <span>Gross Salary:</span>
+                        <span className="text-success">{formatCurrency(selectedPayslip.grossSalary)}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Employee ID:</span>
-                    <span className="font-medium">{user?.employeeId?.employeeCode}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Department:</span>
-                    <span className="font-medium">{user?.employeeId?.department?.name || 'N/A'}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Designation:</span>
-                    <span className="font-medium">{user?.employeeId?.designation?.name || 'N/A'}</span>
-                  </div>
-                </div>
-              </div>
 
-              {/* Earnings */}
-              <div className="bg-green-50 p-6 rounded-lg">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Earnings</h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Basic Salary:</span>
-                    <span className="font-medium">{formatCurrency(selectedPayslip.basicSalary)}</span>
+                  {/* Deductions */}
+                  <div className="bg-danger-50 p-6 rounded-lg">
+                    <h3 className="text-lg font-semibold text-foreground mb-4">Deductions</h3>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-default-600">Tax:</span>
+                        <span className="font-medium text-foreground">{formatCurrency(selectedPayslip.tax)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-default-600">PF:</span>
+                        <span className="font-medium text-foreground">{formatCurrency(selectedPayslip.pf)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-default-600">ESI:</span>
+                        <span className="font-medium text-foreground">{formatCurrency(selectedPayslip.esi)}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-default-600">Other Deductions:</span>
+                        <span className="font-medium text-foreground">{formatCurrency(selectedPayslip.otherDeductions)}</span>
+                      </div>
+                      <Divider className="my-2" />
+                      <div className="flex justify-between font-bold">
+                        <span>Total Deductions:</span>
+                        <span className="text-danger">{formatCurrency(selectedPayslip.totalDeductions)}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">HRA:</span>
-                    <span className="font-medium">{formatCurrency(selectedPayslip.hra)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Allowances:</span>
-                    <span className="font-medium">{formatCurrency(selectedPayslip.allowances)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Overtime:</span>
-                    <span className="font-medium">{formatCurrency(selectedPayslip.overtime)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Bonus:</span>
-                    <span className="font-medium">{formatCurrency(selectedPayslip.bonus)}</span>
-                  </div>
-                  <div className="border-t pt-2 mt-2">
-                    <div className="flex justify-between font-bold">
-                      <span>Gross Salary:</span>
-                      <span>{formatCurrency(selectedPayslip.grossSalary)}</span>
+
+                  {/* Net Salary */}
+                  <div className="bg-primary-50 p-6 rounded-lg">
+                    <h3 className="text-lg font-semibold text-foreground mb-4">Net Salary</h3>
+                    <div className="text-center">
+                      <div className="text-3xl font-bold text-primary">
+                        {formatCurrency(selectedPayslip.netSalary)}
+                      </div>
+                      <p className="text-default-500 mt-2">Amount to be paid</p>
+                      <div className="mt-4">
+                        <StatusBadge status={selectedPayslip.status || 'pending'} />
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-
-              {/* Deductions */}
-              <div className="bg-red-50 p-6 rounded-lg">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Deductions</h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Tax:</span>
-                    <span className="font-medium">{formatCurrency(selectedPayslip.tax)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">PF:</span>
-                    <span className="font-medium">{formatCurrency(selectedPayslip.pf)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">ESI:</span>
-                    <span className="font-medium">{formatCurrency(selectedPayslip.esi)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Other Deductions:</span>
-                    <span className="font-medium">{formatCurrency(selectedPayslip.otherDeductions)}</span>
-                  </div>
-                  <div className="border-t pt-2 mt-2">
-                    <div className="flex justify-between font-bold">
-                      <span>Total Deductions:</span>
-                      <span>{formatCurrency(selectedPayslip.totalDeductions)}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Net Salary */}
-              <div className="bg-blue-50 p-6 rounded-lg">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Net Salary</h3>
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-blue-600">
-                    {formatCurrency(selectedPayslip.netSalary)}
-                  </div>
-                  <p className="text-gray-600 mt-2">Amount to be paid</p>
-                  <div className="mt-4">
-                    <span className={`px-3 py-1 text-sm font-semibold rounded-full ${
-                      selectedPayslip.status === 'paid' ? 'bg-green-100 text-green-800' :
-                      selectedPayslip.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {selectedPayslip.status?.charAt(0).toUpperCase() + selectedPayslip.status?.slice(1)}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end mt-6 space-x-3">
-              <button
-                onClick={() => downloadPayslip(selectedPayslip)}
-                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center space-x-2"
-              >
-                <FaDownload className="w-4 h-4" />
-                <span>Download</span>
-              </button>
-              <button
-                onClick={() => setShowModal(false)}
-                className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+              </HRMSModalBody>
+              <HRMSModalFooter>
+                <PrimaryButton
+                  color="success"
+                  onPress={() => downloadPayslip(selectedPayslip)}
+                  startContent={<FaDownload className="w-4 h-4" />}
+                >
+                  Download
+                </PrimaryButton>
+                <SecondaryButton onPress={closeModal}>
+                  Close
+                </SecondaryButton>
+              </HRMSModalFooter>
+            </>
+          )}
+        </HRMSModalContent>
+      </HRMSModal>
     </div>
   )
 }

@@ -1,40 +1,44 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { FaUser, FaCalendar, FaDollarSign, FaTasks, FaFileAlt, FaPlane, FaBolt } from 'react-icons/fa'
+import { Button } from '@heroui/react'
+import { FaUser, FaCalendar, FaDollarSign, FaTasks, FaFileAlt, FaPlane } from 'react-icons/fa'
 
 export default function QuickActionsWidget() {
     const router = useRouter()
 
     const actions = [
-        { icon: FaCalendar, label: 'Request Leave', path: '/dashboard/leave/requests', color: 'bg-primary-500' },
-        { icon: FaTasks, label: 'My Tasks', path: '/dashboard/projects', color: 'bg-primary-500' },
-        { icon: FaDollarSign, label: 'Payroll', path: '/dashboard/payroll', color: 'bg-primary-500' },
-        { icon: FaPlane, label: 'Travel Request', path: '/dashboard/travel', color: 'bg-primary-500' },
-        { icon: FaFileAlt, label: 'Documents', path: '/dashboard/documents', color: 'bg-primary-500' },
-        { icon: FaUser, label: 'My Profile', path: '/dashboard/profile', color: 'bg-primary-500' },
+        { icon: FaCalendar, label: 'Request Leave', path: '/dashboard/leave/requests', color: 'primary' },
+        { icon: FaTasks, label: 'My Tasks', path: '/dashboard/projects', color: 'secondary' },
+        { icon: FaDollarSign, label: 'Payroll', path: '/dashboard/payroll', color: 'success' },
+        { icon: FaPlane, label: 'Travel Request', path: '/dashboard/travel', color: 'warning' },
+        { icon: FaFileAlt, label: 'Documents', path: '/dashboard/documents', color: 'default' },
+        { icon: FaUser, label: 'My Profile', path: '/dashboard/profile', color: 'primary' },
     ]
 
     return (
         <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
             <div className="mb-4">
-                <h3 className="text-base sm:text-lg font-bold text-gray-800">Quick Actions</h3>
+                <h3 className="text-base sm:text-lg font-bold text-default-900">Quick Actions</h3>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 flex-1">
+            <div className="grid grid-cols-2 gap-3 flex-1">
                 {actions.map((action, index) => {
                     const Icon = action.icon
                     return (
-                        <button
+                        <Button
                             key={index}
-                            onClick={() => router.push(action.path)}
-                            className="p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors flex flex-col items-center gap-2 text-center h-full"
+                            variant="flat"
+                            color={action.color}
+                            onPress={() => router.push(action.path)}
+                            className="p-4 h-auto flex flex-col items-center gap-2 text-center bg-default-50 hover:bg-default-100 border border-default-100"
+                            radius="lg"
                         >
-                            <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
+                            <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
                                 <Icon className="w-5 h-5 text-primary-600" />
                             </div>
-                            <span className="text-xs font-medium text-gray-700">{action.label}</span>
-                        </button>
+                            <span className="text-xs font-medium text-default-700">{action.label}</span>
+                        </Button>
                     )
                 })}
             </div>

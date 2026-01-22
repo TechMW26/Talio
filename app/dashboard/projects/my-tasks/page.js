@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
-import Loader from '@/components/ui/Loader'
+import { Card, CardBody, Button, Chip, Skeleton, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Textarea, Progress, Spinner, Select, SelectItem } from '@heroui/react'
 import {
   HiOutlineClipboardDocumentList,
   HiOutlineClock,
@@ -32,20 +32,20 @@ import Portal from '@/components/ui/Portal'
 import KanbanBoard from '@/components/tasks/KanbanBoard'
 
 const statusColors = {
-  'todo': 'bg-gray-100 text-gray-700 border-gray-200',
-  'in-progress': 'bg-blue-100 text-blue-700 border-blue-200',
-  'review': 'bg-purple-100 text-purple-700 border-purple-200',
-  'completed': 'bg-green-100 text-green-700 border-green-200',
-  'completed-pending-approval': 'bg-yellow-100 text-yellow-700 border-yellow-200',
-  'rejected': 'bg-red-100 text-red-700 border-red-200',
-  'blocked': 'bg-orange-100 text-orange-700 border-orange-200'
+  'todo': 'default',
+  'in-progress': 'primary',
+  'review': 'secondary',
+  'completed': 'success',
+  'completed-pending-approval': 'warning',
+  'rejected': 'danger',
+  'blocked': 'warning'
 }
 
 const priorityColors = {
-  low: 'bg-gray-100 text-gray-700',
-  medium: 'bg-blue-100 text-blue-700',
-  high: 'bg-orange-100 text-orange-700',
-  critical: 'bg-red-100 text-red-700'
+  low: 'default',
+  medium: 'primary',
+  high: 'warning',
+  critical: 'danger'
 }
 
 // Project colors for visual differentiation
@@ -492,7 +492,7 @@ export default function MyTasksPage() {
     return (
       <div className="page-container">
         <div className="flex items-center justify-center h-64">
-          <Loader size="lg" />
+          <Spinner size="lg" />
         </div>
       </div>
     )
@@ -502,7 +502,7 @@ export default function MyTasksPage() {
     return (
       <div className="page-container">
         <div className="flex items-center justify-center h-64">
-          <Loader size="lg" />
+          <Spinner size="lg" />
         </div>
       </div>
     )
@@ -513,11 +513,11 @@ export default function MyTasksPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-default-800 flex items-center gap-2">
             <HiOutlineClipboardDocumentList className="w-7 h-7 text-indigo-600" />
             My Tasks
           </h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-default-600 mt-1">
             View and manage your tasks across all projects
           </p>
         </div>
@@ -525,174 +525,196 @@ export default function MyTasksPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-gray-100 rounded-lg">
-              <HiOutlineListBullet className="w-5 h-5 text-gray-600" />
+        <Card shadow="sm">
+          <CardBody className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-default-100 rounded-lg">
+                <HiOutlineListBullet className="w-5 h-5 text-default-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-default-800">{stats.total}</p>
+                <p className="text-sm text-default-500">Total</p>
+              </div>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{stats.total}</p>
-              <p className="text-sm text-gray-500">Total</p>
-            </div>
-          </div>
-        </div>
+          </CardBody>
+        </Card>
 
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-amber-100 rounded-lg">
-              <HiOutlineClock className="w-5 h-5 text-amber-600" />
+        <Card shadow="sm">
+          <CardBody className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-warning-100 rounded-lg">
+                <HiOutlineClock className="w-5 h-5 text-warning" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-default-800">{stats.pendingAcceptance}</p>
+                <p className="text-sm text-default-500">Pending Accept</p>
+              </div>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{stats.pendingAcceptance}</p>
-              <p className="text-sm text-gray-500">Pending Accept</p>
-            </div>
-          </div>
-        </div>
+          </CardBody>
+        </Card>
 
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-slate-100 rounded-lg">
-              <HiOutlineClipboardDocumentList className="w-5 h-5 text-slate-600" />
+        <Card shadow="sm">
+          <CardBody className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-default-100 rounded-lg">
+                <HiOutlineClipboardDocumentList className="w-5 h-5 text-default-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-default-800">{stats.todo}</p>
+                <p className="text-sm text-default-500">To Do</p>
+              </div>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{stats.todo}</p>
-              <p className="text-sm text-gray-500">To Do</p>
-            </div>
-          </div>
-        </div>
+          </CardBody>
+        </Card>
 
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <HiOutlinePlayCircle className="w-5 h-5 text-blue-600" />
+        <Card shadow="sm">
+          <CardBody className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary-100 rounded-lg">
+                <HiOutlinePlayCircle className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-default-800">{stats.inProgress}</p>
+                <p className="text-sm text-default-500">In Progress</p>
+              </div>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{stats.inProgress}</p>
-              <p className="text-sm text-gray-500">In Progress</p>
-            </div>
-          </div>
-        </div>
+          </CardBody>
+        </Card>
 
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <HiOutlineCheckCircle className="w-5 h-5 text-green-600" />
+        <Card shadow="sm">
+          <CardBody className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-success-100 rounded-lg">
+                <HiOutlineCheckCircle className="w-5 h-5 text-success" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-default-800">{stats.completed}</p>
+                <p className="text-sm text-default-500">Completed</p>
+              </div>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{stats.completed}</p>
-              <p className="text-sm text-gray-500">Completed</p>
-            </div>
-          </div>
-        </div>
+          </CardBody>
+        </Card>
 
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-red-100 rounded-lg">
-              <HiOutlineExclamationTriangle className="w-5 h-5 text-red-600" />
+        <Card shadow="sm">
+          <CardBody className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-danger-100 rounded-lg">
+                <HiOutlineExclamationTriangle className="w-5 h-5 text-danger" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-default-800">{stats.overdue}</p>
+                <p className="text-sm text-default-500">Overdue</p>
+              </div>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{stats.overdue}</p>
-              <p className="text-sm text-gray-500">Overdue</p>
-            </div>
-          </div>
-        </div>
+          </CardBody>
+        </Card>
       </div>
 
       {/* Filters and Search */}
-      <div className="bg-white rounded-lg shadow-md p-4 mb-6">
-        <div className="flex flex-col md:flex-row gap-4">
-          {/* Search */}
-          <div className="relative flex-1">
-            <HiOutlineMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search tasks..."
-              className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            />
-          </div>
+      <Card shadow="sm" className="mb-6">
+        <CardBody className="p-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            {/* Search */}
+            <div className="relative flex-1">
+              <HiOutlineMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-default-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search tasks..."
+                className="w-full pl-10 pr-4 py-2.5 border border-default-300 rounded-lg bg-content1 text-default-800 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+            </div>
 
-          {/* Filters */}
-          <div className="flex flex-wrap gap-2">
-            <select
-              value={filters.project}
-              onChange={(e) => setFilters(prev => ({ ...prev, project: e.target.value }))}
-              className="px-4 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            >
-              <option value="all">All Projects</option>
-              {projects.map(project => (
-                <option key={project._id} value={project._id}>
-                  {project.name}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={filters.status}
-              onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-              className="px-4 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            >
-              <option value="all">All Statuses</option>
-              <option value="todo">To Do</option>
-              <option value="in-progress">In Progress</option>
-              <option value="review">In Review</option>
-              <option value="completed">Completed</option>
-              <option value="blocked">Blocked</option>
-            </select>
-
-            <select
-              value={filters.priority}
-              onChange={(e) => setFilters(prev => ({ ...prev, priority: e.target.value }))}
-              className="px-4 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            >
-              <option value="all">All Priorities</option>
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-              <option value="critical">Critical</option>
-            </select>
-
-            <select
-              value={filters.period}
-              onChange={(e) => setFilters(prev => ({ ...prev, period: e.target.value }))}
-              className="px-4 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            >
-              <option value="all">All Time</option>
-              <option value="today">Today</option>
-              <option value="week">This Week</option>
-              <option value="month">This Month</option>
-              <option value="overdue">Overdue</option>
-            </select>
-
-            {/* View Toggle */}
-            <div className="flex border border-gray-300 rounded-lg overflow-hidden">
-              <button
-                onClick={() => setViewMode('list')}
-                className={`px-3 py-2.5 flex items-center gap-1.5 transition-colors ${
-                  viewMode === 'list'
-                    ? 'bg-primary-500 text-white'
-                    : 'bg-white text-gray-600 hover:bg-gray-50'
-                }`}
-                title="List View"
+            {/* Filters */}
+            <div className="flex flex-wrap gap-2">
+              <Select
+                selectedKeys={[filters.project]}
+                onSelectionChange={(keys) => setFilters(prev => ({ ...prev, project: Array.from(keys)[0] }))}
+                className="min-w-[150px]"
+                size="sm"
+                aria-label="Filter by Project"
               >
-                <HiOutlineQueueList className="w-5 h-5" />
-              </button>
-              <button
-                onClick={() => setViewMode('kanban')}
-                className={`px-3 py-2.5 flex items-center gap-1.5 transition-colors border-l border-gray-300 ${
-                  viewMode === 'kanban'
-                    ? 'bg-primary-500 text-white'
-                    : 'bg-white text-gray-600 hover:bg-gray-50'
-                }`}
-                title="Kanban View"
+                <SelectItem key="all">All Projects</SelectItem>
+                {projects.map(project => (
+                  <SelectItem key={project._id}>
+                    {project.name}
+                  </SelectItem>
+                ))}
+              </Select>
+
+              <Select
+                selectedKeys={[filters.status]}
+                onSelectionChange={(keys) => setFilters(prev => ({ ...prev, status: Array.from(keys)[0] }))}
+                className="min-w-[140px]"
+                size="sm"
+                aria-label="Filter by Status"
               >
-                <HiOutlineViewColumns className="w-5 h-5" />
-              </button>
+                <SelectItem key="all">All Statuses</SelectItem>
+                <SelectItem key="todo">To Do</SelectItem>
+                <SelectItem key="in-progress">In Progress</SelectItem>
+                <SelectItem key="review">In Review</SelectItem>
+                <SelectItem key="completed">Completed</SelectItem>
+                <SelectItem key="blocked">Blocked</SelectItem>
+              </Select>
+
+              <Select
+                selectedKeys={[filters.priority]}
+                onSelectionChange={(keys) => setFilters(prev => ({ ...prev, priority: Array.from(keys)[0] }))}
+                className="min-w-[140px]"
+                size="sm"
+                aria-label="Filter by Priority"
+              >
+                <SelectItem key="all">All Priorities</SelectItem>
+                <SelectItem key="low">Low</SelectItem>
+                <SelectItem key="medium">Medium</SelectItem>
+                <SelectItem key="high">High</SelectItem>
+                <SelectItem key="critical">Critical</SelectItem>
+              </Select>
+
+              <Select
+                selectedKeys={[filters.period]}
+                onSelectionChange={(keys) => setFilters(prev => ({ ...prev, period: Array.from(keys)[0] }))}
+                className="min-w-[130px]"
+                size="sm"
+                aria-label="Filter by Period"
+              >
+                <SelectItem key="all">All Time</SelectItem>
+                <SelectItem key="today">Today</SelectItem>
+                <SelectItem key="week">This Week</SelectItem>
+                <SelectItem key="month">This Month</SelectItem>
+                <SelectItem key="overdue">Overdue</SelectItem>
+              </Select>
+
+              {/* View Toggle */}
+              <div className="flex border border-default-300 rounded-lg overflow-hidden">
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`px-3 py-2.5 flex items-center gap-1.5 transition-colors ${
+                    viewMode === 'list'
+                      ? 'bg-primary-500 text-white'
+                      : 'bg-content1 text-default-600 hover:bg-default-50'
+                  }`}
+                  title="List View"
+                >
+                  <HiOutlineQueueList className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => setViewMode('kanban')}
+                  className={`px-3 py-2.5 flex items-center gap-1.5 transition-colors border-l border-default-300 ${
+                    viewMode === 'kanban'
+                      ? 'bg-primary-500 text-white'
+                      : 'bg-content1 text-default-600 hover:bg-default-50'
+                  }`}
+                  title="Kanban View"
+                >
+                  <HiOutlineViewColumns className="w-5 h-5" />
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
+        </CardBody>
+      </Card>
 
       {/* Kanban View */}
       {viewMode === 'kanban' && (
@@ -708,14 +730,14 @@ export default function MyTasksPage() {
           
           {/* Show pending acceptance tasks above kanban for quick action */}
           {pendingAcceptance.length > 0 && (
-            <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-              <h3 className="text-sm font-medium text-amber-800 mb-2 flex items-center gap-2">
+            <div className="mt-6 p-4 bg-warning-50 border border-warning-200 rounded-lg">
+              <h3 className="text-sm font-medium text-warning-700 mb-2 flex items-center gap-2">
                 <HiOutlineClock className="w-4 h-4" />
                 {pendingAcceptance.length} task(s) pending your acceptance
               </h3>
               <button
                 onClick={() => setViewMode('list')}
-                className="text-sm text-amber-700 hover:text-amber-900 underline"
+                className="text-sm text-warning-600 hover:text-warning-800 underline"
               >
                 Switch to list view to accept
               </button>
@@ -730,8 +752,8 @@ export default function MyTasksPage() {
           {/* Pending Acceptance Tasks */}
           {pendingAcceptance.length > 0 && (
         <div className="mb-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <HiOutlineClock className="w-5 h-5 text-amber-500" />
+          <h2 className="text-lg font-semibold text-default-800 mb-3 flex items-center gap-2">
+            <HiOutlineClock className="w-5 h-5 text-warning" />
             Pending Acceptance ({pendingAcceptance.length})
           </h2>
           <div className="grid gap-4">
@@ -772,8 +794,8 @@ export default function MyTasksPage() {
       {/* Overdue Tasks */}
       {overdueTasks.length > 0 && (
         <div className="mb-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <HiOutlineExclamationTriangle className="w-5 h-5 text-red-500" />
+          <h2 className="text-lg font-semibold text-default-800 mb-3 flex items-center gap-2">
+            <HiOutlineExclamationTriangle className="w-5 h-5 text-danger" />
             Overdue ({overdueTasks.length})
           </h2>
           <div className="grid gap-4">
@@ -796,8 +818,8 @@ export default function MyTasksPage() {
       {/* Today's Tasks */}
       {todayTasks.length > 0 && (
         <div className="mb-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <HiOutlineClock className="w-5 h-5 text-blue-500" />
+          <h2 className="text-lg font-semibold text-default-800 mb-3 flex items-center gap-2">
+            <HiOutlineClock className="w-5 h-5 text-primary" />
             Due Today ({todayTasks.length})
           </h2>
           <div className="grid gap-4">
@@ -819,7 +841,7 @@ export default function MyTasksPage() {
       {/* Upcoming Tasks */}
       {upcomingTasks.filter(t => t.assignmentStatus !== 'pending').length > 0 && (
         <div className="mb-6">
-          <h2 className="text-lg font-semibold text-gray-800 mb-3">
+          <h2 className="text-lg font-semibold text-default-800 mb-3">
             All Tasks
           </h2>
           <div className="grid gap-4">
@@ -839,103 +861,87 @@ export default function MyTasksPage() {
       )}
 
       {filteredTasks.length === 0 && (
-        <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
-          <HiOutlineClipboardDocumentList className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-          <h3 className="text-lg font-medium text-gray-800 mb-2">
-            No tasks found
-          </h3>
-          <p className="text-gray-500">
-            Tasks assigned to you will appear here
-          </p>
-        </div>
+        <Card shadow="sm">
+          <CardBody className="text-center py-12">
+            <HiOutlineClipboardDocumentList className="w-16 h-16 mx-auto text-default-300 mb-4" />
+            <h3 className="text-lg font-medium text-default-800 mb-2">
+              No tasks found
+            </h3>
+            <p className="text-default-500">
+              Tasks assigned to you will appear here
+            </p>
+          </CardBody>
+        </Card>
       )}
         </>
       )}
 
       {/* Reject Modal */}
-      {showRejectModal && selectedTask && (
-        <Portal>
-          <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && (setShowRejectModal(false), setSelectedTask(null), setRejectRemark(''))}>
-            <div className="modal-backdrop" />
-            <div className="modal-container modal-lg">
-              <div className="modal-header">
-                <h3 className="modal-title">Reject Assignment</h3>
-                <button
-                  onClick={() => { setShowRejectModal(false); setSelectedTask(null); setRejectRemark('') }}
-                  className="modal-close-btn"
-                >
-                  <FaTimes />
-                </button>
-              </div>
-              <div className="modal-body">
-                <p className="text-gray-600 mb-4">
+      {/* Reject Modal */}
+      <Modal isOpen={showRejectModal && !!selectedTask} onOpenChange={(open) => { if (!open) { setShowRejectModal(false); setSelectedTask(null); setRejectRemark(''); } }} size="lg">
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>Reject Assignment</ModalHeader>
+              <ModalBody>
+                <p className="text-default-600 mb-4">
                   Please provide a reason for rejecting this task assignment.
                 </p>
-                <textarea
+                <Textarea
                   value={rejectRemark}
                   onChange={(e) => setRejectRemark(e.target.value)}
                   placeholder="Reason for rejection..."
-                  rows={3}
-                  className="modal-textarea"
+                  minRows={3}
                 />
-              </div>
-              <div className="modal-footer">
-                <button
-                  onClick={() => { setShowRejectModal(false); setSelectedTask(null); setRejectRemark('') }}
-                  className="modal-btn modal-btn-secondary"
+              </ModalBody>
+              <ModalFooter>
+                <Button
+                  variant="light"
+                  onPress={onClose}
                 >
                   Cancel
-                </button>
-                <button
-                  onClick={() => handleRespondToAssignment(selectedTask, 'reject')}
-                  disabled={respondingTo === selectedTask._id}
-                  className="modal-btn modal-btn-danger"
+                </Button>
+                <Button
+                  color="danger"
+                  onPress={() => handleRespondToAssignment(selectedTask, 'reject')}
+                  isLoading={respondingTo === selectedTask?._id}
                 >
-                  {respondingTo === selectedTask._id ? 'Rejecting...' : 'Reject'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </Portal>
-      )}
+                  {respondingTo === selectedTask?._id ? 'Rejecting...' : 'Reject'}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
 
       {/* ETA Modal */}
-      {showEtaModal && taskForEta && (
-        <Portal>
-          <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && (setShowEtaModal(false), setTaskForEta(null), setEta({ days: '', hours: '' }), setSubtaskEtas({}))}>
-            <div className="modal-backdrop" />
-            <div className="modal-container modal-2xl">
-              <div className="modal-header">
-                <h3 className="modal-title">Set Estimated Time</h3>
-                <button
-                  onClick={() => { setShowEtaModal(false); setTaskForEta(null); setEta({ days: '', hours: '' }); setSubtaskEtas({}) }}
-                  className="modal-close-btn"
-                >
-                  <FaTimes />
-                </button>
-              </div>
-              <div className="modal-body">
+      <Modal isOpen={showEtaModal && !!taskForEta} onOpenChange={(open) => { if (!open) { setShowEtaModal(false); setTaskForEta(null); setEta({ days: '', hours: '' }); setSubtaskEtas({}); } }} size="2xl">
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>Set Estimated Time</ModalHeader>
+              <ModalBody>
                 <div className="mb-4">
-                  <p className="font-medium text-gray-800 mb-1">{taskForEta.title}</p>
-                  {taskForEta.description && (
-                    <p className="text-sm text-gray-500">{taskForEta.description}</p>
+                  <p className="font-medium text-default-800 mb-1">{taskForEta?.title}</p>
+                  {taskForEta?.description && (
+                    <p className="text-sm text-default-500">{taskForEta.description}</p>
                   )}
                 </div>
 
-                {taskForEta.subtasks && taskForEta.subtasks.length > 0 ? (
+                {taskForEta?.subtasks && taskForEta.subtasks.length > 0 ? (
                   <>
-                    <p className="text-gray-600 mb-4">
+                    <p className="text-default-600 mb-4">
                       Please provide an ETA for each subtask. The total task time will be calculated automatically.
                     </p>
                     <div className="space-y-4">
                       {taskForEta.subtasks.map((st, index) => (
-                        <div key={st._id} className="p-3 bg-gray-50 rounded-lg">
-                          <p className="text-sm font-medium text-gray-700 mb-2">
+                        <div key={st._id} className="p-3 bg-default-50 rounded-lg">
+                          <p className="text-sm font-medium text-default-700 mb-2">
                             {index + 1}. {st.title}
                           </p>
                           <div className="flex items-center gap-3">
                             <div className="flex items-center gap-1">
-                              <input
+                              <Input
                                 type="number"
                                 min="0"
                                 value={subtaskEtas[st._id]?.days || ''}
@@ -944,12 +950,13 @@ export default function MyTasksPage() {
                                   [st._id]: { ...prev[st._id], days: e.target.value }
                                 }))}
                                 placeholder="0"
-                                className="modal-input w-16"
+                                className="w-20"
+                                size="sm"
                               />
-                              <span className="text-xs text-gray-500">days</span>
+                              <span className="text-xs text-default-500">days</span>
                             </div>
                             <div className="flex items-center gap-1">
-                              <input
+                              <Input
                                 type="number"
                                 min="0"
                                 max="23"
@@ -959,19 +966,20 @@ export default function MyTasksPage() {
                                   [st._id]: { ...prev[st._id], hours: e.target.value }
                                 }))}
                                 placeholder="0"
-                                className="modal-input w-16"
+                                className="w-20"
+                                size="sm"
                               />
-                              <span className="text-xs text-gray-500">hours</span>
+                              <span className="text-xs text-default-500">hours</span>
                             </div>
                           </div>
                         </div>
                       ))}
                     </div>
-                    <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                      <p className="text-sm text-blue-700 font-medium">
+                    <div className="mt-4 p-3 bg-primary-50 rounded-lg">
+                      <p className="text-sm text-primary-700 font-medium">
                         Total Estimated Time: {(() => {
                           let total = 0
-                          taskForEta.subtasks.forEach(st => {
+                          taskForEta?.subtasks?.forEach(st => {
                             const stEta = subtaskEtas[st._id] || {}
                             total += ((parseInt(stEta.days) || 0) * 8) + (parseInt(stEta.hours) || 0)
                           })
@@ -984,123 +992,98 @@ export default function MyTasksPage() {
                   </>
                 ) : (
                   <>
-                    <p className="text-gray-600 mb-4">
+                    <p className="text-default-600 mb-4">
                       How long do you estimate this task will take to complete?
                     </p>
                     <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="modal-label">
-                          Days
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          step="1"
-                          value={eta.days}
-                          onChange={(e) => setEta({ ...eta, days: e.target.value })}
-                          placeholder="0"
-                          className="modal-input"
-                        />
-                      </div>
-                      <div>
-                        <label className="modal-label">
-                          Hours
-                        </label>
-                        <input
-                          type="number"
-                          min="0"
-                          max="24"
-                          step="0.5"
-                          value={eta.hours}
-                          onChange={(e) => setEta({ ...eta, hours: e.target.value })}
-                          placeholder="0"
-                          className="modal-input"
-                        />
-                      </div>
+                      <Input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={eta.days}
+                        onChange={(e) => setEta({ ...eta, days: e.target.value })}
+                        placeholder="0"
+                        label="Days"
+                      />
+                      <Input
+                        type="number"
+                        min="0"
+                        max="24"
+                        step="0.5"
+                        value={eta.hours}
+                        onChange={(e) => setEta({ ...eta, hours: e.target.value })}
+                        placeholder="0"
+                        label="Hours"
+                      />
                     </div>
-                    <p className="text-xs text-gray-500 mt-2">
+                    <p className="text-xs text-default-500 mt-2">
                       Total: {((parseFloat(eta.days) || 0) * 8 + (parseFloat(eta.hours) || 0)).toFixed(1)} hours
                     </p>
                   </>
                 )}
-              </div>
-              <div className="modal-footer">
-                <button
-                  onClick={handleAcceptWithEta}
-                  disabled={respondingTo === taskForEta._id}
-                  className="modal-btn modal-btn-success"
+              </ModalBody>
+              <ModalFooter>
+                <Button
+                  color="success"
+                  onPress={handleAcceptWithEta}
+                  isLoading={respondingTo === taskForEta?._id}
+                  startContent={respondingTo !== taskForEta?._id && <FaCheck />}
                 >
-                  {respondingTo === taskForEta._id ? (
-                    <><Loader size="xs" /> Accepting...</>
-                  ) : (
-                    <><FaCheck /> Accept Task</>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </Portal>
-      )}
+                  {respondingTo === taskForEta?._id ? 'Accepting...' : 'Accept Task'}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
 
       {/* Delete Task Confirmation Modal */}
-      {showDeleteModal && taskToDelete && (
-        <Portal>
-          <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && (setShowDeleteModal(false), setTaskToDelete(null))}>
-            <div className="modal-backdrop" />
-            <div className="modal-container modal-lg">
-              <div className="modal-header">
-                <h3 className="modal-title">Delete Task</h3>
-                <button
-                  onClick={() => { setShowDeleteModal(false); setTaskToDelete(null) }}
-                  className="modal-close-btn"
-                >
-                  <FaTimes />
-                </button>
-              </div>
-              <div className="modal-body">
-                <div className="flex items-center gap-3 mb-4 p-3 bg-red-50 rounded-lg">
-                  <FaExclamationTriangle className="text-red-500 text-xl flex-shrink-0" />
-                  <p className="text-red-700">
+      <Modal isOpen={showDeleteModal && !!taskToDelete} onOpenChange={(open) => { if (!open) { setShowDeleteModal(false); setTaskToDelete(null); } }} size="lg">
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>Delete Task</ModalHeader>
+              <ModalBody>
+                <div className="flex items-center gap-3 mb-4 p-3 bg-danger-50 rounded-lg">
+                  <FaExclamationTriangle className="text-danger text-xl flex-shrink-0" />
+                  <p className="text-danger-700">
                     This action cannot be undone. The task and all its subtasks will be permanently deleted.
                   </p>
                 </div>
-                <p className="text-gray-600 mb-2">Are you sure you want to delete this task?</p>
-                <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="font-medium text-gray-800">{taskToDelete.title}</p>
-                  <p className="text-sm text-gray-500 mt-1">Project: {taskToDelete.project?.name}</p>
+                <p className="text-default-600 mb-2">Are you sure you want to delete this task?</p>
+                <div className="p-3 bg-default-50 rounded-lg">
+                  <p className="font-medium text-default-800">{taskToDelete?.title}</p>
+                  <p className="text-sm text-default-500 mt-1">Project: {taskToDelete?.project?.name}</p>
                 </div>
-              </div>
-              <div className="modal-footer">
-                <button
-                  onClick={() => { setShowDeleteModal(false); setTaskToDelete(null) }}
-                  className="modal-btn modal-btn-secondary"
+              </ModalBody>
+              <ModalFooter>
+                <Button
+                  variant="light"
+                  onPress={onClose}
                 >
                   Cancel
-                </button>
-                <button
-                  onClick={handleDeleteTask}
-                  disabled={deleting}
-                  className="modal-btn modal-btn-danger"
+                </Button>
+                <Button
+                  color="danger"
+                  onPress={handleDeleteTask}
+                  isLoading={deleting}
+                  startContent={!deleting && <FaTrash />}
                 >
-                  {deleting ? (
-                    <><Loader size="xs" /> Deleting...</>
-                  ) : (
-                    <><FaTrash /> Delete Task</>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </Portal>
-      )}
+                  {deleting ? 'Deleting...' : 'Delete Task'}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
 
       {/* Task Detail Modal - Opens when clicking task in Kanban view */}
       {selectedTask && !showRejectModal && (
         <Portal>
           <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4" onClick={(e) => e.target === e.currentTarget && setSelectedTask(null)}>
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
-              <div className="px-6 py-4 bg-gray-50 flex items-center justify-between flex-shrink-0">
-                <h3 className="text-lg font-semibold text-gray-800">Task Details</h3>
+            <div className="bg-content1 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
+              <div className="px-6 py-4 bg-default-50 flex items-center justify-between flex-shrink-0">
+                <h3 className="text-lg font-semibold text-default-800">Task Details</h3>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => router.push(`/dashboard/projects/${selectedTask.project?._id || selectedTask.project}`)}
@@ -1111,7 +1094,7 @@ export default function MyTasksPage() {
                   </button>
                   <button
                     onClick={() => setSelectedTask(null)}
-                    className="p-2 hover:bg-gray-100 rounded-lg text-gray-500"
+                    className="p-2 hover:bg-default-100 rounded-lg text-default-500"
                   >
                     <FaTimes />
                   </button>
@@ -1121,7 +1104,7 @@ export default function MyTasksPage() {
               <div className="p-6 overflow-y-auto flex-1">
                 {/* Task Title & Status */}
                 <div className="flex items-start justify-between mb-4">
-                  <h2 className="text-xl font-semibold text-gray-800">{selectedTask.title}</h2>
+                  <h2 className="text-xl font-semibold text-default-800">{selectedTask.title}</h2>
                   <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[selectedTask.status]}`}>
                     {selectedTask.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                   </span>
@@ -1140,15 +1123,15 @@ export default function MyTasksPage() {
                 {/* Description */}
                 {selectedTask.description && (
                   <div className="mb-6">
-                    <h4 className="text-sm font-medium text-gray-500 mb-2">Description</h4>
-                    <p className="text-gray-700 whitespace-pre-wrap">{selectedTask.description}</p>
+                    <h4 className="text-sm font-medium text-default-500 mb-2">Description</h4>
+                    <p className="text-default-700 whitespace-pre-wrap">{selectedTask.description}</p>
                   </div>
                 )}
 
                 {/* Attachments */}
                 {selectedTask.attachments && selectedTask.attachments.length > 0 && (
                   <div className="mb-6">
-                    <h4 className="text-sm font-medium text-gray-500 mb-2">Attachments</h4>
+                    <h4 className="text-sm font-medium text-default-500 mb-2">Attachments</h4>
                     <div className="space-y-2">
                       {selectedTask.attachments.map((file, index) => (
                         <a
@@ -1156,13 +1139,13 @@ export default function MyTasksPage() {
                           href={file.url}
                           target="_blank"
                           rel="noreferrer"
-                          className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100"
+                          className="flex items-center justify-between p-3 bg-default-50 rounded-lg border border-default-200 hover:bg-default-100"
                         >
                           <div className="min-w-0">
-                            <p className="text-sm font-medium text-gray-800 truncate">{file.name || 'Attachment'}</p>
-                            <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+                            <p className="text-sm font-medium text-default-800 truncate">{file.name || 'Attachment'}</p>
+                            <p className="text-xs text-default-500">{formatFileSize(file.size)}</p>
                           </div>
-                          <span className="text-xs text-blue-600">Open</span>
+                          <span className="text-xs text-primary">Open</span>
                         </a>
                       ))}
                     </div>
@@ -1171,34 +1154,34 @@ export default function MyTasksPage() {
 
                 {/* Details Grid */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-xs text-gray-500 mb-1">Priority</p>
+                  <div className="bg-default-50 p-3 rounded-lg">
+                    <p className="text-xs text-default-500 mb-1">Priority</p>
                     <span className={`px-2 py-1 rounded text-sm font-medium ${priorityColors[selectedTask.priority]}`}>
                       {selectedTask.priority.charAt(0).toUpperCase() + selectedTask.priority.slice(1)}
                     </span>
                   </div>
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-xs text-gray-500 mb-1">Due Date</p>
+                  <div className="bg-default-50 p-3 rounded-lg">
+                    <p className="text-xs text-default-500 mb-1">Due Date</p>
                     <p className={`font-medium ${
                       selectedTask.dueDate && new Date(selectedTask.dueDate) < new Date() && selectedTask.status !== 'completed'
-                        ? 'text-red-600' : 'text-gray-800'
+                        ? 'text-danger' : 'text-default-800'
                     }`}>
                       {selectedTask.dueDate ? new Date(selectedTask.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set'}
                     </p>
                   </div>
                   {selectedTask.estimatedHours && (
-                    <div className="bg-gray-50 p-3 rounded-lg">
-                      <p className="text-xs text-gray-500 mb-1">Estimated Time</p>
-                      <p className="font-medium text-gray-800">
+                    <div className="bg-default-50 p-3 rounded-lg">
+                      <p className="text-xs text-default-500 mb-1">Estimated Time</p>
+                      <p className="font-medium text-default-800">
                         {selectedTask.estimatedHours >= 8 
                           ? `${Math.floor(selectedTask.estimatedHours / 8)}d ${selectedTask.estimatedHours % 8}h`
                           : `${selectedTask.estimatedHours}h`}
                       </p>
                     </div>
                   )}
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-xs text-gray-500 mb-1">Progress</p>
-                    <p className="font-medium text-gray-800">{selectedTask.progressPercentage || 0}%</p>
+                  <div className="bg-default-50 p-3 rounded-lg">
+                    <p className="text-xs text-default-500 mb-1">Progress</p>
+                    <p className="font-medium text-default-800">{selectedTask.progressPercentage || 0}%</p>
                   </div>
                 </div>
 
@@ -1206,15 +1189,15 @@ export default function MyTasksPage() {
                 {selectedTask.subtasks && selectedTask.subtasks.length > 0 && (
                   <div className="mb-6">
                     <div className="flex items-center justify-start mb-2">
-                      <h4 className="text-sm font-medium text-gray-500">Progress</h4>
-                      <span className="text-sm text-gray-600">{selectedTask.progressPercentage || 0}%</span>
+                      <h4 className="text-sm font-medium text-default-500">Progress</h4>
+                      <span className="text-sm text-default-600">{selectedTask.progressPercentage || 0}%</span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div className="w-full bg-default-200 rounded-full h-2">
                       <div
                         className={`h-2 rounded-full transition-all ${
-                          selectedTask.progressPercentage === 100 ? 'bg-green-500' :
-                          selectedTask.progressPercentage >= 50 ? 'bg-blue-500' :
-                          'bg-orange-500'
+                          selectedTask.progressPercentage === 100 ? 'bg-success' :
+                          selectedTask.progressPercentage >= 50 ? 'bg-primary' :
+                          'bg-warning'
                         }`}
                         style={{ width: `${selectedTask.progressPercentage || 0}%` }}
                       />
@@ -1225,7 +1208,7 @@ export default function MyTasksPage() {
                 {/* Subtasks - Interactive */}
                 {selectedTask.subtasks && selectedTask.subtasks.length > 0 && (
                   <div className="mb-6">
-                    <h4 className="text-sm font-medium text-gray-500 mb-3">
+                    <h4 className="text-sm font-medium text-default-500 mb-3">
                       Subtasks ({selectedTask.subtasks.filter(st => st.completed).length}/{selectedTask.subtasks.length})
                     </h4>
                     <div className="space-y-2 max-h-60 overflow-y-auto">
@@ -1237,9 +1220,9 @@ export default function MyTasksPage() {
                         
                         return (
                           <div key={subtask._id || idx} className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
-                            subtask.completed ? 'bg-green-50' : 
-                            subtask.pendingAcceptance ? 'bg-yellow-50' : 'bg-gray-50'
-                          } ${canToggle ? 'hover:bg-gray-100 cursor-pointer' : ''}`}
+                            subtask.completed ? 'bg-success-50' : 
+                            subtask.pendingAcceptance ? 'bg-warning-50' : 'bg-default-50'
+                          } ${canToggle ? 'hover:bg-default-100 cursor-pointer' : ''}`}
                           onClick={async () => {
                             if (!canToggle || modalUpdatingSubtask) return
                             const subtaskId = subtask._id
@@ -1286,13 +1269,13 @@ export default function MyTasksPage() {
                           }}
                           >
                             <div className={`w-5 h-5 rounded-full flex items-center justify-center transition-all ${
-                              modalUpdatingSubtask === subtask._id ? 'bg-blue-500 animate-pulse' :
-                              subtask.completed ? 'bg-green-500 text-white' : 
-                              subtask.pendingAcceptance ? 'bg-yellow-500 text-white' : 
-                              canToggle ? 'bg-gray-300 hover:bg-gray-400' : 'bg-gray-200'
+                              modalUpdatingSubtask === subtask._id ? 'bg-primary animate-pulse' :
+                              subtask.completed ? 'bg-success text-white' : 
+                              subtask.pendingAcceptance ? 'bg-warning text-white' : 
+                              canToggle ? 'bg-default-300 hover:bg-default-400' : 'bg-default-200'
                             }`}>
                               {modalUpdatingSubtask === subtask._id ? (
-                                <Loader size="xs" color="#ffffff" />
+                                <Spinner size="sm" color="white" />
                               ) : subtask.completed ? (
                                 <FaCheck className="w-3 h-3" />
                               ) : subtask.pendingAcceptance ? (
@@ -1300,20 +1283,20 @@ export default function MyTasksPage() {
                               ) : null}
                             </div>
                             <div className="flex-1">
-                              <p className={`text-sm ${subtask.completed ? 'text-gray-500 line-through' : 'text-gray-800'}`}>
+                              <p className={`text-sm ${subtask.completed ? 'text-default-500 line-through' : 'text-default-800'}`}>
                                 {subtask.title}
                               </p>
                               {subtask.estimatedHours && (
-                                <p className="text-xs text-gray-400 mt-0.5">
+                                <p className="text-xs text-default-400 mt-0.5">
                                   Est: {subtask.estimatedHours >= 8 ? `${Math.floor(subtask.estimatedHours / 8)}d ${subtask.estimatedHours % 8}h` : `${subtask.estimatedHours}h`}
                                 </p>
                               )}
                             </div>
                             {subtask.pendingAcceptance && (
-                              <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded">Pending Review</span>
+                              <span className="text-xs bg-warning-100 text-warning-700 px-2 py-0.5 rounded">Pending Review</span>
                             )}
                             {!isTaskAccepted && (
-                              <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded">Accept task first</span>
+                              <span className="text-xs bg-default-100 text-default-500 px-2 py-0.5 rounded">Accept task first</span>
                             )}
                           </div>
                         )
@@ -1325,13 +1308,13 @@ export default function MyTasksPage() {
                 {/* Assignees */}
                 {selectedTask.assignees && selectedTask.assignees.length > 0 && (
                   <div className="mb-6">
-                    <h4 className="text-sm font-medium text-gray-500 mb-3">Assignees</h4>
+                    <h4 className="text-sm font-medium text-default-500 mb-3">Assignees</h4>
                     <div className="flex flex-wrap gap-2">
                       {selectedTask.assignees.map((assignee, idx) => (
                         <div key={assignee._id || idx} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${
-                          assignee.assignmentStatus === 'accepted' ? 'bg-green-50 text-green-700' :
-                          assignee.assignmentStatus === 'rejected' ? 'bg-red-50 text-red-700' :
-                          'bg-yellow-50 text-yellow-700'
+                          assignee.assignmentStatus === 'accepted' ? 'bg-success-50 text-success-700' :
+                          assignee.assignmentStatus === 'rejected' ? 'bg-danger-50 text-danger-700' :
+                          'bg-warning-50 text-warning-700'
                         }`}>
                           <div className="w-6 h-6 rounded-full bg-primary-500 text-white flex items-center justify-center text-xs">
                             {assignee.user?.profilePicture ? (
@@ -1441,16 +1424,16 @@ export default function MyTasksPage() {
                       <HiOutlineClock className="w-4 h-4" />
                       This task is pending your acceptance.
                     </p>
-                    <button
-                      onClick={() => {
+                    <Button
+                      onPress={() => {
                         setSelectedTask(null)
                         setViewMode('list')
                       }}
-                      className="btn-primary flex items-center gap-2"
+                      color="primary"
+                      startContent={<HiOutlineQueueList className="w-4 h-4" />}
                     >
-                      <HiOutlineQueueList className="w-4 h-4" />
                       Switch to List View to Accept/Reject
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>

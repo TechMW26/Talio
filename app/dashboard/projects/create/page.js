@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
-import Loader from '@/components/ui/Loader'
+import { Card, CardBody, CardHeader, Button, Input, Select, SelectItem, Textarea, Skeleton, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Spinner } from '@heroui/react'
 import {
   HiOutlineArrowLeft,
   HiOutlinePlus,
@@ -293,27 +293,29 @@ export default function CreateProjectPage() {
     <div className="page-container max-w-4xl mx-auto">
       {/* Header */}
       <div className="flex items-center gap-4 mb-6">
-        <button
-          onClick={() => router.back()}
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+        <Button
+          isIconOnly
+          variant="light"
+          onPress={() => router.back()}
         >
-          <HiOutlineArrowLeft className="w-5 h-5 text-gray-600" />
-        </button>
+          <HiOutlineArrowLeft className="w-5 h-5 text-default-600" />
+        </Button>
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Create New Project</h1>
-          <p className="text-gray-600 mt-1">Set up a new project and invite team members</p>
+          <h1 className="text-2xl font-bold text-default-800">Create New Project</h1>
+          <p className="text-default-600 mt-1">Set up a new project and invite team members</p>
         </div>
       </div>
 
       <form onSubmit={handleSubmit}>
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-6 border border-gray-100">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">Project Details</h2>
+        <Card shadow="sm" className="mb-6">
+          <CardBody className="p-6">
+          <h2 className="text-lg font-semibold text-default-800 mb-4">Project Details</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Project Name */}
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Project Name <span className="text-red-500">*</span>
+              <label className="block text-sm font-medium text-default-700 mb-2">
+                Project Name <span className="text-danger">*</span>
               </label>
               <input
                 type="text"
@@ -321,7 +323,7 @@ export default function CreateProjectPage() {
                 value={formData.name}
                 onChange={handleChange}
                 placeholder="Enter project name"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 required
               />
             </div>
@@ -329,18 +331,21 @@ export default function CreateProjectPage() {
             {/* Description */}
             <div className="md:col-span-2">
               <div className="flex items-center justify-start mb-2">
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-default-700">
                   Description
                 </label>
-                <button
-                  type="button"
-                  onClick={generateDescription}
-                  disabled={generatingDescription || !formData.name.trim()}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                <Button
+                  size="sm"
+                  color="secondary"
+                  variant="flat"
+                  onPress={generateDescription}
+                  isDisabled={generatingDescription || !formData.name.trim()}
+                  isLoading={generatingDescription}
+                  startContent={!generatingDescription && <HiOutlineSparkles className="w-3.5 h-3.5" />}
+                  className="ml-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white"
                 >
-                  <HiOutlineSparkles className={`w-3.5 h-3.5 ${generatingDescription ? 'animate-spin' : ''}`} />
                   {generatingDescription ? 'Writing...' : 'AI Write'}
-                </button>
+                </Button>
               </div>
               <textarea
                 name="description"
@@ -348,23 +353,23 @@ export default function CreateProjectPage() {
                 onChange={handleChange}
                 placeholder="Describe the project objectives and scope..."
                 rows={4}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+                className="w-full px-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
               />
             </div>
 
             {/* Start Date */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Start Date <span className="text-red-500">*</span>
+              <label className="block text-sm font-medium text-default-700 mb-2">
+                Start Date <span className="text-danger">*</span>
               </label>
               <div className="relative">
-                <FaCalendarAlt className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <FaCalendarAlt className="absolute left-3 top-1/2 -translate-y-1/2 text-default-400" />
                 <input
                   type="date"
                   name="startDate"
                   value={formData.startDate}
                   onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   required
                 />
               </div>
@@ -372,17 +377,17 @@ export default function CreateProjectPage() {
 
             {/* End Date */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                End Date / Deadline <span className="text-red-500">*</span>
+              <label className="block text-sm font-medium text-default-700 mb-2">
+                End Date / Deadline <span className="text-danger">*</span>
               </label>
               <div className="relative">
-                <FaCalendarAlt className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <FaCalendarAlt className="absolute left-3 top-1/2 -translate-y-1/2 text-default-400" />
                 <input
                   type="date"
                   name="endDate"
                   value={formData.endDate}
                   onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   required
                 />
               </div>
@@ -390,59 +395,62 @@ export default function CreateProjectPage() {
 
             {/* Priority */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-default-700 mb-2">
                 Priority
               </label>
-              <select
+              <Select
                 name="priority"
-                value={formData.priority}
+                selectedKeys={[formData.priority]}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                aria-label="Priority"
+                classNames={{ trigger: "bg-white" }}
               >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="critical">Critical</option>
-              </select>
+                <SelectItem key="low">Low</SelectItem>
+                <SelectItem key="medium">Medium</SelectItem>
+                <SelectItem key="high">High</SelectItem>
+                <SelectItem key="critical">Critical</SelectItem>
+              </Select>
             </div>
 
             {/* Status */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-default-700 mb-2">
                 Initial Status
               </label>
-              <select
+              <Select
                 name="status"
-                value={formData.status}
+                selectedKeys={[formData.status]}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                aria-label="Initial Status"
+                classNames={{ trigger: "bg-white" }}
               >
-                <option value="planned">Planned</option>
-                <option value="ongoing">Ongoing</option>
-              </select>
+                <SelectItem key="planned">Planned</SelectItem>
+                <SelectItem key="ongoing">Ongoing</SelectItem>
+              </Select>
             </div>
 
             {/* Department */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-default-700 mb-2">
                 Department (Optional)
               </label>
-              <select
+              <Select
                 name="department"
-                value={formData.department}
+                selectedKeys={formData.department ? [formData.department] : []}
                 onChange={handleChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                aria-label="Department"
+                placeholder="Select Department"
+                classNames={{ trigger: "bg-white" }}
               >
-                <option value="">Select Department</option>
                 {departments.map(dept => (
-                  <option key={dept._id} value={dept._id}>{dept.name}</option>
+                  <SelectItem key={dept._id}>{dept.name}</SelectItem>
                 ))}
-              </select>
+              </Select>
             </div>
 
             {/* Tags */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-default-700 mb-2">
                 Tags (comma-separated)
               </label>
               <input
@@ -451,30 +459,32 @@ export default function CreateProjectPage() {
                 value={formData.tags}
                 onChange={handleChange}
                 placeholder="e.g., frontend, urgent, Q1"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
             </div>
           </div>
-        </div>
+          </CardBody>
+        </Card>
 
         {/* Project Heads Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mb-6">
+        <Card shadow="sm" className="mb-6">
+          <CardBody className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-black">
-              Project Heads <span className="text-red-500">*</span>
+            <h2 className="text-lg font-semibold text-default-800">
+              Project Heads <span className="text-danger">*</span>
             </h2>
-            <button
-              type="button"
-              onClick={() => setShowHeadSearch(true)}
-              className="btn-secondary flex items-center text-sm"
+            <Button
+              variant="bordered"
+              size="sm"
+              onPress={() => setShowHeadSearch(true)}
+              startContent={<FaPlus />}
             >
-              <FaPlus className="mr-1" />
               Add Head
-            </button>
+            </Button>
           </div>
 
           {selectedProjectHeads.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">
+            <p className="text-default-500 text-center py-8">
               No project heads added yet. Click "Add Head" to assign project heads.
             </p>
           ) : (
@@ -482,7 +492,7 @@ export default function CreateProjectPage() {
               {selectedProjectHeads.map((head) => (
                 <div key={head._id} className="flex items-center justify-between p-3 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
                   <div className="flex items-center">
-                    <div className="w-12 h-12 rounded-full bg-primary-500 flex items-center justify-center text-black font-medium overflow-hidden">
+                    <div className="w-12 h-12 rounded-full bg-primary-500 flex items-center justify-center text-white font-medium overflow-hidden">
                       {head.profilePicture ? (
                         <img
                           src={head.profilePicture}
@@ -494,50 +504,53 @@ export default function CreateProjectPage() {
                       )}
                     </div>
                     <div className="ml-4">
-                      <p className="font-medium text-gray-900 dark:text-black">
+                      <p className="font-medium text-default-800">
                         {head.firstName} {head.lastName}
                       </p>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">{head.email}</p>
+                      <p className="text-sm text-default-500">{head.email}</p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveProjectHead(head._id)}
-                    className="p-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                  <Button
+                    isIconOnly
+                    variant="light"
+                    color="danger"
+                    onPress={() => handleRemoveProjectHead(head._id)}
                   >
                     <FaTimes />
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>
           )}
-        </div>
+          </CardBody>
+        </Card>
 
         {/* Team Members Section */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm p-6 mb-6">
+        <Card shadow="sm" className="mb-6">
+          <CardBody className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-black">
+            <h2 className="text-lg font-semibold text-default-800">
               <FaUsers className="inline mr-2" />
               Team Members
             </h2>
-            <button
-              type="button"
-              onClick={() => setShowEmployeeSearch(true)}
-              className="btn-secondary flex items-center text-sm"
+            <Button
+              variant="bordered"
+              size="sm"
+              onPress={() => setShowEmployeeSearch(true)}
+              startContent={<FaPlus />}
             >
-              <FaPlus className="mr-1" />
               Add Member
-            </button>
+            </Button>
           </div>
 
           {formData.members.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">
+            <p className="text-default-500 text-center py-8">
               No team members added yet. Click "Add Member" to invite team members.
             </p>
           ) : (
             <div className="space-y-3">
               {formData.members.map((member) => (
-                <div key={member.userId} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div key={member.userId} className="flex items-center justify-between p-3 bg-default-50 rounded-lg">
                   <div className="flex items-center">
                     <div className="w-10 h-10 rounded-full bg-primary-500 flex items-center justify-center text-white text-sm overflow-hidden">
                       {member.profilePicture ? (
@@ -547,50 +560,43 @@ export default function CreateProjectPage() {
                       )}
                     </div>
                     <div className="ml-3">
-                      <p className="font-medium text-gray-800">{member.name}</p>
-                      <p className="text-sm text-gray-500">{member.department || 'No Department'}</p>
+                      <p className="font-medium text-default-800">{member.name}</p>
+                      <p className="text-sm text-default-500">{member.department || 'No Department'}</p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveMember(member.userId)}
-                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                  <Button
+                    isIconOnly
+                    variant="light"
+                    color="danger"
+                    onPress={() => handleRemoveMember(member.userId)}
                   >
                     <FaTimes />
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>
           )}
-        </div>
+          </CardBody>
+        </Card>
 
         {/* Submit Buttons */}
         <div className="flex justify-end gap-4">
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="btn-secondary"
-            disabled={loading}
+          <Button
+            variant="bordered"
+            onPress={() => router.back()}
+            isDisabled={loading}
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
-            className="btn-primary flex items-center"
-            disabled={loading}
+            color="primary"
+            isLoading={loading}
+            isDisabled={loading}
+            startContent={!loading && <FaSave />}
           >
-            {loading ? (
-              <>
-                <Loader size="xs" />
-                <span className="ml-2">Creating...</span>
-              </>
-            ) : (
-              <>
-                <FaSave className="mr-2" />
-                Create Project
-              </>
-            )}
-          </button>
+            {loading ? 'Creating...' : 'Create Project'}
+          </Button>
         </div>
       </form>
 
@@ -598,29 +604,30 @@ export default function CreateProjectPage() {
       {showEmployeeSearch && (
       <Portal>
         <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+          <div className="bg-content1 rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-default-200 flex items-center justify-between flex-shrink-0">
               <h3 className="text-lg font-semibold">Add Team Member</h3>
-              <button
-                onClick={() => {
+              <Button
+                isIconOnly
+                variant="light"
+                onPress={() => {
                   setShowEmployeeSearch(false)
                   setSearchEmployee('')
                 }}
-                className="p-2 hover:bg-gray-100 rounded-lg"
               >
                 <FaTimes />
-              </button>
+              </Button>
             </div>
 
-            <div className="p-4 border-b border-gray-200">
+            <div className="p-4 border-b border-default-200">
               <div className="relative">
-                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-default-400" />
                 <input
                   type="text"
                   value={searchEmployee}
                   onChange={(e) => setSearchEmployee(e.target.value)}
                   placeholder="Search by name, email, or code..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   autoFocus
                 />
               </div>
@@ -628,7 +635,7 @@ export default function CreateProjectPage() {
 
             <div className="flex-1 overflow-y-auto p-4">
               {filteredEmployees.length === 0 ? (
-                <p className="text-center text-gray-500 py-8">No employees found</p>
+                <p className="text-center text-default-500 py-8">No employees found</p>
               ) : (
                 <div className="space-y-2">
                   {/* Group employees by department */}
@@ -646,21 +653,21 @@ export default function CreateProjectPage() {
                     )
                     
                     return (
-                      <div key={deptName} className="border border-gray-200 rounded-lg overflow-hidden">
+                      <div key={deptName} className="border border-default-200 rounded-lg overflow-hidden">
                         {/* Department Header - Clickable */}
-                        <div className="flex items-center justify-between bg-gray-50 px-3 py-2">
+                        <div className="flex items-center justify-between bg-default-50 px-3 py-2">
                           <button
                             type="button"
                             onClick={() => setExpandedMemberDepts(prev => ({ ...prev, [deptName]: !prev[deptName] }))}
                             className="flex items-center gap-2 flex-1 text-left"
                           >
                             {isExpanded ? (
-                              <FaChevronDown className="w-3 h-3 text-gray-500" />
+                              <FaChevronDown className="w-3 h-3 text-default-500" />
                             ) : (
-                              <FaChevronRight className="w-3 h-3 text-gray-500" />
+                              <FaChevronRight className="w-3 h-3 text-default-500" />
                             )}
-                            <span className="text-sm font-semibold text-gray-700">{deptName}</span>
-                            <span className="text-xs text-gray-500">({deptEmployees.length})</span>
+                            <span className="text-sm font-semibold text-default-700">{deptName}</span>
+                            <span className="text-xs text-default-500">({deptEmployees.length})</span>
                           </button>
                           <button
                             type="button"
@@ -696,7 +703,7 @@ export default function CreateProjectPage() {
                             className={`text-xs px-2 py-1 rounded flex items-center gap-1 ${
                               allSelected 
                                 ? 'bg-primary-100 text-primary-700' 
-                                : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                                : 'bg-default-200 text-default-600 hover:bg-default-300'
                             }`}
                           >
                             <FaCheckSquare className="w-3 h-3" />
@@ -706,7 +713,7 @@ export default function CreateProjectPage() {
                         
                         {/* Employees List - Collapsible */}
                         {isExpanded && (
-                          <div className="divide-y divide-gray-100">
+                          <div className="divide-y divide-default-100">
                             {deptEmployees.map(emp => {
                               const isSelected = formData.members.some(m => m.userId === emp._id)
                               return (
@@ -724,11 +731,11 @@ export default function CreateProjectPage() {
                                     }
                                   }}
                                   className={`w-full flex items-center p-2 pl-8 transition-colors text-left ${
-                                    isSelected ? 'bg-primary-50' : 'hover:bg-gray-50'
+                                    isSelected ? 'bg-primary-50' : 'hover:bg-default-50'
                                   }`}
                                 >
                                   <div className={`w-5 h-5 rounded border flex items-center justify-center mr-3 ${
-                                    isSelected ? 'bg-primary-500 border-primary-500' : 'border-gray-300'
+                                    isSelected ? 'bg-primary-500 border-primary-500' : 'border-default-300'
                                   }`}>
                                     {isSelected && <FaTimes className="w-3 h-3 text-white" style={{ transform: 'rotate(45deg)' }} />}
                                   </div>
@@ -740,10 +747,10 @@ export default function CreateProjectPage() {
                                     )}
                                   </div>
                                   <div className="ml-2">
-                                    <p className="font-medium text-gray-900 text-sm">
+                                    <p className="font-medium text-default-800 text-sm">
                                       {emp.firstName} {emp.lastName}
                                     </p>
-                                    <p className="text-xs text-gray-500">{emp.email}</p>
+                                    <p className="text-xs text-default-500">{emp.email}</p>
                                   </div>
                                 </button>
                               )
@@ -765,29 +772,30 @@ export default function CreateProjectPage() {
       {showHeadSearch && (
       <Portal>
         <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+          <div className="bg-content1 rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="p-4 border-b border-default-200 flex items-center justify-between flex-shrink-0">
               <h3 className="text-lg font-semibold">Add Project Head</h3>
-              <button
-                onClick={() => {
+              <Button
+                isIconOnly
+                variant="light"
+                onPress={() => {
                   setShowHeadSearch(false)
                   setSearchHead('')
                 }}
-                className="p-2 hover:bg-gray-100 rounded-lg"
               >
                 <FaTimes />
-              </button>
+              </Button>
             </div>
 
-            <div className="p-4 border-b border-gray-200">
+            <div className="p-4 border-b border-default-200">
               <div className="relative">
-                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-default-400" />
                 <input
                   type="text"
                   value={searchHead}
                   onChange={(e) => setSearchHead(e.target.value)}
                   placeholder="Search by name, email, or code..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                   autoFocus
                 />
               </div>
@@ -795,7 +803,7 @@ export default function CreateProjectPage() {
 
             <div className="flex-1 overflow-y-auto p-4">
               {filteredHeadEmployees.length === 0 ? (
-                <p className="text-center text-gray-500 py-8">No employees found</p>
+                <p className="text-center text-default-500 py-8">No employees found</p>
               ) : (
                 <div className="space-y-2">
                   {/* Group employees by department */}
@@ -813,21 +821,21 @@ export default function CreateProjectPage() {
                     )
                     
                     return (
-                      <div key={deptName} className="border border-gray-200 rounded-lg overflow-hidden">
+                      <div key={deptName} className="border border-default-200 rounded-lg overflow-hidden">
                         {/* Department Header - Clickable */}
-                        <div className="flex items-center justify-between bg-gray-50 px-3 py-2">
+                        <div className="flex items-center justify-between bg-default-50 px-3 py-2">
                           <button
                             type="button"
                             onClick={() => setExpandedHeadDepts(prev => ({ ...prev, [deptName]: !prev[deptName] }))}
                             className="flex items-center gap-2 flex-1 text-left"
                           >
                             {isExpanded ? (
-                              <FaChevronDown className="w-3 h-3 text-gray-500" />
+                              <FaChevronDown className="w-3 h-3 text-default-500" />
                             ) : (
-                              <FaChevronRight className="w-3 h-3 text-gray-500" />
+                              <FaChevronRight className="w-3 h-3 text-default-500" />
                             )}
-                            <span className="text-sm font-semibold text-gray-700">{deptName}</span>
-                            <span className="text-xs text-gray-500">({deptEmployees.length})</span>
+                            <span className="text-sm font-semibold text-default-700">{deptName}</span>
+                            <span className="text-xs text-default-500">({deptEmployees.length})</span>
                           </button>
                           <button
                             type="button"
@@ -856,7 +864,7 @@ export default function CreateProjectPage() {
                             className={`text-xs px-2 py-1 rounded flex items-center gap-1 ${
                               allSelected 
                                 ? 'bg-primary-100 text-primary-700' 
-                                : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                                : 'bg-default-200 text-default-600 hover:bg-default-300'
                             }`}
                           >
                             <FaCheckSquare className="w-3 h-3" />
@@ -866,7 +874,7 @@ export default function CreateProjectPage() {
                         
                         {/* Employees List - Collapsible */}
                         {isExpanded && (
-                          <div className="divide-y divide-gray-100">
+                          <div className="divide-y divide-default-100">
                             {deptEmployees.map(emp => {
                               const isSelected = formData.projectHeadIds.includes(emp._id)
                               return (
@@ -884,11 +892,11 @@ export default function CreateProjectPage() {
                                     }
                                   }}
                                   className={`w-full flex items-center p-2 pl-8 transition-colors text-left ${
-                                    isSelected ? 'bg-primary-50' : 'hover:bg-gray-50'
+                                    isSelected ? 'bg-primary-50' : 'hover:bg-default-50'
                                   }`}
                                 >
                                   <div className={`w-5 h-5 rounded border flex items-center justify-center mr-3 ${
-                                    isSelected ? 'bg-primary-500 border-primary-500' : 'border-gray-300'
+                                    isSelected ? 'bg-primary-500 border-primary-500' : 'border-default-300'
                                   }`}>
                                     {isSelected && <FaTimes className="w-3 h-3 text-white" style={{ transform: 'rotate(45deg)' }} />}
                                   </div>
@@ -900,10 +908,10 @@ export default function CreateProjectPage() {
                                     )}
                                   </div>
                                   <div className="ml-2">
-                                    <p className="font-medium text-gray-900 text-sm">
+                                    <p className="font-medium text-default-800 text-sm">
                                       {emp.firstName} {emp.lastName}
                                     </p>
-                                    <p className="text-xs text-gray-500">{emp.email}</p>
+                                    <p className="text-xs text-default-500">{emp.email}</p>
                                   </div>
                                 </button>
                               )

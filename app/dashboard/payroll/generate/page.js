@@ -9,8 +9,22 @@ import {
   FaUserClock, FaCalendarCheck, FaInfoCircle, FaToggleOn, FaToggleOff,
   FaExclamationCircle, FaSearch, FaChevronDown, FaChevronUp, FaTimes
 } from 'react-icons/fa'
-import Loader from '@/components/ui/Loader'
 import { formatDepartments } from '@/lib/formatters'
+import {
+  HRMSCard,
+  HRMSCardHeader,
+  HRMSCardBody,
+  PrimaryButton,
+  SecondaryButton,
+  GhostButton,
+  HRMSSelect,
+  HRMSSelectItem,
+  HRMSInput,
+  HRMSCheckbox,
+  PageLoader,
+  KPICard,
+} from '@/components/ui/heroui'
+import { Input, Checkbox, Button, Divider, Chip, Progress } from '@heroui/react'
 
 export default function GeneratePayrollPage() {
   const router = useRouter()
@@ -822,7 +836,7 @@ export default function GeneratePayrollPage() {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-96">
-        <Loader size="lg" />
+        <PageLoader message="Loading payroll data..." />
       </div>
     )
   }
@@ -830,246 +844,248 @@ export default function GeneratePayrollPage() {
   const payrollConfig = companySettings?.payroll || {}
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800">Generate Payroll</h1>
-          <p className="text-gray-600 mt-1">Generate salary with attendance-based calculations</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Generate Payroll</h1>
+          <p className="text-default-500 mt-1">Generate salary with attendance-based calculations</p>
         </div>
-        <button
-          onClick={() => router.push('/dashboard/payroll')}
-          className="btn-secondary flex items-center space-x-2"
+        <SecondaryButton
+          onPress={() => router.push('/dashboard/payroll')}
+          startContent={<FaArrowLeft />}
         >
-          <FaArrowLeft />
-          <span>Back</span>
-        </button>
+          Back
+        </SecondaryButton>
       </div>
 
       {/* Company Settings Info Card - Simplified for Addition-Based Calculation */}
       {companySettings && (
-        <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg shadow-md p-6 mb-6 border border-green-100">
-          <div className="flex items-center mb-4">
-            <FaInfoCircle className="text-green-600 mr-2" />
-            <h2 className="text-lg font-bold text-gray-800">Salary Calculation Method</h2>
-            <span className="ml-3 px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
-              Addition-Based (Simplified)
-            </span>
-          </div>
+        <HRMSCard className="bg-gradient-to-r from-success-50 to-success-100 border border-success-200">
+          <HRMSCardBody className="p-6">
+            <div className="flex items-center mb-4">
+              <FaInfoCircle className="text-success-600 mr-2" />
+              <h2 className="text-lg font-bold text-foreground">Salary Calculation Method</h2>
+              <Chip size="sm" color="success" variant="flat" className="ml-3">
+                Addition-Based (Simplified)
+              </Chip>
+            </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 text-sm">
-            <div className="bg-white p-3 rounded-lg shadow-sm">
-              <p className="text-xs text-gray-500 uppercase mb-1">Working Days/Month</p>
-              <p className="font-semibold text-gray-800">{payrollConfig.workingDaysPerMonth || 26}</p>
-            </div>
-            <div className="bg-white p-3 rounded-lg shadow-sm">
-              <p className="text-xs text-gray-500 uppercase mb-1">Full Day Threshold</p>
-              <p className="font-semibold text-gray-800">{companySettings.fullDayThreshold || 7.5} hrs</p>
-            </div>
-            <div className="bg-white p-3 rounded-lg shadow-sm">
-              <p className="text-xs text-gray-500 uppercase mb-1">Holidays This Month</p>
-              <p className="font-semibold text-green-600">{holidayData.length} days</p>
-            </div>
-            {payrollConfig.pfEnabled && (
-              <div className="bg-white p-3 rounded-lg shadow-sm">
-                <p className="text-xs text-gray-500 uppercase mb-1">PF Deduction</p>
-                <p className="font-semibold text-gray-800">{payrollConfig.pfPercentage || 12}%</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 text-sm">
+              <div className="bg-content1 p-3 rounded-lg shadow-sm">
+                <p className="text-xs text-default-500 uppercase mb-1">Working Days/Month</p>
+                <p className="font-semibold text-foreground">{payrollConfig.workingDaysPerMonth || 26}</p>
               </div>
-            )}
-            {payrollConfig.professionalTax?.enabled && (
-              <div className="bg-white p-3 rounded-lg shadow-sm">
-                <p className="text-xs text-gray-500 uppercase mb-1">Professional Tax</p>
-                <p className="font-semibold text-gray-800">{formatCurrency(payrollConfig.professionalTax.amount || 200)}</p>
+              <div className="bg-content1 p-3 rounded-lg shadow-sm">
+                <p className="text-xs text-default-500 uppercase mb-1">Full Day Threshold</p>
+                <p className="font-semibold text-foreground">{companySettings.fullDayThreshold || 7.5} hrs</p>
               </div>
-            )}
-          </div>
+              <div className="bg-content1 p-3 rounded-lg shadow-sm">
+                <p className="text-xs text-default-500 uppercase mb-1">Holidays This Month</p>
+                <p className="font-semibold text-success-600">{holidayData.length} days</p>
+              </div>
+              {payrollConfig.pfEnabled && (
+                <div className="bg-content1 p-3 rounded-lg shadow-sm">
+                  <p className="text-xs text-default-500 uppercase mb-1">PF Deduction</p>
+                  <p className="font-semibold text-foreground">{payrollConfig.pfPercentage || 12}%</p>
+                </div>
+              )}
+              {payrollConfig.professionalTax?.enabled && (
+                <div className="bg-content1 p-3 rounded-lg shadow-sm">
+                  <p className="text-xs text-default-500 uppercase mb-1">Professional Tax</p>
+                  <p className="font-semibold text-foreground">{formatCurrency(payrollConfig.professionalTax.amount || 200)}</p>
+                </div>
+              )}
+            </div>
 
-          {/* Salary Calculation Rules */}
-          <div className="mt-4 p-4 bg-white rounded-lg">
-            <p className="text-sm font-medium text-gray-700 mb-3">How Salary is Calculated:</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs font-medium text-green-600 uppercase mb-2">✓ Paid Days (Salary Added)</p>
-                <div className="flex flex-wrap gap-2 text-xs">
-                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded">Present (Full Day)</span>
-                  <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">Approved Leaves</span>
-                  <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded">Company Holidays</span>
+            {/* Salary Calculation Rules */}
+            <div className="mt-4 p-4 bg-content1 rounded-lg">
+              <p className="text-sm font-medium text-foreground mb-3">How Salary is Calculated:</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs font-medium text-success-600 uppercase mb-2">✓ Paid Days (Salary Added)</p>
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    <Chip size="sm" color="success" variant="flat">Present (Full Day)</Chip>
+                    <Chip size="sm" color="primary" variant="flat">Approved Leaves</Chip>
+                    <Chip size="sm" color="secondary" variant="flat">Company Holidays</Chip>
+                  </div>
                 </div>
-              </div>
-              <div>
-                <p className="text-xs font-medium text-red-600 uppercase mb-2">✗ Unpaid Days (₹0 Salary)</p>
-                <div className="flex flex-wrap gap-2 text-xs">
-                  <span className="px-2 py-1 bg-red-100 text-red-700 rounded">Absent</span>
-                  <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded">Half Days</span>
-                  <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded">Unapproved Leaves</span>
-                  <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded">No Record</span>
-                  <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded">WFH</span>
-                </div>
+                <div>
+                  <p className="text-xs font-medium text-danger-600 uppercase mb-2">✗ Unpaid Days (₹0 Salary)</p>
+                  <div className="flex flex-wrap gap-2 text-xs">
+                    <Chip size="sm" color="danger" variant="flat">Absent</Chip>
+                    <Chip size="sm" color="warning" variant="flat">Half Days</Chip>
+                    <Chip size="sm" color="warning" variant="flat">Unapproved Leaves</Chip>
+                    <Chip size="sm" color="default" variant="flat">No Record</Chip>
+                    <Chip size="sm" color="default" variant="flat">WFH</Chip>
+                  </div>
               </div>
             </div>
-            <div className="mt-3 p-2 bg-green-50 rounded text-xs text-green-700">
+            <div className="mt-3 p-2 bg-success-50 rounded text-xs text-success-700">
               <strong>Formula:</strong> Per-Day Salary = Gross Salary ÷ Working Days (rounded up) | Net Salary = (Per-Day × Paid Days) - Statutory Deductions
             </div>
           </div>
-        </div>
+          </HRMSCardBody>
+        </HRMSCard>
       )}
 
       {/* Payroll Period */}
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h2 className="text-xl font-bold text-gray-800 mb-4">Payroll Period</h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Month *</label>
-            <select
-              value={formData.month}
-              onChange={(e) => {
-                setFormData({ ...formData, month: parseInt(e.target.value) })
+      <HRMSCard>
+        <HRMSCardHeader>
+          <h2 className="text-xl font-bold text-foreground">Payroll Period</h2>
+        </HRMSCardHeader>
+        <Divider />
+        <HRMSCardBody>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <HRMSSelect
+              label="Month"
+              isRequired
+              selectedKeys={[formData.month.toString()]}
+              onSelectionChange={(keys) => {
+                setFormData({ ...formData, month: parseInt(Array.from(keys)[0]) })
                 setShowPreview(false)
               }}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             >
               {Array.from({ length: 12 }, (_, i) => (
-                <option key={i + 1} value={i + 1}>
+                <HRMSSelectItem key={(i + 1).toString()} textValue={new Date(2000, i).toLocaleString('default', { month: 'long' })}>
                   {new Date(2000, i).toLocaleString('default', { month: 'long' })}
-                </option>
+                </HRMSSelectItem>
               ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Year *</label>
-            <select
-              value={formData.year}
-              onChange={(e) => {
-                setFormData({ ...formData, year: parseInt(e.target.value) })
+            </HRMSSelect>
+            <HRMSSelect
+              label="Year"
+              isRequired
+              selectedKeys={[formData.year.toString()]}
+              onSelectionChange={(keys) => {
+                setFormData({ ...formData, year: parseInt(Array.from(keys)[0]) })
                 setShowPreview(false)
               }}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             >
               {Array.from({ length: 5 }, (_, i) => {
                 const year = new Date().getFullYear() - 2 + i
-                return <option key={year} value={year}>{year}</option>
+                return <HRMSSelectItem key={year.toString()} textValue={year.toString()}>{year}</HRMSSelectItem>
               })}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Payment Date *</label>
-            <input
+            </HRMSSelect>
+            <HRMSInput
               type="date"
+              label="Payment Date"
+              isRequired
               value={formData.paymentDate}
               onChange={(e) => setFormData({ ...formData, paymentDate: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
           </div>
-        </div>
-      </div>
+        </HRMSCardBody>
+      </HRMSCard>
 
       {/* Employee Selection or Payroll Preview */}
       {!showPreview ? (
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+        <HRMSCard>
           {/* Header with Search and Filters */}
-          <div className="p-4 border-b border-gray-200">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-              <div className="flex items-center space-x-4">
-                <h2 className="text-xl font-semibold text-gray-800">Select Employees</h2>
-                <span className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">
-                  {selectedEmployees.length} of {filteredEmployees.length} selected
-                </span>
-                {existingPayrollEmployeeIds.length > 0 && (
-                  <span className="text-sm text-orange-600 bg-orange-100 px-3 py-1 rounded-full">
-                    {existingPayrollEmployeeIds.length} already have payroll
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={() => setShowFilters(!showFilters)}
-                  className={`flex items-center space-x-1 px-3 py-2 rounded-lg text-sm ${showFilters ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-600'}`}
-                >
-                  <FaFilter className="w-3 h-3" />
-                  <span>Filters</span>
-                </button>
-                <button
-                  onClick={() => { fetchAttendanceData(); fetchLeaveData(); fetchHolidayData(); }}
-                  className="text-primary-600 hover:text-primary-700 flex items-center space-x-1 px-3 py-2 bg-primary-50 rounded-lg text-sm"
-                >
-                  <FaSync className="w-3 h-3" />
-                  <span>Refresh</span>
-                </button>
-              </div>
+          <HRMSCardHeader className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
+              <h2 className="text-xl font-semibold text-foreground">Select Employees</h2>
+              <Chip size="sm" variant="flat" color="default">
+                {selectedEmployees.length} of {filteredEmployees.length} selected
+              </Chip>
+              {existingPayrollEmployeeIds.length > 0 && (
+                <Chip size="sm" variant="flat" color="warning">
+                  {existingPayrollEmployeeIds.length} already have payroll
+                </Chip>
+              )}
             </div>
-
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant={showFilters ? 'flat' : 'light'}
+                color={showFilters ? 'primary' : 'default'}
+                onPress={() => setShowFilters(!showFilters)}
+                startContent={<FaFilter className="w-3 h-3" />}
+              >
+                Filters
+              </Button>
+              <Button
+                size="sm"
+                variant="flat"
+                color="primary"
+                onPress={() => { fetchAttendanceData(); fetchLeaveData(); fetchHolidayData(); }}
+                startContent={<FaSync className="w-3 h-3" />}
+              >
+                Refresh
+              </Button>
+            </div>
+          </HRMSCardHeader>
+          <Divider />
+          <HRMSCardBody>
             {/* Filters Section */}
             {showFilters && (
-              <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+              <div className="mb-4 p-4 bg-default-50 rounded-lg">
                 <div className="flex flex-col md:flex-row gap-4">
                   {/* Search Box */}
                   <div className="flex-1">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Search</label>
-                    <div className="relative">
-                      <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                      <input
-                        type="text"
-                        placeholder="Search by name, code, email, department..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
-                      />
-                      {searchQuery && (
+                    <Input
+                      type="text"
+                      label="Search"
+                      placeholder="Search by name, code, email, department..."
+                      value={searchQuery}
+                      onValueChange={setSearchQuery}
+                      size="sm"
+                      startContent={<FaSearch className="text-default-400 w-4 h-4" />}
+                      endContent={searchQuery && (
                         <button
                           onClick={() => setSearchQuery('')}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                          className="text-default-400 hover:text-default-600"
                         >
                           <FaTimes className="w-3 h-3" />
                         </button>
                       )}
-                    </div>
+                    />
                   </div>
 
                   {/* Department Filter */}
                   <div className="md:w-64">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Department</label>
-                    <select
-                      value={selectedDepartment}
-                      onChange={(e) => setSelectedDepartment(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                    <HRMSSelect
+                      label="Department"
+                      size="sm"
+                      selectedKeys={[selectedDepartment]}
+                      onSelectionChange={(keys) => setSelectedDepartment(Array.from(keys)[0] || 'all')}
                     >
-                      <option value="all">All Departments</option>
+                      <HRMSSelectItem key="all" textValue="All Departments">All Departments</HRMSSelectItem>
                       {departments.map(dept => (
-                        <option key={dept._id} value={dept._id}>{dept.name}</option>
+                        <HRMSSelectItem key={dept._id} textValue={dept.name}>{dept.name}</HRMSSelectItem>
                       ))}
-                    </select>
+                    </HRMSSelect>
                   </div>
 
                   {/* Clear Filters */}
                   {(searchQuery || selectedDepartment !== 'all') && (
                     <div className="flex items-end">
-                      <button
-                        onClick={clearFilters}
-                        className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 bg-white border border-gray-300 rounded-lg"
+                      <Button
+                        size="sm"
+                        variant="bordered"
+                        onPress={clearFilters}
                       >
                         Clear Filters
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </div>
               </div>
             )}
-          </div>
 
-          {/* Department-Based Employee List */}
-          <div className="divide-y divide-gray-200">
-            {filteredEmployees.length === 0 ? (
-              <div className="px-4 py-8 text-center text-gray-500">
-                <FaCheckCircle className="w-12 h-12 mx-auto text-green-300 mb-3" />
-                <p className="text-lg font-medium">
-                  {availableEmployees.length === 0 
-                    ? 'All employees have payroll generated'
-                    : 'No employees match your filters'}
-                </p>
-                <p className="text-sm text-gray-400 mt-1">
-                  {availableEmployees.length === 0 
-                    ? `Payroll for ${new Date(formData.year, formData.month - 1).toLocaleString('default', { month: 'long', year: 'numeric' })} has been generated for all active employees.`
-                    : 'Try adjusting your search or filter criteria.'}
+            {/* Department-Based Employee List */}
+            <div className="divide-y divide-default-200">
+              {filteredEmployees.length === 0 ? (
+                <div className="px-4 py-8 text-center text-default-500">
+                  <FaCheckCircle className="w-12 h-12 mx-auto text-success-300 mb-3" />
+                  <p className="text-lg font-medium text-foreground">
+                    {availableEmployees.length === 0 
+                      ? 'All employees have payroll generated'
+                      : 'No employees match your filters'}
+                  </p>
+                  <p className="text-sm text-default-400 mt-1">
+                    {availableEmployees.length === 0 
+                      ? `Payroll for ${new Date(formData.year, formData.month - 1).toLocaleString('default', { month: 'long', year: 'numeric' })} has been generated for all active employees.`
+                      : 'Try adjusting your search or filter criteria.'}
                 </p>
               </div>
             ) : (
@@ -1161,7 +1177,7 @@ export default function GeneratePayrollPage() {
                                   <span className={'px-2 py-1 text-xs font-medium rounded-full ' + (attendance.absentDays > 0 ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-500')}>{attendance.absentDays || 0}</span>
                                 </td>
                                 <td className="px-4 py-3 whitespace-nowrap text-center bg-yellow-50">
-                                  <span className={'px-2 py-1 text-xs font-medium rounded-full ' + (employeeLeaves.pendingDays > 0 ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-500')}>{employeeLeaves.pendingDays || 0}</span>
+                                  <span className={'px-2 py-1 text-xs font-medium rounded-full ' + (employeeLeaves.pendingDays > 0 ? 'bg-warning-100 text-warning-800' : 'bg-default-100 text-default-500')}>{employeeLeaves.pendingDays || 0}</span>
                                 </td>
                               </tr>
                             )
@@ -1173,44 +1189,45 @@ export default function GeneratePayrollPage() {
                 </div>
               ))
             )}
-          </div>
+            </div>
 
-          <div className="p-6 bg-gray-50 border-t border-gray-200">
-            <button
-              onClick={handlePreviewPayroll}
-              disabled={selectedEmployees.length === 0}
-              className="btn-primary flex items-center space-x-2"
-            >
-              <FaEye />
-              <span>Preview Payroll for {selectedEmployees.length} Employee{selectedEmployees.length !== 1 ? 's' : ''}</span>
-            </button>
-          </div>
-        </div>
+            <div className="p-6 bg-default-50 border-t border-default-200">
+              <PrimaryButton
+                onPress={handlePreviewPayroll}
+                isDisabled={selectedEmployees.length === 0}
+                startContent={<FaEye />}
+              >
+                Preview Payroll for {selectedEmployees.length} Employee{selectedEmployees.length !== 1 ? 's' : ''}
+              </PrimaryButton>
+            </div>
+          </HRMSCardBody>
+        </HRMSCard>
       ) : (
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
-          <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-gray-800">
+        <HRMSCard>
+          <HRMSCardHeader className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-foreground">
               Payroll Preview - {new Date(formData.year, formData.month - 1).toLocaleString('default', { month: 'long', year: 'numeric' })}
             </h2>
-            <button onClick={() => setShowPreview(false)} className="text-gray-600 hover:text-gray-800 text-sm">← Back to Selection</button>
-          </div>
-
-          {/* Summary Cards - Simplified Addition-Based */}
-          <div className="grid gap-4 p-4 bg-gray-50 border-b grid-cols-2 md:grid-cols-5">
-            <div className="bg-white p-4 rounded-lg shadow-sm">
-              <p className="text-xs text-gray-500 uppercase">Working Days</p>
-              <p className="text-xl font-bold text-gray-800">{formData.workingDays}</p>
-            </div>
-            <div className="bg-white p-4 rounded-lg shadow-sm">
-              <p className="text-xs text-gray-500 uppercase">Total Paid Days</p>
-              <p className="text-xl font-bold text-blue-600">{summaryTotals.totalPaidDays}</p>
-            </div>
-            <div className="bg-white p-4 rounded-lg shadow-sm">
-              <p className="text-xs text-gray-500 uppercase">Earned Salary</p>
-              <p className="text-xl font-bold text-green-600">{formatCurrency(summaryTotals.earnedSalary)}</p>
-            </div>
-            <div className="bg-white p-4 rounded-lg shadow-sm">
-              <p className="text-xs text-gray-500 uppercase">Total Deductions</p>
+            <Button variant="light" onPress={() => setShowPreview(false)}>← Back to Selection</Button>
+          </HRMSCardHeader>
+          <Divider />
+          <HRMSCardBody className="p-0">
+            {/* Summary Cards - Simplified Addition-Based */}
+            <div className="grid gap-4 p-4 bg-default-50 border-b border-default-200 grid-cols-2 md:grid-cols-5">
+              <div className="bg-content1 p-4 rounded-lg shadow-sm">
+                <p className="text-xs text-default-500 uppercase">Working Days</p>
+                <p className="text-xl font-bold text-foreground">{formData.workingDays}</p>
+              </div>
+              <div className="bg-content1 p-4 rounded-lg shadow-sm">
+                <p className="text-xs text-default-500 uppercase">Total Paid Days</p>
+                <p className="text-xl font-bold text-primary">{summaryTotals.totalPaidDays}</p>
+              </div>
+              <div className="bg-content1 p-4 rounded-lg shadow-sm">
+                <p className="text-xs text-default-500 uppercase">Earned Salary</p>
+                <p className="text-xl font-bold text-success">{formatCurrency(summaryTotals.earnedSalary)}</p>
+              </div>
+              <div className="bg-content1 p-4 rounded-lg shadow-sm">
+                <p className="text-xs text-default-500 uppercase">Total Deductions</p>
               <p className="text-xl font-bold text-red-600">{formatCurrency(summaryTotals.totalDeductions)}</p>
             </div>
             <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-green-200">
@@ -1302,14 +1319,14 @@ export default function GeneratePayrollPage() {
                   </p>
                   <div className="space-y-2">
                     {selectedEmployeesPendingLeaves.map((warning, idx) => (
-                      <div key={idx} className="flex items-center justify-between bg-white rounded-lg px-3 py-2 border border-yellow-200">
+                      <div key={idx} className="flex items-center justify-between bg-content1 rounded-lg px-3 py-2 border border-warning-200">
                         <div>
-                          <span className="font-medium text-gray-800">{warning.employeeName}</span>
-                          <span className="text-gray-500 text-xs ml-2">({warning.employeeCode})</span>
+                          <span className="font-medium text-foreground">{warning.employeeName}</span>
+                          <span className="text-default-500 text-xs ml-2">({warning.employeeCode})</span>
                         </div>
                         <div className="flex items-center space-x-3">
-                          <span className="text-yellow-700 text-sm font-medium">{warning.pendingDays} day(s) pending</span>
-                          <span className="text-xs text-gray-500">
+                          <span className="text-warning-700 text-sm font-medium">{warning.pendingDays} day(s) pending</span>
+                          <span className="text-xs text-default-500">
                             {new Date(warning.startDate).toLocaleDateString()} - {new Date(warning.endDate).toLocaleDateString()}
                           </span>
                         </div>
@@ -1321,33 +1338,25 @@ export default function GeneratePayrollPage() {
             </div>
           )}
 
-          <div className="p-6 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
-            <div className="text-sm text-gray-600">
-              <FaExclamationTriangle className="inline-block w-4 h-4 text-yellow-500 mr-1" />
+          <div className="p-6 bg-default-50 border-t border-default-200 flex items-center justify-between">
+            <div className="text-sm text-default-600">
+              <FaExclamationTriangle className="inline-block w-4 h-4 text-warning-500 mr-1" />
               Review the calculated salaries before generating.
             </div>
-            <div className="flex items-center space-x-3">
-              <button onClick={() => setShowPreview(false)} className="btn-secondary">Back</button>
-              <button
-                onClick={handleGeneratePayroll}
-                disabled={generating}
-                className="btn-primary flex items-center space-x-2"
+            <div className="flex items-center gap-3">
+              <SecondaryButton onPress={() => setShowPreview(false)}>Back</SecondaryButton>
+              <PrimaryButton
+                onPress={handleGeneratePayroll}
+                isDisabled={generating}
+                isLoading={generating}
+                startContent={!generating && <FaCheckCircle />}
               >
-                {generating ? (
-                  <>
-                    <Loader size="xs" />
-                    <span>Generating...</span>
-                  </>
-                ) : (
-                  <>
-                    <FaCheckCircle />
-                    <span>Generate Payroll</span>
-                  </>
-                )}
-              </button>
+                {generating ? 'Generating...' : 'Generate Payroll'}
+              </PrimaryButton>
             </div>
           </div>
-        </div>
+          </HRMSCardBody>
+        </HRMSCard>
       )}
     </div>
   )

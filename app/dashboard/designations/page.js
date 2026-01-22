@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { Button } from '@heroui/react'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaEdit, FaTrash, FaBriefcase } from 'react-icons/fa'
@@ -145,13 +146,13 @@ export default function DesignationsPage() {
           <h1 className="text-3xl font-bold text-gray-800">Designations</h1>
           <p className="text-gray-600 mt-1">Manage job designations and roles</p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="btn-primary flex items-center space-x-2"
+        <Button
+          onPress={() => setShowModal(true)}
+          color="primary"
+          startContent={<FaPlus />}
         >
-          <FaPlus />
-          <span>Add Designation</span>
-        </button>
+          Add Designation
+        </Button>
       </div>
 
       {/* Stats Card */}
@@ -288,16 +289,16 @@ export default function DesignationsPage() {
               </div>
 
               <div className="flex justify-end space-x-4 mt-6">
-                <button
+                <Button
                   type="button"
-                  onClick={handleCloseModal}
-                  className="btn-secondary"
+                  onPress={handleCloseModal}
+                  variant="flat"
                 >
                   Cancel
-                </button>
-                <button type="submit" className="btn-primary">
+                </Button>
+                <Button type="submit" color="primary">
                   {editingDesig ? 'Update' : 'Create'}
-                </button>
+                </Button>
               </div>
             </form>
           </div>

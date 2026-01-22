@@ -8,6 +8,7 @@ import Loader from '@/components/ui/Loader'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Area, AreaChart, ComposedChart } from 'recharts'
 import CustomTooltip from '@/components/charts/CustomTooltip'
 import { useAILoading } from '@/contexts/AILoadingContext'
+import { Select, SelectItem, Input } from '@heroui/react'
 
 // Color palette for charts
 const CHART_COLORS = {
@@ -894,26 +895,26 @@ export default function PerformanceReportsPage() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Department</label>
-            <select
-              value={selectedDepartment}
-              onChange={(e) => setSelectedDepartment(e.target.value)}
-              disabled={isDepartmentHead && headedDepartments.length === 1}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+            <Select
+              selectedKeys={[selectedDepartment]}
+              onSelectionChange={(keys) => setSelectedDepartment(Array.from(keys)[0] || 'all')}
+              isDisabled={isDepartmentHead && headedDepartments.length === 1}
+              aria-label="Select department"
             >
               {/* Admin/HR see all departments, multi-dept heads see "All My Departments" */}
               {(!isDepartmentHead || headedDepartments.length > 1) && (
-                <option value="all">{isDepartmentHead ? 'All My Departments' : 'All Departments'}</option>
+                <SelectItem key="all">{isDepartmentHead ? 'All My Departments' : 'All Departments'}</SelectItem>
               )}
               {/* Show departments based on role */}
               {isDepartmentHead 
                 ? headedDepartments.map(dept => (
-                    <option key={dept._id} value={dept._id}>{dept.name}</option>
+                    <SelectItem key={dept._id}>{dept.name}</SelectItem>
                   ))
                 : departments.map(dept => (
-                    <option key={dept._id} value={dept._id}>{dept.name}</option>
+                    <SelectItem key={dept._id}>{dept.name}</SelectItem>
                   ))
               }
-            </select>
+            </Select>
             {isDepartmentHead && headedDepartments.length === 1 && (
               <p className="text-xs text-gray-500 mt-1">You can only view your department's performance</p>
             )}

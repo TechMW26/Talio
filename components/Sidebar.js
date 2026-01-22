@@ -17,6 +17,7 @@ import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
 import { usePageTransition } from '@/contexts/PageTransitionContext'
 import UnreadBadge from './UnreadBadge'
+import { Button, Chip, ScrollShadow, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Tooltip } from '@heroui/react'
 
 import ModalPortal from '@/components/ui/ModalPortal'
 
@@ -24,9 +25,9 @@ import ModalPortal from '@/components/ui/ModalPortal'
 function SidebarBadge({ count }) {
   if (!count || count <= 0) return null
   return (
-    <span className="absolute -top-4 -right-4 w-5 h-5 bg-red-100 border border-red-500 text-red-500 text-[10px] font-bold rounded-full flex items-center justify-center z-10">
+    <Chip size="sm" color="danger" variant="flat" className="absolute -top-4 -right-4 min-w-5 h-5 text-[10px] z-10">
       {count > 99 ? '99+' : count}
-    </span>
+    </Chip>
   )
 }
 
@@ -34,9 +35,9 @@ function SidebarBadge({ count }) {
 function InlineBadge({ count }) {
   if (!count || count <= 0) return null
   return (
-    <span className="w-5 h-5 bg-red-100 border border-red-500 text-red-500 text-[10px] font-bold rounded-full flex items-center justify-center flex-shrink-0">
+    <Chip size="sm" color="danger" variant="flat" className="min-w-5 h-5 text-[10px]">
       {count > 99 ? '99+' : count}
-    </span>
+    </Chip>
   )
 }
 
@@ -340,12 +341,8 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
       {/* Mobile overlay with tinted background - smooth fade animation */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-[60] md:!hidden animate-fade-in"
+          className="fixed inset-0 z-[60] md:!hidden animate-fade-in bg-black/60"
           onClick={() => setIsOpen(false)}
-          style={{
-            backgroundColor: 'rgba(0,0,0,0.6)',
-            animation: 'fadeInBackdrop 0.5s ease-out forwards'
-          }}
         />
       )}
 
@@ -415,10 +412,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
         </div>
 
         {/* Scrollable Menu Section */}
-        <nav className={`pt-4 pb-8 flex-1 overflow-y-auto scrollbar-hide ${isDesktop && isCollapsed ? 'px-2 space-y-3' : 'px-3 sm:px-4 space-y-2'}`} style={{
-          scrollbarWidth: 'none',
-          msOverflowStyle: 'none'
-        }}>
+        <ScrollShadow className={`pt-4 pb-8 flex-1 ${isDesktop && isCollapsed ? 'px-2 space-y-3' : 'px-3 sm:px-4 space-y-2'}`}>
           {menuItems.map((item) => {
             const isActive = isMenuItemActive(item)
             return (
@@ -615,7 +609,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
               )}
             </div>
           )})}
-        </nav>
+        </ScrollShadow>
 
         {/* Chat, Settings and Logout Section - Fixed at bottom - Mobile only */}
         {!isDesktop && (
@@ -677,52 +671,40 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
         {/* Desktop: Bottom section removed - icons are in sidebar menu */}
       </aside>
 
-      {/* Logout Confirmation Popup */}
-      <ModalPortal isOpen={showLogoutConfirm}>
-        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setShowLogoutConfirm(false)}>
-          <div className="modal-backdrop" />
-          <div className="modal-container modal-sm">
-            {/* Header */}
-            <div className="px-6 py-4 bg-red-500 text-white">
-              <h3 className="text-lg font-semibold">Confirm Logout</h3>
-            </div>
-
-            {/* Content */}
-            <div className="modal-body text-center">
-              <p className="text-gray-700">
-                Are you sure you want to logout?
-              </p>
-            </div>
-
-            {/* Actions */}
-            <div className="modal-footer">
-              <button
-                onClick={() => setShowLogoutConfirm(false)}
-                className="modal-btn modal-btn-secondary flex-1"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleLogout}
-                className="modal-btn modal-btn-danger flex-1"
-              >
-                Logout
-              </button>
-            </div>
-          </div>
-        </div>
-      </ModalPortal>
+      {/* Logout Confirmation Modal */}
+      <Modal isOpen={showLogoutConfirm} onOpenChange={setShowLogoutConfirm}>
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader className="bg-danger-500 text-white">Confirm Logout</ModalHeader>
+              <ModalBody className="py-6">
+                <p className="text-center text-default-700">
+                  Are you sure you want to logout?
+                </p>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose}>
+                  Cancel
+                </Button>
+                <Button color="danger" onPress={handleLogout}>
+                  Logout
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
 
       {/* Tooltip */}
       {tooltipContent && (
         <div 
           ref={tooltipRef}
-          className="fixed left-[4.5rem] ml-2 px-2 py-1 bg-gray-800 text-white text-xs rounded pointer-events-none whitespace-nowrap z-[100] shadow-lg"
+          className="fixed left-[4.5rem] ml-2 px-2 py-1 bg-default-900 text-white text-xs rounded pointer-events-none whitespace-nowrap z-[100] shadow-lg"
           style={{ top: tooltipY.current, transform: 'translateY(-50%)' }}
         >
           {tooltipContent}
           {/* Arrow */}
-          <div className="absolute top-1/2 -left-1 -translate-y-1/2 border-4 border-transparent border-r-gray-800"></div>
+          <div className="absolute top-1/2 -left-1 -translate-y-1/2 border-4 border-transparent border-r-default-900"></div>
         </div>
       )}
     </>

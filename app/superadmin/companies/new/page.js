@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Select, SelectItem } from '@heroui/react'
 import toast from '@/utils/toast'
 
 export default function NewCompanyPage() {
@@ -462,20 +463,20 @@ export default function NewCompanyPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Business Type</label>
-                <select
-                  name="businessDetails.businessType"
-                  value={formData.businessDetails.businessType}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                <Select
+                  selectedKeys={formData.businessDetails.businessType ? [formData.businessDetails.businessType] : []}
+                  onChange={(e) => handleChange({ target: { name: 'businessDetails.businessType', value: e.target.value } })}
+                  aria-label="Business Type"
+                  placeholder="Select Type"
+                  classNames={{ trigger: "bg-gray-50" }}
                 >
-                  <option value="">Select Type</option>
-                  <option value="private_limited">Private Limited</option>
-                  <option value="public_limited">Public Limited</option>
-                  <option value="llp">LLP</option>
-                  <option value="partnership">Partnership</option>
-                  <option value="proprietorship">Proprietorship</option>
-                  <option value="other">Other</option>
-                </select>
+                  <SelectItem key="private_limited">Private Limited</SelectItem>
+                  <SelectItem key="public_limited">Public Limited</SelectItem>
+                  <SelectItem key="llp">LLP</SelectItem>
+                  <SelectItem key="partnership">Partnership</SelectItem>
+                  <SelectItem key="proprietorship">Proprietorship</SelectItem>
+                  <SelectItem key="other">Other</SelectItem>
+                </Select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Industry</label>
@@ -512,32 +513,32 @@ export default function NewCompanyPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Plan</label>
-                <select
-                  name="subscription.plan"
-                  value={formData.subscription.plan}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                <Select
+                  selectedKeys={[formData.subscription.plan]}
+                  onChange={(e) => handleChange({ target: { name: 'subscription.plan', value: e.target.value } })}
+                  aria-label="Subscription Plan"
+                  classNames={{ trigger: "bg-gray-50" }}
                 >
-                  <option value="trial">Trial</option>
-                  <option value="starter">Starter</option>
-                  <option value="professional">Professional</option>
-                  <option value="enterprise">Enterprise</option>
-                  <option value="custom">Custom</option>
-                </select>
+                  <SelectItem key="trial">Trial</SelectItem>
+                  <SelectItem key="starter">Starter</SelectItem>
+                  <SelectItem key="professional">Professional</SelectItem>
+                  <SelectItem key="enterprise">Enterprise</SelectItem>
+                  <SelectItem key="custom">Custom</SelectItem>
+                </Select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Billing Cycle</label>
-                <select
-                  name="subscription.billingCycle"
-                  value={formData.subscription.billingCycle}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                <Select
+                  selectedKeys={[formData.subscription.billingCycle]}
+                  onChange={(e) => handleChange({ target: { name: 'subscription.billingCycle', value: e.target.value } })}
+                  aria-label="Billing Cycle"
+                  classNames={{ trigger: "bg-gray-50" }}
                 >
-                  <option value="monthly">Monthly</option>
-                  <option value="quarterly">Quarterly</option>
-                  <option value="yearly">Yearly</option>
-                  <option value="custom">Custom</option>
-                </select>
+                  <SelectItem key="monthly">Monthly</SelectItem>
+                  <SelectItem key="quarterly">Quarterly</SelectItem>
+                  <SelectItem key="yearly">Yearly</SelectItem>
+                  <SelectItem key="custom">Custom</SelectItem>
+                </Select>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Amount (₹)</label>
@@ -643,20 +644,20 @@ export default function NewCompanyPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Payment Method</label>
-                <select
-                  name="onboarding.paymentMethod"
-                  value={formData.onboarding.paymentMethod}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                <Select
+                  selectedKeys={formData.onboarding.paymentMethod ? [formData.onboarding.paymentMethod] : []}
+                  onChange={(e) => handleChange({ target: { name: 'onboarding.paymentMethod', value: e.target.value } })}
+                  aria-label="Payment Method"
+                  placeholder="Select Method"
+                  classNames={{ trigger: "bg-gray-50" }}
                 >
-                  <option value="">Select Method</option>
-                  <option value="bank_transfer">Bank Transfer</option>
-                  <option value="upi">UPI</option>
-                  <option value="card">Card</option>
-                  <option value="cash">Cash</option>
-                  <option value="cheque">Cheque</option>
-                  <option value="other">Other</option>
-                </select>
+                  <SelectItem key="bank_transfer">Bank Transfer</SelectItem>
+                  <SelectItem key="upi">UPI</SelectItem>
+                  <SelectItem key="card">Card</SelectItem>
+                  <SelectItem key="cash">Cash</SelectItem>
+                  <SelectItem key="cheque">Cheque</SelectItem>
+                  <SelectItem key="other">Other</SelectItem>
+                </Select>
               </div>
             </div>
 

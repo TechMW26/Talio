@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { Select, SelectItem } from '@heroui/react';
 import Loader from '@/components/ui/Loader';
 import { 
   HiOutlineXMark,
@@ -409,16 +410,18 @@ export default function CallAlertButton({ user }) {
                     </div>
                     
                     {departments.length > 1 && (
-                      <select
-                        value={selectedDepartment}
+                      <Select
+                        selectedKeys={[selectedDepartment]}
                         onChange={(e) => setSelectedDepartment(e.target.value)}
-                        className="px-4 py-2.5 border border-gray-300 rounded-xl bg-white text-black focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all min-w-[180px]"
+                        aria-label="Filter by Department"
+                        className="min-w-[180px]"
+                        classNames={{ trigger: "bg-white" }}
                       >
-                        <option value="all">All Departments</option>
+                        <SelectItem key="all">All Departments</SelectItem>
                         {departments.map(dept => (
-                          <option key={dept._id} value={dept._id}>{dept.name}</option>
+                          <SelectItem key={dept._id}>{dept.name}</SelectItem>
                         ))}
-                      </select>
+                      </Select>
                     )}
                   </div>
 
@@ -615,16 +618,17 @@ export default function CallAlertButton({ user }) {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Priority</label>
-                      <select
-                        value={priority}
+                      <Select
+                        selectedKeys={[priority]}
                         onChange={(e) => setPriority(e.target.value)}
-                        className="w-full px-4 py-2.5 border border-gray-300 rounded-xl bg-white text-black focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                        aria-label="Priority"
+                        classNames={{ trigger: "bg-white" }}
                       >
-                        <option value="low">Low</option>
-                        <option value="medium">Medium</option>
-                        <option value="high">High</option>
-                        <option value="urgent">Urgent</option>
-                      </select>
+                        <SelectItem key="low">Low</SelectItem>
+                        <SelectItem key="medium">Medium</SelectItem>
+                        <SelectItem key="high">High</SelectItem>
+                        <SelectItem key="urgent">Urgent</SelectItem>
+                      </Select>
                     </div>
 
                     <div>

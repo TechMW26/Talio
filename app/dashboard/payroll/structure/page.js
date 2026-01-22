@@ -3,12 +3,17 @@
 import { useState, useEffect } from 'react'
 import { FaMoneyBillWave, FaPlus, FaEdit, FaTrash, FaSave, FaTimes } from 'react-icons/fa'
 import toast from '@/utils/toast'
-import Loader from '@/components/ui/Loader'
+import { useDisclosure, Divider } from '@heroui/react'
+import { PageLoader } from '@/components/ui/heroui/Loading'
+import { HRMSCard, HRMSCardHeader, HRMSCardBody } from '@/components/ui/heroui/Card'
+import { HRMSInput, HRMSTextarea, HRMSSelect, HRMSSelectItem } from '@/components/ui/heroui/Input'
+import { PrimaryButton, SecondaryButton, GhostButton, DangerButton } from '@/components/ui/heroui/Button'
+import { HRMSModal, HRMSModalContent, HRMSModalHeader, HRMSModalBody, HRMSModalFooter } from '@/components/ui/heroui/Modal'
 
 export default function SalaryStructurePage() {
   const [structures, setStructures] = useState([])
   const [loading, setLoading] = useState(true)
-  const [showModal, setShowModal] = useState(false)
+  const { isOpen: showModal, onOpen: openModal, onClose: closeModal } = useDisclosure()
   const [editingStructure, setEditingStructure] = useState(null)
   const [formData, setFormData] = useState({
     name: '',
@@ -72,7 +77,7 @@ export default function SalaryStructurePage() {
       const data = await response.json()
       if (data.success) {
         toast.success(editingStructure ? 'Structure updated successfully' : 'Structure created successfully')
-        setShowModal(false)
+        closeModal()
         setEditingStructure(null)
         resetForm()
         fetchStructures()
@@ -94,7 +99,7 @@ export default function SalaryStructurePage() {
       allowances: structure.allowances || [],
       deductions: structure.deductions || []
     })
-    setShowModal(true)
+    openModal()
   }
 
   const handleDelete = async (id) => {
@@ -205,86 +210,85 @@ export default function SalaryStructurePage() {
       {/* Header */}
       <div className="mb-6 flex justify-between items-center">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 flex items-center gap-2">
-            <FaMoneyBillWave className="text-green-600" />
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex items-center gap-2">
+            <FaMoneyBillWave className="text-success" />
             Salary Structure
           </h1>
-          <p className="text-sm sm:text-base text-gray-600 mt-1">
+          <p className="text-sm sm:text-base text-default-500 mt-1">
             Define salary components, allowances, and deductions
           </p>
         </div>
-        <button
-          onClick={() => {
+        <PrimaryButton
+          onPress={() => {
             resetForm()
             setEditingStructure(null)
-            setShowModal(true)
+            openModal()
           }}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          startContent={<FaPlus />}
         >
-          <FaPlus />
           <span className="hidden sm:inline">Add Structure</span>
-        </button>
+        </PrimaryButton>
       </div>
 
       {/* Structures List */}
       {loading ? (
-        <div className="text-center py-12">
-          <Loader size="lg" />
-          <p className="text-gray-600 mt-4">Loading salary structures...</p>
-        </div>
+        <PageLoader message="Loading salary structures..." />
       ) : structures.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-md p-8 text-center">
-          <FaMoneyBillWave className="text-6xl text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-600 text-lg mb-4">No salary structures defined yet</p>
-          <button
-            onClick={() => setShowModal(true)}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-          >
-            Create First Structure
-          </button>
-        </div>
+        <HRMSCard>
+          <HRMSCardBody className="text-center py-12">
+            <FaMoneyBillWave className="text-6xl text-default-300 mx-auto mb-4" />
+            <p className="text-default-600 text-lg mb-4">No salary structures defined yet</p>
+            <PrimaryButton onPress={openModal}>
+              Create First Structure
+            </PrimaryButton>
+          </HRMSCardBody>
+        </HRMSCard>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {structures.map((structure) => (
-            <div key={structure._id} className="bg-white rounded-lg shadow-md p-6">
-              <div className="flex justify-between items-start mb-4">
+            <HRMSCard key={structure._id}>
+              <HRMSCardHeader className="flex justify-between items-start">
                 <div>
-                  <h3 className="text-xl font-bold text-gray-800">{structure.name}</h3>
+                  <h3 className="text-xl font-bold text-foreground">{structure.name}</h3>
                   {structure.description && (
-                    <p className="text-sm text-gray-600 mt-1">{structure.description}</p>
+                    <p className="text-sm text-default-500 mt-1">{structure.description}</p>
                   )}
                 </div>
                 <div className="flex gap-2">
-                  <button
-                    onClick={() => handleEdit(structure)}
-                    className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                  <GhostButton
+                    onPress={() => handleEdit(structure)}
+                    isIconOnly
+                    size="sm"
+                    className="text-primary"
                   >
                     <FaEdit />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(structure._id)}
-                    className="p-2 text-red-600 hover:bg-red-50 rounded"
+                  </GhostButton>
+                  <GhostButton
+                    onPress={() => handleDelete(structure._id)}
+                    isIconOnly
+                    size="sm"
+                    className="text-danger"
                   >
                     <FaTrash />
-                  </button>
+                  </GhostButton>
                 </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-sm text-gray-600 mb-1">Basic Salary</p>
-                  <p className="text-2xl font-bold text-gray-800">
+              </HRMSCardHeader>
+              <Divider />
+              <HRMSCardBody className="space-y-4">
+                <div className="bg-default-50 rounded-lg p-4">
+                  <p className="text-sm text-default-500 mb-1">Basic Salary</p>
+                  <p className="text-2xl font-bold text-foreground">
                     {formatCurrency(structure.basicSalary)}
                   </p>
                 </div>
 
                 <div>
-                  <p className="text-sm font-semibold text-gray-700 mb-2">Allowances</p>
+                  <p className="text-sm font-semibold text-default-700 mb-2">Allowances</p>
                   <div className="space-y-2">
                     {structure.allowances?.map((allowance, index) => (
                       <div key={index} className="flex justify-between items-center text-sm">
-                        <span className="text-gray-600">{allowance.name}</span>
-                        <span className="font-medium text-gray-800">
+                        <span className="text-default-600">{allowance.name}</span>
+                        <span className="font-medium text-foreground">
                           {allowance.type === 'percentage'
                             ? `${allowance.value}%`
                             : formatCurrency(allowance.value)}
@@ -295,13 +299,13 @@ export default function SalaryStructurePage() {
                 </div>
 
                 <div>
-                  <p className="text-sm font-semibold text-gray-700 mb-2">Deductions</p>
+                  <p className="text-sm font-semibold text-default-700 mb-2">Deductions</p>
                   <div className="space-y-2">
                     {structure.deductions?.map((deduction, index) => (
                       <div key={index} className="flex justify-between items-center text-sm">
-                        <span className="text-gray-600">{deduction.name}</span>
-                        <span className="font-medium text-red-600">
-                          -{allowance.type === 'percentage'
+                        <span className="text-default-600">{deduction.name}</span>
+                        <span className="font-medium text-danger">
+                          -{deduction.type === 'percentage'
                             ? `${deduction.value}%`
                             : formatCurrency(deduction.value)}
                         </span>
@@ -310,148 +314,124 @@ export default function SalaryStructurePage() {
                   </div>
                 </div>
 
-                <div className="border-t pt-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-semibold text-gray-700">Estimated Gross</span>
-                    <span className="text-lg font-bold text-green-600">
-                      {formatCurrency(
-                        calculateGrossSalary(structure.basicSalary, structure.allowances || [])
-                      )}
-                    </span>
-                  </div>
+                <Divider />
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-semibold text-default-700">Estimated Gross</span>
+                  <span className="text-lg font-bold text-success">
+                    {formatCurrency(
+                      calculateGrossSalary(structure.basicSalary, structure.allowances || [])
+                    )}
+                  </span>
                 </div>
-              </div>
-            </div>
+              </HRMSCardBody>
+            </HRMSCard>
           ))}
         </div>
       )}
 
       {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 flex items-center justify-center z-[9100] p-4" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
-          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-gray-800">
-                {editingStructure ? 'Edit' : 'Create'} Salary Structure
-              </h2>
-              <button
-                onClick={() => {
-                  setShowModal(false)
-                  setEditingStructure(null)
-                  resetForm()
-                }}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                <FaTimes className="w-6 h-6" />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="p-6">
+      <HRMSModal isOpen={showModal} onClose={() => { closeModal(); setEditingStructure(null); resetForm(); }} size="4xl">
+        <HRMSModalContent>
+          <HRMSModalHeader>
+            <h2 className="text-xl font-bold text-foreground">
+              {editingStructure ? 'Edit' : 'Create'} Salary Structure
+            </h2>
+          </HRMSModalHeader>
+          <HRMSModalBody>
+            <form onSubmit={handleSubmit} id="structure-form" className="space-y-6">
               {/* Basic Info */}
-              <div className="space-y-4 mb-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Structure Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                </div>
+              <div className="space-y-4">
+                <HRMSInput
+                  label="Structure Name"
+                  isRequired
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="e.g., Standard Structure"
+                />
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Description
-                  </label>
-                  <textarea
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    rows="2"
-                  />
-                </div>
+                <HRMSTextarea
+                  label="Description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Optional description"
+                  minRows={2}
+                />
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Basic Salary *
-                  </label>
-                  <input
-                    type="number"
-                    value={formData.basicSalary}
-                    onChange={(e) => setFormData({ ...formData, basicSalary: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                </div>
+                <HRMSInput
+                  type="number"
+                  label="Basic Salary"
+                  isRequired
+                  value={formData.basicSalary}
+                  onChange={(e) => setFormData({ ...formData, basicSalary: e.target.value })}
+                  placeholder="Enter basic salary"
+                />
               </div>
 
               {/* Allowances */}
-              <div className="mb-6">
+              <div>
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold text-gray-800">Allowances</h3>
-                  <button
+                  <h3 className="text-lg font-semibold text-foreground">Allowances</h3>
+                  <PrimaryButton
                     type="button"
-                    onClick={addAllowance}
-                    className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
+                    size="sm"
+                    onPress={addAllowance}
+                    startContent={<FaPlus className="w-3 h-3" />}
+                    color="success"
                   >
-                    + Add Allowance
-                  </button>
+                    Add Allowance
+                  </PrimaryButton>
                 </div>
 
                 <div className="space-y-3">
                   {formData.allowances.map((allowance, index) => (
-                    <div key={index} className="grid grid-cols-12 gap-2 items-end">
+                    <div key={index} className="grid grid-cols-12 gap-2 items-end bg-default-50 p-3 rounded-lg">
                       <div className="col-span-3">
-                        <label className="block text-xs text-gray-600 mb-1">Name</label>
-                        <input
-                          type="text"
+                        <HRMSInput
+                          label="Name"
+                          size="sm"
                           value={allowance.name}
                           onChange={(e) => updateAllowance(index, 'name', e.target.value)}
-                          className="w-full px-3 py-2 border rounded-lg text-sm"
                           placeholder="HRA"
                         />
                       </div>
                       <div className="col-span-2">
-                        <label className="block text-xs text-gray-600 mb-1">Type</label>
-                        <select
-                          value={allowance.type}
-                          onChange={(e) => updateAllowance(index, 'type', e.target.value)}
-                          className="w-full px-3 py-2 border rounded-lg text-sm"
+                        <HRMSSelect
+                          label="Type"
+                          size="sm"
+                          selectedKeys={[allowance.type]}
+                          onSelectionChange={(keys) => updateAllowance(index, 'type', Array.from(keys)[0])}
                         >
-                          <option value="fixed">Fixed</option>
-                          <option value="percentage">%</option>
-                        </select>
+                          <HRMSSelectItem key="fixed" textValue="Fixed">Fixed</HRMSSelectItem>
+                          <HRMSSelectItem key="percentage" textValue="%">%</HRMSSelectItem>
+                        </HRMSSelect>
                       </div>
                       <div className="col-span-2">
-                        <label className="block text-xs text-gray-600 mb-1">Value</label>
-                        <input
+                        <HRMSInput
                           type="number"
+                          label="Value"
+                          size="sm"
                           step="0.01"
                           value={allowance.value}
                           onChange={(e) => updateAllowance(index, 'value', e.target.value)}
-                          className="w-full px-3 py-2 border rounded-lg text-sm"
                         />
                       </div>
                       <div className="col-span-4">
-                        <label className="block text-xs text-gray-600 mb-1">Description</label>
-                        <input
-                          type="text"
+                        <HRMSInput
+                          label="Description"
+                          size="sm"
                           value={allowance.description}
                           onChange={(e) => updateAllowance(index, 'description', e.target.value)}
-                          className="w-full px-3 py-2 border rounded-lg text-sm"
                         />
                       </div>
                       <div className="col-span-1">
-                        <button
+                        <GhostButton
                           type="button"
-                          onClick={() => removeAllowance(index)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded w-full"
+                          onPress={() => removeAllowance(index)}
+                          isIconOnly
+                          className="text-danger"
                         >
-                          <FaTrash className="mx-auto" />
-                        </button>
+                          <FaTrash />
+                        </GhostButton>
                       </div>
                     </div>
                   ))}
@@ -459,100 +439,96 @@ export default function SalaryStructurePage() {
               </div>
 
               {/* Deductions */}
-              <div className="mb-6">
+              <div>
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold text-gray-800">Deductions</h3>
-                  <button
+                  <h3 className="text-lg font-semibold text-foreground">Deductions</h3>
+                  <DangerButton
                     type="button"
-                    onClick={addDeduction}
-                    className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+                    size="sm"
+                    onPress={addDeduction}
+                    startContent={<FaPlus className="w-3 h-3" />}
                   >
-                    + Add Deduction
-                  </button>
+                    Add Deduction
+                  </DangerButton>
                 </div>
 
                 <div className="space-y-3">
                   {formData.deductions.map((deduction, index) => (
-                    <div key={index} className="grid grid-cols-12 gap-2 items-end">
+                    <div key={index} className="grid grid-cols-12 gap-2 items-end bg-default-50 p-3 rounded-lg">
                       <div className="col-span-3">
-                        <label className="block text-xs text-gray-600 mb-1">Name</label>
-                        <input
-                          type="text"
+                        <HRMSInput
+                          label="Name"
+                          size="sm"
                           value={deduction.name}
                           onChange={(e) => updateDeduction(index, 'name', e.target.value)}
-                          className="w-full px-3 py-2 border rounded-lg text-sm"
                           placeholder="PF"
                         />
                       </div>
                       <div className="col-span-2">
-                        <label className="block text-xs text-gray-600 mb-1">Type</label>
-                        <select
-                          value={deduction.type}
-                          onChange={(e) => updateDeduction(index, 'type', e.target.value)}
-                          className="w-full px-3 py-2 border rounded-lg text-sm"
+                        <HRMSSelect
+                          label="Type"
+                          size="sm"
+                          selectedKeys={[deduction.type]}
+                          onSelectionChange={(keys) => updateDeduction(index, 'type', Array.from(keys)[0])}
                         >
-                          <option value="fixed">Fixed</option>
-                          <option value="percentage">%</option>
-                        </select>
+                          <HRMSSelectItem key="fixed" textValue="Fixed">Fixed</HRMSSelectItem>
+                          <HRMSSelectItem key="percentage" textValue="%">%</HRMSSelectItem>
+                        </HRMSSelect>
                       </div>
                       <div className="col-span-2">
-                        <label className="block text-xs text-gray-600 mb-1">Value</label>
-                        <input
+                        <HRMSInput
                           type="number"
+                          label="Value"
+                          size="sm"
                           step="0.01"
                           value={deduction.value}
                           onChange={(e) => updateDeduction(index, 'value', e.target.value)}
-                          className="w-full px-3 py-2 border rounded-lg text-sm"
                         />
                       </div>
                       <div className="col-span-4">
-                        <label className="block text-xs text-gray-600 mb-1">Description</label>
-                        <input
-                          type="text"
+                        <HRMSInput
+                          label="Description"
+                          size="sm"
                           value={deduction.description}
                           onChange={(e) => updateDeduction(index, 'description', e.target.value)}
-                          className="w-full px-3 py-2 border rounded-lg text-sm"
                         />
                       </div>
                       <div className="col-span-1">
-                        <button
+                        <GhostButton
                           type="button"
-                          onClick={() => removeDeduction(index)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded w-full"
+                          onPress={() => removeDeduction(index)}
+                          isIconOnly
+                          className="text-danger"
                         >
-                          <FaTrash className="mx-auto" />
-                        </button>
+                          <FaTrash />
+                        </GhostButton>
                       </div>
                     </div>
                   ))}
                 </div>
               </div>
-
-              {/* Submit Buttons */}
-              <div className="flex justify-end gap-3 mt-6">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowModal(false)
-                    setEditingStructure(null)
-                    resetForm()
-                  }}
-                  className="px-6 py-2 border border-gray-300 text-gray-700 bg-white rounded-lg hover:bg-gray-50 font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 font-medium"
-                >
-                  <FaSave />
-                  {editingStructure ? 'Update' : 'Create'} Structure
-                </button>
-              </div>
             </form>
-          </div>
-        </div>
-      )}
+          </HRMSModalBody>
+          <HRMSModalFooter>
+            <SecondaryButton
+              onPress={() => {
+                closeModal()
+                setEditingStructure(null)
+                resetForm()
+              }}
+            >
+              Cancel
+            </SecondaryButton>
+            <PrimaryButton
+              type="submit"
+              form="structure-form"
+              startContent={<FaSave />}
+            >
+              {editingStructure ? 'Update' : 'Create'} Structure
+            </PrimaryButton>
+          </HRMSModalFooter>
+        </HRMSModalContent>
+      </HRMSModal>
     </div>
   )
 }

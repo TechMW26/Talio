@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
-import Loader from '@/components/ui/Loader'
+import { Card, CardBody, Button, Chip, Skeleton, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Spinner } from '@heroui/react'
 import { 
   FaArrowLeft, FaCheck, FaTimes, FaTrash, FaProjectDiagram,
   FaClock, FaCheckCircle, FaTimesCircle, FaFilter,
@@ -21,12 +21,20 @@ const requestTypeLabels = {
   'all': 'All Types'
 }
 
+const requestTypeChipColors = {
+  'task_deletion': 'danger',
+  'task_completion': 'success',
+  'task_review': 'primary',
+  'project_completion': 'secondary',
+  'member_removal': 'warning'
+}
+
 const requestTypeColors = {
-  'task_deletion': 'bg-red-100 text-red-700 border-red-200',
-  'task_completion': 'bg-green-100 text-green-700 border-green-200',
-  'task_review': 'bg-blue-100 text-blue-700 border-blue-200',
-  'project_completion': 'bg-purple-100 text-purple-700 border-purple-200',
-  'member_removal': 'bg-orange-100 text-orange-700 border-orange-200'
+  'task_deletion': 'bg-danger-100 text-danger-700 border-danger-200',
+  'task_completion': 'bg-success-100 text-success-700 border-success-200',
+  'task_review': 'bg-primary-100 text-primary-700 border-primary-200',
+  'project_completion': 'bg-secondary-100 text-secondary-700 border-secondary-200',
+  'member_removal': 'bg-warning-100 text-warning-700 border-warning-200'
 }
 
 const requestTypeIcons = {
@@ -38,9 +46,9 @@ const requestTypeIcons = {
 }
 
 const statusColors = {
-  'pending': 'bg-yellow-100 text-yellow-700',
-  'approved': 'bg-green-100 text-green-700',
-  'rejected': 'bg-red-100 text-red-700'
+  'pending': 'warning',
+  'approved': 'success',
+  'rejected': 'danger'
 }
 
 export default function ApprovalsPage() {
@@ -270,157 +278,175 @@ export default function ApprovalsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center">
-          <button
-            onClick={() => router.push('/dashboard/projects')}
-            className="mr-4 p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          <Button
+            isIconOnly
+            variant="light"
+            onPress={() => router.push('/dashboard/projects')}
+            className="mr-4"
           >
-            <FaArrowLeft className="text-gray-600" />
-          </button>
+            <FaArrowLeft className="text-default-600" />
+          </Button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">Request Approvals</h1>
-            <p className="text-gray-500 text-sm">Manage pending requests for your projects</p>
+            <h1 className="text-2xl font-bold text-default-800">Request Approvals</h1>
+            <p className="text-default-500 text-sm">Manage pending requests for your projects</p>
           </div>
         </div>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div 
-          className={`bg-white rounded-xl shadow-sm p-4 border-2 cursor-pointer transition-all ${
-            statusFilter === 'pending' ? 'border-yellow-400' : 'border-gray-100 hover:border-yellow-200'
+        <Card 
+          isPressable
+          shadow="sm"
+          className={`cursor-pointer transition-all ${
+            statusFilter === 'pending' ? 'ring-2 ring-warning' : ''
           }`}
-          onClick={() => setStatusFilter('pending')}
+          onPress={() => setStatusFilter('pending')}
         >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Pending</p>
-              <p className="text-2xl font-bold text-yellow-600">{stats.pending}</p>
+          <CardBody className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-default-500">Pending</p>
+                <p className="text-2xl font-bold text-warning">{stats.pending}</p>
+              </div>
+              <div className="p-3 bg-warning-100 rounded-lg">
+                <FaClock className="text-warning text-xl" />
+              </div>
             </div>
-            <div className="p-3 bg-yellow-100 rounded-lg">
-              <FaClock className="text-yellow-600 text-xl" />
-            </div>
-          </div>
-        </div>
-        <div 
-          className={`bg-white rounded-xl shadow-sm p-4 border-2 cursor-pointer transition-all ${
-            statusFilter === 'approved' ? 'border-green-400' : 'border-gray-100 hover:border-green-200'
+          </CardBody>
+        </Card>
+        <Card 
+          isPressable
+          shadow="sm"
+          className={`cursor-pointer transition-all ${
+            statusFilter === 'approved' ? 'ring-2 ring-success' : ''
           }`}
-          onClick={() => setStatusFilter('approved')}
+          onPress={() => setStatusFilter('approved')}
         >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Approved</p>
-              <p className="text-2xl font-bold text-green-600">{stats.approved}</p>
+          <CardBody className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-default-500">Approved</p>
+                <p className="text-2xl font-bold text-success">{stats.approved}</p>
+              </div>
+              <div className="p-3 bg-success-100 rounded-lg">
+                <FaCheckCircle className="text-success text-xl" />
+              </div>
             </div>
-            <div className="p-3 bg-green-100 rounded-lg">
-              <FaCheckCircle className="text-green-600 text-xl" />
-            </div>
-          </div>
-        </div>
-        <div 
-          className={`bg-white rounded-xl shadow-sm p-4 border-2 cursor-pointer transition-all ${
-            statusFilter === 'rejected' ? 'border-red-400' : 'border-gray-100 hover:border-red-200'
+          </CardBody>
+        </Card>
+        <Card 
+          isPressable
+          shadow="sm"
+          className={`cursor-pointer transition-all ${
+            statusFilter === 'rejected' ? 'ring-2 ring-danger' : ''
           }`}
-          onClick={() => setStatusFilter('rejected')}
+          onPress={() => setStatusFilter('rejected')}
         >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Rejected</p>
-              <p className="text-2xl font-bold text-red-600">{stats.rejected}</p>
+          <CardBody className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-default-500">Rejected</p>
+                <p className="text-2xl font-bold text-danger">{stats.rejected}</p>
+              </div>
+              <div className="p-3 bg-danger-100 rounded-lg">
+                <FaTimesCircle className="text-danger text-xl" />
+              </div>
             </div>
-            <div className="p-3 bg-red-100 rounded-lg">
-              <FaTimesCircle className="text-red-600 text-xl" />
-            </div>
-          </div>
-        </div>
+          </CardBody>
+        </Card>
       </div>
 
       {/* Type Filter Bar */}
-      <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
-        <div className="flex items-center gap-2 mb-3">
-          <FaFilter className="text-gray-400" />
-          <span className="text-sm font-medium text-gray-700">Filter by Type</span>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setTypeFilter('all')}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-              typeFilter === 'all' 
-                ? 'bg-gray-800 text-white' 
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-          >
-            All Types
-            <span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-white/20">
-              {stats.pending + stats.approved + stats.rejected}
-            </span>
-          </button>
-          {['task_completion', 'task_review', 'task_deletion', 'project_completion', 'member_removal'].map(type => {
-            const IconComponent = requestTypeIcons[type]
-            const count = typeStats[type] || 0
-            return (
-              <button
-                key={type}
-                onClick={() => setTypeFilter(type)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
-                  typeFilter === type 
-                    ? `${requestTypeColors[type]} border-2` 
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                {IconComponent && <IconComponent className="text-sm" />}
-                {requestTypeLabels[type]}
-                {count > 0 && (
-                  <span className={`px-2 py-0.5 rounded-full text-xs ${
-                    typeFilter === type ? 'bg-white/30' : 'bg-gray-200'
-                  }`}>
-                    {count}
-                  </span>
-                )}
-              </button>
-            )
-          })}
-        </div>
-      </div>
+      <Card shadow="sm" className="mb-6">
+        <CardBody className="p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <FaFilter className="text-default-400" />
+            <span className="text-sm font-medium text-default-700">Filter by Type</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant={typeFilter === 'all' ? 'solid' : 'flat'}
+              color={typeFilter === 'all' ? 'default' : 'default'}
+              onPress={() => setTypeFilter('all')}
+              className={typeFilter === 'all' ? 'bg-default-800 text-white' : ''}
+            >
+              All Types
+              <span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-white/20">
+                {stats.pending + stats.approved + stats.rejected}
+              </span>
+            </Button>
+            {['task_completion', 'task_review', 'task_deletion', 'project_completion', 'member_removal'].map(type => {
+              const IconComponent = requestTypeIcons[type]
+              const count = typeStats[type] || 0
+              return (
+                <Button
+                  key={type}
+                  size="sm"
+                  variant={typeFilter === type ? 'flat' : 'light'}
+                  color={typeFilter === type ? requestTypeChipColors[type] : 'default'}
+                  onPress={() => setTypeFilter(type)}
+                  startContent={IconComponent && <IconComponent className="text-sm" />}
+                >
+                  {requestTypeLabels[type]}
+                  {count > 0 && (
+                    <span className={`ml-1 px-2 py-0.5 rounded-full text-xs ${
+                      typeFilter === type ? 'bg-white/30' : 'bg-default-200'
+                    }`}>
+                      {count}
+                    </span>
+                  )}
+                </Button>
+              )
+            })}
+          </div>
+        </CardBody>
+      </Card>
 
       {/* Requests List */}
       {loading ? (
-        <div className="bg-white rounded-lg shadow-md p-8 text-center">
-          <Loader size="lg" className="mx-auto" />
-          <p className="mt-4 text-gray-600">Loading requests...</p>
-        </div>
+        <Card shadow="sm">
+          <CardBody className="p-8 text-center">
+            <Spinner size="lg" className="mx-auto" />
+            <p className="mt-4 text-default-600">Loading requests...</p>
+          </CardBody>
+        </Card>
       ) : requests.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-md p-8 text-center">
-          <FaCheckCircle className="text-6xl text-gray-300 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-700 mb-2">
-            {statusFilter === 'pending' ? 'No pending requests' : `No ${statusFilter} requests`}
-          </h3>
-          <p className="text-gray-500">
-            {statusFilter === 'pending' 
-              ? 'All caught up! No requests need your attention right now.'
-              : `You don't have any ${statusFilter} requests yet.`
-            }
-          </p>
-        </div>
+        <Card shadow="sm">
+          <CardBody className="p-8 text-center">
+            <FaCheckCircle className="text-6xl text-default-300 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-default-700 mb-2">
+              {statusFilter === 'pending' ? 'No pending requests' : `No ${statusFilter} requests`}
+            </h3>
+            <p className="text-default-500">
+              {statusFilter === 'pending' 
+                ? 'All caught up! No requests need your attention right now.'
+                : `You don't have any ${statusFilter} requests yet.`
+              }
+            </p>
+          </CardBody>
+        </Card>
       ) : (
         <div className="space-y-4">
           {requests.map((request) => (
-            <div 
+            <Card 
               key={request._id} 
-              className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow"
+              shadow="sm"
+              className="hover:shadow-md transition-shadow"
             >
-              <div className="p-5">
+              <CardBody className="p-5">
                 {/* Header */}
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${requestTypeColors[request.type]}`}>
+                    <Chip color={requestTypeChipColors[request.type]} variant="flat" size="sm">
                       {requestTypeLabels[request.type]}
-                    </span>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[request.status]}`}>
+                    </Chip>
+                    <Chip color={statusColors[request.status]} variant="flat" size="sm">
                       {request.status.charAt(0).toUpperCase() + request.status.slice(1)}
-                    </span>
+                    </Chip>
                   </div>
-                  <div className="flex items-center text-sm text-gray-500">
+                  <div className="flex items-center text-sm text-default-500">
                     <FaCalendarAlt className="mr-1" />
                     {formatDate(request.createdAt)}
                   </div>
@@ -428,18 +454,18 @@ export default function ApprovalsPage() {
 
                 {/* Project Info */}
                 <div className="flex items-center gap-2 mb-3">
-                  <FaProjectDiagram className="text-gray-400" />
-                  <span className="font-medium text-gray-700">{request.project?.name}</span>
+                  <FaProjectDiagram className="text-default-400" />
+                  <span className="font-medium text-default-700">{request.project?.name}</span>
                 </div>
 
                 {/* Request Details */}
-                <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                <div className="bg-default-50 rounded-lg p-4 mb-4">
                   {request.type === 'task_deletion' && request.relatedTask && (
                     <div className="flex items-start gap-3">
-                      <FaTasks className="text-gray-400 mt-1" />
+                      <FaTasks className="text-default-400 mt-1" />
                       <div>
-                        <p className="font-medium text-gray-800">{request.relatedTask.title || request.metadata?.taskTitle}</p>
-                        <p className="text-sm text-gray-500 mt-1">
+                        <p className="font-medium text-default-800">{request.relatedTask.title || request.metadata?.taskTitle}</p>
+                        <p className="text-sm text-default-500 mt-1">
                           Status: {request.relatedTask.status} • Priority: {request.relatedTask.priority || request.metadata?.taskPriority}
                         </p>
                       </div>
@@ -447,8 +473,8 @@ export default function ApprovalsPage() {
                   )}
                   
                   {request.reason && (
-                    <div className="mt-3 pt-3 border-t border-gray-200">
-                      <p className="text-sm text-gray-600">
+                    <div className="mt-3 pt-3 border-t border-default-200">
+                      <p className="text-sm text-default-600">
                         <span className="font-medium">Reason:</span> {request.reason}
                       </p>
                     </div>
@@ -472,63 +498,56 @@ export default function ApprovalsPage() {
                       )}
                     </div>
                     <div>
-                      <p className="font-medium text-gray-700">
+                      <p className="font-medium text-default-700">
                         {request.requestedBy?.firstName} {request.requestedBy?.lastName}
                       </p>
-                      <p className="text-xs text-gray-500">Requested by</p>
+                      <p className="text-xs text-default-500">Requested by</p>
                     </div>
                   </div>
 
                   {/* Action Buttons */}
                   {request.status === 'pending' && (
                     <div className="flex gap-2">
-                      <button
-                        onClick={() => handleApprove(request._id)}
-                        disabled={processingId === request._id}
-                        className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 flex items-center gap-2"
+                      <Button
+                        color="success"
+                        onPress={() => handleApprove(request._id)}
+                        isDisabled={processingId === request._id}
+                        isLoading={processingId === request._id}
+                        startContent={!processingId && <FaCheck />}
                       >
-                        {processingId === request._id ? (
-                          <Loader size="xs" />
-                        ) : (
-                          <FaCheck />
-                        )}
                         Approve
-                      </button>
-                      <button
-                        onClick={() => openRejectModal(request)}
-                        disabled={processingId === request._id}
-                        className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 flex items-center gap-2"
+                      </Button>
+                      <Button
+                        color="danger"
+                        onPress={() => openRejectModal(request)}
+                        isDisabled={processingId === request._id}
+                        startContent={<FaTimes />}
                       >
-                        {processingId === request._id ? (
-                          <Loader size="xs" />
-                        ) : (
-                          <FaTimes />
-                        )}
                         Reject
-                      </button>
+                      </Button>
                     </div>
                   )}
 
                   {/* Reviewed Info */}
                   {request.status !== 'pending' && request.reviewedBy && (
                     <div className="text-right">
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-default-600">
                         {request.status === 'approved' ? 'Approved' : 'Rejected'} by{' '}
                         <span className="font-medium">
                           {request.reviewedBy?.firstName} {request.reviewedBy?.lastName}
                         </span>
                       </p>
                       {request.reviewedAt && (
-                        <p className="text-xs text-gray-500">{formatDate(request.reviewedAt)}</p>
+                        <p className="text-xs text-default-500">{formatDate(request.reviewedAt)}</p>
                       )}
                       {request.reviewerComment && (
-                        <p className="text-sm text-gray-500 mt-1 italic">"{request.reviewerComment}"</p>
+                        <p className="text-sm text-default-500 mt-1 italic">"{request.reviewerComment}"</p>
                       )}
                     </div>
                   )}
                 </div>
-              </div>
-            </div>
+              </CardBody>
+            </Card>
           ))}
         </div>
       )}
@@ -537,22 +556,22 @@ export default function ApprovalsPage() {
       {showRejectModal && selectedRequest && (
       <Portal>
         <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl animate-modal-enter my-8">
-            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-              <h3 className="text-xl font-bold text-gray-900">Reject Task Review</h3>
+          <div className="bg-content1 rounded-2xl shadow-2xl w-full max-w-2xl animate-modal-enter my-8">
+            <div className="px-6 py-4 bg-default-50 border-b border-default-200">
+              <h3 className="text-xl font-bold text-default-800">Reject Task Review</h3>
               {selectedRequest.relatedTask?.title && (
-                <p className="text-sm text-gray-500 mt-1">Task: {selectedRequest.relatedTask.title}</p>
+                <p className="text-sm text-default-500 mt-1">Task: {selectedRequest.relatedTask.title}</p>
               )}
             </div>
             <div className="p-6 max-h-[70vh] overflow-y-auto">
               {loadingTask ? (
                 <div className="flex items-center justify-center py-8">
-                  <Loader size="md" />
+                  <Spinner size="md" />
                 </div>
               ) : (
                 <>
                   <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label className="block text-sm font-medium text-default-700 mb-2">
                       Rejection Reason
                     </label>
                     <textarea
@@ -560,7 +579,7 @@ export default function ApprovalsPage() {
                       onChange={(e) => setRejectComment(e.target.value)}
                       placeholder="Explain why this task is being rejected..."
                       rows={3}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+                      className="w-full px-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
                     />
                   </div>
 
@@ -568,7 +587,7 @@ export default function ApprovalsPage() {
                   {taskDetails?.subtasks && taskDetails.subtasks.length > 0 ? (
                     <div className="mb-4">
                       <div className="flex items-center justify-between mb-3">
-                        <label className="block text-sm font-medium text-gray-700">
+                        <label className="block text-sm font-medium text-default-700">
                           Select subtasks to mark as incomplete
                         </label>
                         <button
@@ -585,12 +604,12 @@ export default function ApprovalsPage() {
                           {subtasksToUnmark.length === taskDetails.subtasks.length ? 'Deselect All' : 'Select All'}
                         </button>
                       </div>
-                      <div className="space-y-3 max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-3 bg-gray-50">
+                      <div className="space-y-3 max-h-60 overflow-y-auto border border-default-200 rounded-lg p-3 bg-default-50">
                         {taskDetails.subtasks.map((subtask) => {
                           const isSelected = subtasksToUnmark.includes(subtask._id)
                           return (
                             <div key={subtask._id} className={`p-3 rounded-lg border transition-all ${
-                              isSelected ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white'
+                              isSelected ? 'border-danger-300 bg-danger-50' : 'border-default-200 bg-content1'
                             }`}>
                               <div className="flex items-start gap-3">
                                 <input
@@ -610,16 +629,16 @@ export default function ApprovalsPage() {
                                       })
                                     }
                                   }}
-                                  className="w-4 h-4 mt-1 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                                  className="w-4 h-4 mt-1 text-danger border-default-300 rounded focus:ring-danger"
                                 />
                                 <div className="flex-1">
-                                  <label htmlFor={`subtask-${subtask._id}`} className="text-sm font-medium text-gray-800 cursor-pointer">
+                                  <label htmlFor={`subtask-${subtask._id}`} className="text-sm font-medium text-default-800 cursor-pointer">
                                     {subtask.title}
                                   </label>
                                   {subtask.completed && (
-                                    <span className="ml-2 text-xs text-green-600 bg-green-100 px-2 py-0.5 rounded">
+                                    <Chip size="sm" color="success" variant="flat" className="ml-2">
                                       Completed
-                                    </span>
+                                    </Chip>
                                   )}
                                   {isSelected && (
                                     <div className="mt-2">
@@ -631,7 +650,7 @@ export default function ApprovalsPage() {
                                           ...prev,
                                           [subtask._id]: e.target.value
                                         }))}
-                                        className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                                        className="w-full px-3 py-1.5 text-sm border border-default-300 rounded focus:ring-2 focus:ring-danger focus:border-transparent"
                                       />
                                     </div>
                                   )}
@@ -642,7 +661,7 @@ export default function ApprovalsPage() {
                         })}
                       </div>
                       {subtasksToUnmark.length > 0 && (
-                        <p className="text-sm text-red-600 mt-2">
+                        <p className="text-sm text-danger mt-2">
                           {subtasksToUnmark.length} subtask(s) will be marked as incomplete
                         </p>
                       )}
@@ -650,27 +669,24 @@ export default function ApprovalsPage() {
                   ) : (
                     /* For tasks WITHOUT subtasks - show status selection */
                     <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                      <label className="block text-sm font-medium text-default-700 mb-2">
                         Set task status to
                       </label>
                       <div className="grid grid-cols-3 gap-2">
                         {[
-                          { value: 'todo', label: 'To Do', color: 'bg-gray-100 border-gray-300 text-gray-700' },
-                          { value: 'in-progress', label: 'In Progress', color: 'bg-blue-100 border-blue-300 text-blue-700' },
-                          { value: 'on-hold', label: 'On Hold', color: 'bg-yellow-100 border-yellow-300 text-yellow-700' }
+                          { value: 'todo', label: 'To Do', color: 'default' },
+                          { value: 'in-progress', label: 'In Progress', color: 'primary' },
+                          { value: 'on-hold', label: 'On Hold', color: 'warning' }
                         ].map(status => (
-                          <button
+                          <Button
                             key={status.value}
-                            type="button"
-                            onClick={() => setNewStatus(status.value)}
-                            className={`px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all ${
-                              newStatus === status.value 
-                                ? `${status.color} ring-2 ring-offset-1 ring-primary-500` 
-                                : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
-                            }`}
+                            variant={newStatus === status.value ? 'flat' : 'bordered'}
+                            color={newStatus === status.value ? status.color : 'default'}
+                            onPress={() => setNewStatus(status.value)}
+                            className={newStatus === status.value ? 'ring-2 ring-offset-1 ring-primary' : ''}
                           >
                             {status.label}
-                          </button>
+                          </Button>
                         ))}
                       </div>
                     </div>
@@ -678,9 +694,10 @@ export default function ApprovalsPage() {
                 </>
               )}
 
-              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200">
-                <button
-                  onClick={() => {
+              <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-default-200">
+                <Button
+                  variant="bordered"
+                  onPress={() => {
                     setShowRejectModal(false)
                     setSelectedRequest(null)
                     setRejectComment('')
@@ -689,25 +706,18 @@ export default function ApprovalsPage() {
                     setNewStatus('in-progress')
                     setTaskDetails(null)
                   }}
-                  className="btn-secondary"
-                  disabled={processingId}
+                  isDisabled={processingId}
                 >
                   Cancel
-                </button>
-                <button
-                  onClick={handleReject}
-                  disabled={processingId || loadingTask}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
+                </Button>
+                <Button
+                  color="danger"
+                  onPress={handleReject}
+                  isDisabled={processingId || loadingTask}
+                  isLoading={processingId}
                 >
-                  {processingId ? (
-                    <>
-                      <Loader size="xs" />
-                      <span className="ml-1">Rejecting...</span>
-                    </>
-                  ) : (
-                    'Reject Task'
-                  )}
-                </button>
+                  {processingId ? 'Rejecting...' : 'Reject Task'}
+                </Button>
               </div>
             </div>
           </div>

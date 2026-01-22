@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { FaLaptop, FaBarcode } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
 import { getEmployeeId } from '@/utils/userHelper'
+import { Card, CardBody, Chip, Skeleton, ScrollShadow } from '@heroui/react'
 
 export default function MyAssetsWidget({ user }) {
   const router = useRouter()
@@ -30,13 +31,27 @@ export default function MyAssetsWidget({ user }) {
     }
   }
 
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'active': return 'success'
+      case 'maintenance': return 'warning'
+      default: return 'default'
+    }
+  }
+
   if (loading) {
     return (
-      <div className="p-4 sm:p-6 animate-pulse flex-1 flex flex-col h-full">
-        <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
+      <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+        <Skeleton className="h-6 w-1/3 rounded-lg mb-4" />
         <div className="space-y-3">
           {[1, 2, 3].map(i => (
-            <div key={i} className="h-12 bg-gray-200 rounded"></div>
+            <div key={i} className="flex items-center gap-3">
+              <Skeleton className="w-8 h-8 rounded-lg" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-3/4 rounded-lg" />
+                <Skeleton className="h-3 w-1/2 rounded-lg" />
+              </div>
+            </div>
           ))}
         </div>
       </div>
@@ -46,39 +61,37 @@ export default function MyAssetsWidget({ user }) {
   return (
     <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-base sm:text-lg font-bold text-gray-800">My Assets</h3>
-        <span className="text-xs font-medium bg-primary-100 text-primary-800 px-2 py-1 rounded-full">
+        <h3 className="text-base sm:text-lg font-bold text-default-900">My Assets</h3>
+        <Chip size="sm" color="primary" variant="flat">
           {assets.length}
-        </span>
+        </Chip>
       </div>
-      <div className="space-y-2 max-h-[200px] overflow-y-auto">
+      <ScrollShadow className="space-y-2 max-h-[200px]">
         {assets.length === 0 ? (
-          <div className="flex flex-col items-center justify-center text-center py-4 text-gray-500">
-            <img
-              src="/assets/Assets.png"
-              alt="No assets"
-              className="w-28 h-28 object-contain mb-2"
-            />
-            <p className="text-sm">No assets assigned</p>
+          <div className="flex flex-col items-center justify-center text-center py-6">
+            <div className="w-14 h-14 rounded-full bg-primary-100 flex items-center justify-center mb-3">
+              <FaLaptop className="w-7 h-7 text-primary-400" />
+            </div>
+            <p className="text-sm text-default-500">No assets assigned</p>
           </div>
         ) : (
           assets.map(asset => (
-            <div key={asset._id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-gray-800 truncate">{asset.name}</p>
-                <p className="text-xs text-gray-500">{asset.assetId || asset.uin}</p>
-              </div>
-              <span className={`text-xs px-2 py-1 rounded-full capitalize ${
-                asset.status === 'active' ? 'bg-green-100 text-green-700' :
-                asset.status === 'maintenance' ? 'bg-yellow-100 text-yellow-700' :
-                'bg-gray-100 text-gray-700'
-              }`}>
-                {asset.status}
-              </span>
-            </div>
+            <Card key={asset._id} className="bg-default-50 border border-default-100">
+              <CardBody className="p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-default-900 truncate">{asset.name}</p>
+                    <p className="text-xs text-default-500">{asset.assetId || asset.uin}</p>
+                  </div>
+                  <Chip size="sm" color={getStatusColor(asset.status)} variant="flat" className="capitalize">
+                    {asset.status}
+                  </Chip>
+                </div>
+              </CardBody>
+            </Card>
           ))
         )}
-      </div>
+      </ScrollShadow>
     </div>
   )
 }

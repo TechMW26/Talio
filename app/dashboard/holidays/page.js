@@ -9,7 +9,7 @@ import {
   FaList, FaTh, FaChevronLeft, FaChevronRight 
 } from 'react-icons/fa'
 import Loader from '@/components/ui/Loader'
-import ModalPortal from '@/components/ui/ModalPortal'
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Select, SelectItem, Input, Textarea, Checkbox } from '@heroui/react'
 import { 
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, 
   eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, 
@@ -420,22 +420,24 @@ export default function HolidaysPage() {
             <span className="sm:hidden">AI</span>
           </button>
 
-          <button
-            onClick={handleSync}
-            disabled={syncing}
-            className="btn-secondary flex items-center space-x-2 text-sm"
+          <Button
+            onPress={handleSync}
+            isDisabled={syncing}
+            variant="flat"
+            startContent={<FaSync className={syncing ? 'animate-spin' : ''} />}
+            size="sm"
           >
-            <FaSync className={syncing ? 'animate-spin' : ''} />
-            <span>Sync</span>
-          </button>
+            Sync
+          </Button>
           
-          <button
-            onClick={() => setShowModal(true)}
-            className="btn-primary flex items-center space-x-2 text-sm"
+          <Button
+            onPress={() => setShowModal(true)}
+            color="primary"
+            startContent={<FaPlus />}
+            size="sm"
           >
-            <FaPlus />
-            <span>Add Holiday</span>
-          </button>
+            Add Holiday
+          </Button>
         </div>
       </div>
 
@@ -557,195 +559,161 @@ export default function HolidaysPage() {
       )}
 
       {/* Add/Edit Modal */}
-      <ModalPortal isOpen={showModal}>
-        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && handleCloseModal()}>
-          <div className="modal-backdrop" />
-          <div className="modal-container modal-md">
-            <div className="modal-header">
-              <h2 className="modal-title">
+      <Modal isOpen={showModal} onOpenChange={(open) => !open && handleCloseModal()} size="lg">
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader className="flex flex-col gap-1">
                 {editingHoliday ? 'Edit Holiday' : 'Add Holiday'}
-              </h2>
-              <button onClick={handleCloseModal} className="modal-close-btn">×</button>
-            </div>
-            <form onSubmit={handleSubmit}>
-              <div className="modal-body space-y-4">
-                <div>
-                  <label className="modal-label">Holiday Name *</label>
-                  <input
+              </ModalHeader>
+              <form onSubmit={handleSubmit}>
+                <ModalBody className="space-y-4">
+                  <Input
                     type="text"
-                    required
+                    label="Holiday Name"
+                    isRequired
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="modal-input"
                     placeholder="e.g., New Year's Day"
                   />
-                </div>
 
-                <div>
-                  <label className="modal-label">Date *</label>
-                  <input
+                  <Input
                     type="date"
-                    required
+                    label="Date"
+                    isRequired
                     value={formData.date}
                     onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                    className="modal-input"
                   />
-                </div>
 
-                <div>
-                  <label className="modal-label">Type *</label>
-                  <select
-                    required
-                    value={formData.type}
-                    onChange={(e) => setFormData({ ...formData, type: e.target.value })}
-                    className="modal-select"
+                  <Select
+                    label="Type"
+                    isRequired
+                    selectedKeys={formData.type ? [formData.type] : ['public']}
+                    onSelectionChange={(keys) => setFormData({ ...formData, type: Array.from(keys)[0] || 'public' })}
                   >
-                    <option value="public">Public Holiday</option>
-                    <option value="optional">Optional Holiday</option>
-                    <option value="restricted">Restricted Holiday</option>
-                  </select>
-                </div>
+                    <SelectItem key="public">Public Holiday</SelectItem>
+                    <SelectItem key="optional">Optional Holiday</SelectItem>
+                    <SelectItem key="restricted">Restricted Holiday</SelectItem>
+                  </Select>
 
-                <div>
-                  <label className="modal-label">Applicable To</label>
-                  <select
-                    value={formData.applicableTo}
-                    onChange={(e) => setFormData({ ...formData, applicableTo: e.target.value })}
-                    className="modal-select"
+                  <Select
+                    label="Applicable To"
+                    selectedKeys={formData.applicableTo ? [formData.applicableTo] : ['all']}
+                    onSelectionChange={(keys) => setFormData({ ...formData, applicableTo: Array.from(keys)[0] || 'all' })}
                   >
-                    <option value="all">All Locations</option>
-                    <option value="specific-locations">Specific Locations</option>
-                  </select>
-                </div>
+                    <SelectItem key="all">All Locations</SelectItem>
+                    <SelectItem key="specific-locations">Specific Locations</SelectItem>
+                  </Select>
 
                 {formData.applicableTo === 'specific-locations' && (
                   <div>
-                    <label className="modal-label">Select Locations (Countries)</label>
-                    <div className="border border-gray-300 rounded-lg p-2 max-h-40 overflow-y-auto">
+                    <label className="text-sm font-medium text-default-700 mb-2 block">Select Locations (Countries)</label>
+                    <div className="border border-default-200 rounded-lg p-2 max-h-40 overflow-y-auto">
                       {countries.map((country) => (
-                        <label key={country} className="flex items-center space-x-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={formData.locations.includes(country)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setFormData({
-                                  ...formData,
-                                  locations: [...formData.locations, country]
-                                })
-                              } else {
-                                setFormData({
-                                  ...formData,
-                                  locations: formData.locations.filter(l => l !== country)
-                                })
-                              }
-                            }}
-                            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                          />
-                          <span className="text-sm text-gray-700">{country}</span>
-                        </label>
+                        <Checkbox
+                          key={country}
+                          isSelected={formData.locations.includes(country)}
+                          onValueChange={(isSelected) => {
+                            if (isSelected) {
+                              setFormData({
+                                ...formData,
+                                locations: [...formData.locations, country]
+                              })
+                            } else {
+                              setFormData({
+                                ...formData,
+                                locations: formData.locations.filter(l => l !== country)
+                              })
+                            }
+                          }}
+                          className="w-full p-2"
+                        >
+                          {country}
+                        </Checkbox>
                       ))}
                     </div>
                   </div>
                 )}
 
-                <div>
-                  <label className="modal-label">Description</label>
-                  <textarea
-                    rows="3"
+                  <Textarea
+                    label="Description"
+                    minRows={3}
                     value={formData.description}
                     onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="modal-textarea"
                     placeholder="Holiday description"
                   />
-                </div>
-              </div>
+                </ModalBody>
 
-              <div className="modal-footer">
-                <button type="button" onClick={handleCloseModal} className="modal-btn modal-btn-secondary">
-                  Cancel
-                </button>
-                <button type="submit" className="modal-btn modal-btn-primary">
-                  {editingHoliday ? 'Update' : 'Create'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </ModalPortal>
+                <ModalFooter>
+                  <Button variant="light" onPress={handleCloseModal}>
+                    Cancel
+                  </Button>
+                  <Button color="primary" type="submit">
+                    {editingHoliday ? 'Update' : 'Create'}
+                  </Button>
+                </ModalFooter>
+              </form>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
 
       {/* AI Fetch Modal */}
-      <ModalPortal isOpen={showAiModal}>
-        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setShowAiModal(false)}>
-          <div className="modal-backdrop" />
-          <div className="modal-container modal-sm">
-            <div className="modal-header">
-              <h2 className="modal-title flex items-center gap-2">
+      <Modal isOpen={showAiModal} onOpenChange={setShowAiModal} size="md">
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader className="flex items-center gap-2">
+                <FaRobot className="text-purple-600" />
                 Fetch Holidays with AI
-              </h2>
-              <button onClick={() => setShowAiModal(false)} className="modal-close-btn">×</button>
-            </div>
-            <form onSubmit={handleAiFetch}>
-              <div className="modal-body space-y-4">
-                <p className="text-sm text-gray-600">
-                  Automatically fetch and populate public holidays for a specific country using MIRA AI.
-                </p>
-                
-                <div>
-                  <label className="modal-label">Country *</label>
-                  <select
-                    required
-                    value={aiForm.country}
-                    onChange={(e) => setAiForm({ ...aiForm, country: e.target.value })}
-                    className="modal-select"
+              </ModalHeader>
+              <form onSubmit={handleAiFetch}>
+                <ModalBody className="space-y-4">
+                  <p className="text-sm text-default-500">
+                    Automatically fetch and populate public holidays for a specific country using MIRA AI.
+                  </p>
+                  
+                  <Select
+                    label="Country"
+                    isRequired
+                    selectedKeys={aiForm.country ? [aiForm.country] : []}
+                    onSelectionChange={(keys) => setAiForm({ ...aiForm, country: Array.from(keys)[0] || '' })}
+                    placeholder="Select Country"
                   >
-                    <option value="">Select Country</option>
                     {countries.map(c => (
-                      <option key={c} value={c}>{c}</option>
+                      <SelectItem key={c}>{c}</SelectItem>
                     ))}
-                  </select>
-                </div>
+                  </Select>
 
-                <div>
-                  <label className="modal-label">Year *</label>
-                  <input
+                  <Input
                     type="number"
-                    required
+                    label="Year"
+                    isRequired
                     min="2020"
                     max="2030"
-                    value={aiForm.year}
+                    value={String(aiForm.year)}
                     onChange={(e) => setAiForm({ ...aiForm, year: e.target.value })}
-                    className="modal-input"
                   />
-                </div>
-              </div>
+                </ModalBody>
 
-              <div className="modal-footer">
-                <button type="button" onClick={() => setShowAiModal(false)} className="modal-btn modal-btn-secondary">
-                  Cancel
-                </button>
-                <button 
-                  type="submit" 
-                  disabled={fetchingAi}
-                  className="modal-btn bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2"
-                >
-                  {fetchingAi ? (
-                    <>
-                      <Loader size="xs" />
-                      Fetching...
-                    </>
-                  ) : (
-                    <>
-                      <FaRobot />
-                      Fetch Holidays
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </ModalPortal>
+                <ModalFooter>
+                  <Button variant="light" onPress={onClose}>
+                    Cancel
+                  </Button>
+                  <Button 
+                    type="submit" 
+                    isLoading={fetchingAi}
+                    color="secondary"
+                    startContent={!fetchingAi && <FaRobot />}
+                  >
+                    {fetchingAi ? 'Fetching...' : 'Fetch Holidays'}
+                  </Button>
+                </ModalFooter>
+              </form>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
     </div>
   )
 }

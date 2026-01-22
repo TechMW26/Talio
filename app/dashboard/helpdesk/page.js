@@ -6,7 +6,7 @@ import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaTicketAlt, FaCheckCircle, FaClock, FaExclamationCircle, FaTimes, FaCog } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
-import ModalPortal from '@/components/ui/ModalPortal'
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Select, SelectItem, Input, Textarea } from '@heroui/react'
 import Loader from '@/components/ui/Loader'
 
 export default function HelpdeskPage() {
@@ -321,104 +321,75 @@ export default function HelpdeskPage() {
       </div>
 
       {/* Create Ticket Modal */}
-      <ModalPortal isOpen={showModal}>
-        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setShowModal(false)}>
-          <div className="modal-backdrop" />
-          <div className="modal-container modal-md">
-            <div className="modal-header">
-              <h2 className="modal-title">Create Ticket</h2>
-              <button onClick={() => setShowModal(false)} className="modal-close-btn">
-                <FaTimes className="w-5 h-5" />
-              </button>
-            </div>
-            <form onSubmit={handleSubmit}>
-              <div className="space-y-4 modal-body">
-                <div>
-                  <label className="modal-label">
-                    Subject
-                  </label>
-                  <input
-                    type="text"
-                    name="subject"
-                    value={formData.subject}
-                    onChange={handleInputChange}
-                    required
-                    className="modal-input"
-                    placeholder="Brief description of the issue"
-                  />
-                </div>
+      <Modal isOpen={showModal} onOpenChange={setShowModal} size="lg">
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader className="flex flex-col gap-1">Create Ticket</ModalHeader>
+              <ModalBody>
+                <form id="ticket-form" onSubmit={handleSubmit}>
+                  <div className="space-y-4">
+                    <Input
+                      type="text"
+                      label="Subject"
+                      name="subject"
+                      value={formData.subject}
+                      onChange={handleInputChange}
+                      isRequired
+                      placeholder="Brief description of the issue"
+                    />
 
-                <div>
-                  <label className="modal-label">
-                    Category
-                  </label>
-                  <select
-                    name="category"
-                    value={formData.category}
-                    onChange={handleInputChange}
-                    required
-                    className="modal-select"
-                  >
-                    <option value="">Select Category</option>
-                    <option value="it-support">IT Support</option>
-                    <option value="hr-query">HR Query</option>
-                    <option value="payroll">Payroll</option>
-                    <option value="leave">Leave</option>
-                    <option value="attendance">Attendance</option>
-                    <option value="facilities">Facilities</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
+                    <Select
+                      label="Category"
+                      selectedKeys={formData.category ? [formData.category] : []}
+                      onSelectionChange={(keys) => setFormData(prev => ({ ...prev, category: Array.from(keys)[0] || '' }))}
+                      isRequired
+                      placeholder="Select Category"
+                    >
+                      <SelectItem key="it-support">IT Support</SelectItem>
+                      <SelectItem key="hr-query">HR Query</SelectItem>
+                      <SelectItem key="payroll">Payroll</SelectItem>
+                      <SelectItem key="leave">Leave</SelectItem>
+                      <SelectItem key="attendance">Attendance</SelectItem>
+                      <SelectItem key="facilities">Facilities</SelectItem>
+                      <SelectItem key="other">Other</SelectItem>
+                    </Select>
 
-                <div>
-                  <label className="modal-label">
-                    Priority
-                  </label>
-                  <select
-                    name="priority"
-                    value={formData.priority}
-                    onChange={handleInputChange}
-                    className="modal-select"
-                  >
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                    <option value="urgent">Urgent</option>
-                  </select>
-                </div>
+                    <Select
+                      label="Priority"
+                      selectedKeys={[formData.priority]}
+                      onSelectionChange={(keys) => setFormData(prev => ({ ...prev, priority: Array.from(keys)[0] || 'medium' }))}
+                    >
+                      <SelectItem key="low">Low</SelectItem>
+                      <SelectItem key="medium">Medium</SelectItem>
+                      <SelectItem key="high">High</SelectItem>
+                      <SelectItem key="urgent">Urgent</SelectItem>
+                    </Select>
 
-                <div>
-                  <label className="modal-label">
-                    Description
-                  </label>
-                  <textarea
-                    name="description"
-                    value={formData.description}
-                    onChange={handleInputChange}
-                    required
-                    rows="4"
-                    className="modal-textarea"
-                    placeholder="Detailed description of the issue"
-                  />
-                </div>
-              </div>
-
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="modal-btn modal-btn-secondary"
-                >
+                    <Textarea
+                      label="Description"
+                      name="description"
+                      value={formData.description}
+                      onChange={handleInputChange}
+                      isRequired
+                      minRows={4}
+                      placeholder="Detailed description of the issue"
+                    />
+                  </div>
+                </form>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose}>
                   Cancel
-                </button>
-                <button type="submit" className="modal-btn modal-btn-primary">
+                </Button>
+                <Button color="primary" type="submit" form="ticket-form">
                   Create Ticket
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </ModalPortal>
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
     </div>
   )
 }

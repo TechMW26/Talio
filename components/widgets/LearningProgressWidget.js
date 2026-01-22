@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { FaGraduationCap, FaCheckCircle, FaSpinner, FaPlayCircle } from 'react-icons/fa'
+import { Card, CardBody, Button, Chip, Progress, Skeleton, ScrollShadow } from '@heroui/react'
 
 export default function LearningProgressWidget({ limit = 4 }) {
     const [courses, setCourses] = useState([])
@@ -58,34 +59,34 @@ export default function LearningProgressWidget({ limit = 4 }) {
         switch (status) {
             case 'Completed':
                 return (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">
-                        <FaCheckCircle className="w-3 h-3" /> Completed
-                    </span>
+                    <Chip size="sm" color="success" variant="flat" startContent={<FaCheckCircle className="w-3 h-3" />}>
+                        Completed
+                    </Chip>
                 )
             case 'In Progress':
                 return (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-700">
-                        <FaSpinner className="w-3 h-3" /> In Progress
-                    </span>
+                    <Chip size="sm" color="primary" variant="flat" startContent={<FaSpinner className="w-3 h-3" />}>
+                        In Progress
+                    </Chip>
                 )
             default:
                 return (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-700">
-                        <FaPlayCircle className="w-3 h-3" /> Not Started
-                    </span>
+                    <Chip size="sm" color="default" variant="flat" startContent={<FaPlayCircle className="w-3 h-3" />}>
+                        Not Started
+                    </Chip>
                 )
         }
     }
 
     if (loading) {
         return (
-            <div className="p-4 sm:p-6 animate-pulse flex-1 flex flex-col h-full">
-                <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
+            <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+                <Skeleton className="h-6 w-1/3 rounded-lg mb-4" />
                 <div className="space-y-3">
                     {[1, 2, 3].map(i => (
                         <div key={i} className="space-y-2">
-                            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                            <div className="h-2 bg-gray-200 rounded"></div>
+                            <Skeleton className="h-4 w-3/4 rounded-lg" />
+                            <Skeleton className="h-2 w-full rounded-lg" />
                         </div>
                     ))}
                 </div>
@@ -96,36 +97,39 @@ export default function LearningProgressWidget({ limit = 4 }) {
     return (
         <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
             <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base sm:text-lg font-bold text-gray-800">Learning Progress</h3>
-                <a
+                <h3 className="text-base sm:text-lg font-bold text-default-900">Learning Progress</h3>
+                <Button
+                    variant="light"
+                    color="primary"
+                    size="sm"
+                    as="a"
                     href="/dashboard/learning"
-                    className="text-primary-600 hover:text-primary-800 text-sm font-medium"
                 >
                     View All
-                </a>
+                </Button>
             </div>
             
-            <div className="space-y-3 max-h-48 overflow-y-auto">
+            <ScrollShadow className="space-y-3 max-h-48">
             {courses.map((course, index) => (
-                <div key={index} className="p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center justify-start mb-2">
-                        <h4 className="text-sm font-medium text-gray-800 truncate pr-2 flex-1">
-                            {course.course || course.title}
-                        </h4>
-                        {getStatusBadge(course.status)}
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                            className={`h-2 rounded-full transition-all duration-300 ${course.progress === 100 ? 'bg-green-600' :
-                                    course.progress > 0 ? 'bg-primary-600' : 'bg-gray-300'
-                                }`}
-                            style={{ width: `${course.progress}%` }}
-                        ></div>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">{course.progress}% complete</p>
-                </div>
+                <Card key={index} className="bg-default-50 border border-default-100">
+                    <CardBody className="p-3">
+                        <div className="flex items-center justify-start mb-2">
+                            <h4 className="text-sm font-semibold text-default-900 truncate pr-2 flex-1">
+                                {course.course || course.title}
+                            </h4>
+                            {getStatusBadge(course.status)}
+                        </div>
+                        <Progress
+                            size="sm"
+                            value={course.progress}
+                            color={course.progress === 100 ? 'success' : course.progress > 0 ? 'primary' : 'default'}
+                            className="mb-1"
+                        />
+                        <p className="text-xs text-default-500">{course.progress}% complete</p>
+                    </CardBody>
+                </Card>
             ))}
-            </div>
+            </ScrollShadow>
         </div>
     )
 }

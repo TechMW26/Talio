@@ -9,12 +9,50 @@ import {
   FaCheckCircle, FaClock, FaExclamationTriangle, FaUsers,
   FaFileInvoiceDollar, FaChartLine, FaCalendarAlt, FaFileExcel,
   FaEnvelope, FaCheckSquare, FaSquare, FaCog, FaTrash, FaEdit, FaTimes,
-  FaUniversity, FaFileDownload
+  FaUniversity, FaFileDownload, FaSync
 } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
-import ModalPortal from '@/components/ui/ModalPortal'
-import Loader from '@/components/ui/Loader'
 import * as XLSX from 'xlsx'
+
+// Hero UI Components
+import {
+  HRMSCard,
+  HRMSCardHeader,
+  HRMSCardBody,
+  PrimaryButton,
+  SecondaryButton,
+  DangerButton,
+  SuccessButton,
+  GhostButton,
+  IconButton,
+  HRMSSelect,
+  HRMSSelectItem,
+  HRMSInput,
+  HRMSCheckbox,
+  HRMSModal,
+  HRMSModalContent,
+  HRMSModalHeader,
+  HRMSModalBody,
+  HRMSModalFooter,
+  useDisclosure,
+  StatusBadge,
+  KPICard,
+  PageLoader,
+  EmptyState,
+  Chip,
+  Table,
+  TableHeader,
+  TableBody,
+  TableColumn,
+  TableRow,
+  TableCell,
+  Checkbox,
+  Button,
+  Select,
+  SelectItem,
+  Input,
+  Divider,
+} from '@/components/ui/heroui'
 
 const ADMIN_ROLES = ['admin', 'hr', 'super_admin']
 
@@ -30,12 +68,14 @@ export default function PayrollPage() {
   const [selectedPayrolls, setSelectedPayrolls] = useState([])
   const [bulkProcessing, setBulkProcessing] = useState(false)
   const [sendEmailsOnProcess, setSendEmailsOnProcess] = useState(true)
-  const [showEditModal, setShowEditModal] = useState(false)
   const [editingPayroll, setEditingPayroll] = useState(null)
   const [editFormData, setEditFormData] = useState({})
   const [deleting, setDeleting] = useState(false)
-  const [showBankSheetModal, setShowBankSheetModal] = useState(false)
   const [selectedBank, setSelectedBank] = useState('')
+
+  // Hero UI Modal disclosures
+  const editModal = useDisclosure()
+  const bankSheetModal = useDisclosure()
 
   // Real-time updates
   const { socket, isConnected, subscribe, onPayrollUpdate } = useSocket()
@@ -176,20 +216,25 @@ export default function PayrollPage() {
   }
 
   const getStatusBadge = (status) => {
-    const statusConfig = {
-      'draft': { bg: 'bg-gray-100', text: 'text-gray-800', icon: FaClock, label: 'Draft' },
-      'processed': { bg: 'bg-blue-100', text: 'text-blue-800', icon: FaCheckCircle, label: 'Processed' },
-      'paid': { bg: 'bg-green-100', text: 'text-green-800', icon: FaCheckCircle, label: 'Paid' },
-      'on-hold': { bg: 'bg-yellow-100', text: 'text-yellow-800', icon: FaExclamationTriangle, label: 'On Hold' },
-      'pending': { bg: 'bg-yellow-100', text: 'text-yellow-800', icon: FaClock, label: 'Pending' },
+    const statusMap = {
+      'draft': 'default',
+      'processed': 'primary',
+      'paid': 'success',
+      'on-hold': 'warning',
+      'pending': 'warning',
     }
-    const config = statusConfig[status] || statusConfig['draft']
-    const Icon = config.icon
+    const labelMap = {
+      'draft': 'Draft',
+      'processed': 'Processed',
+      'paid': 'Paid',
+      'on-hold': 'On Hold',
+      'pending': 'Pending',
+    }
     return (
-      <span className={`px-2 py-1 inline-flex items-center text-xs leading-5 font-semibold rounded-full ${config.bg} ${config.text}`}>
-        <Icon className="w-3 h-3 mr-1" />
-        {config.label}
-      </span>
+      <StatusBadge 
+        status={statusMap[status] || 'default'} 
+        label={labelMap[status] || 'Unknown'} 
+      />
     )
   }
 
@@ -493,7 +538,7 @@ export default function PayrollPage() {
     const fileName = `BankSheet_${bankFormat?.format || 'GENERIC'}_${getMonthName(selectedMonth)}_${selectedYear}.xlsx`
     XLSX.writeFile(wb, fileName)
     toast.success(`Bank sheet downloaded for ${bankFormat?.name || 'Generic'}!`)
-    setShowBankSheetModal(false)
+    bankSheetModal.onClose()
     setSelectedBank('')
   }
 
@@ -590,12 +635,12 @@ export default function PayrollPage() {
       absentDays: payroll.absentDays || 0,
       leaveDays: payroll.leaveDays || 0,
     })
-    setShowEditModal(true)
+    editModal.onOpen()
   }
 
   // Close edit modal
   const closeEditModal = () => {
-    setShowEditModal(false)
+    editModal.onClose()
     setEditingPayroll(null)
     setEditFormData({})
   }
@@ -683,757 +728,654 @@ export default function PayrollPage() {
   }))
 
   return (
-    <div className="p-4 sm:p-6">
+    <div className="p-4 sm:p-6 space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4 sm:mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
             {isAdmin ? 'Process Payroll' : 'My Payroll'}
           </h1>
-          <p className="text-sm sm:text-base text-gray-600 mt-1">
+          <p className="text-sm sm:text-base text-default-500 mt-1">
             {isAdmin 
               ? 'Manage and process employee payrolls' 
               : 'View your salary slips and payment history'}
           </p>
         </div>
         {isAdmin && (
-          <button
-            onClick={() => router.push('/dashboard/payroll/generate')}
-            className="btn-primary flex items-center justify-center space-x-2 w-full sm:w-auto"
+          <PrimaryButton
+            onPress={() => router.push('/dashboard/payroll/generate')}
+            startContent={<FaPlus />}
+            className="w-full sm:w-auto"
           >
-            <FaPlus />
-            <span>Generate Payroll</span>
-          </button>
+            Generate Payroll
+          </PrimaryButton>
         )}
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg shadow-md p-3 sm:p-4 mb-4 sm:mb-6">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-          <div className="flex items-center gap-2 flex-wrap">
-            <FaCalendarAlt className="text-gray-400 flex-shrink-0" />
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-              className="border border-gray-300 rounded-md px-2 sm:px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 flex-1 min-w-[100px]"
-            >
-              {months.map(m => (
-                <option key={m.value} value={m.value}>{m.label}</option>
-              ))}
-            </select>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-              className="border border-gray-300 rounded-md px-2 sm:px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 flex-1 min-w-[100px]"
-            >
-              {years.map(y => (
-                <option key={y.value} value={y.value}>{y.label}</option>
-              ))}
-            </select>
-          </div>
-
-          {isAdmin && (
-            <div className="flex items-center gap-2">
-              <FaFilter className="text-gray-400 flex-shrink-0" />
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="border border-gray-300 rounded-md px-2 sm:px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 w-full sm:w-auto"
+      <HRMSCard>
+        <HRMSCardBody className="p-3 sm:p-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+            <div className="flex items-center gap-2 flex-wrap flex-1">
+              <FaCalendarAlt className="text-default-400 flex-shrink-0" />
+              <Select
+                selectedKeys={[String(selectedMonth)]}
+                onSelectionChange={(keys) => setSelectedMonth(parseInt(Array.from(keys)[0]))}
+                size="sm"
+                className="min-w-[120px] max-w-[150px]"
+                aria-label="Select month"
               >
-                <option value="all">All Status</option>
-                <option value="draft">Draft</option>
-                <option value="processed">Processed</option>
-                <option value="paid">Paid</option>
-                <option value="on-hold">On Hold</option>
-              </select>
-            </div>
-          )}
+                {months.map(m => (
+                  <SelectItem key={String(m.value)} textValue={m.label}>
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </Select>
+              <Select
+                selectedKeys={[String(selectedYear)]}
+                onSelectionChange={(keys) => setSelectedYear(parseInt(Array.from(keys)[0]))}
+                size="sm"
+                className="min-w-[100px] max-w-[120px]"
+                aria-label="Select year"
+              >
+                {years.map(y => (
+                  <SelectItem key={String(y.value)} textValue={y.label}>
+                    {y.label}
+                  </SelectItem>
+                ))}
+              </Select>
 
-          <button
-            onClick={() => isAdmin ? fetchAllPayrolls() : fetchPayrolls(getEmployeeId(user))}
-            className="btn-secondary text-xs sm:text-sm w-full sm:w-auto sm:ml-auto"
-          >
-            Refresh
-          </button>
-        </div>
-      </div>
+              {isAdmin && (
+                <>
+                  <FaFilter className="text-default-400 flex-shrink-0 ml-2" />
+                  <Select
+                    selectedKeys={[statusFilter]}
+                    onSelectionChange={(keys) => setStatusFilter(Array.from(keys)[0])}
+                    size="sm"
+                    className="min-w-[120px] max-w-[150px]"
+                    aria-label="Filter by status"
+                  >
+                    <SelectItem key="all">All Status</SelectItem>
+                    <SelectItem key="draft">Draft</SelectItem>
+                    <SelectItem key="processed">Processed</SelectItem>
+                    <SelectItem key="paid">Paid</SelectItem>
+                    <SelectItem key="on-hold">On Hold</SelectItem>
+                  </Select>
+                </>
+              )}
+            </div>
+
+            <SecondaryButton
+              onPress={() => isAdmin ? fetchAllPayrolls() : fetchPayrolls(getEmployeeId(user))}
+              size="sm"
+              startContent={<FaSync />}
+              className="w-full sm:w-auto"
+            >
+              Refresh
+            </SecondaryButton>
+          </div>
+        </HRMSCardBody>
+      </HRMSCard>
 
       {/* Admin Stats Cards */}
       {isAdmin && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-4 sm:mb-6">
-          <div className="bg-white rounded-lg shadow-md p-3 sm:p-4">
-            <div className="flex items-center justify-start mb-2">
-              <h3 className="text-xs font-medium text-gray-500 uppercase">Employees</h3>
-              <FaUsers className="text-blue-500 w-4 h-4" />
-            </div>
-            <div className="text-xl sm:text-2xl font-bold text-gray-800">{stats.total}</div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-md p-3 sm:p-4">
-            <div className="flex items-center justify-start mb-2">
-              <h3 className="text-xs font-medium text-gray-500 uppercase">Total Gross</h3>
-              <FaChartLine className="text-blue-500 w-4 h-4" />
-            </div>
-            <div className="text-base sm:text-xl font-bold text-gray-800">{formatCurrency(stats.totalGross)}</div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-md p-3 sm:p-4">
-            <div className="flex items-center justify-start mb-2">
-              <h3 className="text-xs font-medium text-gray-500 uppercase">Deductions</h3>
-              <FaMoneyBillWave className="text-red-500 w-4 h-4" />
-            </div>
-            <div className="text-base sm:text-xl font-bold text-red-600">{formatCurrency(stats.totalDeductions)}</div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-md p-3 sm:p-4">
-            <div className="flex items-center justify-start mb-2">
-              <h3 className="text-xs font-medium text-gray-500 uppercase">Net Payable</h3>
-              <FaFileInvoiceDollar className="text-green-500 w-4 h-4" />
-            </div>
-            <div className="text-base sm:text-xl font-bold text-green-600">{formatCurrency(stats.totalNet)}</div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-md p-3 sm:p-4">
-            <div className="flex items-center justify-start mb-2">
-              <h3 className="text-xs font-medium text-gray-500 uppercase">Draft</h3>
-              <FaClock className="text-gray-500 w-4 h-4" />
-            </div>
-            <div className="text-xl sm:text-2xl font-bold text-gray-600">{stats.draft}</div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-md p-3 sm:p-4">
-            <div className="flex items-center justify-start mb-2">
-              <h3 className="text-xs font-medium text-gray-500 uppercase">Paid</h3>
-              <FaCheckCircle className="text-green-500 w-4 h-4" />
-            </div>
-            <div className="text-xl sm:text-2xl font-bold text-green-600">{stats.paid}</div>
-          </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+          <KPICard
+            title="Employees"
+            value={stats.total}
+            icon={<FaUsers className="w-5 h-5" />}
+            color="primary"
+          />
+          <KPICard
+            title="Total Gross"
+            value={formatCurrency(stats.totalGross)}
+            icon={<FaChartLine className="w-5 h-5" />}
+            color="primary"
+          />
+          <KPICard
+            title="Deductions"
+            value={formatCurrency(stats.totalDeductions)}
+            icon={<FaMoneyBillWave className="w-5 h-5" />}
+            color="danger"
+          />
+          <KPICard
+            title="Net Payable"
+            value={formatCurrency(stats.totalNet)}
+            icon={<FaFileInvoiceDollar className="w-5 h-5" />}
+            color="success"
+          />
+          <KPICard
+            title="Draft"
+            value={stats.draft}
+            icon={<FaClock className="w-5 h-5" />}
+            color="default"
+          />
+          <KPICard
+            title="Paid"
+            value={stats.paid}
+            icon={<FaCheckCircle className="w-5 h-5" />}
+            color="success"
+          />
         </div>
       )}
 
       {/* Employee Summary Cards */}
       {!isAdmin && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
-          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-            <div className="flex items-center justify-start mb-2">
-              <h3 className="text-xs sm:text-sm font-medium text-gray-600">Latest Net Salary</h3>
-              <FaMoneyBillWave className="text-green-500 w-5 h-5" />
-            </div>
-            <div className="text-2xl sm:text-3xl font-bold text-gray-800">
-              {payrolls.length > 0 ? formatCurrency(payrolls[0]?.netSalary) : '₹0'}
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-            <div className="flex items-center justify-start mb-2">
-              <h3 className="text-xs sm:text-sm font-medium text-gray-600">Total Earnings</h3>
-              <FaMoneyBillWave className="text-blue-500 w-5 h-5" />
-            </div>
-            <div className="text-2xl sm:text-3xl font-bold text-gray-800">
-              {payrolls.length > 0 ? formatCurrency(payrolls[0]?.grossSalary) : '₹0'}
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 sm:col-span-2 lg:col-span-1">
-            <div className="flex items-center justify-start mb-2">
-              <h3 className="text-xs sm:text-sm font-medium text-gray-600">Total Deductions</h3>
-              <FaMoneyBillWave className="text-red-500 w-5 h-5" />
-            </div>
-            <div className="text-2xl sm:text-3xl font-bold text-gray-800">
-              {payrolls.length > 0 ? formatCurrency(payrolls[0]?.totalDeductions) : '₹0'}
-            </div>
-          </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+          <KPICard
+            title="Latest Net Salary"
+            value={payrolls.length > 0 ? formatCurrency(payrolls[0]?.netSalary) : '₹0'}
+            icon={<FaMoneyBillWave className="w-5 h-5" />}
+            color="success"
+          />
+          <KPICard
+            title="Total Earnings"
+            value={payrolls.length > 0 ? formatCurrency(payrolls[0]?.grossSalary) : '₹0'}
+            icon={<FaMoneyBillWave className="w-5 h-5" />}
+            color="primary"
+          />
+          <KPICard
+            title="Total Deductions"
+            value={payrolls.length > 0 ? formatCurrency(payrolls[0]?.totalDeductions) : '₹0'}
+            icon={<FaMoneyBillWave className="w-5 h-5" />}
+            color="danger"
+            className="sm:col-span-2 lg:col-span-1"
+          />
         </div>
       )}
 
       {/* Bulk Action Bar - Admin Only */}
       {isAdmin && (
-        <div className="bg-white rounded-lg shadow-md p-3 sm:p-4 mb-4 sm:mb-6">
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-              <span className="text-xs sm:text-sm font-medium text-gray-700">
-                {selectedPayrolls.length} of {filteredPayrolls.length} selected
-              </span>
-              <label className="flex items-center gap-2 text-xs sm:text-sm text-gray-600">
-                <input
-                  type="checkbox"
-                  checked={sendEmailsOnProcess}
-                  onChange={(e) => setSendEmailsOnProcess(e.target.checked)}
-                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                />
-                <span className="whitespace-nowrap">Send email payslips</span>
-              </label>
+        <HRMSCard>
+          <HRMSCardBody className="p-3 sm:p-4">
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <span className="text-xs sm:text-sm font-medium text-default-700">
+                  {selectedPayrolls.length} of {filteredPayrolls.length} selected
+                </span>
+                <Checkbox
+                  isSelected={sendEmailsOnProcess}
+                  onValueChange={setSendEmailsOnProcess}
+                  size="sm"
+                  className="text-xs sm:text-sm"
+                >
+                  Send email payslips
+                </Checkbox>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <PrimaryButton
+                  onPress={() => handleBulkProcess('processed')}
+                  isDisabled={selectedPayrolls.length === 0 || bulkProcessing}
+                  isLoading={bulkProcessing}
+                  size="sm"
+                  startContent={!bulkProcessing && <FaCheckCircle className="w-3 h-3" />}
+                >
+                  Process Selected
+                </PrimaryButton>
+                <SuccessButton
+                  onPress={() => handleBulkProcess('paid')}
+                  isDisabled={selectedPayrolls.length === 0 || bulkProcessing}
+                  size="sm"
+                  startContent={<FaMoneyBillWave className="w-3 h-3" />}
+                >
+                  Mark Paid
+                </SuccessButton>
+                <DangerButton
+                  onPress={handleBulkDelete}
+                  isDisabled={selectedPayrolls.length === 0 || bulkProcessing}
+                  size="sm"
+                  startContent={<FaTrash className="w-3 h-3" />}
+                >
+                  Delete Selected
+                </DangerButton>
+                <Button
+                  onPress={bankSheetModal.onOpen}
+                  isDisabled={selectedPayrolls.length === 0}
+                  size="sm"
+                  color="secondary"
+                  startContent={<FaUniversity className="w-3 h-3" />}
+                >
+                  Bank Sheet
+                </Button>
+                <SecondaryButton
+                  onPress={exportToExcel}
+                  isDisabled={filteredPayrolls.length === 0}
+                  size="sm"
+                  startContent={<FaDownload className="w-3 h-3" />}
+                >
+                  Export Excel
+                </SecondaryButton>
+              </div>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:flex lg:flex-wrap gap-2">
-              <button
-                onClick={() => handleBulkProcess('processed')}
-                disabled={selectedPayrolls.length === 0 || bulkProcessing}
-                className="btn-primary text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1 px-2 sm:px-4 py-2"
-              >
-                <FaCheckCircle className="w-3 h-3 sm:w-4 sm:h-4" />
-                <span className="hidden sm:inline">{bulkProcessing ? 'Processing...' : 'Process Selected'}</span>
-                <span className="sm:hidden">Process</span>
-              </button>
-              <button
-                onClick={() => handleBulkProcess('paid')}
-                disabled={selectedPayrolls.length === 0 || bulkProcessing}
-                className="bg-green-600 hover:bg-green-700 text-white px-2 sm:px-4 py-2 rounded-md text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
-              >
-                <FaMoneyBillWave className="w-3 h-3 sm:w-4 sm:h-4" />
-                <span className="hidden sm:inline">Mark Paid</span>
-                <span className="sm:hidden">Paid</span>
-              </button>
-              <button
-                onClick={handleBulkDelete}
-                disabled={selectedPayrolls.length === 0 || bulkProcessing}
-                className="bg-red-600 hover:bg-red-700 text-white px-2 sm:px-4 py-2 rounded-md text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
-              >
-                <FaTrash className="w-3 h-3 sm:w-4 sm:h-4" />
-                <span className="hidden sm:inline">Delete Selected</span>
-                <span className="sm:hidden">Delete</span>
-              </button>
-              <button
-                onClick={() => setShowBankSheetModal(true)}
-                disabled={filteredPayrolls.length === 0}
-                className="bg-purple-600 hover:bg-purple-700 text-white px-2 sm:px-4 py-2 rounded-md text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1"
-              >
-                <FaUniversity className="w-3 h-3 sm:w-4 sm:h-4" />
-                <span className="hidden sm:inline">Bank Sheet</span>
-                <span className="sm:hidden">Bank</span>
-              </button>
-              <button
-                onClick={exportToExcel}
-                disabled={filteredPayrolls.length === 0}
-                className="bg-gray-600 hover:bg-gray-700 text-white px-2 sm:px-4 py-2 rounded-md text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1 col-span-2 sm:col-span-1"
-              >
-                <FaDownload className="w-3 h-3 sm:w-4 sm:h-4" />
-                <span className="hidden sm:inline">Export Excel</span>
-                <span className="sm:hidden">Export</span>
-              </button>
-            </div>
-          </div>
-        </div>
+          </HRMSCardBody>
+        </HRMSCard>
       )}
 
       {/* Payroll Table */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="p-3 sm:p-4 border-b border-gray-200">
-          <h2 className="text-base sm:text-xl font-semibold text-gray-800">
+      <HRMSCard>
+        <HRMSCardHeader className="flex justify-between items-center">
+          <h2 className="text-base sm:text-xl font-semibold text-foreground">
             {isAdmin ? `Payroll Records - ${getMonthName(selectedMonth)} ${selectedYear}` : 'Salary Slips'}
           </h2>
-        </div>
-
-        {loading ? (
-          <div className="p-8 text-center">
-            <Loader size="lg" />
-            <p className="mt-4 text-sm sm:text-base text-gray-600">Loading payroll records...</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[800px]">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  {isAdmin && (
-                    <th className="px-2 sm:px-4 py-3 text-center">
-                      <input
-                        type="checkbox"
-                        checked={selectedPayrolls.length === filteredPayrolls.length && filteredPayrolls.length > 0}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedPayrolls(filteredPayrolls.map(p => p._id));
-                          } else {
-                            setSelectedPayrolls([]);
-                          }
-                        }}
-                        className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                      />
-                    </th>
-                  )}
-                  {isAdmin && (
-                    <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Employee
-                    </th>
-                  )}
-                  <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    Month/Year
-                  </th>
-                  <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    Gross
-                  </th>
-                  <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    Deductions
-                  </th>
-                  <th className="px-2 sm:px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    Net Salary
-                  </th>
-                  <th className="px-2 sm:px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-2 sm:px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredPayrolls.length === 0 ? (
-                  <tr>
-                    <td colSpan={isAdmin ? 8 : 6} className="px-6 py-8 text-center text-gray-500">
-                      <FaFileInvoiceDollar className="w-12 h-12 mx-auto text-gray-300 mb-3" />
-                      <p className="text-lg font-medium">No payroll records found</p>
-                      <p className="text-sm text-gray-400 mt-1">
-                        {isAdmin 
-                          ? 'Generate payroll for employees to see records here' 
-                          : 'Your payroll records will appear here once processed'}
-                      </p>
+        </HRMSCardHeader>
+        <Divider />
+        <HRMSCardBody className="p-0">
+          {loading ? (
+            <div className="p-8">
+              <PageLoader message="Loading payroll records..." />
+            </div>
+          ) : filteredPayrolls.length === 0 ? (
+            <EmptyState
+              icon={<FaFileInvoiceDollar className="w-12 h-12" />}
+              title="No payroll records found"
+              description={isAdmin 
+                ? 'Generate payroll for employees to see records here' 
+                : 'Your payroll records will appear here once processed'}
+              action={isAdmin && (
+                <PrimaryButton 
+                  onPress={() => router.push('/dashboard/payroll/generate')}
+                  startContent={<FaPlus />}
+                >
+                  Generate Payroll
+                </PrimaryButton>
+              )}
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <Table 
+                aria-label="Payroll records table"
+                selectionMode={isAdmin ? "multiple" : "none"}
+                selectedKeys={new Set(selectedPayrolls)}
+                onSelectionChange={(keys) => {
+                  if (keys === "all") {
+                    setSelectedPayrolls(filteredPayrolls.map(p => p._id))
+                  } else {
+                    setSelectedPayrolls(Array.from(keys))
+                  }
+                }}
+                classNames={{
+                  wrapper: "min-h-[200px]",
+                }}
+              >
+                <TableHeader>
+                  {isAdmin && <TableColumn>EMPLOYEE</TableColumn>}
+                  <TableColumn>MONTH/YEAR</TableColumn>
+                  <TableColumn align="end">GROSS</TableColumn>
+                  <TableColumn align="end">DEDUCTIONS</TableColumn>
+                  <TableColumn align="end">NET SALARY</TableColumn>
+                  <TableColumn align="center">STATUS</TableColumn>
+                  <TableColumn align="center">ACTIONS</TableColumn>
+                </TableHeader>
+                <TableBody items={filteredPayrolls}>
+                  {(payroll) => (
+                    <TableRow key={payroll._id}>
                       {isAdmin && (
-                        <button
-                          onClick={() => router.push('/dashboard/payroll/generate')}
-                          className="mt-4 btn-primary"
-                        >
-                          Generate Payroll
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ) : (
-                  filteredPayrolls.map((payroll) => (
-                    <tr key={payroll._id} className="hover:bg-gray-50">
-                      {isAdmin && (
-                        <td className="px-2 sm:px-4 py-3 sm:py-4 text-center">
-                          <input
-                            type="checkbox"
-                            checked={selectedPayrolls.includes(payroll._id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedPayrolls([...selectedPayrolls, payroll._id]);
-                              } else {
-                                setSelectedPayrolls(selectedPayrolls.filter(id => id !== payroll._id));
-                              }
-                            }}
-                            className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                          />
-                        </td>
-                      )}
-                      {isAdmin && (
-                        <td className="px-2 sm:px-4 py-3 sm:py-4 whitespace-nowrap">
-                          <div className="font-medium text-gray-900 text-xs sm:text-sm">
+                        <TableCell>
+                          <div className="font-medium text-foreground text-xs sm:text-sm">
                             {payroll.employee?.firstName} {payroll.employee?.lastName}
                           </div>
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-default-400">
                             {payroll.employee?.employeeCode}
                           </div>
-                        </td>
+                        </TableCell>
                       )}
-                      <td className="px-2 sm:px-4 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">
+                      <TableCell className="text-xs sm:text-sm">
                         {getMonthName(payroll.month)} {payroll.year}
-                      </td>
-                      <td className="px-2 sm:px-4 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-right text-gray-900">
+                      </TableCell>
+                      <TableCell className="text-xs sm:text-sm text-right">
                         {formatCurrency(payroll.grossSalary)}
-                      </td>
-                      <td className="px-2 sm:px-4 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-right text-red-600">
+                      </TableCell>
+                      <TableCell className="text-xs sm:text-sm text-right text-danger">
                         {formatCurrency(payroll.totalDeductions)}
-                      </td>
-                      <td className="px-2 sm:px-4 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-right font-semibold text-green-600">
+                      </TableCell>
+                      <TableCell className="text-xs sm:text-sm text-right font-semibold text-success">
                         {formatCurrency(payroll.netSalary)}
-                      </td>
-                      <td className="px-2 sm:px-4 py-3 sm:py-4 whitespace-nowrap text-center">
+                      </TableCell>
+                      <TableCell className="text-center">
                         {getStatusBadge(payroll.status)}
-                      </td>
-                      <td className="px-2 sm:px-4 py-3 sm:py-4 whitespace-nowrap text-center">
-                        <div className="flex items-center justify-center gap-1 sm:gap-2">
-                          <button
-                            onClick={() => router.push(`/dashboard/payroll/payslips/${payroll._id}`)}
-                            className="text-blue-600 hover:text-blue-900 p-1 hover:bg-blue-50 rounded"
-                            title="View Payslip"
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-center gap-1">
+                          <IconButton
+                            onPress={() => router.push(`/dashboard/payroll/payslips/${payroll._id}`)}
+                            color="primary"
+                            variant="light"
+                            size="sm"
+                            aria-label="View Payslip"
                           >
-                            <FaEye className="w-3 h-3 sm:w-4 sm:h-4" />
-                          </button>
-                          <button
-                            className="text-green-600 hover:text-green-900 p-1 hover:bg-green-50 rounded"
-                            title="Download Payslip"
+                            <FaEye className="w-3 h-3" />
+                          </IconButton>
+                          <IconButton
+                            color="success"
+                            variant="light"
+                            size="sm"
+                            aria-label="Download Payslip"
                           >
-                            <FaDownload className="w-3 h-3 sm:w-4 sm:h-4" />
-                          </button>
+                            <FaDownload className="w-3 h-3" />
+                          </IconButton>
                           {isAdmin && (
                             <>
-                              <button
-                                onClick={() => openEditModal(payroll)}
-                                className="text-yellow-600 hover:text-yellow-900 p-1 hover:bg-yellow-50 rounded"
-                                title="Edit Payroll"
+                              <IconButton
+                                onPress={() => openEditModal(payroll)}
+                                color="warning"
+                                variant="light"
+                                size="sm"
+                                aria-label="Edit Payroll"
                               >
-                                <FaEdit className="w-3 h-3 sm:w-4 sm:h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleDeletePayroll(payroll._id)}
-                                disabled={deleting}
-                                className="text-red-600 hover:text-red-900 p-1 disabled:opacity-50 hover:bg-red-50 rounded"
-                                title="Delete Payroll"
+                                <FaEdit className="w-3 h-3" />
+                              </IconButton>
+                              <IconButton
+                                onPress={() => handleDeletePayroll(payroll._id)}
+                                isDisabled={deleting}
+                                color="danger"
+                                variant="light"
+                                size="sm"
+                                aria-label="Delete Payroll"
                               >
-                                <FaTrash className="w-3 h-3 sm:w-4 sm:h-4" />
-                              </button>
+                                <FaTrash className="w-3 h-3" />
+                              </IconButton>
                             </>
                           )}
                           {isAdmin && payroll.status === 'draft' && (
-                            <button
-                              onClick={() => handleUpdateStatus(payroll._id, 'processed')}
-                              className="text-xs bg-blue-500 text-white px-2 py-1 rounded hover:bg-blue-600"
-                              title="Mark as Processed"
+                            <Button
+                              onPress={() => handleUpdateStatus(payroll._id, 'processed')}
+                              size="sm"
+                              color="primary"
                             >
                               Process
-                            </button>
+                            </Button>
                           )}
                           {isAdmin && payroll.status === 'processed' && (
-                            <button
-                              onClick={() => handleUpdateStatus(payroll._id, 'paid')}
-                              className="text-xs bg-green-500 text-white px-2 py-1 rounded hover:bg-green-600"
-                              title="Mark as Paid"
+                            <Button
+                              onPress={() => handleUpdateStatus(payroll._id, 'paid')}
+                              size="sm"
+                              color="success"
                             >
                               Mark Paid
-                            </button>
+                            </Button>
                           )}
                         </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </HRMSCardBody>
+      </HRMSCard>
 
       {/* Edit Payroll Modal */}
-      <ModalPortal isOpen={showEditModal}>
-        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && closeEditModal()}>
-          <div className="modal-backdrop" />
-          <div className="modal-container modal-lg">
-            <div className="modal-header">
-              <h2 className="modal-title">
+      <HRMSModal 
+        isOpen={editModal.isOpen} 
+        onOpenChange={editModal.onOpenChange}
+        size="3xl"
+        scrollBehavior="inside"
+      >
+        <HRMSModalContent>
+          {(onClose) => (
+            <>
+              <HRMSModalHeader className="flex flex-col gap-1">
                 Edit Payroll - {editingPayroll?.employee?.firstName} {editingPayroll?.employee?.lastName}
-              </h2>
-              <button onClick={closeEditModal} className="modal-close-btn">
-                <FaTimes className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="modal-body">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Earnings Section */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Earnings</h3>
-                  <div>
-                    <label className="modal-label">Basic Salary</label>
-                    <input
+              </HRMSModalHeader>
+              <HRMSModalBody>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Earnings Section */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-foreground border-b border-divider pb-2">Earnings</h3>
+                    <HRMSInput
                       type="number"
+                      label="Basic Salary"
                       value={editFormData.earnings?.basic || 0}
                       onChange={(e) => handleEditFieldChange('earnings', 'basic', e.target.value)}
-                      className="modal-input"
                     />
-                  </div>
-                  <div>
-                    <label className="modal-label">HRA</label>
-                    <input
+                    <HRMSInput
                       type="number"
+                      label="HRA"
                       value={editFormData.earnings?.hra || 0}
                       onChange={(e) => handleEditFieldChange('earnings', 'hra', e.target.value)}
-                      className="modal-input"
                     />
-                  </div>
-                  <div>
-                    <label className="modal-label">Conveyance</label>
-                    <input
+                    <HRMSInput
                       type="number"
+                      label="Conveyance"
                       value={editFormData.earnings?.conveyance || 0}
                       onChange={(e) => handleEditFieldChange('earnings', 'conveyance', e.target.value)}
-                      className="modal-input"
                     />
-                  </div>
-                  <div>
-                    <label className="modal-label">Medical Allowance</label>
-                    <input
+                    <HRMSInput
                       type="number"
+                      label="Medical Allowance"
                       value={editFormData.earnings?.medicalAllowance || 0}
                       onChange={(e) => handleEditFieldChange('earnings', 'medicalAllowance', e.target.value)}
-                      className="modal-input"
                     />
-                  </div>
-                  <div>
-                    <label className="modal-label">Special Allowance</label>
-                    <input
+                    <HRMSInput
                       type="number"
+                      label="Special Allowance"
                       value={editFormData.earnings?.specialAllowance || 0}
                       onChange={(e) => handleEditFieldChange('earnings', 'specialAllowance', e.target.value)}
-                      className="modal-input"
                     />
-                  </div>
-                  <div>
-                    <label className="modal-label">Overtime</label>
-                    <input
+                    <HRMSInput
                       type="number"
+                      label="Overtime"
                       value={editFormData.earnings?.overtime || 0}
                       onChange={(e) => handleEditFieldChange('earnings', 'overtime', e.target.value)}
-                      className="modal-input"
                     />
-                  </div>
-                  <div>
-                    <label className="modal-label">Bonus</label>
-                    <input
+                    <HRMSInput
                       type="number"
+                      label="Bonus"
                       value={editFormData.earnings?.bonus || 0}
                       onChange={(e) => handleEditFieldChange('earnings', 'bonus', e.target.value)}
-                      className="modal-input"
                     />
                   </div>
-                </div>
 
-                {/* Deductions Section */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Deductions</h3>
-                  <div>
-                    <label className="modal-label">PF</label>
-                    <input
+                  {/* Deductions Section */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-foreground border-b border-divider pb-2">Deductions</h3>
+                    <HRMSInput
                       type="number"
+                      label="PF"
                       value={editFormData.deductions?.pf || 0}
                       onChange={(e) => handleEditFieldChange('deductions', 'pf', e.target.value)}
-                      className="modal-input"
                     />
-                  </div>
-                  <div>
-                    <label className="modal-label">ESI</label>
-                    <input
+                    <HRMSInput
                       type="number"
+                      label="ESI"
                       value={editFormData.deductions?.esi || 0}
                       onChange={(e) => handleEditFieldChange('deductions', 'esi', e.target.value)}
-                      className="modal-input"
                     />
-                  </div>
-                  <div>
-                    <label className="modal-label">Professional Tax</label>
-                    <input
+                    <HRMSInput
                       type="number"
+                      label="Professional Tax"
                       value={editFormData.deductions?.professionalTax || 0}
                       onChange={(e) => handleEditFieldChange('deductions', 'professionalTax', e.target.value)}
-                      className="modal-input"
                     />
-                  </div>
-                  <div>
-                    <label className="modal-label">TDS</label>
-                    <input
+                    <HRMSInput
                       type="number"
+                      label="TDS"
                       value={editFormData.deductions?.tds || 0}
                       onChange={(e) => handleEditFieldChange('deductions', 'tds', e.target.value)}
-                      className="modal-input"
                     />
-                  </div>
-                  <div>
-                    <label className="modal-label">Late Deduction</label>
-                    <input
+                    <HRMSInput
                       type="number"
+                      label="Late Deduction"
                       value={editFormData.deductions?.lateDeduction || 0}
                       onChange={(e) => handleEditFieldChange('deductions', 'lateDeduction', e.target.value)}
-                      className="modal-input"
                     />
-                  </div>
-                  <div>
-                    <label className="modal-label">Other Deductions</label>
-                    <input
+                    <HRMSInput
                       type="number"
+                      label="Other Deductions"
                       value={editFormData.deductions?.other || 0}
                       onChange={(e) => handleEditFieldChange('deductions', 'other', e.target.value)}
-                      className="modal-input"
                     />
                   </div>
                 </div>
-              </div>
 
-              {/* Attendance Section */}
-              <div className="mt-6 grid grid-cols-3 gap-4">
-                <div>
-                  <label className="modal-label">Present Days</label>
-                  <input
+                {/* Attendance Section */}
+                <div className="mt-6 grid grid-cols-3 gap-4">
+                  <HRMSInput
                     type="number"
+                    label="Present Days"
                     value={editFormData.presentDays || 0}
                     onChange={(e) => handleEditFieldChange('attendance', 'presentDays', e.target.value)}
-                    className="modal-input"
                   />
-                </div>
-                <div>
-                  <label className="modal-label">Absent Days</label>
-                  <input
+                  <HRMSInput
                     type="number"
+                    label="Absent Days"
                     value={editFormData.absentDays || 0}
                     onChange={(e) => handleEditFieldChange('attendance', 'absentDays', e.target.value)}
-                    className="modal-input"
                   />
-                </div>
-                <div>
-                  <label className="modal-label">Leave Days</label>
-                  <input
+                  <HRMSInput
                     type="number"
+                    label="Leave Days"
                     value={editFormData.leaveDays || 0}
                     onChange={(e) => handleEditFieldChange('attendance', 'leaveDays', e.target.value)}
-                    className="modal-input"
                   />
                 </div>
-              </div>
 
-              {/* Status */}
-              <div className="mt-6">
-                <label className="modal-label">Status</label>
-                <select
-                  value={editFormData.status || 'draft'}
-                  onChange={(e) => handleEditFieldChange('status', 'status', e.target.value)}
-                  className="modal-input"
-                >
-                  <option value="draft">Draft</option>
-                  <option value="processed">Processed</option>
-                  <option value="paid">Paid</option>
-                  <option value="on-hold">On Hold</option>
-                </select>
-              </div>
-
-              {/* Summary */}
-              <div className="mt-6 bg-gray-50 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">Summary</h3>
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-500">Gross Salary</p>
-                    <p className="text-xl font-bold text-gray-800">{formatCurrency(editFormData.grossSalary)}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Total Deductions</p>
-                    <p className="text-xl font-bold text-red-600">{formatCurrency(editFormData.totalDeductions)}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Net Salary</p>
-                    <p className="text-xl font-bold text-green-600">{formatCurrency(editFormData.netSalary)}</p>
-                  </div>
+                {/* Status */}
+                <div className="mt-6">
+                  <HRMSSelect
+                    label="Status"
+                    selectedKeys={[editFormData.status || 'draft']}
+                    onSelectionChange={(keys) => handleEditFieldChange('status', 'status', Array.from(keys)[0])}
+                  >
+                    <HRMSSelectItem key="draft">Draft</HRMSSelectItem>
+                    <HRMSSelectItem key="processed">Processed</HRMSSelectItem>
+                    <HRMSSelectItem key="paid">Paid</HRMSSelectItem>
+                    <HRMSSelectItem key="on-hold">On Hold</HRMSSelectItem>
+                  </HRMSSelect>
                 </div>
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button
-                type="button"
-                onClick={closeEditModal}
-                className="modal-btn modal-btn-secondary"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleSaveEdit}
-                disabled={bulkProcessing}
-                className="modal-btn modal-btn-primary"
-              >
-                {bulkProcessing ? 'Saving...' : 'Save Changes'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </ModalPortal>
+
+                {/* Summary */}
+                <HRMSCard className="mt-6 bg-default-50">
+                  <HRMSCardBody>
+                    <h3 className="text-lg font-semibold text-foreground mb-4">Summary</h3>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <p className="text-sm text-default-500">Gross Salary</p>
+                        <p className="text-xl font-bold text-foreground">{formatCurrency(editFormData.grossSalary)}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-default-500">Total Deductions</p>
+                        <p className="text-xl font-bold text-danger">{formatCurrency(editFormData.totalDeductions)}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-default-500">Net Salary</p>
+                        <p className="text-xl font-bold text-success">{formatCurrency(editFormData.netSalary)}</p>
+                      </div>
+                    </div>
+                  </HRMSCardBody>
+                </HRMSCard>
+              </HRMSModalBody>
+              <HRMSModalFooter>
+                <SecondaryButton onPress={onClose}>
+                  Cancel
+                </SecondaryButton>
+                <PrimaryButton
+                  onPress={handleSaveEdit}
+                  isLoading={bulkProcessing}
+                >
+                  {bulkProcessing ? 'Saving...' : 'Save Changes'}
+                </PrimaryButton>
+              </HRMSModalFooter>
+            </>
+          )}
+        </HRMSModalContent>
+      </HRMSModal>
 
       {/* Bank Sheet Export Modal */}
-      <ModalPortal isOpen={showBankSheetModal}>
-        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setShowBankSheetModal(false)}>
-          <div className="modal-backdrop" />
-          <div className="modal-container modal-md">
-            <div className="modal-header">
-              <h2 className="modal-title flex items-center space-x-2">
-                <FaUniversity className="text-purple-600" />
+      <HRMSModal 
+        isOpen={bankSheetModal.isOpen} 
+        onOpenChange={bankSheetModal.onOpenChange}
+        size="lg"
+      >
+        <HRMSModalContent>
+          {(onClose) => (
+            <>
+              <HRMSModalHeader className="flex items-center gap-2">
+                <FaUniversity className="text-secondary" />
                 <span>Export Bank Sheet</span>
-              </h2>
-              <button onClick={() => setShowBankSheetModal(false)} className="modal-close-btn">
-                <FaTimes className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="modal-body">
-              <div className="mb-6">
-                <p className="text-sm text-gray-600 mb-4">
-                  Select your bank to download the salary sheet in the correct format for bulk salary transfers.
-                  Only <span className="font-medium text-blue-600">processed</span> or <span className="font-medium text-green-600">paid</span> payrolls will be included.
-                </p>
-                
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-                  <p className="text-sm text-blue-800">
-                    <strong>Ready for transfer:</strong> {filteredPayrolls.filter(p => p.status === 'processed' || p.status === 'paid').length} payroll(s)
+              </HRMSModalHeader>
+              <HRMSModalBody>
+                <div className="mb-6">
+                  <p className="text-sm text-default-600 mb-4">
+                    Select your bank to download the salary sheet in the correct format for bulk salary transfers.
+                    Only <span className="font-medium text-primary">processed</span> or <span className="font-medium text-success">paid</span> payrolls will be included.
                   </p>
-                  <p className="text-xs text-blue-600 mt-1">
-                    Total Amount: {formatCurrency(filteredPayrolls.filter(p => p.status === 'processed' || p.status === 'paid').reduce((sum, p) => sum + (p.netSalary || 0), 0))}
-                  </p>
+                  
+                  <HRMSCard className="bg-primary-50 border border-primary-200">
+                    <HRMSCardBody className="py-3">
+                      <p className="text-sm text-primary-800">
+                        <strong>Ready for transfer:</strong> {filteredPayrolls.filter(p => p.status === 'processed' || p.status === 'paid').length} payroll(s)
+                      </p>
+                      <p className="text-xs text-primary-600 mt-1">
+                        Total Amount: {formatCurrency(filteredPayrolls.filter(p => p.status === 'processed' || p.status === 'paid').reduce((sum, p) => sum + (p.netSalary || 0), 0))}
+                      </p>
+                    </HRMSCardBody>
+                  </HRMSCard>
                 </div>
-              </div>
 
-              <div>
-                <label className="modal-label">Select Bank *</label>
-                <select
-                  value={selectedBank}
-                  onChange={(e) => setSelectedBank(e.target.value)}
-                  className="modal-input"
+                <HRMSSelect
+                  label="Select Bank"
+                  placeholder="-- Select Bank --"
+                  isRequired
+                  selectedKeys={selectedBank ? [selectedBank] : []}
+                  onSelectionChange={(keys) => setSelectedBank(Array.from(keys)[0] || '')}
+                  description="The sheet will be formatted according to the selected bank's bulk upload requirements."
                 >
-                  <option value="">-- Select Bank --</option>
-                  <optgroup label="Major Private Banks">
-                    <option value="hdfc">HDFC Bank</option>
-                    <option value="icici">ICICI Bank</option>
-                    <option value="axis">Axis Bank</option>
-                    <option value="kotak">Kotak Mahindra Bank</option>
-                    <option value="yes">Yes Bank</option>
-                    <option value="indusind">IndusInd Bank</option>
-                  </optgroup>
-                  <optgroup label="Public Sector Banks">
-                    <option value="sbi">State Bank of India</option>
-                    <option value="pnb">Punjab National Bank</option>
-                    <option value="bob">Bank of Baroda</option>
-                    <option value="canara">Canara Bank</option>
-                    <option value="union">Union Bank of India</option>
-                    <option value="idbi">IDBI Bank</option>
-                  </optgroup>
-                  <optgroup label="Other Banks">
-                    <option value="federal">Federal Bank</option>
-                    <option value="rbl">RBL Bank</option>
-                    <option value="generic">Generic Format (All Banks)</option>
-                  </optgroup>
-                </select>
-                <p className="text-xs text-gray-500 mt-2">
-                  The sheet will be formatted according to the selected bank's bulk upload requirements.
-                </p>
-              </div>
+                  <HRMSSelectItem key="hdfc" textValue="HDFC Bank">HDFC Bank</HRMSSelectItem>
+                  <HRMSSelectItem key="icici" textValue="ICICI Bank">ICICI Bank</HRMSSelectItem>
+                  <HRMSSelectItem key="axis" textValue="Axis Bank">Axis Bank</HRMSSelectItem>
+                  <HRMSSelectItem key="kotak" textValue="Kotak Mahindra Bank">Kotak Mahindra Bank</HRMSSelectItem>
+                  <HRMSSelectItem key="yes" textValue="Yes Bank">Yes Bank</HRMSSelectItem>
+                  <HRMSSelectItem key="indusind" textValue="IndusInd Bank">IndusInd Bank</HRMSSelectItem>
+                  <HRMSSelectItem key="sbi" textValue="State Bank of India">State Bank of India</HRMSSelectItem>
+                  <HRMSSelectItem key="pnb" textValue="Punjab National Bank">Punjab National Bank</HRMSSelectItem>
+                  <HRMSSelectItem key="bob" textValue="Bank of Baroda">Bank of Baroda</HRMSSelectItem>
+                  <HRMSSelectItem key="canara" textValue="Canara Bank">Canara Bank</HRMSSelectItem>
+                  <HRMSSelectItem key="union" textValue="Union Bank of India">Union Bank of India</HRMSSelectItem>
+                  <HRMSSelectItem key="idbi" textValue="IDBI Bank">IDBI Bank</HRMSSelectItem>
+                  <HRMSSelectItem key="federal" textValue="Federal Bank">Federal Bank</HRMSSelectItem>
+                  <HRMSSelectItem key="rbl" textValue="RBL Bank">RBL Bank</HRMSSelectItem>
+                  <HRMSSelectItem key="generic" textValue="Generic Format (All Banks)">Generic Format (All Banks)</HRMSSelectItem>
+                </HRMSSelect>
 
-              {selectedBank && (
-                <div className="mt-4 bg-gray-50 rounded-lg p-4">
-                  <h4 className="text-sm font-medium text-gray-700 mb-2">Sheet will include:</h4>
-                  <ul className="text-xs text-gray-600 space-y-1">
-                    <li>• Employee Name & Code</li>
-                    <li>• Bank Account Number</li>
-                    <li>• IFSC Code</li>
-                    <li>• Net Salary Amount</li>
-                    <li>• Payment Narration/Purpose</li>
-                  </ul>
-                </div>
-              )}
-            </div>
-            <div className="modal-footer">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowBankSheetModal(false)
-                  setSelectedBank('')
-                }}
-                className="modal-btn modal-btn-secondary"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={exportBankSheet}
-                disabled={!selectedBank}
-                className="modal-btn bg-purple-600 hover:bg-purple-700 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
-              >
-                <FaFileDownload />
-                <span>Download Bank Sheet</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      </ModalPortal>
+                {selectedBank && (
+                  <HRMSCard className="mt-4 bg-default-50">
+                    <HRMSCardBody>
+                      <h4 className="text-sm font-medium text-foreground mb-2">Sheet will include:</h4>
+                      <ul className="text-xs text-default-600 space-y-1">
+                        <li>• Employee Name & Code</li>
+                        <li>• Bank Account Number</li>
+                        <li>• IFSC Code</li>
+                        <li>• Net Salary Amount</li>
+                        <li>• Payment Narration/Purpose</li>
+                      </ul>
+                    </HRMSCardBody>
+                  </HRMSCard>
+                )}
+              </HRMSModalBody>
+              <HRMSModalFooter>
+                <SecondaryButton 
+                  onPress={() => {
+                    onClose()
+                    setSelectedBank('')
+                  }}
+                >
+                  Cancel
+                </SecondaryButton>
+                <PrimaryButton
+                  onPress={exportBankSheet}
+                  isDisabled={!selectedBank}
+                  startContent={<FaFileDownload />}
+                  color="secondary"
+                >
+                  Download Bank Sheet
+                </PrimaryButton>
+              </HRMSModalFooter>
+            </>
+          )}
+        </HRMSModalContent>
+      </HRMSModal>
     </div>
   )
 }

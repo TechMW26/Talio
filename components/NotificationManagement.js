@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { FaBell, FaClock, FaRedo, FaPaperPlane, FaUsers, FaBuilding, FaUserTag, FaCalendar, FaTrash, FaEdit, FaPause, FaPlay, FaHistory, FaCheck, FaTimes, FaChevronDown, FaSync } from 'react-icons/fa'
+import { Select, SelectItem } from '@heroui/react'
 import toast from '@/utils/toast'
 import Loader from '@/components/ui/Loader'
 
@@ -446,16 +447,17 @@ function SendNotificationTab({ userRole, userDepartment, isDepartmentHead, apiKe
           <label className="block text-xs sm:text-sm font-semibold text-gray-700 mb-1.5 sm:mb-2">
             Send To
           </label>
-          <select
-            value={formData.targetType}
+          <Select
+            selectedKeys={[formData.targetType]}
             onChange={(e) => setFormData({ ...formData, targetType: e.target.value })}
-            className="w-full px-3 py-2 sm:px-4 sm:py-2.5 text-sm sm:text-base text-gray-900 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+            aria-label="Send To"
+            classNames={{ trigger: "bg-white" }}
           >
-            <option value="all">{isDeptHead && !isAdminOrHR ? 'All Department Members' : 'All Employees'}</option>
-            {isAdminOrHR && <option value="department">Specific Department</option>}
-            {isAdminOrHR && <option value="role">Specific Role</option>}
-            <option value="specific">Specific Users</option>
-          </select>
+            <SelectItem key="all">{isDeptHead && !isAdminOrHR ? 'All Department Members' : 'All Employees'}</SelectItem>
+            {isAdminOrHR && <SelectItem key="department">Specific Department</SelectItem>}
+            {isAdminOrHR && <SelectItem key="role">Specific Role</SelectItem>}
+            <SelectItem key="specific">Specific Users</SelectItem>
+          </Select>
         </div>
 
         {formData.targetType === 'department' && isAdminOrHR && (
@@ -463,17 +465,18 @@ function SendNotificationTab({ userRole, userDepartment, isDepartmentHead, apiKe
             <label className="block text-sm font-semibold text-gray-700 mb-2">
               Select Department
             </label>
-            <select
-              value={formData.targetDepartment}
+            <Select
+              selectedKeys={formData.targetDepartment ? [formData.targetDepartment] : []}
               onChange={(e) => setFormData({ ...formData, targetDepartment: e.target.value })}
-              className="w-full px-4 py-2.5 text-gray-900 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
-              required
+              aria-label="Select Department"
+              placeholder="Select a department"
+              isRequired
+              classNames={{ trigger: "bg-white" }}
             >
-              <option value="">Select a department</option>
               {departments.map(dept => (
-                <option key={dept._id} value={dept._id}>{dept.name}</option>
+                <SelectItem key={dept._id}>{dept.name}</SelectItem>
               ))}
-            </select>
+            </Select>
           </div>
         )}
 
@@ -851,19 +854,17 @@ function CreateRecurringForm({ formData, setFormData, handleSubmit, creating, de
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Frequency *
         </label>
-        <select
-          value={formData.frequency}
+        <Select
+          selectedKeys={[formData.frequency]}
           onChange={(e) => setFormData({ ...formData, frequency: e.target.value })}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent transition-colors"
-          style={{ '--tw-ring-color': 'var(--color-primary-500)' }}
-          onFocus={(e) => e.currentTarget.style.borderColor = 'var(--color-primary-500)'}
-          onBlur={(e) => e.currentTarget.style.borderColor = '#D1D5DB'}
+          aria-label="Frequency"
+          classNames={{ trigger: "bg-white" }}
         >
-          <option value="daily">Daily</option>
-          <option value="weekly">Weekly</option>
-          <option value="monthly">Monthly</option>
-          <option value="custom">Custom (Specific Days)</option>
-        </select>
+          <SelectItem key="daily">Daily</SelectItem>
+          <SelectItem key="weekly">Weekly</SelectItem>
+          <SelectItem key="monthly">Monthly</SelectItem>
+          <SelectItem key="custom">Custom (Specific Days)</SelectItem>
+        </Select>
       </div>
 
       {/* Time */}
@@ -938,16 +939,17 @@ function CreateRecurringForm({ formData, setFormData, handleSubmit, creating, de
         <label className="block text-sm font-semibold text-gray-700 mb-2">
           Send To *
         </label>
-        <select
-          value={formData.targetType}
+        <Select
+          selectedKeys={[formData.targetType]}
           onChange={(e) => setFormData({ ...formData, targetType: e.target.value })}
-          className="w-full px-4 py-2.5 text-gray-900 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+          aria-label="Send To"
+          classNames={{ trigger: "bg-white" }}
         >
-          <option value="all">{isDeptHead ? 'All Department Members' : 'All Users'}</option>
-          {!isDeptHead && <option value="department">Specific Department</option>}
-          {!isDeptHead && <option value="role">Specific Role</option>}
-          <option value="users">Specific Users</option>
-        </select>
+          <SelectItem key="all">{isDeptHead ? 'All Department Members' : 'All Users'}</SelectItem>
+          {!isDeptHead && <SelectItem key="department">Specific Department</SelectItem>}
+          {!isDeptHead && <SelectItem key="role">Specific Role</SelectItem>}
+          <SelectItem key="users">Specific Users</SelectItem>
+        </Select>
       </div>
 
       {/* Department Selection */}
@@ -956,16 +958,17 @@ function CreateRecurringForm({ formData, setFormData, handleSubmit, creating, de
           <label className="block text-sm font-semibold text-gray-700 mb-2">
             Select Department
           </label>
-          <select
-            value={formData.targetDepartment}
+          <Select
+            selectedKeys={formData.targetDepartment ? [formData.targetDepartment] : []}
             onChange={(e) => setFormData({ ...formData, targetDepartment: e.target.value })}
-            className="w-full px-4 py-2.5 text-gray-900 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+            aria-label="Select Department"
+            placeholder="Select a department"
+            classNames={{ trigger: "bg-white" }}
           >
-            <option value="">Select a department</option>
             {departments.map(dept => (
-              <option key={dept._id} value={dept._id}>{dept.name}</option>
+              <SelectItem key={dept._id}>{dept.name}</SelectItem>
             ))}
-          </select>
+          </Select>
         </div>
       )}
 

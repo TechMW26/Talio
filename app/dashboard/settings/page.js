@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { Select, SelectItem, Button } from '@heroui/react'
 import { FaBuilding, FaBriefcase, FaCalendarAlt, FaUmbrellaBeach, FaCog, FaMapMarkerAlt, FaClock, FaImage, FaPalette, FaCheck, FaBell, FaMoneyBillWave, FaArrowLeft } from 'react-icons/fa'
 import { HiOutlineOfficeBuilding, HiOutlineCog, HiOutlineArrowLeft } from 'react-icons/hi2'
 import { toast } from '@/utils/toast'
@@ -532,13 +533,13 @@ function CompanySettingsTab() {
           </h2>
           <p className="text-gray-600 mt-1">Manage your companies and their individual settings</p>
         </div>
-        <button
-          onClick={() => handleOpenModal()}
-          className="btn-primary flex items-center gap-2"
+        <Button
+          onPress={() => handleOpenModal()}
+          color="primary"
+          startContent={<FaBuilding className="w-4 h-4" />}
         >
-          <FaBuilding className="w-4 h-4" />
           Add Company
-        </button>
+        </Button>
       </div>
 
       {/* Companies Grid */}
@@ -547,12 +548,13 @@ function CompanySettingsTab() {
           <FaBuilding className="mx-auto h-12 w-12 text-gray-400" />
           <h3 className="mt-4 text-lg font-medium text-gray-800">No companies yet</h3>
           <p className="mt-2 text-sm text-gray-500">Get started by adding your first company.</p>
-          <button
-            onClick={() => handleOpenModal()}
-            className="mt-4 btn-primary px-4 py-2"
+          <Button
+            onPress={() => handleOpenModal()}
+            color="primary"
+            className="mt-4"
           >
             Add Company
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -951,10 +953,10 @@ function CompanySettingsTab() {
                 >
                   Cancel
                 </button>
-                <button
+                <Button
                   type="submit"
-                  disabled={saving}
-                  className="btn-primary px-6 py-2.5"
+                  isDisabled={saving}
+                  color="primary"
                 >
                   {saving ? (
                     <span className="flex items-center gap-2">
@@ -962,7 +964,7 @@ function CompanySettingsTab() {
                       Saving...
                     </span>
                   ) : (editingCompany ? 'Update Company' : 'Create Company')}
-                </button>
+                </Button>
               </div>
             </form>
           </div>
@@ -1234,13 +1236,13 @@ function GeofenceLocationsManager() {
           </h3>
           <p className="text-sm text-gray-600 mt-1">Manage multiple office locations. Employees can check in from any configured location.</p>
         </div>
-        <button
-          onClick={() => handleOpenModal()}
-          className="btn btn-primary"
+        <Button
+          onPress={() => handleOpenModal()}
+          color="primary"
+          startContent={<FaMapMarkerAlt />}
         >
-          <FaMapMarkerAlt />
           Add Location
-        </button>
+        </Button>
       </div>
 
       {loading ? (
@@ -1249,12 +1251,12 @@ function GeofenceLocationsManager() {
         <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
           <FaMapMarkerAlt className="mx-auto text-4xl text-gray-400 mb-3" />
           <p className="text-gray-600 mb-4">No locations configured yet</p>
-          <button
-            onClick={() => handleOpenModal()}
-            className="btn btn-primary"
+          <Button
+            onPress={() => handleOpenModal()}
+            color="primary"
           >
             Add Your First Location
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1904,7 +1906,7 @@ function DepartmentsTab() {
     <div>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Departments</h2>
-        <button className="btn-primary text-sm sm:text-base w-full sm:w-auto">Add Department</button>
+        <Button color="primary" size="sm" className="w-full sm:w-auto">Add Department</Button>
       </div>
       <div className="text-gray-600">
         <p className="text-sm sm:text-base mb-3 sm:mb-4">Manage organization departments here.</p>
@@ -1941,7 +1943,7 @@ function DesignationsTab() {
     <div>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Designations</h2>
-        <button className="btn-primary text-sm sm:text-base w-full sm:w-auto">Add Designation</button>
+        <Button color="primary" size="sm" className="w-full sm:w-auto">Add Designation</Button>
       </div>
       <div className="text-gray-600">
         <p className="text-sm sm:text-base mb-3 sm:mb-4">Manage job designations and titles here.</p>
@@ -1971,7 +1973,7 @@ function HolidaysTab() {
     <div>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Holidays</h2>
-        <button className="btn-primary text-sm sm:text-base w-full sm:w-auto">Add Holiday</button>
+        <Button color="primary" size="sm" className="w-full sm:w-auto">Add Holiday</Button>
       </div>
       <div className="text-gray-600">
         <p className="text-sm sm:text-base mb-3 sm:mb-4">Manage company holidays and observances.</p>
@@ -2001,7 +2003,7 @@ function LeaveTypesTab() {
     <div>
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 sm:mb-6">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Leave Types</h2>
-        <button className="btn-primary text-sm sm:text-base w-full sm:w-auto">Add Leave Type</button>
+        <Button color="primary" size="sm" className="w-full sm:w-auto">Add Leave Type</Button>
       </div>
       <div className="text-gray-600">
         <p className="text-sm sm:text-base mb-3 sm:mb-4">Configure different types of leaves available.</p>
@@ -2064,29 +2066,37 @@ function GeneralTab() {
           <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
             Time Zone
           </label>
-          <select className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent">
-            <option>UTC</option>
-            <option>America/New_York</option>
-            <option>America/Los_Angeles</option>
-            <option>Europe/London</option>
-            <option>Asia/Kolkata</option>
-          </select>
+          <Select
+            defaultSelectedKeys={["UTC"]}
+            aria-label="Time Zone"
+            classNames={{ trigger: "bg-white" }}
+          >
+            <SelectItem key="UTC">UTC</SelectItem>
+            <SelectItem key="America/New_York">America/New_York</SelectItem>
+            <SelectItem key="America/Los_Angeles">America/Los_Angeles</SelectItem>
+            <SelectItem key="Europe/London">Europe/London</SelectItem>
+            <SelectItem key="Asia/Kolkata">Asia/Kolkata</SelectItem>
+          </Select>
         </div>
 
         <div>
           <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
             Currency
           </label>
-          <select className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent">
-            <option>USD - US Dollar</option>
-            <option>EUR - Euro</option>
-            <option>GBP - British Pound</option>
-            <option>INR - Indian Rupee</option>
-          </select>
+          <Select
+            defaultSelectedKeys={["USD"]}
+            aria-label="Currency"
+            classNames={{ trigger: "bg-white" }}
+          >
+            <SelectItem key="USD">USD - US Dollar</SelectItem>
+            <SelectItem key="EUR">EUR - Euro</SelectItem>
+            <SelectItem key="GBP">GBP - British Pound</SelectItem>
+            <SelectItem key="INR">INR - Indian Rupee</SelectItem>
+          </Select>
         </div>
 
         <div className="flex justify-end pt-2">
-          <button className="btn-primary text-sm sm:text-base w-full sm:w-auto">Save Changes</button>
+          <Button color="primary" size="sm" className="w-full sm:w-auto">Save Changes</Button>
         </div>
       </div>
     </div>

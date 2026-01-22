@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Loader from '@/components/ui/Loader'
+import { Select, SelectItem, Button, Card, CardBody, Tabs, Tab } from '@heroui/react'
 import { 
   HiOutlineComputerDesktop, 
   HiOutlineCalendarDays,
@@ -23,7 +24,7 @@ import {
 } from 'react-icons/hi2'
 import RawCaptureViewer from '@/components/productivity/RawCaptureViewer'
 import ManualCapturePanel from '@/components/productivity/ManualCapturePanel'
-import ModalPortal from '@/components/ModalPortal'
+import { Modal, ModalContent, ModalHeader, ModalBody } from '@heroui/react'
 import { useAILoading } from '@/contexts/AILoadingContext'
 
 // Helper function to get screenshot URL (handles different field names)
@@ -520,18 +521,20 @@ export default function ProductivityPage() {
             {(isAdminOrHR || (isDepartmentHead && departments.length > 1)) && activeTab === 'team' && departments.length > 0 && (
               <div className="flex items-center gap-2">
                 <HiOutlineBuildingOffice2 className="w-5 h-5 text-gray-400" />
-                <select
-                  value={selectedDepartment}
-                  onChange={(e) => setSelectedDepartment(e.target.value)}
-                  className="px-4 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-primary-500 focus:border-transparent min-w-[150px]"
+                <Select
+                  selectedKeys={[selectedDepartment]}
+                  onSelectionChange={(keys) => setSelectedDepartment(Array.from(keys)[0])}
+                  className="min-w-[150px]"
+                  size="sm"
+                  aria-label="Filter by Department"
                 >
-                  <option value="all">All Departments</option>
+                  <SelectItem key="all">All Departments</SelectItem>
                   {departments.map((dept) => (
-                    <option key={dept._id} value={dept._id}>
+                    <SelectItem key={dept._id}>
                       {dept.name}
-                    </option>
+                    </SelectItem>
                   ))}
-                </select>
+                </Select>
               </div>
             )}
           </div>
@@ -587,18 +590,20 @@ export default function ProductivityPage() {
             <div className="bg-white rounded-lg shadow-md p-4 mb-6">
               <div className="flex items-center gap-3">
                 <label className="text-sm font-medium text-gray-700">View captures for:</label>
-                <select
-                  value={selectedTeamMember || ''}
-                  onChange={(e) => setSelectedTeamMember(e.target.value || null)}
-                  className="px-4 py-2.5 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-primary-500 focus:border-transparent min-w-[200px]"
+                <Select
+                  selectedKeys={selectedTeamMember ? [selectedTeamMember] : []}
+                  onSelectionChange={(keys) => setSelectedTeamMember(Array.from(keys)[0] || null)}
+                  className="min-w-[200px]"
+                  size="sm"
+                  placeholder="Select team member"
+                  aria-label="Select Team Member"
                 >
-                  <option value="">Select team member</option>
                   {teamSessions.map((member) => (
-                    <option key={member.userId || member._id} value={member.userId || member._id}>
+                    <SelectItem key={member.userId || member._id}>
                       {member.name || `${member.firstName || ''} ${member.lastName || ''}`.trim() || member.email}
-                    </option>
+                    </SelectItem>
                   ))}
-                </select>
+                </Select>
               </div>
             </div>
           )}
@@ -653,12 +658,12 @@ export default function ProductivityPage() {
               <p className="text-gray-500 mb-4">
                 No screenshots were captured on this date. Make sure the desktop app is running while clocked in.
               </p>
-              <button
-                onClick={refreshSessions}
-                className="btn-primary inline-flex items-center gap-2"
+              <Button
+                onPress={refreshSessions}
+                color="primary"
               >
                 Check for Screenshots
-              </button>
+              </Button>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1033,17 +1038,16 @@ export default function ProductivityPage() {
       )}
 
       {/* Session Detail Modal */}
-      <ModalPortal show={!!selectedSession}>
+      <Modal isOpen={!!selectedSession} onClose={() => { setSelectedSession(null); setCurrentSlideIndex(0); }} size="5xl" scrollBehavior="inside" classNames={{ wrapper: 'z-[9999]' }}>
+        <ModalContent>
         {selectedSession && (
-        <div className="fixed inset-0 flex items-center justify-center z-[9999] p-4" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
-          <div className="bg-white rounded-2xl shadow-xl max-w-7xl w-full max-h-[95vh] overflow-hidden flex flex-col">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b bg-gray-50">
+        <>
+          <ModalHeader className="flex items-center justify-between border-b bg-default-50">
               <div className="min-w-0 flex-1">
-                <h2 className="text-lg font-bold text-gray-800">
+                <h2 className="text-lg font-bold text-default-800">
                   {selectedSession.sessionTitle || `Session ${selectedSession.sessionNumber || 1}`}
                 </h2>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-default-500">
                   {formatTime(selectedSession.startTime)} - {formatTime(selectedSession.endTime)} 
                   {selectedSession.analysis?.isAnalyzed ? (
                     <span> • <span className="text-primary-600 font-medium">AI Analyzed</span></span>
@@ -1055,26 +1059,17 @@ export default function ProductivityPage() {
               <div className="flex items-center gap-2">
                 {/* Only show analyze button if NOT already analyzed */}
                 {!selectedSession.analysis?.isAnalyzed && !selectedSession.screenshotsDeleted && (
-                  <button
-                    onClick={() => analyzeSession(selectedSession._id)}
-                    disabled={analyzing}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-lg font-medium hover:opacity-90 transition disabled:opacity-50"
+                  <Button
+                    onPress={() => analyzeSession(selectedSession._id)}
+                    isLoading={analyzing}
+                    color="primary"
+                    startContent={!analyzing && <HiOutlineSparkles className="w-5 h-5" />}
                   >
-                    <HiOutlineSparkles className="w-5 h-5" />
                     {analyzing ? 'Analyzing...' : 'Analyze with AI'}
-                  </button>
+                  </Button>
                 )}
-                <button
-                  onClick={() => {
-                    setSelectedSession(null)
-                    setCurrentSlideIndex(0)
-                  }}
-                  className="p-2 hover:bg-gray-200 rounded-lg transition"
-                >
-                  <HiOutlineXMark className="w-5 h-5" />
-                </button>
               </div>
-            </div>
+            </ModalHeader>
 
             {/* Modal Content - 40-60 Split */}
             <div className="flex-1 overflow-hidden flex flex-col lg:flex-row">
@@ -1474,22 +1469,23 @@ export default function ProductivityPage() {
                     <p className="text-sm text-gray-500 mb-6 max-w-xs">
                       Get detailed insights about productivity, work patterns, and suggestions for improvement.
                     </p>
-                    <button
-                      onClick={() => analyzeSession(selectedSession._id)}
-                      disabled={analyzing}
-                      className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-xl font-medium hover:opacity-90 transition disabled:opacity-50 shadow-lg shadow-primary-500/25"
+                    <Button
+                      onPress={() => analyzeSession(selectedSession._id)}
+                      isLoading={analyzing}
+                      color="primary"
+                      size="lg"
+                      startContent={!analyzing && <HiOutlineSparkles className="w-5 h-5" />}
                     >
-                      <HiOutlineSparkles className="w-5 h-5" />
                       {analyzing ? 'Analyzing...' : 'Analyze with AI'}
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>
             </div>
-          </div>
-        </div>
+        </>
         )}
-      </ModalPortal>
+        </ModalContent>
+      </Modal>
     </div>
   )
 }

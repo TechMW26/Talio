@@ -24,6 +24,7 @@ import {
   FaThumbtack, FaLock, FaSync, FaExchangeAlt
 } from 'react-icons/fa'
 import { playNotificationSound, NotificationSoundTypes } from '@/lib/notificationSounds'
+import { Button, Select, SelectItem } from '@heroui/react'
 import ProjectOverview from '@/components/projects/ProjectOverview'
 import KanbanBoard from '@/components/tasks/KanbanBoard'
 import Portal from '@/components/ui/Portal'
@@ -1571,13 +1572,13 @@ export default function ProjectDetailPage() {
             >
               Reject
             </button>
-            <button
-              onClick={() => handleRespondToInvitation('accept')}
-              disabled={submitting}
-              className="btn-primary"
+            <Button
+              onPress={() => handleRespondToInvitation('accept')}
+              isDisabled={submitting}
+              color="primary"
             >
               Accept Invitation
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -1600,13 +1601,13 @@ export default function ProjectDetailPage() {
               >
                 Reject
               </button>
-              <button
-                onClick={() => handleApprovalResponse(true)}
-                disabled={submitting}
-                className="btn-primary"
+              <Button
+                onPress={() => handleApprovalResponse(true)}
+                isDisabled={submitting}
+                color="primary"
               >
                 Approve
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -1711,13 +1712,13 @@ export default function ProjectDetailPage() {
             <div>
               {isAcceptedMember && (
                 <div className="flex justify-end mb-4">
-                  <button
-                    onClick={() => setShowCreateTask(true)}
-                    className="btn-primary flex items-center"
+                  <Button
+                    onPress={() => setShowCreateTask(true)}
+                    color="primary"
+                    startContent={<FaPlus className="mr-2" />}
                   >
-                    <FaPlus className="mr-2" />
                     Add Task
-                  </button>
+                  </Button>
                 </div>
               )}
 
@@ -1810,14 +1811,14 @@ export default function ProjectDetailPage() {
                       placeholder="Add a comment or update..."
                       className="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                     />
-                    <button
+                    <Button
                       type="submit"
-                      disabled={submitting || !newComment.trim()}
-                      className="btn-primary flex items-center gap-2 rounded-xl"
+                      isDisabled={submitting || !newComment.trim()}
+                      color="primary"
+                      startContent={<HiOutlineChatBubbleOvalLeftEllipsis className="w-5 h-5" />}
                     >
-                      <HiOutlineChatBubbleOvalLeftEllipsis className="w-5 h-5" />
                       Post
-                    </button>
+                    </Button>
                   </div>
                 </form>
               )}
@@ -1982,13 +1983,14 @@ export default function ProjectDetailPage() {
             <div>
               {/* Create Note Button */}
               {isAcceptedMember && !showCreateNote && !editingNote && (
-                <button
-                  onClick={() => setShowCreateNote(true)}
-                  className="btn-primary mb-6 flex items-center gap-2"
+                <Button
+                  onPress={() => setShowCreateNote(true)}
+                  color="primary"
+                  startContent={<FaPlus />}
+                  className="mb-6"
                 >
-                  <FaPlus />
                   Add Note
-                </button>
+                </Button>
               )}
 
               {/* Create Note Form */}
@@ -2040,34 +2042,35 @@ export default function ProjectDetailPage() {
                       </div>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Visibility</label>
-                        <select
-                          value={noteForm.visibility}
+                        <Select
+                          selectedKeys={[noteForm.visibility]}
                           onChange={(e) => setNoteForm(prev => ({ ...prev, visibility: e.target.value }))}
-                          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                          aria-label="Visibility"
+                          classNames={{ trigger: "bg-white" }}
                         >
-                          <option value="team">Team (All members)</option>
-                          <option value="personal">Personal (Only me)</option>
-                        </select>
+                          <SelectItem key="team">Team (All members)</SelectItem>
+                          <SelectItem key="personal">Personal (Only me)</SelectItem>
+                        </Select>
                       </div>
                     </div>
                     <div className="flex justify-end gap-3">
-                      <button
+                      <Button
                         type="button"
-                        onClick={() => {
+                        onPress={() => {
                           setShowCreateNote(false)
                           setNoteForm({ title: '', content: '', color: 'yellow', visibility: 'team' })
                         }}
-                        className="btn-secondary"
+                        variant="flat"
                       >
                         Cancel
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="submit"
-                        disabled={submitting}
-                        className="btn-primary"
+                        isDisabled={submitting}
+                        color="primary"
                       >
                         {submitting ? 'Creating...' : 'Create Note'}
-                      </button>
+                      </Button>
                     </div>
                   </form>
                 </div>
@@ -2347,16 +2350,17 @@ export default function ProjectDetailPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
-                  <select
-                    value={taskForm.priority}
+                  <Select
+                    selectedKeys={[taskForm.priority]}
                     onChange={(e) => setTaskForm(prev => ({ ...prev, priority: e.target.value }))}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    aria-label="Priority"
+                    classNames={{ trigger: "bg-white" }}
                   >
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                    <option value="critical">Critical</option>
-                  </select>
+                    <SelectItem key="low">Low</SelectItem>
+                    <SelectItem key="medium">Medium</SelectItem>
+                    <SelectItem key="high">High</SelectItem>
+                    <SelectItem key="critical">Critical</SelectItem>
+                  </Select>
                 </div>
 
                 <div>
@@ -2528,22 +2532,22 @@ export default function ProjectDetailPage() {
               </div>
 
               <div className="flex justify-end gap-3 pt-4">
-                <button
+                <Button
                   type="button"
-                  onClick={() => setShowCreateTask(false)}
-                  className="btn-secondary"
+                  onPress={() => setShowCreateTask(false)}
+                  variant="flat"
                 >
                   Cancel
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
-                  disabled={submitting || uploadingTaskAttachments}
-                  className="btn-primary"
+                  isDisabled={submitting || uploadingTaskAttachments}
+                  color="primary"
                 >
                   {uploadingTaskAttachments
                     ? 'Uploading attachments...'
                     : (submitting ? 'Creating...' : 'Create Task')}
-                </button>
+                </Button>
               </div>
             </form>
           </div>
@@ -2765,16 +2769,17 @@ export default function ProjectDetailPage() {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">Priority</label>
-                  <select
-                    value={editTaskForm.priority}
+                  <Select
+                    selectedKeys={[editTaskForm.priority]}
                     onChange={(e) => setEditTaskForm(prev => ({ ...prev, priority: e.target.value }))}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    aria-label="Priority"
+                    classNames={{ trigger: "bg-white" }}
                   >
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                    <option value="critical">Critical</option>
-                  </select>
+                    <SelectItem key="low">Low</SelectItem>
+                    <SelectItem key="medium">Medium</SelectItem>
+                    <SelectItem key="high">High</SelectItem>
+                    <SelectItem key="critical">Critical</SelectItem>
+                  </Select>
                 </div>
 
                 {/* Subtasks Section */}
@@ -2931,23 +2936,23 @@ export default function ProjectDetailPage() {
                 </div>
 
                 <div className="flex justify-end gap-3 pt-4">
-                  <button
+                  <Button
                     type="button"
-                    onClick={() => {
+                    onPress={() => {
                       setShowEditTaskModal(false)
                       setEditTaskForm(null)
                     }}
-                    className="btn-secondary"
+                    variant="flat"
                   >
                     Cancel
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="submit"
-                    disabled={submitting}
-                    className="btn-primary"
+                    isDisabled={submitting}
+                    color="primary"
                   >
                     {submitting ? 'Updating...' : 'Update Task'}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </form>
@@ -3013,8 +3018,8 @@ export default function ProjectDetailPage() {
                   const canEdit = isProjectHead || (user && ['admin'].includes(user.role)) || isAssignedAndAccepted || selectedTask.createdBy?._id?.toString() === currentEmployeeId?.toString()
                   
                   return canEdit && (
-                    <button
-                      onClick={() => {
+                    <Button
+                      onPress={() => {
                         setEditTaskForm({
                           _id: selectedTask._id,
                           title: selectedTask.title,
@@ -3027,11 +3032,12 @@ export default function ProjectDetailPage() {
                         setShowEditTaskModal(true)
                         setSelectedTask(null)
                       }}
-                      className="btn-primary flex items-center gap-2 text-sm py-1.5 px-3"
+                      color="primary"
+                      size="sm"
+                      startContent={<FaEdit />}
                     >
-                      <FaEdit />
                       Edit Task
-                    </button>
+                    </Button>
                   )
                 })()}
                 <button
@@ -3663,21 +3669,22 @@ export default function ProjectDetailPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Reassign To
                 </label>
-                <select
-                  value={reassignToId}
+                <Select
+                  selectedKeys={reassignToId ? [reassignToId] : []}
                   onChange={(e) => setReassignToId(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  aria-label="Reassign To"
+                  placeholder="Select a team member"
+                  classNames={{ trigger: "bg-white" }}
                 >
-                  <option value="">Select a team member</option>
                   {project?.members
                     ?.filter(m => m.status === 'accepted' && !reassignTask.assignees?.some(a => a.user._id === m.employee._id))
                     .map(m => (
-                      <option key={m.employee._id} value={m.employee._id}>
+                      <SelectItem key={m.employee._id}>
                         {m.employee.firstName} {m.employee.lastName}
-                      </option>
+                      </SelectItem>
                     ))
                   }
-                </select>
+                </Select>
               </div>
 
               <div className="flex justify-end gap-3">

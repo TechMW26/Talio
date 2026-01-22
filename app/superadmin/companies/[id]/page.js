@@ -2,6 +2,7 @@
 
 import { useEffect, useState, use } from 'react'
 import { useRouter } from 'next/navigation'
+import { Select, SelectItem } from '@heroui/react'
 import toast from '@/utils/toast'
 import Loader from '@/components/ui/Loader'
 
@@ -944,43 +945,46 @@ export default function CompanyDetailPage({ params }) {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Plan</label>
-                      <select
-                        value={subscriptionForm.plan}
+                      <Select
+                        selectedKeys={[subscriptionForm.plan]}
                         onChange={(e) => setSubscriptionForm({ ...subscriptionForm, plan: e.target.value })}
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        aria-label="Subscription Plan"
+                        classNames={{ trigger: "bg-gray-50" }}
                       >
-                        <option value="trial">Trial</option>
-                        <option value="starter">Starter</option>
-                        <option value="professional">Professional</option>
-                        <option value="enterprise">Enterprise</option>
-                        <option value="custom">Custom</option>
-                      </select>
+                        <SelectItem key="trial">Trial</SelectItem>
+                        <SelectItem key="starter">Starter</SelectItem>
+                        <SelectItem key="professional">Professional</SelectItem>
+                        <SelectItem key="enterprise">Enterprise</SelectItem>
+                        <SelectItem key="custom">Custom</SelectItem>
+                      </Select>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Billing Cycle</label>
-                      <select
-                        value={subscriptionForm.billingCycle}
+                      <Select
+                        selectedKeys={[subscriptionForm.billingCycle]}
                         onChange={(e) => setSubscriptionForm({ ...subscriptionForm, billingCycle: e.target.value })}
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        aria-label="Billing Cycle"
+                        classNames={{ trigger: "bg-gray-50" }}
                       >
-                        <option value="monthly">Monthly</option>
-                        <option value="quarterly">Quarterly</option>
-                        <option value="yearly">Yearly</option>
-                        <option value="custom">Custom</option>
-                      </select>
+                        <SelectItem key="monthly">Monthly</SelectItem>
+                        <SelectItem key="quarterly">Quarterly</SelectItem>
+                        <SelectItem key="yearly">Yearly</SelectItem>
+                        <SelectItem key="custom">Custom</SelectItem>
+                      </Select>
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                      <select
-                        value={subscriptionForm.status}
+                      <Select
+                        selectedKeys={[subscriptionForm.status]}
                         onChange={(e) => setSubscriptionForm({ ...subscriptionForm, status: e.target.value })}
-                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        aria-label="Subscription Status"
+                        classNames={{ trigger: "bg-gray-50" }}
                       >
-                        <option value="active">Active</option>
-                        <option value="paused">Paused</option>
-                        <option value="expired">Expired</option>
-                        <option value="cancelled">Cancelled</option>
-                      </select>
+                        <SelectItem key="active">Active</SelectItem>
+                        <SelectItem key="paused">Paused</SelectItem>
+                        <SelectItem key="expired">Expired</SelectItem>
+                        <SelectItem key="cancelled">Cancelled</SelectItem>
+                      </Select>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1243,17 +1247,18 @@ export default function CompanyDetailPage({ params }) {
                   placeholder="Add a note..."
                 />
                 <div className="flex gap-4">
-                  <select
-                    value={newNote.category}
+                  <Select
+                    selectedKeys={[newNote.category]}
                     onChange={(e) => setNewNote({ ...newNote, category: e.target.value })}
-                    className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    aria-label="Note Category"
+                    classNames={{ trigger: "bg-gray-50 min-w-[140px]" }}
                   >
-                    <option value="general">General</option>
-                    <option value="billing">Billing</option>
-                    <option value="support">Support</option>
-                    <option value="technical">Technical</option>
-                    <option value="feedback">Feedback</option>
-                  </select>
+                    <SelectItem key="general">General</SelectItem>
+                    <SelectItem key="billing">Billing</SelectItem>
+                    <SelectItem key="support">Support</SelectItem>
+                    <SelectItem key="technical">Technical</SelectItem>
+                    <SelectItem key="feedback">Feedback</SelectItem>
+                  </Select>
                   <button
                     type="submit"
                     disabled={submitting || !newNote.content.trim()}
@@ -1324,16 +1329,17 @@ export default function CompanyDetailPage({ params }) {
                   className="md:col-span-2 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white resize-none"
                   placeholder="Description (optional)..."
                 />
-                <select
-                  value={newReminder.priority}
+                <Select
+                  selectedKeys={[newReminder.priority]}
                   onChange={(e) => setNewReminder({ ...newReminder, priority: e.target.value })}
-                  className="px-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  aria-label="Reminder Priority"
+                  classNames={{ trigger: "bg-gray-50" }}
                 >
-                  <option value="low">Low Priority</option>
-                  <option value="medium">Medium Priority</option>
-                  <option value="high">High Priority</option>
-                  <option value="urgent">Urgent</option>
-                </select>
+                  <SelectItem key="low">Low Priority</SelectItem>
+                  <SelectItem key="medium">Medium Priority</SelectItem>
+                  <SelectItem key="high">High Priority</SelectItem>
+                  <SelectItem key="urgent">Urgent</SelectItem>
+                </Select>
                 <button
                   type="submit"
                   disabled={submitting || !newReminder.title.trim() || !newReminder.dueDate}

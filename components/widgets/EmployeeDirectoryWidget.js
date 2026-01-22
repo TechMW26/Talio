@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { FaSearch, FaUser } from 'react-icons/fa'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
+import { Card, CardBody, Button, Input, Avatar, Skeleton, ScrollShadow } from '@heroui/react'
 
 export default function EmployeeDirectoryWidget() {
   const router = useRouter()
@@ -22,11 +23,17 @@ export default function EmployeeDirectoryWidget() {
 
   if (isLoading) {
     return (
-      <div className="p-4 sm:p-6 animate-pulse flex-1 flex flex-col h-full">
-        <div className="h-10 bg-gray-200 rounded mb-4"></div>
+      <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+        <Skeleton className="h-10 w-full rounded-lg mb-4" />
         <div className="space-y-3">
           {[1, 2, 3, 4].map(i => (
-            <div key={i} className="h-12 bg-gray-200 rounded"></div>
+            <div key={i} className="flex items-center gap-3">
+              <Skeleton className="w-10 h-10 rounded-full" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-3/4 rounded-lg" />
+                <Skeleton className="h-3 w-1/2 rounded-lg" />
+              </div>
+            </div>
           ))}
         </div>
       </div>
@@ -36,8 +43,8 @@ export default function EmployeeDirectoryWidget() {
   if (error) {
     return (
       <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
-        <h3 className="text-base sm:text-lg font-bold text-gray-800 mb-4">Employee Directory</h3>
-        <p className="text-sm text-gray-500">Unable to load employees.</p>
+        <h3 className="text-base sm:text-lg font-bold text-default-900 mb-4">Employee Directory</h3>
+        <p className="text-sm text-default-500">Unable to load employees.</p>
       </div>
     )
   }
@@ -45,60 +52,67 @@ export default function EmployeeDirectoryWidget() {
   return (
     <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-base sm:text-lg font-bold text-gray-800">Employee Directory</h3>
-        <button
-          onClick={() => router.push('/dashboard/employees')}
-          className="text-primary-600 hover:text-primary-800 text-sm font-medium"
+        <h3 className="text-base sm:text-lg font-bold text-default-900">Employee Directory</h3>
+        <Button
+          variant="light"
+          color="primary"
+          size="sm"
+          onPress={() => router.push('/dashboard/employees')}
         >
           View All
-        </button>
+        </Button>
       </div>
 
       {/* Search */}
-      <div className="relative mb-4">
-        <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-        <input
-          type="text"
-          placeholder="Search employees..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-        />
-      </div>
+      <Input
+        placeholder="Search employees..."
+        value={search}
+        onValueChange={setSearch}
+        startContent={<FaSearch className="text-default-400" />}
+        size="sm"
+        variant="bordered"
+        className="mb-4"
+      />
 
       {/* Employee List */}
-      <div className="space-y-2 max-h-[200px] overflow-y-auto">
+      <ScrollShadow className="space-y-2 max-h-[200px]">
         {filteredEmployees.length === 0 ? (
-          <div className="text-center py-6 text-gray-500">
-            <FaUser className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-            <p className="text-sm">No employees match your search</p>
+          <div className="flex flex-col items-center justify-center text-center py-6">
+            <div className="w-14 h-14 rounded-full bg-default-100 flex items-center justify-center mb-3">
+              <FaUser className="w-7 h-7 text-default-400" />
+            </div>
+            <p className="text-sm text-default-500">No employees match your search</p>
           </div>
         ) : (
           filteredEmployees.slice(0, 8).map((emp) => (
-            <div
+            <Card
               key={emp._id}
-              className="flex items-center gap-3 p-2 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition-colors"
-              onClick={() => router.push(`/dashboard/employees/${emp._id}`)}
+              isPressable
+              onPress={() => router.push(`/dashboard/employees/${emp._id}`)}
+              className="bg-default-50 border border-default-100"
             >
-              <div className="w-10 h-10 rounded-full overflow-hidden bg-primary-100 flex items-center justify-center flex-shrink-0">
-                {emp.profilePicture ? (
-                  <img src={emp.profilePicture} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <FaUser className="w-4 h-4 text-primary-600" />
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800 truncate">
-                  {emp.firstName} {emp.lastName}
-                </p>
-                <p className="text-xs text-gray-500 truncate">
-                  {emp.designation?.title || emp.employeeCode}
-                </p>
-              </div>
-            </div>
+              <CardBody className="p-2">
+                <div className="flex items-center gap-3">
+                  <Avatar
+                    src={emp.profilePicture}
+                    name={`${emp.firstName?.charAt(0) || ''}${emp.lastName?.charAt(0) || ''}`}
+                    size="sm"
+                    className="bg-primary-100 text-primary-600"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-default-900 truncate">
+                      {emp.firstName} {emp.lastName}
+                    </p>
+                    <p className="text-xs text-default-500 truncate">
+                      {emp.designation?.title || emp.employeeCode}
+                    </p>
+                  </div>
+                </div>
+              </CardBody>
+            </Card>
           ))
         )}
-      </div>
+      </ScrollShadow>
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { FaStar, FaArrowLeft, FaSave } from 'react-icons/fa'
+import { Select, SelectItem, Input, Button } from '@heroui/react'
 
 export default function CreatePerformanceReviewPage() {
   const router = useRouter()
@@ -148,22 +149,19 @@ export default function CreatePerformanceReviewPage() {
             <h2 className="text-xl font-bold text-gray-800 mb-4">Employee Information</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Select Employee *
-                </label>
-                <select
-                  required
-                  value={formData.employee}
-                  onChange={(e) => setFormData({ ...formData, employee: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                <Select
+                  label="Select Employee *"
+                  isRequired
+                  selectedKeys={formData.employee ? [formData.employee] : []}
+                  onSelectionChange={(keys) => setFormData({ ...formData, employee: Array.from(keys)[0] || '' })}
+                  placeholder="Select Employee"
                 >
-                  <option value="">Select Employee</option>
                   {employees.map((emp) => (
-                    <option key={emp._id} value={emp._id}>
+                    <SelectItem key={emp._id}>
                       {emp.firstName} {emp.lastName} - {emp.employeeCode}
-                    </option>
+                    </SelectItem>
                   ))}
-                </select>
+                </Select>
               </div>
 
               <div>
@@ -312,22 +310,22 @@ export default function CreatePerformanceReviewPage() {
 
           {/* Submit Button */}
           <div className="flex justify-end space-x-4">
-            <button
+            <Button
               type="button"
-              onClick={() => router.push('/dashboard/performance')}
-              className="btn-secondary"
-              disabled={submitting}
+              onPress={() => router.push('/dashboard/performance')}
+              variant="flat"
+              isDisabled={submitting}
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
-              className="btn-primary flex items-center space-x-2"
-              disabled={submitting}
+              color="primary"
+              startContent={<FaSave />}
+              isDisabled={submitting}
             >
-              <FaSave />
-              <span>{submitting ? 'Creating...' : 'Create Review'}</span>
-            </button>
+              {submitting ? 'Creating...' : 'Create Review'}
+            </Button>
           </div>
         </form>
       </div>

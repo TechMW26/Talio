@@ -4,9 +4,9 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import toast from '@/utils/toast'
 import { FaClock, FaSignInAlt, FaSignOutAlt, FaCalendarAlt, FaEdit, FaCheck, FaTimes, FaExclamationCircle, FaPlus, FaChevronLeft, FaChevronRight, FaList, FaTh, FaMapMarkerAlt } from 'react-icons/fa'
 import OvertimePrompt, { useOvertimeCheck } from '@/components/OvertimePrompt'
-import ModalPortal from '@/components/ui/ModalPortal'
 import useLocationCapture from '@/hooks/useLocationCapture'
 import { useSocket } from '@/contexts/SocketContext'
+import { Card, CardBody, CardHeader, CardFooter, Button, Chip, Skeleton, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Textarea, Select, SelectItem } from '@heroui/react'
 
 export default function AttendancePage() {
   const [mounted, setMounted] = useState(false)
@@ -672,43 +672,43 @@ export default function AttendancePage() {
 
   // Get status color for calendar cell
   const getStatusColor = (record, isFuture) => {
-    if (isFuture) return 'bg-gray-50'
-    if (!record) return 'bg-gray-100/80' // No record - potentially absent
+    if (isFuture) return 'bg-default-50'
+    if (!record) return 'bg-default-100/80' // No record - potentially absent
     switch (record.status) {
-      case 'present': return 'bg-green-100/70'
-      case 'in-progress': return 'bg-orange-100/70'
-      case 'half-day': return 'bg-yellow-100/70'
-      case 'late': return 'bg-amber-100/70'
-      case 'absent': return 'bg-red-100/70'
-      case 'on-leave': return 'bg-blue-100/70'
-      case 'holiday': return 'bg-purple-100/70'
-      default: return 'bg-gray-100/70'
+      case 'present': return 'bg-success-100/70'
+      case 'in-progress': return 'bg-warning-100/70'
+      case 'half-day': return 'bg-warning-100/70'
+      case 'late': return 'bg-warning-100/70'
+      case 'absent': return 'bg-danger-100/70'
+      case 'on-leave': return 'bg-primary-100/70'
+      case 'holiday': return 'bg-secondary-100/70'
+      default: return 'bg-default-100/70'
     }
   }
 
   const getStatusTextColor = (status) => {
     switch (status) {
-      case 'present': return 'text-green-700'
-      case 'in-progress': return 'text-orange-700'
-      case 'half-day': return 'text-yellow-700'
-      case 'late': return 'text-amber-700'
-      case 'absent': return 'text-red-700'
-      case 'on-leave': return 'text-blue-700'
-      case 'holiday': return 'text-purple-700'
-      default: return 'text-gray-700'
+      case 'present': return 'text-success-700'
+      case 'in-progress': return 'text-warning-700'
+      case 'half-day': return 'text-warning-700'
+      case 'late': return 'text-warning-700'
+      case 'absent': return 'text-danger-700'
+      case 'on-leave': return 'text-primary-700'
+      case 'holiday': return 'text-secondary-700'
+      default: return 'text-default-700'
     }
   }
 
   const getStatusBadgeColor = (status) => {
     switch (status) {
-      case 'present': return 'bg-green-100 text-green-800 border-green-200'
-      case 'in-progress': return 'bg-orange-100 text-orange-800 border-orange-200'
-      case 'half-day': return 'bg-yellow-100 text-yellow-800 border-yellow-200'
-      case 'late': return 'bg-amber-100 text-amber-800 border-amber-200'
-      case 'absent': return 'bg-red-100 text-red-800 border-red-200'
-      case 'on-leave': case 'leave': return 'bg-blue-100 text-blue-800 border-blue-200'
-      case 'holiday': return 'bg-purple-100 text-purple-800 border-purple-200'
-      default: return 'bg-gray-100 text-gray-800 border-gray-200'
+      case 'present': return 'bg-success-100 text-success-800 border-success-200'
+      case 'in-progress': return 'bg-warning-100 text-warning-800 border-warning-200'
+      case 'half-day': return 'bg-warning-100 text-warning-800 border-warning-200'
+      case 'late': return 'bg-warning-100 text-warning-800 border-warning-200'
+      case 'absent': return 'bg-danger-100 text-danger-800 border-danger-200'
+      case 'on-leave': case 'leave': return 'bg-primary-100 text-primary-800 border-primary-200'
+      case 'holiday': return 'bg-secondary-100 text-secondary-800 border-secondary-200'
+      default: return 'bg-default-100 text-default-800 border-default-200'
     }
   }
 
@@ -911,10 +911,10 @@ export default function AttendancePage() {
   if (!mounted) {
     return (
       <div className="page-container">
-        <div className="animate-pulse space-y-4">
-          <div className="h-10 bg-gray-200 rounded w-1/4"></div>
-          <div className="h-32 bg-gray-200 rounded"></div>
-          <div className="h-64 bg-gray-200 rounded"></div>
+        <div className="space-y-4">
+          <Skeleton className="h-10 w-1/4 rounded-lg" />
+          <Skeleton className="h-32 w-full rounded-lg" />
+          <Skeleton className="h-64 w-full rounded-lg" />
         </div>
       </div>
     )
@@ -925,44 +925,49 @@ export default function AttendancePage() {
       {/* Header */}
       <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-0">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Attendance</h1>
-          <p className="text-sm sm:text-base text-gray-600 mt-1">Track your attendance and work hours</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-default-800">Attendance</h1>
+          <p className="text-sm sm:text-base text-default-500 mt-1">Track your attendance and work hours</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
-          <button
-            onClick={() => setShowMissingEntryModal(true)}
-            className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors text-sm sm:text-base"
+          <Button
+            color="warning"
+            onPress={() => setShowMissingEntryModal(true)}
+            startContent={<FaPlus className="w-3 h-3 sm:w-4 sm:h-4" />}
+            className="text-sm sm:text-base"
           >
-            <FaPlus className="w-3 h-3 sm:w-4 sm:h-4" />
             <span className="hidden sm:inline">Report Missing Entry</span>
             <span className="sm:hidden">Missing Entry</span>
-          </button>
-          <button
-            onClick={() => setShowMyCorrections(!showMyCorrections)}
-            className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm sm:text-base"
+          </Button>
+          <Button
+            color="primary"
+            onPress={() => setShowMyCorrections(!showMyCorrections)}
+            startContent={<FaEdit className="w-3 h-3 sm:w-4 sm:h-4" />}
+            className="text-sm sm:text-base"
           >
-            <FaEdit className="w-3 h-3 sm:w-4 sm:h-4" />
             <span className="hidden sm:inline">My Requests ({myCorrections.length})</span>
             <span className="sm:hidden">Requests ({myCorrections.length})</span>
-          </button>
+          </Button>
           {canApprove && pendingCorrections.length > 0 && (
-            <button
-              onClick={() => setShowPendingApprovals(!showPendingApprovals)}
-              className="flex items-center justify-center gap-2 px-3 sm:px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition-colors text-sm sm:text-base"
+            <Button
+              color="secondary"
+              onPress={() => setShowPendingApprovals(!showPendingApprovals)}
+              startContent={<FaExclamationCircle className="w-3 h-3 sm:w-4 sm:h-4" />}
+              className="text-sm sm:text-base"
             >
-              <FaExclamationCircle className="w-3 h-3 sm:w-4 sm:h-4" />
               <span className="hidden sm:inline">Pending Approvals ({pendingCorrections.length})</span>
               <span className="sm:hidden">Approvals ({pendingCorrections.length})</span>
-            </button>
+            </Button>
           )}
         </div>
       </div>
 
       {/* Pending Approvals Section (for admins/HRs/dept heads) */}
       {showPendingApprovals && pendingCorrections.length > 0 && (
-        <div className="bg-purple-50 rounded-lg shadow-md p-4 sm:p-6 mb-4 sm:mb-6 border border-purple-200">
-          <h2 className="text-lg sm:text-xl font-semibold text-purple-800 mb-4">Pending Correction Approvals</h2>
-          <div className="space-y-4">
+        <Card className="mb-4 sm:mb-6 border border-secondary-200 bg-secondary-50">
+          <CardHeader className="pb-2">
+            <h2 className="text-lg sm:text-xl font-semibold text-secondary-800">Pending Correction Approvals</h2>
+          </CardHeader>
+          <CardBody className="space-y-4">
             {pendingCorrections.map((correction) => {
               // Calculate what status WOULD BE if approved
               const requestedCheckIn = correction.requestedCheckIn || correction.currentCheckIn
@@ -975,242 +980,268 @@ export default function AttendancePage() {
                 : 0
 
               return (
-                <div key={correction._id} className="bg-white rounded-lg p-3 sm:p-4 border border-purple-100">
-                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
-                    <div className="flex-1">
-                      <p className="font-semibold text-sm sm:text-base text-gray-800">
-                        {correction.employee?.firstName} {correction.employee?.lastName}
-                      </p>
-                      <p className="text-xs sm:text-sm text-gray-600 mt-1">
-                        Date: {formatDate(correction.date)} | Type: {correction.correctionType}
-                      </p>
-                      <p className="text-xs sm:text-sm text-gray-500 mt-1">
-                        <strong>Current:</strong> {formatTime(correction.currentCheckIn)} - {formatTime(correction.currentCheckOut)} ({correction.currentStatus})
-                      </p>
-                      <p className="text-xs sm:text-sm text-blue-600 mt-1">
-                        <strong>Requested:</strong> {correction.requestedCheckIn ? formatTime(correction.requestedCheckIn) : formatTime(correction.currentCheckIn)} - {correction.requestedCheckOut ? formatTime(correction.requestedCheckOut) : formatTime(correction.currentCheckOut)}
-                      </p>
-                      {expectedWorkHours > 0 && (
-                        <p className="text-xs sm:text-sm text-green-600 mt-1 font-medium">
-                          <strong>If approved:</strong> {expectedWorkHours.toFixed(1)}h worked → <span className={`px-1.5 py-0.5 rounded text-white ${expectedStatus === 'present' ? 'bg-green-500' : expectedStatus === 'half-day' ? 'bg-yellow-500' : 'bg-red-500'}`}>{expectedStatus}</span>
+                <Card key={correction._id} className="border border-secondary-100">
+                  <CardBody>
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
+                      <div className="flex-1">
+                        <p className="font-semibold text-sm sm:text-base text-default-800">
+                          {correction.employee?.firstName} {correction.employee?.lastName}
                         </p>
-                      )}
-                      <p className="text-xs sm:text-sm text-gray-600 mt-2 italic line-clamp-2">&quot;{correction.reason}&quot;</p>
+                        <p className="text-xs sm:text-sm text-default-600 mt-1">
+                          Date: {formatDate(correction.date)} | Type: {correction.correctionType}
+                        </p>
+                        <p className="text-xs sm:text-sm text-default-500 mt-1">
+                          <strong>Current:</strong> {formatTime(correction.currentCheckIn)} - {formatTime(correction.currentCheckOut)} ({correction.currentStatus})
+                        </p>
+                        <p className="text-xs sm:text-sm text-primary mt-1">
+                          <strong>Requested:</strong> {correction.requestedCheckIn ? formatTime(correction.requestedCheckIn) : formatTime(correction.currentCheckIn)} - {correction.requestedCheckOut ? formatTime(correction.requestedCheckOut) : formatTime(correction.currentCheckOut)}
+                        </p>
+                        {expectedWorkHours > 0 && (
+                          <p className="text-xs sm:text-sm text-success mt-1 font-medium">
+                            <strong>If approved:</strong> {expectedWorkHours.toFixed(1)}h worked → <Chip size="sm" color={expectedStatus === 'present' ? 'success' : expectedStatus === 'half-day' ? 'warning' : 'danger'}>{expectedStatus}</Chip>
+                          </p>
+                        )}
+                        <p className="text-xs sm:text-sm text-default-600 mt-2 italic line-clamp-2">&quot;{correction.reason}&quot;</p>
+                      </div>
+                      <div className="flex gap-2 flex-shrink-0">
+                        <Button
+                          isIconOnly
+                          color="success"
+                          size="sm"
+                          onPress={() => handleApproveReject(correction._id, 'approve')}
+                          title="Approve"
+                        >
+                          <FaCheck className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          isIconOnly
+                          color="danger"
+                          size="sm"
+                          onPress={() => {
+                            const comment = prompt('Reason for rejection (optional):')
+                            handleApproveReject(correction._id, 'reject', comment || '')
+                          }}
+                          title="Reject"
+                        >
+                          <FaTimes className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex gap-2 flex-shrink-0">
-                      <button
-                        onClick={() => handleApproveReject(correction._id, 'approve')}
-                        className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
-                        title="Approve"
-                      >
-                        <FaCheck className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          const comment = prompt('Reason for rejection (optional):')
-                          handleApproveReject(correction._id, 'reject', comment || '')
-                        }}
-                        className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-                        title="Reject"
-                      >
-                        <FaTimes className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                  </CardBody>
+                </Card>
               )
             })}
-          </div>
-        </div>
+          </CardBody>
+        </Card>
       )}
 
       {/* My Correction Requests */}
       {showMyCorrections && (
-        <div className="bg-blue-50 rounded-lg shadow-md p-4 sm:p-6 mb-4 sm:mb-6 border border-blue-200">
-          <h2 className="text-lg sm:text-xl font-semibold text-blue-800 mb-4">My Correction Requests</h2>
-          {myCorrections.length === 0 ? (
-            <p className="text-sm sm:text-base text-gray-500">No correction requests submitted yet.</p>
-          ) : (
-            <div className="space-y-3">
-              {myCorrections.map((correction) => (
-                <div key={correction._id} className="bg-white rounded-lg p-3 sm:p-4 border border-blue-100">
-                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-0">
-                    <div className="flex-1">
-                      <p className="font-medium text-sm sm:text-base text-gray-800">{formatDate(correction.date)}</p>
-                      <p className="text-xs sm:text-sm text-gray-600">Type: {correction.correctionType}</p>
-                      <p className="text-xs sm:text-sm text-gray-500 italic line-clamp-2">&quot;{correction.reason}&quot;</p>
-                    </div>
-                    <span className={`px-2 sm:px-3 py-1 text-xs sm:text-sm rounded-full whitespace-nowrap self-start ${correction.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                      correction.status === 'approved' ? 'bg-green-100 text-green-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
-                      {correction.status}
-                    </span>
-                  </div>
+        <Card className="mb-4 sm:mb-6 border border-primary-200 bg-primary-50">
+          <CardHeader className="pb-2">
+            <h2 className="text-lg sm:text-xl font-semibold text-primary-800">My Correction Requests</h2>
+          </CardHeader>
+          <CardBody>
+            {myCorrections.length === 0 ? (
+              <p className="text-sm sm:text-base text-default-500">No correction requests submitted yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {myCorrections.map((correction) => (
+                  <Card key={correction._id} className="border border-primary-100">
+                    <CardBody>
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 sm:gap-0">
+                        <div className="flex-1">
+                          <p className="font-medium text-sm sm:text-base text-default-800">{formatDate(correction.date)}</p>
+                          <p className="text-xs sm:text-sm text-default-600">Type: {correction.correctionType}</p>
+                          <p className="text-xs sm:text-sm text-default-500 italic line-clamp-2">&quot;{correction.reason}&quot;</p>
+                        </div>
+                        <Chip
+                          size="sm"
+                          color={correction.status === 'pending' ? 'warning' : correction.status === 'approved' ? 'success' : 'danger'}
+                          variant="flat"
+                        >
+                          {correction.status}
+                        </Chip>
+                      </div>
                   {correction.reviewerComments && (
-                    <p className="text-xs sm:text-sm text-gray-500 mt-2">
+                    <p className="text-xs sm:text-sm text-default-500 mt-2">
                       <strong>Reviewer:</strong> {correction.reviewerComments}
                     </p>
                   )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                    </CardBody>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </CardBody>
+        </Card>
       )}
 
       {/* Clock In/Out Card */}
-      <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 mb-4 sm:mb-6">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-          <div className="w-full lg:w-auto">
-            <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-3">Today&apos;s Attendance</h2>
-            <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-4 text-sm sm:text-base text-gray-600">
-              <div className="flex items-center gap-2">
-                <FaClock className="text-primary-500 w-4 h-4" />
-                <span>Check In: {formatTime(todayAttendance?.checkIn)}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <FaClock className="text-primary-500 w-4 h-4" />
-                <span>Check Out: {formatTime(todayAttendance?.checkOut)}</span>
-              </div>
-              {todayAttendance?.workHours && (
+      <Card className="mb-4 sm:mb-6 shadow-md">
+        <CardBody>
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+            <div className="w-full lg:w-auto">
+              <h2 className="text-lg sm:text-xl font-semibold text-default-800 mb-3">Today&apos;s Attendance</h2>
+              <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-4 text-sm sm:text-base text-default-600">
                 <div className="flex items-center gap-2">
-                  <FaClock className="text-green-500 w-4 h-4" />
-                  <span className="font-semibold">
-                    Work Hours: {todayAttendance.workHours}h
-                  </span>
+                  <FaClock className="text-primary w-4 h-4" />
+                  <span>Check In: {formatTime(todayAttendance?.checkIn)}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <FaClock className="text-primary w-4 h-4" />
+                  <span>Check Out: {formatTime(todayAttendance?.checkOut)}</span>
+                </div>
+                {todayAttendance?.workHours && (
+                  <div className="flex items-center gap-2">
+                    <FaClock className="text-success w-4 h-4" />
+                    <span className="font-semibold">
+                      Work Hours: {todayAttendance.workHours}h
+                    </span>
+                  </div>
+                )}
+              </div>
+              {/* Location Display */}
+              {(todayAttendance?.location?.checkIn?.address || todayAttendance?.location?.checkOut?.address) && (
+                <div className="mt-3 pt-3 border-t border-divider">
+                  <div className="flex flex-col gap-2 text-xs sm:text-sm">
+                    {todayAttendance?.location?.checkIn?.address && (
+                      <div className="flex items-start gap-2 text-default-600">
+                        <FaMapMarkerAlt className="text-success w-3 h-3 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <span className="font-medium text-default-700">Check-in: </span>
+                          <span className="text-default-600">{todayAttendance.location.checkIn.address}</span>
+                        </div>
+                      </div>
+                    )}
+                    {todayAttendance?.location?.checkOut?.address && (
+                      <div className="flex items-start gap-2 text-default-600">
+                        <FaMapMarkerAlt className="text-danger w-3 h-3 mt-0.5 flex-shrink-0" />
+                        <div>
+                          <span className="font-medium text-default-700">Check-out: </span>
+                          <span className="text-default-600">{todayAttendance.location.checkOut.address}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
-            {/* Location Display */}
-            {(todayAttendance?.location?.checkIn?.address || todayAttendance?.location?.checkOut?.address) && (
-              <div className="mt-3 pt-3 border-t border-gray-100">
-                <div className="flex flex-col gap-2 text-xs sm:text-sm">
-                  {todayAttendance?.location?.checkIn?.address && (
-                    <div className="flex items-start gap-2 text-gray-600">
-                      <FaMapMarkerAlt className="text-green-500 w-3 h-3 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <span className="font-medium text-gray-700">Check-in: </span>
-                        <span className="text-gray-600">{todayAttendance.location.checkIn.address}</span>
-                      </div>
-                    </div>
-                  )}
-                  {todayAttendance?.location?.checkOut?.address && (
-                    <div className="flex items-start gap-2 text-gray-600">
-                      <FaMapMarkerAlt className="text-red-500 w-3 h-3 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <span className="font-medium text-gray-700">Check-out: </span>
-                        <span className="text-gray-600">{todayAttendance.location.checkOut.address}</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+            <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
+              <Button
+                color="primary"
+                size="lg"
+                onPress={handleClockIn}
+                isDisabled={loading || locationLoading || (todayAttendance && todayAttendance.checkIn)}
+                startContent={<FaSignInAlt className="w-4 h-4 sm:w-5 sm:h-5" />}
+                className="font-semibold"
+              >
+                {loading || locationLoading ? 'Getting Location...' : 'Clock In'}
+              </Button>
+              <Button
+                color="secondary"
+                size="lg"
+                onPress={handleClockOut}
+                isDisabled={loading || locationLoading || !todayAttendance || !todayAttendance.checkIn || todayAttendance.checkOut}
+                startContent={<FaSignOutAlt className="w-4 h-4 sm:w-5 sm:h-5" />}
+                className="font-semibold"
+              >
+                {loading || locationLoading ? 'Getting Location...' : 'Clock Out'}
+              </Button>
+            </div>
           </div>
-          <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
-            <button
-              onClick={handleClockIn}
-              disabled={loading || locationLoading || (todayAttendance && todayAttendance.checkIn)}
-              className="btn-theme-primary flex items-center justify-center gap-2 px-6 py-3 sm:p-8 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold shadow-md hover:shadow-lg transition-all duration-200 text-sm sm:text-base"
-            >
-              <FaSignInAlt className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span>{loading || locationLoading ? 'Getting Location...' : 'Clock In'}</span>
-            </button>
-            <button
-              onClick={handleClockOut}
-              disabled={loading || locationLoading || !todayAttendance || !todayAttendance.checkIn || todayAttendance.checkOut}
-              className="btn-theme-secondary flex items-center justify-center gap-2 px-6 py-3 sm:p-8 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg font-semibold shadow-md hover:shadow-lg transition-all duration-200 text-sm sm:text-base"
-            >
-              <FaSignOutAlt className="w-4 h-4 sm:w-5 sm:h-5" />
-              <span>{loading || locationLoading ? 'Getting Location...' : 'Clock Out'}</span>
-            </button>
-          </div>
-        </div>
-      </div>
+        </CardBody>
+      </Card>
 
       {/* Attendance History - Calendar & List View */}
-      <div className="bg-white rounded-lg shadow-md p-4 sm:p-6">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-4 sm:mb-6 gap-3 sm:gap-4">
-          <div>
-            <h2 className="text-lg sm:text-xl font-semibold text-gray-800">My Attendance - {user?.firstName} {user?.lastName}</h2>
-            <p className="text-xs sm:text-sm text-gray-500 mt-1">Click on any day to edit or report missing entry</p>
-          </div>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full lg:w-auto">
-            {/* View Toggle */}
-            <div className="flex bg-gray-100 rounded-lg p-1 w-full sm:w-auto">
-              <button
-                onClick={() => setViewMode('calendar')}
-                className={`flex items-center justify-center gap-1 px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors flex-1 sm:flex-initial ${viewMode === 'calendar' ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:text-gray-700'
-                  }`}
-              >
-                <FaTh className="w-3 h-3 sm:w-4 sm:h-4" />
-                <span>Calendar</span>
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`flex items-center justify-center gap-1 px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-colors flex-1 sm:flex-initial ${viewMode === 'list' ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:text-gray-700'
-                  }`}
-              >
-                <FaList className="w-3 h-3 sm:w-4 sm:h-4" />
-                <span>List</span>
-              </button>
+      <Card className="shadow-md">
+        <CardBody>
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-4 sm:mb-6 gap-3 sm:gap-4">
+            <div>
+              <h2 className="text-lg sm:text-xl font-semibold text-default-800">My Attendance - {user?.firstName} {user?.lastName}</h2>
+              <p className="text-xs sm:text-sm text-default-500 mt-1">Click on any day to edit or report missing entry</p>
             </div>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full lg:w-auto">
+              {/* View Toggle */}
+              <div className="flex bg-default-100 rounded-lg p-1 w-full sm:w-auto">
+                <Button
+                  size="sm"
+                  variant={viewMode === 'calendar' ? 'solid' : 'light'}
+                  onPress={() => setViewMode('calendar')}
+                  startContent={<FaTh className="w-3 h-3 sm:w-4 sm:h-4" />}
+                  className="flex-1 sm:flex-initial"
+                >
+                  Calendar
+                </Button>
+                <Button
+                  size="sm"
+                  variant={viewMode === 'list' ? 'solid' : 'light'}
+                  onPress={() => setViewMode('list')}
+                  startContent={<FaList className="w-3 h-3 sm:w-4 sm:h-4" />}
+                  className="flex-1 sm:flex-initial"
+                >
+                  List
+                </Button>
+              </div>
 
-            {/* Month Navigation */}
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <button
-                onClick={goToPreviousMonth}
-                className="p-2 rounded-lg hover:bg-gray-100 text-gray-600"
-              >
-                <FaChevronLeft className="w-3 h-3 sm:w-4 sm:h-4" />
-              </button>
-              <span className="text-sm sm:text-lg font-medium text-gray-800 min-w-[120px] sm:min-w-[140px] text-center">
-                {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-              </span>
-              <button
-                onClick={goToNextMonth}
-                className="p-2 rounded-lg hover:bg-gray-100 text-gray-600"
-              >
-                <FaChevronRight className="w-3 h-3 sm:w-4 sm:h-4" />
-              </button>
+              {/* Month Navigation */}
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <Button
+                  isIconOnly
+                  variant="light"
+                  size="sm"
+                  onPress={goToPreviousMonth}
+                >
+                  <FaChevronLeft className="w-3 h-3 sm:w-4 sm:h-4" />
+                </Button>
+                <span className="text-sm sm:text-lg font-medium text-default-800 min-w-[120px] sm:min-w-[140px] text-center">
+                  {currentMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                </span>
+                <Button
+                  isIconOnly
+                  variant="light"
+                  size="sm"
+                  onPress={goToNextMonth}
+                >
+                  <FaChevronRight className="w-3 h-3 sm:w-4 sm:h-4" />
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
 
         {/* Status Legend */}
-        <div className="flex flex-wrap gap-2 sm:gap-3 mb-4 sm:mb-6 p-2 sm:p-3 bg-gray-50 rounded-lg">
+        <div className="flex flex-wrap gap-2 sm:gap-3 mb-4 sm:mb-6 p-2 sm:p-3 bg-default-50 rounded-lg">
           <div className="flex items-center gap-1.5 sm:gap-2">
-            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-green-100 border border-green-400"></div>
-            <span className="text-[10px] sm:text-xs text-gray-600">Present</span>
+            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-success-100 border border-success-400"></div>
+            <span className="text-[10px] sm:text-xs text-default-600">Present</span>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2">
-            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-orange-100 border border-orange-400"></div>
-            <span className="text-[10px] sm:text-xs text-gray-600">In Progress</span>
+            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-warning-100 border border-warning-400"></div>
+            <span className="text-[10px] sm:text-xs text-default-600">In Progress</span>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2">
-            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-yellow-100 border border-yellow-400"></div>
-            <span className="text-[10px] sm:text-xs text-gray-600">Half Day</span>
+            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-warning-100 border border-warning-400"></div>
+            <span className="text-[10px] sm:text-xs text-default-600">Half Day</span>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2">
-            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-amber-100 border border-amber-400"></div>
-            <span className="text-[10px] sm:text-xs text-gray-600">Late</span>
+            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-warning-100 border border-warning-400"></div>
+            <span className="text-[10px] sm:text-xs text-default-600">Late</span>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2">
-            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-red-100 border border-red-400"></div>
-            <span className="text-[10px] sm:text-xs text-gray-600">Absent</span>
+            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-danger-100 border border-danger-400"></div>
+            <span className="text-[10px] sm:text-xs text-default-600">Absent</span>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2">
-            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-blue-100 border border-blue-400"></div>
-            <span className="text-[10px] sm:text-xs text-gray-600">On Leave</span>
+            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-primary-100 border border-primary-400"></div>
+            <span className="text-[10px] sm:text-xs text-default-600">On Leave</span>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2">
-            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-purple-100 border border-purple-400"></div>
-            <span className="text-[10px] sm:text-xs text-gray-600">Holiday</span>
+            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-secondary-100 border border-secondary-400"></div>
+            <span className="text-[10px] sm:text-xs text-default-600">Holiday</span>
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2">
-            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-gray-100 border border-gray-300"></div>
-            <span className="text-[10px] sm:text-xs text-gray-600">No Record</span>
+            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-default-100 border border-default-300"></div>
+            <span className="text-[10px] sm:text-xs text-default-600">No Record</span>
           </div>
         </div>
 
@@ -1221,7 +1252,7 @@ export default function AttendancePage() {
               {/* Day Headers */}
               <div className="grid grid-cols-7 gap-1 mb-2">
                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                  <div key={day} className="text-center text-xs sm:text-sm font-semibold text-gray-500 py-2">
+                  <div key={day} className="text-center text-xs sm:text-sm font-semibold text-default-500 py-2">
                     {day}
                   </div>
                 ))}
@@ -1249,21 +1280,21 @@ export default function AttendancePage() {
                   const shouldShowAsAbsent = dayData.isCurrentMonth && isPastDay && isWorkingDay && !isHoliday && !dayData.record && isAfterJoining
 
                   // Determine status color
-                  let statusColor = 'bg-gray-50'
+                  let statusColor = 'bg-default-50'
                   let displayStatus = dayData.record?.status
 
                   if (dayData.record) {
-                    if (dayData.record.status === 'present') statusColor = 'bg-green-50 border-green-100'
-                    else if (dayData.record.status === 'absent') statusColor = 'bg-red-50 border-red-100'
-                    else if (dayData.record.status === 'late') statusColor = 'bg-yellow-50 border-yellow-100'
-                    else if (dayData.record.status === 'half-day') statusColor = 'bg-orange-50 border-orange-100'
-                    else if (dayData.record.status === 'leave') statusColor = 'bg-blue-50 border-blue-100'
-                    else if (dayData.record.status === 'holiday') statusColor = 'bg-purple-50 border-purple-100'
+                    if (dayData.record.status === 'present') statusColor = 'bg-success-50 border-success-100'
+                    else if (dayData.record.status === 'absent') statusColor = 'bg-danger-50 border-danger-100'
+                    else if (dayData.record.status === 'late') statusColor = 'bg-warning-50 border-warning-100'
+                    else if (dayData.record.status === 'half-day') statusColor = 'bg-warning-50 border-warning-100'
+                    else if (dayData.record.status === 'leave') statusColor = 'bg-primary-50 border-primary-100'
+                    else if (dayData.record.status === 'holiday') statusColor = 'bg-secondary-50 border-secondary-100'
                   } else if (isHoliday) {
-                    statusColor = 'bg-purple-50 border-purple-100'
+                    statusColor = 'bg-secondary-50 border-secondary-100'
                   } else if (shouldShowAsAbsent) {
                     // Past working day without record = show as absent
-                    statusColor = 'bg-red-50 border-red-200'
+                    statusColor = 'bg-danger-50 border-danger-200'
                     displayStatus = 'absent'
                   }
 
@@ -1290,13 +1321,13 @@ export default function AttendancePage() {
                       className={`
                       min-h-[80px] sm:min-h-[120px] p-1.5 sm:p-2 border rounded transition-all cursor-pointer relative group
                       ${statusColor}
-                      ${dayData.isToday ? 'ring-2 ring-blue-500' : ''}
-                      ${!dayData.isCurrentMonth ? 'opacity-40 bg-gray-50 border-transparent' : 'bg-white hover:shadow'}
+                      ${dayData.isToday ? 'ring-2 ring-primary' : ''}
+                      ${!dayData.isCurrentMonth ? 'opacity-40 bg-default-50 border-transparent' : 'bg-content1 hover:shadow'}
                     `}
                     >
                       {/* Day number */}
                       <div className="font-bold text-xs sm:text-sm mb-1">
-                        <span className={dayData.isToday ? 'text-blue-600' : 'text-gray-700'}>
+                        <span className={dayData.isToday ? 'text-primary' : 'text-default-700'}>
                           {dayData.day}
                         </span>
                       </div>
@@ -1322,17 +1353,17 @@ export default function AttendancePage() {
                             // Pass dayData.date for accurate timezone handling
                             openCorrectionModal(dayData.record, dayData.date)
                           }}
-                          className="absolute top-0.5 sm:top-1 right-0.5 sm:right-1 p-0.5 sm:p-1 rounded-full bg-white shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-blue-50 z-10"
+                          className="absolute top-0.5 sm:top-1 right-0.5 sm:right-1 p-0.5 sm:p-1 rounded-full bg-content1 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-primary-50 z-10"
                           title="Request Regularisation"
                         >
-                          <FaEdit className="w-2 h-2 sm:w-3 sm:h-3 text-blue-600" />
+                          <FaEdit className="w-2 h-2 sm:w-3 sm:h-3 text-primary" />
                         </button>
                       )}
 
                       {/* Pending correction indicator */}
                       {hasPending && (
                         <div className="absolute bottom-0.5 sm:bottom-1 right-0.5 sm:right-1">
-                          <span className="text-[7px] sm:text-[8px] px-0.5 sm:px-1 py-0.5 bg-yellow-400 text-yellow-900 rounded font-medium">
+                          <span className="text-[7px] sm:text-[8px] px-0.5 sm:px-1 py-0.5 bg-warning text-warning-foreground rounded font-medium">
                             Pending
                           </span>
                         </div>
@@ -1349,23 +1380,23 @@ export default function AttendancePage() {
                             }))
                             setShowMissingEntryModal(true)
                           }}
-                          className="absolute top-0.5 sm:top-1 right-0.5 sm:right-1 p-0.5 sm:p-1 rounded-full bg-white shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-green-50 z-10"
+                          className="absolute top-0.5 sm:top-1 right-0.5 sm:right-1 p-0.5 sm:p-1 rounded-full bg-content1 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-success-50 z-10"
                           title="Add Missing Entry"
                         >
-                          <FaPlus className="w-2 h-2 sm:w-3 sm:h-3 text-green-600" />
+                          <FaPlus className="w-2 h-2 sm:w-3 sm:h-3 text-success" />
                         </button>
                       )}
 
                       {/* Holiday Name */}
                       {isHoliday && (
-                        <div className="text-[9px] sm:text-[10px] leading-tight text-purple-700 mt-1 font-medium bg-purple-100/50 px-1 py-0.5 rounded break-words" style={{ wordBreak: 'break-word', hyphens: 'auto' }}>
+                        <div className="text-[9px] sm:text-[10px] leading-tight text-secondary-700 mt-1 font-medium bg-secondary-100/50 px-1 py-0.5 rounded break-words" style={{ wordBreak: 'break-word', hyphens: 'auto' }}>
                           {holidayName}
                         </div>
                       )}
 
                       {/* Time details for present/late/half-day */}
                       {dayData.record && ['present', 'late', 'half-day'].includes(dayData.record.status) && (
-                        <div className="text-[9px] sm:text-[10px] text-gray-600 mt-1 space-y-0.5 max-h-[50px] sm:max-h-[70px] overflow-y-auto overflow-x-hidden">
+                        <div className="text-[9px] sm:text-[10px] text-default-600 mt-1 space-y-0.5 max-h-[50px] sm:max-h-[70px] overflow-y-auto overflow-x-hidden">
                           {dayData.record.checkIn && (
                             <div className="truncate" title={`In: ${formatTime(dayData.record.checkIn)}`}>In: {formatTime(dayData.record.checkIn)}</div>
                           )}
@@ -1387,21 +1418,21 @@ export default function AttendancePage() {
           /* List View */
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="bg-default-50 border-b border-divider">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Check In</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Check Out</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">Locations</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Hours</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Check In</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Check Out</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider hidden md:table-cell">Locations</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Hours</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-content1 divide-y divide-divider">
                 {attendance.length === 0 ? (
                   <tr>
-                    <td colSpan="7" className="px-4 py-4 text-center text-gray-500">
+                    <td colSpan="7" className="px-4 py-4 text-center text-default-500">
                       No attendance records found for this month
                     </td>
                   </tr>
@@ -1411,16 +1442,16 @@ export default function AttendancePage() {
                     const hasPending = !!pendingCorrection
 
                     return (
-                      <tr key={record._id} className={`hover:bg-gray-50 ${hasPending ? 'bg-yellow-50' : ''}`}>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{formatDate(record.date)}</td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{formatTime(record.checkIn)}</td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{formatTime(record.checkOut)}</td>
-                        <td className="px-4 py-4 text-xs text-gray-600 hidden md:table-cell max-w-xs">
+                      <tr key={record._id} className={`hover:bg-default-50 ${hasPending ? 'bg-warning-50' : ''}`}>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-default-900">{formatDate(record.date)}</td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-default-900">{formatTime(record.checkIn)}</td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-default-900">{formatTime(record.checkOut)}</td>
+                        <td className="px-4 py-4 text-xs text-default-600 hidden md:table-cell max-w-xs">
                           {record.location?.checkIn?.address || record.location?.checkOut?.address ? (
                             <div className="space-y-1">
                               {record.location?.checkIn?.address && (
                                 <div className="flex items-start gap-1">
-                                  <FaMapMarkerAlt className="text-green-500 mt-0.5 flex-shrink-0 w-3 h-3" />
+                                  <FaMapMarkerAlt className="text-success mt-0.5 flex-shrink-0 w-3 h-3" />
                                   <span className="truncate" title={record.location.checkIn.address}>
                                     {record.location.checkIn.address.length > 40
                                       ? record.location.checkIn.address.substring(0, 40) + '...'
@@ -1430,7 +1461,7 @@ export default function AttendancePage() {
                               )}
                               {record.location?.checkOut?.address && (
                                 <div className="flex items-start gap-1">
-                                  <FaMapMarkerAlt className="text-red-500 mt-0.5 flex-shrink-0 w-3 h-3" />
+                                  <FaMapMarkerAlt className="text-danger mt-0.5 flex-shrink-0 w-3 h-3" />
                                   <span className="truncate" title={record.location.checkOut.address}>
                                     {record.location.checkOut.address.length > 40
                                       ? record.location.checkOut.address.substring(0, 40) + '...'
@@ -1440,42 +1471,45 @@ export default function AttendancePage() {
                               )}
                             </div>
                           ) : (
-                            <span className="text-gray-400 italic">Not captured</span>
+                            <span className="text-default-400 italic">Not captured</span>
                           )}
                         </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{record.workHours ? `${record.workHours}h` : 'N/A'}</td>
+                        <td className="px-4 py-4 whitespace-nowrap text-sm text-default-900">{record.workHours ? `${record.workHours}h` : 'N/A'}</td>
                         <td className="px-4 py-4 whitespace-nowrap">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${record.status === 'present' ? 'bg-green-100 text-green-800' :
-                            record.status === 'absent' ? 'bg-red-100 text-red-800' :
-                              record.status === 'half-day' ? 'bg-yellow-100 text-yellow-800' :
-                                record.status === 'in-progress' ? 'bg-orange-100 text-orange-800' :
-                                  record.status === 'late' ? 'bg-amber-100 text-amber-800' :
-                                    record.status === 'on-leave' ? 'bg-blue-100 text-blue-800' :
-                                      'bg-gray-100 text-gray-800'
-                            }`}>
+                          <Chip
+                            size="sm"
+                            color={record.status === 'present' ? 'success' :
+                              record.status === 'absent' ? 'danger' :
+                                record.status === 'half-day' ? 'warning' :
+                                  record.status === 'in-progress' ? 'warning' :
+                                    record.status === 'late' ? 'warning' :
+                                      record.status === 'on-leave' ? 'primary' :
+                                        'default'}
+                            variant="flat"
+                          >
                             {record.status === 'in-progress' ? 'In Progress' : record.status}
-                          </span>
+                          </Chip>
                         </td>
                         <td className="px-4 py-4 whitespace-nowrap">
                           {hasPending ? (
-                            <span className="inline-flex items-center space-x-1 px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs font-medium border border-yellow-300">
-                              <FaClock className="w-3 h-3" />
-                              <span>Pending</span>
-                            </span>
+                            <Chip size="sm" color="warning" variant="bordered" startContent={<FaClock className="w-3 h-3" />}>
+                              Pending
+                            </Chip>
                           ) : (
-                            <button
-                              onClick={() => {
+                            <Button
+                              size="sm"
+                              variant="light"
+                              color="primary"
+                              onPress={() => {
                                 // Extract date in local timezone from the record
                                 const recordDate = new Date(record.date)
                                 const localDate = new Date(recordDate.getFullYear(), recordDate.getMonth(), recordDate.getDate())
                                 openCorrectionModal(record, localDate)
                               }}
-                              className="text-blue-600 hover:text-blue-800 flex items-center space-x-1"
-                              title="Request Correction"
+                              startContent={<FaEdit />}
                             >
-                              <FaEdit />
-                              <span className="text-sm">Correct</span>
-                            </button>
+                              Correct
+                            </Button>
                           )}
                         </td>
                       </tr>
@@ -1488,52 +1522,61 @@ export default function AttendancePage() {
         )}
 
         {/* Monthly Summary */}
-        <div className="mt-6 pt-6 border-t border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Monthly Summary</h3>
+        <div className="mt-6 pt-6 border-t border-divider">
+          <h3 className="text-lg font-semibold text-default-800 mb-4">Monthly Summary</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-green-50 rounded-lg p-4 text-center">
-              <p className="text-2xl font-bold text-green-600">
-                {attendance.filter(r => r.status === 'present').length}
-              </p>
-              <p className="text-sm text-green-700">Present Days</p>
-            </div>
-            <div className="bg-red-50 rounded-lg p-4 text-center">
-              <p className="text-2xl font-bold text-red-600">
-                {attendance.filter(r => r.status === 'absent').length}
-              </p>
-              <p className="text-sm text-red-700">Absent Days</p>
-            </div>
-            <div className="bg-amber-50 rounded-lg p-4 text-center">
-              <p className="text-2xl font-bold text-amber-600">
-                {attendance.filter(r => r.status === 'late').length}
-              </p>
-              <p className="text-sm text-amber-700">Late Days</p>
-            </div>
-            <div className="bg-yellow-50 rounded-lg p-4 text-center">
-              <p className="text-2xl font-bold text-yellow-600">
-                {attendance.filter(r => r.status === 'half-day').length}
-              </p>
-              <p className="text-sm text-yellow-700">Half Days</p>
-            </div>
+            <Card className="bg-success-50">
+              <CardBody className="text-center py-4">
+                <p className="text-2xl font-bold text-success">
+                  {attendance.filter(r => r.status === 'present').length}
+                </p>
+                <p className="text-sm text-success-700">Present Days</p>
+              </CardBody>
+            </Card>
+            <Card className="bg-danger-50">
+              <CardBody className="text-center py-4">
+                <p className="text-2xl font-bold text-danger">
+                  {attendance.filter(r => r.status === 'absent').length}
+                </p>
+                <p className="text-sm text-danger-700">Absent Days</p>
+              </CardBody>
+            </Card>
+            <Card className="bg-warning-50">
+              <CardBody className="text-center py-4">
+                <p className="text-2xl font-bold text-warning">
+                  {attendance.filter(r => r.status === 'late').length}
+                </p>
+                <p className="text-sm text-warning-700">Late Days</p>
+              </CardBody>
+            </Card>
+            <Card className="bg-warning-50">
+              <CardBody className="text-center py-4">
+                <p className="text-2xl font-bold text-warning">
+                  {attendance.filter(r => r.status === 'half-day').length}
+                </p>
+                <p className="text-sm text-warning-700">Half Days</p>
+              </CardBody>
+            </Card>
           </div>
         </div>
-      </div>
+        </CardBody>
+      </Card>
 
       {/* Correction Request Modal */}
-      <ModalPortal isOpen={showCorrectionModal && selectedRecord}>
-        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && (setShowCorrectionModal(false), setSelectedRecord(null), setSelectedDayForEdit(null))}>
-          <div className="modal-backdrop" />
-          <div className="modal-container modal-md">
-            <div className="modal-header">
-              <h3 className="modal-title">Request Attendance Correction</h3>
-              <button onClick={() => { setShowCorrectionModal(false); setSelectedRecord(null); setSelectedDayForEdit(null); }} className="modal-close-btn">
-                <FaTimes />
-              </button>
-            </div>
-            <div className="modal-body">
-              {/* Display the date from selectedRecord - not editable */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-                <p className="text-sm font-medium text-blue-800">
+      <Modal 
+        isOpen={showCorrectionModal && selectedRecord} 
+        onClose={() => { setShowCorrectionModal(false); setSelectedRecord(null); setSelectedDayForEdit(null); }}
+        size="lg"
+      >
+        <ModalContent>
+          <ModalHeader className="flex flex-col gap-1">
+            Request Attendance Correction
+          </ModalHeader>
+          <ModalBody>
+            {/* Display the date from selectedRecord - not editable */}
+            <Card className="bg-primary-50 border border-primary-200">
+              <CardBody className="py-3">
+                <p className="text-sm font-medium text-primary-800">
                   <FaCalendarAlt className="inline mr-2" />
                   Date: {selectedRecord && formatDate(selectedRecord.date)}
                 </p>
@@ -1550,17 +1593,17 @@ export default function AttendancePage() {
 
                   return (
                     <>
-                      <p className="text-xs text-blue-600 mt-1">
+                      <p className="text-xs text-primary mt-1">
                         Current: {selectedRecord && formatTime(selectedRecord.checkIn)} - {selectedRecord && formatTime(selectedRecord.checkOut)}
-                        <span className={`ml-1 ${statusMismatch ? 'text-orange-600 font-medium' : ''}`}>
+                        <span className={`ml-1 ${statusMismatch ? 'text-warning font-medium' : ''}`}>
                           ({dynamicStatus || storedStatus || 'N/A'})
                         </span>
                         {workHours > 0 && (
-                          <span className="ml-1 text-gray-500">• {workHours.toFixed(1)}h worked</span>
+                          <span className="ml-1 text-default-500">• {workHours.toFixed(1)}h worked</span>
                         )}
                       </p>
                       {statusMismatch && (
-                        <p className="text-xs text-orange-600 mt-1 bg-orange-50 rounded px-2 py-1">
+                        <p className="text-xs text-warning mt-1 bg-warning-50 rounded px-2 py-1">
                           ⚠️ Stored status "{storedStatus}" differs from calculated "{dynamicStatus}" - correction may fix this
                         </p>
                       )}
@@ -1569,16 +1612,16 @@ export default function AttendancePage() {
                 })()}
                 {/* Location Display in Modal */}
                 {(selectedRecord?.location?.checkIn?.address || selectedRecord?.location?.checkOut?.address) && (
-                  <div className="mt-2 pt-2 border-t border-blue-200">
+                  <div className="mt-2 pt-2 border-t border-primary-200">
                     {selectedRecord?.location?.checkIn?.address && (
-                      <p className="text-xs text-blue-600 flex items-start gap-1">
-                        <FaMapMarkerAlt className="text-green-600 mt-0.5 flex-shrink-0" />
+                      <p className="text-xs text-primary flex items-start gap-1">
+                        <FaMapMarkerAlt className="text-success mt-0.5 flex-shrink-0" />
                         <span><strong>Check-in:</strong> {selectedRecord.location.checkIn.address}</span>
                       </p>
                     )}
                     {selectedRecord?.location?.checkOut?.address && (
-                      <p className="text-xs text-blue-600 flex items-start gap-1 mt-1">
-                        <FaMapMarkerAlt className="text-red-600 mt-0.5 flex-shrink-0" />
+                      <p className="text-xs text-primary flex items-start gap-1 mt-1">
+                        <FaMapMarkerAlt className="text-danger mt-0.5 flex-shrink-0" />
                         <span><strong>Check-out:</strong> {selectedRecord.location.checkOut.address}</span>
                       </p>
                     )}
@@ -1586,196 +1629,202 @@ export default function AttendancePage() {
                 )}
                 {/* Show "Location not captured" for old records */}
                 {selectedRecord && !selectedRecord?.location?.checkIn?.address && !selectedRecord?.location?.checkOut?.address && (
-                  <p className="text-xs text-gray-500 mt-2 pt-2 border-t border-blue-200 flex items-center gap-1">
-                    <FaMapMarkerAlt className="text-gray-400" />
+                  <p className="text-xs text-default-500 mt-2 pt-2 border-t border-primary-200 flex items-center gap-1">
+                    <FaMapMarkerAlt className="text-default-400" />
                     <span>Location not captured</span>
                   </p>
                 )}
-              </div>
+              </CardBody>
+            </Card>
 
-              <div className="space-y-4">
-                <div>
-                  <label className="modal-label">Correction Type</label>
-                  <select
-                    value={correctionForm.correctionType}
-                    onChange={(e) => setCorrectionForm({ ...correctionForm, correctionType: e.target.value })}
-                    className="modal-select"
-                  >
-                    <option value="check-in">Check-In Time</option>
-                    <option value="check-out">Check-Out Time</option>
-                    <option value="both">Both Times</option>
-                    <option value="status">Status Only</option>
-                  </select>
-                </div>
+            <div className="space-y-4 mt-4">
+              <div>
+                <label className="block text-sm font-medium text-default-700 mb-1">Correction Type</label>
+                <Select
+                  selectedKeys={[correctionForm.correctionType]}
+                  onChange={(e) => setCorrectionForm({ ...correctionForm, correctionType: e.target.value })}
+                  aria-label="Correction Type"
+                  classNames={{ trigger: "bg-white" }}
+                >
+                  <SelectItem key="check-in">Check-In Time</SelectItem>
+                  <SelectItem key="check-out">Check-Out Time</SelectItem>
+                  <SelectItem key="both">Both Times</SelectItem>
+                  <SelectItem key="status">Status Only</SelectItem>
+                </Select>
+              </div>
 
                 {['check-in', 'both'].includes(correctionForm.correctionType) && (
                   <div>
-                    <label className="modal-label">Correct Check-In Time</label>
+                    <label className="block text-sm font-medium text-default-700 mb-1">Correct Check-In Time</label>
                     <input
                       type="time"
                       value={correctionForm.requestedCheckIn}
                       onChange={(e) => setCorrectionForm({ ...correctionForm, requestedCheckIn: e.target.value })}
-                      className="modal-input"
+                      className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                   </div>
                 )}
 
                 {['check-out', 'both'].includes(correctionForm.correctionType) && (
                   <div>
-                    <label className="modal-label">Correct Check-Out Time</label>
+                    <label className="block text-sm font-medium text-default-700 mb-1">Correct Check-Out Time</label>
                     <input
                       type="time"
                       value={correctionForm.requestedCheckOut}
                       onChange={(e) => setCorrectionForm({ ...correctionForm, requestedCheckOut: e.target.value })}
-                      className="modal-input"
+                      className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                   </div>
                 )}
 
                 {correctionForm.correctionType === 'status' && (
                   <div>
-                    <label className="modal-label">Requested Status</label>
-                    <select
-                      value={correctionForm.requestedStatus}
+                    <label className="block text-sm font-medium text-default-700 mb-1">Requested Status</label>
+                    <Select
+                      selectedKeys={correctionForm.requestedStatus ? [correctionForm.requestedStatus] : []}
                       onChange={(e) => setCorrectionForm({ ...correctionForm, requestedStatus: e.target.value })}
-                      className="modal-select"
+                      aria-label="Requested Status"
+                      classNames={{ trigger: "bg-white" }}
                     >
-                      <option value="present">Present</option>
-                      <option value="half-day">Half Day</option>
-                      <option value="on-leave">On Leave</option>
-                    </select>
+                      <SelectItem key="present">Present</SelectItem>
+                      <SelectItem key="half-day">Half Day</SelectItem>
+                      <SelectItem key="on-leave">On Leave</SelectItem>
+                    </Select>
                   </div>
                 )}
 
                 <div>
-                  <label className="modal-label">Reason for Correction *</label>
+                  <label className="block text-sm font-medium text-default-700 mb-1">Reason for Correction *</label>
                   <textarea
                     value={correctionForm.reason}
                     onChange={(e) => setCorrectionForm({ ...correctionForm, reason: e.target.value })}
                     placeholder="Please explain why this correction is needed..."
                     rows={3}
-                    className="modal-textarea"
+                    className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                   />
                 </div>
               </div>
-            </div>
-
-            <div className="modal-footer">
-              <button
-                onClick={() => {
-                  setShowCorrectionModal(false)
-                  setSelectedRecord(null)
-                  setSelectedDayForEdit(null)
-                }}
-                className="modal-btn modal-btn-secondary"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCorrectionRequest}
-                disabled={submittingCorrection || !correctionForm.reason}
-                className="modal-btn modal-btn-primary"
-              >
-                {submittingCorrection ? 'Submitting...' : 'Submit Request'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </ModalPortal>
+          </ModalBody>
+          <ModalFooter>
+            <Button
+              color="default"
+              variant="flat"
+              onPress={() => {
+                setShowCorrectionModal(false)
+                setSelectedRecord(null)
+                setSelectedDayForEdit(null)
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              color="primary"
+              onPress={handleCorrectionRequest}
+              isDisabled={submittingCorrection || !correctionForm.reason}
+              isLoading={submittingCorrection}
+            >
+              {submittingCorrection ? 'Submitting...' : 'Submit Request'}
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
 
       {/* Missing Entry Modal */}
-      {/* Missing Entry Modal */}
-      <ModalPortal isOpen={showMissingEntryModal}>
-        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && (setShowMissingEntryModal(false), setSelectedDayForMissingEntry(null), setMissingEntryForm({ date: '', checkIn: '', checkOut: '', reason: '' }))}>
-          <div className="modal-backdrop" />
-          <div className="modal-container modal-md">
-            <div className="modal-header">
-              <h3 className="modal-title">Report Missing Entry</h3>
-              <button onClick={() => { setShowMissingEntryModal(false); setSelectedDayForMissingEntry(null); setMissingEntryForm({ date: '', checkIn: '', checkOut: '', reason: '' }); }} className="modal-close-btn">
-                <FaTimes />
-              </button>
-            </div>
-            <div className="modal-body">
-              <p className="text-sm text-gray-600 mb-4">Submit a request to add attendance for a day you forgot to clock in/out.</p>
+      <Modal 
+        isOpen={showMissingEntryModal} 
+        onClose={() => {
+          setShowMissingEntryModal(false)
+          setSelectedDayForMissingEntry(null)
+          setMissingEntryForm({ date: '', checkIn: '', checkOut: '', reason: '' })
+        }}
+        size="lg"
+      >
+        <ModalContent>
+          <ModalHeader className="flex flex-col gap-1">
+            Report Missing Entry
+          </ModalHeader>
+          <ModalBody>
+            <p className="text-sm text-default-500 mb-2">Submit a request to add attendance for a day you forgot to clock in/out.</p>
 
-              <div className="space-y-4">
-                {/* Show date as read-only info box when selected from calendar */}
-                {selectedDayForMissingEntry ? (
-                  <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
-                    <p className="text-sm font-medium text-orange-800">
+            <div className="space-y-4">
+              {/* Show date as read-only info box when selected from calendar */}
+              {selectedDayForMissingEntry ? (
+                <Card className="bg-warning-50 border border-warning-200">
+                  <CardBody className="py-3">
+                    <p className="text-sm font-medium text-warning-800">
                       <FaCalendarAlt className="inline mr-2" />
                       Date: {formatDate(selectedDayForMissingEntry)}
                     </p>
-                  </div>
-                ) : (
-                  <div>
-                    <label className="modal-label">Date *</label>
-                    <input
-                      type="date"
-                      value={missingEntryForm.date}
-                      onChange={(e) => setMissingEntryForm({ ...missingEntryForm, date: e.target.value })}
-                      max={formatDateLocal(new Date())}
-                      className="modal-input"
-                    />
-                  </div>
-                )}
-
+                  </CardBody>
+                </Card>
+              ) : (
                 <div>
-                  <label className="modal-label">Check-In Time</label>
+                  <label className="block text-sm font-medium text-default-700 mb-1">Date *</label>
                   <input
-                    type="time"
-                    value={missingEntryForm.checkIn}
-                    onChange={(e) => setMissingEntryForm({ ...missingEntryForm, checkIn: e.target.value })}
-                    className="modal-input"
+                    type="date"
+                    value={missingEntryForm.date}
+                    onChange={(e) => setMissingEntryForm({ ...missingEntryForm, date: e.target.value })}
+                    max={formatDateLocal(new Date())}
+                    className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
+              )}
 
-                <div>
-                  <label className="modal-label">Check-Out Time</label>
-                  <input
-                    type="time"
-                    value={missingEntryForm.checkOut}
-                    onChange={(e) => setMissingEntryForm({ ...missingEntryForm, checkOut: e.target.value })}
-                    className="modal-input"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-default-700 mb-1">Check-In Time</label>
+                <input
+                  type="time"
+                  value={missingEntryForm.checkIn}
+                  onChange={(e) => setMissingEntryForm({ ...missingEntryForm, checkIn: e.target.value })}
+                  className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
 
-                <div>
-                  <label className="modal-label">Reason *</label>
-                  <textarea
-                    value={missingEntryForm.reason}
-                    onChange={(e) => setMissingEntryForm({ ...missingEntryForm, reason: e.target.value })}
-                    placeholder="Why did you miss clocking in/out?"
-                    rows={3}
-                    className="modal-textarea"
-                  />
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-default-700 mb-1">Check-Out Time</label>
+                <input
+                  type="time"
+                  value={missingEntryForm.checkOut}
+                  onChange={(e) => setMissingEntryForm({ ...missingEntryForm, checkOut: e.target.value })}
+                  className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-default-700 mb-1">Reason *</label>
+                <textarea
+                  value={missingEntryForm.reason}
+                  onChange={(e) => setMissingEntryForm({ ...missingEntryForm, reason: e.target.value })}
+                  placeholder="Why did you miss clocking in/out?"
+                  rows={3}
+                  className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                />
               </div>
             </div>
-
-            <div className="modal-footer">
-              <button
-                onClick={() => {
-                  setShowMissingEntryModal(false)
-                  setSelectedDayForMissingEntry(null)
-                  setMissingEntryForm({ date: '', checkIn: '', checkOut: '', reason: '' })
-                }}
-                className="modal-btn modal-btn-secondary"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleMissingEntryRequest}
-                disabled={submittingCorrection || (!selectedDayForMissingEntry && !missingEntryForm.date) || !missingEntryForm.reason}
-                className="modal-btn modal-btn-primary"
-                style={{ backgroundColor: '#f97316' }}
-              >
-                {submittingCorrection ? 'Submitting...' : 'Submit Request'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </ModalPortal>
+          </ModalBody>
+          <ModalFooter>
+            <Button
+              color="default"
+              variant="flat"
+              onPress={() => {
+                setShowMissingEntryModal(false)
+                setSelectedDayForMissingEntry(null)
+                setMissingEntryForm({ date: '', checkIn: '', checkOut: '', reason: '' })
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              color="warning"
+              onPress={handleMissingEntryRequest}
+              isDisabled={submittingCorrection || (!selectedDayForMissingEntry && !missingEntryForm.date) || !missingEntryForm.reason}
+              isLoading={submittingCorrection}
+            >
+              {submittingCorrection ? 'Submitting...' : 'Submit Request'}
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
 
       {/* Overtime Prompt Modal */}
       {showOvertimePrompt && (
@@ -1798,68 +1847,69 @@ export default function AttendancePage() {
       )}
 
       {/* Holiday Details Modal */}
-      {showHolidayModal && selectedHoliday && (
-        <ModalPortal onClose={() => setShowHolidayModal(false)}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-gray-800">{selectedHoliday.name}</h3>
-              <button
-                onClick={() => setShowHolidayModal(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors p-1 hover:bg-gray-100 rounded-full"
-              >
-                <FaTimes size={20} />
-              </button>
-            </div>
-
+      <Modal 
+        isOpen={showHolidayModal && selectedHoliday} 
+        onClose={() => setShowHolidayModal(false)}
+        size="md"
+      >
+        <ModalContent>
+          <ModalHeader className="flex flex-col gap-1">
+            {selectedHoliday?.name}
+          </ModalHeader>
+          <ModalBody>
             <div className="space-y-4">
-              <div className="flex items-center p-3 bg-purple-50 rounded-lg border border-purple-100">
-                <div className="bg-white p-2 rounded-full shadow-sm mr-3">
-                  <FaCalendarAlt className="text-purple-600" size={18} />
-                </div>
-                <div>
-                  <p className="text-xs text-purple-600 font-semibold uppercase tracking-wide">Date</p>
-                  <p className="text-gray-800 font-medium">
-                    {new Date(selectedHoliday.date).toLocaleDateString('en-US', {
-                      weekday: 'long',
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric'
-                    })}
-                  </p>
-                </div>
-              </div>
+              <Card className="bg-secondary-50 border border-secondary-100">
+                <CardBody className="flex-row items-center gap-3">
+                  <div className="bg-content1 p-2 rounded-full shadow-sm">
+                    <FaCalendarAlt className="text-secondary" size={18} />
+                  </div>
+                  <div>
+                    <p className="text-xs text-secondary font-semibold uppercase tracking-wide">Date</p>
+                    <p className="text-default-800 font-medium">
+                      {selectedHoliday && new Date(selectedHoliday.date).toLocaleDateString('en-US', {
+                        weekday: 'long',
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
+                      })}
+                    </p>
+                  </div>
+                </CardBody>
+              </Card>
 
-              {selectedHoliday.description ? (
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-100">
-                  <h4 className="text-sm font-semibold text-gray-700 mb-2">Description</h4>
-                  <p className="text-gray-600 text-sm leading-relaxed">
-                    {selectedHoliday.description}
-                  </p>
-                </div>
+              {selectedHoliday?.description ? (
+                <Card className="bg-default-50 border border-default-100">
+                  <CardBody>
+                    <h4 className="text-sm font-semibold text-default-700 mb-2">Description</h4>
+                    <p className="text-default-600 text-sm leading-relaxed">
+                      {selectedHoliday.description}
+                    </p>
+                  </CardBody>
+                </Card>
               ) : (
-                <div className="text-center py-4 text-gray-500 italic bg-gray-50 rounded-lg">
+                <div className="text-center py-4 text-default-500 italic bg-default-50 rounded-lg">
                   No description available for this holiday.
                 </div>
               )}
 
               <div className="flex gap-2 pt-2">
-                <span className="px-3 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded-full capitalize border border-purple-200 shadow-sm">
-                  {selectedHoliday.type || 'Public Holiday'}
-                </span>
+                <Chip color="secondary" variant="flat" size="sm">
+                  {selectedHoliday?.type || 'Public Holiday'}
+                </Chip>
               </div>
             </div>
-
-            <div className="mt-6 flex justify-end">
-              <button
-                onClick={() => setShowHolidayModal(false)}
-                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium text-sm transition-colors"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </ModalPortal>
-      )}
+          </ModalBody>
+          <ModalFooter>
+            <Button
+              color="default"
+              variant="flat"
+              onPress={() => setShowHolidayModal(false)}
+            >
+              Close
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </div>
   )
 }

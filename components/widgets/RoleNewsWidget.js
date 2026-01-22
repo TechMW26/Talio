@@ -7,18 +7,19 @@ import {
     FaExternalLinkAlt
 } from 'react-icons/fa'
 import { HiOutlineNewspaper } from 'react-icons/hi2'
+import { Button, Skeleton, ScrollShadow } from '@heroui/react'
 
 // Category icons and colors matching other widgets
 const CATEGORY_CONFIG = {
-    frontend: { icon: FaCode, color: 'text-blue-600', bg: 'bg-blue-100' },
-    backend: { icon: FaServer, color: 'text-green-600', bg: 'bg-green-100' },
-    ai: { icon: FaRobot, color: 'text-purple-600', bg: 'bg-purple-100' },
-    cloud: { icon: FaCloud, color: 'text-cyan-600', bg: 'bg-cyan-100' },
-    mobile: { icon: FaMobileAlt, color: 'text-orange-600', bg: 'bg-orange-100' },
-    security: { icon: FaShieldAlt, color: 'text-red-600', bg: 'bg-red-100' },
-    data: { icon: FaDatabase, color: 'text-indigo-600', bg: 'bg-indigo-100' },
-    business: { icon: FaBriefcase, color: 'text-amber-600', bg: 'bg-amber-100' },
-    tech: { icon: FaMicrochip, color: 'text-gray-600', bg: 'bg-gray-100' }
+    frontend: { icon: FaCode, color: 'text-primary-600', bg: 'bg-primary-100' },
+    backend: { icon: FaServer, color: 'text-success-600', bg: 'bg-success-100' },
+    ai: { icon: FaRobot, color: 'text-secondary-600', bg: 'bg-secondary-100' },
+    cloud: { icon: FaCloud, color: 'text-primary-500', bg: 'bg-primary-50' },
+    mobile: { icon: FaMobileAlt, color: 'text-warning-600', bg: 'bg-warning-100' },
+    security: { icon: FaShieldAlt, color: 'text-danger-600', bg: 'bg-danger-100' },
+    data: { icon: FaDatabase, color: 'text-secondary-600', bg: 'bg-secondary-100' },
+    business: { icon: FaBriefcase, color: 'text-warning-600', bg: 'bg-warning-100' },
+    tech: { icon: FaMicrochip, color: 'text-default-600', bg: 'bg-default-100' }
 }
 
 export default function RoleNewsWidget() {
@@ -55,14 +56,20 @@ export default function RoleNewsWidget() {
         fetchNews()
     }, [fetchNews])
 
-    // Loading skeleton - matches AnnouncementsWidget style
+    // Loading skeleton
     if (loading) {
         return (
-            <div className="p-4 sm:p-6 animate-pulse flex-1 flex flex-col h-full">
-                <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
+            <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+                <Skeleton className="h-6 w-1/3 rounded-lg mb-4" />
                 <div className="space-y-3">
                     {[1, 2, 3].map(i => (
-                        <div key={i} className="h-16 bg-gray-200 rounded"></div>
+                        <div key={i} className="flex items-center gap-3">
+                            <Skeleton className="w-10 h-10 rounded-full" />
+                            <div className="flex-1 space-y-2">
+                                <Skeleton className="h-4 w-full rounded-lg" />
+                                <Skeleton className="h-3 w-1/2 rounded-lg" />
+                            </div>
+                        </div>
                     ))}
                 </div>
             </div>
@@ -74,18 +81,23 @@ export default function RoleNewsWidget() {
         return (
             <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
                 <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-base sm:text-lg font-bold text-gray-800">Latest News</h3>
+                    <h3 className="text-base sm:text-lg font-bold text-default-900">Latest News</h3>
                 </div>
                 <div className="flex-1 flex items-center justify-center">
-                    <div className="text-center text-gray-500">
-                        <HiOutlineNewspaper className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-                        <p className="text-sm">{error}</p>
-                        <button
-                            onClick={fetchNews}
-                            className="mt-2 text-primary-600 hover:text-primary-800 text-sm font-medium"
+                    <div className="flex flex-col items-center text-center">
+                        <div className="w-14 h-14 rounded-full bg-default-100 flex items-center justify-center mb-3">
+                            <HiOutlineNewspaper className="w-7 h-7 text-default-400" />
+                        </div>
+                        <p className="text-sm text-default-500">{error}</p>
+                        <Button
+                            variant="light"
+                            color="primary"
+                            size="sm"
+                            onPress={fetchNews}
+                            className="mt-2"
                         >
                             Retry
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </div>
@@ -94,29 +106,29 @@ export default function RoleNewsWidget() {
 
     return (
         <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
-            {/* Header - matches other widgets */}
+            {/* Header */}
             <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base sm:text-lg font-bold text-gray-800">Latest News</h3>
-                <button
-                    onClick={fetchNews}
-                    className="text-primary-600 hover:text-primary-800 text-sm font-medium"
+                <h3 className="text-base sm:text-lg font-bold text-default-900">Latest News</h3>
+                <Button
+                    variant="light"
+                    color="primary"
+                    size="sm"
+                    onPress={fetchNews}
                 >
                     Refresh
-                </button>
+                </Button>
             </div>
 
             {/* News List */}
             <div className="flex-1 flex flex-col">
-                <div className="space-y-2 overflow-y-auto flex-1 max-h-[200px]">
+                <ScrollShadow className="space-y-2 flex-1 max-h-[200px]">
                     {news.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center text-center text-gray-500 py-4">
-                            <img
-                                src="/assets/News.png"
-                                alt="No news"
-                                className="w-28 h-28 object-contain mb-2"
-                            />
-                            <p className="text-sm">No breaking updates right now.</p>
-                            <p className="text-xs text-gray-400 mt-1">Showing the freshest items as they appear.</p>
+                        <div className="flex flex-col items-center justify-center text-center py-6">
+                            <div className="w-14 h-14 rounded-full bg-primary-100 flex items-center justify-center mb-3">
+                                <HiOutlineNewspaper className="w-7 h-7 text-primary-400" />
+                            </div>
+                            <p className="text-sm text-default-500">No breaking updates right now.</p>
+                            <p className="text-xs text-default-400 mt-1">Showing the freshest items as they appear.</p>
                         </div>
                     ) : (
                         news.map((item, index) => {
@@ -129,7 +141,7 @@ export default function RoleNewsWidget() {
                                     href={item.link}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors group"
+                                    className="flex items-center gap-3 p-3 bg-default-50 rounded-xl hover:bg-default-100 transition-colors group border border-default-100"
                                 >
                                     {/* Icon */}
                                     <div className={`w-10 h-10 ${config.bg} rounded-full flex items-center justify-center flex-shrink-0`}>
@@ -138,23 +150,23 @@ export default function RoleNewsWidget() {
 
                                     {/* Content */}
                                     <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium text-gray-800 line-clamp-2 group-hover:text-primary-600 transition-colors">
+                                        <p className="text-sm font-semibold text-default-900 line-clamp-2 group-hover:text-primary-600 transition-colors">
                                             {item.title}
                                         </p>
                                         <div className="flex items-center gap-2 mt-1">
-                                            <span className="text-xs text-gray-500 truncate max-w-[100px]">{item.source}</span>
-                                            <span className="text-xs text-gray-400">•</span>
-                                            <span className="text-xs text-gray-400">{item.time}</span>
+                                            <span className="text-xs text-default-500 truncate max-w-[100px]">{item.source}</span>
+                                            <span className="text-xs text-default-400">•</span>
+                                            <span className="text-xs text-default-400">{item.time}</span>
                                         </div>
                                     </div>
 
                                     {/* External link indicator */}
-                                    <FaExternalLinkAlt className="w-3 h-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                                    <FaExternalLinkAlt className="w-3 h-3 text-default-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
                                 </a>
                             )
                         })
                     )}
-                </div>
+                </ScrollShadow>
             </div>
         </div>
     )

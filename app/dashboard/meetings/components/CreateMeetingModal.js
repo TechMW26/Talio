@@ -17,7 +17,7 @@ import {
   HiOutlineTrash
 } from 'react-icons/hi2'
 import toast from '@/utils/toast'
-import ModalPortal from '@/components/ui/ModalPortal'
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button } from '@heroui/react'
 
 export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
   const [step, setStep] = useState(1) // 1: Basic Info, 2: Invitees, 3: Review
@@ -242,36 +242,29 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
   if (!isOpen) return null
 
   return (
-    <ModalPortal isOpen={isOpen}>
-      <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-        <div className="modal-backdrop" />
-        <div className="modal-container modal-2xl">
+    <Modal isOpen={isOpen} onOpenChange={(open) => !open && onClose()} size="3xl">
+      <ModalContent>
+        {(onModalClose) => (
+          <>
           {/* Header */}
-          <div className="modal-header">
+          <ModalHeader className="flex flex-col gap-1">
             <div>
-              <h2 className="modal-title">
-                Schedule Meeting
-              </h2>
-              <p className="text-sm text-gray-500 mt-1">
+              <span className="text-lg">Schedule Meeting</span>
+              <p className="text-sm text-default-500 mt-1 font-normal">
                 Step {step} of 3: {step === 1 ? 'Meeting Details' : step === 2 ? 'Invite Attendees' : 'Review & Create'}
               </p>
             </div>
-            <button
-              onClick={onClose}
-              className="modal-close-btn"
-            >
-              <HiOutlineXMark className="w-5 h-5" />
-            </button>
-          </div>
+          </ModalHeader>
 
+          <ModalBody>
           {/* Progress Bar */}
-          <div className="px-4 pt-4">
+          <div className="pb-4">
             <div className="flex gap-2">
               {[1, 2, 3].map(s => (
                 <div
                   key={s}
                   className={`flex-1 h-1.5 rounded-full transition-colors ${
-                    s <= step ? 'bg-primary-600' : 'bg-gray-200'
+                    s <= step ? 'bg-primary-600' : 'bg-default-200'
                   }`}
                 />
               ))}
@@ -279,7 +272,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
           </div>
 
           {/* Content */}
-          <div className="modal-body">
+          <div className="space-y-4">
             {/* Step 1: Basic Info */}
           {step === 1 && (
             <div className="space-y-4">
@@ -738,7 +731,7 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
                           <span className="text-gray-600">
                             {index + 1}. {item.title}
                           </span>
-                          <span className="text-gray-500">{item.duration} min</span>
+                          <span className="text-default-500">{item.duration} min</span>
                         </li>
                       ))}
                     </ul>
@@ -747,35 +740,27 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
               </div>
             </div>
           )}
-        </div>
-
-        {/* Footer */}
-        <div className="flex items-center justify-between p-4 border-t border-gray-200">
-          <button
-            onClick={step === 1 ? onClose : handleBack}
-            className="modal-btn modal-btn-secondary"
-          >
-            {step === 1 ? 'Cancel' : 'Back'}
-          </button>
-          <button
-            onClick={step === 3 ? handleSubmit : handleNext}
-            disabled={loading}
-            className="modal-btn modal-btn-primary"
-          >
-            {loading ? (
-              <>
-                <Loader size="xs" />
-                Creating...
-              </>
-            ) : step === 3 ? (
-              'Create Meeting'
-            ) : (
-              'Next'
-            )}
-          </button>
-        </div>
-        </div>
-      </div>
-    </ModalPortal>
+          </div>
+          </ModalBody>
+          {/* Footer */}
+          <ModalFooter>
+            <Button
+              variant="light"
+              onPress={step === 1 ? onModalClose : handleBack}
+            >
+              {step === 1 ? 'Cancel' : 'Back'}
+            </Button>
+            <Button
+              color="primary"
+              onPress={step === 3 ? handleSubmit : handleNext}
+              isLoading={loading}
+            >
+              {loading ? 'Creating...' : step === 3 ? 'Create Meeting' : 'Next'}
+            </Button>
+          </ModalFooter>
+          </>
+        )}
+      </ModalContent>
+    </Modal>
   )
 }

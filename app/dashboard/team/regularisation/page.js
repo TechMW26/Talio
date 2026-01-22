@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { FaCheck, FaTimes, FaCalendarCheck, FaExclamationCircle, FaChevronDown, FaChevronUp, FaFilter, FaBuilding } from 'react-icons/fa'
-import Loader from '@/components/ui/Loader'
+import { Card, CardBody, Button, Chip, Skeleton, Select, SelectItem, Avatar, Accordion, AccordionItem } from '@heroui/react'
 
 export default function TeamRegularisationPage() {
   const router = useRouter()
@@ -187,16 +187,16 @@ export default function TeamRegularisationPage() {
     return allCorrections.filter(c => statusFilter === 'all' || c.status === statusFilter)
   }
 
-  const getStatusBadge = (status) => {
+  const getStatusColor = (status) => {
     switch (status) {
       case 'pending':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-300'
+        return 'warning'
       case 'approved':
-        return 'bg-green-100 text-green-800 border-green-300'
+        return 'success'
       case 'rejected':
-        return 'bg-red-100 text-red-800 border-red-300'
+        return 'danger'
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-300'
+        return 'default'
     }
   }
 
@@ -204,8 +204,21 @@ export default function TeamRegularisationPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center pb-14 md:pb-6">
-        <Loader size="lg" />
+      <div className="min-h-screen px-4 py-4 sm:p-6 lg:p-8 pb-14 md:pb-6">
+        <div className="mb-6">
+          <Skeleton className="h-10 w-72 rounded-lg mb-2" />
+          <Skeleton className="h-5 w-96 rounded-lg" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-28 rounded-lg" />
+          ))}
+        </div>
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-24 rounded-lg" />
+          ))}
+        </div>
       </div>
     )
   }
@@ -213,11 +226,15 @@ export default function TeamRegularisationPage() {
   if (!hasAccess) {
     return (
       <div className="min-h-screen flex items-center justify-center px-4 py-4 sm:p-6 lg:p-8 pb-14 md:pb-6">
-        <div className="text-center">
-          <FaExclamationCircle className="mx-auto h-12 w-12 text-yellow-500 mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Restricted</h2>
-          <p className="text-gray-600">This section is only available to admins, HR, and department heads.</p>
-        </div>
+        <Card className="max-w-md">
+          <CardBody className="text-center py-10 px-8">
+            <div className="w-16 h-16 bg-warning-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FaExclamationCircle className="h-8 w-8 text-warning-500" />
+            </div>
+            <h2 className="text-2xl font-bold text-default-900 mb-2">Access Restricted</h2>
+            <p className="text-default-500">This section is only available to admins, HR, and department heads.</p>
+          </CardBody>
+        </Card>
       </div>
     )
   }
@@ -225,256 +242,274 @@ export default function TeamRegularisationPage() {
   const filteredCorrections = getFilteredCorrections()
 
   return (
-    <div className="min-h-screen bg-gray-50 px-4 py-4 sm:p-6 lg:p-8 pb-14 md:pb-6">
+    <div className="min-h-screen bg-default-50 px-4 py-4 sm:p-6 lg:p-8 pb-14 md:pb-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Attendance Regularisation</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-default-900">Attendance Regularisation</h1>
+          <p className="text-default-500 mt-1">
             Review and approve attendance correction requests {isAdminOrHR ? 'across all departments' : 'from your team'}
           </p>
         </div>
         
         {/* Filters */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-3">
           {/* Department filter - only for admin/HR */}
           {isAdminOrHR && departments.length > 0 && (
-            <div className="flex items-center space-x-2">
-              <FaBuilding className="text-gray-400" />
-              <select
-                value={selectedDepartment}
-                onChange={(e) => setSelectedDepartment(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">All Departments</option>
-                {departments.map(dept => (
-                  <option key={dept._id} value={dept._id}>{dept.name}</option>
-                ))}
-              </select>
-            </div>
+            <Select
+              label="Department"
+              placeholder="All Departments"
+              selectedKeys={selectedDepartment ? [selectedDepartment] : []}
+              onChange={(e) => setSelectedDepartment(e.target.value)}
+              className="w-48"
+              size="sm"
+              startContent={<FaBuilding className="text-default-400" />}
+            >
+              <SelectItem key="all" value="all">All Departments</SelectItem>
+              {departments.map(dept => (
+                <SelectItem key={dept._id} value={dept._id}>{dept.name}</SelectItem>
+              ))}
+            </Select>
           )}
           
           {/* Status filter */}
-          <div className="flex items-center space-x-2">
-            <FaFilter className="text-gray-400" />
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-            >
-              <option value="pending">Pending ({pendingCorrections.length})</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
-              <option value="all">All Requests</option>
-            </select>
-          </div>
+          <Select
+            label="Status"
+            placeholder="Filter by status"
+            selectedKeys={statusFilter ? [statusFilter] : []}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="w-44"
+            size="sm"
+            startContent={<FaFilter className="text-default-400" />}
+          >
+            <SelectItem key="pending" value="pending">Pending ({pendingCorrections.length})</SelectItem>
+            <SelectItem key="approved" value="approved">Approved</SelectItem>
+            <SelectItem key="rejected" value="rejected">Rejected</SelectItem>
+            <SelectItem key="all" value="all">All Requests</SelectItem>
+          </Select>
         </div>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-        <div className="bg-yellow-50 rounded-lg shadow p-6 border border-yellow-200">
-          <div className="flex items-center justify-between">
+        <Card shadow="sm" className="border-l-4 border-l-warning-500">
+          <CardBody className="flex flex-row items-center justify-between">
             <div>
-              <p className="text-sm text-yellow-700">Pending Requests</p>
-              <p className="text-3xl font-bold text-yellow-600 mt-1">
+              <p className="text-sm text-warning-600 font-medium">Pending Requests</p>
+              <p className="text-3xl font-bold text-warning-600 mt-1">
                 {pendingCorrections.length}
               </p>
             </div>
-            <div className="bg-yellow-100 p-3 rounded-lg">
-              <FaCalendarCheck className="h-6 w-6 text-yellow-600" />
+            <div className="bg-warning-100 p-3 rounded-xl">
+              <FaCalendarCheck className="h-6 w-6 text-warning-600" />
             </div>
-          </div>
-        </div>
+          </CardBody>
+        </Card>
 
-        <div className="bg-green-50 rounded-lg shadow p-6 border border-green-200">
-          <div className="flex items-center justify-between">
+        <Card shadow="sm" className="border-l-4 border-l-success-500">
+          <CardBody className="flex flex-row items-center justify-between">
             <div>
-              <p className="text-sm text-green-700">Approved This Month</p>
-              <p className="text-3xl font-bold text-green-600 mt-1">
+              <p className="text-sm text-success-600 font-medium">Approved This Month</p>
+              <p className="text-3xl font-bold text-success-600 mt-1">
                 {allCorrections.filter(c => c.status === 'approved').length}
               </p>
             </div>
-            <div className="bg-green-100 p-3 rounded-lg">
-              <FaCheck className="h-6 w-6 text-green-600" />
+            <div className="bg-success-100 p-3 rounded-xl">
+              <FaCheck className="h-6 w-6 text-success-600" />
             </div>
-          </div>
-        </div>
+          </CardBody>
+        </Card>
 
-        <div className="bg-red-50 rounded-lg shadow p-6 border border-red-200">
-          <div className="flex items-center justify-between">
+        <Card shadow="sm" className="border-l-4 border-l-danger-500">
+          <CardBody className="flex flex-row items-center justify-between">
             <div>
-              <p className="text-sm text-red-700">Rejected This Month</p>
-              <p className="text-3xl font-bold text-red-600 mt-1">
+              <p className="text-sm text-danger-600 font-medium">Rejected This Month</p>
+              <p className="text-3xl font-bold text-danger-600 mt-1">
                 {allCorrections.filter(c => c.status === 'rejected').length}
               </p>
             </div>
-            <div className="bg-red-100 p-3 rounded-lg">
-              <FaTimes className="h-6 w-6 text-red-600" />
+            <div className="bg-danger-100 p-3 rounded-xl">
+              <FaTimes className="h-6 w-6 text-danger-600" />
             </div>
-          </div>
-        </div>
+          </CardBody>
+        </Card>
       </div>
 
       {/* Corrections List */}
       {filteredCorrections.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-md p-12 text-center">
-          <FaCalendarCheck className="mx-auto h-16 w-16 text-gray-300 mb-4" />
-          <h3 className="text-xl font-semibold text-gray-700 mb-2">No Requests Found</h3>
-          <p className="text-gray-500">
-            {statusFilter === 'pending' 
-              ? 'There are no pending attendance correction requests at the moment.'
-              : `No ${statusFilter} requests found.`
-            }
-          </p>
-        </div>
+        <Card shadow="sm">
+          <CardBody className="py-12 text-center">
+            <div className="w-20 h-20 bg-default-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <FaCalendarCheck className="h-10 w-10 text-default-300" />
+            </div>
+            <h3 className="text-xl font-semibold text-default-700 mb-2">No Requests Found</h3>
+            <p className="text-default-500">
+              {statusFilter === 'pending' 
+                ? 'There are no pending attendance correction requests at the moment.'
+                : `No ${statusFilter} requests found.`
+              }
+            </p>
+          </CardBody>
+        </Card>
       ) : (
         <div className="space-y-4">
           {filteredCorrections.map((correction) => (
-            <div 
+            <Card 
               key={correction._id} 
-              className={`bg-white rounded-lg shadow-md border-l-4 overflow-hidden ${
-                correction.status === 'pending' ? 'border-l-yellow-500' :
-                correction.status === 'approved' ? 'border-l-green-500' :
-                'border-l-red-500'
+              shadow="sm"
+              className={`border-l-4 overflow-visible ${
+                correction.status === 'pending' ? 'border-l-warning-500' :
+                correction.status === 'approved' ? 'border-l-success-500' :
+                'border-l-danger-500'
               }`}
             >
-              {/* Header - Always visible */}
-              <div 
-                className="p-4 cursor-pointer hover:bg-gray-50 transition-colors"
-                onClick={() => toggleCard(correction._id)}
-              >
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white font-bold text-lg shadow-md">
-                      {correction.employee?.firstName?.[0]}{correction.employee?.lastName?.[0]}
+              <CardBody className="p-0">
+                {/* Header - Always visible */}
+                <div 
+                  className="p-4 cursor-pointer hover:bg-default-50 transition-colors"
+                  onClick={() => toggleCard(correction._id)}
+                >
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div className="flex items-center space-x-4">
+                      <Avatar
+                        name={`${correction.employee?.firstName?.[0]}${correction.employee?.lastName?.[0]}`}
+                        className="bg-gradient-to-br from-primary-400 to-primary-600 text-white font-bold"
+                        size="lg"
+                      />
+                      <div>
+                        <h3 className="font-semibold text-default-900 text-lg">
+                          {correction.employee?.firstName} {correction.employee?.lastName}
+                        </h3>
+                        <p className="text-sm text-default-500">
+                          {correction.employee?.designation?.title || 'Employee'} • {formatDate(correction.date)}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900 text-lg">
-                        {correction.employee?.firstName} {correction.employee?.lastName}
-                      </h3>
-                      <p className="text-sm text-gray-500">
-                        {correction.employee?.designation?.title || 'Employee'} • {formatDate(correction.date)}
-                      </p>
+                    
+                    <div className="flex items-center space-x-3">
+                      <Chip color={getStatusColor(correction.status)} variant="flat" size="sm">
+                        {correction.status.charAt(0).toUpperCase() + correction.status.slice(1)}
+                      </Chip>
+                      <Chip color="warning" variant="flat" size="sm" className="capitalize">
+                        {correction.correctionType?.replace('-', ' ')}
+                      </Chip>
+                      {expandedCards[correction._id] ? (
+                        <FaChevronUp className="text-default-400" />
+                      ) : (
+                        <FaChevronDown className="text-default-400" />
+                      )}
                     </div>
                   </div>
-                  
-                  <div className="flex items-center space-x-3">
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getStatusBadge(correction.status)}`}>
-                      {correction.status.charAt(0).toUpperCase() + correction.status.slice(1)}
-                    </span>
-                    <span className="px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm font-medium capitalize">
-                      {correction.correctionType?.replace('-', ' ')}
-                    </span>
-                    {expandedCards[correction._id] ? (
-                      <FaChevronUp className="text-gray-400" />
-                    ) : (
-                      <FaChevronDown className="text-gray-400" />
+                </div>
+
+                {/* Expanded Details */}
+                {expandedCards[correction._id] && (
+                  <div className="px-4 pb-4 pt-2 border-t border-default-100 bg-default-50">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                      {/* Current Record */}
+                      <Card shadow="none" className="border border-default-200">
+                        <CardBody>
+                          <h4 className="text-xs font-semibold text-default-500 uppercase mb-3">Current Record</h4>
+                          <div className="space-y-2">
+                            <p className="text-sm text-default-700">
+                              <span className="text-default-500">In:</span>{' '}
+                              <span className="font-medium">{formatTime(correction.currentCheckIn)}</span>
+                            </p>
+                            <p className="text-sm text-default-700">
+                              <span className="text-default-500">Out:</span>{' '}
+                              <span className="font-medium">{formatTime(correction.currentCheckOut)}</span>
+                            </p>
+                            <p className="text-sm text-default-700">
+                              <span className="text-default-500">Status:</span>{' '}
+                              <span className="font-medium capitalize">{correction.currentStatus || 'N/A'}</span>
+                            </p>
+                          </div>
+                        </CardBody>
+                      </Card>
+
+                      {/* Requested Changes */}
+                      <Card shadow="none" className="border border-primary-200 bg-primary-50">
+                        <CardBody>
+                          <h4 className="text-xs font-semibold text-primary-600 uppercase mb-3">Requested Changes</h4>
+                          <div className="space-y-2">
+                            {correction.requestedCheckIn && (
+                              <p className="text-sm">
+                                <span className="text-primary-500">In:</span>{' '}
+                                <span className="font-medium text-primary-700">{formatRequestedTime(correction.requestedCheckIn)}</span>
+                              </p>
+                            )}
+                            {correction.requestedCheckOut && (
+                              <p className="text-sm">
+                                <span className="text-primary-500">Out:</span>{' '}
+                                <span className="font-medium text-primary-700">{formatRequestedTime(correction.requestedCheckOut)}</span>
+                              </p>
+                            )}
+                            {correction.requestedStatus && (
+                              <p className="text-sm">
+                                <span className="text-primary-500">Status:</span>{' '}
+                                <span className="font-medium text-primary-700 capitalize">{correction.requestedStatus}</span>
+                              </p>
+                            )}
+                          </div>
+                        </CardBody>
+                      </Card>
+
+                      {/* Reason */}
+                      <Card shadow="none" className="border border-warning-200 bg-warning-50">
+                        <CardBody>
+                          <h4 className="text-xs font-semibold text-warning-600 uppercase mb-3">Reason</h4>
+                          <p className="text-sm text-default-700 italic">&quot;{correction.reason}&quot;</p>
+                          <p className="text-xs text-default-400 mt-3">
+                            Submitted: {new Date(correction.createdAt).toLocaleString()}
+                          </p>
+                        </CardBody>
+                      </Card>
+                    </div>
+
+                    {/* Reviewer comments if any */}
+                    {correction.reviewerComments && (
+                      <Card shadow="none" className="border border-secondary-200 bg-secondary-50 mb-4">
+                        <CardBody>
+                          <h4 className="text-xs font-semibold text-secondary-600 uppercase mb-2">Reviewer Comments</h4>
+                          <p className="text-sm text-default-700">{correction.reviewerComments}</p>
+                          <p className="text-xs text-default-400 mt-2">
+                            Reviewed by: {correction.reviewedBy?.firstName} {correction.reviewedBy?.lastName}
+                          </p>
+                        </CardBody>
+                      </Card>
+                    )}
+
+                    {/* Action Buttons - Only for pending */}
+                    {correction.status === 'pending' && (
+                      <div className="flex justify-end space-x-3">
+                        <Button
+                          color="danger"
+                          variant="flat"
+                          startContent={<FaTimes />}
+                          onPress={() => {
+                            const comment = prompt('Reason for rejection (optional):')
+                            handleApproveReject(correction._id, 'reject', comment || '')
+                          }}
+                          isDisabled={processingCorrection === correction._id}
+                          isLoading={processingCorrection === correction._id}
+                        >
+                          Reject
+                        </Button>
+                        <Button
+                          color="success"
+                          startContent={<FaCheck />}
+                          onPress={() => handleApproveReject(correction._id, 'approve')}
+                          isDisabled={processingCorrection === correction._id}
+                          isLoading={processingCorrection === correction._id}
+                        >
+                          Approve
+                        </Button>
+                      </div>
                     )}
                   </div>
-                </div>
-              </div>
-
-              {/* Expanded Details */}
-              {expandedCards[correction._id] && (
-                <div className="px-4 pb-4 pt-2 border-t border-gray-100 bg-gray-50">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                    {/* Current Record */}
-                    <div className="bg-white rounded-lg p-4 border border-gray-200">
-                      <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Current Record</h4>
-                      <div className="space-y-1">
-                        <p className="text-sm" style={{ color: '#111827' }}>
-                          <span style={{ color: '#6b7280' }}>In:</span>{' '}
-                          <span className="font-medium" style={{ color: '#111827' }}>{formatTime(correction.currentCheckIn)}</span>
-                        </p>
-                        <p className="text-sm" style={{ color: '#111827' }}>
-                          <span style={{ color: '#6b7280' }}>Out:</span>{' '}
-                          <span className="font-medium" style={{ color: '#111827' }}>{formatTime(correction.currentCheckOut)}</span>
-                        </p>
-                        <p className="text-sm" style={{ color: '#111827' }}>
-                          <span style={{ color: '#6b7280' }}>Status:</span>{' '}
-                          <span className="font-medium capitalize" style={{ color: '#111827' }}>{correction.currentStatus || 'N/A'}</span>
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Requested Changes */}
-                    <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                      <h4 className="text-xs font-semibold text-blue-600 uppercase mb-2">Requested Changes</h4>
-                      <div className="space-y-1">
-                        {correction.requestedCheckIn && (
-                          <p className="text-sm">
-                            <span className="text-blue-500">In:</span>{' '}
-                            <span className="font-medium text-blue-800">{formatRequestedTime(correction.requestedCheckIn)}</span>
-                          </p>
-                        )}
-                        {correction.requestedCheckOut && (
-                          <p className="text-sm">
-                            <span className="text-blue-500">Out:</span>{' '}
-                            <span className="font-medium text-blue-800">{formatRequestedTime(correction.requestedCheckOut)}</span>
-                          </p>
-                        )}
-                        {correction.requestedStatus && (
-                          <p className="text-sm">
-                            <span className="text-blue-500">Status:</span>{' '}
-                            <span className="font-medium text-blue-800 capitalize">{correction.requestedStatus}</span>
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Reason */}
-                    <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
-                      <h4 className="text-xs font-semibold text-yellow-600 uppercase mb-2">Reason</h4>
-                      <p className="text-sm text-gray-700 italic">&quot;{correction.reason}&quot;</p>
-                      <p className="text-xs text-gray-400 mt-2">
-                        Submitted: {new Date(correction.createdAt).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Reviewer comments if any */}
-                  {correction.reviewerComments && (
-                    <div className="bg-purple-50 rounded-lg p-4 border border-purple-200 mb-4">
-                      <h4 className="text-xs font-semibold text-purple-600 uppercase mb-2">Reviewer Comments</h4>
-                      <p className="text-sm text-gray-700">{correction.reviewerComments}</p>
-                      <p className="text-xs text-gray-400 mt-2">
-                        Reviewed by: {correction.reviewedBy?.firstName} {correction.reviewedBy?.lastName}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Action Buttons - Only for pending */}
-                  {correction.status === 'pending' && (
-                    <div className="flex justify-end space-x-3">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          const comment = prompt('Reason for rejection (optional):')
-                          handleApproveReject(correction._id, 'reject', comment || '')
-                        }}
-                        disabled={processingCorrection === correction._id}
-                        className="flex items-center space-x-2 px-5 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50 shadow-md"
-                      >
-                        <FaTimes />
-                        <span>Reject</span>
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleApproveReject(correction._id, 'approve')
-                        }}
-                        disabled={processingCorrection === correction._id}
-                        className="flex items-center space-x-2 px-5 py-2.5 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 shadow-md"
-                      >
-                        <FaCheck />
-                        <span>Approve</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+                )}
+              </CardBody>
+            </Card>
           ))}
         </div>
       )}

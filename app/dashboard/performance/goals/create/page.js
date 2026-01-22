@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { FaArrowLeft, FaSave, FaTimes, FaPlus } from 'react-icons/fa'
+import { Select, SelectItem, Input, Textarea, Button } from '@heroui/react'
 
 export default function CreateGoalPage() {
   const router = useRouter()
@@ -156,72 +157,56 @@ export default function CreateGoalPage() {
           <h2 className="text-xl font-semibold text-gray-800 mb-4">Basic Information</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Employee *
-              </label>
-              <select
-                name="employeeId"
-                value={formData.employeeId}
-                onChange={handleInputChange}
-                required
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              <Select
+                label="Employee *"
+                selectedKeys={formData.employeeId ? [formData.employeeId] : []}
+                onSelectionChange={(keys) => handleInputChange({ target: { name: 'employeeId', value: Array.from(keys)[0] || '' }})}
+                isRequired
+                placeholder="Select Employee"
               >
-                <option value="">Select Employee</option>
                 {employees.map((employee) => (
-                  <option key={employee._id} value={employee._id}>
+                  <SelectItem key={employee._id}>
                     {employee.firstName} {employee.lastName} ({employee.employeeCode})
-                  </option>
+                  </SelectItem>
                 ))}
-              </select>
+              </Select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Category
-              </label>
-              <select
-                name="category"
-                value={formData.category}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              <Select
+                label="Category"
+                selectedKeys={formData.category ? [formData.category] : []}
+                onSelectionChange={(keys) => handleInputChange({ target: { name: 'category', value: Array.from(keys)[0] || '' }})}
+                placeholder="Select Category"
               >
-                <option value="">Select Category</option>
                 {categories.map((category) => (
-                  <option key={category} value={category}>
+                  <SelectItem key={category}>
                     {category}
-                  </option>
+                  </SelectItem>
                 ))}
-              </select>
+              </Select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Priority
-              </label>
-              <select
-                name="priority"
-                value={formData.priority}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              <Select
+                label="Priority"
+                selectedKeys={[formData.priority]}
+                onSelectionChange={(keys) => handleInputChange({ target: { name: 'priority', value: Array.from(keys)[0] || 'medium' }})}
               >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-              </select>
+                <SelectItem key="low">Low</SelectItem>
+                <SelectItem key="medium">Medium</SelectItem>
+                <SelectItem key="high">High</SelectItem>
+              </Select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Status
-              </label>
-              <select
-                name="status"
-                value={formData.status}
-                onChange={handleInputChange}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              <Select
+                label="Status"
+                selectedKeys={[formData.status]}
+                onSelectionChange={(keys) => handleInputChange({ target: { name: 'status', value: Array.from(keys)[0] || 'not-started' }})}
               >
-                <option value="not-started">Not Started</option>
-                <option value="in-progress">In Progress</option>
-                <option value="on-hold">On Hold</option>
-                <option value="completed">Completed</option>
-              </select>
+                <SelectItem key="not-started">Not Started</SelectItem>
+                <SelectItem key="in-progress">In Progress</SelectItem>
+                <SelectItem key="on-hold">On Hold</SelectItem>
+                <SelectItem key="completed">Completed</SelectItem>
+              </Select>
             </div>
           </div>
         </div>

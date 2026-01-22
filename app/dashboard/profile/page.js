@@ -23,7 +23,7 @@ import {
   FaExclamationTriangle,
 } from 'react-icons/fa'
 import toast from '@/utils/toast'
-import ModalPortal from '@/components/ModalPortal'
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button } from '@heroui/react'
 import { formatDesignation, formatDepartments, getLevelNameFromNumber } from '@/lib/formatters'
 import TiltWrapper from "@/components/TiltWrapper";
 import dynamic from 'next/dynamic'
@@ -1423,14 +1423,9 @@ export default function ProfilePage() {
       </div>
 
       {/* Image Editor Modal */}
-      <ModalPortal show={showImageEditor}>
-        <div
-          className="fixed inset-0 modal-overlay-dark flex items-center justify-center p-0 sm:p-4"
-          style={{ zIndex: 99999 }}
-        >
-          <div className="bg-white rounded-none sm:rounded-3xl shadow-2xl w-full h-full sm:max-w-5xl sm:max-h-[95vh] sm:h-auto overflow-hidden flex flex-col">
-            {/* Header */}
-            <div className="px-4 sm:px-6 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50 flex-shrink-0">
+      <Modal isOpen={showImageEditor} onClose={closeImageEditor} size="5xl" scrollBehavior="inside" classNames={{ wrapper: 'z-[99999]' }}>
+        <ModalContent>
+          <ModalHeader className="flex flex-col gap-1 bg-slate-50 border-b border-slate-200">
               <div className="flex flex-col">
                 <h2 className="text-base sm:text-lg font-semibold text-slate-900">
                   Edit Profile Picture
@@ -1439,17 +1434,8 @@ export default function ProfilePage() {
                   Crop, adjust and fine-tune how your profile photo looks.
                 </p>
               </div>
-              <button
-                onClick={closeImageEditor}
-                className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition-colors"
-                title="Close"
-              >
-                <FaTimes className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Editor Content */}
-            <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row lg:p-6 lg:gap-6 bg-slate-50/60">
+            </ModalHeader>
+          <ModalBody className="bg-slate-50/60">
               {/* Preview area */}
               <div className="lg:flex-[2] flex-shrink-0 sticky top-0 bg-slate-50 z-10 lg:static rounded-none lg:rounded-2xl">
                 <div className="bg-slate-100 rounded-none lg:rounded-2xl overflow-hidden relative h-[300px] sm:h-[350px] lg:h-[450px] border border-slate-200/80">
@@ -1642,35 +1628,26 @@ export default function ProfilePage() {
             </div>
 
             {/* Footer */}
-            <div className="px-4 sm:px-6 py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-2 sm:gap-3 flex-shrink-0">
-              <button
-                onClick={closeImageEditor}
-                disabled={uploadingImage}
-                className="px-4 sm:px-6 py-2 bg-white border border-slate-300 text-slate-700 rounded-full hover:bg-slate-50 transition-colors text-xs sm:text-sm font-semibold disabled:opacity-60"
+            </ModalBody>
+            <ModalFooter className="border-t border-slate-200 bg-slate-50">
+              <Button
+                variant="bordered"
+                onPress={closeImageEditor}
+                isDisabled={uploadingImage}
               >
                 Cancel
-              </button>
-              <button
-                onClick={handleSaveImage}
-                disabled={uploadingImage}
-                className="px-4 sm:px-6 py-2 bg-slate-900 text-white rounded-full hover:bg-black transition-colors text-xs sm:text-sm font-semibold flex items-center gap-2 disabled:opacity-60"
+              </Button>
+              <Button
+                color="primary"
+                onPress={handleSaveImage}
+                isLoading={uploadingImage}
+                startContent={!uploadingImage && <FaCheck />}
               >
-                {uploadingImage ? (
-                  <>
-                    <Loader size="xs" />
-                    Saving…
-                  </>
-                ) : (
-                  <>
-                    <FaCheck />
-                    Save Picture
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      </ModalPortal>
+                {uploadingImage ? 'Saving…' : 'Save Picture'}
+              </Button>
+            </ModalFooter>
+        </ModalContent>
+      </Modal>
     </div>
   )
 }

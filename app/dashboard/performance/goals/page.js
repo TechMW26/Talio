@@ -9,6 +9,7 @@ import {
   FaFlag, FaTasks, FaUserClock, FaSync
 } from 'react-icons/fa'
 import Loader from '@/components/ui/Loader'
+import { Select, SelectItem, Input, Button } from '@heroui/react'
 
 export default function PerformanceGoalsPage() {
   const router = useRouter()
@@ -309,42 +310,46 @@ export default function PerformanceGoalsPage() {
             </div>
 
             {/* Search */}
-            <div className="relative">
-              <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
+            <div className="w-48">
+              <Input
                 type="text"
                 placeholder="Search..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-4 py-2 w-48 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+                startContent={<FaSearch className="text-gray-400 w-4 h-4" />}
+                size="sm"
               />
             </div>
 
             {/* Status Filter */}
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+            <Select
+              selectedKeys={[filterStatus]}
+              onSelectionChange={(keys) => setFilterStatus(Array.from(keys)[0] || 'all')}
+              className="w-40"
+              size="sm"
+              aria-label="Filter by status"
             >
-              <option value="all">All Status</option>
-              <option value="completed">Completed</option>
-              <option value="in-progress">In Progress</option>
-              <option value="not-started">Not Started</option>
-              <option value="on-hold">On Hold</option>
-            </select>
+              <SelectItem key="all">All Status</SelectItem>
+              <SelectItem key="completed">Completed</SelectItem>
+              <SelectItem key="in-progress">In Progress</SelectItem>
+              <SelectItem key="not-started">Not Started</SelectItem>
+              <SelectItem key="on-hold">On Hold</SelectItem>
+            </Select>
 
             {/* Priority Filter */}
-            <select
-              value={filterPriority}
-              onChange={(e) => setFilterPriority(e.target.value)}
-              className="px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
+            <Select
+              selectedKeys={[filterPriority]}
+              onSelectionChange={(keys) => setFilterPriority(Array.from(keys)[0] || 'all')}
+              className="w-40"
+              size="sm"
+              aria-label="Filter by priority"
             >
-              <option value="all">All Priority</option>
-              <option value="critical">Critical</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </select>
+              <SelectItem key="all">All Priority</SelectItem>
+              <SelectItem key="critical">Critical</SelectItem>
+              <SelectItem key="high">High</SelectItem>
+              <SelectItem key="medium">Medium</SelectItem>
+              <SelectItem key="low">Low</SelectItem>
+            </Select>
           </div>
 
           <div className="text-sm text-gray-500">

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import toast from '@/utils/toast'
 import { FaPlus, FaEdit, FaTrash, FaUmbrella } from 'react-icons/fa'
-import Loader from '@/components/ui/Loader'
+import { Card, CardBody, Button, Chip, Skeleton, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Textarea, Switch } from '@heroui/react'
 
 export default function LeaveTypesPage() {
   const [leaveTypes, setLeaveTypes] = useState([])
@@ -154,232 +154,263 @@ export default function LeaveTypesPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-3 sm:space-y-0">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">Leave Types</h1>
-          <p className="text-gray-600 mt-1 text-sm sm:text-base">Configure different types of leaves</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-default-900">Leave Types</h1>
+          <p className="text-default-500 mt-1 text-sm sm:text-base">Configure different types of leaves</p>
         </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="btn-theme-primary flex items-center justify-center space-x-2 w-full sm:w-auto rounded-lg px-4 py-2 font-semibold shadow-md hover:shadow-lg transition-all duration-200"
+        <Button
+          color="primary"
+          startContent={<FaPlus className="w-4 h-4" />}
+          onPress={() => setShowModal(true)}
+          className="w-full sm:w-auto"
         >
-          <FaPlus className="w-4 h-4" />
-          <span>Add Leave Type</span>
-        </button>
+          Add Leave Type
+        </Button>
       </div>
 
       {/* Stats Card */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-start mb-2">
-            <h3 className="text-sm font-medium text-gray-600">Total Leave Types</h3>
-            <FaUmbrella className="text-primary-500" />
-          </div>
-          <div className="text-3xl font-bold text-gray-800">{leaveTypes.length}</div>
-        </div>
+        <Card shadow="sm">
+          <CardBody className="flex flex-row items-center justify-between">
+            <div>
+              <h3 className="text-sm font-medium text-default-500">Total Leave Types</h3>
+              <div className="text-3xl font-bold text-default-900 mt-1">{leaveTypes.length}</div>
+            </div>
+            <div className="bg-primary-100 p-3 rounded-xl">
+              <FaUmbrella className="text-primary-500 h-6 w-6" />
+            </div>
+          </CardBody>
+        </Card>
 
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-start mb-2">
-            <h3 className="text-sm font-medium text-gray-600">Paid Leaves</h3>
-            <FaUmbrella className="text-green-500" />
-          </div>
-          <div className="text-3xl font-bold text-gray-800">
-            {leaveTypes.filter(t => t.isPaid).length}
-          </div>
-        </div>
+        <Card shadow="sm">
+          <CardBody className="flex flex-row items-center justify-between">
+            <div>
+              <h3 className="text-sm font-medium text-default-500">Paid Leaves</h3>
+              <div className="text-3xl font-bold text-success-600 mt-1">
+                {leaveTypes.filter(t => t.isPaid).length}
+              </div>
+            </div>
+            <div className="bg-success-100 p-3 rounded-xl">
+              <FaUmbrella className="text-success-500 h-6 w-6" />
+            </div>
+          </CardBody>
+        </Card>
 
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-start mb-2">
-            <h3 className="text-sm font-medium text-gray-600">Total Days</h3>
-            <FaUmbrella className="text-blue-500" />
-          </div>
-          <div className="text-3xl font-bold text-gray-800">
-            {leaveTypes.reduce((sum, t) => sum + (t.maxDaysPerYear || 0), 0)}
-          </div>
-        </div>
+        <Card shadow="sm">
+          <CardBody className="flex flex-row items-center justify-between">
+            <div>
+              <h3 className="text-sm font-medium text-default-500">Total Days</h3>
+              <div className="text-3xl font-bold text-primary-600 mt-1">
+                {leaveTypes.reduce((sum, t) => sum + (t.maxDaysPerYear || 0), 0)}
+              </div>
+            </div>
+            <div className="bg-primary-100 p-3 rounded-xl">
+              <FaUmbrella className="text-primary-500 h-6 w-6" />
+            </div>
+          </CardBody>
+        </Card>
       </div>
 
       {/* Leave Types Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {loading ? (
-          <div className="col-span-full bg-white rounded-lg shadow-md p-8 text-center">
-            <Loader size="lg" className="mx-auto" />
-            <p className="mt-4 text-gray-600">Loading leave types...</p>
-          </div>
+          <>
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <Card key={i} shadow="sm">
+                <CardBody className="space-y-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center space-x-3">
+                      <Skeleton className="w-12 h-12 rounded-lg" />
+                      <div className="space-y-2">
+                        <Skeleton className="h-5 w-32 rounded-lg" />
+                        <Skeleton className="h-4 w-16 rounded-lg" />
+                      </div>
+                    </div>
+                  </div>
+                  <Skeleton className="h-12 w-full rounded-lg" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-full rounded-lg" />
+                    <Skeleton className="h-4 w-full rounded-lg" />
+                    <Skeleton className="h-4 w-full rounded-lg" />
+                  </div>
+                </CardBody>
+              </Card>
+            ))}
+          </>
         ) : leaveTypes.length === 0 ? (
-          <div className="col-span-full bg-white rounded-lg shadow-md p-8 text-center text-gray-500">
-            No leave types found
+          <div className="col-span-full">
+            <Card shadow="sm">
+              <CardBody className="py-12 text-center">
+                <div className="w-16 h-16 bg-default-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <FaUmbrella className="text-default-300 h-8 w-8" />
+                </div>
+                <p className="text-default-500">No leave types found</p>
+                <Button
+                  color="primary"
+                  variant="flat"
+                  startContent={<FaPlus />}
+                  onPress={() => setShowModal(true)}
+                  className="mt-4"
+                >
+                  Add First Leave Type
+                </Button>
+              </CardBody>
+            </Card>
           </div>
         ) : (
           leaveTypes.map((type) => (
-            <div
+            <Card
               key={type._id}
-              className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow"
+              shadow="sm"
+              className="hover:shadow-md transition-shadow"
             >
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex items-center space-x-3">
-                  <div className="bg-primary-100 p-3 rounded-lg">
-                    <FaUmbrella className="text-primary-500 text-xl" />
+              <CardBody>
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="bg-primary-100 p-3 rounded-xl">
+                      <FaUmbrella className="text-primary-500 text-xl" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-default-900">{type.name}</h3>
+                      {type.code && (
+                        <p className="text-sm text-default-500">{type.code}</p>
+                      )}
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-gray-800">{type.name}</h3>
-                    {type.code && (
-                      <p className="text-sm text-gray-500">{type.code}</p>
-                    )}
+                  <div className="flex space-x-1">
+                    <Button
+                      isIconOnly
+                      variant="light"
+                      color="primary"
+                      size="sm"
+                      onPress={() => handleEdit(type)}
+                    >
+                      <FaEdit />
+                    </Button>
+                    <Button
+                      isIconOnly
+                      variant="light"
+                      color="danger"
+                      size="sm"
+                      onPress={() => handleDelete(type._id)}
+                    >
+                      <FaTrash />
+                    </Button>
                   </div>
                 </div>
-                <div className="flex space-x-2">
-                  <button
-                    onClick={() => handleEdit(type)}
-                    className="text-blue-600 hover:text-blue-800"
-                  >
-                    <FaEdit />
-                  </button>
-                  <button
-                    onClick={() => handleDelete(type._id)}
-                    className="text-red-600 hover:text-red-800"
-                  >
-                    <FaTrash />
-                  </button>
-                </div>
-              </div>
 
-              {type.description && (
-                <p className="text-gray-600 text-sm mb-4">{type.description}</p>
-              )}
+                {type.description && (
+                  <p className="text-default-600 text-sm mb-4">{type.description}</p>
+                )}
 
-              <div className="space-y-2 pt-4 border-t border-gray-200">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Max Days Per Year:</span>
-                  <span className="font-semibold text-gray-800">{type.maxDaysPerYear || 0}</span>
+                <div className="space-y-3 pt-4 border-t border-default-200">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-default-500">Max Days Per Year:</span>
+                    <span className="font-semibold text-default-900">{type.maxDaysPerYear || 0}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-default-500">Type:</span>
+                    <Chip
+                      size="sm"
+                      color={type.isPaid ? 'success' : 'default'}
+                      variant="flat"
+                    >
+                      {type.isPaid ? 'Paid' : 'Unpaid'}
+                    </Chip>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-default-500">Approval:</span>
+                    <Chip
+                      size="sm"
+                      color={type.requiresApproval ? 'primary' : 'default'}
+                      variant="flat"
+                    >
+                      {type.requiresApproval ? 'Required' : 'Not Required'}
+                    </Chip>
+                  </div>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Type:</span>
-                  <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                    type.isPaid ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {type.isPaid ? 'Paid' : 'Unpaid'}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Approval:</span>
-                  <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                    type.requiresApproval ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {type.requiresApproval ? 'Required' : 'Not Required'}
-                  </span>
-                </div>
-              </div>
-            </div>
+              </CardBody>
+            </Card>
           ))
         )}
       </div>
 
       {/* Add/Edit Modal */}
-      {showModal && (
-        <div className="fixed inset-0 modal-overlay flex items-center justify-center style={{ zIndex: 99999 }}">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">
-              {editingType ? 'Edit Leave Type' : 'Add Leave Type'}
-            </h2>
-            <form onSubmit={handleSubmit}>
+      <Modal isOpen={showModal} onClose={handleCloseModal} size="lg">
+        <ModalContent>
+          <form onSubmit={handleSubmit}>
+            <ModalHeader className="flex flex-col gap-1">
+              <h2 className="text-xl font-bold">
+                {editingType ? 'Edit Leave Type' : 'Add Leave Type'}
+              </h2>
+            </ModalHeader>
+            <ModalBody>
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Leave Name *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    placeholder="e.g., Casual Leave"
-                  />
-                </div>
+                <Input
+                  label="Leave Name"
+                  placeholder="e.g., Casual Leave"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  isRequired
+                  variant="bordered"
+                />
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Code
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.code}
-                    onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    placeholder="e.g., CL"
-                  />
-                </div>
+                <Input
+                  label="Code"
+                  placeholder="e.g., CL"
+                  value={formData.code}
+                  onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                  variant="bordered"
+                />
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Max Days Per Year *
-                  </label>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    value={formData.maxDaysPerYear}
-                    onChange={(e) => setFormData({ ...formData, maxDaysPerYear: parseInt(e.target.value) })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    placeholder="0"
-                  />
-                </div>
+                <Input
+                  type="number"
+                  label="Max Days Per Year"
+                  placeholder="0"
+                  value={formData.maxDaysPerYear.toString()}
+                  onChange={(e) => setFormData({ ...formData, maxDaysPerYear: parseInt(e.target.value) || 0 })}
+                  isRequired
+                  min={0}
+                  variant="bordered"
+                />
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Description
-                  </label>
-                  <textarea
-                    rows="3"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    placeholder="Leave type description"
-                  />
-                </div>
+                <Textarea
+                  label="Description"
+                  placeholder="Leave type description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  variant="bordered"
+                />
 
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="isPaid"
-                    checked={formData.isPaid}
-                    onChange={(e) => setFormData({ ...formData, isPaid: e.target.checked })}
-                    className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                  />
-                  <label htmlFor="isPaid" className="text-sm font-medium text-gray-700">
+                <div className="flex flex-col gap-3 pt-2">
+                  <Switch
+                    isSelected={formData.isPaid}
+                    onValueChange={(value) => setFormData({ ...formData, isPaid: value })}
+                    size="sm"
+                  >
                     Paid Leave
-                  </label>
-                </div>
+                  </Switch>
 
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="requiresApproval"
-                    checked={formData.requiresApproval}
-                    onChange={(e) => setFormData({ ...formData, requiresApproval: e.target.checked })}
-                    className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                  />
-                  <label htmlFor="requiresApproval" className="text-sm font-medium text-gray-700">
+                  <Switch
+                    isSelected={formData.requiresApproval}
+                    onValueChange={(value) => setFormData({ ...formData, requiresApproval: value })}
+                    size="sm"
+                  >
                     Requires Approval
-                  </label>
+                  </Switch>
                 </div>
               </div>
-
-              <div className="flex justify-end space-x-4 mt-6">
-                <button
-                  type="button"
-                  onClick={handleCloseModal}
-                  className="btn-secondary"
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary">
-                  {editingType ? 'Update' : 'Create'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="flat" onPress={handleCloseModal}>
+                Cancel
+              </Button>
+              <Button color="primary" type="submit">
+                {editingType ? 'Update' : 'Create'}
+              </Button>
+            </ModalFooter>
+          </form>
+        </ModalContent>
+      </Modal>
     </div>
   )
 }

@@ -5,7 +5,17 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import toast from '@/utils/toast'
 import { FaEnvelope, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa'
-import Loader from '@/components/ui/Loader'
+import { 
+  Card, 
+  CardBody, 
+  CardFooter,
+  Input, 
+  Button, 
+  Checkbox,
+  Spinner,
+  Divider,
+  Link as HeroLink
+} from '@heroui/react'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -251,25 +261,31 @@ export default function LoginPage() {
   // Show loading screen while checking session
   if (checking) {
     return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-white">
+      <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50">
         <div className="text-center flex flex-col items-center justify-center">
-          <Loader size="lg" />
-          <p className="mt-4 text-gray-600 text-center">Checking session...</p>
+          <Spinner size="lg" color="primary" />
+          <p className="mt-4 text-default-600 text-center font-medium">Checking session...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      {/* Decorative background elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary-200 rounded-full blur-3xl opacity-30" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-secondary-200 rounded-full blur-3xl opacity-30" />
+      </div>
+
       {/* Login Form - Centered */}
-      <div className="min-h-screen flex items-center justify-center px-4 py-8">
+      <div className="min-h-screen flex items-center justify-center px-4 py-8 relative z-10">
         <div className="w-full max-w-md">
-          {/* Clean card with subtle shadow */}
-          <div
-            className="rounded-3xl shadow-xl overflow-hidden bg-white border border-gray-100"
+          <Card 
+            className="shadow-2xl border border-default-100 bg-white/80 backdrop-blur-xl"
+            radius="lg"
           >
-            <div className="p-8 md:p-10">
+            <CardBody className="p-8 md:p-10">
               {/* Logo and Title */}
               <div className="text-center mb-8">
                 <div className="flex justify-center mb-5">
@@ -279,107 +295,121 @@ export default function LoginPage() {
                     className="h-12 w-auto object-contain"
                   />
                 </div>
-                <h1 className="text-2xl font-bold text-gray-900 mb-1">Welcome Back</h1>
-                <p className="text-gray-500 text-sm">Sign in to continue to Talio</p>
+                <h1 className="text-2xl font-bold text-default-900 mb-1">Welcome Back</h1>
+                <p className="text-default-500 text-sm">Sign in to continue to Talio</p>
               </div>
 
               <form className="space-y-5" onSubmit={handleSubmit}>
                 {/* Email Field */}
-                <div>
-                  <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">
-                    Email Address
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <FaEnvelope className="h-4 w-4 text-gray-400" />
-                    </div>
-                    <input
-                      id="email"
-                      name="email"
-                      type="email"
-                      autoComplete="email"
-                      required
-                      className="w-full pl-11 pr-4 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
-                      placeholder="name@company.com"
-                      value={formData.email}
-                      onChange={handleChange}
-                    />
-                  </div>
-                </div>
+                <Input
+                  label="Email Address"
+                  labelPlacement="outside"
+                  type="email"
+                  name="email"
+                  placeholder="name@company.com"
+                  value={formData.email}
+                  onChange={handleChange}
+                  autoComplete="email"
+                  isRequired
+                  variant="bordered"
+                  radius="lg"
+                  size="lg"
+                  startContent={
+                    <FaEnvelope className="text-default-400 pointer-events-none flex-shrink-0" />
+                  }
+                  classNames={{
+                    label: "text-default-700 font-semibold",
+                    input: "text-default-900",
+                    inputWrapper: "bg-default-50 hover:bg-default-100 border-default-200 hover:border-primary-300 transition-colors",
+                  }}
+                />
 
                 {/* Password Field */}
-                <div>
-                  <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-2">
-                    Password
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <FaLock className="h-4 w-4 text-gray-400" />
-                    </div>
-                    <input
-                      id="password"
-                      name="password"
-                      type={showPassword ? 'text' : 'password'}
-                      autoComplete="current-password"
-                      required
-                      className="w-full pl-11 pr-12 py-3.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200"
-                      placeholder="Enter your password"
-                      value={formData.password}
-                      onChange={handleChange}
-                    />
+                <Input
+                  label="Password"
+                  labelPlacement="outside"
+                  type={showPassword ? 'text' : 'password'}
+                  name="password"
+                  placeholder="Enter your password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  autoComplete="current-password"
+                  isRequired
+                  variant="bordered"
+                  radius="lg"
+                  size="lg"
+                  startContent={
+                    <FaLock className="text-default-400 pointer-events-none flex-shrink-0" />
+                  }
+                  endContent={
                     <button
                       type="button"
-                      className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+                      className="focus:outline-none"
                       onClick={() => setShowPassword(!showPassword)}
                     >
                       {showPassword ? (
-                        <FaEyeSlash className="h-4 w-4" />
+                        <FaEyeSlash className="text-default-400 hover:text-default-600 transition-colors" />
                       ) : (
-                        <FaEye className="h-4 w-4" />
+                        <FaEye className="text-default-400 hover:text-default-600 transition-colors" />
                       )}
                     </button>
-                  </div>
-                </div>
+                  }
+                  classNames={{
+                    label: "text-default-700 font-semibold",
+                    input: "text-default-900",
+                    inputWrapper: "bg-default-50 hover:bg-default-100 border-default-200 hover:border-primary-300 transition-colors",
+                  }}
+                />
 
                 {/* Remember & Forgot */}
-                <div className="flex items-center justify-between text-sm">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                    />
-                    <span className="text-gray-600">Remember me</span>
-                  </label>
-                  <Link href="/auth/forgot-password" className="text-purple-600 hover:text-purple-700 font-medium transition-colors">
+                <div className="flex items-center justify-between">
+                  <Checkbox 
+                    size="sm"
+                    classNames={{
+                      label: "text-default-600 text-sm",
+                    }}
+                  >
+                    Remember me
+                  </Checkbox>
+                  <Link 
+                    href="/auth/forgot-password" 
+                    className="text-primary-600 hover:text-primary-700 text-sm font-medium transition-colors"
+                  >
                     Forgot password?
                   </Link>
                 </div>
 
                 {/* Sign In Button */}
-                <button
+                <Button
                   type="submit"
-                  disabled={loading}
-                  className="w-full py-3.5 px-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold rounded-xl shadow-lg shadow-purple-500/30 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 flex items-center justify-center gap-2"
+                  color="primary"
+                  size="lg"
+                  radius="lg"
+                  isLoading={loading}
+                  isDisabled={loading}
+                  className="w-full font-semibold shadow-lg shadow-primary-500/30 bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700"
+                  spinner={<Spinner size="sm" color="white" />}
                 >
-                  {loading ? (
-                    <>
-                      <Loader size="xs" color="#ffffff" />
-                      <span>Signing in...</span>
-                    </>
-                  ) : (
-                    'Sign in'
-                  )}
-                </button>
+                  {loading ? 'Signing in...' : 'Sign in'}
+                </Button>
               </form>
-            </div>
+            </CardBody>
+
+            <Divider />
 
             {/* Footer */}
-            <div className="px-8 py-4 bg-gray-50 border-t border-gray-100">
-              <p className="text-center text-gray-500 text-xs">
-                Powered by <span className="text-purple-600 font-medium">Talio</span>
+            <CardFooter className="justify-center py-4 bg-default-50/50">
+              <p className="text-default-500 text-xs">
+                Powered by <span className="text-primary-600 font-semibold">Talio</span>
               </p>
-            </div>
-          </div>
+            </CardFooter>
+          </Card>
+
+          {/* Optional: Link to sign up or help */}
+          <p className="text-center mt-6 text-default-500 text-sm">
+            Need help? Contact your{' '}
+            <span className="text-primary-600 font-medium">administrator</span>
+          </p>
         </div>
       </div>
     </div>

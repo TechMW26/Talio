@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
-import Loader from '@/components/ui/Loader'
+import { Card, CardBody, Button, Chip, Skeleton, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Textarea, Progress, Spinner, Select, SelectItem } from '@heroui/react'
 import { 
   FaTasks, FaCalendarAlt, FaFilter, FaSearch, FaProjectDiagram,
   FaCheck, FaPlay, FaEye, FaClock, FaExclamationTriangle,
@@ -16,20 +16,20 @@ import Portal from '@/components/ui/Portal'
 import KanbanBoard from '@/components/tasks/KanbanBoard'
 
 const statusColors = {
-  'todo': 'bg-gray-100 text-gray-700 border-gray-200',
-  'in-progress': 'bg-blue-100 text-blue-700 border-blue-200',
-  'review': 'bg-purple-100 text-purple-700 border-purple-200',
-  'completed': 'bg-green-100 text-green-700 border-green-200',
-  'completed-pending-approval': 'bg-yellow-100 text-yellow-700 border-yellow-200',
-  'rejected': 'bg-red-100 text-red-700 border-red-200',
-  'blocked': 'bg-orange-100 text-orange-700 border-orange-200'
+  'todo': 'default',
+  'in-progress': 'primary',
+  'review': 'secondary',
+  'completed': 'success',
+  'completed-pending-approval': 'warning',
+  'rejected': 'danger',
+  'blocked': 'warning'
 }
 
 const priorityColors = {
-  low: 'bg-gray-100 text-gray-700',
-  medium: 'bg-blue-100 text-blue-700',
-  high: 'bg-orange-100 text-orange-700',
-  critical: 'bg-red-100 text-red-700'
+  low: 'default',
+  medium: 'primary',
+  high: 'warning',
+  critical: 'danger'
 }
 
 // Project colors for visual differentiation
@@ -507,7 +507,7 @@ export default function AssignedTasksPage() {
     return (
       <div className="page-container">
         <div className="flex items-center justify-center h-64">
-          <Loader size="lg" />
+          <Spinner size="lg" />
         </div>
       </div>
     )
@@ -518,172 +518,189 @@ export default function AssignedTasksPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div className="flex items-center gap-4">
-          <button
-            onClick={() => router.push('/dashboard/projects')}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          <Button
+            isIconOnly
+            variant="light"
+            onPress={() => router.push('/dashboard/projects')}
           >
-            <FaArrowLeft className="text-gray-600" />
-          </button>
+            <FaArrowLeft className="text-default-600" />
+          </Button>
           <div>
-            <h1 className="text-3xl font-bold text-gray-800">Assigned Tasks</h1>
-            <p className="text-gray-600">Tasks you&apos;ve assigned to team members</p>
+            <h1 className="text-3xl font-bold text-default-800">Assigned Tasks</h1>
+            <p className="text-default-600">Tasks you&apos;ve assigned to team members</p>
           </div>
         </div>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-gray-100 rounded-lg">
-              <FaTasks className="w-5 h-5 text-gray-600" />
+        <Card shadow="sm">
+          <CardBody className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-default-100 rounded-lg">
+                <FaTasks className="w-5 h-5 text-default-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-default-800">{stats.total || 0}</p>
+                <p className="text-sm text-default-500">Total</p>
+              </div>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{stats.total || 0}</p>
-              <p className="text-sm text-gray-500">Total</p>
+          </CardBody>
+        </Card>
+        <Card shadow="sm">
+          <CardBody className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-warning-100 rounded-lg">
+                <FaClock className="w-5 h-5 text-warning" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-default-800">{stats.pendingAcceptance || 0}</p>
+                <p className="text-sm text-default-500">Pending Accept</p>
+              </div>
             </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-amber-100 rounded-lg">
-              <FaClock className="w-5 h-5 text-amber-600" />
+          </CardBody>
+        </Card>
+        <Card shadow="sm">
+          <CardBody className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary-100 rounded-lg">
+                <FaPlay className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-default-800">{stats.inProgress || 0}</p>
+                <p className="text-sm text-default-500">In Progress</p>
+              </div>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{stats.pendingAcceptance || 0}</p>
-              <p className="text-sm text-gray-500">Pending Accept</p>
+          </CardBody>
+        </Card>
+        <Card shadow="sm">
+          <CardBody className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-secondary-100 rounded-lg">
+                <FaEye className="w-5 h-5 text-secondary" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-default-800">{stats.review || 0}</p>
+                <p className="text-sm text-default-500">In Review</p>
+              </div>
             </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <FaPlay className="w-5 h-5 text-blue-600" />
+          </CardBody>
+        </Card>
+        <Card shadow="sm">
+          <CardBody className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-success-100 rounded-lg">
+                <FaCheckCircle className="w-5 h-5 text-success" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-default-800">{stats.completed || 0}</p>
+                <p className="text-sm text-default-500">Completed</p>
+              </div>
             </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{stats.inProgress || 0}</p>
-              <p className="text-sm text-gray-500">In Progress</p>
+          </CardBody>
+        </Card>
+        <Card shadow="sm">
+          <CardBody className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-danger-100 rounded-lg">
+                <FaTrash className="w-5 h-5 text-danger" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-default-800">{stats.pendingDeletion || 0}</p>
+                <p className="text-sm text-default-500">Pending Delete</p>
+              </div>
             </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <FaEye className="w-5 h-5 text-purple-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{stats.review || 0}</p>
-              <p className="text-sm text-gray-500">In Review</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <FaCheckCircle className="w-5 h-5 text-green-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{stats.completed || 0}</p>
-              <p className="text-sm text-gray-500">Completed</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-red-100 rounded-lg">
-              <FaTrash className="w-5 h-5 text-red-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-gray-800">{stats.pendingDeletion || 0}</p>
-              <p className="text-sm text-gray-500">Pending Delete</p>
-            </div>
-          </div>
-        </div>
+          </CardBody>
+        </Card>
       </div>
 
       {/* Search & Filters */}
-      <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
-        <div className="flex flex-col md:flex-row gap-4">
-          <div className="relative flex-1">
-            <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search tasks..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            />
-          </div>
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className="btn-secondary flex items-center"
-          >
-            <FaFilter className="mr-2" />
-            Filters
-            <FaChevronDown className={`ml-2 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
-          </button>
-          
-          {/* View Toggle */}
-          <div className="flex border border-gray-300 rounded-lg overflow-hidden">
-            <button
-              onClick={() => setViewMode('list')}
-              className={`px-3 py-2 flex items-center gap-1.5 transition-colors ${
-                viewMode === 'list'
-                  ? 'bg-primary-500 text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-50'
-              }`}
-              title="List View"
+      <Card shadow="sm" className="mb-6">
+        <CardBody className="p-4">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="relative flex-1">
+              <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-default-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search tasks..."
+                className="w-full pl-10 pr-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+            </div>
+            <Button
+              variant="bordered"
+              onPress={() => setShowFilters(!showFilters)}
+              startContent={<FaFilter />}
+              endContent={<FaChevronDown className={`transition-transform ${showFilters ? 'rotate-180' : ''}`} />}
             >
-              <FaList className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setViewMode('kanban')}
-              className={`px-3 py-2 flex items-center gap-1.5 transition-colors border-l border-gray-300 ${
-                viewMode === 'kanban'
-                  ? 'bg-primary-500 text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-50'
-              }`}
-              title="Kanban View"
-            >
-              <FaTh className="w-4 h-4" />
-            </button>
+              Filters
+            </Button>
+            
+            {/* View Toggle */}
+            <div className="flex border border-default-300 rounded-lg overflow-hidden">
+              <button
+                onClick={() => setViewMode('list')}
+                className={`px-3 py-2 flex items-center gap-1.5 transition-colors ${
+                  viewMode === 'list'
+                    ? 'bg-primary-500 text-white'
+                    : 'bg-content1 text-default-600 hover:bg-default-50'
+                }`}
+                title="List View"
+              >
+                <FaList className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('kanban')}
+                className={`px-3 py-2 flex items-center gap-1.5 transition-colors border-l border-default-300 ${
+                  viewMode === 'kanban'
+                    ? 'bg-primary-500 text-white'
+                    : 'bg-content1 text-default-600 hover:bg-default-50'
+                }`}
+                title="Kanban View"
+              >
+                <FaTh className="w-4 h-4" />
+              </button>
+            </div>
           </div>
-        </div>
 
-        {showFilters && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-200">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Project</label>
-              <select
-                value={filters.project}
-                onChange={(e) => setFilters(prev => ({ ...prev, project: e.target.value }))}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-              >
-                <option value="all">All Projects</option>
-                {projects.map(project => (
-                  <option key={project._id} value={project._id}>
-                    {project.name}
-                  </option>
-                ))}
-              </select>
+          {showFilters && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-default-200">
+              <div>
+                <label className="block text-sm font-medium text-default-700 mb-1">Project</label>
+                <Select
+                  selectedKeys={[filters.project]}
+                  onChange={(e) => setFilters(prev => ({ ...prev, project: e.target.value }))}
+                  aria-label="Project filter"
+                  classNames={{ trigger: "bg-white" }}
+                >
+                  <SelectItem key="all">All Projects</SelectItem>
+                  {projects.map(project => (
+                    <SelectItem key={project._id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-default-700 mb-1">Status</label>
+                <Select
+                  selectedKeys={[filters.status]}
+                  onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+                  aria-label="Status filter"
+                  classNames={{ trigger: "bg-white" }}
+                >
+                  <SelectItem key="all">All Statuses</SelectItem>
+                  <SelectItem key="todo">To Do</SelectItem>
+                  <SelectItem key="in-progress">In Progress</SelectItem>
+                  <SelectItem key="review">In Review</SelectItem>
+                  <SelectItem key="completed">Completed</SelectItem>
+                </Select>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-              <select
-                value={filters.status}
-                onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-              >
-                <option value="all">All Statuses</option>
-                <option value="todo">To Do</option>
-                <option value="in-progress">In Progress</option>
-                <option value="review">In Review</option>
-                <option value="completed">Completed</option>
-              </select>
-            </div>
-          </div>
-        )}
-      </div>
+          )}
+        </CardBody>
+      </Card>
 
       {/* Kanban View */}
       {viewMode === 'kanban' && (
@@ -699,14 +716,14 @@ export default function AssignedTasksPage() {
           
           {/* Show pending deletion in kanban mode */}
           {pendingDeletion.length > 0 && (
-            <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <h3 className="text-sm font-medium text-red-800 mb-2 flex items-center gap-2">
+            <div className="mt-6 p-4 bg-danger-50 border border-danger-200 rounded-lg">
+              <h3 className="text-sm font-medium text-danger-700 mb-2 flex items-center gap-2">
                 <FaTrash className="w-4 h-4" />
                 {pendingDeletion.length} task(s) pending deletion approval
               </h3>
               <button
                 onClick={() => setViewMode('list')}
-                className="text-sm text-red-700 hover:text-red-900 underline"
+                className="text-sm text-danger-600 hover:text-danger-800 underline"
               >
                 Switch to list view to review
               </button>
@@ -722,11 +739,11 @@ export default function AssignedTasksPage() {
           {pendingDeletion.length > 0 && (
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
-            <FaTrash className="text-red-500" />
-            <h2 className="text-lg font-semibold text-gray-800">Pending Deletion Approval</h2>
-            <span className="px-2 py-1 bg-red-100 text-red-700 text-sm rounded-full">
+            <FaTrash className="text-danger" />
+            <h2 className="text-lg font-semibold text-default-800">Pending Deletion Approval</h2>
+            <Chip color="danger" variant="flat" size="sm">
               {pendingDeletion.length}
-            </span>
+            </Chip>
           </div>
           <div className="grid gap-4">
             {pendingDeletion.map(task => (
@@ -777,11 +794,11 @@ export default function AssignedTasksPage() {
       {pendingAcceptance.length > 0 && (
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
-            <FaClock className="text-yellow-500" />
-            <h2 className="text-lg font-semibold text-gray-800">Awaiting Acceptance</h2>
-            <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-sm rounded-full">
+            <FaClock className="text-warning" />
+            <h2 className="text-lg font-semibold text-default-800">Awaiting Acceptance</h2>
+            <Chip color="warning" variant="flat" size="sm">
               {pendingAcceptance.length}
-            </span>
+            </Chip>
           </div>
           <div className="grid gap-4">
             {pendingAcceptance.map(task => (
@@ -827,11 +844,11 @@ export default function AssignedTasksPage() {
       {activeTasks.length > 0 && (
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
-            <FaTasks className="text-blue-500" />
-            <h2 className="text-lg font-semibold text-gray-800">Active Tasks</h2>
-            <span className="px-2 py-1 bg-blue-100 text-blue-700 text-sm rounded-full">
+            <FaTasks className="text-primary" />
+            <h2 className="text-lg font-semibold text-default-800">Active Tasks</h2>
+            <Chip color="primary" variant="flat" size="sm">
               {activeTasks.length}
-            </span>
+            </Chip>
           </div>
           <div className="grid gap-4">
             {activeTasks.map(task => (
@@ -878,11 +895,11 @@ export default function AssignedTasksPage() {
       {completedTasks.length > 0 && (
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-4">
-            <FaCheckCircle className="text-green-500" />
-            <h2 className="text-lg font-semibold text-gray-800">Completed</h2>
-            <span className="px-2 py-1 bg-green-100 text-green-700 text-sm rounded-full">
+            <FaCheckCircle className="text-success" />
+            <h2 className="text-lg font-semibold text-default-800">Completed</h2>
+            <Chip color="success" variant="flat" size="sm">
               {completedTasks.length}
-            </span>
+            </Chip>
           </div>
           <div className="grid gap-4">
             {completedTasks.map(task => (
@@ -955,16 +972,17 @@ export default function AssignedTasksPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
-                  <select
-                    value={editForm.priority}
+                  <Select
+                    selectedKeys={[editForm.priority]}
                     onChange={(e) => setEditForm(prev => ({ ...prev, priority: e.target.value }))}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                    aria-label="Priority"
+                    classNames={{ trigger: "bg-white" }}
                   >
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                    <option value="critical">Critical</option>
-                  </select>
+                    <SelectItem key="low">Low</SelectItem>
+                    <SelectItem key="medium">Medium</SelectItem>
+                    <SelectItem key="high">High</SelectItem>
+                    <SelectItem key="critical">Critical</SelectItem>
+                  </Select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
@@ -977,12 +995,20 @@ export default function AssignedTasksPage() {
                 </div>
               </div>
               <div className="flex justify-end gap-3 pt-4">
-                <button type="button" onClick={() => { setShowEditModal(false); setSelectedTask(null) }} className="btn-secondary">
+                <Button
+                  type="button"
+                  onPress={() => { setShowEditModal(false); setSelectedTask(null) }}
+                  variant="flat"
+                >
                   Cancel
-                </button>
-                <button type="submit" disabled={submitting} className="btn-primary">
+                </Button>
+                <Button
+                  type="submit"
+                  isDisabled={submitting}
+                  color="primary"
+                >
                   {submitting ? 'Saving...' : 'Save Changes'}
-                </button>
+                </Button>
               </div>
             </form>
           </div>
@@ -1124,12 +1150,20 @@ export default function AssignedTasksPage() {
               </p>
             </div>
             <div className="p-4 border-t border-gray-200 flex justify-end gap-3">
-              <button onClick={() => { setShowAddSubtaskModal(false); setNewSubtaskTitle('') }} className="btn-secondary">
+              <Button
+                onPress={() => { setShowAddSubtaskModal(false); setNewSubtaskTitle('') }}
+                variant="flat"
+              >
                 Cancel
-              </button>
-              <button onClick={handleAddSubtask} disabled={submitting || !newSubtaskTitle.trim()} className="btn-primary flex items-center gap-2">
-                {submitting ? <><Loader size="xs" /> <span className="ml-1">Adding...</span></> : <><FaPlus /> Add Subtask</>}
-              </button>
+              </Button>
+              <Button
+                onPress={handleAddSubtask}
+                isDisabled={submitting || !newSubtaskTitle.trim()}
+                color="primary"
+                startContent={submitting ? <Loader size="xs" /> : <FaPlus />}
+              >
+                {submitting ? 'Adding...' : 'Add Subtask'}
+              </Button>
             </div>
           </div>
         </div>
@@ -1151,29 +1185,38 @@ export default function AssignedTasksPage() {
               <p className="text-gray-600 mb-4">Task: <strong>{selectedTask.title}</strong></p>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Select New Assignee</label>
-                <select
-                  value={reassignToId}
+                <Select
+                  selectedKeys={reassignToId ? [reassignToId] : []}
                   onChange={(e) => setReassignToId(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+                  aria-label="Select New Assignee"
+                  placeholder="Select a team member..."
+                  classNames={{ trigger: "bg-white" }}
                 >
-                  <option value="">Select a team member...</option>
                   {projectMembers.filter(m => 
                     !selectedTask.assignees?.some(a => a.user._id === m.user._id)
                   ).map(member => (
-                    <option key={member.user._id} value={member.user._id}>
+                    <SelectItem key={member.user._id}>
                       {member.user.firstName} {member.user.lastName}
-                    </option>
+                    </SelectItem>
                   ))}
-                </select>
+                </Select>
               </div>
             </div>
             <div className="p-4 border-t border-gray-200 flex justify-end gap-3">
-              <button onClick={() => { setShowReassignModal(false); setReassignToId('') }} className="btn-secondary">
+              <Button
+                onPress={() => { setShowReassignModal(false); setReassignToId('') }}
+                variant="flat"
+              >
                 Cancel
-              </button>
-              <button onClick={handleReassignTask} disabled={submitting || !reassignToId} className="btn-primary flex items-center gap-2">
-                {submitting ? <><Loader size="xs" /> <span className="ml-1">Reassigning...</span></> : <><FaExchangeAlt /> Reassign</>}
-              </button>
+              </Button>
+              <Button
+                onPress={handleReassignTask}
+                isDisabled={submitting || !reassignToId}
+                color="primary"
+                startContent={submitting ? <Loader size="xs" /> : <FaExchangeAlt />}
+              >
+                {submitting ? 'Reassigning...' : 'Reassign'}
+              </Button>
             </div>
           </div>
         </div>
@@ -1224,12 +1267,20 @@ export default function AssignedTasksPage() {
               </div>
             </div>
             <div className="p-4 border-t border-gray-200 flex justify-end gap-3">
-              <button onClick={() => { setShowAddUserModal(false); setAddUserIds([]) }} className="btn-secondary">
+              <Button
+                onPress={() => { setShowAddUserModal(false); setAddUserIds([]) }}
+                variant="flat"
+              >
                 Cancel
-              </button>
-              <button onClick={handleAddUserToTask} disabled={submitting || addUserIds.length === 0} className="btn-primary flex items-center gap-2">
-                {submitting ? <><Loader size="xs" /> <span className="ml-1">Adding...</span></> : <><FaUserPlus /> Add Users</>}
-              </button>
+              </Button>
+              <Button
+                onPress={handleAddUserToTask}
+                isDisabled={submitting || addUserIds.length === 0}
+                color="primary"
+                startContent={submitting ? <Loader size="xs" /> : <FaUserPlus />}
+              >
+                {submitting ? 'Adding...' : 'Add Users'}
+              </Button>
             </div>
           </div>
         </div>
@@ -1330,8 +1381,8 @@ export default function AssignedTasksPage() {
               <div className="px-6 py-4 bg-gray-50 flex items-center justify-between flex-shrink-0">
                 <h3 className="text-lg font-semibold text-gray-800">Task Details</h3>
                 <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
+                  <Button
+                    onPress={() => {
                       setEditForm({
                         title: selectedTask.title,
                         description: selectedTask.description || '',
@@ -1340,18 +1391,20 @@ export default function AssignedTasksPage() {
                       })
                       setShowEditModal(true)
                     }}
-                    className="btn-primary flex items-center gap-2 text-sm py-1.5 px-3"
+                    color="primary"
+                    size="sm"
+                    startContent={<FaEdit className="w-3 h-3" />}
                   >
-                    <FaEdit className="w-3 h-3" />
                     Edit Task
-                  </button>
-                  <button
-                    onClick={() => router.push(`/dashboard/projects/${selectedTask.project?._id || selectedTask.project}`)}
-                    className="btn-secondary flex items-center gap-2 text-sm py-1.5 px-3"
+                  </Button>
+                  <Button
+                    onPress={() => router.push(`/dashboard/projects/${selectedTask.project?._id || selectedTask.project}`)}
+                    variant="flat"
+                    size="sm"
+                    startContent={<FaProjectDiagram className="w-3 h-3" />}
                   >
-                    <FaProjectDiagram className="w-3 h-3" />
                     View Project
-                  </button>
+                  </Button>
                   <button
                     onClick={() => setSelectedTask(null)}
                     className="p-2 hover:bg-gray-100 rounded-lg text-gray-500"

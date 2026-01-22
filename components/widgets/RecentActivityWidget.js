@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { FaHistory, FaClock, FaArrowRight, FaArrowLeft, FaCoffee, FaSignOutAlt, FaSignInAlt } from 'react-icons/fa'
+import { Card, CardBody, Button, Skeleton, ScrollShadow } from '@heroui/react'
 
 export default function RecentActivityWidget({ limit = 6 }) {
     const [activities, setActivities] = useState([])
@@ -94,17 +95,17 @@ export default function RecentActivityWidget({ limit = 6 }) {
     const getActivityIcon = (type) => {
         switch (type) {
             case 'clock-in':
-                return <FaSignInAlt className="w-4 h-4 text-green-600" />
+                return <FaSignInAlt className="w-4 h-4 text-success-600" />
             case 'clock-out':
-                return <FaSignOutAlt className="w-4 h-4 text-red-600" />
+                return <FaSignOutAlt className="w-4 h-4 text-danger-600" />
             case 'break-start':
-                return <FaCoffee className="w-4 h-4 text-amber-600" />
+                return <FaCoffee className="w-4 h-4 text-warning-600" />
             case 'break-end':
-                return <FaArrowRight className="w-4 h-4 text-blue-600" />
+                return <FaArrowRight className="w-4 h-4 text-primary-600" />
             case 'leave':
-                return <FaArrowLeft className="w-4 h-4 text-purple-600" />
+                return <FaArrowLeft className="w-4 h-4 text-secondary-600" />
             default:
-                return <FaHistory className="w-4 h-4 text-gray-600" />
+                return <FaHistory className="w-4 h-4 text-default-600" />
         }
     }
 
@@ -125,15 +126,15 @@ export default function RecentActivityWidget({ limit = 6 }) {
 
     if (loading) {
         return (
-            <div className="p-4 sm:p-6 animate-pulse flex-1 flex flex-col h-full">
-                <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
+            <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
+                <Skeleton className="h-6 w-1/3 rounded-lg mb-4" />
                 <div className="space-y-3">
                     {[1, 2, 3, 4].map(i => (
                         <div key={i} className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-gray-200 rounded-full"></div>
+                            <Skeleton className="w-8 h-8 rounded-full" />
                             <div className="flex-1 space-y-1">
-                                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                                <div className="h-3 bg-gray-200 rounded w-1/4"></div>
+                                <Skeleton className="h-4 w-3/4 rounded-lg" />
+                                <Skeleton className="h-3 w-1/4 rounded-lg" />
                             </div>
                         </div>
                     ))}
@@ -147,32 +148,39 @@ export default function RecentActivityWidget({ limit = 6 }) {
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                     <FaHistory className="w-5 h-5 text-primary-500" />
-                    <h3 className="text-base sm:text-lg font-bold text-gray-800">Recent Activity</h3>
+                    <h3 className="text-base sm:text-lg font-bold text-default-900">Recent Activity</h3>
                 </div>
-                <a
+                <Button
+                    variant="light"
+                    color="primary"
+                    size="sm"
+                    as="a"
                     href="/dashboard/attendance"
-                    className="text-primary-600 hover:text-primary-800 text-sm font-medium"
                 >
                     View All
-                </a>
+                </Button>
             </div>
             
-            <div className="space-y-2 max-h-48 overflow-y-auto">
+            <ScrollShadow className="space-y-2 max-h-48">
             {activities.map((activity, index) => (
-                <div key={index} className="flex items-start gap-3 p-2 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">
-                    <div className="flex-shrink-0 w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                        {getActivityIcon(activity.type)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-800 truncate">{activity.description}</p>
-                        <p className="text-xs text-gray-500 flex items-center gap-1">
-                            <FaClock className="w-3 h-3" />
-                            {formatTime(activity.time)}
-                        </p>
-                    </div>
-                </div>
+                <Card key={index} className="bg-default-50 border border-default-100">
+                    <CardBody className="p-2">
+                        <div className="flex items-start gap-3">
+                            <div className="flex-shrink-0 w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
+                                {getActivityIcon(activity.type)}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className="text-sm text-default-900 truncate">{activity.description}</p>
+                                <p className="text-xs text-default-500 flex items-center gap-1">
+                                    <FaClock className="w-3 h-3" />
+                                    {formatTime(activity.time)}
+                                </p>
+                            </div>
+                        </div>
+                    </CardBody>
+                </Card>
             ))}
-            </div>
+            </ScrollShadow>
         </div>
     )
 }

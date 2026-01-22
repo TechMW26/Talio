@@ -25,7 +25,7 @@ import {
   HiOutlineGlobeAlt
 } from 'react-icons/hi2'
 import toast from '@/utils/toast'
-import ModalPortal from '@/components/ui/ModalPortal'
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Textarea } from '@heroui/react'
 
 export default function MeetingDetailPage({ params }) {
   const router = useRouter()
@@ -686,94 +686,87 @@ export default function MeetingDetailPage({ params }) {
       </div>
 
       {/* Delete Confirmation Modal */}
-      <ModalPortal isOpen={showDeleteModal}>
-        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setShowDeleteModal(false)}>
-          <div className="modal-backdrop" />
-          <div className="modal-container modal-md">
-            <div className="modal-header border-b border-red-100 bg-red-50">
-              <h3 className="modal-title text-red-700">Delete Meeting Permanently</h3>
-              <button onClick={() => setShowDeleteModal(false)} className="modal-close-btn">
-                <HiOutlineXMark className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="modal-body">
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
-                  <HiOutlineTrash className="w-5 h-5 text-red-600" />
+      <Modal isOpen={showDeleteModal} onOpenChange={setShowDeleteModal} size="md">
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader className="border-b border-red-100 bg-red-50">
+                <span className="text-red-700">Delete Meeting Permanently</span>
+              </ModalHeader>
+              <ModalBody>
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                    <HiOutlineTrash className="w-5 h-5 text-red-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-default-900 mb-1">Are you sure you want to delete this meeting?</p>
+                    <p className="text-sm text-default-600">
+                      This will permanently delete <strong>"{meeting?.title}"</strong> from the database. 
+                      All associated data including invitees, transcripts, and AI summaries will be removed.
+                    </p>
+                    <p className="text-sm text-red-600 mt-2 font-medium">
+                      ⚠️ This action cannot be undone.
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-medium text-gray-900 mb-1">Are you sure you want to delete this meeting?</p>
-                  <p className="text-sm text-gray-600">
-                    This will permanently delete <strong>"{meeting?.title}"</strong> from the database. 
-                    All associated data including invitees, transcripts, and AI summaries will be removed.
-                  </p>
-                  <p className="text-sm text-red-600 mt-2 font-medium">
-                    ⚠️ This action cannot be undone.
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button
-                onClick={() => setShowDeleteModal(false)}
-                disabled={deleting}
-                className="modal-btn modal-btn-secondary"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteMeeting}
-                disabled={deleting}
-                className="modal-btn bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
-              >
-                {deleting ? 'Deleting...' : 'Delete Permanently'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </ModalPortal>
+              </ModalBody>
+              <ModalFooter>
+                <Button
+                  variant="light"
+                  onPress={onClose}
+                  isDisabled={deleting}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  color="danger"
+                  onPress={handleDeleteMeeting}
+                  isLoading={deleting}
+                >
+                  {deleting ? 'Deleting...' : 'Delete Permanently'}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
 
       {/* Reject Modal */}
-      <ModalPortal isOpen={showRejectModal}>
-        <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setShowRejectModal(false)}>
-          <div className="modal-backdrop" />
-          <div className="modal-container modal-md">
-            <div className="modal-header">
-              <h3 className="modal-title">Decline Meeting</h3>
-              <button onClick={() => setShowRejectModal(false)} className="modal-close-btn">
-                <HiOutlineXMark className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="modal-body">
-              <p className="text-sm text-gray-600 mb-4">
-                Please provide a reason for declining (optional):
-              </p>
-              <textarea
-                value={rejectReason}
-                onChange={(e) => setRejectReason(e.target.value)}
-                placeholder="Reason for declining..."
-                className="modal-textarea"
-                rows={3}
-              />
-            </div>
-            <div className="modal-footer">
-              <button
-                onClick={() => setShowRejectModal(false)}
-                className="modal-btn modal-btn-secondary"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleRespond('rejected', rejectReason)}
-                disabled={responding}
-                className="modal-btn modal-btn-danger"
-              >
-                {responding ? 'Declining...' : 'Decline'}
-              </button>
-            </div>
-          </div>
-        </div>
-      </ModalPortal>
+      <Modal isOpen={showRejectModal} onOpenChange={setShowRejectModal} size="md">
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader>Decline Meeting</ModalHeader>
+              <ModalBody>
+                <p className="text-sm text-default-600 mb-4">
+                  Please provide a reason for declining (optional):
+                </p>
+                <Textarea
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder="Reason for declining..."
+                  minRows={3}
+                />
+              </ModalBody>
+              <ModalFooter>
+                <Button
+                  variant="light"
+                  onPress={onClose}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  color="danger"
+                  onPress={() => handleRespond('rejected', rejectReason)}
+                  isLoading={responding}
+                >
+                  {responding ? 'Declining...' : 'Decline'}
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
     </div>
   )
 }
