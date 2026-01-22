@@ -82,6 +82,9 @@ export default function ProjectDetailPage() {
   const [tasks, setTasks] = useState([])
   const [timeline, setTimeline] = useState([])
   const [loading, setLoading] = useState(true)
+  const [timelineLoading, setTimelineLoading] = useState(false)
+  const [timelineError, setTimelineError] = useState(null)
+  const [timelineFetched, setTimelineFetched] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
   const [user, setUser] = useState(null)
   const [currentEmployeeId, setCurrentEmployeeId] = useState(null)
@@ -258,8 +261,12 @@ export default function ProjectDetailPage() {
     }
   }, [projectId])
 
-  const fetchTimeline = useCallback(async () => {
+  const fetchTimeline = useCallback(async (silent = false) => {
     try {
+      if (!silent) {
+        setTimelineLoading(true)
+        setTimelineError(null)
+      }
       const token = localStorage.getItem('token')
       const response = await fetch(`/api/projects/${projectId}/timeline`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -273,9 +280,22 @@ export default function ProjectDetailPage() {
           }
           return prev
         })
+        setTimelineError(null)
+        setTimelineFetched(true)
+      } else {
+        if (!silent) {
+          setTimelineError(data.message || 'Failed to load activity')
+        }
       }
     } catch (error) {
       console.error('Fetch timeline error:', error)
+      if (!silent) {
+        setTimelineError('Failed to load activity. Please try again.')
+      }
+    } finally {
+      if (!silent) {
+        setTimelineLoading(false)
+      }
     }
   }, [projectId])
 
@@ -322,7 +342,7 @@ export default function ProjectDetailPage() {
     fetchProject(true)
     fetchCompletionStatus() // Always check completion status
     if (activeTab === 'tasks') fetchTasks(true)
-    if (activeTab === 'timeline') fetchTimeline()
+    if (activeTab === 'timeline') fetchTimeline(true) // Silent refresh for timeline
     if (activeTab === 'notes') fetchNotes()
     lastFetchRef.current = Date.now()
   }, [activeTab, fetchProject, fetchTasks, fetchTimeline, fetchNotes, fetchCompletionStatus])
@@ -1788,9 +1808,9 @@ export default function ProjectDetailPage() {
           {/* Timeline/Activity Tab */}
           {activeTab === 'timeline' && (
             <div>
-              {/* Search Bar */}
-              <div className="mb-4">
-                <div className="relative">
+              {/* Search Bar with Refresh Button */}
+              <div className="mb-4 flex gap-3">
+                <div className="relative flex-1">
                   <HiOutlineMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                   <input
                     type="text"
@@ -1798,6 +1818,16 @@ export default function ProjectDetailPage() {
                     className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                   />
                 </div>
+                <Button
+                  isIconOnly
+                  variant="flat"
+                  onPress={() => fetchTimeline()}
+                  isDisabled={timelineLoading}
+                  className="h-[42px] w-[42px]"
+                  title="Refresh activity"
+                >
+                  <HiOutlineArrowPath className={`w-5 h-5 ${timelineLoading ? 'animate-spin' : ''}`} />
+                </Button>
               </div>
 
               {/* Add Comment Form */}
@@ -1825,11 +1855,40 @@ export default function ProjectDetailPage() {
 
               {/* GitHub-style Timeline with Branch Visualization */}
               <div className="relative">
-                {/* Main vertical line */}
-                <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-gradient-to-b from-indigo-200 via-gray-200 to-gray-100" />
+                {/* Loading State - show when actively loading OR when not fetched yet */}
+                {(timelineLoading || !timelineFetched) && !timelineError && (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+                      <p className="text-gray-500 text-sm">Loading activity...</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Error State */}
+                {timelineError && !timelineLoading && (
+                  <div className="text-center py-12">
+                    <HiOutlineExclamationTriangle className="w-12 h-12 text-red-300 mx-auto mb-3" />
+                    <p className="text-red-500 mb-3">{timelineError}</p>
+                    <Button
+                      onPress={() => fetchTimeline()}
+                      color="primary"
+                      size="sm"
+                      startContent={<HiOutlineArrowPath className="w-4 h-4" />}
+                    >
+                      Retry
+                    </Button>
+                  </div>
+                )}
+
+                {/* Main vertical line - only show when we have timeline data */}
+                {timelineFetched && !timelineLoading && !timelineError && timeline.length > 0 && (
+                  <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-gradient-to-b from-indigo-200 via-gray-200 to-gray-100" />
+                )}
                 
-                <div className="space-y-0">
-                  {timeline.map((event, index) => {
+                {timelineFetched && !timelineLoading && !timelineError && (
+                  <div className="space-y-0">
+                    {timeline.map((event, index) => {
                     // Get event type icon and color
                     const getEventStyle = (type) => {
                       switch (type) {
@@ -1966,9 +2025,10 @@ export default function ProjectDetailPage() {
                       </div>
                     )
                   })}
-                </div>
+                  </div>
+                )}
                 
-                {timeline.length === 0 && (
+                {timelineFetched && !timelineLoading && !timelineError && timeline.length === 0 && (
                   <div className="text-center py-12">
                     <HiOutlineHistory className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                     <p className="text-gray-500">No activity yet</p>

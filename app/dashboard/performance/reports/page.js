@@ -24,11 +24,15 @@ const CHART_COLORS = {
 
 // Gauge Chart Component for key metrics
 const GaugeChart = ({ value, maxValue = 100, label, color = CHART_COLORS.primary, size = 120 }) => {
-  const percentage = Math.min((value / maxValue) * 100, 100)
+  const percentage = Math.min(Math.max((value / maxValue) * 100, 0), 100)
   const strokeWidth = 10
   const radius = (size - strokeWidth) / 2
   const circumference = 2 * Math.PI * radius
-  const strokeDashoffset = circumference - (percentage / 100) * circumference * 0.75 // 270 degrees
+  
+  // For a 270-degree gauge (from bottom-left to bottom-right, going over top)
+  const gaugeArc = circumference * 0.75 // 270 degrees
+  const filledArc = (percentage / 100) * gaugeArc
+  const emptyArc = gaugeArc - filledArc
   
   // Determine color based on value
   const getColor = () => {
@@ -39,37 +43,49 @@ const GaugeChart = ({ value, maxValue = 100, label, color = CHART_COLORS.primary
   
   const gaugeColor = color === 'auto' ? getColor() : color
   
+  // Center of the SVG
+  const cx = size / 2
+  const cy = size / 2
+  
   return (
     <div className="flex flex-col items-center">
-      <svg width={size} height={size * 0.75} viewBox={`0 0 ${size} ${size * 0.75}`}>
-        {/* Background arc */}
-        <path
-          d={`M ${strokeWidth / 2} ${size * 0.6} A ${radius} ${radius} 0 1 1 ${size - strokeWidth / 2} ${size * 0.6}`}
+      <svg width={size} height={size * 0.7} viewBox={`0 0 ${size} ${size * 0.7}`}>
+        {/* Background arc (gray) */}
+        <circle
+          cx={cx}
+          cy={cy}
+          r={radius}
           fill="none"
           stroke="#E5E7EB"
           strokeWidth={strokeWidth}
           strokeLinecap="round"
+          strokeDasharray={`${gaugeArc} ${circumference}`}
+          transform={`rotate(135 ${cx} ${cy})`}
+          style={{ strokeLinecap: 'round' }}
         />
-        {/* Foreground arc */}
-        <path
-          d={`M ${strokeWidth / 2} ${size * 0.6} A ${radius} ${radius} 0 1 1 ${size - strokeWidth / 2} ${size * 0.6}`}
+        {/* Foreground arc (colored) - fills from left */}
+        <circle
+          cx={cx}
+          cy={cy}
+          r={radius}
           fill="none"
           stroke={gaugeColor}
           strokeWidth={strokeWidth}
           strokeLinecap="round"
-          strokeDasharray={circumference * 0.75}
-          strokeDashoffset={circumference * 0.75 - (percentage / 100) * circumference * 0.75}
-          style={{ transition: 'stroke-dashoffset 0.5s ease' }}
+          strokeDasharray={`${filledArc} ${circumference}`}
+          transform={`rotate(135 ${cx} ${cy})`}
+          style={{ transition: 'stroke-dasharray 0.5s ease', strokeLinecap: 'round' }}
         />
-        {/* Value text */}
+        {/* Value text - positioned in center of gauge */}
         <text
-          x={size / 2}
-          y={size * 0.45}
+          x={cx}
+          y={cy - 2}
           textAnchor="middle"
+          dominantBaseline="middle"
           className="text-2xl font-bold"
           fill={gaugeColor}
         >
-          {value}%
+          {Math.round(value)}%
         </text>
       </svg>
       <span className="text-sm font-medium text-gray-600 mt-1">{label}</span>
@@ -108,12 +124,12 @@ const formatDateForInput = (date) => {
   return date.toISOString().split('T')[0]
 }
 
-// Get default date range (start of current year to today)
+// Get default date range (month to date)
 const getDefaultDateRange = () => {
   const now = new Date()
-  const startOfYear = new Date(now.getFullYear(), 0, 1)
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
   return {
-    startDate: formatDateForInput(startOfYear),
+    startDate: formatDateForInput(startOfMonth),
     endDate: formatDateForInput(now)
   }
 }
@@ -148,6 +164,8 @@ export default function PerformanceReportsPage() {
   // Global AI loading animation
   const { startAILoading, stopAILoading } = useAILoading()
 
+  const [headCheckComplete, setHeadCheckComplete] = useState(false)
+  
   useEffect(() => {
     const userData = localStorage.getItem('user')
     if (userData) {
@@ -155,7 +173,6 @@ export default function PerformanceReportsPage() {
       setUser(parsedUser)
       checkDepartmentHead()
       fetchDepartments()
-      fetchReportData()
     }
   }, [])
 
@@ -180,14 +197,17 @@ export default function PerformanceReportsPage() {
       }
     } catch (error) {
       console.error('Error checking department head:', error)
+    } finally {
+      setHeadCheckComplete(true)
     }
   }
 
+  // Only fetch report data after head check is complete
   useEffect(() => {
-    if (user) {
+    if (user && headCheckComplete) {
       fetchReportData()
     }
-  }, [dateRange.startDate, dateRange.endDate, selectedDepartment])
+  }, [user, headCheckComplete, dateRange.startDate, dateRange.endDate, selectedDepartment])
 
   const fetchDepartments = async () => {
     try {
@@ -298,10 +318,19 @@ export default function PerformanceReportsPage() {
       let filteredGoals = goals
       let filteredProjects = projects
 
-      if (isDepartmentHead && userDepartmentId) {
-        filteredEmployees = employees.filter(emp => 
-          String(emp.department?._id || emp.department) === String(userDepartmentId)
-        )
+      if (isDepartmentHead && headedDepartments.length > 0) {
+        // Get all department IDs this user heads
+        const headedDeptIds = new Set(headedDepartments.map(d => String(d._id)))
+        
+        // Filter by selected department or all headed departments
+        const deptIdsToFilter = selectedDepartment !== 'all' 
+          ? new Set([selectedDepartment]) 
+          : headedDeptIds
+        
+        filteredEmployees = employees.filter(emp => {
+          const empDeptId = String(emp.department?._id || emp.department)
+          return deptIdsToFilter.has(empDeptId)
+        })
         const employeeIds = new Set(filteredEmployees.map(e => String(e._id)))
         
         filteredPerformanceMetrics = performanceMetrics.filter(metric => 
@@ -313,9 +342,10 @@ export default function PerformanceReportsPage() {
         filteredGoals = goals.filter(goal => 
           employeeIds.has(String(goal.employee?._id || goal.employee))
         )
-        filteredProjects = projects.filter(project => 
-          String(project.department?._id || project.department) === String(userDepartmentId)
-        )
+        filteredProjects = projects.filter(project => {
+          const projDeptId = String(project.department?._id || project.department)
+          return deptIdsToFilter.has(projDeptId)
+        })
       }
 
       // Calculate comprehensive KPIs with company settings, holidays, and productivity scores for proper working day calculations
@@ -1215,7 +1245,7 @@ export default function PerformanceReportsPage() {
                 <h3 className="text-lg font-semibold text-gray-700 mb-4">Attendance by Day of Week</h3>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={attendanceStats.dayOfWeekBreakdown || []} layout="vertical">
+                    <BarChart data={attendanceStats.dayOfWeekBreakdown || []} layout="vertical" margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
                       <YAxis dataKey="day" type="category" width={80} />
@@ -1238,7 +1268,7 @@ export default function PerformanceReportsPage() {
                     <BarChart data={(attendanceStats.departmentBreakdown || []).map(d => ({
                       ...d,
                       name: departments.find(dept => dept._id === d.departmentId)?.name || 'Unknown'
-                    }))}>
+                    }))} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="name" fontSize={10} angle={-45} textAnchor="end" height={60} />
                       <YAxis domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
@@ -1329,7 +1359,7 @@ export default function PerformanceReportsPage() {
                 <h3 className="text-lg font-semibold text-gray-700 mb-4">Tasks by Priority</h3>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={taskStats.priorityBreakdown || []}>
+                    <BarChart data={taskStats.priorityBreakdown || []} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="priority" />
                       <YAxis />
@@ -1348,7 +1378,7 @@ export default function PerformanceReportsPage() {
                 <h3 className="text-lg font-semibold text-gray-700 mb-4">Dept Task Performance</h3>
                 <div className="h-64">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={(taskStats.departmentBreakdown || []).slice(0, 5)} layout="vertical">
+                    <BarChart data={(taskStats.departmentBreakdown || []).slice(0, 5)} layout="vertical" margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
                       <YAxis dataKey="name" type="category" width={100} fontSize={10} />
@@ -1621,6 +1651,7 @@ export default function PerformanceReportsPage() {
                     taskCompletion: taskDept?.taskCompletionRate || 0
                   }
                 })}
+                margin={{ top: 5, right: 5, left: 0, bottom: 0 }}
               >
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="department" fontSize={10} angle={-20} textAnchor="end" height={50} />
@@ -1650,6 +1681,7 @@ export default function PerformanceReportsPage() {
                     focusScore: e.sessionFocusScore || 0
                   }))}
                 layout="vertical"
+                margin={{ top: 5, right: 5, left: 0, bottom: 0 }}
               >
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} />

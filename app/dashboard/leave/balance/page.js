@@ -191,7 +191,7 @@ export default function LeaveBalancePage() {
             <h3 className="text-sm sm:text-base font-bold text-default-800 mb-4">Leave Balance by Type</h3>
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={getChartData()} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                <BarChart data={getChartData()} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#d1d5db" />
                   <XAxis dataKey="name" fontSize={9} tick={{ fontSize: 9, fill: '#6b7280' }} stroke="#9ca3af" />
                   <YAxis fontSize={9} tick={{ fontSize: 9, fill: '#6b7280' }} stroke="#9ca3af" width={35} />
@@ -210,7 +210,7 @@ export default function LeaveBalancePage() {
             <h3 className="text-sm sm:text-base font-bold text-default-800 mb-4">Monthly Leave Usage</h3>
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={getMonthlyUsage()} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+                <BarChart data={getMonthlyUsage()} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#d1d5db" />
                   <XAxis dataKey="month" fontSize={9} tick={{ fontSize: 9, fill: '#6b7280' }} stroke="#9ca3af" />
                   <YAxis fontSize={9} tick={{ fontSize: 9, fill: '#6b7280' }} stroke="#9ca3af" width={35} />

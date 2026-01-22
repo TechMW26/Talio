@@ -4333,27 +4333,79 @@ Return ONLY the updated JSON structure (same format as input, but modified):
         { role: 'assistant', content: `Created ${generatedObjects.length} elements from your prepared content as a ${templateType}. The content is now visualized on the canvas!`, timestamp: new Date() }
       );
 
-      // Save with retry logic
-      const MAX_SAVE_RETRIES = 3;
+      // Mark as modified to ensure Mongoose detects changes in nested objects
+      whiteboard.markModified('aiAnalysis');
+      whiteboard.markModified('pages');
+
+      // Save using chunked approach - save objects in batches to handle large documents
+      const MAX_SAVE_RETRIES = 5;
+      const CHUNK_SIZE = 50; // Save 50 objects at a time
       let saveSuccess = false;
       let saveError = null;
       
-      for (let i = 0; i < MAX_SAVE_RETRIES && !saveSuccess; i++) {
+      const allObjects = currentPage.objects;
+      const totalObjects = allObjects.length;
+      
+      console.log(`[MIRA] Preparing to save ${totalObjects} objects in chunks of ${CHUNK_SIZE}`);
+      
+      for (let attempt = 0; attempt < MAX_SAVE_RETRIES && !saveSuccess; attempt++) {
         try {
-          await whiteboard.save();
+          // Clear the page objects first
+          console.log(`[MIRA] Attempt ${attempt + 1}: Clearing page ${pageIndex}...`);
+          await Whiteboard.updateOne(
+            { _id: whiteboard._id },
+            { $set: { [`pages.${pageIndex}.objects`]: [] } },
+            { maxTimeMS: 30000 }
+          );
+          
+          // Save objects in chunks using $push with $each
+          for (let i = 0; i < totalObjects; i += CHUNK_SIZE) {
+            const chunk = allObjects.slice(i, i + CHUNK_SIZE);
+            const chunkNum = Math.floor(i / CHUNK_SIZE) + 1;
+            const totalChunks = Math.ceil(totalObjects / CHUNK_SIZE);
+            
+            console.log(`[MIRA] Attempt ${attempt + 1}: Saving chunk ${chunkNum}/${totalChunks} (${chunk.length} objects)...`);
+            
+            await Whiteboard.updateOne(
+              { _id: whiteboard._id },
+              { 
+                $push: { 
+                  [`pages.${pageIndex}.objects`]: { $each: chunk } 
+                }
+              },
+              { maxTimeMS: 60000 }
+            );
+          }
+          
+          // Save aiAnalysis separately (smaller payload)
+          console.log(`[MIRA] Attempt ${attempt + 1}: Saving aiAnalysis...`);
+          await Whiteboard.updateOne(
+            { _id: whiteboard._id },
+            {
+              $set: {
+                aiAnalysis: whiteboard.aiAnalysis,
+                lastModified: new Date()
+              }
+            },
+            { maxTimeMS: 30000 }
+          );
+          
           saveSuccess = true;
-          console.log(`[MIRA] Whiteboard saved successfully (attempt ${i + 1})`);
+          console.log(`[MIRA] Whiteboard saved successfully (attempt ${attempt + 1}) - ${totalObjects} objects in ${Math.ceil(totalObjects / CHUNK_SIZE)} chunks`);
         } catch (err) {
           saveError = err;
-          console.error(`[MIRA] Save attempt ${i + 1} failed:`, err.message);
-          if (i < MAX_SAVE_RETRIES - 1) {
-            await new Promise(resolve => setTimeout(resolve, 500 * (i + 1)));
+          console.error(`[MIRA] Save attempt ${attempt + 1} failed:`, err.message, err.code);
+          if (attempt < MAX_SAVE_RETRIES - 1) {
+            // Exponential backoff with longer delays
+            const delay = 3000 * Math.pow(2, attempt);
+            console.log(`[MIRA] Retrying in ${delay}ms...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
           }
         }
       }
       
       if (!saveSuccess) {
-        console.error('[MIRA] All save attempts failed:', saveError);
+        console.error('[MIRA] All save attempts failed:', saveError?.message);
         return NextResponse.json({
           error: 'Failed to save canvas after multiple attempts. Your content was generated but could not be saved. Please try again.',
           details: saveError?.message || 'Save error'

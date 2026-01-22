@@ -24,6 +24,7 @@ export async function GET(request) {
     const limit = parseInt(searchParams.get('limit')) || 10
     const search = searchParams.get('search') || ''
     const department = searchParams.get('department')
+    const departmentsParam = searchParams.get('departments') // Comma-separated list of department IDs
     const designation = searchParams.get('designation')
     const level = searchParams.get('level')
     const status = searchParams.get('status')
@@ -31,7 +32,7 @@ export async function GET(request) {
     const sortOrder = searchParams.get('sortOrder') || 'desc'
 
     // Generate cache key
-    const cacheKey = queryCache.generateKey('employees', page, limit, search, department, designation, level, status, sortBy, sortOrder)
+    const cacheKey = queryCache.generateKey('employees', page, limit, search, department, departmentsParam, designation, level, status, sortBy, sortOrder)
     const cached = queryCache.get(cacheKey)
     if (cached) {
       return NextResponse.json(cached)
@@ -49,7 +50,13 @@ export async function GET(request) {
       ]
     }
 
-    if (department) {
+    // Handle multiple departments filter (comma-separated)
+    if (departmentsParam) {
+      const deptIds = departmentsParam.split(',').filter(id => id.trim())
+      if (deptIds.length > 0) {
+        query.department = { $in: deptIds }
+      }
+    } else if (department) {
       query.department = department
     }
 

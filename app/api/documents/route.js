@@ -1,16 +1,18 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { emitDocumentUpdate } from '@/lib/realtimeEvents'
+import mongoose from 'mongoose'
+
 // GET - List documents
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Document'])
+    const auth = await getAuthAndModels(request, ['Document', 'User', 'Employee'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Document } = models
+    const { Document, User, Employee } = models
 
     const { searchParams } = new URL(request.url)
     const employeeId = searchParams.get('employeeId')
@@ -31,9 +33,82 @@ export async function GET(request) {
       .populate('uploadedBy', 'firstName lastName')
       .sort({ createdAt: -1 })
 
+    // Convert to plain objects
+    let allDocuments = documents.map(doc => doc.toObject ? doc.toObject() : doc)
+
+    // If fetching for a specific employee, also include Aadhaar documents from User's profileCompletion
+    if (employeeId && (!category || category === 'identity')) {
+      try {
+        // Convert employeeId to ObjectId if valid
+        const employeeObjectId = mongoose.Types.ObjectId.isValid(employeeId) 
+          ? new mongoose.Types.ObjectId(employeeId) 
+          : employeeId
+
+        // Find the user with this employeeId
+        const userWithAadhaar = await User.findOne({ employeeId: employeeObjectId })
+          .select('profileCompletion')
+          .lean()
+
+        if (userWithAadhaar?.profileCompletion) {
+          const { aadhaarFront, aadhaarBack } = userWithAadhaar.profileCompletion
+          
+          // Get employee details for the document
+          const employee = await Employee.findById(employeeId).select('firstName lastName employeeCode').lean()
+
+          // Add Aadhaar Front if it exists
+          if (aadhaarFront?.url) {
+            allDocuments.push({
+              _id: `aadhaar-front-${employeeId}`,
+              name: 'Aadhaar Card (Front)',
+              fileName: 'Aadhaar Card (Front)',
+              category: 'identity',
+              url: aadhaarFront.url,
+              fileUrl: aadhaarFront.url,
+              fileId: aadhaarFront.fileId,
+              type: 'image',
+              fileType: 'image',
+              employee: employee,
+              uploadedBy: employee,
+              createdAt: aadhaarFront.uploadedAt || userWithAadhaar.profileCompletion.firstLoginAt || new Date(),
+              updatedAt: aadhaarFront.uploadedAt || userWithAadhaar.profileCompletion.firstLoginAt || new Date(),
+              isAadhaarDocument: true,
+              isSystemGenerated: true,
+            })
+          }
+
+          // Add Aadhaar Back if it exists
+          if (aadhaarBack?.url) {
+            allDocuments.push({
+              _id: `aadhaar-back-${employeeId}`,
+              name: 'Aadhaar Card (Back)',
+              fileName: 'Aadhaar Card (Back)',
+              category: 'identity',
+              url: aadhaarBack.url,
+              fileUrl: aadhaarBack.url,
+              fileId: aadhaarBack.fileId,
+              type: 'image',
+              fileType: 'image',
+              employee: employee,
+              uploadedBy: employee,
+              createdAt: aadhaarBack.uploadedAt || userWithAadhaar.profileCompletion.firstLoginAt || new Date(),
+              updatedAt: aadhaarBack.uploadedAt || userWithAadhaar.profileCompletion.firstLoginAt || new Date(),
+              isAadhaarDocument: true,
+              isSystemGenerated: true,
+            })
+          }
+        }
+      } catch (aadhaarError) {
+        // Log but don't fail the whole request if Aadhaar fetch fails
+        console.error('Error fetching Aadhaar documents:', aadhaarError)
+      }
+
+      // Sort all documents by createdAt (newest first)
+      allDocuments.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+    }
+
     return NextResponse.json({
       success: true,
-      data: documents,
+      data: allDocuments,
     })
   } catch (error) {
     console.error('Get documents error:', error)

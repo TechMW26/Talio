@@ -383,6 +383,26 @@ main {
   background-color: transparent;
 }
 
+/* Fix HeroUI Input with outside labels - prevent overlap */
+[data-slot="base"][data-has-label="true"] {
+  margin-top: 0.25rem;
+}
+
+/* Ensure outside labels have proper spacing in forms */
+.form-input-outside-label {
+  margin-top: 0.5rem;
+}
+
+/* Hide scrollbar globally - keep scroll functionality */
+* {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+*::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari, Opera */
+}
+
 /* Hide scrollbar utility */
 @layer utilities {
   .scrollbar-hide {
@@ -393,15 +413,22 @@ main {
     display: none;
   }
 
-  /* Hide scrollbars on mobile */
-  @media (max-width: 768px) {
-    * {
-      -ms-overflow-style: none;
-      scrollbar-width: none;
-    }
-    *::-webkit-scrollbar {
-      display: none;
-    }
+  /* Show scrollbar when explicitly needed */
+  .scrollbar-show {
+    -ms-overflow-style: auto;
+    scrollbar-width: thin;
+  }
+  .scrollbar-show::-webkit-scrollbar {
+    display: block;
+    width: 6px;
+    height: 6px;
+  }
+  .scrollbar-show::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-show::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
   }
 }
 

@@ -28,6 +28,7 @@ export async function GET(request) {
     const startDate = searchParams.get('startDate') || new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
     const endDate = searchParams.get('endDate') || new Date().toISOString().split('T')[0];
     const departmentFilter = searchParams.get('department');
+    const departmentsFilter = searchParams.get('departments'); // Comma-separated list of department IDs
 
     // Permission check
     const isAdminOrHR = ['admin', 'hr'].includes(user.role);
@@ -66,7 +67,23 @@ export async function GET(request) {
     // Build employee filter
     let employeeQuery = { status: 'active' };
     
-    if (departmentFilter && departmentFilter !== 'all') {
+    // Handle multiple departments filter (comma-separated)
+    if (departmentsFilter) {
+      const deptIds = departmentsFilter.split(',').filter(id => id.trim());
+      if (!isAdminOrHR && isDeptHead) {
+        // Validate department head can only see their departments
+        const validDeptIds = deptIds.filter(id => userDepartmentIds.includes(id));
+        if (validDeptIds.length === 0) {
+          return NextResponse.json({
+            success: false,
+            message: 'Not authorized to view these departments'
+          }, { status: 403 });
+        }
+        employeeQuery.department = { $in: validDeptIds };
+      } else if (isAdminOrHR) {
+        employeeQuery.department = { $in: deptIds };
+      }
+    } else if (departmentFilter && departmentFilter !== 'all') {
       if (!isAdminOrHR && isDeptHead && !userDepartmentIds.includes(departmentFilter)) {
         return NextResponse.json({
           success: false,
@@ -75,8 +92,10 @@ export async function GET(request) {
       }
       employeeQuery.department = departmentFilter;
     } else if (isDeptHead && !isAdminOrHR) {
+      // Default: show only departments the user heads
       employeeQuery.department = { $in: userDepartmentIds };
     }
+    // For admin/HR with no filter, show all employees (no department filter added)
 
     // Get employees and company settings
     const [employees, company, holidays] = await Promise.all([
@@ -96,10 +115,28 @@ export async function GET(request) {
     const shiftEnd = company?.workingHours?.shiftEnd || '18:00';
     const expectedHoursPerDay = 8;
     const gracePeriodMinutes = company?.attendanceSettings?.gracePeriod || 15;
+    const companyTimezone = company?.timezone || 'Asia/Kolkata';
     
-    // Parse shift times
+    // Parse shift times for late arrival calculation
     const [shiftStartHour, shiftStartMin] = shiftStart.split(':').map(Number);
-    const shiftStartMinutes = shiftStartHour * 60 + shiftStartMin + gracePeriodMinutes;
+    const shiftStartTotalMinutes = shiftStartHour * 60 + shiftStartMin + gracePeriodMinutes;
+    
+    // Helper function to check if checkIn time is late (for historical data without checkInStatus)
+    const isCheckInLate = (checkInDate) => {
+      if (!checkInDate) return false;
+      
+      // Convert to IST and extract hours/minutes
+      const checkInIST = new Date(checkInDate).toLocaleString('en-US', { 
+        timeZone: companyTimezone,
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: false
+      });
+      const [hours, minutes] = checkInIST.split(':').map(Number);
+      const checkInTotalMinutes = hours * 60 + minutes;
+      
+      return checkInTotalMinutes > shiftStartTotalMinutes;
+    };
 
     // Get all attendance records in date range
     const attendanceRecords = await Attendance.find({
@@ -136,11 +173,12 @@ export async function GET(request) {
     let totalWorkingDays = 0;
     let totalPresentDays = 0;
     let totalHalfDays = 0;
-    let totalAbsentDays = 0;
+    let totalExplicitAbsentDays = 0;
     let totalLateArrivals = 0;
     let totalEarlyDepartures = 0;
     let totalWorkingHours = 0;
     let recordsWithHours = 0;
+    let totalRecordCount = 0;
     
     // Day of week breakdown
     const dayOfWeekStats = {
@@ -174,7 +212,8 @@ export async function GET(request) {
           lateArrivals: 0,
           totalHours: 0,
           hoursCount: 0,
-          employeeCount: 0
+          employeeCount: 0,
+          recordCount: 0
         };
       }
       departmentStats[deptId].workingDays += workingDaysForEmp;
@@ -189,7 +228,8 @@ export async function GET(request) {
         absentDays: 0,
         lateArrivals: 0,
         totalHours: 0,
-        hoursCount: 0
+        hoursCount: 0,
+        recordCount: 0
       };
     });
 
@@ -199,12 +239,19 @@ export async function GET(request) {
       const empStat = employeeStats[empId];
       if (!empStat) return;
       
+      empStat.recordCount++;
+      totalRecordCount++;
+      
       const deptStat = departmentStats[empStat.department];
+      if (deptStat) deptStat.recordCount++;
+      
       const recordDate = new Date(record.date);
       const dayName = dayNameMap[recordDate.getDay()];
       
       // Count by status
-      if (record.status === 'present') {
+      // Note: status field values are: 'present', 'half-day', 'absent', 'in-progress', 'on-leave'
+      // 'late' is stored in checkInStatus field, not status field
+      if (record.status === 'present' || record.status === 'in-progress') {
         totalPresentDays++;
         empStat.presentDays++;
         if (deptStat) deptStat.presentDays++;
@@ -215,7 +262,7 @@ export async function GET(request) {
         if (deptStat) deptStat.halfDays++;
         dayOfWeekStats[dayName].present += 0.5;
       } else if (record.status === 'absent') {
-        totalAbsentDays++;
+        totalExplicitAbsentDays++;
         empStat.absentDays++;
         if (deptStat) deptStat.absentDays++;
         dayOfWeekStats[dayName].absent++;
@@ -223,17 +270,27 @@ export async function GET(request) {
       
       dayOfWeekStats[dayName].total++;
       
-      // Check for late arrival
-      if (record.checkIn) {
-        const checkInDate = new Date(record.checkIn);
-        const checkInMinutes = checkInDate.getHours() * 60 + checkInDate.getMinutes();
-        
-        if (checkInMinutes > shiftStartMinutes) {
-          totalLateArrivals++;
-          empStat.lateArrivals++;
-          if (deptStat) deptStat.lateArrivals++;
-          dayOfWeekStats[dayName].late++;
-        }
+      // Check for late arrival - use checkInStatus field for accuracy
+      // checkInStatus tracks late check-in specifically, while status is overall day status
+      // Also calculate from checkIn timestamp for historical records without checkInStatus
+      const isLateFromStatus = record.checkInStatus === 'late';
+      const isLateFromCheckIn = !record.checkInStatus && record.checkIn && isCheckInLate(record.checkIn);
+      const isLateArrival = isLateFromStatus || isLateFromCheckIn;
+      
+      if (isLateArrival) {
+        totalLateArrivals++;
+        empStat.lateArrivals++;
+        if (deptStat) deptStat.lateArrivals++;
+        dayOfWeekStats[dayName].late++;
+      }
+      
+      // Check for early departure using checkOutStatus or work hours
+      // Note: status is never 'late', use checkOutStatus for early departure
+      if ((record.status === 'present' || record.status === 'in-progress') && 
+          (record.checkOutStatus === 'early' || (record.workHours && record.workHours < (expectedHoursPerDay * 0.8125)))) {
+        totalEarlyDepartures++;
+        empStat.earlyDepartures = (empStat.earlyDepartures || 0) + 1;
+        if (deptStat) deptStat.earlyDepartures = (deptStat.earlyDepartures || 0) + 1;
       }
       
       // Track working hours
@@ -248,15 +305,25 @@ export async function GET(request) {
         }
       }
     });
+    
+    // Calculate missing days (working days with no record) as effective absences
+    const totalMissingDays = Math.max(0, totalWorkingDays - totalRecordCount);
+    const totalAbsentDays = totalExplicitAbsentDays + totalMissingDays;
 
     // Calculate final metrics
+    // Attendance rate includes late arrivals (they showed up)
     const attendanceRate = totalWorkingDays > 0 
       ? Math.round(((totalPresentDays + (totalHalfDays * 0.5)) / totalWorkingDays) * 100) 
       : 0;
     
-    const punctualityRate = (totalPresentDays + totalHalfDays) > 0
-      ? Math.round(((totalPresentDays + totalHalfDays - totalLateArrivals) / (totalPresentDays + totalHalfDays)) * 100)
-      : 0;
+    // Punctuality rate: considers both on-time arrival AND completing full work hours
+    // Formula: (Total work instances - Late arrivals - Early departures) / Total work instances * 100
+    const totalWorkInstances = totalPresentDays + totalHalfDays;
+    const punctualityDeductions = totalLateArrivals + totalEarlyDepartures;
+    const punctualInstances = Math.max(0, totalWorkInstances - punctualityDeductions);
+    const punctualityRate = totalWorkInstances > 0
+      ? Math.round((punctualInstances / totalWorkInstances) * 100)
+      : 0; // If no one worked, punctuality should be 0%
     
     const avgWorkingHours = recordsWithHours > 0
       ? (totalWorkingHours / recordsWithHours).toFixed(1)
@@ -266,34 +333,44 @@ export async function GET(request) {
       ? Math.round((totalWorkingHours / (recordsWithHours * expectedHoursPerDay)) * 100)
       : 0;
 
-    // Process department stats
-    const departmentBreakdown = Object.entries(departmentStats).map(([deptId, stats]) => ({
-      departmentId: deptId,
-      employeeCount: stats.employeeCount,
-      attendanceRate: stats.workingDays > 0 
-        ? Math.round(((stats.presentDays + (stats.halfDays * 0.5)) / stats.workingDays) * 100)
-        : 0,
-      punctualityRate: (stats.presentDays + stats.halfDays) > 0
-        ? Math.round(((stats.presentDays + stats.halfDays - stats.lateArrivals) / (stats.presentDays + stats.halfDays)) * 100)
-        : 0,
-      avgWorkingHours: stats.hoursCount > 0 ? (stats.totalHours / stats.hoursCount).toFixed(1) : '0.0'
-    }));
+    // Process department stats - calculate effective absent (including missing days)
+    const departmentBreakdown = Object.entries(departmentStats).map(([deptId, stats]) => {
+      const deptMissingDays = Math.max(0, stats.workingDays - (stats.recordCount || 0));
+      const deptEffectiveAbsent = stats.absentDays + deptMissingDays;
+      return {
+        departmentId: deptId,
+        employeeCount: stats.employeeCount,
+        attendanceRate: stats.workingDays > 0 
+          ? Math.round(((stats.presentDays + (stats.halfDays * 0.5)) / stats.workingDays) * 100)
+          : 0,
+        punctualityRate: (stats.presentDays + stats.halfDays) > 0
+          ? Math.round((((stats.presentDays + stats.halfDays) - stats.lateArrivals - (stats.earlyDepartures || 0)) / (stats.presentDays + stats.halfDays)) * 100)
+          : 0,
+        avgWorkingHours: stats.hoursCount > 0 ? (stats.totalHours / stats.hoursCount).toFixed(1) : '0.0',
+        absentDays: deptEffectiveAbsent
+      };
+    });
 
-    // Process employee stats for top/bottom performers
-    const employeeBreakdown = Object.entries(employeeStats).map(([empId, stats]) => ({
-      employeeId: empId,
-      name: stats.name,
-      attendanceRate: stats.workingDays > 0
-        ? Math.round(((stats.presentDays + (stats.halfDays * 0.5)) / stats.workingDays) * 100)
-        : 0,
-      punctualityRate: (stats.presentDays + stats.halfDays) > 0
-        ? Math.round(((stats.presentDays + stats.halfDays - stats.lateArrivals) / (stats.presentDays + stats.halfDays)) * 100)
-        : 100,
-      avgWorkingHours: stats.hoursCount > 0 ? parseFloat((stats.totalHours / stats.hoursCount).toFixed(1)) : 0,
-      lateArrivals: stats.lateArrivals,
-      presentDays: stats.presentDays,
-      absentDays: stats.absentDays
-    })).sort((a, b) => b.attendanceRate - a.attendanceRate);
+    // Process employee stats for top/bottom performers - calculate effective absent
+    const employeeBreakdown = Object.entries(employeeStats).map(([empId, stats]) => {
+      const empMissingDays = Math.max(0, stats.workingDays - (stats.recordCount || 0));
+      const empEffectiveAbsent = stats.absentDays + empMissingDays;
+      return {
+        employeeId: empId,
+        name: stats.name,
+        attendanceRate: stats.workingDays > 0
+          ? Math.round(((stats.presentDays + (stats.halfDays * 0.5)) / stats.workingDays) * 100)
+          : 0,
+        punctualityRate: (stats.presentDays + stats.halfDays) > 0
+          ? Math.round((((stats.presentDays + stats.halfDays) - stats.lateArrivals - (stats.earlyDepartures || 0)) / (stats.presentDays + stats.halfDays)) * 100)
+          : 0,
+        avgWorkingHours: stats.hoursCount > 0 ? parseFloat((stats.totalHours / stats.hoursCount).toFixed(1)) : 0,
+        lateArrivals: stats.lateArrivals,
+        presentDays: stats.presentDays,
+        absentDays: empEffectiveAbsent,
+        expectedDays: stats.workingDays
+      };
+    }).sort((a, b) => b.attendanceRate - a.attendanceRate);
 
     // Day of week breakdown for heat map
     const dayOfWeekBreakdown = Object.entries(dayOfWeekStats)
@@ -317,6 +394,7 @@ export async function GET(request) {
           halfDays: totalHalfDays,
           absentDays: totalAbsentDays,
           lateArrivals: totalLateArrivals,
+          earlyDepartures: totalEarlyDepartures,
           attendanceRate,
           punctualityRate,
           avgWorkingHours: parseFloat(avgWorkingHours),

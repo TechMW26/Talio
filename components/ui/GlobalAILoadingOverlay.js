@@ -586,15 +586,31 @@ export default function GlobalAILoadingOverlay() {
     }
   }, [isVisible, mounted])
 
+  // Prevent body scroll when overlay is visible
+  useEffect(() => {
+    if (isVisible && mounted) {
+      const originalOverflow = document.body.style.overflow
+      document.body.style.overflow = 'hidden'
+      return () => {
+        document.body.style.overflow = originalOverflow
+      }
+    }
+  }, [isVisible, mounted])
+
   if (!isVisible || !mounted) return null
 
   return (
     <>
-      {/* Main overlay container - fully transparent background */}
+      {/* Main overlay container - blocks interaction and has fade-in white background */}
       <div 
-        className={`fixed inset-0 z-[999999] pointer-events-none ${
+        className={`fixed inset-0 z-[999999] ${
           isAnimatingOut ? 'ai-loading-exit' : 'ai-loading-enter'
         }`}
+        style={{ 
+          pointerEvents: 'auto',
+          backgroundColor: 'rgba(255, 255, 255, 0.8)'
+        }}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Morphing 3D shape particles */}
         <canvas 
@@ -606,12 +622,22 @@ export default function GlobalAILoadingOverlay() {
 
       <style jsx global>{`
         .ai-loading-enter {
-          animation: aiLoadingEnter 0.4s ease-out forwards;
+          animation: aiLoadingEnter 0.6s ease-out forwards;
         }
 
         @keyframes aiLoadingEnter {
-          0% { opacity: 0; }
-          100% { opacity: 1; }
+          0% { 
+            opacity: 0;
+            background-color: rgba(255, 255, 255, 0);
+          }
+          40% { 
+            opacity: 1;
+            background-color: rgba(255, 255, 255, 0);
+          }
+          100% { 
+            opacity: 1;
+            background-color: rgba(255, 255, 255, 0.8);
+          }
         }
 
         .ai-loading-exit {
@@ -619,8 +645,14 @@ export default function GlobalAILoadingOverlay() {
         }
 
         @keyframes aiLoadingExit {
-          0% { opacity: 1; }
-          100% { opacity: 0; }
+          0% { 
+            opacity: 1;
+            background-color: rgba(255, 255, 255, 0.8);
+          }
+          100% { 
+            opacity: 0;
+            background-color: rgba(255, 255, 255, 0);
+          }
         }
       `}</style>
     </>

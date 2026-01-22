@@ -26,6 +26,10 @@ export default function DocumentsPage() {
   })
   const [selectedFile, setSelectedFile] = useState(null)
   const fileInputRef = useRef(null)
+  
+  // Preview modal state
+  const [previewDoc, setPreviewDoc] = useState(null)
+  const [showPreview, setShowPreview] = useState(false)
 
   // Real-time updates
   const { socket, isConnected, subscribe, onDocumentUpdate } = useSocket()
@@ -256,12 +260,12 @@ export default function DocumentsPage() {
       </div>
 
       {/* Document Categories */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        {['Personal', 'Employment', 'Tax', 'Other'].map((category) => (
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+        {['Identity', 'Personal', 'Employment', 'Tax', 'Other'].map((category) => (
           <div key={category} className="bg-white rounded-lg shadow-md p-6">
             <div className="flex items-center justify-start mb-2">
               <h3 className="text-sm font-medium text-gray-600">{category}</h3>
-              <FaFile className="text-primary-500" />
+              <FaFile className={`ml-2 ${category === 'Identity' ? 'text-green-500' : 'text-primary-500'}`} />
             </div>
             <div className="text-3xl font-bold text-gray-800">
               {documents.filter(d => d.category === category.toLowerCase()).length}
@@ -315,22 +319,29 @@ export default function DocumentsPage() {
                     <tr key={doc._id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
-                          <FaFile className="text-primary-500 mr-3" />
+                          <FaFile className={`mr-3 ${doc.isAadhaarDocument ? 'text-green-500' : 'text-primary-500'}`} />
                           <div>
-                            <div className="text-sm font-medium text-gray-900">
-                              {doc.fileName}
+                            <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                              {doc.fileName || doc.name}
+                              {doc.isAadhaarDocument && (
+                                <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700">
+                                  Verified
+                                </span>
+                              )}
                             </div>
-                            <div className="text-sm text-gray-500">{doc.fileType}</div>
+                            <div className="text-sm text-gray-500">{doc.fileType || doc.type}</div>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          doc.category === 'identity' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
+                        }`}>
                           {doc.category}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatFileSize(doc.fileSize || 0)}
+                        {doc.isAadhaarDocument ? '-' : formatFileSize(doc.fileSize || 0)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {formatDate(doc.createdAt)}
@@ -338,27 +349,32 @@ export default function DocumentsPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex space-x-2">
                           <button
-                            onClick={() => window.open(doc.fileUrl, '_blank')}
+                            onClick={() => {
+                              setPreviewDoc(doc)
+                              setShowPreview(true)
+                            }}
                             className="text-blue-600 hover:text-blue-900"
                             title="View"
                           >
                             <FaEye />
                           </button>
                           <a
-                            href={doc.fileUrl}
-                            download={doc.fileName}
+                            href={doc.fileUrl || doc.url}
+                            download={doc.fileName || doc.name}
                             className="text-green-600 hover:text-green-900"
                             title="Download"
                           >
                             <FaDownload />
                           </a>
-                          <button
-                            onClick={() => handleDelete(doc._id)}
-                            className="text-red-600 hover:text-red-900"
-                            title="Delete"
-                          >
-                            <FaTrash />
-                          </button>
+                          {!doc.isAadhaarDocument && (
+                            <button
+                              onClick={() => handleDelete(doc._id)}
+                              className="text-red-600 hover:text-red-900"
+                              title="Delete"
+                            >
+                              <FaTrash />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -449,6 +465,73 @@ export default function DocumentsPage() {
                   </Button>
                 </ModalFooter>
               </form>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+
+      {/* Document Preview Modal */}
+      <Modal 
+        isOpen={showPreview} 
+        onOpenChange={(open) => {
+          setShowPreview(open)
+          if (!open) setPreviewDoc(null)
+        }} 
+        size="4xl"
+        scrollBehavior="inside"
+      >
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader className="flex flex-col gap-1">
+                <span>{previewDoc?.fileName || previewDoc?.name || 'Document Preview'}</span>
+                <span className="text-sm font-normal text-gray-500 capitalize">{previewDoc?.category}</span>
+              </ModalHeader>
+              <ModalBody className="p-0">
+                {previewDoc && (
+                  <div className="flex items-center justify-center bg-gray-100 min-h-[400px] max-h-[70vh]">
+                    {(previewDoc.fileType?.startsWith('image') || previewDoc.type?.startsWith('image') || previewDoc.isAadhaarDocument) ? (
+                      <img 
+                        src={previewDoc.fileUrl || previewDoc.url} 
+                        alt={previewDoc.fileName || previewDoc.name}
+                        className="max-w-full max-h-[70vh] object-contain"
+                      />
+                    ) : previewDoc.fileType === 'application/pdf' || previewDoc.type === 'application/pdf' ? (
+                      <iframe
+                        src={previewDoc.fileUrl || previewDoc.url}
+                        className="w-full h-[70vh]"
+                        title={previewDoc.fileName || previewDoc.name}
+                      />
+                    ) : (
+                      <div className="text-center p-8">
+                        <FaFile className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                        <p className="text-gray-600 mb-4">Preview not available for this file type</p>
+                        <a
+                          href={previewDoc.fileUrl || previewDoc.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary-600 hover:text-primary-700 underline"
+                        >
+                          Open in new tab
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose}>
+                  Close
+                </Button>
+                <a
+                  href={previewDoc?.fileUrl || previewDoc?.url}
+                  download={previewDoc?.fileName || previewDoc?.name}
+                >
+                  <Button color="primary" startContent={<FaDownload />}>
+                    Download
+                  </Button>
+                </a>
+              </ModalFooter>
             </>
           )}
         </ModalContent>

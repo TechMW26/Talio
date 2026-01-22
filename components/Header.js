@@ -592,6 +592,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
             }}>
               <DropdownTrigger>
                 <Button
+                  isIconOnly
                   variant="light"
                   onPress={() => {
                     if (window.innerWidth < 768) {
@@ -600,7 +601,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                       setShowProfileMenu(!showProfileMenu)
                     }
                   }}
-                  className="p-1.5 sm:p-2"
+                  className="p-0 min-w-0 bg-transparent hover:bg-transparent data-[hover=true]:bg-transparent"
                 >
                   <Avatar
                     size="sm"

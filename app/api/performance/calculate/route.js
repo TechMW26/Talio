@@ -54,6 +54,8 @@ export async function GET(request) {
     const employeeIdParam = searchParams.get('employeeId')
     const startDateStr = searchParams.get('startDate')
     const endDateStr = searchParams.get('endDate')
+    const departmentParam = searchParams.get('department')
+    const departmentsParam = searchParams.get('departments') // Comma-separated list of department IDs
 
     // Date range for filtering
     const startDate = startDateStr ? new Date(startDateStr) : new Date(new Date().setDate(new Date().getDate() - 30)) // Default last 30 days
@@ -87,6 +89,16 @@ export async function GET(request) {
       employeeQuery._id = { $in: [...teamMemberIds, currentEmployeeId] }
     }
     // Admin and HR can see all employees
+
+    // Apply department filter
+    if (departmentsParam) {
+      const deptIds = departmentsParam.split(',').filter(id => id.trim())
+      if (deptIds.length > 0) {
+        employeeQuery.department = { $in: deptIds }
+      }
+    } else if (departmentParam && departmentParam !== 'all') {
+      employeeQuery.department = departmentParam
+    }
 
     if (employeeIdParam) {
       employeeQuery._id = employeeIdParam

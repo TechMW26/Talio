@@ -13,7 +13,7 @@ import { Card, CardBody, CardHeader, Button, Chip, Skeleton, Input, Select, Sele
 export default function AttendanceReportPage() {
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState(null)
-  const [dateRange, setDateRange] = useState('today')
+  const [dateRange, setDateRange] = useState('month') // Default to month-to-date
   const [customStartDate, setCustomStartDate] = useState('')
   const [customEndDate, setCustomEndDate] = useState('')
   const [selectedDepartment, setSelectedDepartment] = useState('all')
@@ -227,22 +227,32 @@ export default function AttendanceReportPage() {
     let totalWorkHours = 0
     let lateArrivals = 0
     let earlyDepartures = 0
+    let totalAccountedRecords = 0
     
     attendance.forEach(record => {
       if (statusCounts[record.status] !== undefined) {
         statusCounts[record.status]++
+        totalAccountedRecords++
       }
       if (record.workHours) {
         totalWorkHours += record.workHours
       }
-      if (record.status === 'late') {
+      // Check for late arrivals using checkInStatus field (not status)
+      // checkInStatus captures 'late', 'on-time', 'early' based on check-in time
+      if (record.checkInStatus === 'late') {
         lateArrivals++
       }
-      // Check for early departure (less than 81.25% of full day hours on a present day = early checkout)
-      if (record.status === 'present' && record.workHours && record.workHours < (fullDayHours * 0.8125)) {
+      // Check for early departure (less than 81.25% of full day hours OR checkOutStatus is 'early')
+      if ((record.status === 'present' || record.status === 'in-progress') && 
+          (record.checkOutStatus === 'early' || (record.workHours && record.workHours < (fullDayHours * 0.8125)))) {
         earlyDepartures++
       }
     })
+
+    // Calculate missing days (expected attendance - records we have)
+    // These are days where no record exists at all = effectively absent
+    const missingRecords = Math.max(0, totalExpectedAttendance - totalAccountedRecords)
+    const effectiveAbsent = statusCounts.absent + missingRecords
 
     // Calculate scheduled hours based on actual expected attendance
     const totalScheduledHours = totalExpectedAttendance * fullDayHours
@@ -254,70 +264,115 @@ export default function AttendanceReportPage() {
       : '0.00'
     
     // Attendance rate: (present + half-day*0.5 + in-progress) / expected attendance
+    // Note: statusCounts.present already includes late arrivals since late is a checkInStatus, not status
+    // statusCounts.late will always be 0 since status field never has 'late' value
     const actualAttendanceValue = statusCounts.present + (statusCounts['half-day'] * 0.5) + statusCounts['in-progress']
     const attendanceRate = totalExpectedAttendance > 0 
       ? ((actualAttendanceValue / totalExpectedAttendance) * 100).toFixed(2) 
       : '0.00'
     
-    // Absenteeism rate: absent / expected attendance
+    // Absenteeism rate: effective absent (including missing records) / expected attendance
     const absenteeismRate = totalExpectedAttendance > 0 
-      ? ((statusCounts.absent / totalExpectedAttendance) * 100).toFixed(2) 
+      ? ((effectiveAbsent / totalExpectedAttendance) * 100).toFixed(2) 
       : '0.00'
     
-    // Punctuality rate: non-late present / total present
-    const totalPresentAndLate = statusCounts.present + lateArrivals
-    const punctualityRate = totalPresentAndLate > 0 
-      ? (((statusCounts.present) / totalPresentAndLate) * 100).toFixed(2) 
-      : '100.00'
+    // Punctuality rate calculation:
+    // - Punctuality considers both on-time arrival AND completing full work hours
+    // - Late arrival = checkInStatus === 'late' (counted in lateArrivals variable)
+    // - Early departure = checkOutStatus === 'early' or worked < 81.25% of full day
+    // Formula: (Total work instances - Late arrivals - Early departures) / Total work instances * 100
+    const totalWorkInstances = statusCounts.present + statusCounts['half-day'] + statusCounts['in-progress']
+    const punctualityDeductions = lateArrivals + earlyDepartures
+    const punctualInstances = Math.max(0, totalWorkInstances - punctualityDeductions)
+    const punctualityRate = totalWorkInstances > 0 
+      ? ((punctualInstances / totalWorkInstances) * 100).toFixed(2) 
+      : '0.00' // If no one worked, punctuality should be 0%, not 100%
     
-    // Average work hours per expected attendance
-    const avgWorkHours = totalExpectedAttendance > 0 
-      ? (totalWorkHours / totalExpectedAttendance).toFixed(2) 
+    // Average work hours per actual worked days (not expected days)
+    const totalWorkedDays = statusCounts.present + statusCounts['half-day'] + statusCounts['in-progress']
+    const avgWorkHours = totalWorkedDays > 0 
+      ? (totalWorkHours / totalWorkedDays).toFixed(2) 
       : '0.00'
 
-    // Department breakdown
+    // Department breakdown - calculate expected days per department too
     const departmentStats = {}
     employees.forEach(emp => {
       const deptId = emp.department?._id || emp.department
       const deptName = emp.department?.name || 'Unknown'
+      const empExpectedDays = countEmployeeWorkingDays(emp, startDate, endDate, workingDays, holidays)
+      
       if (!departmentStats[deptId]) {
         departmentStats[deptId] = {
           name: deptName,
           totalEmployees: 0,
+          expectedDays: 0,
           present: 0,
           absent: 0,
           late: 0,
           'half-day': 0,
-          totalHours: 0
+          'on-leave': 0,
+          totalHours: 0,
+          recordCount: 0
         }
       }
       departmentStats[deptId].totalEmployees++
+      departmentStats[deptId].expectedDays += empExpectedDays
       
       const empRecords = employeeAttendance[emp._id] || []
       empRecords.forEach(record => {
+        // Count status-based metrics
         if (departmentStats[deptId][record.status] !== undefined) {
           departmentStats[deptId][record.status]++
         }
+        // Count late arrivals using checkInStatus (not status)
+        if (record.checkInStatus === 'late') {
+          departmentStats[deptId].late++
+        }
+        departmentStats[deptId].recordCount++
         if (record.workHours) {
           departmentStats[deptId].totalHours += record.workHours
         }
       })
+    })
+    
+    // Calculate effective absent for each department (including missing records)
+    Object.keys(departmentStats).forEach(deptId => {
+      const dept = departmentStats[deptId]
+      const deptMissingDays = Math.max(0, dept.expectedDays - dept.recordCount)
+      dept.absent = dept.absent + deptMissingDays
     })
 
     // Individual employee metrics
     const employeeMetrics = employees.map(emp => {
       const empRecords = employeeAttendance[emp._id] || []
       const empPresent = empRecords.filter(r => r.status === 'present' || r.status === 'in-progress').length
-      const empAbsent = empRecords.filter(r => r.status === 'absent').length
-      const empLate = empRecords.filter(r => r.status === 'late').length
+      // Use checkInStatus for late arrivals (status field never contains 'late')
+      const empLate = empRecords.filter(r => r.checkInStatus === 'late').length
       const empHalfDay = empRecords.filter(r => r.status === 'half-day').length
+      const empOnLeave = empRecords.filter(r => r.status === 'on-leave').length
       const empWorkHours = empRecords.reduce((sum, r) => sum + (r.workHours || 0), 0)
       
       // Calculate expected days for this employee
       const empExpectedDays = countEmployeeWorkingDays(emp, startDate, endDate, workingDays, holidays)
+      
+      // Calculate effective absences: days with no record or explicit absent status
+      // Note: empLate is count of late arrivals, not separate from empPresent
+      // People who arrived late are still in empPresent (status = 'present' or 'in-progress')
+      const empExplicitAbsent = empRecords.filter(r => r.status === 'absent').length
+      const empAccountedDays = empPresent + empHalfDay + empOnLeave + empExplicitAbsent
+      const empMissingDays = Math.max(0, empExpectedDays - empAccountedDays)
+      const empAbsent = empExplicitAbsent + empMissingDays // Total absent = explicit + missing records
+      
+      // Attendance rate: (present + half-day*0.5) / expected days
+      // empPresent already includes people who arrived late (late is a checkInStatus, not status)
       const empAttendanceRate = empExpectedDays > 0 
         ? (((empPresent + empHalfDay * 0.5) / empExpectedDays) * 100).toFixed(1) 
         : '0.0'
+      
+      // Average hours per ACTUAL worked days (not expected days)
+      // empPresent includes late arrivals since status is 'present' not 'late'
+      const empWorkedDays = empPresent + empHalfDay
+      const empAvgHours = empWorkedDays > 0 ? (empWorkHours / empWorkedDays).toFixed(2) : '0.00'
       
       return {
         id: emp._id,
@@ -327,17 +382,41 @@ export default function AttendanceReportPage() {
         designation: emp.designation?.title || 'N/A',
         email: emp.email,
         avatar: emp.avatar,
-        present: empPresent,
+        present: empPresent, // empPresent already includes late arrivals (status = 'present')
         absent: empAbsent,
-        late: empLate,
+        late: empLate, // This is count of checkInStatus === 'late'
         halfDay: empHalfDay,
         totalHours: empWorkHours.toFixed(2),
-        avgHours: empExpectedDays > 0 ? (empWorkHours / empExpectedDays).toFixed(2) : '0.00',
+        avgHours: empAvgHours,
         attendanceRate: empAttendanceRate,
         expectedDays: empExpectedDays,
         records: empRecords
       }
     }).sort((a, b) => parseFloat(b.attendanceRate) - parseFloat(a.attendanceRate))
+
+    // Update status counts to include effective absent (missing records)
+    const effectiveStatusCounts = {
+      ...statusCounts,
+      absent: effectiveAbsent
+    }
+
+    // Calculate shrinkage breakdown properly
+    // Shrinkage from complete absences (days with no work at all)
+    const absentDays = effectiveAbsent
+    const shrinkageFromAbsent = absentDays * fullDayHours
+    
+    // Shrinkage from half days (lost half the day's hours)
+    const shrinkageFromHalfDay = statusCounts['half-day'] * (fullDayHours * 0.5)
+    
+    // Shrinkage from underwork on present days
+    // Expected hours from worked days = (present + in-progress) * fullDayHours + half-day * fullDayHours
+    // Note: statusCounts.late is always 0 since late is stored in checkInStatus, not status
+    const expectedHoursFromWorkedDays = (statusCounts.present + statusCounts['in-progress']) * fullDayHours + statusCounts['half-day'] * fullDayHours
+    const shrinkageFromUnderwork = Math.max(0, expectedHoursFromWorkedDays - totalWorkHours)
+    
+    // Recalculate total shrinkage to ensure consistency
+    const calculatedShrinkage = shrinkageFromAbsent + shrinkageFromHalfDay + shrinkageFromUnderwork
+    const finalShrinkageHours = Math.max(shrinkageHours, calculatedShrinkage) // Use max to ensure we capture all lost time
 
     return {
       period: { startDate, endDate, days: daysDiff, workingDays: totalWorkingDaysInPeriod },
@@ -350,22 +429,23 @@ export default function AttendanceReportPage() {
         punctualityRate,
         avgWorkHours
       },
-      statusCounts,
+      statusCounts: effectiveStatusCounts,
       workHours: {
         total: totalWorkHours.toFixed(2),
         scheduled: totalScheduledHours.toFixed(2),
+        // statusCounts.present includes late arrivals (late is checkInStatus, not status)
         productive: ((statusCounts.present * fullDayHours) + (statusCounts['half-day'] * fullDayHours * 0.5)).toFixed(2),
         average: avgWorkHours
       },
       shrinkage: {
-        totalHours: shrinkageHours.toFixed(2),
-        percentage: shrinkagePercentage,
+        totalHours: finalShrinkageHours.toFixed(2),
+        percentage: totalScheduledHours > 0 ? ((finalShrinkageHours / totalScheduledHours) * 100).toFixed(2) : '0.00',
         breakdown: {
-          absent: statusCounts.absent * fullDayHours,
-          halfDay: statusCounts['half-day'] * (fullDayHours * 0.5),
+          absent: shrinkageFromAbsent.toFixed(2),
+          halfDay: shrinkageFromHalfDay.toFixed(2),
           late: lateArrivals,
           earlyDeparture: earlyDepartures,
-          unproductive: Math.max(0, shrinkageHours - (statusCounts.absent * fullDayHours + statusCounts['half-day'] * (fullDayHours * 0.5))).toFixed(2)
+          unproductive: shrinkageFromUnderwork.toFixed(2)
         }
       },
       performance: {
@@ -439,7 +519,7 @@ export default function AttendanceReportPage() {
       ['STATUS BREAKDOWN'],
       ['Present', reportData.statusCounts.present],
       ['Absent', reportData.statusCounts.absent],
-      ['Late', reportData.statusCounts.late],
+      ['Late', reportData.performance.lateArrivals],
       ['Half Day', reportData.statusCounts['half-day']],
       ['On Leave', reportData.statusCounts['on-leave']],
       [],
@@ -663,10 +743,15 @@ export default function AttendanceReportPage() {
                 className="flex items-center justify-between cursor-pointer mb-4"
                 onClick={() => toggleSection('overview')}
               >
-                <h2 className="text-xl font-bold text-default-800 flex items-center space-x-2">
-                  <FaChartLine className="text-primary" />
-                  <span>Overview Metrics</span>
-                </h2>
+                <div>
+                  <h2 className="text-xl font-bold text-default-800 flex items-center space-x-2">
+                    <FaChartLine className="text-primary" />
+                    <span>Overview Metrics</span>
+                  </h2>
+                  <p className="text-sm text-default-500 mt-1">
+                    {reportData.period.startDate} to {reportData.period.endDate} ({reportData.period.workingDays} working days)
+                  </p>
+                </div>
                 {expandedSections.overview ? <FaChevronUp /> : <FaChevronDown />}
               </div>
               
@@ -720,7 +805,7 @@ export default function AttendanceReportPage() {
                       <p className="text-sm text-warning-700">Half Day</p>
                     </div>
                     <div className="bg-warning-50 rounded-lg p-4 text-center">
-                      <p className="text-2xl font-bold text-warning">{reportData.statusCounts.late}</p>
+                      <p className="text-2xl font-bold text-warning">{reportData.performance.lateArrivals}</p>
                       <p className="text-sm text-warning-700">Late</p>
                     </div>
                     <div className="bg-primary-50 rounded-lg p-4 text-center">
@@ -740,10 +825,15 @@ export default function AttendanceReportPage() {
                 className="flex items-center justify-between cursor-pointer mb-4"
                 onClick={() => toggleSection('shrinkage')}
               >
-                <h2 className="text-xl font-bold text-default-800 flex items-center space-x-2">
-                  <FaChartPie className="text-danger" />
-                  <span>Shrinkage Analysis</span>
-                </h2>
+                <div>
+                  <h2 className="text-xl font-bold text-default-800 flex items-center space-x-2">
+                    <FaChartPie className="text-danger" />
+                    <span>Shrinkage Analysis</span>
+                  </h2>
+                  <p className="text-sm text-default-500 mt-1">
+                    {reportData.period.startDate} to {reportData.period.endDate} ({reportData.period.workingDays} working days)
+                  </p>
+                </div>
                 {expandedSections.shrinkage ? <FaChevronUp /> : <FaChevronDown />}
               </div>
               
@@ -766,7 +856,10 @@ export default function AttendanceReportPage() {
 
                     <div className="space-y-3">
                       <div className="flex justify-between items-center p-3 bg-default-50 rounded-lg">
-                        <span className="text-sm text-default-700">Scheduled Hours</span>
+                        <div>
+                          <span className="text-sm text-default-700">Scheduled Hours</span>
+                          <p className="text-xs text-default-400">{reportData.overview.expectedAttendance} employee-days × 8h</p>
+                        </div>
                         <span className="font-semibold text-default-800">{reportData.workHours.scheduled}h</span>
                       </div>
                       <div className="flex justify-between items-center p-3 bg-success-50 rounded-lg">

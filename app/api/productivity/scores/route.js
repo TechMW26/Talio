@@ -27,6 +27,7 @@ export async function GET(request) {
     const startDate = searchParams.get('startDate') || `${currentYear}-01-01`;
     const endDate = searchParams.get('endDate') || `${currentYear}-12-31`;
     const departmentFilter = searchParams.get('department');
+    const departmentsFilter = searchParams.get('departments'); // Comma-separated list of department IDs
     const employeeIdFilter = searchParams.get('employeeId');
 
     // Permission check
@@ -83,6 +84,22 @@ export async function GET(request) {
           }, { status: 403 });
         }
       }
+    } else if (departmentsFilter) {
+      // Handle multiple departments filter (comma-separated)
+      const deptIds = departmentsFilter.split(',').filter(id => id.trim());
+      if (!isAdminOrHR && isDeptHead) {
+        // Validate department head can only see their departments
+        const validDeptIds = deptIds.filter(id => userDepartmentIds.includes(id));
+        if (validDeptIds.length === 0) {
+          return NextResponse.json({
+            success: false,
+            message: 'Not authorized to view these departments'
+          }, { status: 403 });
+        }
+        employeeQuery.department = { $in: validDeptIds };
+      } else if (isAdminOrHR) {
+        employeeQuery.department = { $in: deptIds };
+      }
     } else if (departmentFilter && departmentFilter !== 'all') {
       // Department filter
       if (!isAdminOrHR && isDeptHead && !userDepartmentIds.includes(departmentFilter)) {
@@ -96,6 +113,7 @@ export async function GET(request) {
       // Department head can only see their departments
       employeeQuery.department = { $in: userDepartmentIds };
     }
+    // For admin/HR with no filter, show all employees (no department filter added)
 
     // Get employees matching the filter
     const employees = await Employee.find(employeeQuery).select('_id firstName lastName department').lean();

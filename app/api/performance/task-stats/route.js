@@ -15,19 +15,20 @@ import { getAuthAndModels } from '@/lib/auth';
  */
 export async function GET(request) {
   try {
-    const auth = await getAuthAndModels(request, ['Task', 'Employee', 'User', 'Department', 'Project']);
+    const auth = await getAuthAndModels(request, ['Task', 'TaskAssignee', 'Employee', 'User', 'Department', 'Project']);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
 
     const { user, models } = auth;
-    const { Task, Employee, User, Department, Project } = models;
+    const { Task, TaskAssignee, Employee, User, Department, Project } = models;
     const { searchParams } = new URL(request.url);
 
     // Parse date range
     const startDate = searchParams.get('startDate') || new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0];
     const endDate = searchParams.get('endDate') || new Date().toISOString().split('T')[0];
     const departmentFilter = searchParams.get('department');
+    const departmentsFilter = searchParams.get('departments'); // Comma-separated list of department IDs
 
     // Permission check
     const isAdminOrHR = ['admin', 'hr'].includes(user.role);
@@ -66,7 +67,23 @@ export async function GET(request) {
     // Build employee filter
     let employeeQuery = { status: 'active' };
     
-    if (departmentFilter && departmentFilter !== 'all') {
+    // Handle multiple departments filter (comma-separated)
+    if (departmentsFilter) {
+      const deptIds = departmentsFilter.split(',').filter(id => id.trim());
+      if (!isAdminOrHR && isDeptHead) {
+        // Validate department head can only see their departments
+        const validDeptIds = deptIds.filter(id => userDepartmentIds.includes(id));
+        if (validDeptIds.length === 0) {
+          return NextResponse.json({
+            success: false,
+            message: 'Not authorized to view these departments'
+          }, { status: 403 });
+        }
+        employeeQuery.department = { $in: validDeptIds };
+      } else if (isAdminOrHR) {
+        employeeQuery.department = { $in: deptIds };
+      }
+    } else if (departmentFilter && departmentFilter !== 'all') {
       if (!isAdminOrHR && isDeptHead && !userDepartmentIds.includes(departmentFilter)) {
         return NextResponse.json({
           success: false,
@@ -75,8 +92,10 @@ export async function GET(request) {
       }
       employeeQuery.department = departmentFilter;
     } else if (isDeptHead && !isAdminOrHR) {
+      // Default: show only departments the user heads
       employeeQuery.department = { $in: userDepartmentIds };
     }
+    // For admin/HR with no filter, show all employees (no department filter added)
 
     // Get employees
     const employees = await Employee.find(employeeQuery)
@@ -94,13 +113,34 @@ export async function GET(request) {
       };
     });
 
-    // Get all tasks assigned to these employees in the date range
-    // Tasks created OR due within the date range
+    // Get all task assignments for these employees
+    const taskAssignments = await TaskAssignee.find({
+      user: { $in: employeeIds },
+      assignmentStatus: { $in: ['pending', 'accepted'] }
+    }).lean();
+    
+    const taskIds = [...new Set(taskAssignments.map(a => a.task.toString()))];
+    
+    // Build assignment map: taskId -> [employeeId, ...]
+    const taskToEmployeesMap = {};
+    taskAssignments.forEach(assignment => {
+      const taskId = assignment.task.toString();
+      const empId = assignment.user.toString();
+      if (!taskToEmployeesMap[taskId]) {
+        taskToEmployeesMap[taskId] = [];
+      }
+      taskToEmployeesMap[taskId].push(empId);
+    });
+
+    // Get all tasks that are assigned to these employees
+    // Filter by date range (created OR due within the range)
     const tasks = await Task.find({
-      assignee: { $in: employeeIds },
+      _id: { $in: taskIds },
+      status: { $ne: 'archived' },
       $or: [
-        { createdAt: { $gte: new Date(startDate), $lte: new Date(endDate) } },
-        { dueDate: { $gte: new Date(startDate), $lte: new Date(endDate) } }
+        { createdAt: { $gte: new Date(startDate), $lte: new Date(endDate + 'T23:59:59.999Z') } },
+        { dueDate: { $gte: new Date(startDate), $lte: new Date(endDate + 'T23:59:59.999Z') } },
+        { completedAt: { $gte: new Date(startDate), $lte: new Date(endDate + 'T23:59:59.999Z') } }
       ]
     }).lean();
 
@@ -121,13 +161,15 @@ export async function GET(request) {
       low: { total: 0, completed: 0, overdue: 0 }
     };
 
-    // Status breakdown
+    // Status breakdown - matches TaskSchema status enum
     const statusStats = {
-      todo: 0,
+      'todo': 0,
       'in-progress': 0,
-      'in-review': 0,
-      completed: 0,
-      blocked: 0
+      'review': 0,
+      'completed': 0,
+      'completed-pending-approval': 0,
+      'rejected': 0,
+      'blocked': 0
     };
 
     // Department breakdown
@@ -167,10 +209,8 @@ export async function GET(request) {
 
     // Process each task
     tasks.forEach(task => {
-      const empId = task.assignee?.toString();
-      const empStat = employeeStats[empId];
-      const deptId = empStat ? employeeMap[empId]?.departmentId : 'unknown';
-      const deptStat = departmentStats[deptId];
+      const taskId = task._id.toString();
+      const assignedEmployeeIds = taskToEmployeesMap[taskId] || [];
       
       // Count by status
       const status = task.status || 'todo';
@@ -184,16 +224,29 @@ export async function GET(request) {
         priorityStats[priority].total++;
       }
 
-      // Track totals
-      if (empStat) empStat.totalTasks++;
-      if (deptStat) deptStat.totalTasks++;
+      // Track totals for each assigned employee
+      assignedEmployeeIds.forEach(empId => {
+        const empStat = employeeStats[empId];
+        const deptId = employeeMap[empId]?.departmentId || 'unknown';
+        const deptStat = departmentStats[deptId];
+        
+        if (empStat) empStat.totalTasks++;
+        if (deptStat) deptStat.totalTasks++;
+      });
 
       // Check completion
-      if (status === 'completed' || status === 'done') {
+      if (status === 'completed' || status === 'done' || status === 'completed-pending-approval') {
         completedTasks++;
-        if (empStat) empStat.completedTasks++;
-        if (deptStat) deptStat.completedTasks++;
         if (priorityStats[priority]) priorityStats[priority].completed++;
+        
+        // Update employee/dept stats
+        assignedEmployeeIds.forEach(empId => {
+          const empStat = employeeStats[empId];
+          const deptId = employeeMap[empId]?.departmentId || 'unknown';
+          const deptStat = departmentStats[deptId];
+          if (empStat) empStat.completedTasks++;
+          if (deptStat) deptStat.completedTasks++;
+        });
         
         // Check if completed on time
         if (task.dueDate && task.completedAt) {
@@ -201,25 +254,43 @@ export async function GET(request) {
           const completedAt = new Date(task.completedAt);
           if (completedAt <= dueDate) {
             onTimeTasks++;
-            if (empStat) empStat.onTimeTasks++;
-            if (deptStat) deptStat.onTimeTasks++;
+            assignedEmployeeIds.forEach(empId => {
+              const empStat = employeeStats[empId];
+              const deptId = employeeMap[empId]?.departmentId || 'unknown';
+              const deptStat = departmentStats[deptId];
+              if (empStat) empStat.onTimeTasks++;
+              if (deptStat) deptStat.onTimeTasks++;
+            });
           }
         } else if (task.dueDate) {
           // If no completedAt, assume it was completed on time if status is completed
           onTimeTasks++;
-          if (empStat) empStat.onTimeTasks++;
-          if (deptStat) deptStat.onTimeTasks++;
+          assignedEmployeeIds.forEach(empId => {
+            const empStat = employeeStats[empId];
+            const deptId = employeeMap[empId]?.departmentId || 'unknown';
+            const deptStat = departmentStats[deptId];
+            if (empStat) empStat.onTimeTasks++;
+            if (deptStat) deptStat.onTimeTasks++;
+          });
         }
-      } else if (status === 'in-progress' || status === 'in-review') {
+      } else if (status === 'in-progress' || status === 'in-review' || status === 'review') {
         inProgressTasks++;
-        if (empStat) empStat.inProgressTasks++;
+        assignedEmployeeIds.forEach(empId => {
+          const empStat = employeeStats[empId];
+          if (empStat) empStat.inProgressTasks++;
+        });
         
         // Check if overdue
         if (task.dueDate && new Date(task.dueDate) < now) {
           overdueTasks++;
-          if (empStat) empStat.overdueTasks++;
-          if (deptStat) deptStat.overdueTasks++;
           if (priorityStats[priority]) priorityStats[priority].overdue++;
+          assignedEmployeeIds.forEach(empId => {
+            const empStat = employeeStats[empId];
+            const deptId = employeeMap[empId]?.departmentId || 'unknown';
+            const deptStat = departmentStats[deptId];
+            if (empStat) empStat.overdueTasks++;
+            if (deptStat) deptStat.overdueTasks++;
+          });
         }
       } else if (status === 'todo') {
         todoTasks++;
@@ -227,17 +298,27 @@ export async function GET(request) {
         // Check if overdue
         if (task.dueDate && new Date(task.dueDate) < now) {
           overdueTasks++;
-          if (empStat) empStat.overdueTasks++;
-          if (deptStat) deptStat.overdueTasks++;
           if (priorityStats[priority]) priorityStats[priority].overdue++;
+          assignedEmployeeIds.forEach(empId => {
+            const empStat = employeeStats[empId];
+            const deptId = employeeMap[empId]?.departmentId || 'unknown';
+            const deptStat = departmentStats[deptId];
+            if (empStat) empStat.overdueTasks++;
+            if (deptStat) deptStat.overdueTasks++;
+          });
         }
       } else if (status === 'blocked') {
         // Check if overdue
         if (task.dueDate && new Date(task.dueDate) < now) {
           overdueTasks++;
-          if (empStat) empStat.overdueTasks++;
-          if (deptStat) deptStat.overdueTasks++;
           if (priorityStats[priority]) priorityStats[priority].overdue++;
+          assignedEmployeeIds.forEach(empId => {
+            const empStat = employeeStats[empId];
+            const deptId = employeeMap[empId]?.departmentId || 'unknown';
+            const deptStat = departmentStats[deptId];
+            if (empStat) empStat.overdueTasks++;
+            if (deptStat) deptStat.overdueTasks++;
+          });
         }
       }
     });
@@ -274,13 +355,14 @@ export async function GET(request) {
       }))
       .sort((a, b) => b.taskCompletionRate - a.taskCompletionRate);
 
-    // Status breakdown for pie chart
+    // Status breakdown for pie chart (combining similar statuses)
     const statusBreakdown = [
-      { status: 'Completed', count: completedTasks, color: '#10B981' },
+      { status: 'Completed', count: statusStats['completed'] + statusStats['completed-pending-approval'], color: '#10B981' },
       { status: 'In Progress', count: statusStats['in-progress'], color: '#3B82F6' },
-      { status: 'In Review', count: statusStats['in-review'], color: '#8B5CF6' },
+      { status: 'In Review', count: statusStats['review'], color: '#8B5CF6' },
       { status: 'To Do', count: statusStats['todo'], color: '#F59E0B' },
-      { status: 'Blocked', count: statusStats['blocked'], color: '#EF4444' }
+      { status: 'Blocked', count: statusStats['blocked'], color: '#EF4444' },
+      { status: 'Rejected', count: statusStats['rejected'], color: '#DC2626' }
     ].filter(s => s.count > 0);
 
     // Priority breakdown for chart

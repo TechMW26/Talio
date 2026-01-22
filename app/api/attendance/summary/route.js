@@ -149,18 +149,30 @@ export async function GET(request) {
       present: 0,
       absent: 0,
       late: 0,
-      halfDay: 0
+      halfDay: 0,
+      onLeave: 0
     }
 
+    let todayRecordCount = 0
     todayAttendance.forEach(item => {
+      todayRecordCount += item.count
       if (item._id === 'present' || item._id === 'in-progress') todayStats.present += item.count // in-progress = checked in but not checked out
       else if (item._id === 'absent') todayStats.absent = item.count
       else if (item._id === 'late') todayStats.late = item.count
       else if (item._id === 'half-day') todayStats.halfDay = item.count
+      else if (item._id === 'on-leave') todayStats.onLeave = item.count
     })
 
-    const todayTotal = todayStats.present + todayStats.absent + todayStats.late + todayStats.halfDay
-    const todayAttendanceRate = todayTotal > 0 ? ((todayStats.present + todayStats.late + todayStats.halfDay) / todayTotal * 100).toFixed(1) : 0
+    // Calculate employees missing from today's records (no attendance record = effectively absent)
+    const todayMissing = Math.max(0, totalEmployees - todayRecordCount)
+    const effectiveTodayAbsent = todayStats.absent + todayMissing
+
+    // Total accounted = present + late + half-day + on-leave + absent (including missing)
+    const todayTotal = totalEmployees
+    // Attendance rate = (present + late + half-day*0.5) / total employees
+    const todayAttendanceRate = todayTotal > 0 
+      ? (((todayStats.present + todayStats.late + todayStats.halfDay * 0.5) / todayTotal) * 100).toFixed(1) 
+      : 0
 
     const response = {
       success: true,
@@ -176,7 +188,11 @@ export async function GET(request) {
           totalRecords
         },
         today: {
-          ...todayStats,
+          present: todayStats.present,
+          absent: effectiveTodayAbsent,
+          late: todayStats.late,
+          halfDay: todayStats.halfDay,
+          onLeave: todayStats.onLeave,
           total: todayTotal,
           attendanceRate: parseFloat(todayAttendanceRate)
         },

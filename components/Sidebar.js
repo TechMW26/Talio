@@ -326,6 +326,8 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
         return sidebarCounts.projects
       case "To-Do's":
         return sidebarCounts.tasks
+      case 'Approvals': // Expense approvals
+        return sidebarCounts.expenses
       default:
         return 0
     }
@@ -412,7 +414,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
         </div>
 
         {/* Scrollable Menu Section */}
-        <ScrollShadow className={`pt-4 pb-8 flex-1 ${isDesktop && isCollapsed ? 'px-2 space-y-3' : 'px-3 sm:px-4 space-y-2'}`}>
+        <ScrollShadow className={`pt-4 pb-8 flex-1 scrollbar-hide ${isDesktop && isCollapsed ? 'px-2 space-y-3' : 'px-3 sm:px-4 space-y-2'}`}>
           {menuItems.map((item) => {
             const isActive = isMenuItemActive(item)
             return (

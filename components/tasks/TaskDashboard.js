@@ -220,7 +220,7 @@ const TaskDashboard = () => {
           </div>
           <div className="h-80 sm:h-80 pr-4 sm:pr-6 pb-4 sm:pb-6">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={charts.tasksByStatus} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
+              <BarChart data={charts.tasksByStatus} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#d1d5db" />
                 <XAxis dataKey="_id" fontSize={9} tick={{ fontSize: 9, fill: '#6b7280' }} stroke="#9ca3af" />
                 <YAxis fontSize={9} tick={{ fontSize: 9, fill: '#6b7280' }} stroke="#9ca3af" width={35} />

@@ -40,6 +40,7 @@ export async function GET(request) {
     const employeeId = searchParams.get('employeeId')
     const status = searchParams.get('status')
     const department = searchParams.get('department')
+    const departments = searchParams.get('departments') // Comma-separated list of department IDs
     const page = parseInt(searchParams.get('page')) || 1
     const limit = parseInt(searchParams.get('limit')) || 50
 
@@ -77,7 +78,13 @@ export async function GET(request) {
     if (status) {
       query.status = status
     }
-    if (department) {
+    // Support multiple departments filter (comma-separated)
+    if (departments) {
+      const deptIds = departments.split(',').filter(id => id.trim())
+      if (deptIds.length > 0) {
+        query.department = { $in: deptIds }
+      }
+    } else if (department && department !== 'all') {
       query.department = department
     }
 

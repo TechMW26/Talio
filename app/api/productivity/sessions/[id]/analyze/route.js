@@ -19,13 +19,13 @@ export async function POST(request, { params }) {
     console.log(`[ProductivityAnalysis] Starting analysis for session: ${sessionId}`);
     
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['ProductivitySession', 'User'])
+    const auth = await getAuthAndModels(request, ['ProductivitySession', 'User', 'Task', 'TaskAssignee', 'Project'])
     if (!auth.success) {
       console.log(`[ProductivityAnalysis] Auth failed: ${auth.message}`);
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { ProductivitySession, User } = models
+    const { ProductivitySession, User, Task, TaskAssignee, Project } = models
 
     const currentUserId = user._id || user.userId;
     const currentUserRole = user.role;
@@ -171,6 +171,7 @@ export async function POST(request, { params }) {
     let employeeRole = 'Employee';
     let employeeDesignation = '';
     let employeeDepartment = '';
+    let employeeId = null;
     
     if (sessionUserId) {
       const userRecord = await User.findById(sessionUserId).populate({
@@ -181,6 +182,7 @@ export async function POST(request, { params }) {
         employeeName = `${userRecord.employeeId.firstName} ${userRecord.employeeId.lastName}`;
         employeeDesignation = userRecord.employeeId.designation || userRecord.employeeId.jobTitle || '';
         employeeDepartment = userRecord.employeeId.department?.name || '';
+        employeeId = userRecord.employeeId._id;
       }
       if (userRecord?.role) {
         employeeRole = userRecord.role;
@@ -192,6 +194,51 @@ export async function POST(request, { params }) {
         employeeName = `${employee.firstName} ${employee.lastName}`;
         employeeDesignation = employee.designation || employee.jobTitle || '';
         employeeDepartment = employee.department?.name || '';
+        employeeId = employee._id;
+      }
+    }
+    
+    // Fetch user's ongoing tasks for context
+    let ongoingTasks = [];
+    let taskContextStr = 'No active tasks assigned';
+    
+    if (employeeId) {
+      try {
+        // Get task assignments for this employee
+        const taskAssignments = await TaskAssignee.find({
+          user: employeeId,
+          assignmentStatus: { $in: ['pending', 'accepted'] }
+        }).select('task').lean();
+        
+        const taskIds = taskAssignments.map(ta => ta.task);
+        
+        if (taskIds.length > 0) {
+          // Fetch actual tasks that are in progress or todo
+          const tasks = await Task.find({
+            _id: { $in: taskIds },
+            status: { $in: ['todo', 'in-progress', 'review'] }
+          })
+          .populate('project', 'name')
+          .select('title description status priority dueDate project tags')
+          .sort({ priority: -1, dueDate: 1 })
+          .limit(10)
+          .lean();
+          
+          ongoingTasks = tasks;
+          
+          if (tasks.length > 0) {
+            taskContextStr = tasks.map((task, idx) => {
+              const projectName = task.project?.name || 'No Project';
+              const dueDate = task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'No due date';
+              const tags = task.tags?.length > 0 ? task.tags.join(', ') : '';
+              return `${idx + 1}. [${task.status.toUpperCase()}] "${task.title}" (Project: ${projectName}, Priority: ${task.priority}, Due: ${dueDate})${tags ? ` [Tags: ${tags}]` : ''}`;
+            }).join('\n');
+          }
+        }
+        
+        console.log(`[ProductivityAnalysis] Found ${ongoingTasks.length} ongoing tasks for employee ${employeeId}`);
+      } catch (taskError) {
+        console.error(`[ProductivityAnalysis] Error fetching tasks:`, taskError.message);
       }
     }
     
@@ -283,33 +330,69 @@ export async function POST(request, { params }) {
     const sessionDurationMinutes = Math.round(sessionDurationMs / (1000 * 60));
     const sessionDurationHours = (sessionDurationMinutes / 60).toFixed(1);
     
-    // Build role context for better analysis
-    const roleContext = [];
-    if (employeeDesignation) roleContext.push(`Designation: ${employeeDesignation}`);
-    if (employeeDepartment) roleContext.push(`Department: ${employeeDepartment}`);
-    if (employeeRole && employeeRole !== 'employee') roleContext.push(`System Role: ${employeeRole}`);
-    const roleContextStr = roleContext.length > 0 ? roleContext.join('\n- ') : 'Not specified';
+    // Build role context for better analysis - DESIGNATION is PRIMARY, department is fallback
+    // Designation tells us WHAT the employee does (Developer, Designer, HR Manager)
+    // Department only tells us WHERE they work (Engineering, Marketing) - less useful for work analysis
+    let primaryRoleContext = '';
+    let fallbackContext = '';
+    
+    if (employeeDesignation) {
+      primaryRoleContext = `Designation/Job Title: ${employeeDesignation}`;
+    }
+    if (employeeDepartment && !employeeDesignation) {
+      // Only use department as fallback if no designation
+      fallbackContext = `Department: ${employeeDepartment} (Note: No specific job title available, infer expected work from department)`;
+    }
+    if (employeeRole && employeeRole !== 'employee') {
+      fallbackContext += fallbackContext ? `\n- System Role: ${employeeRole}` : `System Role: ${employeeRole}`;
+    }
+    
+    const roleContextStr = primaryRoleContext || fallbackContext || 'Not specified - evaluate based on observed activities';
     
     // Build analysis prompt with comprehensive KPIs
     // IMPORTANT: Emphasize this is workplace productivity analysis, not facial recognition
-    const analysisPrompt = `You are an expert workplace productivity analyst. Your task is to analyze computer desktop screenshots to assess work activities and productivity metrics.
+    const analysisPrompt = `You are a STRICT and PRECISE workplace productivity analyst. Your task is to analyze computer desktop screenshots to assess ACTUAL work activities and productivity metrics.
 
-IMPORTANT CONTEXT:
-- These are DESKTOP/SCREEN captures showing applications, websites, and work activities
-- You are analyzing SOFTWARE USAGE and WORK PATTERNS, not people
-- Focus ONLY on: applications open, websites visited, documents being worked on, code being written, etc.
-- Do NOT attempt to identify any individuals - focus purely on the digital work content visible on screen
+CRITICAL ANALYSIS PRINCIPLES:
+1. BE SKEPTICAL - Just having an app open does NOT mean productive work is happening
+2. LOOK FOR EVIDENCE of actual work: typing, code changes, document edits, meaningful interactions
+3. Static screens, paused videos, idle chats = LOW productivity
+4. Entertainment sites (YouTube, Netflix, social media) = AUTOMATIC productivity penalty unless clearly work-related
+5. Research should show ACTIVE reading/scrolling, not just an open page
+6. For YouTube: Check if video is ACTUALLY PLAYING (progress bar, play button state). Paused or just open = idle time
+7. Multiple browser tabs with entertainment = distraction pattern
+8. Same screen across multiple screenshots = likely idle/inactive
+9. COMPARE observed activities with ASSIGNED TASKS to determine task relativity
 
 EMPLOYEE PROFILE:
 - Name: ${employeeName}
 - ${roleContextStr}
 
-Use this role/designation context to better understand expected work activities:
-- A "Developer" or "Engineer" would typically use code editors, terminals, documentation
-- A "Designer" would use design tools like Figma, Photoshop, Canva
-- An "HR" or "Manager" would use spreadsheets, emails, HR systems, video calls
-- A "Sales" person would use CRM, emails, video calls, presentations
-- An "Admin" would use office tools, email, scheduling, data entry
+IMPORTANT: The employee's DESIGNATION/JOB TITLE is the PRIMARY indicator of expected work type.
+- A "Software Developer" should be coding, not doing HR work
+- A "Graphic Designer" should be designing, not doing accounting
+- Use the designation to judge if activities are role-appropriate
+- Department name alone is NOT enough to determine expected work (e.g., "Engineering" dept could have developers, QA, DevOps, managers)
+
+ASSIGNED TASKS (Current workload - use this to determine if work is task-related):
+${taskContextStr}
+
+TASK RELATIVITY ANALYSIS:
+- Check if the visible work MATCHES any of the assigned tasks above
+- A developer working on code related to their task = HIGH task relativity
+- Someone browsing unrelated content when they have urgent tasks = LOW task relativity
+- Research that clearly supports an assigned task = TASK-RELATED
+- If no assigned tasks, evaluate based on role-appropriate work
+
+ROLE-SPECIFIC EXPECTATIONS (match based on DESIGNATION, not department):
+- Developers/Engineers: Active coding (cursor in editor, code visible), terminal commands, documentation lookup
+- Designers: Active design work in Figma/Photoshop, not just viewing
+- Marketing: Campaign management, analytics review, content creation - NOT just social media browsing
+- HR/Admin: Document editing, spreadsheet work, email composition (not just reading)
+- Sales: CRM updates, email composition, call preparation - NOT general browsing
+- QA/Testers: Testing tools, bug tracking, test case management
+- Project Managers: Project management tools, documentation, team communication
+- Data Analysts: Spreadsheets, analytics dashboards, data visualization tools
 
 SESSION CONTEXT:
 - Date: ${session.date.toISOString().split('T')[0]}
@@ -318,87 +401,123 @@ SESSION CONTEXT:
 - Total Screenshots: ${screenshots.length}
 - Screenshots Being Analyzed: ${images.length}
 
-ANALYSIS INSTRUCTIONS:
-1. Examine EACH screenshot to identify visible applications and websites
-2. Consider the employee's role/designation when evaluating productivity
-3. A developer coding is productive; a sales person on CRM is productive
-4. Activities should be judged relative to the employee's job function
-5. Be specific about what applications and tasks are visible
+STRICT SCORING CRITERIA (be harsh but fair):
+- 85-100: EXCEPTIONAL - Deep coding/design work with visible progress, minimal distractions, CLEARLY working on assigned tasks (RARE)
+- 70-84: PRODUCTIVE - Consistent work activity with minor breaks, work appears related to assigned tasks
+- 55-69: MODERATE - Mix of work and idle time, some task-related work but also distractions
+- 40-54: BELOW AVERAGE - Significant idle time, work not clearly related to assigned tasks
+- 25-39: POOR - Mostly entertainment/social media, ignoring assigned tasks
+- 0-24: UNPRODUCTIVE - Entertainment, gaming, or completely idle screens despite having tasks
 
-SCORING GUIDELINES (calculate based on observations):
-- 90-100: Exceptional focus - deep work, no distractions, high-value tasks
-- 75-89: Very productive - mostly focused work with minimal breaks
-- 60-74: Good productivity - solid work with some context switching
-- 45-59: Moderate - mix of work and non-work activities
-- 30-44: Below average - significant time on non-work activities
-- 0-29: Low productivity - mostly idle or non-work activities
+RED FLAGS (each reduces score by 10-20 points):
+- YouTube/Netflix/Streaming open (unless clearly work tutorial being ACTIVELY watched)
+- Social media (Twitter, Facebook, Instagram, Reddit, TikTok)
+- Same exact screen in multiple screenshots (idle)
+- Video paused or at 0:00 progress (opened but not watching)
+- Chat apps without work context
+- Gaming or game-related content
+- Shopping websites
+- News sites with no work relation
+
+YOUTUBE DETECTION RULES:
+- If YouTube is visible, CHECK THE VIDEO PROGRESS BAR
+- Video at 0:00 or paused = NOT watching = count as distraction
+- Video clearly mid-play with work-related title = could be learning
+- Multiple YouTube tabs = likely entertainment binge
+- YouTube with work tutorial AND notes/code open = productive learning
+
+PATTERN ANALYSIS:
+- Compare screenshots for CHANGES - same screen = idle
+- Look for typing indicators, cursor positions, scroll changes
+- Active work shows PROGRESSION between screenshots
+- Idle shows static or repetitive screens
 
 RESPOND WITH ONLY THIS JSON (no markdown, no code blocks):
 
 {
-  "sessionTitle": "<SHORT_2_TO_4_WORD_NAME_FOR_SESSION_e.g._Frontend_Development_or_Code_Review_or_Documentation_Work>",
-  "summary": "Detailed 2-3 paragraph analysis of what the employee worked on, specific tasks observed, and overall productivity assessment",
-  "score": <CALCULATED_NUMBER_0_TO_100_BASED_ON_ACTUAL_ANALYSIS>,
-  "focusScore": <NUMBER_0_TO_100_HOW_FOCUSED_WERE_THEY>,
-  "taskCompletionIndicators": <NUMBER_0_TO_100_EVIDENCE_OF_COMPLETING_TASKS>,
+  "sessionTitle": "<SHORT_2_TO_4_WORD_NAME_FOR_SESSION>",
+  "summary": "Detailed 2-3 paragraph analysis. Be SPECIFIC about what was observed. Note any concerns about productivity patterns. Mention specific apps/sites seen.",
+  "score": <STRICTLY_CALCULATED_0_TO_100>,
+  "focusScore": <0_TO_100_BASED_ON_CONTEXT_SWITCHING_AND_DISTRACTIONS>,
+  "taskCompletionIndicators": <0_TO_100_EVIDENCE_OF_ACTUAL_WORK_COMPLETED>,
   "timeDistribution": {
-    "deepWork": <PERCENTAGE_OF_TIME_IN_FOCUSED_WORK>,
-    "collaboration": <PERCENTAGE_IN_MEETINGS_OR_CHAT>,
-    "administrative": <PERCENTAGE_ON_EMAIL_DOCS_ETC>,
-    "breaks": <PERCENTAGE_IDLE_OR_BREAKS>,
-    "unfocused": <PERCENTAGE_ON_DISTRACTING_ACTIVITIES>
+    "deepWork": <PERCENTAGE_ACTIVE_FOCUSED_WORK>,
+    "collaboration": <PERCENTAGE_WORK_MEETINGS_OR_CHAT>,
+    "administrative": <PERCENTAGE_EMAIL_DOCS>,
+    "unfocused": <PERCENTAGE_ENTERTAINMENT_SOCIAL_MEDIA>,
+    "idle": <PERCENTAGE_INACTIVE_OR_SAME_SCREEN>
   },
   "focusMetrics": {
-    "longestFocusStreak": "<ESTIMATED_DURATION_e.g._45_minutes>",
-    "contextSwitches": <NUMBER_OF_APP_SWITCHES_OBSERVED>,
-    "distractionCount": <NUMBER_OF_NON_WORK_ACTIVITIES>
+    "longestFocusStreak": "<DURATION_OF_UNINTERRUPTED_WORK>",
+    "contextSwitches": <NUMBER_OF_APP_SWITCHES>,
+    "distractionCount": <COUNT_OF_NON_WORK_ACTIVITIES>,
+    "idleScreensDetected": <COUNT_OF_UNCHANGED_SCREENSHOTS>
   },
-  "achievements": ["Specific accomplishment 1 observed", "Specific accomplishment 2", "..."],
-  "suggestions": ["Specific actionable improvement 1", "Specific improvement 2", "..."],
-  "insights": ["Behavioral pattern 1 noticed", "Work habit observation 2", "..."],
-  "concerns": ["Any concerning patterns like too many distractions", "Potential burnout signs if any"],
+  "achievements": ["Only list REAL accomplishments with evidence"],
+  "suggestions": ["Specific actionable improvements based on observations"],
+  "insights": ["Behavioral patterns noticed - both good and concerning"],
+  "concerns": ["Any productivity concerns - be direct and specific"],
+  "redFlags": ["List any red flags detected: entertainment, idle, etc."],
   "workCategories": [
-    {"category": "Development/Coding", "percentage": <NUMBER>, "description": "What coding work was observed"},
-    {"category": "Communication", "percentage": <NUMBER>, "description": "Email, Slack, meetings"},
-    {"category": "Documentation", "percentage": <NUMBER>, "description": "Docs, notes, wiki"},
-    {"category": "Research", "percentage": <NUMBER>, "description": "Browsing, reading"},
-    {"category": "Other", "percentage": <NUMBER>, "description": "Other activities"}
+    {"category": "Development/Coding", "percentage": <NUMBER>, "isActive": <true_if_actively_coding_false_if_just_open>},
+    {"category": "Communication", "percentage": <NUMBER>, "isWorkRelated": <true_or_false>},
+    {"category": "Entertainment", "percentage": <NUMBER>, "sites": ["list detected entertainment"]},
+    {"category": "Research", "percentage": <NUMBER>, "isActive": <true_if_actively_reading>},
+    {"category": "Idle/Inactive", "percentage": <NUMBER>, "reason": "why marked as idle"}
   ],
   "screenshotAnalysis": [
     {
       "index": 0,
-      "timestamp": "<time if visible>",
-      "summary": "Detailed description of what's visible in this screenshot",
-      "activity": "coding|browsing|meeting|document|communication|design|idle|entertainment|other",
+      "summary": "DETAILED description - what EXACTLY is on screen",
+      "activity": "coding|browsing|meeting|document|communication|design|idle|entertainment|research",
       "productivity": "high|medium|low|idle",
-      "applicationVisible": "App name visible",
-      "websiteVisible": "Website if browser is open",
-      "taskDescription": "What specific task they appear to be doing"
+      "applicationVisible": "Exact app name",
+      "websiteVisible": "Full domain if browser visible",
+      "isActiveWork": <true_if_evidence_of_active_work_false_otherwise>,
+      "concerns": "Any concerns about this specific screenshot",
+      "youtubeStatus": "playing|paused|not_applicable - if YouTube visible"
     }
   ],
   "applications": [
     {
       "name": "Application name",
-      "category": "development|communication|productivity|browser|entertainment|utility|other",
+      "category": "development|communication|productivity|browser|entertainment|utility",
       "estimatedMinutes": <NUMBER>,
-      "productivityImpact": "positive|neutral|negative"
+      "productivityImpact": "positive|neutral|negative",
+      "wasActivelyUsed": <true_or_false>
     }
   ],
   "websites": [
     {
-      "domain": "website domain if visible",
-      "category": "work|research|social|entertainment|other",
-      "estimatedMinutes": <NUMBER>
+      "domain": "full domain",
+      "category": "work|research|social|entertainment|shopping|news",
+      "estimatedMinutes": <NUMBER>,
+      "wasActivelyViewed": <true_if_scrolling_or_interaction_visible>
     }
   ],
+  "taskRelativity": {
+    "score": <0_TO_100_HOW_RELATED_TO_ASSIGNED_TASKS>,
+    "matchedTasks": ["List task titles that appear to be worked on"],
+    "unrelatedActivities": ["Activities that don't match any assigned task"],
+    "assessment": "Brief assessment of how well work aligns with assigned tasks"
+  },
   "overallAssessment": {
-    "strengths": ["What the employee did well"],
-    "areasForImprovement": ["Specific areas to improve"],
-    "recommendation": "One sentence recommendation for tomorrow"
+    "genuineWorkPercentage": <HONEST_ESTIMATE_OF_REAL_WORK>,
+    "taskAlignmentPercentage": <PERCENTAGE_OF_WORK_RELATED_TO_TASKS>,
+    "strengths": ["What was done well"],
+    "majorConcerns": ["Direct concerns if any"],
+    "recommendation": "One sentence honest recommendation"
   }
 }
 
-CRITICAL: The "score" MUST be calculated based on what you ACTUALLY observe in the screenshots. Do NOT use a default value. Analyze the activities and calculate an appropriate score.`;
+CRITICAL REMINDERS:
+1. Do NOT give high scores just because work apps are open - look for ACTIVE work
+2. Entertainment = automatic score reduction
+3. Same screen multiple times = idle time
+4. Be HONEST - inflated scores don't help anyone improve
+5. The "score" MUST reflect ACTUAL observed productivity, not potential
+6. COMPARE work activities with assigned tasks - working on unrelated things when tasks are pending = lower score
+7. If employee has IN-PROGRESS tasks but screenshots show unrelated activities = RED FLAG`;
 
     let analysisResult;
     
@@ -563,6 +682,13 @@ CRITICAL: The "score" MUST be calculated based on what you ACTUALLY observe in t
           screenshotSummaries[sa.index].summary = sa.summary || '';
           screenshotSummaries[sa.index].activity = sa.activity || '';
           screenshotSummaries[sa.index].productivity = sa.productivity || '';
+          // Also save website visible data from each screenshot
+          if (sa.websiteVisible) {
+            screenshotSummaries[sa.index].websiteVisible = sa.websiteVisible;
+          }
+          if (sa.applicationVisible) {
+            screenshotSummaries[sa.index].applicationVisible = sa.applicationVisible;
+          }
         }
       }
     }
@@ -597,27 +723,54 @@ CRITICAL: The "score" MUST be calculated based on what you ACTUALLY observe in t
       })),
       // New KPI fields
       focusScore: analysisResult.focusScore || null,
-      taskCompletionIndicators: analysisResult.taskCompletionIndicators || [],
+      taskCompletionIndicators: analysisResult.taskCompletionIndicators || null,
       timeDistribution: analysisResult.timeDistribution || null,
       focusMetrics: analysisResult.focusMetrics || null,
       concerns: analysisResult.concerns || [],
+      redFlags: analysisResult.redFlags || [],
       workCategories: analysisResult.workCategories || [],
-      overallAssessment: analysisResult.overallAssessment || '',
+      overallAssessment: analysisResult.overallAssessment || null,
+      // Map websites from AI analysis (AI uses 'domain' field)
       websites: (analysisResult.websites || []).map(site => ({
-        name: site.name || site.url || 'Unknown',
-        url: site.url || '',
-        estimatedMinutes: site.estimatedMinutes || 0,
+        domain: site.domain || site.name || site.url || 'Unknown',
         category: site.category || 'other',
-        isProductive: site.isProductive !== undefined ? site.isProductive : true
+        estimatedMinutes: site.estimatedMinutes || 0,
+        wasActivelyViewed: site.wasActivelyViewed !== undefined ? site.wasActivelyViewed : true
       })),
+      // Map applications from AI analysis
       applications: (analysisResult.applications || []).map(app => ({
         name: app.name || 'Unknown',
-        estimatedMinutes: app.estimatedMinutes || 0,
         category: app.category || 'other',
-        isProductive: app.isProductive !== undefined ? app.isProductive : true
+        estimatedMinutes: app.estimatedMinutes || 0,
+        productivityImpact: app.productivityImpact || 'neutral',
+        wasActivelyUsed: app.wasActivelyUsed !== undefined ? app.wasActivelyUsed : true
       })),
+      // Screenshot analysis (detailed per-screenshot breakdown)
+      screenshotAnalysis: (analysisResult.screenshotAnalysis || []).map(sa => ({
+        index: sa.index,
+        summary: sa.summary || '',
+        activity: sa.activity || '',
+        productivity: sa.productivity || '',
+        applicationVisible: sa.applicationVisible || '',
+        websiteVisible: sa.websiteVisible || '',
+        isActiveWork: sa.isActiveWork || false,
+        concerns: sa.concerns || '',
+        youtubeStatus: sa.youtubeStatus || 'not_applicable'
+      })),
+      // Task relativity analysis
+      taskRelativity: analysisResult.taskRelativity ? {
+        score: analysisResult.taskRelativity.score || null,
+        matchedTasks: analysisResult.taskRelativity.matchedTasks || [],
+        unrelatedActivities: analysisResult.taskRelativity.unrelatedActivities || [],
+        assessment: analysisResult.taskRelativity.assessment || ''
+      } : null,
       error: analysisResult.error || null
     };
+    
+    // Add taskAlignmentPercentage to overallAssessment if available
+    if (session.analysis.overallAssessment && analysisResult.overallAssessment?.taskAlignmentPercentage !== undefined) {
+      session.analysis.overallAssessment.taskAlignmentPercentage = analysisResult.overallAssessment.taskAlignmentPercentage;
+    }
     
     await session.save();
     

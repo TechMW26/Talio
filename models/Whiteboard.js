@@ -123,8 +123,10 @@ const AIAnalysisSchema = new mongoose.Schema({
   // Agent content state with history support
   agentContent: { type: AgentContentStateSchema, default: null },
   // Legacy field for backward compatibility (will migrate to agentContent)
-  agentPreparedContent: { type: mongoose.Schema.Types.Mixed, default: null }
-}, { _id: false });
+  agentPreparedContent: { type: mongoose.Schema.Types.Mixed, default: null },
+  // Mapping of content sections to canvas elements
+  contentElementMapping: { type: mongoose.Schema.Types.Mixed, default: null }
+}, { _id: false, strict: false });
 
 const WhiteboardShareSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },

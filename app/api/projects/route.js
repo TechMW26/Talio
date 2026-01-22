@@ -36,6 +36,8 @@ export async function GET(request) {
     const role = searchParams.get('role')
     const invitationStatus = searchParams.get('invitationStatus')
     const all = searchParams.get('all') // For admin to see all projects
+    const departmentParam = searchParams.get('department')
+    const departmentsParam = searchParams.get('departments') // Comma-separated list of department IDs
 
     let projects
 
@@ -49,6 +51,16 @@ export async function GET(request) {
       }
       if (!status) {
         query.status = { $ne: 'archived' }
+      }
+      
+      // Apply department filter
+      if (departmentsParam) {
+        const deptIds = departmentsParam.split(',').filter(id => id.trim())
+        if (deptIds.length > 0) {
+          query.department = { $in: deptIds }
+        }
+      } else if (departmentParam && departmentParam !== 'all') {
+        query.department = departmentParam
       }
 
       projects = await Project.find(query)

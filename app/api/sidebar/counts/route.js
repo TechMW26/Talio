@@ -131,13 +131,16 @@ export async function GET(request) {
         }
       }
 
-      // 4. Pending leave approvals
+      // 4. Pending leave approvals (exclude user's own leave requests)
       try {
-        const leaveQuery = { status: 'pending' }
+        const leaveQuery = { 
+          status: 'pending',
+          employee: { $ne: employeeId } // Exclude own leave requests
+        }
         
         // Department heads/managers only see their managed departments' leaves
         if (hasDeptScopedView && departmentEmployeeIds.length > 0) {
-          leaveQuery.employee = { $in: departmentEmployeeIds }
+          leaveQuery.employee = { $in: departmentEmployeeIds.filter(id => id.toString() !== employeeId.toString()) }
         } else if (hasDeptScopedView) {
           // No departments managed, no pending leaves to show
           leaveQuery._id = null // Will return 0
@@ -148,12 +151,15 @@ export async function GET(request) {
         console.error('Error counting leave approvals:', err.message)
       }
 
-      // 5. Pending attendance corrections
+      // 5. Pending attendance corrections (exclude user's own corrections)
       try {
-        const correctionQuery = { status: 'pending' }
+        const correctionQuery = { 
+          status: 'pending',
+          employee: { $ne: employeeId } // Exclude own corrections
+        }
         
         if (hasDeptScopedView && departmentEmployeeIds.length > 0) {
-          correctionQuery.employee = { $in: departmentEmployeeIds }
+          correctionQuery.employee = { $in: departmentEmployeeIds.filter(id => id.toString() !== employeeId.toString()) }
         } else if (hasDeptScopedView) {
           correctionQuery._id = null // Will return 0
         }
@@ -163,12 +169,16 @@ export async function GET(request) {
         console.error('Error counting attendance corrections:', err.message)
       }
 
-      // 6. Pending expense approvals
+      // 6. Pending expense approvals (exclude user's own expenses - can't approve your own)
       try {
-        const expenseQuery = { status: 'pending' }
+        const expenseQuery = { 
+          status: 'pending',
+          employee: { $ne: employeeId } // Exclude own expenses
+        }
         
         if (hasDeptScopedView && departmentEmployeeIds.length > 0) {
-          expenseQuery.employee = { $in: departmentEmployeeIds }
+          // Filter to department employees, still excluding self
+          expenseQuery.employee = { $in: departmentEmployeeIds.filter(id => id.toString() !== employeeId.toString()) }
         } else if (hasDeptScopedView) {
           expenseQuery._id = null // Will return 0
         }

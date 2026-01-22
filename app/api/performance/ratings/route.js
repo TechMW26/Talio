@@ -14,6 +14,10 @@ export async function GET(request) {
     const { user, models } = auth
     const { Employee } = models
 
+    const { searchParams } = new URL(request.url)
+    const department = searchParams.get('department')
+    const departments = searchParams.get('departments') // Comma-separated list
+
     // Build query based on role
     let query = { status: 'active' }
     
@@ -34,6 +38,16 @@ export async function GET(request) {
       query._id = { $in: [...teamMemberIds, employeeId] }
     }
     // Admin and HR can see all employees
+    
+    // Apply department filter
+    if (departments) {
+      const deptIds = departments.split(',').filter(id => id.trim())
+      if (deptIds.length > 0) {
+        query.department = { $in: deptIds }
+      }
+    } else if (department && department !== 'all') {
+      query.department = department
+    }
 
     // Fetch employees with reviews
     const employees = await Employee.find(query)

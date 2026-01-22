@@ -20,7 +20,9 @@ import {
   HiOutlineTrophy,
   HiOutlineChartBar,
   HiOutlineExclamationCircle,
-  HiOutlineBuildingOffice2
+  HiOutlineBuildingOffice2,
+  HiOutlineClipboardDocumentList,
+  HiOutlineEye
 } from 'react-icons/hi2'
 import RawCaptureViewer from '@/components/productivity/RawCaptureViewer'
 import ManualCapturePanel from '@/components/productivity/ManualCapturePanel'
@@ -334,6 +336,19 @@ export default function ProductivityPage() {
             return s
           })
           console.log('[ProductivityUI] Sessions updated, count:', updated.length)
+          return updated
+        })
+        
+        // Also update employeeSessions if viewing team member's sessions
+        setEmployeeSessions(prev => {
+          const updated = prev.map(s => {
+            const sIdStr = (s._id || s.id || '').toString()
+            if (sIdStr === sessionIdStr) {
+              console.log('[ProductivityUI] Replacing employee session in list:', sIdStr)
+              return updatedSession
+            }
+            return s
+          })
           return updated
         })
         
@@ -766,25 +781,20 @@ export default function ProductivityPage() {
                             </span>
                           )}
                         </div>
-                        
-                        {/* View details hint */}
-                        <p className="text-sm text-primary-600 font-medium mt-2">
-                          Click to view full analysis →
-                        </p>
                       </div>
                     ) : (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          analyzeSession(session._id)
-                        }}
-                        disabled={analyzing}
-                        className="mt-2 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-lg font-medium hover:opacity-90 transition disabled:opacity-50"
-                      >
-                        <HiOutlineSparkles className="w-5 h-5" />
-                        {analyzing ? 'Analyzing...' : 'Analyze with AI'}
-                      </button>
+                      <p className="text-sm text-gray-500 mt-2">
+                        Not analyzed yet
+                      </p>
                     )}
+                    
+                    {/* View Button - Always visible */}
+                    <button
+                      className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-lg font-medium hover:opacity-90 transition"
+                    >
+                      <HiOutlineEye className="w-5 h-5" />
+                      View Session
+                    </button>
                   </div>
                 </div>
                 )
@@ -907,30 +917,25 @@ export default function ProductivityPage() {
                       {/* Analysis Status / Actions */}
                       <div className="p-4 border-t bg-gray-50">
                         {session.analysis?.isAnalyzed ? (
-                          <div>
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${getScoreColor(session.analysis.score)}`}>
-                                {session.analysis.score}%
-                              </span>
-                              <span className="text-sm text-gray-500">productivity score</span>
-                            </div>
-                            <p className="text-sm text-primary-600 font-medium">
-                              Click to view full analysis →
-                            </p>
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${getScoreColor(session.analysis.score)}`}>
+                              {session.analysis.score}%
+                            </span>
+                            <span className="text-sm text-gray-500">productivity score</span>
                           </div>
                         ) : (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              analyzeSession(session._id)
-                            }}
-                            disabled={analyzing}
-                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-lg font-medium hover:opacity-90 transition disabled:opacity-50"
-                          >
-                            <HiOutlineSparkles className="w-5 h-5" />
-                            {analyzing ? 'Analyzing...' : 'Analyze with AI'}
-                          </button>
+                          <p className="text-sm text-gray-500 mb-2">
+                            Not analyzed yet
+                          </p>
                         )}
+                        
+                        {/* View Button - Always visible */}
+                        <button
+                          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-lg font-medium hover:opacity-90 transition"
+                        >
+                          <HiOutlineEye className="w-5 h-5" />
+                          View Session
+                        </button>
                       </div>
                     </div>
                     )
@@ -1038,11 +1043,24 @@ export default function ProductivityPage() {
       )}
 
       {/* Session Detail Modal */}
-      <Modal isOpen={!!selectedSession} onClose={() => { setSelectedSession(null); setCurrentSlideIndex(0); }} size="5xl" scrollBehavior="inside" classNames={{ wrapper: 'z-[9999]' }}>
-        <ModalContent>
+      <Modal 
+        isOpen={!!selectedSession} 
+        onClose={() => { setSelectedSession(null); setCurrentSlideIndex(0); }} 
+        size="5xl"
+        scrollBehavior="inside"
+        radius="lg"
+        classNames={{ 
+          wrapper: 'z-[9999] flex items-center justify-center',
+          base: '!rounded-2xl !max-w-none !max-h-none m-0',
+          body: 'rounded-b-2xl',
+          header: 'rounded-t-2xl',
+          closeButton: 'top-3 right-3 z-50'
+        }}
+      >
+        <ModalContent className="!rounded-2xl overflow-hidden" style={{ width: '80vw', height: '85vh', maxWidth: '80vw', maxHeight: '85vh' }}>
         {selectedSession && (
         <>
-          <ModalHeader className="flex items-center justify-between border-b bg-default-50">
+          <ModalHeader className="flex items-center justify-between border-b bg-default-50 pr-12">
               <div className="min-w-0 flex-1">
                 <h2 className="text-lg font-bold text-default-800">
                   {selectedSession.sessionTitle || `Session ${selectedSession.sessionNumber || 1}`}
@@ -1055,19 +1073,6 @@ export default function ProductivityPage() {
                     <span> • {selectedSession.screenshots?.length || 0} screenshots</span>
                   )}
                 </p>
-              </div>
-              <div className="flex items-center gap-2">
-                {/* Only show analyze button if NOT already analyzed */}
-                {!selectedSession.analysis?.isAnalyzed && !selectedSession.screenshotsDeleted && (
-                  <Button
-                    onPress={() => analyzeSession(selectedSession._id)}
-                    isLoading={analyzing}
-                    color="primary"
-                    startContent={!analyzing && <HiOutlineSparkles className="w-5 h-5" />}
-                  >
-                    {analyzing ? 'Analyzing...' : 'Analyze with AI'}
-                  </Button>
-                )}
               </div>
             </ModalHeader>
 
@@ -1242,6 +1247,59 @@ export default function ProductivityPage() {
                       </p>
                     </div>
                     
+                    {/* Task Relativity */}
+                    {selectedSession.analysis.taskRelativity && (
+                      <div className="bg-gradient-to-r from-violet-50 to-purple-50 rounded-xl p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-medium text-violet-900 flex items-center gap-2">
+                            <HiOutlineClipboardDocumentList className="w-4 h-4" />
+                            Task Alignment
+                          </h4>
+                          {selectedSession.analysis.taskRelativity.score !== null && (
+                            <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                              selectedSession.analysis.taskRelativity.score >= 70 ? 'bg-green-100 text-green-700' :
+                              selectedSession.analysis.taskRelativity.score >= 50 ? 'bg-yellow-100 text-yellow-700' :
+                              'bg-red-100 text-red-700'
+                            }`}>
+                              {selectedSession.analysis.taskRelativity.score}%
+                            </span>
+                          )}
+                        </div>
+                        
+                        {selectedSession.analysis.taskRelativity.assessment && (
+                          <p className="text-sm text-gray-600">
+                            {selectedSession.analysis.taskRelativity.assessment}
+                          </p>
+                        )}
+                        
+                        {selectedSession.analysis.taskRelativity.matchedTasks?.length > 0 && (
+                          <div>
+                            <p className="text-xs font-medium text-green-700 mb-1">Tasks Being Worked On:</p>
+                            <div className="flex flex-wrap gap-1">
+                              {selectedSession.analysis.taskRelativity.matchedTasks.map((task, idx) => (
+                                <span key={idx} className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs">
+                                  ✓ {task}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {selectedSession.analysis.taskRelativity.unrelatedActivities?.length > 0 && (
+                          <div>
+                            <p className="text-xs font-medium text-amber-700 mb-1">Unrelated Activities:</p>
+                            <div className="flex flex-wrap gap-1">
+                              {selectedSession.analysis.taskRelativity.unrelatedActivities.map((activity, idx) => (
+                                <span key={idx} className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded text-xs">
+                                  {activity}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    
                     {/* Time Distribution */}
                     {selectedSession.analysis.timeDistribution && (
                       <div>
@@ -1366,6 +1424,26 @@ export default function ProductivityPage() {
                       </div>
                     )}
                     
+                    {/* Red Flags */}
+                    {selectedSession.analysis.redFlags?.length > 0 && (
+                      <div>
+                        <h4 className="font-medium text-gray-900 mb-3 flex items-center gap-2 text-red-700">
+                          <HiOutlineExclamationCircle className="w-4 h-4" />
+                          Red Flags Detected
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {selectedSession.analysis.redFlags.map((flag, idx) => (
+                            <span 
+                              key={idx} 
+                              className="px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700"
+                            >
+                              🚩 {flag}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
                     {/* Insights */}
                     {selectedSession.analysis.insights?.length > 0 && (
                       <div>
@@ -1385,12 +1463,42 @@ export default function ProductivityPage() {
                       <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl p-4 space-y-3">
                         <h4 className="font-medium text-blue-900">Overall Assessment</h4>
                         
+                        {/* Genuine Work Percentage */}
+                        {selectedSession.analysis.overallAssessment.genuineWorkPercentage !== undefined && (
+                          <div className="flex items-center gap-3 mb-3">
+                            <span className="text-sm text-gray-600">Genuine Work:</span>
+                            <div className="flex-1 bg-gray-200 rounded-full h-2">
+                              <div 
+                                className={`h-2 rounded-full ${
+                                  selectedSession.analysis.overallAssessment.genuineWorkPercentage >= 70 ? 'bg-green-500' :
+                                  selectedSession.analysis.overallAssessment.genuineWorkPercentage >= 50 ? 'bg-yellow-500' :
+                                  'bg-red-500'
+                                }`}
+                                style={{ width: `${selectedSession.analysis.overallAssessment.genuineWorkPercentage}%` }}
+                              />
+                            </div>
+                            <span className="text-sm font-semibold">{selectedSession.analysis.overallAssessment.genuineWorkPercentage}%</span>
+                          </div>
+                        )}
+                        
                         {selectedSession.analysis.overallAssessment.strengths?.length > 0 && (
                           <div>
                             <p className="text-xs font-medium text-green-700 mb-1">Strengths</p>
                             <ul className="text-sm text-gray-700 list-disc list-inside">
                               {selectedSession.analysis.overallAssessment.strengths.map((s, idx) => (
                                 <li key={idx}>{s}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        
+                        {/* Major Concerns */}
+                        {selectedSession.analysis.overallAssessment.majorConcerns?.length > 0 && (
+                          <div>
+                            <p className="text-xs font-medium text-red-700 mb-1">Major Concerns</p>
+                            <ul className="text-sm text-red-600 list-disc list-inside">
+                              {selectedSession.analysis.overallAssessment.majorConcerns.map((c, idx) => (
+                                <li key={idx}>{c}</li>
                               ))}
                             </ul>
                           </div>

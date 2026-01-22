@@ -381,7 +381,7 @@ export default function ProjectOverview({ projectId }) {
               </h3>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={progressComparisonData} layout="vertical">
+                  <BarChart data={progressComparisonData} layout="vertical" margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                     <XAxis type="number" domain={[0, 100]} tick={{ fill: '#374151', fontWeight: 600 }} />
                     <YAxis dataKey="name" type="category" width={100} tick={{ fill: '#374151', fontWeight: 600 }} />
@@ -413,7 +413,7 @@ export default function ProjectOverview({ projectId }) {
               </h3>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={taskAnalytics.burndownData?.slice(-14) || []}>
+                  <AreaChart data={taskAnalytics.burndownData?.slice(-14) || []} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="burndownGradient" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor={colors.primary} stopOpacity={0.4}/>
@@ -503,7 +503,7 @@ export default function ProjectOverview({ projectId }) {
             </h3>
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={memberChartData} layout="vertical">
+                <BarChart data={memberChartData} layout="vertical" margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis type="number" tick={{ fill: '#374151', fontWeight: 600 }} />
                   <YAxis dataKey="name" type="category" width={100} tick={{ fill: '#374151', fontWeight: 600, fontSize: 12 }} />
@@ -643,7 +643,7 @@ export default function ProjectOverview({ projectId }) {
               </h3>
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={priorityChartData}>
+                  <BarChart data={priorityChartData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" tick={{ fill: '#374151', fontWeight: 600 }} />
                     <YAxis tick={{ fill: '#374151', fontWeight: 600 }} />
@@ -666,7 +666,7 @@ export default function ProjectOverview({ projectId }) {
             </h3>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={taskAnalytics.dailyProgress || []}>
+                <AreaChart data={taskAnalytics.dailyProgress || []} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="progressGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor={colors.success} stopOpacity={0.4}/>
