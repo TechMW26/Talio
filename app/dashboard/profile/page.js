@@ -1426,226 +1426,224 @@ export default function ProfilePage() {
       <Modal isOpen={showImageEditor} onClose={closeImageEditor} size="5xl" scrollBehavior="inside" classNames={{ wrapper: 'z-[99999]' }}>
         <ModalContent>
           <ModalHeader className="flex flex-col gap-1 bg-slate-50 border-b border-slate-200">
-              <div className="flex flex-col">
-                <h2 className="text-base sm:text-lg font-semibold text-slate-900">
-                  Edit Profile Picture
-                </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Crop, adjust and fine-tune how your profile photo looks.
-                </p>
-              </div>
-            </ModalHeader>
+            <div className="flex flex-col">
+              <h2 className="text-base sm:text-lg font-semibold text-slate-900">
+                Edit Profile Picture
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Crop, adjust and fine-tune how your profile photo looks.
+              </p>
+            </div>
+          </ModalHeader>
           <ModalBody className="bg-slate-50/60">
-              {/* Preview area */}
-              <div className="lg:flex-[2] flex-shrink-0 sticky top-0 bg-slate-50 z-10 lg:static rounded-none lg:rounded-2xl">
-                <div className="bg-slate-100 rounded-none lg:rounded-2xl overflow-hidden relative h-[300px] sm:h-[350px] lg:h-[450px] border border-slate-200/80">
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div
-                      className="relative overflow-hidden rounded-full bg-slate-200 shadow-2xl shadow-slate-900/20 border-[6px] border-white"
-                      style={{ width: '260px', height: '260px' }}
-                      onMouseDown={handleMouseDown}
-                      onMouseMove={handleMouseMove}
-                      onMouseUp={handleMouseUp}
-                      onMouseLeave={handleMouseUp}
-                      onTouchStart={handleTouchStart}
-                      onTouchMove={handleTouchMove}
-                      onTouchEnd={handleTouchEnd}
-                    >
-                      <img
-                        ref={imageRef}
-                        src={selectedImage}
-                        alt="Preview"
-                        className="absolute inset-0 w-full h-full object-cover"
-                        style={{
-                          transform: `translate(${imagePosition.x}px, ${imagePosition.y}px) scale(${imageScale}) rotate(${imageRotation}deg)`,
-                          filter: `brightness(${imageBrightness}%) contrast(${imageContrast}%) saturate(${imageSaturation}%)`,
-                          cursor: isDragging ? 'grabbing' : 'grab',
-                          transformOrigin: 'center center',
-                        }}
-                        draggable={false}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/80 text-white px-3 py-1.5 rounded-full text-[11px] shadow-lg">
-                    Drag to reposition • Use controls to adjust
+            {/* Preview area */}
+            <div className="lg:flex-[2] flex-shrink-0 sticky top-0 bg-slate-50 z-10 lg:static rounded-none lg:rounded-2xl">
+              <div className="bg-slate-100 rounded-none lg:rounded-2xl overflow-hidden relative h-[300px] sm:h-[350px] lg:h-[450px] border border-slate-200/80">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div
+                    className="relative overflow-hidden rounded-full bg-slate-200 shadow-2xl shadow-slate-900/20 border-[6px] border-white"
+                    style={{ width: '260px', height: '260px' }}
+                    onMouseDown={handleMouseDown}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                    onMouseLeave={handleMouseUp}
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                  >
+                    <img
+                      ref={imageRef}
+                      src={selectedImage}
+                      alt="Preview"
+                      className="absolute inset-0 w-full h-full object-cover"
+                      style={{
+                        transform: `translate(${imagePosition.x}px, ${imagePosition.y}px) scale(${imageScale}) rotate(${imageRotation}deg)`,
+                        filter: `brightness(${imageBrightness}%) contrast(${imageContrast}%) saturate(${imageSaturation}%)`,
+                        cursor: isDragging ? 'grabbing' : 'grab',
+                        transformOrigin: 'center center',
+                      }}
+                      draggable={false}
+                    />
                   </div>
                 </div>
-              </div>
 
-              {/* Controls */}
-              <div className="lg:flex-1 overflow-y-auto p-4 sm:p-6 lg:p-0">
-                <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                  {/* Zoom */}
-                  <div className="bg-white border border-slate-200 rounded-2xl p-3 col-span-2 sm:col-span-1 shadow-xs">
-                    <div className="flex items-center justify-start mb-2">
-                      <label className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
-                        <FaSearchPlus className="text-slate-500 text-xs" />
-                        Zoom
-                      </label>
-                      <span className="text-[11px] font-medium text-slate-500">
-                        {Math.round(imageScale * 100)}%
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0.5"
-                      max="3"
-                      step="0.1"
-                      value={imageScale}
-                      onChange={(e) => setImageScale(parseFloat(e.target.value))}
-                      className="w-full h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-slate-900"
-                    />
-                    <div className="flex gap-2 mt-2">
-                      <button
-                        onClick={() => setImageScale(Math.max(0.5, imageScale - 0.1))}
-                        className="flex-1 px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-[11px] text-slate-700 hover:bg-slate-50 transition-colors"
-                      >
-                        <FaSearchMinus className="inline mr-1" />
-                        Zoom out
-                      </button>
-                      <button
-                        onClick={() => setImageScale(Math.min(3, imageScale + 0.1))}
-                        className="flex-1 px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-[11px] text-slate-700 hover:bg-slate-50 transition-colors"
-                      >
-                        <FaSearchPlus className="inline mr-1" />
-                        Zoom in
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Rotation */}
-                  <div className="bg-white border border-slate-200 rounded-2xl p-3 col-span-2 sm:col-span-1 shadow-xs">
-                    <div className="flex items-center justify-start mb-2">
-                      <label className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
-                        <FaUndo className="text-slate-500 text-xs" />
-                        Rotation
-                      </label>
-                      <span className="text-[11px] font-medium text-slate-500">
-                        {imageRotation}°
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="360"
-                      step="1"
-                      value={imageRotation}
-                      onChange={(e) => setImageRotation(parseInt(e.target.value))}
-                      className="w-full h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-slate-900"
-                    />
-                    <div className="flex gap-2 mt-2">
-                      <button
-                        onClick={() => setImageRotation((imageRotation - 90 + 360) % 360)}
-                        className="flex-1 px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-[11px] text-slate-700 hover:bg-slate-50 transition-colors"
-                      >
-                        <FaUndo className="inline mr-1" /> 90°
-                      </button>
-                      <button
-                        onClick={() => setImageRotation((imageRotation + 90) % 360)}
-                        className="flex-1 px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-[11px] text-slate-700 hover:bg-slate-50 transition-colors"
-                      >
-                        <FaRedo className="inline mr-1" /> 90°
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Brightness */}
-                  <div className="bg-white border border-slate-200 rounded-2xl p-3 col-span-2 sm:col-span-1 shadow-xs">
-                    <div className="flex items-center justify-start mb-2">
-                      <label className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
-                        <FaSun className="text-slate-500 text-xs" />
-                        Brightness
-                      </label>
-                      <span className="text-[11px] font-medium text-slate-500">
-                        {imageBrightness}%
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min="50"
-                      max="150"
-                      step="1"
-                      value={imageBrightness}
-                      onChange={(e) => setImageBrightness(parseInt(e.target.value))}
-                      className="w-full h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-slate-900"
-                    />
-                  </div>
-
-                  {/* Contrast */}
-                  <div className="bg-white border border-slate-200 rounded-2xl p-3 col-span-2 sm:col-span-1 shadow-xs">
-                    <div className="flex items-center justify-start mb-2">
-                      <label className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
-                        <FaAdjust className="text-slate-500 text-xs" />
-                        Contrast
-                      </label>
-                      <span className="text-[11px] font-medium text-slate-500">
-                        {imageContrast}%
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min="50"
-                      max="150"
-                      step="1"
-                      value={imageContrast}
-                      onChange={(e) => setImageContrast(parseInt(e.target.value))}
-                      className="w-full h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-slate-900"
-                    />
-                  </div>
-
-                  {/* Saturation */}
-                  <div className="bg-white border border-slate-200 rounded-2xl p-3 col-span-2 sm:col-span-1 shadow-xs">
-                    <div className="flex items-center justify-start mb-2">
-                      <label className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
-                        <FaAdjust className="text-slate-500 text-xs" />
-                        Saturation
-                      </label>
-                      <span className="text-[11px] font-medium text-slate-500">
-                        {imageSaturation}%
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="200"
-                      step="1"
-                      value={imageSaturation}
-                      onChange={(e) => setImageSaturation(parseInt(e.target.value))}
-                      className="w-full h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-slate-900"
-                    />
-                  </div>
-
-                  {/* Reset */}
-                  <button
-                    onClick={resetImageEditor}
-                    className="col-span-2 sm:col-span-1 px-3 py-2 bg-white border border-slate-300 text-slate-700 rounded-2xl hover:bg-slate-50 transition-colors text-xs font-semibold flex items-center justify-center"
-                  >
-                    Reset all adjustments
-                  </button>
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-black/80 text-white px-3 py-1.5 rounded-full text-[11px] shadow-lg">
+                  Drag to reposition • Use controls to adjust
                 </div>
               </div>
             </div>
 
-            {/* Footer */}
-            </ModalBody>
-            <ModalFooter className="border-t border-slate-200 bg-slate-50">
-              <Button
-                variant="bordered"
-                onPress={closeImageEditor}
-                isDisabled={uploadingImage}
-              >
-                Cancel
-              </Button>
-              <Button
-                color="primary"
-                onPress={handleSaveImage}
-                isLoading={uploadingImage}
-                startContent={!uploadingImage && <FaCheck />}
-              >
-                {uploadingImage ? 'Saving…' : 'Save Picture'}
-              </Button>
-            </ModalFooter>
+            {/* Controls */}
+            <div className="lg:flex-1 overflow-y-auto p-4 sm:p-6 lg:p-0">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                {/* Zoom */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-3 col-span-2 sm:col-span-1 shadow-xs">
+                  <div className="flex items-center justify-start mb-2">
+                    <label className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
+                      <FaSearchPlus className="text-slate-500 text-xs" />
+                      Zoom
+                    </label>
+                    <span className="text-[11px] font-medium text-slate-500">
+                      {Math.round(imageScale * 100)}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="3"
+                    step="0.1"
+                    value={imageScale}
+                    onChange={(e) => setImageScale(parseFloat(e.target.value))}
+                    className="w-full h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-slate-900"
+                  />
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      onClick={() => setImageScale(Math.max(0.5, imageScale - 0.1))}
+                      className="flex-1 px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-[11px] text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                      <FaSearchMinus className="inline mr-1" />
+                      Zoom out
+                    </button>
+                    <button
+                      onClick={() => setImageScale(Math.min(3, imageScale + 0.1))}
+                      className="flex-1 px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-[11px] text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                      <FaSearchPlus className="inline mr-1" />
+                      Zoom in
+                    </button>
+                  </div>
+                </div>
+
+                {/* Rotation */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-3 col-span-2 sm:col-span-1 shadow-xs">
+                  <div className="flex items-center justify-start mb-2">
+                    <label className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
+                      <FaUndo className="text-slate-500 text-xs" />
+                      Rotation
+                    </label>
+                    <span className="text-[11px] font-medium text-slate-500">
+                      {imageRotation}°
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="360"
+                    step="1"
+                    value={imageRotation}
+                    onChange={(e) => setImageRotation(parseInt(e.target.value))}
+                    className="w-full h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-slate-900"
+                  />
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      onClick={() => setImageRotation((imageRotation - 90 + 360) % 360)}
+                      className="flex-1 px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-[11px] text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                      <FaUndo className="inline mr-1" /> 90°
+                    </button>
+                    <button
+                      onClick={() => setImageRotation((imageRotation + 90) % 360)}
+                      className="flex-1 px-2 py-1.5 bg-white border border-slate-300 rounded-lg text-[11px] text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                      <FaRedo className="inline mr-1" /> 90°
+                    </button>
+                  </div>
+                </div>
+
+                {/* Brightness */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-3 col-span-2 sm:col-span-1 shadow-xs">
+                  <div className="flex items-center justify-start mb-2">
+                    <label className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
+                      <FaSun className="text-slate-500 text-xs" />
+                      Brightness
+                    </label>
+                    <span className="text-[11px] font-medium text-slate-500">
+                      {imageBrightness}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="50"
+                    max="150"
+                    step="1"
+                    value={imageBrightness}
+                    onChange={(e) => setImageBrightness(parseInt(e.target.value))}
+                    className="w-full h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-slate-900"
+                  />
+                </div>
+
+                {/* Contrast */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-3 col-span-2 sm:col-span-1 shadow-xs">
+                  <div className="flex items-center justify-start mb-2">
+                    <label className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
+                      <FaAdjust className="text-slate-500 text-xs" />
+                      Contrast
+                    </label>
+                    <span className="text-[11px] font-medium text-slate-500">
+                      {imageContrast}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="50"
+                    max="150"
+                    step="1"
+                    value={imageContrast}
+                    onChange={(e) => setImageContrast(parseInt(e.target.value))}
+                    className="w-full h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-slate-900"
+                  />
+                </div>
+
+                {/* Saturation */}
+                <div className="bg-white border border-slate-200 rounded-2xl p-3 col-span-2 sm:col-span-1 shadow-xs">
+                  <div className="flex items-center justify-start mb-2">
+                    <label className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
+                      <FaAdjust className="text-slate-500 text-xs" />
+                      Saturation
+                    </label>
+                    <span className="text-[11px] font-medium text-slate-500">
+                      {imageSaturation}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="200"
+                    step="1"
+                    value={imageSaturation}
+                    onChange={(e) => setImageSaturation(parseInt(e.target.value))}
+                    className="w-full h-2 bg-slate-200 rounded-full appearance-none cursor-pointer accent-slate-900"
+                  />
+                </div>
+
+                {/* Reset */}
+                <button
+                  onClick={resetImageEditor}
+                  className="col-span-2 sm:col-span-1 px-3 py-2 bg-white border border-slate-300 text-slate-700 rounded-2xl hover:bg-slate-50 transition-colors text-xs font-semibold flex items-center justify-center"
+                >
+                  Reset all adjustments
+                </button>
+              </div>
+            </div>
+          </ModalBody>
+          {/* Footer */}
+          <ModalFooter className="border-t border-slate-200 bg-slate-50">
+            <Button
+              variant="bordered"
+              onPress={closeImageEditor}
+              isDisabled={uploadingImage}
+            >
+              Cancel
+            </Button>
+            <Button
+              color="primary"
+              onPress={handleSaveImage}
+              isLoading={uploadingImage}
+              startContent={!uploadingImage && <FaCheck />}
+            >
+              {uploadingImage ? 'Saving…' : 'Save Picture'}
+            </Button>
+          </ModalFooter>
         </ModalContent>
       </Modal>
     </div>

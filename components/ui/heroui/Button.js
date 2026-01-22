@@ -120,7 +120,7 @@ export function GhostButton({ children, className, ...props }) {
 /**
  * Icon Button
  */
-export function IconButton({ icon: Icon, className, size = 'sm', ...props }) {
+export function IconButton({ icon: Icon, className, size = 'sm', children, ...props }) {
   return (
     <HRMSButton
       isIconOnly
@@ -129,7 +129,7 @@ export function IconButton({ icon: Icon, className, size = 'sm', ...props }) {
       className={cn('min-w-unit-8 w-8 h-8', className)}
       {...props}
     >
-      {Icon && <Icon className="w-4 h-4" />}
+      {Icon ? <Icon className="w-4 h-4" /> : children}
     </HRMSButton>
   )
 }

@@ -74,7 +74,10 @@ export function EmptyState({
           {description}
         </p>
       )}
-      {(action || onAction) && (
+      {action && typeof action === 'object' ? (
+        // Render action directly if it's a React element (e.g., a button)
+        action
+      ) : (actionLabel || onAction) && (
         <PrimaryButton size="sm" onPress={onAction}>
           {actionLabel || action}
         </PrimaryButton>

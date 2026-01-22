@@ -136,6 +136,14 @@ export async function PUT(request, { params }) {
 // DELETE - Delete payroll
 export async function DELETE(request, { params }) {
   try {
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Payroll'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Payroll } = models
+
     const payroll = await Payroll.findByIdAndDelete(params.id)
 
     if (!payroll) {
