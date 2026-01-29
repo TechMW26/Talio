@@ -117,7 +117,7 @@ const UserSchema = new mongoose.Schema({
     },
     platform: {
       type: String,
-      enum: ['android', 'web', 'ios'],
+      enum: ['android', 'web', 'ios', 'android_expo', 'ios_expo', 'android_webview'],
       default: 'android'
     },
     deviceInfo: {
