@@ -11,32 +11,73 @@ export async function GET(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
+    const { models } = auth
     const { Department, Employee } = models
 
-    const departments = await Department.find({ isActive: true })
-      .populate('head', 'firstName lastName employeeCode email designation')
-      .populate('heads', 'firstName lastName employeeCode email designation')
-      .sort({ name: 1 })
-      .lean()
-
-    // Add employee count for each department (including multiple departments)
-    const departmentsWithCount = await Promise.all(
-      departments.map(async (dept) => {
-        // Count employees where this department is in their departments array OR is their primary department
-        const employeeCount = await Employee.countDocuments({
-          $or: [
-            { departments: dept._id },
-            { department: dept._id }
-          ],
-          status: 'active'
-        })
-        return {
-          ...dept,
-          employeeCount
+    // Single aggregation to fetch departments with employee counts (avoids N+1 queries)
+    const departmentsWithCount = await Department.aggregate([
+      { $match: { isActive: true } },
+      { $sort: { name: 1 } },
+      // Lookup head (single)
+      {
+        $lookup: {
+          from: 'employees',
+          localField: 'head',
+          foreignField: '_id',
+          as: 'head',
+          pipeline: [
+            { $project: { firstName: 1, lastName: 1, employeeCode: 1, email: 1, designation: 1 } }
+          ]
         }
-      })
-    )
+      },
+      { $unwind: { path: '$head', preserveNullAndEmptyArrays: true } },
+      // Lookup heads (array)
+      {
+        $lookup: {
+          from: 'employees',
+          localField: 'heads',
+          foreignField: '_id',
+          as: 'heads',
+          pipeline: [
+            { $project: { firstName: 1, lastName: 1, employeeCode: 1, email: 1, designation: 1 } }
+          ]
+        }
+      },
+      // Count employees belonging to this department (via departments array or legacy department field)
+      {
+        $lookup: {
+          from: 'employees',
+          let: { deptId: '$_id' },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ['$status', 'active'] },
+                    {
+                      $or: [
+                        { $in: ['$$deptId', { $ifNull: ['$departments', []] }] },
+                        { $eq: ['$department', '$$deptId'] }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            { $count: 'count' }
+          ],
+          as: 'employeeStats'
+        }
+      },
+      {
+        $addFields: {
+          employeeCount: {
+            $ifNull: [{ $arrayElemAt: ['$employeeStats.count', 0] }, 0]
+          }
+        }
+      },
+      { $project: { employeeStats: 0 } }
+    ])
 
     return NextResponse.json({
       success: true,

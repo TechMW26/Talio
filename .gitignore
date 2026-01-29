@@ -104,3 +104,6 @@ scripts/create-admin.js
 # Sensitive uploads (Aadhaar documents, etc.)
 uploads/aadhaar/
 !uploads/aadhaar/.gitkeep
+
+# Sentry Config File
+.env.sentry-build-plugin
