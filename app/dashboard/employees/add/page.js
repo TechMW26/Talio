@@ -384,7 +384,7 @@ export default function AddEmployeePage() {
               value={formData.employeeCode}
               onChange={handleChange}
               required
-              className="w-full px-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full px-4 py-2 border border-default-300 rounded-lg bg-white text-default-900 placeholder:text-default-400 focus:ring-2 focus:ring-primary focus:border-primary"
               placeholder="EMP001"
             />
           </div>
@@ -402,7 +402,7 @@ export default function AddEmployeePage() {
                 value={formData.firstName}
                 onChange={handleChange}
                 required
-                className="w-full px-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full px-4 py-2 border border-default-300 rounded-lg bg-white text-default-900 placeholder:text-default-400 focus:ring-2 focus:ring-primary focus:border-primary"
                 placeholder="First Name"
               />
             </div>
@@ -418,7 +418,7 @@ export default function AddEmployeePage() {
                 value={formData.lastName}
                 onChange={handleChange}
                 required
-                className="w-full px-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full px-4 py-2 border border-default-300 rounded-lg bg-white text-default-900 placeholder:text-default-400 focus:ring-2 focus:ring-primary focus:border-primary"
                 placeholder="Last Name"
               />
             </div>
@@ -435,7 +435,7 @@ export default function AddEmployeePage() {
               value={formData.email}
               onChange={handleChange}
               required
-              className="w-full px-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full px-4 py-2 border border-default-300 rounded-lg bg-white text-default-900 placeholder:text-default-400 focus:ring-2 focus:ring-primary focus:border-primary"
               placeholder="employee@mushroomworldgroup.com"
             />
           </div>
@@ -451,13 +451,13 @@ export default function AddEmployeePage() {
               value={formData.phone}
               onChange={handleChange}
               required
-              className="w-full px-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full px-4 py-2 border border-default-300 rounded-lg bg-white text-default-900 placeholder:text-default-400 focus:ring-2 focus:ring-primary focus:border-primary"
               placeholder="+1234567890"
             />
           </div>
 
           {/* Gender - Full Width */}
-          <div className="md:col-span-2">
+          <div className="md:col-span-1">
             <label className="block text-sm font-medium text-default-700 mb-2">
               Gender
             </label>
@@ -467,7 +467,12 @@ export default function AddEmployeePage() {
               onChange={handleChange}
               aria-label="Gender"
               placeholder="Select Gender"
-              classNames={{ trigger: "bg-white" }}
+              classNames={{
+                trigger: "bg-white border border-default-300 text-default-700 data-[hover=true]:border-default-400",
+                value: "text-default-700",
+                selectorIcon: "text-default-500",
+                listbox: "text-default-700"
+              }}
             >
               <SelectItem key="male">Male</SelectItem>
               <SelectItem key="female">Female</SelectItem>
@@ -485,7 +490,7 @@ export default function AddEmployeePage() {
               name="dateOfBirth"
               value={formData.dateOfBirth}
               onChange={handleChange}
-              className="w-full px-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full px-4 py-2 border border-default-300 rounded-lg bg-white text-default-900 placeholder:text-default-400 focus:ring-2 focus:ring-primary focus:border-primary"
             />
           </div>
 
@@ -500,12 +505,12 @@ export default function AddEmployeePage() {
               value={formData.dateOfJoining}
               onChange={handleChange}
               required
-              className="w-full px-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full px-4 py-2 border border-default-300 rounded-lg bg-white text-default-900 placeholder:text-default-400 focus:ring-2 focus:ring-primary focus:border-primary"
             />
           </div>
 
           {/* Department - Multi-select */}
-          <div className="md:col-span-2" ref={deptDropdownRef}>
+          <div className="md:col-span-1" ref={deptDropdownRef}>
             <label className="block text-sm font-medium text-default-700 mb-2">
               Departments <span className="text-default-400 text-xs">(can select multiple)</span>
             </label>
@@ -539,7 +544,7 @@ export default function AddEmployeePage() {
               <button
                 type="button"
                 onClick={() => setShowDeptDropdown(!showDeptDropdown)}
-                className="w-full px-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-left flex items-center justify-between bg-white"
+                className="w-full px-4 py-2 border border-default-300 rounded-lg bg-white text-default-900 focus:ring-2 focus:ring-primary focus:border-primary text-left flex items-center justify-between"
               >
                 <span className={formData.departments?.length > 0 ? 'text-default-700' : 'text-default-400'}>
                   {formData.departments?.length > 0 
@@ -591,7 +596,12 @@ export default function AddEmployeePage() {
                 onChange={handleChange}
                 aria-label="Designation"
                 placeholder="Select Designation"
-                classNames={{ trigger: "bg-white" }}
+                classNames={{
+                  trigger: "bg-white border border-default-300 text-default-700 data-[hover=true]:border-default-400",
+                  value: "text-default-700",
+                  selectorIcon: "text-default-500",
+                  listbox: "text-default-700"
+                }}
               >
                 {designations.map((desig) => (
                   <SelectItem key={desig._id}>
@@ -619,7 +629,12 @@ export default function AddEmployeePage() {
                 }}
                 aria-label="Level"
                 placeholder="Select Level"
-                classNames={{ trigger: "bg-white" }}
+                classNames={{
+                  trigger: "bg-white border border-default-300 text-default-700 data-[hover=true]:border-default-400",
+                  value: "text-default-700",
+                  selectorIcon: "text-default-500",
+                  listbox: "text-default-700"
+                }}
               >
                 {levels.map((level) => (
                   <SelectItem key={String(level.level)}>
@@ -646,7 +661,15 @@ export default function AddEmployeePage() {
               onChange={handleChange}
               aria-label="Company"
               placeholder="Select Company"
-              classNames={{ trigger: "bg-white" }}
+              className="text-default-900"
+              classNames={{
+                trigger: "bg-white border border-default-300 text-default-900 data-[hover=true]:border-default-400",
+                value: "text-default-900",
+                innerWrapper: "text-default-900",
+                selectorIcon: "text-default-600",
+                listbox: "text-default-900",
+                popoverContent: "bg-white text-default-900"
+              }}
             >
               {companies.map((company) => (
                 <SelectItem key={company._id}>
@@ -666,7 +689,15 @@ export default function AddEmployeePage() {
               selectedKeys={[formData.employmentType]}
               onChange={handleChange}
               aria-label="Employment Type"
-              classNames={{ trigger: "bg-white" }}
+              className="text-default-900"
+              classNames={{
+                trigger: "bg-white border border-default-300 text-default-900 data-[hover=true]:border-default-400",
+                value: "text-default-900",
+                innerWrapper: "text-default-900",
+                selectorIcon: "text-default-600",
+                listbox: "text-default-900",
+                popoverContent: "bg-white text-default-900"
+              }}
             >
               <SelectItem key="full-time">Full Time</SelectItem>
               <SelectItem key="part-time">Part Time</SelectItem>
@@ -685,7 +716,15 @@ export default function AddEmployeePage() {
               selectedKeys={[formData.status]}
               onChange={handleChange}
               aria-label="Status"
-              classNames={{ trigger: "bg-white" }}
+              className="text-default-900"
+              classNames={{
+                trigger: "bg-white border border-default-300 text-default-900 data-[hover=true]:border-default-400",
+                value: "text-default-900",
+                innerWrapper: "text-default-900",
+                selectorIcon: "text-default-600",
+                listbox: "text-default-900",
+                popoverContent: "bg-white text-default-900"
+              }}
             >
               <SelectItem key="active">Active</SelectItem>
               <SelectItem key="inactive">Inactive</SelectItem>
@@ -703,7 +742,7 @@ export default function AddEmployeePage() {
               value={formData.password}
               onChange={handleChange}
               required
-              className="w-full px-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              className="w-full px-4 py-2 border border-default-300 rounded-lg bg-white text-default-900 placeholder:text-default-400 focus:ring-2 focus:ring-primary focus:border-primary"
               placeholder="Enter login password"
             />
             <p className="text-xs text-default-500 mt-1">
@@ -722,7 +761,15 @@ export default function AddEmployeePage() {
               onChange={handleChange}
               isRequired
               aria-label="User Role"
-              classNames={{ trigger: "bg-white" }}
+              className="text-default-900"
+              classNames={{
+                trigger: "bg-white border border-default-300 text-default-900 data-[hover=true]:border-default-400",
+                value: "text-default-900",
+                innerWrapper: "text-default-900",
+                selectorIcon: "text-default-600",
+                listbox: "text-default-900",
+                popoverContent: "bg-white text-default-900"
+              }}
             >
               <SelectItem key="employee">Employee</SelectItem>
               <SelectItem key="manager">Manager</SelectItem>
@@ -772,7 +819,7 @@ export default function AddEmployeePage() {
                   type="number"
                   value={formData.salary.basic}
                   onChange={(e) => handleSalaryComponentChange('basic', e.target.value)}
-                  className="w-full pl-8 pr-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="w-full pl-8 pr-4 py-2 border border-default-300 rounded-lg bg-white text-default-900 placeholder:text-default-400 focus:ring-2 focus:ring-primary focus:border-primary"
                   placeholder="25000"
                 />
               </div>
@@ -789,7 +836,7 @@ export default function AddEmployeePage() {
                   type="number"
                   value={formData.salary.hra}
                   onChange={(e) => handleSalaryComponentChange('hra', e.target.value)}
-                  className="w-full pl-8 pr-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="w-full pl-8 pr-4 py-2 border border-default-300 rounded-lg bg-white text-default-900 placeholder:text-default-400 focus:ring-2 focus:ring-primary focus:border-primary"
                   placeholder="10000"
                 />
               </div>
@@ -806,7 +853,7 @@ export default function AddEmployeePage() {
                   type="number"
                   value={formData.salary.conveyance}
                   onChange={(e) => handleSalaryComponentChange('conveyance', e.target.value)}
-                  className="w-full pl-8 pr-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="w-full pl-8 pr-4 py-2 border border-default-300 rounded-lg bg-white text-default-900 placeholder:text-default-400 focus:ring-2 focus:ring-primary focus:border-primary"
                   placeholder="800"
                 />
               </div>
@@ -823,7 +870,7 @@ export default function AddEmployeePage() {
                   type="number"
                   value={formData.salary.medical}
                   onChange={(e) => handleSalaryComponentChange('medical', e.target.value)}
-                  className="w-full pl-8 pr-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="w-full pl-8 pr-4 py-2 border border-default-300 rounded-lg bg-white text-default-900 placeholder:text-default-400 focus:ring-2 focus:ring-primary focus:border-primary"
                   placeholder="1250"
                 />
               </div>
