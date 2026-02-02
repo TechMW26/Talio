@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import {
   FaMoneyBillWave, FaArrowLeft, FaCalculator, FaEye, FaDownload,
   FaFilter, FaSync, FaExclamationTriangle, FaCheckCircle, FaClock,
   FaUserClock, FaCalendarCheck, FaInfoCircle, FaToggleOn, FaToggleOff,
-  FaExclamationCircle, FaSearch, FaChevronDown, FaChevronUp, FaTimes
+  FaExclamationCircle, FaSearch, FaChevronDown, FaChevronUp, FaTimes, FaEdit
 } from 'react-icons/fa'
 import { formatDepartments } from '@/lib/formatters'
 import {
@@ -24,7 +24,8 @@ import {
   PageLoader,
   KPICard,
 } from '@/components/ui/heroui'
-import { Input, Checkbox, Button, Divider, Chip, Progress } from '@heroui/react'
+import { Input, Checkbox, Button, Divider, Chip, Progress, Tooltip } from '@heroui/react'
+import AttendanceCorrectionModal from '@/components/payroll/AttendanceCorrectionModal'
 
 export default function GeneratePayrollPage() {
   const router = useRouter()
@@ -40,13 +41,18 @@ export default function GeneratePayrollPage() {
   const [showPreview, setShowPreview] = useState(false)
   const [selectedEmployees, setSelectedEmployees] = useState([])
   const [pendingLeavesWarning, setPendingLeavesWarning] = useState([]) // Employees with pending leaves
-  
+
   // Filter states
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedDepartment, setSelectedDepartment] = useState('all')
   const [expandedDepartments, setExpandedDepartments] = useState({})
   const [showFilters, setShowFilters] = useState(true)
-  
+
+  // Attendance correction modal states
+  const [correctionModalOpen, setCorrectionModalOpen] = useState(false)
+  const [selectedEmployeeForCorrection, setSelectedEmployeeForCorrection] = useState(null)
+  const [correctedEmployees, setCorrectedEmployees] = useState({}) // Track which employees were corrected
+
   const [formData, setFormData] = useState({
     month: new Date().getMonth() + 1,
     year: new Date().getFullYear(),
@@ -190,14 +196,14 @@ export default function GeneratePayrollPage() {
         { headers: { 'Authorization': `Bearer ${token}` } }
       )
       const data = await response.json()
-      
+
       if (data.success && data.data) {
         // Filter holidays for the selected month
         const monthHolidays = data.data.filter(holiday => {
           const holidayDate = new Date(holiday.date)
-          return holidayDate.getMonth() + 1 === formData.month && 
-                 holidayDate.getFullYear() === formData.year &&
-                 holiday.isActive
+          return holidayDate.getMonth() + 1 === formData.month &&
+            holidayDate.getFullYear() === formData.year &&
+            holiday.isActive
         })
         setHolidayData(monthHolidays)
       }
@@ -302,7 +308,7 @@ export default function GeneratePayrollPage() {
           // Check if leave overlaps with selected month
           const leaveStart = new Date(leave.startDate)
           const leaveEnd = new Date(leave.endDate)
-          
+
           // Only consider leaves that overlap with the payroll month
           if (leaveEnd < startOfMonth || leaveStart > endOfMonth) return
 
@@ -415,10 +421,10 @@ export default function GeneratePayrollPage() {
     const unpaidDeniedLeaves = employeeLeaves.deniedDays || 0
     const unpaidPendingLeaves = employeeLeaves.pendingDays || 0
     const unpaidWfhDays = attendance.wfhDays || 0
-    
+
     // Days with no record = working days - all accounted days
-    const accountedDays = paidPresentDays + unpaidHalfDays + unpaidAbsentDays + paidApprovedLeaves + 
-                          unpaidDeniedLeaves + unpaidPendingLeaves + unpaidWfhDays + paidHolidays
+    const accountedDays = paidPresentDays + unpaidHalfDays + unpaidAbsentDays + paidApprovedLeaves +
+      unpaidDeniedLeaves + unpaidPendingLeaves + unpaidWfhDays + paidHolidays
     const noRecordDays = Math.max(0, workingDays - accountedDays)
 
     // EARNED SALARY = Per-day salary × Total paid days
@@ -555,7 +561,7 @@ export default function GeneratePayrollPage() {
     // Search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(emp => 
+      filtered = filtered.filter(emp =>
         emp.firstName?.toLowerCase().includes(query) ||
         emp.lastName?.toLowerCase().includes(query) ||
         emp.employeeCode?.toLowerCase().includes(query) ||
@@ -584,7 +590,7 @@ export default function GeneratePayrollPage() {
     filteredEmployees.forEach(emp => {
       const deptId = emp.department?._id || emp.department
       const deptName = emp.department?.name || 'No Department'
-      
+
       if (!deptId) {
         noDept.push(emp)
       } else {
@@ -622,7 +628,7 @@ export default function GeneratePayrollPage() {
   const handleSelectDepartment = (deptId, employees) => {
     const empIds = employees.map(e => e._id)
     const allSelected = empIds.every(id => selectedEmployees.includes(id))
-    
+
     if (allSelected) {
       // Deselect all in department
       setSelectedEmployees(prev => prev.filter(id => !empIds.includes(id)))
@@ -653,6 +659,19 @@ export default function GeneratePayrollPage() {
     setSelectedDepartment('all')
   }
 
+  // Attendance correction handlers
+  const handleOpenCorrectionModal = useCallback((employee) => {
+    setSelectedEmployeeForCorrection(employee)
+    setCorrectionModalOpen(true)
+  }, [])
+
+  const handleCorrectionSaved = useCallback((employeeId) => {
+    setCorrectedEmployees(prev => ({ ...prev, [employeeId]: true }))
+    // Refresh attendance data to reflect corrections
+    fetchAttendanceData()
+    fetchLeaveData()
+  }, [fetchAttendanceData, fetchLeaveData])
+
   const handlePreviewPayroll = () => {
     if (selectedEmployees.length === 0) {
       toast.error('Please select at least one employee')
@@ -682,8 +701,8 @@ export default function GeneratePayrollPage() {
             year: formData.year,
             // Basic salary fields (simple numbers for tenant schema)
             basic: payroll.earnedBasic,
-            allowances: (payroll.earnedHRA || 0) + (payroll.earnedConveyance || 0) + 
-                       (payroll.earnedMedical || 0) + (payroll.earnedSpecial || 0),
+            allowances: (payroll.earnedHRA || 0) + (payroll.earnedConveyance || 0) +
+              (payroll.earnedMedical || 0) + (payroll.earnedSpecial || 0),
             deductions: payroll.totalDeductions, // Total deductions as a number
             grossSalary: payroll.earnedSalary,
             netSalary: payroll.netSalary,
@@ -919,12 +938,12 @@ export default function GeneratePayrollPage() {
                     <Chip size="sm" color="default" variant="flat">No Record</Chip>
                     <Chip size="sm" color="default" variant="flat">WFH</Chip>
                   </div>
+                </div>
+              </div>
+              <div className="mt-3 p-2 bg-success-50 rounded text-xs text-success-700">
+                <strong>Formula:</strong> Per-Day Salary = Gross Salary ÷ Working Days (rounded up) | Net Salary = (Per-Day × Paid Days) - Statutory Deductions
               </div>
             </div>
-            <div className="mt-3 p-2 bg-success-50 rounded text-xs text-success-700">
-              <strong>Formula:</strong> Per-Day Salary = Gross Salary ÷ Working Days (rounded up) | Net Salary = (Per-Day × Paid Days) - Statutory Deductions
-            </div>
-          </div>
           </HRMSCardBody>
         </HRMSCard>
       )}
@@ -1078,117 +1097,139 @@ export default function GeneratePayrollPage() {
                 <div className="px-4 py-8 text-center text-default-500">
                   <FaCheckCircle className="w-12 h-12 mx-auto text-success-300 mb-3" />
                   <p className="text-lg font-medium text-foreground">
-                    {availableEmployees.length === 0 
+                    {availableEmployees.length === 0
                       ? 'All employees have payroll generated'
                       : 'No employees match your filters'}
                   </p>
                   <p className="text-sm text-default-400 mt-1">
-                    {availableEmployees.length === 0 
+                    {availableEmployees.length === 0
                       ? `Payroll for ${new Date(formData.year, formData.month - 1).toLocaleString('default', { month: 'long', year: 'numeric' })} has been generated for all active employees.`
                       : 'Try adjusting your search or filter criteria.'}
-                </p>
-              </div>
-            ) : (
-              employeesByDepartment.map((dept) => (
-                <div key={dept.id} className="border-b border-gray-100 last:border-b-0">
-                  {/* Department Header */}
-                  <div 
-                    className="flex items-center justify-between px-4 py-3 bg-gray-50 cursor-pointer hover:bg-gray-100"
-                    onClick={() => toggleDepartmentExpand(dept.id)}
-                  >
-                    <div className="flex items-center space-x-3">
-                      {expandedDepartments[dept.id] ? <FaChevronUp className="text-gray-400 w-3 h-3" /> : <FaChevronDown className="text-gray-400 w-3 h-3" />}
-                      <span className="font-medium text-gray-800">{dept.name}</span>
-                      <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">{dept.employees.length} employees</span>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <span className="text-xs text-gray-500">
-                        {dept.employees.filter(e => selectedEmployees.includes(e._id)).length} selected
-                      </span>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleSelectDepartment(dept.id, dept.employees); }}
-                        className="text-xs px-3 py-1 bg-primary-100 text-primary-700 rounded hover:bg-primary-200"
-                      >
-                        {dept.employees.every(e => selectedEmployees.includes(e._id)) ? 'Deselect All' : 'Select All'}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Employees in Department */}
-                  {expandedDepartments[dept.id] && (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead className="bg-gray-50 border-b border-gray-200">
-                          <tr>
-                            <th className="px-4 py-2 text-left w-10">
-                              <input
-                                type="checkbox"
-                                checked={dept.employees.every(e => selectedEmployees.includes(e._id))}
-                                onChange={() => handleSelectDepartment(dept.id, dept.employees)}
-                                className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                              />
-                            </th>
-                            <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Employee</th>
-                            <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Gross Salary</th>
-                            <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Per Day</th>
-                            <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase bg-green-50">Present</th>
-                            <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase bg-blue-50">Approved Leaves</th>
-                            <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase bg-purple-50">Holidays</th>
-                            <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase bg-orange-50">Half Days</th>
-                            <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase bg-red-50">Absent</th>
-                            <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase bg-yellow-50">Pending</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-100">
-                          {dept.employees.map((employee) => {
-                            const attendance = attendanceData[employee._id] || {}
-                            const employeeLeaves = leaveData[employee._id] || {}
-                            const grossSalary = employee.salary?.grossSalary || employee.salary?.basic || 0
-                            const perDaySalary = grossSalary > 0 ? Math.ceil(grossSalary / (payrollConfig.workingDaysPerMonth || 26)) : 0
-                            return (
-                              <tr key={employee._id} className="hover:bg-gray-50">
-                                <td className="px-4 py-3">
-                                  <input
-                                    type="checkbox"
-                                    checked={selectedEmployees.includes(employee._id)}
-                                    onChange={() => handleSelectEmployee(employee._id)}
-                                    className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                                  />
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap">
-                                  <div className="font-medium text-gray-900">{employee.firstName} {employee.lastName}</div>
-                                  <div className="text-xs text-gray-500">{employee.employeeCode} • {employee.designation?.title || 'N/A'}</div>
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-right font-semibold text-gray-900">{formatCurrency(grossSalary)}</td>
-                                <td className="px-4 py-3 whitespace-nowrap text-right text-gray-600">{formatCurrency(perDaySalary)}</td>
-                                <td className="px-4 py-3 whitespace-nowrap text-center bg-green-50">
-                                  <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">{attendance.presentDays || 0}</span>
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-center bg-blue-50">
-                                  <span className={'px-2 py-1 text-xs font-medium rounded-full ' + (employeeLeaves.approvedDays > 0 ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-500')}>{employeeLeaves.approvedDays || 0}</span>
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-center bg-purple-50">
-                                  <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded-full">{holidayData.length}</span>
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-center bg-orange-50">
-                                  <span className={'px-2 py-1 text-xs font-medium rounded-full ' + (attendance.halfDays > 0 ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-500')}>{attendance.halfDays || 0}</span>
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-center bg-red-50">
-                                  <span className={'px-2 py-1 text-xs font-medium rounded-full ' + (attendance.absentDays > 0 ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-500')}>{attendance.absentDays || 0}</span>
-                                </td>
-                                <td className="px-4 py-3 whitespace-nowrap text-center bg-yellow-50">
-                                  <span className={'px-2 py-1 text-xs font-medium rounded-full ' + (employeeLeaves.pendingDays > 0 ? 'bg-warning-100 text-warning-800' : 'bg-default-100 text-default-500')}>{employeeLeaves.pendingDays || 0}</span>
-                                </td>
-                              </tr>
-                            )
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
+                  </p>
                 </div>
-              ))
-            )}
+              ) : (
+                employeesByDepartment.map((dept) => (
+                  <div key={dept.id} className="border-b border-gray-100 last:border-b-0">
+                    {/* Department Header */}
+                    <div
+                      className="flex items-center justify-between px-4 py-3 bg-gray-50 cursor-pointer hover:bg-gray-100"
+                      onClick={() => toggleDepartmentExpand(dept.id)}
+                    >
+                      <div className="flex items-center space-x-3">
+                        {expandedDepartments[dept.id] ? <FaChevronUp className="text-gray-400 w-3 h-3" /> : <FaChevronDown className="text-gray-400 w-3 h-3" />}
+                        <span className="font-medium text-gray-800">{dept.name}</span>
+                        <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">{dept.employees.length} employees</span>
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <span className="text-xs text-gray-500">
+                          {dept.employees.filter(e => selectedEmployees.includes(e._id)).length} selected
+                        </span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleSelectDepartment(dept.id, dept.employees); }}
+                          className="text-xs px-3 py-1 bg-primary-100 text-primary-700 rounded hover:bg-primary-200"
+                        >
+                          {dept.employees.every(e => selectedEmployees.includes(e._id)) ? 'Deselect All' : 'Select All'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Employees in Department */}
+                    {expandedDepartments[dept.id] && (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="bg-gray-50 border-b border-gray-200">
+                            <tr>
+                              <th className="px-4 py-2 text-left w-10">
+                                <input
+                                  type="checkbox"
+                                  checked={dept.employees.every(e => selectedEmployees.includes(e._id))}
+                                  onChange={() => handleSelectDepartment(dept.id, dept.employees)}
+                                  className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                                />
+                              </th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Employee</th>
+                              <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Gross Salary</th>
+                              <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">Per Day</th>
+                              <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase bg-green-50">Present</th>
+                              <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase bg-blue-50">Approved Leaves</th>
+                              <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase bg-purple-50">Holidays</th>
+                              <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase bg-orange-50">Half Days</th>
+                              <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase bg-red-50">Absent</th>
+                              <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase bg-yellow-50">Pending</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-100">
+                            {dept.employees.map((employee) => {
+                              const attendance = attendanceData[employee._id] || {}
+                              const employeeLeaves = leaveData[employee._id] || {}
+                              const grossSalary = employee.salary?.grossSalary || employee.salary?.basic || 0
+                              const perDaySalary = grossSalary > 0 ? Math.ceil(grossSalary / (payrollConfig.workingDaysPerMonth || 26)) : 0
+                              return (
+                                <tr key={employee._id} className="hover:bg-gray-50">
+                                  <td className="px-4 py-3">
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedEmployees.includes(employee._id)}
+                                      onChange={() => handleSelectEmployee(employee._id)}
+                                      className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                                    />
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap">
+                                    <div className="flex items-center gap-2 group">
+                                      <div className="flex-1">
+                                        <div className="font-medium text-gray-900 flex items-center gap-2">
+                                          {employee.firstName} {employee.lastName}
+                                          {correctedEmployees[employee._id] && (
+                                            <span className="px-1.5 py-0.5 bg-success-100 text-success-700 text-[10px] font-medium rounded-full">
+                                              Corrected
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="text-xs text-gray-500">{employee.employeeCode} • {employee.designation?.title || 'N/A'}</div>
+                                      </div>
+                                      <Tooltip content="Edit Attendance">
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            handleOpenCorrectionModal(employee)
+                                          }}
+                                          className="p-1.5 text-default-400 hover:text-primary-500 hover:bg-primary-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                        >
+                                          <FaEdit size={14} />
+                                        </button>
+                                      </Tooltip>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-right font-semibold text-gray-900">{formatCurrency(grossSalary)}</td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-right text-gray-600">{formatCurrency(perDaySalary)}</td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-center bg-green-50">
+                                    <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">{attendance.presentDays || 0}</span>
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-center bg-blue-50">
+                                    <span className={'px-2 py-1 text-xs font-medium rounded-full ' + (employeeLeaves.approvedDays > 0 ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-500')}>{employeeLeaves.approvedDays || 0}</span>
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-center bg-purple-50">
+                                    <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded-full">{holidayData.length}</span>
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-center bg-orange-50">
+                                    <span className={'px-2 py-1 text-xs font-medium rounded-full ' + (attendance.halfDays > 0 ? 'bg-orange-100 text-orange-800' : 'bg-gray-100 text-gray-500')}>{attendance.halfDays || 0}</span>
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-center bg-red-50">
+                                    <span className={'px-2 py-1 text-xs font-medium rounded-full ' + (attendance.absentDays > 0 ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-500')}>{attendance.absentDays || 0}</span>
+                                  </td>
+                                  <td className="px-4 py-3 whitespace-nowrap text-center bg-yellow-50">
+                                    <span className={'px-2 py-1 text-xs font-medium rounded-full ' + (employeeLeaves.pendingDays > 0 ? 'bg-warning-100 text-warning-800' : 'bg-default-100 text-default-500')}>{employeeLeaves.pendingDays || 0}</span>
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
 
             <div className="p-6 bg-default-50 border-t border-default-200">
@@ -1228,136 +1269,146 @@ export default function GeneratePayrollPage() {
               </div>
               <div className="bg-content1 p-4 rounded-lg shadow-sm">
                 <p className="text-xs text-default-500 uppercase">Total Deductions</p>
-              <p className="text-xl font-bold text-red-600">{formatCurrency(summaryTotals.totalDeductions)}</p>
+                <p className="text-xl font-bold text-red-600">{formatCurrency(summaryTotals.totalDeductions)}</p>
+              </div>
+              <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-green-200">
+                <p className="text-xs text-green-600 uppercase">Net Payable</p>
+                <p className="text-xl font-bold text-green-600">{formatCurrency(summaryTotals.netSalary)}</p>
+              </div>
             </div>
-            <div className="bg-white p-4 rounded-lg shadow-sm border-2 border-green-200">
-              <p className="text-xs text-green-600 uppercase">Net Payable</p>
-              <p className="text-xl font-bold text-green-600">{formatCurrency(summaryTotals.netSalary)}</p>
-            </div>
-          </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead className="bg-gray-100 border-b border-gray-200">
-                <tr>
-                  <th className="px-3 py-3 text-left font-semibold text-gray-700 sticky left-0 bg-gray-100 min-w-[180px]">Employee</th>
-                  <th className="px-3 py-3 text-right font-semibold text-gray-700 bg-gray-50">Per Day</th>
-                  <th className="px-3 py-3 text-center font-semibold text-gray-700 bg-green-50">Present</th>
-                  <th className="px-3 py-3 text-center font-semibold text-gray-700 bg-blue-50">Leaves</th>
-                  <th className="px-3 py-3 text-center font-semibold text-gray-700 bg-purple-50">Holidays</th>
-                  <th className="px-3 py-3 text-center font-semibold text-gray-700 bg-green-100">Paid Days</th>
-                  <th className="px-3 py-3 text-right font-semibold text-gray-700 bg-green-100">Earned</th>
-                  <th className="px-3 py-3 text-right font-semibold text-gray-700">PF</th>
-                  <th className="px-3 py-3 text-right font-semibold text-gray-700">ESI</th>
-                  <th className="px-3 py-3 text-right font-semibold text-gray-700">PT</th>
-                  <th className="px-3 py-3 text-right font-semibold text-gray-700">TDS</th>
-                  <th className="px-3 py-3 text-right font-semibold text-gray-700 bg-red-50">Total Ded.</th>
-                  <th className="px-3 py-3 text-right font-semibold text-gray-700 bg-green-100">Net Salary</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {calculatedPayrollData.map((payroll, idx) => (
-                  <tr key={payroll.employee._id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="px-3 py-3 whitespace-nowrap sticky left-0 bg-inherit min-w-[180px]">
-                      <div className="font-medium text-gray-900">{payroll.employee.firstName} {payroll.employee.lastName}</div>
-                      <div className="text-gray-500">{payroll.employee.employeeCode}</div>
-                      <div className="text-gray-400 text-[10px] mt-1">
-                        Gross: {formatCurrency(payroll.grossSalary)} | Half: {payroll.attendance.halfDays || 0} | Absent: {payroll.attendance.absentDays || 0}
-                      </div>
-                    </td>
-                    <td className="px-3 py-3 text-right text-gray-900 bg-gray-50">{formatCurrency(payroll.perDaySalary)}</td>
-                    <td className="px-3 py-3 text-center bg-green-50">
-                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-200 text-green-800">{payroll.paidDays.present}</span>
-                    </td>
-                    <td className="px-3 py-3 text-center bg-blue-50">
-                      <span className={'px-2 py-1 text-xs font-medium rounded-full ' + (payroll.paidDays.approvedLeaves > 0 ? 'bg-blue-200 text-blue-800' : 'bg-gray-100 text-gray-500')}>{payroll.paidDays.approvedLeaves}</span>
-                    </td>
-                    <td className="px-3 py-3 text-center bg-purple-50">
-                      <span className={'px-2 py-1 text-xs font-medium rounded-full ' + (payroll.paidDays.holidays > 0 ? 'bg-purple-200 text-purple-800' : 'bg-gray-100 text-gray-500')}>{payroll.paidDays.holidays}</span>
-                    </td>
-                    <td className="px-3 py-3 text-center bg-green-100">
-                      <span className="px-2 py-1 text-xs font-bold rounded-full bg-green-300 text-green-900">{payroll.paidDays.total}</span>
-                    </td>
-                    <td className="px-3 py-3 text-right font-semibold text-green-700 bg-green-100">{formatCurrency(payroll.earnedSalary)}</td>
-                    <td className="px-3 py-3 text-right text-red-600">{formatCurrency(payroll.pf)}</td>
-                    <td className="px-3 py-3 text-right text-red-600">{formatCurrency(payroll.esi)}</td>
-                    <td className="px-3 py-3 text-right text-red-600">{formatCurrency(payroll.professionalTax)}</td>
-                    <td className="px-3 py-3 text-right text-red-600">{formatCurrency(payroll.tds)}</td>
-                    <td className="px-3 py-3 text-right font-semibold text-red-700 bg-red-50">{formatCurrency(payroll.totalDeductions)}</td>
-                    <td className="px-3 py-3 text-right font-bold text-green-700 bg-green-100">{formatCurrency(payroll.netSalary)}</td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-gray-100 border-b border-gray-200">
+                  <tr>
+                    <th className="px-3 py-3 text-left font-semibold text-gray-700 sticky left-0 bg-gray-100 min-w-[180px]">Employee</th>
+                    <th className="px-3 py-3 text-right font-semibold text-gray-700 bg-gray-50">Per Day</th>
+                    <th className="px-3 py-3 text-center font-semibold text-gray-700 bg-green-50">Present</th>
+                    <th className="px-3 py-3 text-center font-semibold text-gray-700 bg-blue-50">Leaves</th>
+                    <th className="px-3 py-3 text-center font-semibold text-gray-700 bg-purple-50">Holidays</th>
+                    <th className="px-3 py-3 text-center font-semibold text-gray-700 bg-green-100">Paid Days</th>
+                    <th className="px-3 py-3 text-right font-semibold text-gray-700 bg-green-100">Earned</th>
+                    <th className="px-3 py-3 text-right font-semibold text-gray-700">PF</th>
+                    <th className="px-3 py-3 text-right font-semibold text-gray-700">ESI</th>
+                    <th className="px-3 py-3 text-right font-semibold text-gray-700">PT</th>
+                    <th className="px-3 py-3 text-right font-semibold text-gray-700">TDS</th>
+                    <th className="px-3 py-3 text-right font-semibold text-gray-700 bg-red-50">Total Ded.</th>
+                    <th className="px-3 py-3 text-right font-semibold text-gray-700 bg-green-100">Net Salary</th>
                   </tr>
-                ))}
-              </tbody>
-              <tfoot className="bg-gray-200 border-t-2 border-gray-400">
-                <tr>
-                  <td className="px-3 py-3 font-bold text-gray-800 sticky left-0 bg-gray-200">TOTAL ({calculatedPayrollData.length} employees)</td>
-                  <td className="px-3 py-3 bg-gray-200"></td>
-                  <td className="px-3 py-3 text-center font-bold text-green-700 bg-green-100">{summaryTotals.totalPresentDays}</td>
-                  <td className="px-3 py-3 text-center font-bold text-blue-700 bg-blue-100">{summaryTotals.totalApprovedLeaves}</td>
-                  <td className="px-3 py-3 text-center font-bold text-purple-700 bg-purple-100">{summaryTotals.totalHolidays}</td>
-                  <td className="px-3 py-3 text-center font-bold text-green-700 bg-green-200">{summaryTotals.totalPaidDays}</td>
-                  <td className="px-3 py-3 text-right font-bold text-green-700 bg-green-200">{formatCurrency(summaryTotals.earnedSalary)}</td>
-                  <td className="px-3 py-3 text-right font-bold text-red-700">{formatCurrency(summaryTotals.pf)}</td>
-                  <td className="px-3 py-3 text-right font-bold text-red-700">{formatCurrency(summaryTotals.esi)}</td>
-                  <td className="px-3 py-3" colSpan={2}></td>
-                  <td className="px-3 py-3 text-right font-bold text-red-700 bg-red-100">{formatCurrency(summaryTotals.totalDeductions)}</td>
-                  <td className="px-3 py-3 text-right font-bold text-green-700 bg-green-200">{formatCurrency(summaryTotals.netSalary)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {calculatedPayrollData.map((payroll, idx) => (
+                    <tr key={payroll.employee._id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      <td className="px-3 py-3 whitespace-nowrap sticky left-0 bg-inherit min-w-[180px]">
+                        <div className="font-medium text-gray-900">{payroll.employee.firstName} {payroll.employee.lastName}</div>
+                        <div className="text-gray-500">{payroll.employee.employeeCode}</div>
+                        <div className="text-gray-400 text-[10px] mt-1">
+                          Gross: {formatCurrency(payroll.grossSalary)} | Half: {payroll.attendance.halfDays || 0} | Absent: {payroll.attendance.absentDays || 0}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-right text-gray-900 bg-gray-50">{formatCurrency(payroll.perDaySalary)}</td>
+                      <td className="px-3 py-3 text-center bg-green-50">
+                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-200 text-green-800">{payroll.paidDays.present}</span>
+                      </td>
+                      <td className="px-3 py-3 text-center bg-blue-50">
+                        <span className={'px-2 py-1 text-xs font-medium rounded-full ' + (payroll.paidDays.approvedLeaves > 0 ? 'bg-blue-200 text-blue-800' : 'bg-gray-100 text-gray-500')}>{payroll.paidDays.approvedLeaves}</span>
+                      </td>
+                      <td className="px-3 py-3 text-center bg-purple-50">
+                        <span className={'px-2 py-1 text-xs font-medium rounded-full ' + (payroll.paidDays.holidays > 0 ? 'bg-purple-200 text-purple-800' : 'bg-gray-100 text-gray-500')}>{payroll.paidDays.holidays}</span>
+                      </td>
+                      <td className="px-3 py-3 text-center bg-green-100">
+                        <span className="px-2 py-1 text-xs font-bold rounded-full bg-green-300 text-green-900">{payroll.paidDays.total}</span>
+                      </td>
+                      <td className="px-3 py-3 text-right font-semibold text-green-700 bg-green-100">{formatCurrency(payroll.earnedSalary)}</td>
+                      <td className="px-3 py-3 text-right text-red-600">{formatCurrency(payroll.pf)}</td>
+                      <td className="px-3 py-3 text-right text-red-600">{formatCurrency(payroll.esi)}</td>
+                      <td className="px-3 py-3 text-right text-red-600">{formatCurrency(payroll.professionalTax)}</td>
+                      <td className="px-3 py-3 text-right text-red-600">{formatCurrency(payroll.tds)}</td>
+                      <td className="px-3 py-3 text-right font-semibold text-red-700 bg-red-50">{formatCurrency(payroll.totalDeductions)}</td>
+                      <td className="px-3 py-3 text-right font-bold text-green-700 bg-green-100">{formatCurrency(payroll.netSalary)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-gray-200 border-t-2 border-gray-400">
+                  <tr>
+                    <td className="px-3 py-3 font-bold text-gray-800 sticky left-0 bg-gray-200">TOTAL ({calculatedPayrollData.length} employees)</td>
+                    <td className="px-3 py-3 bg-gray-200"></td>
+                    <td className="px-3 py-3 text-center font-bold text-green-700 bg-green-100">{summaryTotals.totalPresentDays}</td>
+                    <td className="px-3 py-3 text-center font-bold text-blue-700 bg-blue-100">{summaryTotals.totalApprovedLeaves}</td>
+                    <td className="px-3 py-3 text-center font-bold text-purple-700 bg-purple-100">{summaryTotals.totalHolidays}</td>
+                    <td className="px-3 py-3 text-center font-bold text-green-700 bg-green-200">{summaryTotals.totalPaidDays}</td>
+                    <td className="px-3 py-3 text-right font-bold text-green-700 bg-green-200">{formatCurrency(summaryTotals.earnedSalary)}</td>
+                    <td className="px-3 py-3 text-right font-bold text-red-700">{formatCurrency(summaryTotals.pf)}</td>
+                    <td className="px-3 py-3 text-right font-bold text-red-700">{formatCurrency(summaryTotals.esi)}</td>
+                    <td className="px-3 py-3" colSpan={2}></td>
+                    <td className="px-3 py-3 text-right font-bold text-red-700 bg-red-100">{formatCurrency(summaryTotals.totalDeductions)}</td>
+                    <td className="px-3 py-3 text-right font-bold text-green-700 bg-green-200">{formatCurrency(summaryTotals.netSalary)}</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
 
-          {/* Pending Leaves Warning Section */}
-          {selectedEmployeesPendingLeaves.length > 0 && (
-            <div className="p-4 bg-yellow-50 border-t border-yellow-200">
-              <div className="flex items-start space-x-3">
-                <FaExclamationCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-                <div>
-                  <h3 className="text-sm font-semibold text-yellow-800">Pending Leave Requests</h3>
-                  <p className="text-xs text-yellow-700 mt-1 mb-2">
-                    The following employees have pending leave requests for this period. Please approve or reject before finalizing payroll.
-                  </p>
-                  <div className="space-y-2">
-                    {selectedEmployeesPendingLeaves.map((warning, idx) => (
-                      <div key={idx} className="flex items-center justify-between bg-content1 rounded-lg px-3 py-2 border border-warning-200">
-                        <div>
-                          <span className="font-medium text-foreground">{warning.employeeName}</span>
-                          <span className="text-default-500 text-xs ml-2">({warning.employeeCode})</span>
+            {/* Pending Leaves Warning Section */}
+            {selectedEmployeesPendingLeaves.length > 0 && (
+              <div className="p-4 bg-yellow-50 border-t border-yellow-200">
+                <div className="flex items-start space-x-3">
+                  <FaExclamationCircle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <h3 className="text-sm font-semibold text-yellow-800">Pending Leave Requests</h3>
+                    <p className="text-xs text-yellow-700 mt-1 mb-2">
+                      The following employees have pending leave requests for this period. Please approve or reject before finalizing payroll.
+                    </p>
+                    <div className="space-y-2">
+                      {selectedEmployeesPendingLeaves.map((warning, idx) => (
+                        <div key={idx} className="flex items-center justify-between bg-content1 rounded-lg px-3 py-2 border border-warning-200">
+                          <div>
+                            <span className="font-medium text-foreground">{warning.employeeName}</span>
+                            <span className="text-default-500 text-xs ml-2">({warning.employeeCode})</span>
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            <span className="text-warning-700 text-sm font-medium">{warning.pendingDays} day(s) pending</span>
+                            <span className="text-xs text-default-500">
+                              {new Date(warning.startDate).toLocaleDateString()} - {new Date(warning.endDate).toLocaleDateString()}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex items-center space-x-3">
-                          <span className="text-warning-700 text-sm font-medium">{warning.pendingDays} day(s) pending</span>
-                          <span className="text-xs text-default-500">
-                            {new Date(warning.startDate).toLocaleDateString()} - {new Date(warning.endDate).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
 
-          <div className="p-6 bg-default-50 border-t border-default-200 flex items-center justify-between">
-            <div className="text-sm text-default-600">
-              <FaExclamationTriangle className="inline-block w-4 h-4 text-warning-500 mr-1" />
-              Review the calculated salaries before generating.
+            <div className="p-6 bg-default-50 border-t border-default-200 flex items-center justify-between">
+              <div className="text-sm text-default-600">
+                <FaExclamationTriangle className="inline-block w-4 h-4 text-warning-500 mr-1" />
+                Review the calculated salaries before generating.
+              </div>
+              <div className="flex items-center gap-3">
+                <SecondaryButton onPress={() => setShowPreview(false)}>Back</SecondaryButton>
+                <PrimaryButton
+                  onPress={handleGeneratePayroll}
+                  isDisabled={generating}
+                  isLoading={generating}
+                  startContent={!generating && <FaCheckCircle />}
+                >
+                  {generating ? 'Generating...' : 'Generate Payroll'}
+                </PrimaryButton>
+              </div>
             </div>
-            <div className="flex items-center gap-3">
-              <SecondaryButton onPress={() => setShowPreview(false)}>Back</SecondaryButton>
-              <PrimaryButton
-                onPress={handleGeneratePayroll}
-                isDisabled={generating}
-                isLoading={generating}
-                startContent={!generating && <FaCheckCircle />}
-              >
-                {generating ? 'Generating...' : 'Generate Payroll'}
-              </PrimaryButton>
-            </div>
-          </div>
           </HRMSCardBody>
         </HRMSCard>
       )}
+
+      {/* Attendance Correction Modal */}
+      <AttendanceCorrectionModal
+        isOpen={correctionModalOpen}
+        onClose={() => setCorrectionModalOpen(false)}
+        employee={selectedEmployeeForCorrection}
+        month={formData.month}
+        year={formData.year}
+        onCorrectionSaved={handleCorrectionSaved}
+      />
     </div>
   )
 }

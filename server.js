@@ -108,10 +108,10 @@ app.prepare().then(() => {
       if (userId) {
         socket.userId = userId;
         socket.join(`user:${userId}`);
-        
+
         // CRITICAL FIX: Mark this socket as a desktop app
         socket.isDesktopApp = true;
-        
+
         socket.emit('registration-confirmed', { status: 'ok', userId });
         console.log(`🖥️ [Socket.IO] Desktop app registered for user ${userId} (isDesktopApp=true)`);
       }
@@ -121,7 +121,7 @@ app.prepare().then(() => {
     socket.on('join-chat', (chatId) => {
       socket.join(`chat:${chatId}`);
       console.log(`👤 [Socket.IO] User ${socket.userId || socket.id} joined chat:${chatId}`);
-      
+
       // Notify others in the room
       socket.to(`chat:${chatId}`).emit('user-joined', {
         userId: socket.userId,
@@ -145,7 +145,7 @@ app.prepare().then(() => {
     socket.on('leave-chat', (chatId) => {
       socket.leave(`chat:${chatId}`);
       console.log(`👋 [Socket.IO] User ${socket.userId || socket.id} left chat:${chatId}`);
-      
+
       // Notify others in the room
       socket.to(`chat:${chatId}`).emit('user-left', {
         userId: socket.userId,
@@ -157,7 +157,7 @@ app.prepare().then(() => {
     socket.on('send-message', (data) => {
       const { chatId, message } = data;
       console.log(`💬 [Socket.IO] Broadcasting message to chat:${chatId}`);
-      
+
       // Broadcast to all users in the chat room (including sender for confirmation)
       io.to(`chat:${chatId}`).emit('new-message', {
         chatId,
@@ -168,41 +168,41 @@ app.prepare().then(() => {
     // Handle typing indicator
     socket.on('typing', (data) => {
       const { chatId, userId, userName } = data;
-      socket.to(`chat:${chatId}`).emit('user-typing', { 
-        userId, 
+      socket.to(`chat:${chatId}`).emit('user-typing', {
+        userId,
         userName,
-        chatId 
+        chatId
       });
     });
 
     // Handle stop typing
     socket.on('stop-typing', (data) => {
       const { chatId, userId } = data;
-      socket.to(`chat:${chatId}`).emit('user-stop-typing', { 
+      socket.to(`chat:${chatId}`).emit('user-stop-typing', {
         userId,
-        chatId 
+        chatId
       });
     });
 
     // ========== MEETING ROOM HANDLERS ==========
-    
+
     // Join a meeting room
     socket.on('join-meeting', (data) => {
       const { roomId, userId, userName } = data;
       socket.meetingRoom = roomId;
       socket.meetingUserId = userId;
       socket.meetingUserName = userName;
-      
+
       socket.join(`meeting:${roomId}`);
       console.log(`📹 [Socket.IO] User ${userName} (${socket.id}) joined meeting:${roomId}`);
-      
+
       // Notify others in the meeting room
       socket.to(`meeting:${roomId}`).emit('user-joined', {
         id: socket.id,
         userId: userId,
         userName: userName
       });
-      
+
       // Send list of existing participants to the new user
       const room = io.sockets.adapter.rooms.get(`meeting:${roomId}`);
       if (room) {
@@ -228,7 +228,7 @@ app.prepare().then(() => {
       const { roomId } = data;
       socket.leave(`meeting:${roomId}`);
       console.log(`📹 [Socket.IO] User ${socket.meetingUserName || socket.id} left meeting:${roomId}`);
-      
+
       // Notify others
       socket.to(`meeting:${roomId}`).emit('user-left', {
         id: socket.id,
@@ -319,7 +319,7 @@ app.prepare().then(() => {
           }
         }
       }
-      
+
       // If user was in a meeting, notify others
       if (socket.meetingRoom) {
         socket.to(`meeting:${socket.meetingRoom}`).emit('user-left', {
@@ -332,9 +332,20 @@ app.prepare().then(() => {
     });
   });
 
-  server.listen(port, (err) => {
+  server.listen(port, async (err) => {
     if (err) throw err;
     console.log(`> Ready on http://${hostname}:${port}`);
     console.log(`> Socket.IO server running on path: /api/socketio`);
+
+    // Warm up database connections in background (don't block startup)
+    if (dev) {
+      console.log('🔥 Warming up database connections...');
+      // Dynamic import for ESM module
+      import('./lib/superadminDb.js').then(({ getSuperadminConnection }) => {
+        getSuperadminConnection()
+          .then(() => console.log('✅ Superadmin DB connection warmed'))
+          .catch((e) => console.warn('⚠️ Superadmin DB warm-up skipped:', e.message));
+      }).catch(() => { });
+    }
   });
 });

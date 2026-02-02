@@ -10,12 +10,12 @@ import { emitAttendanceUpdate, emitDashboardRefresh } from '@/lib/realtimeEvents
 import { getAuthAndModels } from '@/lib/auth'
 import { buildSearchQuery, fetchRoleNews } from '@/lib/roleNews'
 import mongoose from 'mongoose'
-import { 
-  getTimezone, 
-  toTimezoneDate, 
-  compareTimeToOfficeHours, 
+import {
+  getTimezone,
+  toTimezoneDate,
+  compareTimeToOfficeHours,
   getDayNameInTimezone,
-  DEFAULT_TIMEZONE 
+  DEFAULT_TIMEZONE
 } from '@/lib/timezone'
 
 const isValidObjectId = (id) => {
@@ -383,14 +383,14 @@ export async function POST(request) {
       return NextResponse.json({ message: auth.message || 'Unauthorized' }, { status: 401 });
     }
 
-  const { user, models, tenant } = auth;
+    const { user, models, tenant } = auth;
     const TenantAttendance = models.Attendance;
     const TenantEmployee = models.Employee;
     const TenantLeave = models.Leave;
     const TenantCompanySettings = models.CompanySettings;
 
     const data = await request.json()
-    const { employeeId, type, latitude, longitude, address, accuracy } = data // type: 'clock-in' or 'clock-out'
+    const { employeeId, type, latitude, longitude, address, accuracy, date, checkIn, checkOut, status, workHours, remarks } = data // type: 'clock-in' or 'clock-out' or 'manual'
 
     // LOCATION VALIDATION - Optional but log warnings if not provided
     const locationValidation = validateLocationData({ latitude, longitude })
@@ -417,6 +417,96 @@ export async function POST(request) {
         { success: false, message: 'Employee not found' },
         { status: 404 }
       )
+    }
+
+    // Manual attendance correction (admin/hr) for specific date
+    if (type === 'manual') {
+      if (!['admin', 'hr', 'superadmin', 'owner'].includes(user?.role)) {
+        return NextResponse.json(
+          { success: false, message: 'Unauthorized' },
+          { status: 403 }
+        )
+      }
+
+      if (!date || !isValidDateString(date)) {
+        return NextResponse.json(
+          { success: false, message: 'Invalid date format' },
+          { status: 400 }
+        )
+      }
+
+      const dayStart = new Date(date)
+      dayStart.setHours(0, 0, 0, 0)
+      const dayEnd = new Date(date)
+      dayEnd.setHours(23, 59, 59, 999)
+
+      let attendance = await TenantAttendance.findOne({
+        employee: employeeId,
+        date: { $gte: dayStart, $lte: dayEnd }
+      })
+
+      let calculatedWorkHours = workHours || 0
+      let totalLoggedHours = 0
+      let breakMinutes = 0
+      let shrinkagePercentage = 0
+      let statusToSet = status || 'absent'
+      let statusReason = ''
+
+      if (checkIn && checkOut) {
+        const checkInDate = new Date(checkIn)
+        const checkOutDate = new Date(checkOut)
+
+        const breakTimings = Array.isArray(settings?.breakTimings) ? settings.breakTimings : []
+        const fullDayHours = settings?.fullDayHours || 8
+        const halfDayHours = settings?.halfDayHours || 4
+
+        const workHoursCalc = calculateEffectiveWorkHours(checkInDate, checkOutDate, breakTimings)
+        calculatedWorkHours = workHoursCalc.effectiveWorkHours
+        totalLoggedHours = workHoursCalc.totalLoggedHours
+        breakMinutes = workHoursCalc.breakMinutes
+        shrinkagePercentage = workHoursCalc.shrinkagePercentage
+
+        const statusResult = determineAttendanceStatus(calculatedWorkHours, {
+          fullDayHours,
+          halfDayHours
+        })
+        statusToSet = statusResult.status
+        statusReason = statusResult.reason
+      }
+
+      const updatePayload = {
+        employee: employeeId,
+        date: dayStart,
+        checkIn: checkIn ? new Date(checkIn) : null,
+        checkOut: checkOut ? new Date(checkOut) : null,
+        status: statusToSet,
+        workHours: calculatedWorkHours,
+        totalLoggedHours,
+        breakMinutes,
+        shrinkagePercentage,
+        statusReason,
+        remarks: remarks || '',
+        isManualEntry: true,
+        source: 'correction',
+        correctedAt: new Date(),
+        correctedBy: user?._id
+      }
+
+      if (attendance) {
+        attendance = await TenantAttendance.findByIdAndUpdate(
+          attendance._id,
+          updatePayload,
+          { new: true, runValidators: true }
+        )
+      } else {
+        attendance = await TenantAttendance.create(updatePayload)
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Attendance saved successfully',
+        data: attendance
+      })
     }
 
     // Determine settings based on employee's company
@@ -548,7 +638,7 @@ export async function POST(request) {
       }
 
       const checkInTime = new Date()
-      
+
       // Use office timings from settings (default: 09:00 - 18:00)
       // Note: companyTimezone is already declared above for working day checks
       const officeCheckInTime = settings?.checkInTime || '09:00'
@@ -565,11 +655,11 @@ export async function POST(request) {
 
       // Determine check-in status based on timezone-aware comparison
       const checkInStatus = timeComparison.status;
-      
+
       // Log for debugging (can be removed in production)
       console.log(`[Attendance Check-in] Timezone: ${companyTimezone}, Office: ${officeCheckInTime}, ` +
-                  `Actual: ${timeComparison.actualTime.toLocaleTimeString('en-IN', { timeZone: companyTimezone })}, ` +
-                  `Status: ${checkInStatus}, Diff: ${timeComparison.minutesDiff} mins`)
+        `Actual: ${timeComparison.actualTime.toLocaleTimeString('en-IN', { timeZone: companyTimezone })}, ` +
+        `Status: ${checkInStatus}, Diff: ${timeComparison.minutesDiff} mins`)
 
       // Server-side reverse geocoding for accurate address (only if location provided)
       let resolvedAddress = null
@@ -802,13 +892,13 @@ export async function POST(request) {
         console.error('Failed to send latest news push notification:', newsPushError)
       }
 
-  const tenantId = tenant?.databaseName
-  await clearCachePattern(buildCachePattern({ tenantId, namespace: 'attendance-summary' }))
-  await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:hr-stats', userId: '*' }))
-  await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:manager-stats', userId: '*' }))
-  await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:employee-stats', userId: user._id || user.userId }))
+      const tenantId = tenant?.databaseName
+      await clearCachePattern(buildCachePattern({ tenantId, namespace: 'attendance-summary' }))
+      await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:hr-stats', userId: '*' }))
+      await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:manager-stats', userId: '*' }))
+      await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:employee-stats', userId: user._id || user.userId }))
 
-  // Build response with optional warning
+      // Build response with optional warning
       const responseData = {
         success: true,
         message: locationWarning
@@ -952,11 +1042,11 @@ export async function POST(request) {
       if (checkOutComparison.minutesDiff < -1) { // 1 minute buffer for precision
         checkOutStatus = 'early'
       }
-      
+
       // Log for debugging
       console.log(`[Attendance Check-out] Timezone: ${companyTimezone}, Office: ${officeCheckOutTime}, ` +
-                  `Actual: ${checkOutComparison.actualTime.toLocaleTimeString('en-IN', { timeZone: companyTimezone })}, ` +
-                  `Status: ${checkOutStatus}, Diff: ${checkOutComparison.minutesDiff} mins`)
+        `Actual: ${checkOutComparison.actualTime.toLocaleTimeString('en-IN', { timeZone: companyTimezone })}, ` +
+        `Status: ${checkOutStatus}, Diff: ${checkOutComparison.minutesDiff} mins`)
 
       attendance.checkOutStatus = checkOutStatus
 
@@ -1135,13 +1225,13 @@ export async function POST(request) {
         console.error('Failed to send clock-out push notification:', pushError)
       }
 
-  const tenantId = tenant?.databaseName
-  await clearCachePattern(buildCachePattern({ tenantId, namespace: 'attendance-summary' }))
-  await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:hr-stats', userId: '*' }))
-  await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:manager-stats', userId: '*' }))
-  await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:employee-stats', userId: user._id || user.userId }))
+      const tenantId = tenant?.databaseName
+      await clearCachePattern(buildCachePattern({ tenantId, namespace: 'attendance-summary' }))
+      await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:hr-stats', userId: '*' }))
+      await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:manager-stats', userId: '*' }))
+      await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:employee-stats', userId: user._id || user.userId }))
 
-  // Build response with optional warning
+      // Build response with optional warning
       const checkOutResponse = {
         success: true,
         message: checkOutLocationWarning
