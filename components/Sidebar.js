@@ -56,7 +56,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
   const [tooltipContent, setTooltipContent] = useState(null)
   const tooltipY = useRef(0)
   const tooltipRef = useRef(null)
-  
+
   // Sidebar pending counts
   const [sidebarCounts, setSidebarCounts] = useState({
     projects: 0,
@@ -67,7 +67,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
     helpdesk: 0,
     notifications: 0
   })
-  
+
   // Auto-collapse timer ref
   const autoCollapseTimerRef = useRef(null)
   const sidebarRef = useRef(null)
@@ -84,7 +84,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
   const startAutoCollapseTimer = useCallback(() => {
     // Only auto-collapse on desktop when sidebar is expanded
     if (!isDesktop || isCollapsed) return
-    
+
     clearAutoCollapseTimer()
     autoCollapseTimerRef.current = setTimeout(() => {
       setIsCollapsed(true)
@@ -196,15 +196,11 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
   // Fetch counts on mount and periodically
   useEffect(() => {
     if (mounted && user) {
-      // Small delay to ensure token is available after login
-      const initialTimeout = setTimeout(() => {
-        fetchSidebarCounts()
-      }, 500)
-      
+      fetchSidebarCounts()
+
       // Refresh counts every 60 seconds
       const interval = setInterval(fetchSidebarCounts, 60000)
       return () => {
-        clearTimeout(initialTimeout)
         clearInterval(interval)
       }
     }
@@ -214,7 +210,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
   // NOTE: MIRA AI Assistant has been removed from web - only available in desktop apps
   const menuItems = useMemo(() => {
     if (!user) return []
-    
+
     // If user is detected as department head, use department_head menu
     const effectiveRole = isDepartmentHead ? 'department_head' : user.role
     let baseMenuItems = getMenuItemsForRole(effectiveRole)
@@ -362,7 +358,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
           ${isDesktop && isCollapsed ? 'lg:!w-[4.5rem]' : ''}
           transition-transform duration-300 ease-in-out lg:transition-[width] lg:duration-300
         `}
-        style={{ 
+        style={{
           backgroundColor: 'var(--color-bg-sidebar)',
         }}
       >
@@ -418,18 +414,101 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
           {menuItems.map((item) => {
             const isActive = isMenuItemActive(item)
             return (
-            <div key={item.name} className="w-full">
-              {item.submenu ? (
-                <div className="w-full">
+              <div key={item.name} className="w-full">
+                {item.submenu ? (
+                  <div className="w-full">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (isDesktop && isCollapsed) {
+                          setIsCollapsed(false)
+                          setTimeout(() => toggleSubmenu(item.name), 100)
+                        } else {
+                          toggleSubmenu(item.name)
+                        }
+                      }}
+                      onMouseEnter={(e) => {
+                        if (isDesktop && isCollapsed) {
+                          tooltipY.current = e.clientY
+                          setTooltipContent(item.name)
+                        }
+                      }}
+                      onMouseMove={(e) => {
+                        if (isDesktop && isCollapsed) {
+                          tooltipY.current = e.clientY
+                          if (tooltipRef.current) {
+                            tooltipRef.current.style.top = `${e.clientY}px`
+                          }
+                        }
+                      }}
+                      onMouseLeave={() => setTooltipContent(null)}
+                      className={`w-full flex items-center text-left rounded-xl transition-all duration-200 group relative ${isDesktop && isCollapsed ? 'justify-center p-2.5 bg-[var(--color-primary-100)] hover:!bg-gray-800' : 'justify-between px-3 sm:px-4 py-3'}`}
+                      style={{
+                        backgroundColor: isDesktop && isCollapsed
+                          ? (isActive ? 'var(--color-primary-500)' : undefined)
+                          : (expandedMenus[item.name] ? 'var(--color-bg-hover)' : 'transparent'),
+                        color: '#111827'
+                      }}
+                    >
+                      <div className={`flex items-center ${isDesktop && isCollapsed ? '' : 'gap-3 flex-1'}`}>
+                        <div
+                          className={`transition-colors relative flex-shrink-0 ${isDesktop && isCollapsed ? '' : 'p-2 rounded-lg'}`}
+                          style={{
+                            backgroundColor: isDesktop && isCollapsed ? 'transparent' : (expandedMenus[item.name] ? 'var(--color-primary-500)' : 'var(--color-primary-100)'),
+                            color: isDesktop && isCollapsed
+                              ? (isActive ? 'white' : 'var(--color-primary-600)')
+                              : (expandedMenus[item.name] ? 'white' : 'var(--color-primary-700)')
+                          }}
+                        >
+                          <item.icon className={isDesktop && isCollapsed ? 'w-6 h-6 group-hover:text-white' : 'w-5 h-5'} />
+                          {/* Only show badge on icon when collapsed */}
+                          {(isDesktop && isCollapsed) && <SidebarBadge count={getBadgeCount(item.name)} />}
+                        </div>
+                        {!(isDesktop && isCollapsed) && (
+                          <div className="flex items-center gap-2 flex-1 min-w-0">
+                            {item.name === 'Attendance & Leaves' ? (
+                              <span className="text-sm font-medium leading-tight text-left">
+                                Attendance &<br />Leaves
+                              </span>
+                            ) : (
+                              <span className="text-sm font-medium truncate">{item.name}</span>
+                            )}
+                            <InlineBadge count={getBadgeCount(item.name)} />
+                          </div>
+                        )}
+                      </div>
+                      {!(isDesktop && isCollapsed) && (
+                        <div className={`transition-transform duration-200 flex-shrink-0 ${expandedMenus[item.name] ? 'rotate-90' : ''}`}>
+                          <HiOutlineChevronRight className="w-4 h-4" />
+                        </div>
+                      )}
+                    </button>
+                    {expandedMenus[item.name] && !(isDesktop && isCollapsed) && (
+                      <div className="mt-2 space-y-1 ml-8 pl-3" style={{ borderLeft: '2px solid var(--color-primary-200)' }}>
+                        {item.submenu.map((subItem) => (
+                          <Link
+                            key={subItem.path}
+                            href={subItem.path}
+                            onClick={() => handleLinkClick(subItem.path)}
+                            className="w-full text-left flex items-center justify-between px-3 py-2 text-sm rounded-lg transition-all duration-200 cursor-pointer"
+                            style={{
+                              backgroundColor: pathname === subItem.path ? 'var(--color-primary-500)' : 'transparent',
+                              color: pathname === subItem.path ? 'white' : '#6B7280'
+                            }}
+                          >
+                            <span>{subItem.name}</span>
+                            <InlineBadge count={getSubmenuBadgeCount(subItem.name)} />
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : item.name === 'Chat' && isDesktop ? (
+                  // Desktop: Open floating chat widget instead of navigating
                   <button
-                    type="button"
                     onClick={() => {
-                      if (isDesktop && isCollapsed) {
-                        setIsCollapsed(false)
-                        setTimeout(() => toggleSubmenu(item.name), 100)
-                      } else {
-                        toggleSubmenu(item.name)
-                      }
+                      toggleWidget('sidebar')
+                      handleLinkClick(null) // null path - no navigation needed
                     }}
                     onMouseEnter={(e) => {
                       if (isDesktop && isCollapsed) {
@@ -446,11 +525,9 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                       }
                     }}
                     onMouseLeave={() => setTooltipContent(null)}
-                    className={`w-full flex items-center text-left rounded-xl transition-all duration-200 group relative ${isDesktop && isCollapsed ? 'justify-center p-2.5 bg-[var(--color-primary-100)] hover:!bg-gray-800' : 'justify-between px-3 sm:px-4 py-3'}`}
+                    className={`w-full flex items-center text-left rounded-xl transition-all duration-200 group cursor-pointer relative ${isDesktop && isCollapsed ? 'justify-center p-2.5 bg-[var(--color-primary-100)] hover:!bg-gray-800' : 'px-3 sm:px-4 py-3'}`}
                     style={{
-                      backgroundColor: isDesktop && isCollapsed 
-                        ? (isActive ? 'var(--color-primary-500)' : undefined) 
-                        : (expandedMenus[item.name] ? 'var(--color-bg-hover)' : 'transparent'),
+                      backgroundColor: isDesktop && isCollapsed ? undefined : 'transparent',
                       color: '#111827'
                     }}
                   >
@@ -458,166 +535,86 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                       <div
                         className={`transition-colors relative flex-shrink-0 ${isDesktop && isCollapsed ? '' : 'p-2 rounded-lg'}`}
                         style={{
-                          backgroundColor: isDesktop && isCollapsed ? 'transparent' : (expandedMenus[item.name] ? 'var(--color-primary-500)' : 'var(--color-primary-100)'),
-                          color: isDesktop && isCollapsed 
-                            ? (isActive ? 'white' : 'var(--color-primary-600)') 
-                            : (expandedMenus[item.name] ? 'white' : 'var(--color-primary-700)')
+                          backgroundColor: isDesktop && isCollapsed ? 'transparent' : 'var(--color-primary-100)',
+                          color: 'var(--color-primary-600)'
                         }}
                       >
                         <item.icon className={isDesktop && isCollapsed ? 'w-6 h-6 group-hover:text-white' : 'w-5 h-5'} />
-                        {/* Only show badge on icon when collapsed */}
-                        {(isDesktop && isCollapsed) && <SidebarBadge count={getBadgeCount(item.name)} />}
+                        {unreadCount > 0 && (
+                          <UnreadBadge count={unreadCount} />
+                        )}
                       </div>
                       {!(isDesktop && isCollapsed) && (
                         <div className="flex items-center gap-2 flex-1 min-w-0">
-                          {item.name === 'Attendance & Leaves' ? (
-                            <span className="text-sm font-medium leading-tight text-left">
-                              Attendance &<br />Leaves
-                            </span>
-                          ) : (
-                            <span className="text-sm font-medium truncate">{item.name}</span>
-                          )}
-                          <InlineBadge count={getBadgeCount(item.name)} />
+                          <span className="text-sm font-medium truncate">{item.name}</span>
                         </div>
                       )}
                     </div>
-                    {!(isDesktop && isCollapsed) && (
-                      <div className={`transition-transform duration-200 flex-shrink-0 ${expandedMenus[item.name] ? 'rotate-90' : ''}`}>
-                        <HiOutlineChevronRight className="w-4 h-4" />
-                      </div>
-                    )}
                   </button>
-                  {expandedMenus[item.name] && !(isDesktop && isCollapsed) && (
-                    <div className="mt-2 space-y-1 ml-8 pl-3" style={{ borderLeft: '2px solid var(--color-primary-200)' }}>
-                      {item.submenu.map((subItem) => (
-                        <Link
-                          key={subItem.path}
-                          href={subItem.path}
-                          onClick={() => handleLinkClick(subItem.path)}
-                          className="w-full text-left flex items-center justify-between px-3 py-2 text-sm rounded-lg transition-all duration-200 cursor-pointer"
-                          style={{
-                            backgroundColor: pathname === subItem.path ? 'var(--color-primary-500)' : 'transparent',
-                            color: pathname === subItem.path ? 'white' : '#6B7280'
-                          }}
-                        >
-                          <span>{subItem.name}</span>
-                          <InlineBadge count={getSubmenuBadgeCount(subItem.name)} />
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ) : item.name === 'Chat' && isDesktop ? (
-                // Desktop: Open floating chat widget instead of navigating
-                <button
-                  onClick={() => {
-                    toggleWidget('sidebar')
-                    handleLinkClick(null) // null path - no navigation needed
-                  }}
-                  onMouseEnter={(e) => {
-                    if (isDesktop && isCollapsed) {
-                      tooltipY.current = e.clientY
-                      setTooltipContent(item.name)
-                    }
-                  }}
-                  onMouseMove={(e) => {
-                    if (isDesktop && isCollapsed) {
-                      tooltipY.current = e.clientY
-                      if (tooltipRef.current) {
-                        tooltipRef.current.style.top = `${e.clientY}px`
+                ) : (
+                  <Link
+                    href={item.path}
+                    onClick={() => handleLinkClick(item.path)}
+                    onMouseEnter={(e) => {
+                      if (isDesktop && isCollapsed) {
+                        tooltipY.current = e.clientY
+                        setTooltipContent(item.name)
                       }
-                    }
-                  }}
-                  onMouseLeave={() => setTooltipContent(null)}
-                  className={`w-full flex items-center text-left rounded-xl transition-all duration-200 group cursor-pointer relative ${isDesktop && isCollapsed ? 'justify-center p-2.5 bg-[var(--color-primary-100)] hover:!bg-gray-800' : 'px-3 sm:px-4 py-3'}`}
-                  style={{
-                    backgroundColor: isDesktop && isCollapsed ? undefined : 'transparent',
-                    color: '#111827'
-                  }}
-                >
-                  <div className={`flex items-center ${isDesktop && isCollapsed ? '' : 'gap-3 flex-1'}`}>
-                    <div
-                      className={`transition-colors relative flex-shrink-0 ${isDesktop && isCollapsed ? '' : 'p-2 rounded-lg'}`}
-                      style={{
-                        backgroundColor: isDesktop && isCollapsed ? 'transparent' : 'var(--color-primary-100)',
-                        color: 'var(--color-primary-600)'
-                      }}
-                    >
-                      <item.icon className={isDesktop && isCollapsed ? 'w-6 h-6 group-hover:text-white' : 'w-5 h-5'} />
-                      {unreadCount > 0 && (
-                        <UnreadBadge count={unreadCount} />
+                    }}
+                    onMouseMove={(e) => {
+                      if (isDesktop && isCollapsed) {
+                        tooltipY.current = e.clientY
+                        if (tooltipRef.current) {
+                          tooltipRef.current.style.top = `${e.clientY}px`
+                        }
+                      }
+                    }}
+                    onMouseLeave={() => setTooltipContent(null)}
+                    className={`w-full flex items-center text-left rounded-xl transition-all duration-200 group cursor-pointer relative ${isDesktop && isCollapsed ? 'justify-center p-2.5 bg-[var(--color-primary-100)] hover:!bg-gray-800' : 'px-3 sm:px-4 py-3'}`}
+                    style={{
+                      backgroundColor: isDesktop && isCollapsed
+                        ? (isActive ? 'var(--color-primary-500)' : undefined)
+                        : (isActive ? 'var(--color-primary-500)' : 'transparent'),
+                      color: isActive ? 'white' : '#111827'
+                    }}
+                  >
+                    <div className={`flex items-center ${isDesktop && isCollapsed ? '' : 'gap-3 flex-1'}`}>
+                      <div
+                        className={`transition-colors relative flex-shrink-0 ${isDesktop && isCollapsed ? '' : 'p-2 rounded-lg'}`}
+                        style={{
+                          backgroundColor: isDesktop && isCollapsed ? 'transparent' : (isActive ? 'var(--color-primary-600)' : 'var(--color-primary-100)'),
+                          color: isDesktop && isCollapsed
+                            ? (isActive ? 'white' : 'var(--color-primary-600)')
+                            : (isActive ? 'white' : 'var(--color-primary-700)')
+                        }}
+                      >
+                        <item.icon className={isDesktop && isCollapsed ? 'w-6 h-6 group-hover:text-white' : 'w-5 h-5'} />
+                        {/* Chat unread badge - always on icon */}
+                        {item.name === 'Chat' && unreadCount > 0 && (
+                          <UnreadBadge count={unreadCount} />
+                        )}
+                        {/* Other badges - only on icon when collapsed */}
+                        {item.name !== 'Chat' && (isDesktop && isCollapsed) && <SidebarBadge count={getBadgeCount(item.name)} />}
+                      </div>
+                      {!(isDesktop && isCollapsed) && (
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <span className="text-sm font-medium truncate">{item.name}</span>
+                          {item.name !== 'Chat' && <InlineBadge count={getBadgeCount(item.name)} />}
+                        </div>
                       )}
                     </div>
-                    {!(isDesktop && isCollapsed) && (
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <span className="text-sm font-medium truncate">{item.name}</span>
-                      </div>
-                    )}
-                  </div>
-                </button>
-              ) : (
-                <Link
-                  href={item.path}
-                  onClick={() => handleLinkClick(item.path)}
-                  onMouseEnter={(e) => {
-                    if (isDesktop && isCollapsed) {
-                      tooltipY.current = e.clientY
-                      setTooltipContent(item.name)
-                    }
-                  }}
-                  onMouseMove={(e) => {
-                    if (isDesktop && isCollapsed) {
-                      tooltipY.current = e.clientY
-                      if (tooltipRef.current) {
-                        tooltipRef.current.style.top = `${e.clientY}px`
-                      }
-                    }
-                  }}
-                  onMouseLeave={() => setTooltipContent(null)}
-                  className={`w-full flex items-center text-left rounded-xl transition-all duration-200 group cursor-pointer relative ${isDesktop && isCollapsed ? 'justify-center p-2.5 bg-[var(--color-primary-100)] hover:!bg-gray-800' : 'px-3 sm:px-4 py-3'}`}
-                  style={{
-                    backgroundColor: isDesktop && isCollapsed 
-                      ? (isActive ? 'var(--color-primary-500)' : undefined) 
-                      : (isActive ? 'var(--color-primary-500)' : 'transparent'),
-                    color: isActive ? 'white' : '#111827'
-                  }}
-                >
-                  <div className={`flex items-center ${isDesktop && isCollapsed ? '' : 'gap-3 flex-1'}`}>
-                    <div
-                      className={`transition-colors relative flex-shrink-0 ${isDesktop && isCollapsed ? '' : 'p-2 rounded-lg'}`}
-                      style={{
-                        backgroundColor: isDesktop && isCollapsed ? 'transparent' : (isActive ? 'var(--color-primary-600)' : 'var(--color-primary-100)'),
-                        color: isDesktop && isCollapsed 
-                          ? (isActive ? 'white' : 'var(--color-primary-600)') 
-                          : (isActive ? 'white' : 'var(--color-primary-700)')
-                      }}
-                    >
-                      <item.icon className={isDesktop && isCollapsed ? 'w-6 h-6 group-hover:text-white' : 'w-5 h-5'} />
-                      {/* Chat unread badge - always on icon */}
-                      {item.name === 'Chat' && unreadCount > 0 && (
-                        <UnreadBadge count={unreadCount} />
-                      )}
-                      {/* Other badges - only on icon when collapsed */}
-                      {item.name !== 'Chat' && (isDesktop && isCollapsed) && <SidebarBadge count={getBadgeCount(item.name)} />}
-                    </div>
-                    {!(isDesktop && isCollapsed) && (
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <span className="text-sm font-medium truncate">{item.name}</span>
-                        {item.name !== 'Chat' && <InlineBadge count={getBadgeCount(item.name)} />}
-                      </div>
-                    )}
-                  </div>
-                </Link>
-              )}
-            </div>
-          )})}
+                  </Link>
+                )}
+              </div>
+            )
+          })}
         </ScrollShadow>
 
         {/* Chat, Settings and Logout Section - Fixed at bottom - Mobile only */}
         {!isDesktop && (
-          <div 
+          <div
             className="flex-shrink-0 px-3 py-3"
-            style={{ 
+            style={{
               borderTop: '1px solid var(--color-primary-200)',
               backgroundColor: 'var(--color-primary-50)'
             }}
@@ -630,8 +627,8 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                 className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl transition-all duration-200 hover:bg-white/50 relative"
                 style={{ color: '#111827' }}
               >
-                <HiOutlineChatBubbleLeftRight 
-                  className="w-5 h-5" 
+                <HiOutlineChatBubbleLeftRight
+                  className="w-5 h-5"
                   style={{ color: 'var(--color-primary-600)' }}
                 />
                 <span className="text-sm font-medium">Chat</span>
@@ -647,8 +644,8 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                 className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl transition-all duration-200 hover:bg-white/50"
                 style={{ color: '#111827' }}
               >
-                <HiOutlineCog6Tooth 
-                  className="w-5 h-5" 
+                <HiOutlineCog6Tooth
+                  className="w-5 h-5"
                   style={{ color: pathname === '/dashboard/settings' ? 'var(--color-primary-600)' : 'var(--color-primary-500)' }}
                 />
                 <span className="text-sm font-medium">Settings</span>
@@ -660,8 +657,8 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                 className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl transition-all duration-200 hover:bg-red-50"
                 style={{ color: '#111827' }}
               >
-                <HiOutlineArrowRightOnRectangle 
-                  className="w-5 h-5" 
+                <HiOutlineArrowRightOnRectangle
+                  className="w-5 h-5"
                   style={{ color: 'var(--color-primary-500)' }}
                 />
                 <span className="text-sm font-medium">Logout</span>
@@ -699,7 +696,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
 
       {/* Tooltip */}
       {tooltipContent && (
-        <div 
+        <div
           ref={tooltipRef}
           className="fixed left-[4.5rem] ml-2 px-2 py-1 bg-default-900 text-white text-xs rounded pointer-events-none whitespace-nowrap z-[100] shadow-lg"
           style={{ top: tooltipY.current, transform: 'translateY(-50%)' }}

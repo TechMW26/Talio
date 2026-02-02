@@ -8,11 +8,11 @@ export async function GET(request) {
       'User', 'Employee', 'Department', 'ProjectMember', 'Leave', 'AttendanceCorrection',
       'Expense', 'Helpdesk', 'Notification', 'Task', 'TaskAssignee'
     ])
-    
+
     if (!auth.success) {
       // Return empty counts instead of 401 to avoid console errors
-      return NextResponse.json({ 
-        success: true, 
+      return NextResponse.json({
+        success: true,
         data: {
           projects: 0,
           tasks: 0,
@@ -24,17 +24,19 @@ export async function GET(request) {
         }
       })
     }
-    
+
     const { user, models } = auth
-    const { 
+    const {
       User, Employee, Department, ProjectMember, Leave, AttendanceCorrection,
-      Expense, Helpdesk, Notification, Task, TaskAssignee 
+      Expense, Helpdesk, Notification, Task, TaskAssignee
     } = models
 
-    const userRecord = await User.findById(user._id || user.userId).select('employeeId role')
+    const userRecord = await User.findById(user._id || user.userId)
+      .select('employeeId role isDepartmentHead headOfDepartments')
+      .lean()
     if (!userRecord?.employeeId) {
-      return NextResponse.json({ 
-        success: true, 
+      return NextResponse.json({
+        success: true,
         data: {
           projects: 0,
           tasks: 0,
@@ -60,61 +62,59 @@ export async function GET(request) {
       notifications: 0  // Unread notifications
     }
 
-    // 1. Project invitations for current user
-    try {
-      counts.projects = await ProjectMember.countDocuments({
+    // 1-3. Base counts in parallel
+    const [projectCount, taskCount, notificationCount] = await Promise.all([
+      ProjectMember.countDocuments({
         user: employeeId,
         invitationStatus: 'invited'
-      })
-    } catch (err) {
-      console.error('Error counting project invitations:', err.message)
-    }
-
-    // 2. Pending task assignments for current user
-    try {
-      if (TaskAssignee) {
-        counts.tasks = await TaskAssignee.countDocuments({
+      }).catch((err) => {
+        console.error('Error counting project invitations:', err.message)
+        return 0
+      }),
+      TaskAssignee
+        ? TaskAssignee.countDocuments({
           user: employeeId,
           assignmentStatus: 'pending'
+        }).catch((err) => {
+          console.error('Error counting task assignments:', err.message)
+          return 0
         })
-      }
-    } catch (err) {
-      console.error('Error counting task assignments:', err.message)
-    }
-
-    // 3. Unread notifications
-    try {
-      counts.notifications = await Notification.countDocuments({
+        : Promise.resolve(0),
+      Notification.countDocuments({
         user: user._id || user.userId,
         read: false
+      }).catch((err) => {
+        console.error('Error counting notifications:', err.message)
+        return 0
       })
-    } catch (err) {
-      console.error('Error counting notifications:', err.message)
-    }
+    ])
+
+    counts.projects = projectCount
+    counts.tasks = taskCount
+    counts.notifications = notificationCount
 
     // For managers, department heads, HR, and admins - count pending approvals
     const canApprove = ['admin', 'hr', 'manager', 'department_head'].includes(userRole)
-    
+
     if (canApprove) {
       // Check if user is a department head (via User model flag OR role)
-      const userDoc = await User.findById(user._id || user.userId).select('isDepartmentHead headOfDepartments').lean()
-      const isDeptHead = userRole === 'department_head' || userDoc?.isDepartmentHead === true
-      
+      const isDeptHead = userRole === 'department_head' || userRecord?.isDepartmentHead === true
+
       // Determine if this user should have department-scoped view
       // Only admin and HR see company-wide counts
       // Managers and department heads see only their department's counts
       const hasDeptScopedView = !['admin', 'hr'].includes(userRole)
-      
+
       // For users with department-scoped view, find departments they manage
       let departmentEmployeeIds = []
-      
+
       if (hasDeptScopedView) {
         // Get departments from headOfDepartments array on User model first
         let managedDeptIds = []
-        if (userDoc?.headOfDepartments?.length > 0) {
-          managedDeptIds = userDoc.headOfDepartments
+        if (userRecord?.headOfDepartments?.length > 0) {
+          managedDeptIds = userRecord.headOfDepartments
         }
-        
+
         // Also check Department model for head/heads fields
         const managedDepartments = await Department.find({
           $or: [
@@ -123,7 +123,7 @@ export async function GET(request) {
             { _id: { $in: managedDeptIds } }
           ]
         }).select('_id').lean()
-        
+
         if (managedDepartments.length > 0) {
           const deptIds = managedDepartments.map(d => d._id)
           const deptEmployees = await Employee.find({ department: { $in: deptIds } }).select('_id').lean()
@@ -132,72 +132,58 @@ export async function GET(request) {
       }
 
       // 4. Pending leave approvals (exclude user's own leave requests)
-      try {
-        const leaveQuery = { 
-          status: 'pending',
-          employee: { $ne: employeeId } // Exclude own leave requests
-        }
-        
-        // Department heads/managers only see their managed departments' leaves
-        if (hasDeptScopedView && departmentEmployeeIds.length > 0) {
-          leaveQuery.employee = { $in: departmentEmployeeIds.filter(id => id.toString() !== employeeId.toString()) }
-        } else if (hasDeptScopedView) {
-          // No departments managed, no pending leaves to show
-          leaveQuery._id = null // Will return 0
-        }
-        
-        counts.leaves = await Leave.countDocuments(leaveQuery)
-      } catch (err) {
-        console.error('Error counting leave approvals:', err.message)
+      const leaveQuery = {
+        status: 'pending',
+        employee: { $ne: employeeId } // Exclude own leave requests
       }
 
-      // 5. Pending attendance corrections (exclude user's own corrections)
-      try {
-        const correctionQuery = { 
-          status: 'pending',
-          employee: { $ne: employeeId } // Exclude own corrections
-        }
-        
-        if (hasDeptScopedView && departmentEmployeeIds.length > 0) {
-          correctionQuery.employee = { $in: departmentEmployeeIds.filter(id => id.toString() !== employeeId.toString()) }
-        } else if (hasDeptScopedView) {
-          correctionQuery._id = null // Will return 0
-        }
-        
-        counts.attendance = await AttendanceCorrection.countDocuments(correctionQuery)
-      } catch (err) {
-        console.error('Error counting attendance corrections:', err.message)
+      const correctionQuery = {
+        status: 'pending',
+        employee: { $ne: employeeId } // Exclude own corrections
       }
 
-      // 6. Pending expense approvals (exclude user's own expenses - can't approve your own)
-      try {
-        const expenseQuery = { 
-          status: 'pending',
-          employee: { $ne: employeeId } // Exclude own expenses
-        }
-        
-        if (hasDeptScopedView && departmentEmployeeIds.length > 0) {
-          // Filter to department employees, still excluding self
-          expenseQuery.employee = { $in: departmentEmployeeIds.filter(id => id.toString() !== employeeId.toString()) }
-        } else if (hasDeptScopedView) {
-          expenseQuery._id = null // Will return 0
-        }
-        
-        counts.expenses = await Expense.countDocuments(expenseQuery)
-      } catch (err) {
-        console.error('Error counting expenses:', err.message)
+      const expenseQuery = {
+        status: 'pending',
+        employee: { $ne: employeeId } // Exclude own expenses
       }
 
-      // 7. Pending helpdesk tickets (for IT/HR admins only)
-      if (['admin', 'hr'].includes(userRole)) {
-        try {
-          counts.helpdesk = await Helpdesk.countDocuments({
-            status: { $in: ['open', 'in-progress'] }
+      // Department heads/managers only see their managed departments' items
+      if (hasDeptScopedView && departmentEmployeeIds.length > 0) {
+        const filteredIds = departmentEmployeeIds.filter(id => id.toString() !== employeeId.toString())
+        leaveQuery.employee = { $in: filteredIds }
+        correctionQuery.employee = { $in: filteredIds }
+        expenseQuery.employee = { $in: filteredIds }
+      } else if (hasDeptScopedView) {
+        leaveQuery._id = null
+        correctionQuery._id = null
+        expenseQuery._id = null
+      }
+
+      const [leaveCount, attendanceCount, expenseCount, helpdeskCount] = await Promise.all([
+        Leave.countDocuments(leaveQuery).catch((err) => {
+          console.error('Error counting leave approvals:', err.message)
+          return 0
+        }),
+        AttendanceCorrection.countDocuments(correctionQuery).catch((err) => {
+          console.error('Error counting attendance corrections:', err.message)
+          return 0
+        }),
+        Expense.countDocuments(expenseQuery).catch((err) => {
+          console.error('Error counting expenses:', err.message)
+          return 0
+        }),
+        ['admin', 'hr'].includes(userRole)
+          ? Helpdesk.countDocuments({ status: { $in: ['open', 'in-progress'] } }).catch((err) => {
+            console.error('Error counting helpdesk tickets:', err.message)
+            return 0
           })
-        } catch (err) {
-          console.error('Error counting helpdesk tickets:', err.message)
-        }
-      }
+          : Promise.resolve(0)
+      ])
+
+      counts.leaves = leaveCount
+      counts.attendance = attendanceCount
+      counts.expenses = expenseCount
+      counts.helpdesk = helpdeskCount
     }
 
     return NextResponse.json({
