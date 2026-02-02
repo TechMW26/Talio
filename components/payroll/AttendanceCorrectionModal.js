@@ -78,6 +78,16 @@ export default function AttendanceCorrectionModal({
                     (a, b) => new Date(b.date) - new Date(a.date)
                 )
                 setAttendanceRecords(sorted)
+
+                // Initialize corrections state from records that have correctedAt
+                const existingCorrections = {}
+                sorted.forEach((record) => {
+                    if (record.correctedAt) {
+                        const dateKey = new Date(record.date).toISOString().split('T')[0]
+                        existingCorrections[dateKey] = true
+                    }
+                })
+                setCorrections(existingCorrections)
             } else {
                 toast.error(data.message || 'Failed to fetch attendance records')
             }
@@ -265,11 +275,44 @@ export default function AttendanceCorrectionModal({
 
             if (data.success) {
                 toast.success('Attendance corrected successfully')
+
+                // Mark this date as corrected in local state
                 setCorrections((prev) => ({ ...prev, [dateKey]: true }))
+
+                // Update the local attendance records immediately with the edited data
+                setAttendanceRecords((prevRecords) => {
+                    const updatedRecord = data.data || {
+                        _id: existingRecord?._id || data.data?._id,
+                        date: recordDate.toISOString(),
+                        checkIn: checkInDate?.toISOString() || null,
+                        checkOut: checkOutDate?.toISOString() || null,
+                        status: editedData.status,
+                        workHours: editedData.workHours,
+                        remarks: editedData.remarks,
+                        correctedAt: new Date().toISOString(),
+                        correctedBy: 'payroll-admin',
+                    }
+
+                    // Find and update the existing record, or add new one
+                    const existingIndex = prevRecords.findIndex(
+                        (r) => new Date(r.date).toISOString().split('T')[0] === dateKey
+                    )
+
+                    if (existingIndex >= 0) {
+                        const newRecords = [...prevRecords]
+                        newRecords[existingIndex] = { ...newRecords[existingIndex], ...updatedRecord }
+                        return newRecords
+                    } else {
+                        // Add new record and sort by date descending
+                        return [...prevRecords, updatedRecord].sort(
+                            (a, b) => new Date(b.date) - new Date(a.date)
+                        )
+                    }
+                })
+
                 setEditingRecord(null)
                 setEditedData({})
-                // Refresh the records
-                await fetchAttendanceRecords()
+
                 // Notify parent to refresh payroll data
                 if (onCorrectionSaved) {
                     onCorrectionSaved(employee._id)

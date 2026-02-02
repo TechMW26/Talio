@@ -1175,7 +1175,7 @@ export default function GeneratePayrollPage() {
                                     />
                                   </td>
                                   <td className="px-4 py-3 whitespace-nowrap">
-                                    <div className="flex items-center gap-2 group">
+                                    <div className="flex items-center gap-2">
                                       <div className="flex-1">
                                         <div className="font-medium text-gray-900 flex items-center gap-2">
                                           {employee.firstName} {employee.lastName}
@@ -1193,7 +1193,7 @@ export default function GeneratePayrollPage() {
                                             e.stopPropagation()
                                             handleOpenCorrectionModal(employee)
                                           }}
-                                          className="p-1.5 text-default-400 hover:text-primary-500 hover:bg-primary-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+                                          className="p-1.5 text-default-400 hover:text-primary-500 hover:bg-primary-50 rounded-lg transition-colors"
                                         >
                                           <FaEdit size={14} />
                                         </button>

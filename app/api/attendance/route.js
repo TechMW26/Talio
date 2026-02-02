@@ -246,7 +246,7 @@ export async function GET(request) {
 
     // Optimized: Use lean() and select only needed fields (including location for display)
     const attendance = await TenantAttendance.find(query)
-      .select('employee date checkIn checkOut checkInStatus checkOutStatus status workHours overtime totalLoggedHours breakMinutes shrinkagePercentage location source createdBySystem isManualEntry statusReason remarks autoCheckedOut autoCheckoutReason autoCheckoutAt')
+      .select('employee date checkIn checkOut checkInStatus checkOutStatus status workHours overtime totalLoggedHours breakMinutes shrinkagePercentage location source createdBySystem isManualEntry statusReason remarks autoCheckedOut autoCheckoutReason autoCheckoutAt correctedAt correctedBy')
       .populate({
         path: 'employee',
         select: 'firstName lastName employeeCode company',
