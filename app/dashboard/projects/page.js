@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { Card, CardBody, Button, Chip, Skeleton, Progress } from '@heroui/react'
-import { 
+import {
   HiOutlineRectangleStack,
   HiOutlinePlus,
   HiOutlineMagnifyingGlass,
@@ -12,7 +12,7 @@ import {
   HiOutlineCheckCircle,
   HiOutlineExclamationTriangle
 } from 'react-icons/hi2'
-import { 
+import {
   FaPlus, FaSearch, FaFilter, FaProjectDiagram, FaCalendarAlt,
   FaCheckCircle, FaClock, FaExclamationTriangle, FaArchive,
   FaEye, FaUsers, FaTasks, FaChartLine, FaClipboardCheck, FaTimes, FaCheck
@@ -64,7 +64,7 @@ export default function ProjectsPage() {
     completed: 0,
     overdue: 0
   })
-  
+
   // Auto-refresh refs
   const refreshIntervalRef = useRef(null)
   const lastFetchRef = useRef(Date.now())
@@ -96,7 +96,7 @@ export default function ProjectsPage() {
           }
           return prev
         })
-        
+
         // Calculate stats
         const allProjects = data.data
         setStats({
@@ -129,16 +129,16 @@ export default function ProjectsPage() {
   // Auto-refresh every 10 seconds
   useEffect(() => {
     refreshIntervalRef.current = setInterval(silentRefresh, 10000)
-    
+
     // Also refresh when window gains focus
     const handleFocus = () => {
       if (Date.now() - lastFetchRef.current > 5000) {
         silentRefresh()
       }
     }
-    
+
     window.addEventListener('focus', handleFocus)
-    
+
     return () => {
       if (refreshIntervalRef.current) {
         clearInterval(refreshIntervalRef.current)
@@ -148,7 +148,7 @@ export default function ProjectsPage() {
   }, [silentRefresh])
 
   const filteredProjects = projects.filter(project => {
-    const matchesSearch = search === '' || 
+    const matchesSearch = search === '' ||
       project.name.toLowerCase().includes(search.toLowerCase()) ||
       project.description?.toLowerCase().includes(search.toLowerCase())
     return matchesSearch
@@ -160,9 +160,7 @@ export default function ProjectsPage() {
   }
 
   // Handle accept/reject project invitation
-  const handleRespondToInvitation = async (projectId, action, e) => {
-    e.stopPropagation() // Prevent navigating to project
-    
+  const handleRespondToInvitation = async (projectId, action) => {
     try {
       setRespondingTo({ projectId, action })
       const token = localStorage.getItem('token')
@@ -376,14 +374,14 @@ export default function ProjectsPage() {
             const daysRemaining = getDaysRemaining(project.endDate)
             const isOverdue = daysRemaining < 0 && !['completed', 'approved', 'archived'].includes(project.status)
             const isPendingInvitation = project.userInvitationStatus === 'invited'
-            
+
             // Get status-based border color
             const getStatusBorderColor = () => {
               // Pending invitation takes priority
               if (isPendingInvitation) return 'border-warning bg-warning-50/30'
               if (isOverdue) return 'border-danger-300 bg-danger-50/30'
-              
-              switch(project.status) {
+
+              switch (project.status) {
                 case 'planning':
                 case 'not-started':
                   return 'border-default-300 bg-default-50/30'
@@ -400,7 +398,7 @@ export default function ProjectsPage() {
                   return 'border-default-100'
               }
             }
-            
+
             return (
               <div
                 key={project._id}
@@ -417,7 +415,7 @@ export default function ProjectsPage() {
                       {project.priority}
                     </Chip>
                   </div>
-                  
+
                   <p className="text-default-500 text-sm line-clamp-2 mb-4">
                     {project.description || 'No description'}
                   </p>
@@ -439,8 +437,8 @@ export default function ProjectsPage() {
                       <span className="text-default-500">Progress</span>
                       <span className="font-medium text-default-700">{project.completionPercentage || 0}%</span>
                     </div>
-                    <Progress 
-                      value={Math.min(project.completionPercentage || 0, 100)} 
+                    <Progress
+                      value={Math.min(project.completionPercentage || 0, 100)}
                       color={project.completionPercentage >= 100 ? 'success' : project.completionPercentage >= 50 ? 'primary' : 'warning'}
                       size="sm"
                       className="max-w-full"
@@ -471,14 +469,14 @@ export default function ProjectsPage() {
                       {/* Show stacked avatars for multiple heads */}
                       <div className="flex -space-x-2">
                         {(project.projectHeads?.length ? project.projectHeads : (project.projectHead ? [project.projectHead] : [])).slice(0, 3).map((head, idx) => (
-                          <div 
+                          <div
                             key={head?._id || idx}
                             className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-sm font-medium overflow-hidden border-2 border-content1"
                             title={`${head?.firstName} ${head?.lastName}`}
                           >
                             {head?.profilePicture ? (
-                              <img 
-                                src={head.profilePicture} 
+                              <img
+                                src={head.profilePicture}
                                 alt={`${head.firstName} ${head.lastName}`}
                                 className="w-full h-full object-cover"
                               />
@@ -497,7 +495,7 @@ export default function ProjectsPage() {
                       </div>
                       <div className="ml-2">
                         <p className="text-sm font-medium text-default-700">
-                          {project.projectHeads?.length > 1 
+                          {project.projectHeads?.length > 1
                             ? `${project.projectHeads[0]?.firstName} +${project.projectHeads.length - 1} more`
                             : `${project.projectHead?.firstName || project.projectHeads?.[0]?.firstName} ${project.projectHead?.lastName || project.projectHeads?.[0]?.lastName}`
                           }
@@ -519,9 +517,9 @@ export default function ProjectsPage() {
                 {!['completed', 'approved', 'archived'].includes(project.status) && project.userInvitationStatus !== 'invited' && (
                   <div className={`px-5 py-3 ${isOverdue ? 'bg-danger-50' : 'bg-default-50'}`}>
                     <p className={`text-sm ${isOverdue ? 'text-danger' : 'text-default-600'}`}>
-                      {isOverdue 
+                      {isOverdue
                         ? `${Math.abs(daysRemaining)} days overdue`
-                        : daysRemaining === 0 
+                        : daysRemaining === 0
                           ? 'Due today'
                           : `${daysRemaining} days remaining`
                       }
@@ -531,14 +529,14 @@ export default function ProjectsPage() {
 
                 {/* Pending Invitation Banner */}
                 {project.userInvitationStatus === 'invited' && (
-                  <div className="px-5 py-3 bg-warning-50 border-t border-warning-200">
+                  <div className="px-5 py-3 bg-warning-50 border-t border-warning-200" onClick={(e) => e.stopPropagation()}>
                     <p className="text-sm text-warning-700 font-medium mb-2">You've been invited to this project</p>
                     <div className="flex gap-2">
                       <Button
                         color="success"
                         size="sm"
                         className="flex-1"
-                        onPress={(e) => { e.stopPropagation(); handleRespondToInvitation(project._id, 'accept', e); }}
+                        onPress={() => handleRespondToInvitation(project._id, 'accept')}
                         isDisabled={respondingTo?.projectId === project._id}
                         isLoading={respondingTo?.projectId === project._id && respondingTo?.action === 'accept'}
                         startContent={!respondingTo && <FaCheck className="w-3 h-3" />}
@@ -549,7 +547,7 @@ export default function ProjectsPage() {
                         color="danger"
                         size="sm"
                         className="flex-1"
-                        onPress={(e) => { e.stopPropagation(); handleRespondToInvitation(project._id, 'reject', e); }}
+                        onPress={() => handleRespondToInvitation(project._id, 'reject')}
                         isDisabled={respondingTo?.projectId === project._id}
                         isLoading={respondingTo?.projectId === project._id && respondingTo?.action === 'reject'}
                         startContent={!respondingTo && <FaTimes className="w-3 h-3" />}

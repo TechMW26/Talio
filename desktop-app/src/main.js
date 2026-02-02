@@ -56,9 +56,9 @@ const autoLauncher = new AutoLaunch({
  */
 async function requestPermissions() {
   if (process.platform !== 'darwin') return;
-  
+
   logger.log('info', 'Main', 'Checking macOS permissions...');
-  
+
   // Check and request camera permission
   const cameraStatus = systemPreferences.getMediaAccessStatus('camera');
   if (cameraStatus !== 'granted') {
@@ -66,7 +66,7 @@ async function requestPermissions() {
     const granted = await systemPreferences.askForMediaAccess('camera');
     logger.log('info', 'Main', 'Camera permission: ' + (granted ? 'granted' : 'denied'));
   }
-  
+
   // Check and request microphone permission
   const micStatus = systemPreferences.getMediaAccessStatus('microphone');
   if (micStatus !== 'granted') {
@@ -74,7 +74,7 @@ async function requestPermissions() {
     const granted = await systemPreferences.askForMediaAccess('microphone');
     logger.log('info', 'Main', 'Microphone permission: ' + (granted ? 'granted' : 'denied'));
   }
-  
+
   // Check screen recording permission (can't request programmatically, but can check and prompt)
   const screenStatus = systemPreferences.getMediaAccessStatus('screen');
   if (screenStatus !== 'granted') {
@@ -88,7 +88,7 @@ async function requestPermissions() {
       defaultId: 0,
       cancelId: 1
     });
-    
+
     if (result.response === 0) {
       // Open System Preferences to Screen Recording
       shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
@@ -103,7 +103,7 @@ const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   app.quit();
 } else {
-  app.on('second-instance', function() {
+  app.on('second-instance', function () {
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.show();
@@ -117,7 +117,7 @@ if (!gotTheLock) {
  */
 function createWindow() {
   const windowBounds = store.get('windowBounds', { width: 1280, height: 800 });
-  
+
   mainWindow = new BrowserWindow({
     width: windowBounds.width,
     height: windowBounds.height,
@@ -147,34 +147,34 @@ function createWindow() {
   });
 
   // Show window when ready to prevent white flash
-  mainWindow.once('ready-to-show', function() {
+  mainWindow.once('ready-to-show', function () {
     mainWindow.show();
     logger.log('info', 'Main', 'Window ready-to-show triggered');
   });
 
   // Log renderer console messages for debugging
-  mainWindow.webContents.on('console-message', function(event, level, message, line, sourceId) {
+  mainWindow.webContents.on('console-message', function (event, level, message, line, sourceId) {
     if (level >= 2) { // warnings and errors
       logger.log('warn', 'Renderer', message);
     }
   });
 
   // Handle render process crashes - with recovery limit to prevent infinite loop
-  mainWindow.webContents.on('render-process-gone', function(event, details) {
+  mainWindow.webContents.on('render-process-gone', function (event, details) {
     const now = Date.now();
     logger.log('error', 'Main', 'Render process gone: ' + details.reason + ' (exitCode: ' + details.exitCode + ')');
-    
+
     // Reset crash count if more than 30 seconds since last crash
     if (now - lastCrashTime > 30000) {
       crashCount = 0;
     }
     lastCrashTime = now;
     crashCount++;
-    
+
     if (crashCount <= MAX_CRASH_RECOVERY && mainWindow && !mainWindow.isDestroyed()) {
       logger.log('warn', 'Main', 'Attempting crash recovery (' + crashCount + '/' + MAX_CRASH_RECOVERY + ')');
       // Wait a bit before reloading to let things settle
-      setTimeout(function() {
+      setTimeout(function () {
         if (mainWindow && !mainWindow.isDestroyed()) {
           mainWindow.loadURL(APP_URL);
         }
@@ -186,23 +186,23 @@ function createWindow() {
   });
 
   // Handle unresponsive page
-  mainWindow.webContents.on('unresponsive', function() {
+  mainWindow.webContents.on('unresponsive', function () {
     logger.log('warn', 'Main', 'Page became unresponsive');
   });
 
-  mainWindow.webContents.on('responsive', function() {
+  mainWindow.webContents.on('responsive', function () {
     logger.log('info', 'Main', 'Page became responsive');
   });
 
   // Show loader first, then load app
   showLoader();
-  
+
   // Setup window events
   setupWindowEvents();
-  
+
   // Setup IPC handlers
   setupIPCHandlers();
-  
+
   logger.log('info', 'Main', 'Window created');
 }
 
@@ -229,14 +229,14 @@ function showLoader() {
     '<p class="status">Connecting...</p>' +
     '<script>var p=document.getElementById("loaderPath");var l=p.getTotalLength();p.style.setProperty("--path-length",l);p.style.strokeDasharray=l;</script>' +
     '</body></html>';
-  
+
   mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(loaderHTML));
-  
+
   // Show window immediately for loader (bypass ready-to-show for data URL)
   if (!mainWindow.isVisible()) {
     mainWindow.show();
   }
-  
+
   // Start loading app after a short delay
   setTimeout(loadApp, 1000);
 }
@@ -247,18 +247,18 @@ function showLoader() {
 function loadApp() {
   loadRetries++;
   logger.log('info', 'Main', 'Loading app (attempt ' + loadRetries + '/' + MAX_LOAD_RETRIES + ')');
-  
+
   // Set timeout for loading
   clearTimeout(loadTimeout);
-  loadTimeout = setTimeout(function() {
+  loadTimeout = setTimeout(function () {
     handleLoadTimeout();
   }, LOADER_TIMEOUT_MS);
-  
-  mainWindow.loadURL(APP_URL).then(function() {
+
+  mainWindow.loadURL(APP_URL).then(function () {
     clearTimeout(loadTimeout);
     loadRetries = 0;
     logger.log('info', 'Main', 'App loaded successfully');
-  }).catch(function(error) {
+  }).catch(function (error) {
     logger.log('error', 'Main', 'Load failed: ' + error.message);
     handleLoadError(error);
   });
@@ -278,31 +278,31 @@ function handleLoadTimeout() {
 function handleLoadError(error) {
   clearTimeout(loadTimeout);
   logger.log('error', 'Main', 'Load error: ' + error.message);
-  
+
   // Determine error type from error message/code
   var errorType = 'offline';
   var errorCode = null;
   var errorDesc = error.message;
-  
-  if (error.message.includes('ERR_INTERNET_DISCONNECTED') || 
-      error.message.includes('ERR_NETWORK_CHANGED') ||
-      error.message.includes('net::ERR_NETWORK_IO_SUSPENDED')) {
+
+  if (error.message.includes('ERR_INTERNET_DISCONNECTED') ||
+    error.message.includes('ERR_NETWORK_CHANGED') ||
+    error.message.includes('net::ERR_NETWORK_IO_SUSPENDED')) {
     errorType = 'offline';
   } else if (error.message.includes('ERR_NAME_NOT_RESOLVED') ||
-             error.message.includes('ERR_NAME_RESOLUTION_FAILED')) {
+    error.message.includes('ERR_NAME_RESOLUTION_FAILED')) {
     errorType = 'dns';
   } else if (error.message.includes('ERR_CONNECTION_TIMED_OUT') ||
-             error.message.includes('ERR_TIMED_OUT')) {
+    error.message.includes('ERR_TIMED_OUT')) {
     errorType = 'timeout';
   } else if (error.message.includes('ERR_SSL') ||
-             error.message.includes('ERR_CERT')) {
+    error.message.includes('ERR_CERT')) {
     errorType = 'ssl';
   } else if (error.message.includes('ERR_CONNECTION_REFUSED') ||
-             error.message.includes('ERR_CONNECTION_RESET') ||
-             error.message.includes('ERR_CONNECTION_CLOSED')) {
+    error.message.includes('ERR_CONNECTION_RESET') ||
+    error.message.includes('ERR_CONNECTION_CLOSED')) {
     errorType = 'server-error';
   }
-  
+
   showOfflinePage(errorType, errorCode, errorDesc);
 }
 
@@ -311,16 +311,16 @@ function handleLoadError(error) {
  */
 function showOfflinePage(errorType, errorCode, errorDesc) {
   if (!mainWindow || mainWindow.isDestroyed()) return;
-  
+
   var offlinePath = path.join(__dirname, 'offline.html');
   var params = new URLSearchParams();
-  
+
   if (errorType) params.append('type', errorType);
   if (errorCode) params.append('code', errorCode);
   if (errorDesc) params.append('desc', encodeURIComponent(errorDesc));
-  
+
   var offlineUrl = 'file://' + offlinePath + '?' + params.toString();
-  
+
   logger.log('info', 'Main', 'Showing offline page: type=' + errorType + ', code=' + errorCode);
   mainWindow.loadURL(offlineUrl);
 }
@@ -338,41 +338,41 @@ function showCrashPage() {
  * Setup window events
  */
 function setupWindowEvents() {
-  mainWindow.on('close', function(event) {
+  mainWindow.on('close', function (event) {
     if (!isQuitting) {
       event.preventDefault();
       mainWindow.hide();
       return false;
     }
   });
-  
-  mainWindow.on('closed', function() {
+
+  mainWindow.on('closed', function () {
     mainWindow = null;
   });
-  
+
   mainWindow.on('resize', saveWindowBounds);
   mainWindow.on('move', saveWindowBounds);
-  
+
   // Handle navigation - did-finish-load fires for successful loads
-  mainWindow.webContents.on('did-finish-load', function() {
+  mainWindow.webContents.on('did-finish-load', function () {
     const url = mainWindow.webContents.getURL();
     logger.log('info', 'Main', 'Page loaded: ' + url);
-    
+
     // Only inject auth listener for actual app pages, not data URLs
     if (url.startsWith('https://app.talio.in')) {
       injectAuthListener();
     }
   });
-  
+
   // Handle page load failures - show offline page for network/server errors
-  mainWindow.webContents.on('did-fail-load', function(event, errorCode, errorDescription, validatedURL, isMainFrame) {
+  mainWindow.webContents.on('did-fail-load', function (event, errorCode, errorDescription, validatedURL, isMainFrame) {
     if (isMainFrame) {
       logger.log('error', 'Main', 'Page failed to load: ' + errorDescription + ' (' + errorCode + ') - ' + validatedURL);
-      
+
       // Map error codes to error types
       var errorType = 'offline';
       var httpCode = null;
-      
+
       // Network errors
       if (errorCode === -106) { // ERR_INTERNET_DISCONNECTED
         errorType = 'offline';
@@ -392,13 +392,13 @@ function setupWindowEvents() {
         // Don't show offline page for aborted requests (e.g., navigation change)
         return;
       }
-      
+
       showOfflinePage(errorType, httpCode, errorDescription);
     }
   });
 
   // Handle HTTP errors (4xx, 5xx) - intercept responses
-  mainWindow.webContents.on('did-navigate', function(event, url, httpResponseCode) {
+  mainWindow.webContents.on('did-navigate', function (event, url, httpResponseCode) {
     if (httpResponseCode >= 400) {
       logger.log('error', 'Main', 'HTTP error ' + httpResponseCode + ' for ' + url);
       showOfflinePage('server-error', httpResponseCode.toString(), 'HTTP ' + httpResponseCode);
@@ -408,7 +408,7 @@ function setupWindowEvents() {
   // Also handle in-page HTTP errors via response interception
   mainWindow.webContents.session.webRequest.onCompleted(
     { urls: ['https://app.talio.in/*'] },
-    function(details) {
+    function (details) {
       // Check for server errors on main frame navigation
       if (details.resourceType === 'mainFrame' && details.statusCode >= 500) {
         logger.log('error', 'Main', 'Server error ' + details.statusCode + ' for ' + details.url);
@@ -419,24 +419,24 @@ function setupWindowEvents() {
 
   // Handle DOM ready - page is interactive but might still be loading resources
   // CRITICAL: Inject audio disable script here BEFORE React hydration completes
-  mainWindow.webContents.on('dom-ready', function() {
+  mainWindow.webContents.on('dom-ready', function () {
     logger.log('info', 'Main', 'DOM ready');
-    
+
     // Inject AudioContext disable as early as possible
     const url = mainWindow.webContents.getURL();
     if (url.startsWith('https://app.talio.in')) {
       injectAudioDisable();
     }
   });
-  
+
   // Handle new window requests (open in browser)
-  mainWindow.webContents.setWindowOpenHandler(function(details) {
+  mainWindow.webContents.setWindowOpenHandler(function (details) {
     shell.openExternal(details.url);
     return { action: 'deny' };
   });
-  
+
   // Handle certificate errors gracefully
-  mainWindow.webContents.on('certificate-error', function(event, url, error, cert, callback) {
+  mainWindow.webContents.on('certificate-error', function (event, url, error, cert, callback) {
     logger.log('warn', 'Main', 'Certificate error: ' + error);
     callback(false);
   });
@@ -457,52 +457,72 @@ function saveWindowBounds() {
  * MUST be called at dom-ready, before React hydration
  */
 function injectAudioDisable() {
-  const disableAudioScript = '(' + (function() {
+  const disableAudioScript = '(' + (function () {
     // CRITICAL: Disable AudioContext to prevent renderer crashes in Electron
     // This must run before any audio initialization
     if (window.__TALIO_AUDIO_DISABLED__) return;
     window.__TALIO_AUDIO_DISABLED__ = true;
-    
+
     try {
       var OriginalAudioContext = window.AudioContext || window.webkitAudioContext;
-      
-      window.AudioContext = function() {
+
+      window.AudioContext = function () {
         console.log('[Talio Desktop] AudioContext disabled for stability');
         return {
           state: 'suspended',
           sampleRate: 44100,
           destination: { channelCount: 2 },
-          resume: function() { return Promise.resolve(); },
-          suspend: function() { return Promise.resolve(); },
-          close: function() { return Promise.resolve(); },
-          createGain: function() { 
-            return { 
-              connect: function() { return this; }, 
-              disconnect: function() {},
-              gain: { value: 0, setValueAtTime: function() {} } 
-            }; 
-          },
-          createBufferSource: function() { 
-            return { 
-              connect: function() { return this; }, 
-              disconnect: function() {},
-              start: function() {}, 
-              stop: function() {},
-              buffer: null
-            }; 
-          },
-          createOscillator: function() {
+          resume: function () { return Promise.resolve(); },
+          suspend: function () { return Promise.resolve(); },
+          close: function () { return Promise.resolve(); },
+          createGain: function () {
+            var audioParam = {
+              value: 0,
+              setValueAtTime: function () { return this; },
+              linearRampToValueAtTime: function () { return this; },
+              exponentialRampToValueAtTime: function () { return this; },
+              setTargetAtTime: function () { return this; },
+              setValueCurveAtTime: function () { return this; },
+              cancelScheduledValues: function () { return this; }
+            };
             return {
-              connect: function() { return this; },
-              disconnect: function() {},
-              start: function() {},
-              stop: function() {},
-              frequency: { value: 440 }
+              connect: function () { return this; },
+              disconnect: function () { },
+              gain: audioParam
             };
           },
-          decodeAudioData: function(buffer, success, error) { 
+          createBufferSource: function () {
+            return {
+              connect: function () { return this; },
+              disconnect: function () { },
+              start: function () { },
+              stop: function () { },
+              buffer: null
+            };
+          },
+          createOscillator: function () {
+            var audioParam = {
+              value: 440,
+              setValueAtTime: function () { return this; },
+              linearRampToValueAtTime: function () { return this; },
+              exponentialRampToValueAtTime: function () { return this; },
+              setTargetAtTime: function () { return this; },
+              setValueCurveAtTime: function () { return this; },
+              cancelScheduledValues: function () { return this; }
+            };
+            return {
+              connect: function () { return this; },
+              disconnect: function () { },
+              start: function () { },
+              stop: function () { },
+              type: 'sine',
+              frequency: audioParam,
+              detune: audioParam
+            };
+          },
+          decodeAudioData: function (buffer, success, error) {
             if (error) error(new Error('AudioContext disabled in desktop app'));
-            return Promise.reject(new Error('AudioContext disabled in desktop app')); 
+            return Promise.reject(new Error('AudioContext disabled in desktop app'));
           }
         };
       };
@@ -512,8 +532,8 @@ function injectAudioDisable() {
       console.warn('[Talio Desktop] Failed to patch AudioContext:', e);
     }
   }).toString() + ')()';
-  
-  mainWindow.webContents.executeJavaScript(disableAudioScript).catch(function(e) {
+
+  mainWindow.webContents.executeJavaScript(disableAudioScript).catch(function (e) {
     logger.log('warn', 'Main', 'Failed to inject audio disable script: ' + e.message);
   });
 }
@@ -522,7 +542,7 @@ function injectAudioDisable() {
  * Inject authentication listener into the page
  */
 function injectAuthListener() {
-  const script = '(' + (function() {
+  const script = '(' + (function () {
     // Check for stored auth data
     function checkAuth() {
       try {
@@ -536,22 +556,22 @@ function injectAuthListener() {
         console.error('[Talio Desktop] Auth check error:', e);
       }
     }
-    
+
     // Check immediately and on storage changes
     checkAuth();
     window.addEventListener('storage', checkAuth);
-    
+
     // Also check periodically for initial load
     var checkCount = 0;
-    var authInterval = setInterval(function() {
+    var authInterval = setInterval(function () {
       checkAuth();
       checkCount++;
       if (checkCount > 10) clearInterval(authInterval);
     }, 1000);
   }).toString() + ')()';
-  
-  mainWindow.webContents.executeJavaScript(script).catch(function() {});
-  
+
+  mainWindow.webContents.executeJavaScript(script).catch(function () { });
+
   // Also inject network status listener
   injectNetworkStatusListener();
 }
@@ -560,32 +580,32 @@ function injectAuthListener() {
  * Inject network status listener to detect when connection drops while app is running
  */
 function injectNetworkStatusListener() {
-  const networkScript = '(' + (function() {
+  const networkScript = '(' + (function () {
     // Skip if already injected
     if (window.__TALIO_NETWORK_LISTENER_INJECTED__) return;
     window.__TALIO_NETWORK_LISTENER_INJECTED__ = true;
-    
+
     console.log('[Talio Desktop] Network status listener injected');
-    
+
     // Listen for offline event
-    window.addEventListener('offline', function() {
+    window.addEventListener('offline', function () {
       console.log('[Talio Desktop] Browser detected offline');
       if (window.electronAPI && window.electronAPI.setOnlineStatus) {
         window.electronAPI.setOnlineStatus(false);
       }
     });
-    
+
     // Listen for online event  
-    window.addEventListener('online', function() {
+    window.addEventListener('online', function () {
       console.log('[Talio Desktop] Browser detected online');
       if (window.electronAPI && window.electronAPI.setOnlineStatus) {
         window.electronAPI.setOnlineStatus(true);
       }
     });
-    
+
     // Also do periodic connectivity checks
     var lastOnlineState = navigator.onLine;
-    setInterval(function() {
+    setInterval(function () {
       var currentState = navigator.onLine;
       if (currentState !== lastOnlineState) {
         lastOnlineState = currentState;
@@ -595,14 +615,14 @@ function injectNetworkStatusListener() {
         }
       }
     }, 3000);
-    
+
     // Report initial state
     if (window.electronAPI && window.electronAPI.setOnlineStatus) {
       window.electronAPI.setOnlineStatus(navigator.onLine);
     }
   }).toString() + ')()';
-  
-  mainWindow.webContents.executeJavaScript(networkScript).catch(function(e) {
+
+  mainWindow.webContents.executeJavaScript(networkScript).catch(function (e) {
     logger.log('warn', 'Main', 'Failed to inject network listener: ' + e.message);
   });
 }
@@ -612,85 +632,85 @@ function injectNetworkStatusListener() {
  */
 function setupIPCHandlers() {
   // App version
-  ipcMain.handle('get-app-version', function() {
+  ipcMain.handle('get-app-version', function () {
     return app.getVersion();
   });
-  
+
   // Authentication
-  ipcMain.handle('auth-data', function(event, data) {
+  ipcMain.handle('auth-data', function (event, data) {
     handleAuthentication(data);
     return { success: true };
   });
-  
-  ipcMain.handle('logout', function() {
+
+  ipcMain.handle('logout', function () {
     handleLogout();
     return { success: true };
   });
-  
+
   // Screenshot service
-  ipcMain.handle('start-capture', function() {
+  ipcMain.handle('start-capture', function () {
     return screenshotService.start();
   });
-  
-  ipcMain.handle('stop-capture', function() {
+
+  ipcMain.handle('stop-capture', function () {
     screenshotService.stop();
     return { success: true };
   });
-  
-  ipcMain.handle('manual-capture', async function() {
+
+  ipcMain.handle('manual-capture', async function () {
     return await screenshotService.manualCapture();
   });
-  
-  ipcMain.handle('get-capture-status', function() {
+
+  ipcMain.handle('get-capture-status', function () {
     return screenshotService.getStatus();
   });
-  
-  ipcMain.handle('get-capture-stats', function() {
+
+  ipcMain.handle('get-capture-stats', function () {
     return screenshotService.getStats();
   });
-  
-  ipcMain.handle('get-session-info', function() {
+
+  ipcMain.handle('get-session-info', function () {
     var sessionManager = require('./sessionManager');
     return sessionManager.getSessionInfo();
   });
-  
+
   // Network status - handle online/offline transitions
-  ipcMain.handle('set-online-status', function(event, online) {
+  ipcMain.handle('set-online-status', function (event, online) {
     screenshotService.setOnlineStatus(online);
-    
+
     // If network went offline and we're not already on the offline page, show it
     if (!online && mainWindow && !mainWindow.isDestroyed()) {
       const currentUrl = mainWindow.webContents.getURL();
       const isAlreadyOnOfflinePage = currentUrl.includes('offline.html') || currentUrl.startsWith('file://');
-      
+
       if (!isAlreadyOnOfflinePage) {
         logger.log('info', 'Main', 'Network went offline, showing offline page');
         showOfflinePage('offline', null, 'Network connection lost');
       }
     }
-    
+
     // If network came back online and we're on the offline page, reload the app
     if (online && mainWindow && !mainWindow.isDestroyed()) {
       const currentUrl = mainWindow.webContents.getURL();
       const isOnOfflinePage = currentUrl.includes('offline.html') || currentUrl.startsWith('file://');
-      
+
       if (isOnOfflinePage) {
         logger.log('info', 'Main', 'Network restored, reloading app');
         loadRetries = 0;
         loadApp();
       }
     }
-    
+
     return { success: true };
   });
-  
+
   // Window controls
-  ipcMain.handle('minimize-window', function() {
+  ipcMain.handle('minimize-window', function () {
     if (mainWindow) mainWindow.minimize();
     return { success: true };
   });
-  
-  ipcMain.handle('maximize-window', function() {
+
+  ipcMain.handle('maximize-window', function () {
     if (mainWindow) {
       if (mainWindow.isMaximized()) {
         mainWindow.unmaximize();
@@ -700,28 +720,28 @@ function setupIPCHandlers() {
     }
     return { success: true };
   });
-  
-  ipcMain.handle('close-window', function() {
+
+  ipcMain.handle('close-window', function () {
     if (mainWindow) mainWindow.hide();
     return { success: true };
   });
-  
+
   // Notifications
-  ipcMain.handle('show-notification', function(event, data) {
+  ipcMain.handle('show-notification', function (event, data) {
     showNotification(data.title, data.body);
     return { success: true };
   });
-  
+
   // Restart app (for crash recovery)
-  ipcMain.handle('restart-app', function() {
+  ipcMain.handle('restart-app', function () {
     logger.log('info', 'Main', 'Restart requested');
     crashCount = 0;
     app.relaunch();
     app.exit(0);
   });
-  
+
   // Load app (for offline page retry)
-  ipcMain.handle('load-app', function() {
+  ipcMain.handle('load-app', function () {
     logger.log('info', 'Main', 'Load app requested from offline page');
     loadRetries = 0;
     loadApp();
@@ -737,15 +757,15 @@ function handleAuthentication(data) {
     logger.log('warn', 'Main', 'Invalid auth data');
     return;
   }
-  
+
   // Store auth data
   userData = data.user;
   store.set('userData', userData);
   store.set('authToken', data.token);
   isAuthenticated = true;
-  
+
   logger.log('info', 'Main', 'Authenticated as ' + userData.email + ' (role: ' + userData.role + ')');
-  
+
   // Initialize services
   screenshotService.initialize({
     userId: userData.userId || userData._id,
@@ -754,41 +774,41 @@ function handleAuthentication(data) {
     token: data.token,
     mainWindow: mainWindow
   });
-  
+
   // Initialize socket
   socketHandler.initialize(userData.userId || userData._id, data.token);
-  
+
   // Setup socket callbacks
-  socketHandler.on('screenshotRequest', function() {
+  socketHandler.on('screenshotRequest', function () {
     screenshotService.manualCapture();
   });
-  
-  socketHandler.on('notification', function(notif) {
+
+  socketHandler.on('notification', function (notif) {
     showNotification(notif.title, notif.message || notif.body);
     if (mainWindow) {
       mainWindow.webContents.send('notification', notif);
     }
   });
-  
-  socketHandler.on('connect', function() {
+
+  socketHandler.on('connect', function () {
     if (mainWindow) {
       mainWindow.webContents.send('socket-status', { connected: true });
     }
   });
-  
-  socketHandler.on('disconnect', function() {
+
+  socketHandler.on('disconnect', function () {
     if (mainWindow) {
       mainWindow.webContents.send('socket-status', { connected: false });
     }
   });
-  
+
   // Start capture (only for non-admin users)
   if (userData.role !== 'admin') {
     screenshotService.start();
   } else {
     logger.log('info', 'Main', 'Admin user - screen capture disabled');
   }
-  
+
   // Update tray menu
   updateTrayMenu();
 }
@@ -798,16 +818,16 @@ function handleAuthentication(data) {
  */
 function handleLogout() {
   logger.log('info', 'Main', 'User logged out');
-  
+
   screenshotService.reset();
   socketHandler.reset();
-  
+
   store.delete('userData');
   store.delete('authToken');
-  
+
   isAuthenticated = false;
   userData = null;
-  
+
   updateTrayMenu();
 }
 
@@ -818,16 +838,16 @@ function createTray() {
   const icon = getTrayIcon();
   tray = new Tray(icon);
   tray.setToolTip('Talio');
-  
+
   updateTrayMenu();
-  
-  tray.on('click', function() {
+
+  tray.on('click', function () {
     if (mainWindow) {
       mainWindow.show();
       mainWindow.focus();
     }
   });
-  
+
   logger.log('info', 'Main', 'Tray created');
 }
 
@@ -836,18 +856,18 @@ function createTray() {
  */
 function updateTrayMenu() {
   var menuItems = [
-    { label: 'Open Talio', click: function() { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } } },
+    { label: 'Open Talio', click: function () { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } } },
     { type: 'separator' }
   ];
-  
+
   if (isAuthenticated && userData) {
     menuItems.push({ label: 'Logged in as: ' + (userData.email || 'Unknown'), enabled: false });
-    
+
     if (userData.role !== 'admin') {
       var status = screenshotService.getStatus();
       menuItems.push({
         label: status.isCapturing ? 'Pause Capture' : 'Resume Capture',
-        click: function() {
+        click: function () {
           if (status.isCapturing) {
             screenshotService.stop();
           } else {
@@ -857,16 +877,16 @@ function updateTrayMenu() {
         }
       });
     }
-    
+
     menuItems.push({ type: 'separator' });
   }
-  
+
   menuItems.push(
     { label: 'Start at Login', type: 'checkbox', checked: store.get('autoLaunch', true), click: toggleAutoLaunch },
     { type: 'separator' },
-    { label: 'Quit', click: function() { isQuitting = true; app.quit(); } }
+    { label: 'Quit', click: function () { isQuitting = true; app.quit(); } }
   );
-  
+
   var contextMenu = Menu.buildFromTemplate(menuItems);
   tray.setContextMenu(contextMenu);
 }
@@ -944,7 +964,7 @@ async function initAutoLaunch() {
   try {
     var isEnabled = await autoLauncher.isEnabled();
     var shouldEnable = store.get('autoLaunch', true);
-    
+
     if (shouldEnable && !isEnabled) {
       await autoLauncher.enable();
     } else if (!shouldEnable && isEnabled) {
@@ -960,10 +980,10 @@ async function initAutoLaunch() {
  */
 function setupSessionPermissions() {
   // Handle permission requests from the renderer
-  session.defaultSession.setPermissionRequestHandler(function(webContents, permission, callback, details) {
+  session.defaultSession.setPermissionRequestHandler(function (webContents, permission, callback, details) {
     const allowedPermissions = [
       'media',
-      'mediaKeySystem', 
+      'mediaKeySystem',
       'geolocation',
       'notifications',
       'fullscreen',
@@ -971,26 +991,26 @@ function setupSessionPermissions() {
       'display-capture',  // Screen sharing
       'window-management'
     ];
-    
+
     // For media permissions, check the specific type
     if (permission === 'media') {
       const mediaTypes = details.mediaTypes || [];
       logger.log('info', 'Main', 'Media permission requested: ' + mediaTypes.join(', '));
-      
+
       // Allow audio and video
       if (mediaTypes.includes('audio') || mediaTypes.includes('video')) {
         callback(true);
         return;
       }
     }
-    
+
     // Allow display-capture for screen sharing
     if (permission === 'display-capture') {
       logger.log('info', 'Main', 'Display capture permission requested');
       callback(true);
       return;
     }
-    
+
     if (allowedPermissions.includes(permission)) {
       logger.log('info', 'Main', 'Permission granted: ' + permission);
       callback(true);
@@ -999,43 +1019,43 @@ function setupSessionPermissions() {
       callback(false);
     }
   });
-  
+
   // Handle permission check requests
-  session.defaultSession.setPermissionCheckHandler(function(webContents, permission, requestingOrigin, details) {
+  session.defaultSession.setPermissionCheckHandler(function (webContents, permission, requestingOrigin, details) {
     // Allow all permission checks from our app
     if (requestingOrigin.startsWith('https://app.talio.in') || requestingOrigin.startsWith('file://')) {
       return true;
     }
-    
+
     // Allow media and display-capture
     if (permission === 'media' || permission === 'display-capture') {
       return true;
     }
-    
+
     return false;
   });
-  
+
   // Handle desktop capturer permission for screen sharing
-  session.defaultSession.setDisplayMediaRequestHandler(function(request, callback) {
+  session.defaultSession.setDisplayMediaRequestHandler(function (request, callback) {
     logger.log('info', 'Main', 'Display media request from: ' + request.frame.url);
-    
+
     // For the main app, automatically allow screen sharing
     // The user will still see the OS-level screen picker
     const { desktopCapturer } = require('electron');
-    
-    desktopCapturer.getSources({ types: ['screen', 'window'] }).then(function(sources) {
+
+    desktopCapturer.getSources({ types: ['screen', 'window'] }).then(function (sources) {
       if (sources.length > 0) {
         // Return the first screen source - user can pick in the web app
         callback({ video: sources[0], audio: 'loopback' });
       } else {
         callback({});
       }
-    }).catch(function(error) {
+    }).catch(function (error) {
       logger.log('error', 'Main', 'Failed to get display sources: ' + error.message);
       callback({});
     });
   });
-  
+
   logger.log('info', 'Main', 'Session permissions configured');
 }
 
@@ -1048,33 +1068,33 @@ let networkCheckInterval = null;
 
 function setupNetworkMonitoring() {
   // Check network connectivity periodically when on offline page
-  const checkNetworkAndReload = async function() {
+  const checkNetworkAndReload = async function () {
     if (!mainWindow || mainWindow.isDestroyed()) return;
-    
+
     const currentUrl = mainWindow.webContents.getURL();
     isOnOfflinePage = currentUrl.includes('offline.html') || currentUrl.startsWith('file://');
-    
+
     if (isOnOfflinePage) {
       try {
         // Try to reach the app server
         const https = require('https');
-        const checkPromise = new Promise(function(resolve) {
+        const checkPromise = new Promise(function (resolve) {
           const req = https.request({
             hostname: 'app.talio.in',
             port: 443,
             path: '/api/health',
             method: 'HEAD',
             timeout: 10000
-          }, function(res) {
+          }, function (res) {
             resolve(res.statusCode < 500);
           });
-          req.on('error', function() { resolve(false); });
-          req.on('timeout', function() { req.destroy(); resolve(false); });
+          req.on('error', function () { resolve(false); });
+          req.on('timeout', function () { req.destroy(); resolve(false); });
           req.end();
         });
-        
+
         const isOnline = await checkPromise;
-        
+
         if (isOnline && isOnOfflinePage) {
           logger.log('info', 'Main', 'Network restored, reloading app...');
           loadRetries = 0;
@@ -1085,50 +1105,50 @@ function setupNetworkMonitoring() {
       }
     }
   };
-  
+
   // Start periodic network check (every 10 seconds)
   networkCheckInterval = setInterval(checkNetworkAndReload, 10000);
-  
+
   // Also check immediately when the window gains focus (user returns to app)
   if (mainWindow) {
-    mainWindow.on('focus', function() {
+    mainWindow.on('focus', function () {
       if (isOnOfflinePage) {
         logger.log('info', 'Main', 'Window focused while on offline page, checking network...');
         setTimeout(checkNetworkAndReload, 1000);
       }
     });
   }
-  
+
   logger.log('info', 'Main', 'Network monitoring setup complete');
 }
 
 // App lifecycle events
-app.whenReady().then(async function() {
+app.whenReady().then(async function () {
   logger.log('info', 'Main', 'App ready - version ' + app.getVersion());
-  
+
   // Setup session permissions for screen sharing
   setupSessionPermissions();
-  
+
   createWindow();
   createTray();
   initAutoLaunch();
-  
+
   // Setup network connectivity monitoring
   setupNetworkMonitoring();
-  
+
   // Request permissions on macOS (camera, mic, screen recording)
   await requestPermissions();
-  
+
   // Check for saved auth
   var savedToken = store.get('authToken');
   var savedUser = store.get('userData');
   if (savedToken && savedUser) {
-    setTimeout(function() {
+    setTimeout(function () {
       handleAuthentication({ token: savedToken, user: savedUser });
     }, 2000);
   }
-  
-  app.on('activate', function() {
+
+  app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
     } else if (mainWindow) {
@@ -1137,13 +1157,13 @@ app.whenReady().then(async function() {
   });
 });
 
-app.on('window-all-closed', function() {
+app.on('window-all-closed', function () {
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
 
-app.on('before-quit', function() {
+app.on('before-quit', function () {
   isQuitting = true;
   screenshotService.stop();
   socketHandler.disconnect();
@@ -1151,10 +1171,10 @@ app.on('before-quit', function() {
 });
 
 // Handle uncaught exceptions
-process.on('uncaughtException', function(error) {
+process.on('uncaughtException', function (error) {
   logger.log('error', 'Main', 'Uncaught exception: ' + error.message);
 });
 
-process.on('unhandledRejection', function(reason) {
+process.on('unhandledRejection', function (reason) {
   logger.log('error', 'Main', 'Unhandled rejection: ' + reason);
 });

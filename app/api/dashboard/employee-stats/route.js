@@ -13,7 +13,7 @@ export async function GET(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
-  const { user, models, tenant } = auth;
+    const { user, models, tenant } = auth;
     const { Attendance, LeaveBalance, LeaveType, Payroll, Employee, Designation, Department, User, Performance } = models;
 
     // Find the user first to get the employeeId
@@ -57,7 +57,7 @@ export async function GET(request) {
     // Get current month attendance
     const currentMonthStart = new Date(currentYear, currentMonth - 1, 1)
     const currentMonthEnd = new Date(currentYear, currentMonth, 0, 23, 59, 59, 999)
-    
+
     const currentMonthAttendance = await Attendance.find({
       employee: employee._id,
       date: { $gte: currentMonthStart, $lte: currentMonthEnd }
@@ -71,7 +71,7 @@ export async function GET(request) {
     // Get last month attendance for comparison
     const lastMonthStart = new Date(lastMonthYear, lastMonth - 1, 1)
     const lastMonthEnd = new Date(lastMonthYear, lastMonth, 0, 23, 59, 59, 999)
-    
+
     const lastMonthAttendance = await Attendance.find({
       employee: employee._id,
       date: { $gte: lastMonthStart, $lte: lastMonthEnd }
@@ -81,15 +81,36 @@ export async function GET(request) {
       return sum + (record.workHours || 0)
     }, 0)
 
-    // Get leave balance
-    const leaveBalances = await LeaveBalance.find({
-      employee: employee._id,
-      year: currentYear
-    }).populate('leaveType', 'name')
+    // Prepare last 6 months and batch leave balance fetch by year
+    const last6Months = []
+    const leaveYears = new Set()
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date()
+      date.setDate(1)
+      date.setMonth(date.getMonth() - i)
+      last6Months.push({
+        month: date.getMonth() + 1,
+        year: date.getFullYear(),
+        label: date.toLocaleDateString('en-US', { month: 'short' })
+      })
+      leaveYears.add(date.getFullYear())
+    }
 
-    const totalLeaveBalance = leaveBalances.reduce((sum, balance) => {
-      return sum + (balance.balance || 0)
-    }, 0)
+    const leaveBalancesByYear = await LeaveBalance.find({
+      employee: employee._id,
+      year: { $in: Array.from(leaveYears) }
+    }).select('year allocated balance').lean()
+
+    const leaveYearTotals = {}
+    for (const balance of leaveBalancesByYear) {
+      if (!leaveYearTotals[balance.year]) {
+        leaveYearTotals[balance.year] = { totalBalance: 0, totalAllocated: 0 }
+      }
+      leaveYearTotals[balance.year].totalBalance += balance.balance || 0
+      leaveYearTotals[balance.year].totalAllocated += balance.allocated || 0
+    }
+
+    const totalLeaveBalance = leaveYearTotals[currentYear]?.totalBalance || 0
 
     // Get current month salary
     const currentSalary = await Payroll.findOne({
@@ -110,50 +131,54 @@ export async function GET(request) {
       employee: employee._id
     }).sort({ createdAt: -1 })
 
-    // Get last 7 days attendance for chart
+    // Get last 7 days attendance for chart (single query)
+    const startOfDay = (date) => {
+      const d = new Date(date)
+      d.setHours(0, 0, 0, 0)
+      return d
+    }
+    const dayKey = (date) => {
+      const d = new Date(date)
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    }
+
+    const last7Start = startOfDay(new Date())
+    last7Start.setDate(last7Start.getDate() - 6)
+    const last7End = new Date()
+    last7End.setHours(23, 59, 59, 999)
+
+    const last7Attendance = await Attendance.find({
+      employee: employee._id,
+      date: { $gte: last7Start, $lte: last7End }
+    }).select('date workHours').lean()
+
+    const attendanceByDay = {}
+    for (const record of last7Attendance) {
+      const key = dayKey(record.date)
+      attendanceByDay[key] = (attendanceByDay[key] || 0) + (record.workHours || 0)
+    }
+
     const last7Days = []
     for (let i = 6; i >= 0; i--) {
-      const date = new Date()
+      const date = startOfDay(new Date())
       date.setDate(date.getDate() - i)
-      date.setHours(0, 0, 0, 0)
-      
-      const nextDay = new Date(date)
-      nextDay.setDate(nextDay.getDate() + 1)
-      
-      const attendance = await Attendance.findOne({
-        employee: employee._id,
-        date: { $gte: date, $lt: nextDay }
-      })
-      
+      const key = dayKey(date)
       last7Days.push({
         date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-        hours: attendance ? (attendance.workHours || 0) : 0
+        hours: attendanceByDay[key] || 0
       })
     }
 
-    // Get last 6 months leave data for chart
-    const leaveData = []
-    for (let i = 5; i >= 0; i--) {
-      const date = new Date()
-      date.setMonth(date.getMonth() - i)
-      const month = date.getMonth() + 1
-      const year = date.getFullYear()
-      
-      const monthlyLeaveBalances = await LeaveBalance.find({
-        employee: employee._id,
-        year: year
-      }).populate('leaveType', 'name')
-      
-      const totalBalance = monthlyLeaveBalances.reduce((sum, balance) => sum + (balance.balance || 0), 0)
-      const totalAllocated = monthlyLeaveBalances.reduce((sum, balance) => sum + (balance.allocated || 0), 0)
-      const used = totalAllocated - totalBalance
-      
-      leaveData.push({
-        month: date.toLocaleDateString('en-US', { month: 'short' }),
+    // Get last 6 months leave data for chart (reuse yearly totals)
+    const leaveData = last6Months.map(({ year, label }) => {
+      const totals = leaveYearTotals[year] || { totalBalance: 0, totalAllocated: 0 }
+      const used = totals.totalAllocated - totals.totalBalance
+      return {
+        month: label,
         used: used > 0 ? used : 0,
-        available: totalBalance
-      })
-    }
+        available: totals.totalBalance
+      }
+    })
 
     // Calculate statistics
     const stats = {

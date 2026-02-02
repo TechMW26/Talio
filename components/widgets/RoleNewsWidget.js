@@ -26,31 +26,61 @@ export default function RoleNewsWidget() {
     const [news, setNews] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
+    const [retryCount, setRetryCount] = useState(0)
+    const MAX_RETRIES = 3
 
-    const fetchNews = useCallback(async () => {
+    const fetchNews = useCallback(async (isRetry = false) => {
         try {
             setLoading(true)
-            setError(null)
+            if (!isRetry) {
+                setError(null)
+                setRetryCount(0)
+            }
 
             const token = localStorage.getItem('token')
             const response = await fetch('/api/dashboard/role-news?fresh=true', {
                 headers: { 'Authorization': `Bearer ${token}` }
             })
 
+            if (!response.ok) {
+                throw new Error(`Server error: ${response.status}`)
+            }
+
             const data = await response.json()
 
             if (data.success) {
                 setNews(data.news || [])
+                setRetryCount(0)
             } else {
                 setError(data.message || 'Failed to load news')
             }
         } catch (err) {
             console.error('[RoleNewsWidget] Error:', err)
-            setError('Failed to load news')
+
+            // Detect network errors vs other errors
+            const isNetworkError = err.name === 'TypeError' &&
+                (err.message === 'Failed to fetch' || err.message.includes('NetworkError') || err.message.includes('network'))
+
+            if (isNetworkError && retryCount < MAX_RETRIES) {
+                // Retry with exponential backoff for transient network failures
+                const delay = Math.min(1000 * Math.pow(2, retryCount), 8000)
+                console.log(`[RoleNewsWidget] Network error, retrying in ${delay}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`)
+                setRetryCount(prev => prev + 1)
+                setTimeout(() => fetchNews(true), delay)
+                return
+            }
+
+            if (isNetworkError) {
+                setError('Network unavailable. Check your connection.')
+            } else if (err.message?.includes('Server error')) {
+                setError('Server temporarily unavailable. Try again later.')
+            } else {
+                setError('Failed to load news')
+            }
         } finally {
             setLoading(false)
         }
-    }, [])
+    }, [retryCount])
 
     useEffect(() => {
         fetchNews()

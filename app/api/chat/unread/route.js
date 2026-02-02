@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import mongoose from 'mongoose'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,7 +17,7 @@ export async function GET(request) {
     const { Chat, Employee, User } = models
 
     // Get user to find employee ID
-    const userDoc = await User.findById(user._id || user.userId).select('employeeId')
+    const userDoc = await User.findById(user._id || user.userId).select('employeeId').lean()
     if (!userDoc || !userDoc.employeeId) {
       // Return 0 unread for users without employee records
       return NextResponse.json({
@@ -27,46 +28,37 @@ export async function GET(request) {
       })
     }
 
-    // Get employee details
-    const employee = await Employee.findById(userDoc.employeeId)
-    if (!employee) {
-      return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
-    }
+    const employeeId = new mongoose.Types.ObjectId(userDoc.employeeId)
 
-    // Find all chats where user is a participant
-    const chats = await Chat.find({
-      participants: employee._id
-    }).select('messages participants')
+    // Use aggregation to count unread messages efficiently in MongoDB
+    const unreadCounts = await Chat.aggregate([
+      // Match only chats where user is a participant
+      { $match: { participants: employeeId } },
+      // Unwind messages array
+      { $unwind: { path: '$messages', preserveNullAndEmptyArrays: false } },
+      // Filter: message not from current user AND not read by current user
+      {
+        $match: {
+          'messages.sender': { $ne: employeeId },
+          'messages.isRead.user': { $ne: employeeId }
+        }
+      },
+      // Group by chat ID and count unread messages
+      {
+        $group: {
+          _id: '$_id',
+          unreadCount: { $sum: 1 }
+        }
+      }
+    ])
 
+    // Build response
     let totalUnread = 0
     const unreadByChat = {}
 
-    // Count unread messages in each chat
-    for (const chat of chats) {
-      let chatUnread = 0
-      
-      if (!chat.messages || !Array.isArray(chat.messages)) continue;
-
-      for (const message of chat.messages) {
-        // Skip invalid messages
-        if (!message || !message.sender) continue;
-
-        // Check if message is from someone else and not read by current user
-        if (message.sender.toString() !== employee._id.toString()) {
-          const isReadByUser = message.isRead?.some(
-            read => read && read.user && read.user.toString() === employee._id.toString()
-          )
-          
-          if (!isReadByUser) {
-            chatUnread++
-          }
-        }
-      }
-      
-      if (chatUnread > 0) {
-        unreadByChat[chat._id.toString()] = chatUnread
-        totalUnread += chatUnread
-      }
+    for (const item of unreadCounts) {
+      unreadByChat[item._id.toString()] = item.unreadCount
+      totalUnread += item.unreadCount
     }
 
     return NextResponse.json({
