@@ -37,14 +37,16 @@ export default function LeaveRequestsWidget({
       <ScrollShadow className="space-y-2 flex-1 max-h-[200px]">
         {leaveRequests.length === 0 ? (
           <div className="flex flex-col items-center justify-center text-center py-6 flex-1">
-            <div className="w-14 h-14 rounded-full bg-primary-100 flex items-center justify-center mb-3">
-              <FaCalendarCheck className="w-7 h-7 text-primary-400" />
-            </div>
+            <img
+              src="/assets/Leave-Request.png"
+              alt="No leave requests"
+              className="w-24 h-24 object-contain mb-3"
+            />
             <p className="text-sm text-default-500">No leave requests found</p>
           </div>
         ) : (
           leaveRequests.slice(0, 5).map((request) => (
-            <Card key={request._id} className="bg-default-50 border border-default-100">
+            <Card key={request._id} className="border border-default-100">
               <CardBody className="p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-3 min-w-0 flex-1">

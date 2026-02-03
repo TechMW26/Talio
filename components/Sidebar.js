@@ -267,11 +267,11 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
       {/* Desktop: Icon Strip + Sliding Sidebar */}
       {isDesktop && (
         <>
-          <IconStrip 
+          <IconStrip
             onExpandClick={handleIconStripExpand}
             sidebarCounts={sidebarCounts}
           />
-          <SlidingSidebar 
+          <SlidingSidebar
             isOpen={slidingSidebarOpen}
             setIsOpen={setSlidingSidebarOpen}
             activeSubmenu={activeSubmenu}
@@ -299,7 +299,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
             className={`
               fixed inset-y-0 left-0 z-[60]
               text-gray-800
-              flex flex-col h-screen shadow-lg
+              flex flex-col h-screen shadow-[0_6px_24px_rgba(15,23,42,0.08)]
               ${isOpen ? 'translate-x-0' : '-translate-x-full'}
               w-full max-w-[280px]
               transition-transform duration-300 ease-in-out
@@ -309,7 +309,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
             }}
           >
             {/* Logo Section */}
-            <div className="h-[60.5px] px-4 flex-shrink-0 flex items-center" style={{ borderBottom: '1px solid var(--color-primary-200)' }}>
+            <div className="h-[60.5px] px-4 flex-shrink-0 flex items-center">
               <div className="flex items-center w-full justify-between">
                 <img
                   src="/assets/logo.png"

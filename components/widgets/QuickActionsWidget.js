@@ -31,7 +31,7 @@ export default function QuickActionsWidget() {
                             variant="flat"
                             color={action.color}
                             onPress={() => router.push(action.path)}
-                            className="p-4 h-auto flex flex-col items-center gap-2 text-center bg-default-50 hover:bg-default-100 border border-default-100"
+                            className="p-4 h-auto flex flex-col items-center gap-2 text-center border border-default-100"
                             radius="lg"
                         >
                             <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">

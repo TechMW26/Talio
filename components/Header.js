@@ -63,7 +63,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
         setMiraModalClosing(true)
       }
     }
-    
+
     if (showMiraModal) {
       window.addEventListener('keydown', handleEscape)
       return () => window.removeEventListener('keydown', handleEscape)
@@ -139,7 +139,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
         console.log('Employee Designation Level:', result.data.designationLevel)
         console.log('Employee Designation Level Name:', result.data.designationLevelName)
         setEmployeeData(result.data)
-        
+
         if (result.data.company && result.data.company.timezone) {
           setTimezone(result.data.company.timezone)
         }
@@ -313,13 +313,13 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
     setShowSearchResults(false)
     setShowMobileSearch(false)
     setSearchQuery('')
-    
+
     // On desktop, open chat popup instead of navigating to chat page
     if (link === '/dashboard/chat' && isDesktop) {
       openWidget('button')
       return
     }
-    
+
     router.push(link)
   }
 
@@ -344,8 +344,8 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
   // Don't render user-specific content until mounted to avoid hydration mismatch
   if (!mounted) {
     return (
-      <header 
-        className="h-[60.5px] bg-content1 w-full z-[50] border-b border-divider transition-all duration-300 flex-shrink-0"
+      <header
+        className="h-[60.5px] bg-content1 w-full z-[50] shadow-[0_2px_6px_rgba(15,23,42,0.08)] transition-all duration-300 flex-shrink-0"
       >
         <div className="flex items-center justify-between px-1 sm:px-4 lg:px-0 h-[45px] lg:h-[60px]">
           <div className="flex items-center space-x-2 sm:space-x-4">
@@ -372,8 +372,8 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
   }
 
   return (
-    <header 
-      className="h-[60.5px] bg-content1 w-full z-[50] border-b border-divider transition-all duration-300 flex-shrink-0"
+    <header
+      className="h-[60.5px] bg-content1 w-full z-[50] shadow-[0_2px_6px_rgba(15,23,42,0.08)] transition-all duration-300 flex-shrink-0"
     >
       <div className="flex items-center justify-between px-1 sm:px-4 lg:px-6 h-[60.5px] lg:h-[60px]">
         {/* Left side */}
@@ -396,7 +396,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
           <div ref={searchRef} className="hidden lg:block relative w-64 lg:w-96">
             {/* Backdrop overlay when search is active */}
             {(showSearchResults || searchQuery.length >= 2) && (
-              <div 
+              <div
                 className="fixed inset-0 z-[100] bg-black/60"
                 onClick={() => {
                   setSearchQuery('')
@@ -404,7 +404,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                 }}
               />
             )}
-            
+
             {/* Unified Search Container */}
             <div className={`z-[101] ${(showSearchResults || searchQuery.length >= 2) ? 'fixed left-1/2 -translate-x-1/2 top-4 w-[90%] max-w-xl bg-content1 rounded-xl shadow-2xl border border-divider overflow-hidden' : 'relative'}`}>
               <div className="relative flex items-center">
@@ -415,19 +415,19 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                   startContent={<FaSearch className="text-default-400 w-4 h-4" />}
                   endContent={
                     searching ? <Loader size="xs" /> :
-                    searchQuery ? (
-                      <Button
-                        isIconOnly
-                        size="sm"
-                        variant="light"
-                        onPress={() => {
-                          setSearchQuery('')
-                          setShowSearchResults(false)
-                        }}
-                      >
-                        <FaTimes className="w-4 h-4" />
-                      </Button>
-                    ) : null
+                      searchQuery ? (
+                        <Button
+                          isIconOnly
+                          size="sm"
+                          variant="light"
+                          onPress={() => {
+                            setSearchQuery('')
+                            setShowSearchResults(false)
+                          }}
+                        >
+                          <FaTimes className="w-4 h-4" />
+                        </Button>
+                      ) : null
                   }
                   classNames={{
                     inputWrapper: (showSearchResults || searchQuery.length >= 2) ? 'bg-transparent border-b border-divider rounded-none' : 'bg-default-100'
@@ -490,7 +490,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
         {/* Right side */}
         <div className="flex items-center space-x-2 sm:space-x-4 flex-1 justify-end">
           {/* MIRA Cloud Button - Desktop Only */}
-          <div 
+          <div
             className="hidden md:flex items-center justify-center cursor-pointer relative group"
             data-mira-sphere="true"
             onClick={() => setShowMiraModal(true)}
@@ -570,14 +570,14 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
               {/* Animated lightbulb container */}
               <div className="relative">
                 {/* Main lightbulb icon */}
-                <svg 
+                <svg
                   className="w-5 h-5 transition-all duration-300 group-hover:text-warning-500 group-hover:scale-110"
                   fill="currentColor"
                   viewBox="0 0 24 24"
                 >
-                  <path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zm2.85 11.1l-.85.6V16h-4v-2.3l-.85-.6A4.997 4.997 0 0 1 7 9c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.63-.8 3.16-2.15 4.1z"/>
+                  <path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7zm2.85 11.1l-.85.6V16h-4v-2.3l-.85-.6A4.997 4.997 0 0 1 7 9c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.63-.8 3.16-2.15 4.1z" />
                 </svg>
-                
+
                 {/* Sparkle effects on hover */}
                 <span className="absolute -top-1 -right-1 w-2 h-2 bg-warning-400 rounded-full opacity-0 group-hover:opacity-100 group-hover:animate-ping transition-opacity" />
                 <span className="absolute -bottom-0.5 -left-0.5 w-1.5 h-1.5 bg-warning-500 rounded-full opacity-0 group-hover:opacity-100 group-hover:animate-ping transition-opacity" style={{ animationDelay: '0.2s' }} />
@@ -686,19 +686,19 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                   startContent={<FaSearch className="text-default-400 w-4 h-4" />}
                   endContent={
                     searching ? <Loader size="xs" /> :
-                    searchQuery ? (
-                      <Button
-                        isIconOnly
-                        size="sm"
-                        variant="light"
-                        onPress={() => {
-                          setSearchQuery('')
-                          setSearchResults(null)
-                        }}
-                      >
-                        <FaTimes className="w-4 h-4" />
-                      </Button>
-                    ) : null
+                      searchQuery ? (
+                        <Button
+                          isIconOnly
+                          size="sm"
+                          variant="light"
+                          onPress={() => {
+                            setSearchQuery('')
+                            setSearchResults(null)
+                          }}
+                        >
+                          <FaTimes className="w-4 h-4" />
+                        </Button>
+                      ) : null
                   }
                   autoFocus
                 />
@@ -738,17 +738,17 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                               <div className="flex items-center gap-2 mb-1">
                                 <h4 className="font-semibold text-base text-default-900">{item.title}</h4>
                               </div>
-                                {item.subtitle && (
-                                  <p className="text-sm mb-1 text-primary-600">{item.subtitle}</p>
-                                )}
-                                {item.description && (
-                                  <p className="text-sm text-default-500 line-clamp-2">{item.description}</p>
-                                )}
-                                {item.meta && item.type !== 'page' && (
-                                  <span className="inline-block text-xs text-default-500 bg-default-100 px-2 py-1 rounded mt-2">
-                                    {item.meta}
-                                  </span>
-                                )}
+                              {item.subtitle && (
+                                <p className="text-sm mb-1 text-primary-600">{item.subtitle}</p>
+                              )}
+                              {item.description && (
+                                <p className="text-sm text-default-500 line-clamp-2">{item.description}</p>
+                              )}
+                              {item.meta && item.type !== 'page' && (
+                                <span className="inline-block text-xs text-default-500 bg-default-100 px-2 py-1 rounded mt-2">
+                                  {item.meta}
+                                </span>
+                              )}
                             </div>
                           </div>
                         ))}
@@ -774,7 +774,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
       {/* MIRA Cloud Fullscreen Modal */}
       {/* Backdrop overlay with blur animation - renders below iframe */}
       {(showMiraModal || miraModalClosing) && (
-        <div 
+        <div
           className={`fixed inset-0 bg-black/60 ${miraModalClosing ? 'animate-mira-backdrop-out' : 'animate-mira-backdrop-in'}`}
           style={{ zIndex: 99998, pointerEvents: 'none' }}
           onAnimationEnd={() => {
@@ -785,12 +785,12 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
           }}
         />
       )}
-      
+
       {/* Iframe container - only mounted when modal is open */}
       {(showMiraModal || miraModalClosing) && (
-        <div 
+        <div
           className={`fixed inset-0 ${miraModalClosing ? 'animate-mira-iframe-out' : 'animate-mira-iframe-in'}`}
-          style={{ 
+          style={{
             zIndex: 99999,
             pointerEvents: 'auto'
           }}
@@ -804,7 +804,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
           />
         </div>
       )}
-      
+
       {/* Close button - separate from backdrop for proper click handling */}
       {(showMiraModal || miraModalClosing) && (
         <Button

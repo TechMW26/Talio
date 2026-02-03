@@ -21,7 +21,7 @@ export default function KPIStatsWidget({ statsData }) {
               isPressable={!!stat.href}
               isHoverable
               onPress={() => stat.href && router.push(stat.href)}
-              className="bg-default-50 border border-default-100 transition-all hover:shadow-md hover:border-primary-200"
+              className="border border-default-100 transition-all hover:shadow-md hover:border-primary-200"
               radius="lg"
             >
               <CardBody className="p-3 sm:p-4">

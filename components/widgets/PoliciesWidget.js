@@ -48,7 +48,7 @@ export default function PoliciesWidget() {
     <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-base sm:text-lg font-bold text-default-900">Policies</h3>
-        <Button 
+        <Button
           variant="light"
           color="primary"
           size="sm"
@@ -59,19 +59,21 @@ export default function PoliciesWidget() {
       </div>
       {policies.length === 0 ? (
         <div className="flex flex-col items-center justify-center text-center py-6">
-          <div className="w-14 h-14 rounded-full bg-primary-100 flex items-center justify-center mb-3">
-            <FaFileContract className="w-7 h-7 text-primary-400" />
-          </div>
+          <img
+            src="/assets/Policies.png"
+            alt="No policies found"
+            className="w-24 h-24 object-contain mb-3"
+          />
           <p className="text-sm text-default-500">No policies found</p>
         </div>
       ) : (
         <ScrollShadow className="space-y-2 max-h-[200px]">
           {policies.slice(0, 5).map(policy => (
-            <Card 
-              key={policy._id} 
+            <Card
+              key={policy._id}
               isPressable
               onPress={() => router.push('/dashboard/policies')}
-              className="bg-default-50 border border-default-100"
+              className="border border-default-100"
             >
               <CardBody className="p-3">
                 <div className="flex items-center gap-3">

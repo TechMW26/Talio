@@ -69,14 +69,16 @@ export default function MyAssetsWidget({ user }) {
       <ScrollShadow className="space-y-2 max-h-[200px]">
         {assets.length === 0 ? (
           <div className="flex flex-col items-center justify-center text-center py-6">
-            <div className="w-14 h-14 rounded-full bg-primary-100 flex items-center justify-center mb-3">
-              <FaLaptop className="w-7 h-7 text-primary-400" />
-            </div>
+            <img
+              src="/assets/Assets.png"
+              alt="No assets assigned"
+              className="w-24 h-24 object-contain mb-3"
+            />
             <p className="text-sm text-default-500">No assets assigned</p>
           </div>
         ) : (
           assets.map(asset => (
-            <Card key={asset._id} className="bg-default-50 border border-default-100">
+            <Card key={asset._id} className="border border-default-100">
               <CardBody className="p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0 flex-1">

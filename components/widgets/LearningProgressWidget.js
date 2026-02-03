@@ -108,27 +108,27 @@ export default function LearningProgressWidget({ limit = 4 }) {
                     View All
                 </Button>
             </div>
-            
+
             <ScrollShadow className="space-y-3 max-h-48">
-            {courses.map((course, index) => (
-                <Card key={index} className="bg-default-50 border border-default-100">
-                    <CardBody className="p-3">
-                        <div className="flex items-center justify-start mb-2">
-                            <h4 className="text-sm font-semibold text-default-900 truncate pr-2 flex-1">
-                                {course.course || course.title}
-                            </h4>
-                            {getStatusBadge(course.status)}
-                        </div>
-                        <Progress
-                            size="sm"
-                            value={course.progress}
-                            color={course.progress === 100 ? 'success' : course.progress > 0 ? 'primary' : 'default'}
-                            className="mb-1"
-                        />
-                        <p className="text-xs text-default-500">{course.progress}% complete</p>
-                    </CardBody>
-                </Card>
-            ))}
+                {courses.map((course, index) => (
+                    <Card key={index} className="border border-default-100">
+                        <CardBody className="p-3">
+                            <div className="flex items-center justify-start mb-2">
+                                <h4 className="text-sm font-semibold text-default-900 truncate pr-2 flex-1">
+                                    {course.course || course.title}
+                                </h4>
+                                {getStatusBadge(course.status)}
+                            </div>
+                            <Progress
+                                size="sm"
+                                value={course.progress}
+                                color={course.progress === 100 ? 'success' : course.progress > 0 ? 'primary' : 'default'}
+                                className="mb-1"
+                            />
+                            <p className="text-xs text-default-500">{course.progress}% complete</p>
+                        </CardBody>
+                    </Card>
+                ))}
             </ScrollShadow>
         </div>
     )

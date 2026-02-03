@@ -65,6 +65,18 @@ export default function HolidaysWidget({ limit = 5 }) {
         )
     }
 
+    const upcomingHolidays = (holidays || [])
+        .filter(holiday => getDaysUntil(holiday.date) >= 0)
+        .sort((a, b) => new Date(a.date) - new Date(b.date))
+
+    const itemColors = [
+        'bg-blue-50/80',
+        'bg-emerald-50/80',
+        'bg-amber-50/80',
+        'bg-purple-50/80',
+        'bg-rose-50/80'
+    ]
+
     return (
         <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
             <div className="flex items-center justify-between mb-4">
@@ -78,22 +90,24 @@ export default function HolidaysWidget({ limit = 5 }) {
                     View All
                 </Button>
             </div>
-            
+
             <ScrollShadow className="space-y-2 max-h-[200px]">
-                {holidays.length === 0 ? (
+                {upcomingHolidays.length === 0 ? (
                     <div className="flex flex-col items-center justify-center text-center py-6">
-                        <div className="w-14 h-14 rounded-full bg-primary-100 flex items-center justify-center mb-3">
-                            <FaGift className="w-7 h-7 text-primary-400" />
-                        </div>
+                        <img
+                            src="/assets/Holiday.png"
+                            alt="No upcoming holidays"
+                            className="w-24 h-24 object-contain mb-3"
+                        />
                         <p className="text-sm text-default-500">No upcoming holidays</p>
                     </div>
                 ) : (
-                    holidays.map((holiday, index) => {
+                    upcomingHolidays.map((holiday, index) => {
                         const daysUntil = getDaysUntil(holiday.date)
                         return (
                             <Card
                                 key={holiday._id || index}
-                                className="bg-default-50 border border-default-100"
+                                className={`border-0 shadow-none ${itemColors[index % itemColors.length]}`}
                             >
                                 <CardBody className="p-3">
                                     <div className="flex items-center justify-between gap-2">

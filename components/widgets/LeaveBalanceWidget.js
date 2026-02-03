@@ -18,7 +18,7 @@ export default function LeaveBalanceWidget({ employeeId }) {
                 <Skeleton className="h-6 w-1/3 rounded-lg mb-4" />
                 <div className="space-y-3">
                     {[1, 2, 3].map(i => (
-                        <Card key={i} className="bg-default-50">
+                        <Card key={i} className="bg-transparent">
                             <CardBody className="p-3 space-y-2">
                                 <Skeleton className="h-4 w-1/2 rounded-lg" />
                                 <Skeleton className="h-2 w-full rounded-full" />
@@ -70,7 +70,7 @@ export default function LeaveBalanceWidget({ employeeId }) {
                             return (
                                 <Card
                                     key={balance._id || index}
-                                    className="bg-default-50 border border-default-100"
+                                    className="border border-default-100"
                                 >
                                     <CardBody className="p-3">
                                         <div className="flex items-center justify-between mb-2">

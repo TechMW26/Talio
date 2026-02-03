@@ -115,19 +115,19 @@ export default function GoalsWidget({ userId }) {
             ) : (
                 <ScrollShadow className="space-y-2 max-h-[200px]">
                     {goals.map((goal) => (
-                        <Card key={goal._id} className="bg-default-50 border border-default-100">
+                        <Card key={goal._id} className="border border-default-100">
                             <CardBody className="p-3">
                                 <div className="flex items-center justify-between gap-2">
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm font-semibold text-default-900 truncate">{goal.title}</p>
                                         <div className="flex items-center gap-2 mt-1">
-                                            <Chip 
-                                                size="sm" 
+                                            <Chip
+                                                size="sm"
                                                 variant="flat"
                                                 color={
                                                     goal.status === 'completed' ? 'success' :
-                                                    goal.status === 'in_progress' ? 'primary' :
-                                                    goal.isOverdue ? 'danger' : 'default'
+                                                        goal.status === 'in_progress' ? 'primary' :
+                                                            goal.isOverdue ? 'danger' : 'default'
                                                 }
                                             >
                                                 {goal.status === 'completed' ? 'Completed' :

@@ -160,26 +160,26 @@ export default function RecentActivityWidget({ limit = 6 }) {
                     View All
                 </Button>
             </div>
-            
+
             <ScrollShadow className="space-y-2 max-h-48">
-            {activities.map((activity, index) => (
-                <Card key={index} className="bg-default-50 border border-default-100">
-                    <CardBody className="p-2">
-                        <div className="flex items-start gap-3">
-                            <div className="flex-shrink-0 w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                                {getActivityIcon(activity.type)}
+                {activities.map((activity, index) => (
+                    <Card key={index} className="border border-default-100">
+                        <CardBody className="p-2">
+                            <div className="flex items-start gap-3">
+                                <div className="flex-shrink-0 w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
+                                    {getActivityIcon(activity.type)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm text-default-900 truncate">{activity.description}</p>
+                                    <p className="text-xs text-default-500 flex items-center gap-1">
+                                        <FaClock className="w-3 h-3" />
+                                        {formatTime(activity.time)}
+                                    </p>
+                                </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                                <p className="text-sm text-default-900 truncate">{activity.description}</p>
-                                <p className="text-xs text-default-500 flex items-center gap-1">
-                                    <FaClock className="w-3 h-3" />
-                                    {formatTime(activity.time)}
-                                </p>
-                            </div>
-                        </div>
-                    </CardBody>
-                </Card>
-            ))}
+                        </CardBody>
+                    </Card>
+                ))}
             </ScrollShadow>
         </div>
     )

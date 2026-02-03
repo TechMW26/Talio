@@ -154,9 +154,11 @@ export default function RoleNewsWidget() {
                 <ScrollShadow className="space-y-2 flex-1 max-h-[200px]">
                     {news.length === 0 ? (
                         <div className="flex flex-col items-center justify-center text-center py-6">
-                            <div className="w-14 h-14 rounded-full bg-primary-100 flex items-center justify-center mb-3">
-                                <HiOutlineNewspaper className="w-7 h-7 text-primary-400" />
-                            </div>
+                            <img
+                                src="/assets/News.png"
+                                alt="No news"
+                                className="w-24 h-24 object-contain mb-3"
+                            />
                             <p className="text-sm text-default-500">No breaking updates right now.</p>
                             <p className="text-xs text-default-400 mt-1">Showing the freshest items as they appear.</p>
                         </div>
@@ -171,7 +173,7 @@ export default function RoleNewsWidget() {
                                     href={item.link}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="flex items-center gap-3 p-3 bg-default-50 rounded-xl hover:bg-default-100 transition-colors group border border-default-100"
+                                    className="flex items-center gap-3 p-3 rounded-xl transition-colors group border border-default-100"
                                 >
                                     {/* Icon */}
                                     <div className={`w-10 h-10 ${config.bg} rounded-full flex items-center justify-center flex-shrink-0`}>

@@ -54,7 +54,7 @@ export default function MyExpensesWidget({ user }) {
     <div className="p-4 sm:p-6 flex-1 flex flex-col h-full">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-base sm:text-lg font-bold text-default-900">Expenses</h3>
-        <Button 
+        <Button
           variant="light"
           color="primary"
           size="sm"
@@ -67,14 +67,16 @@ export default function MyExpensesWidget({ user }) {
       <ScrollShadow className="space-y-2 max-h-[200px]">
         {expenses.length === 0 ? (
           <div className="flex flex-col items-center justify-center text-center py-6">
-            <div className="w-14 h-14 rounded-full bg-success-100 flex items-center justify-center mb-3">
-              <FaMoneyBillWave className="w-7 h-7 text-success-500" />
-            </div>
+            <img
+              src="/assets/Expense.png"
+              alt="No expenses yet"
+              className="w-24 h-24 object-contain mb-3"
+            />
             <p className="text-sm text-default-500">No expenses yet</p>
           </div>
         ) : (
           expenses.slice(0, 5).map(expense => (
-            <Card key={expense._id} className="bg-default-50 border border-default-100">
+            <Card key={expense._id} className="border border-default-100">
               <CardBody className="p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0 flex-1">

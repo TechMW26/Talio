@@ -29,12 +29,12 @@ function InlineBadge({ count }) {
   )
 }
 
-export default function SlidingSidebar({ 
-  isOpen, 
-  setIsOpen, 
-  activeSubmenu, 
+export default function SlidingSidebar({
+  isOpen,
+  setIsOpen,
+  activeSubmenu,
   setActiveSubmenu,
-  sidebarCounts = {} 
+  sidebarCounts = {}
 }) {
   const pathname = usePathname()
   const router = useRouter()
@@ -269,7 +269,7 @@ export default function SlidingSidebar({
         onMouseEnter={handleSidebarMouseEnter}
         onMouseLeave={handleSidebarMouseLeave}
         className={`
-          hidden lg:flex fixed inset-y-0 left-0 z-[70] flex-col h-screen w-[17rem] shadow-xl
+          hidden lg:flex fixed inset-y-0 left-0 z-[70] flex-col h-screen w-[17rem] shadow-[0_6px_24px_rgba(15,23,42,0.08)]
           transition-transform duration-300 ease-out
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}
         `}
@@ -278,9 +278,8 @@ export default function SlidingSidebar({
         }}
       >
         {/* Header with close button */}
-        <div 
+        <div
           className="h-[60.5px] px-4 flex items-center justify-between flex-shrink-0"
-          style={{ borderBottom: '1px solid var(--color-primary-200)' }}
         >
           <img
             src="/assets/logo.png"

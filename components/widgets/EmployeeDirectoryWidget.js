@@ -89,7 +89,7 @@ export default function EmployeeDirectoryWidget() {
               key={emp._id}
               isPressable
               onPress={() => router.push(`/dashboard/employees/${emp._id}`)}
-              className="bg-default-50 border border-default-100"
+              className="border border-default-100"
             >
               <CardBody className="p-2">
                 <div className="flex items-center gap-3">

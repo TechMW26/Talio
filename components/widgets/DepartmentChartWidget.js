@@ -41,7 +41,7 @@ export default function DepartmentChartWidget({ departmentStats = [] }) {
         setContainerWidth(containerRef.current.offsetWidth)
       }
     }
-    
+
     updateWidth()
     window.addEventListener('resize', updateWidth)
     return () => window.removeEventListener('resize', updateWidth)
@@ -54,9 +54,11 @@ export default function DepartmentChartWidget({ departmentStats = [] }) {
           <h3 className="text-base sm:text-lg font-bold text-default-900">Department Distribution</h3>
         </div>
         <div className="flex flex-col items-center justify-center text-center py-6">
-          <div className="w-14 h-14 rounded-full bg-default-100 flex items-center justify-center mb-3">
-            <FaBuilding className="w-7 h-7 text-default-400" />
-          </div>
+          <img
+            src="/assets/Department-Distribution.png"
+            alt="No department data"
+            className="w-24 h-24 object-contain mb-3"
+          />
           <p className="text-sm text-default-500">No department data available</p>
         </div>
       </div>
@@ -65,7 +67,7 @@ export default function DepartmentChartWidget({ departmentStats = [] }) {
 
   // Calculate total for percentage
   const total = departmentStats.reduce((sum, dept) => sum + (dept.value || 0), 0)
-  
+
   // Find max value for scaling bar heights
   const maxValue = Math.max(...departmentStats.map(d => d.value || 0))
 
@@ -77,7 +79,7 @@ export default function DepartmentChartWidget({ departmentStats = [] }) {
   const totalGapWidth = (numBars - 1) * BAR_GAP
   const availableWidth = containerWidth - 32 // Account for padding (px-4 = 16px * 2)
   const calculatedBarWidth = numBars > 0 ? (availableWidth - totalGapWidth) / numBars : MIN_BAR_WIDTH
-  
+
   // Use calculated width if >= min, otherwise use min width (will trigger overflow)
   const barWidth = Math.max(calculatedBarWidth, MIN_BAR_WIDTH)
   const needsOverflow = calculatedBarWidth < MIN_BAR_WIDTH
@@ -88,18 +90,18 @@ export default function DepartmentChartWidget({ departmentStats = [] }) {
       <div className="mb-4">
         <h3 className="text-base sm:text-lg font-bold text-default-900">Department Distribution</h3>
       </div>
-      
+
       {/* Centralized Tooltip - always positioned in center of widget */}
       {hoveredIndex !== null && departmentStats[hoveredIndex] && (() => {
         const dept = departmentStats[hoveredIndex]
         const percentage = total > 0 ? ((dept.value / total) * 100) : 0
         const color = CHART_COLORS[hoveredIndex % CHART_COLORS.length]
-        
+
         return (
           <div className="absolute left-1/2 top-12 -translate-x-1/2 z-20 pointer-events-none">
             <Card className="min-w-[140px] shadow-lg">
               {/* Tooltip Header with department color */}
-              <div 
+              <div
                 className="px-3 py-2 border-b border-default-200"
                 style={{ backgroundColor: color }}
               >
@@ -107,7 +109,7 @@ export default function DepartmentChartWidget({ departmentStats = [] }) {
                   {dept.name}
                 </p>
               </div>
-              
+
               {/* Tooltip Content */}
               <CardBody className="px-3 py-2">
                 <div className="flex items-center justify-between gap-3">
@@ -131,16 +133,16 @@ export default function DepartmentChartWidget({ departmentStats = [] }) {
           </div>
         )
       })()}
-      
+
       {/* Scrollable container for bar chart */}
-      <div 
+      <div
         ref={containerRef}
         className="flex-1 overflow-x-auto"
       >
-        <div 
+        <div
           className="flex items-end justify-between px-4"
-          style={{ 
-            height: `${chartHeight}px`, 
+          style={{
+            height: `${chartHeight}px`,
             width: totalContentWidth,
             minWidth: needsOverflow ? `${totalContentWidth}px` : undefined,
             gap: `${BAR_GAP}px`
@@ -151,19 +153,19 @@ export default function DepartmentChartWidget({ departmentStats = [] }) {
             const barHeight = maxValue > 0 ? Math.max((dept.value / maxValue) * chartHeight, 20) : 20
             const color = CHART_COLORS[index % CHART_COLORS.length]
             const isHovered = hoveredIndex === index
-            
+
             return (
-              <div 
-                key={dept.name || index} 
+              <div
+                key={dept.name || index}
                 className="relative flex flex-col items-center"
                 style={{ flex: needsOverflow ? '0 0 auto' : 1 }}
                 onMouseEnter={() => setHoveredIndex(index)}
                 onMouseLeave={() => setHoveredIndex(null)}
               >
                 {/* Bar */}
-                <div 
+                <div
                   className="cursor-pointer transition-all duration-200 rounded-t"
-                  style={{ 
+                  style={{
                     width: needsOverflow ? `${MIN_BAR_WIDTH}px` : '100%',
                     maxWidth: '48px',
                     height: `${barHeight}px`,
@@ -178,7 +180,7 @@ export default function DepartmentChartWidget({ departmentStats = [] }) {
           })}
         </div>
       </div>
-      
+
       {/* Summary line at bottom */}
       <div className="mt-3 pt-3 border-t border-default-100">
         <p className="text-xs text-default-500 text-center">

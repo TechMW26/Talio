@@ -158,16 +158,14 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {} }) {
     <>
       {/* Icon Strip - Always visible on desktop */}
       <aside
-        className="hidden lg:flex fixed inset-y-0 left-0 z-[8] flex-col h-screen w-[4.5rem] shadow-md"
+        className="hidden lg:flex fixed inset-y-0 left-0 z-[8] flex-col h-screen w-[4.5rem] shadow-[0_4px_16px_rgba(15,23,42,0.08)]"
         style={{
-          backgroundColor: 'var(--color-bg-sidebar)',
-          borderRight: '1px solid var(--color-primary-200)'
+          backgroundColor: 'var(--color-bg-sidebar)'
         }}
       >
         {/* Logo + Expand Button Section */}
-        <div 
+        <div
           className="h-[60.5px] flex items-center justify-between px-2 flex-shrink-0"
-          style={{ borderBottom: '1px solid var(--color-primary-200)' }}
         >
           <img
             src="/assets/lanyard-card-logo.webp"
@@ -190,13 +188,13 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {} }) {
           {menuItems.map((item) => {
             const isActive = isMenuItemActive(item)
             const badgeCount = getBadgeCount(item.name)
-            
+
             // Special handling for Chat on desktop - opens widget instead of navigating
             if (item.name === 'Chat') {
               return (
-                <Tooltip 
-                  key={item.name} 
-                  content={item.name} 
+                <Tooltip
+                  key={item.name}
+                  content={item.name}
                   placement="right"
                   delay={200}
                   closeDelay={0}
@@ -220,9 +218,9 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {} }) {
             // For items with submenu, clicking expands the sliding sidebar
             if (item.submenu) {
               return (
-                <Tooltip 
-                  key={item.name} 
-                  content={item.name} 
+                <Tooltip
+                  key={item.name}
+                  content={item.name}
                   placement="right"
                   delay={200}
                   closeDelay={0}
@@ -235,9 +233,9 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {} }) {
                     }}
                   >
                     <div className="relative">
-                      <item.icon 
-                        className="w-6 h-6 group-hover:text-white" 
-                        style={{ color: isActive ? 'white' : 'var(--color-primary-600)' }} 
+                      <item.icon
+                        className="w-6 h-6 group-hover:text-white"
+                        style={{ color: isActive ? 'white' : 'var(--color-primary-600)' }}
                       />
                       <SidebarBadge count={badgeCount} />
                     </div>
@@ -248,9 +246,9 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {} }) {
 
             // Regular menu items - navigate directly
             return (
-              <Tooltip 
-                key={item.name} 
-                content={item.name} 
+              <Tooltip
+                key={item.name}
+                content={item.name}
                 placement="right"
                 delay={200}
                 closeDelay={0}
@@ -264,9 +262,9 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {} }) {
                   }}
                 >
                   <div className="relative">
-                    <item.icon 
-                      className="w-6 h-6 group-hover:text-white" 
-                      style={{ color: isActive ? 'white' : 'var(--color-primary-600)' }} 
+                    <item.icon
+                      className="w-6 h-6 group-hover:text-white"
+                      style={{ color: isActive ? 'white' : 'var(--color-primary-600)' }}
                     />
                     <SidebarBadge count={badgeCount} />
                   </div>
