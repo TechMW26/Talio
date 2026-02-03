@@ -28,7 +28,28 @@ export async function GET(request) {
       })
     }
 
-    const employeeId = new mongoose.Types.ObjectId(userDoc.employeeId)
+    let employeeId
+    try {
+      employeeId = new mongoose.Types.ObjectId(userDoc.employeeId)
+    } catch (idError) {
+      console.warn('[API] Invalid employeeId format:', userDoc.employeeId)
+      return NextResponse.json({
+        success: true,
+        totalUnread: 0,
+        unreadByChat: {},
+        message: 'Invalid employee ID format'
+      })
+    }
+
+    // First check if user has any chats at all to avoid unnecessary aggregation
+    const hasChats = await Chat.exists({ participants: employeeId })
+    if (!hasChats) {
+      return NextResponse.json({
+        success: true,
+        totalUnread: 0,
+        unreadByChat: {}
+      })
+    }
 
     // Use aggregation to count unread messages efficiently in MongoDB
     const unreadCounts = await Chat.aggregate([

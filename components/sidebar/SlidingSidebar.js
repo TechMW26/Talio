@@ -1,0 +1,450 @@
+'use client'
+
+import { usePathname, useRouter } from 'next/navigation'
+import Link from 'next/link'
+import {
+  HiOutlineChevronRight,
+  HiOutlineXMark,
+  HiOutlineCog6Tooth,
+  HiOutlineArrowRightOnRectangle,
+  HiOutlineChatBubbleLeftRight,
+  HiOutlineUsers
+} from 'react-icons/hi2'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { getMenuItemsForRole } from '@/utils/roleBasedMenus'
+import toast from '@/utils/toast'
+import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
+import { useChatWidget } from '@/contexts/ChatWidgetContext'
+import { usePageTransition } from '@/contexts/PageTransitionContext'
+import UnreadBadge from '@/components/UnreadBadge'
+import { Button, Chip, ScrollShadow, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@heroui/react'
+
+// Inline badge component for expanded menu items
+function InlineBadge({ count }) {
+  if (!count || count <= 0) return null
+  return (
+    <Chip size="sm" color="danger" variant="flat" className="min-w-5 h-5 text-[10px]">
+      {count > 99 ? '99+' : count}
+    </Chip>
+  )
+}
+
+export default function SlidingSidebar({ 
+  isOpen, 
+  setIsOpen, 
+  activeSubmenu, 
+  setActiveSubmenu,
+  sidebarCounts = {} 
+}) {
+  const pathname = usePathname()
+  const router = useRouter()
+  const [expandedMenus, setExpandedMenus] = useState({})
+  const [user, setUser] = useState(null)
+  const [mounted, setMounted] = useState(false)
+  const [isDepartmentHead, setIsDepartmentHead] = useState(false)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const { unreadCount } = useUnreadMessages()
+  const { toggleWidget } = useChatWidget()
+  const { startNavigation } = usePageTransition()
+  const sidebarRef = useRef(null)
+
+  // Auto-close timer ref
+  const autoCloseTimerRef = useRef(null)
+
+  // Clear the auto-close timer
+  const clearAutoCloseTimer = useCallback(() => {
+    if (autoCloseTimerRef.current) {
+      clearTimeout(autoCloseTimerRef.current)
+      autoCloseTimerRef.current = null
+    }
+  }, [])
+
+  // Start the auto-close timer (3 seconds)
+  const startAutoCloseTimer = useCallback(() => {
+    if (!isOpen) return
+
+    clearAutoCloseTimer()
+    autoCloseTimerRef.current = setTimeout(() => {
+      setIsOpen(false)
+      setActiveSubmenu(null)
+    }, 3000)
+  }, [isOpen, setIsOpen, setActiveSubmenu, clearAutoCloseTimer])
+
+  // Handle mouse enter on sidebar - cancel auto-close
+  const handleSidebarMouseEnter = useCallback(() => {
+    clearAutoCloseTimer()
+  }, [clearAutoCloseTimer])
+
+  // Handle mouse leave from sidebar - start auto-close timer
+  const handleSidebarMouseLeave = useCallback(() => {
+    startAutoCloseTimer()
+  }, [startAutoCloseTimer])
+
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => clearAutoCloseTimer()
+  }, [clearAutoCloseTimer])
+
+  // Auto-expand submenu when activeSubmenu changes
+  useEffect(() => {
+    if (activeSubmenu) {
+      setExpandedMenus(prev => ({
+        ...prev,
+        [activeSubmenu]: true
+      }))
+    }
+  }, [activeSubmenu])
+
+  // Load user only once on mount
+  useEffect(() => {
+    setMounted(true)
+    const userData = localStorage.getItem('user')
+    if (userData) {
+      const parsedUser = JSON.parse(userData)
+      setUser(parsedUser)
+      checkDepartmentHead()
+    }
+  }, [])
+
+  // Check if user is a department head
+  const checkDepartmentHead = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return
+
+      const response = await fetch('/api/team/check-head', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      const data = await response.json()
+      if (data.success && data.isDepartmentHead) {
+        setIsDepartmentHead(true)
+      }
+    } catch (error) {
+      console.error('Error checking department head:', error)
+    }
+  }
+
+  // Get menu items based on user role (memoized)
+  const menuItems = useMemo(() => {
+    if (!user) return []
+
+    const effectiveRole = isDepartmentHead ? 'department_head' : user.role
+    let baseMenuItems = getMenuItemsForRole(effectiveRole)
+
+    if (isDepartmentHead) {
+      const teamMenuItem = {
+        name: 'Team',
+        icon: HiOutlineUsers,
+        path: '/dashboard/team/members',
+        submenu: [
+          { name: 'Team Members', path: '/dashboard/team/members' },
+          { name: 'Team Ratings', path: '/dashboard/performance/ratings' },
+          { name: 'Team Goals', path: '/dashboard/performance/goals' },
+          { name: 'Performance Reports', path: '/dashboard/performance/reports' },
+          { name: 'Geofencing', path: '/dashboard/team/geofencing' }
+        ]
+      }
+
+      const attendanceMenuIndex = baseMenuItems.findIndex(item => item.name === 'Attendance & Leaves')
+      if (attendanceMenuIndex !== -1) {
+        baseMenuItems = [...baseMenuItems]
+        baseMenuItems[attendanceMenuIndex] = {
+          ...baseMenuItems[attendanceMenuIndex],
+          submenu: [
+            { name: 'My Attendance', path: '/dashboard/attendance' },
+            { name: 'Team Attendance', path: '/dashboard/attendance/team' },
+            { name: 'Attendance Regularisation', path: '/dashboard/team/regularisation' },
+            { name: 'Apply Leave', path: '/dashboard/leave/apply' },
+            { name: 'My Leave Balance', path: '/dashboard/leave/balance' },
+            { name: 'My Leave Requests', path: '/dashboard/leave/requests' },
+            { name: 'Leave Approvals', path: '/dashboard/leave/approvals' },
+          ]
+        }
+      }
+
+      return [
+        baseMenuItems[0],
+        teamMenuItem,
+        ...baseMenuItems.slice(1)
+      ]
+    }
+
+    return baseMenuItems
+  }, [user, isDepartmentHead])
+
+  const toggleSubmenu = (menuName) => {
+    setExpandedMenus(prev => ({
+      ...prev,
+      [menuName]: !prev[menuName]
+    }))
+  }
+
+  const handleLinkClick = (path) => {
+    // Close sidebar when link is clicked
+    setIsOpen(false)
+    setActiveSubmenu(null)
+    // Show page transition loading if navigating to a different page
+    if (path && path !== pathname) {
+      startNavigation(path)
+    }
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    localStorage.removeItem('userId')
+    toast.success('Logged out successfully')
+    router.push('/login')
+  }
+
+  // Helper to check if a menu item is active
+  const isMenuItemActive = (item) => {
+    if (item.path === pathname) return true
+    if (item.submenu) {
+      return item.submenu.some(subItem => subItem.path === pathname)
+    }
+    return false
+  }
+
+  // Helper to get badge count for a menu item
+  const getBadgeCount = (itemName) => {
+    switch (itemName) {
+      case 'Projects':
+        return (sidebarCounts.projects || 0) + (sidebarCounts.tasks || 0)
+      case 'Attendance & Leaves':
+        return (sidebarCounts.leaves || 0) + (sidebarCounts.attendance || 0)
+      case 'Expenses':
+        return sidebarCounts.expenses || 0
+      case 'Helpdesk':
+        return sidebarCounts.helpdesk || 0
+      case 'Notifications':
+        return sidebarCounts.notifications || 0
+      default:
+        return 0
+    }
+  }
+
+  // Helper to get badge count for submenu items
+  const getSubmenuBadgeCount = (subItemName) => {
+    switch (subItemName) {
+      case 'Attendance Regularisation':
+        return sidebarCounts.attendance || 0
+      case 'Leave Approvals':
+        return sidebarCounts.leaves || 0
+      case 'My Projects':
+      case 'Project Invitations':
+        return sidebarCounts.projects || 0
+      case "To-Do's":
+        return sidebarCounts.tasks || 0
+      case 'Approvals':
+        return sidebarCounts.expenses || 0
+      default:
+        return 0
+    }
+  }
+
+  if (!mounted) {
+    return null
+  }
+
+  return (
+    <>
+      {/* Overlay for clicking outside to close */}
+      {isOpen && (
+        <div
+          className="hidden lg:block fixed inset-0 z-[49] bg-black/20"
+          onClick={() => {
+            setIsOpen(false)
+            setActiveSubmenu(null)
+          }}
+        />
+      )}
+
+      {/* Sliding Sidebar - starts off screen, slides in when open - overlaps icon strip */}
+      <aside
+        ref={sidebarRef}
+        onMouseEnter={handleSidebarMouseEnter}
+        onMouseLeave={handleSidebarMouseLeave}
+        className={`
+          hidden lg:flex fixed inset-y-0 left-0 z-[70] flex-col h-screen w-[17rem] shadow-xl
+          transition-transform duration-300 ease-out
+          ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+        `}
+        style={{
+          backgroundColor: 'var(--color-bg-sidebar)',
+        }}
+      >
+        {/* Header with close button */}
+        <div 
+          className="h-[60.5px] px-4 flex items-center justify-between flex-shrink-0"
+          style={{ borderBottom: '1px solid var(--color-primary-200)' }}
+        >
+          <img
+            src="/assets/logo.png"
+            alt="Talio Logo"
+            className="h-10 w-auto object-contain"
+          />
+          <button
+            onClick={() => {
+              setIsOpen(false)
+              setActiveSubmenu(null)
+            }}
+            className="p-2 rounded-lg transition-colors hover:bg-gray-100"
+            title="Close sidebar"
+          >
+            <HiOutlineChevronRight className="w-4 h-4 text-gray-600 rotate-180" />
+          </button>
+        </div>
+
+        {/* Scrollable Menu Section */}
+        <ScrollShadow className="pt-4 pb-8 flex-1 scrollbar-hide px-3 space-y-2">
+          {menuItems.map((item) => {
+            const isActive = isMenuItemActive(item)
+            return (
+              <div key={item.name} className="w-full">
+                {item.submenu ? (
+                  <div className="w-full">
+                    <button
+                      type="button"
+                      onClick={() => toggleSubmenu(item.name)}
+                      className="w-full flex items-center text-left rounded-xl transition-all duration-200 group relative justify-between px-4 py-3"
+                      style={{
+                        backgroundColor: expandedMenus[item.name] ? 'var(--color-bg-hover)' : 'transparent',
+                        color: '#111827'
+                      }}
+                    >
+                      <div className="flex items-center gap-3 flex-1">
+                        <div
+                          className="transition-colors p-2 rounded-lg"
+                          style={{
+                            backgroundColor: expandedMenus[item.name] ? 'var(--color-primary-500)' : 'var(--color-primary-100)',
+                            color: expandedMenus[item.name] ? 'white' : 'var(--color-primary-700)'
+                          }}
+                        >
+                          <item.icon className="w-5 h-5" />
+                        </div>
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          {item.name === 'Attendance & Leaves' ? (
+                            <span className="text-sm font-medium leading-tight text-left">
+                              Attendance &<br />Leaves
+                            </span>
+                          ) : (
+                            <span className="text-sm font-medium truncate">{item.name}</span>
+                          )}
+                          <InlineBadge count={getBadgeCount(item.name)} />
+                        </div>
+                      </div>
+                      <div className={`transition-transform duration-200 flex-shrink-0 ${expandedMenus[item.name] ? 'rotate-90' : ''}`}>
+                        <HiOutlineChevronRight className="w-4 h-4" />
+                      </div>
+                    </button>
+                    {expandedMenus[item.name] && (
+                      <div className="mt-2 space-y-1 ml-8 pl-3" style={{ borderLeft: '2px solid var(--color-primary-200)' }}>
+                        {item.submenu.map((subItem) => (
+                          <Link
+                            key={subItem.path}
+                            href={subItem.path}
+                            onClick={() => handleLinkClick(subItem.path)}
+                            className="w-full text-left flex items-center justify-between px-3 py-2 text-sm rounded-lg transition-all duration-200 cursor-pointer"
+                            style={{
+                              backgroundColor: pathname === subItem.path ? 'var(--color-primary-500)' : 'transparent',
+                              color: pathname === subItem.path ? 'white' : '#6B7280'
+                            }}
+                          >
+                            <span>{subItem.name}</span>
+                            <InlineBadge count={getSubmenuBadgeCount(subItem.name)} />
+                          </Link>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : item.name === 'Chat' ? (
+                  <button
+                    onClick={() => {
+                      toggleWidget('sidebar')
+                      handleLinkClick(null)
+                    }}
+                    className="w-full flex items-center text-left rounded-xl transition-all duration-200 group cursor-pointer relative px-4 py-3"
+                    style={{
+                      backgroundColor: 'transparent',
+                      color: '#111827'
+                    }}
+                  >
+                    <div className="flex items-center gap-3 flex-1">
+                      <div
+                        className="transition-colors relative p-2 rounded-lg"
+                        style={{
+                          backgroundColor: 'var(--color-primary-100)',
+                          color: 'var(--color-primary-600)'
+                        }}
+                      >
+                        <item.icon className="w-5 h-5" />
+                        {unreadCount > 0 && <UnreadBadge count={unreadCount} />}
+                      </div>
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <span className="text-sm font-medium truncate">{item.name}</span>
+                      </div>
+                    </div>
+                  </button>
+                ) : (
+                  <Link
+                    href={item.path}
+                    onClick={() => handleLinkClick(item.path)}
+                    className="w-full flex items-center text-left rounded-xl transition-all duration-200 group cursor-pointer relative px-4 py-3"
+                    style={{
+                      backgroundColor: isActive ? 'var(--color-primary-500)' : 'transparent',
+                      color: isActive ? 'white' : '#111827'
+                    }}
+                  >
+                    <div className="flex items-center gap-3 flex-1">
+                      <div
+                        className="transition-colors p-2 rounded-lg"
+                        style={{
+                          backgroundColor: isActive ? 'var(--color-primary-600)' : 'var(--color-primary-100)',
+                          color: isActive ? 'white' : 'var(--color-primary-700)'
+                        }}
+                      >
+                        <item.icon className="w-5 h-5" />
+                      </div>
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <span className="text-sm font-medium truncate">{item.name}</span>
+                        {item.name !== 'Chat' && <InlineBadge count={getBadgeCount(item.name)} />}
+                      </div>
+                    </div>
+                  </Link>
+                )}
+              </div>
+            )
+          })}
+        </ScrollShadow>
+      </aside>
+
+      {/* Logout Confirmation Modal */}
+      <Modal isOpen={showLogoutConfirm} onOpenChange={setShowLogoutConfirm}>
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader className="bg-danger-500 text-white">Confirm Logout</ModalHeader>
+              <ModalBody className="py-6">
+                <p className="text-center text-default-700">
+                  Are you sure you want to logout?
+                </p>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose}>
+                  Cancel
+                </Button>
+                <Button color="danger" onPress={handleLogout}>
+                  Logout
+                </Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
+    </>
+  )
+}

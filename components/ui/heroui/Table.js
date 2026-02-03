@@ -9,16 +9,57 @@ import {
   TableCell as HeroTableCell,
   Pagination,
   Spinner,
+  Chip,
 } from '@heroui/react'
 import { cn } from '@/utils/cn'
+
+// Re-export HeroUI table components with HRMS prefix for composable usage
+export const HRMSTableHeader = HeroTableHeader
+export const HRMSTableBody = HeroTableBody
+export const HRMSTableColumn = HeroTableColumn
+export const HRMSTableRow = HeroTableRow
+export const HRMSTableCell = HeroTableCell
+
+/**
+ * Status Badge Component for tables
+ */
+export function StatusBadge({ status, className }) {
+  const statusConfig = {
+    paid: { color: 'success', label: 'Paid' },
+    pending: { color: 'warning', label: 'Pending' },
+    processing: { color: 'primary', label: 'Processing' },
+    failed: { color: 'danger', label: 'Failed' },
+    cancelled: { color: 'default', label: 'Cancelled' },
+    approved: { color: 'success', label: 'Approved' },
+    rejected: { color: 'danger', label: 'Rejected' },
+    draft: { color: 'default', label: 'Draft' },
+    active: { color: 'success', label: 'Active' },
+    inactive: { color: 'default', label: 'Inactive' },
+  }
+
+  const config = statusConfig[status?.toLowerCase()] || { color: 'default', label: status || 'Unknown' }
+
+  return (
+    <Chip
+      size="sm"
+      variant="flat"
+      color={config.color}
+      className={cn('capitalize', className)}
+    >
+      {config.label}
+    </Chip>
+  )
+}
 
 /**
  * HRMS Table Component
  * Standardized table with consistent styling, pagination, and loading states
+ * Supports both data-driven (columns/data props) and composable (children) patterns
  */
 export function HRMSTable({
   columns,
   data,
+  children,
   isLoading = false,
   isEmpty = false,
   emptyContent = 'No data available',
@@ -31,6 +72,42 @@ export function HRMSTable({
   classNames,
   ...props
 }) {
+  // If children are provided, use composable pattern
+  if (children) {
+    return (
+      <HeroTable
+        aria-label="Data table"
+        className={cn('w-full', className)}
+        selectionMode={selectionMode}
+        selectedKeys={selectedKeys}
+        onSelectionChange={onSelectionChange}
+        sortDescriptor={sortDescriptor}
+        onSortChange={onSortChange}
+        classNames={{
+          wrapper: 'shadow-none border-0 rounded-xl',
+          th: [
+            'bg-default-50',
+            'text-default-600',
+            'font-semibold',
+            'text-xs',
+            'uppercase',
+            'tracking-wider',
+          ],
+          td: [
+            'text-default-700',
+            'py-3',
+          ],
+          tr: 'hover:bg-default-50 transition-colors',
+          ...classNames,
+        }}
+        {...props}
+      >
+        {children}
+      </HeroTable>
+    )
+  }
+
+  // Data-driven pattern
   return (
     <HeroTable
       aria-label="Data table"
@@ -202,6 +279,12 @@ export function SimpleTableCell({ children, className, isHeader }) {
 
 export default {
   HRMSTable,
+  HRMSTableHeader,
+  HRMSTableBody,
+  HRMSTableColumn,
+  HRMSTableRow,
+  HRMSTableCell,
+  StatusBadge,
   PaginatedTable,
   SimpleTable,
   SimpleTableHead,

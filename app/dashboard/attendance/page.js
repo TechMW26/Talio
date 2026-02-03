@@ -735,21 +735,15 @@ export default function AttendancePage() {
     setLoading(true)
 
     try {
-      // Capture location with high accuracy - REQUIRED for check-in
+      // Capture location with high accuracy - preferred but not blocking
       let locationData = null
 
       try {
         locationData = await captureLocation()
       } catch (locationError) {
-        setLoading(false)
-        toast.error(locationError.message || 'Location is required for check-in. Please enable location services and try again.')
-        return // Block check-in if location capture fails
-      }
-
-      if (!locationData || !locationData.latitude || !locationData.longitude) {
-        setLoading(false)
-        toast.error('Unable to capture location. Please enable location services and try again.')
-        return
+        console.warn('Location capture failed:', locationError.message)
+        // Show warning but continue with check-in
+        toast.warning('Location could not be captured. Check-in will proceed without location.')
       }
 
       const token = localStorage.getItem('token')
@@ -762,9 +756,9 @@ export default function AttendancePage() {
         body: JSON.stringify({
           employeeId: getEmployeeId(user),
           type: 'clock-in',
-          latitude: locationData.latitude,
-          longitude: locationData.longitude,
-          accuracy: locationData.accuracy,
+          latitude: locationData?.latitude || null,
+          longitude: locationData?.longitude || null,
+          accuracy: locationData?.accuracy || null,
           // Address will be resolved server-side for accuracy
         }),
       })
@@ -796,21 +790,15 @@ export default function AttendancePage() {
     setLoading(true)
 
     try {
-      // Capture location with high accuracy - REQUIRED for check-out
+      // Capture location with high accuracy - preferred but not blocking
       let locationData = null
 
       try {
         locationData = await captureLocation()
       } catch (locationError) {
-        setLoading(false)
-        toast.error(locationError.message || 'Location is required for check-out. Please enable location services and try again.')
-        return // Block check-out if location capture fails
-      }
-
-      if (!locationData || !locationData.latitude || !locationData.longitude) {
-        setLoading(false)
-        toast.error('Unable to capture location. Please enable location services and try again.')
-        return
+        console.warn('Location capture failed:', locationError.message)
+        // Show warning but continue with check-out
+        toast.warning('Location could not be captured. Check-out will proceed without location.')
       }
 
       const token = localStorage.getItem('token')
@@ -823,9 +811,9 @@ export default function AttendancePage() {
         body: JSON.stringify({
           employeeId: getEmployeeId(user),
           type: 'clock-out',
-          latitude: locationData.latitude,
-          longitude: locationData.longitude,
-          accuracy: locationData.accuracy,
+          latitude: locationData?.latitude || null,
+          longitude: locationData?.longitude || null,
+          accuracy: locationData?.accuracy || null,
           // Address will be resolved server-side for accuracy
         }),
       })
