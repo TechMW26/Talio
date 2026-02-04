@@ -62,6 +62,7 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
   const fileInputRef = useRef(null)
+  const [showPhotoGuidance, setShowPhotoGuidance] = useState(false)
 
   // Profile completion state
   const [profileCompletionStatus, setProfileCompletionStatus] = useState(null)
@@ -469,6 +470,15 @@ export default function ProfilePage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleStartPhotoUpload = () => {
+    setShowPhotoGuidance(true)
+  }
+
+  const handleConfirmPhotoUpload = () => {
+    setShowPhotoGuidance(false)
+    fileInputRef.current?.click()
   }
 
   if (loading || !user || !employee) {
@@ -899,7 +909,7 @@ export default function ProfilePage() {
                       logo: employee.company.logo
                     } : null
                   }}
-                  onImageClick={() => fileInputRef.current?.click()}
+                  onImageClick={handleStartPhotoUpload}
                   uploadingImage={uploadingImage}
                 />
               </div>
@@ -1421,6 +1431,28 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      <Modal isOpen={showPhotoGuidance} onOpenChange={setShowPhotoGuidance} placement="center">
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader className="flex items-center gap-2">
+                <FaExclamationTriangle className="text-amber-500" />
+                Profile Photo Guidelines
+              </ModalHeader>
+              <ModalBody>
+                <p className="text-sm text-slate-600">
+                  Please upload a professional photo with a clear facial expression. Avoid casual or party photos.
+                </p>
+              </ModalBody>
+              <ModalFooter>
+                <Button variant="light" onPress={onClose}>Cancel</Button>
+                <Button color="primary" onPress={handleConfirmPhotoUpload}>Continue</Button>
+              </ModalFooter>
+            </>
+          )}
+        </ModalContent>
+      </Modal>
 
       {/* Image Editor Modal */}
       <Modal isOpen={showImageEditor} onClose={closeImageEditor} size="5xl" scrollBehavior="inside" classNames={{ wrapper: 'z-[99999]' }}>
