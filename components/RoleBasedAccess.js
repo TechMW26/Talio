@@ -18,8 +18,10 @@ const rolePermissions = {
     '/dashboard/employees/add',
     '/dashboard/departments',
     '/dashboard/designations',
+    '/dashboard/attendance',
     '/dashboard/attendance/report',
-
+    '/dashboard/attendance/checkins',
+    '/dashboard/attendance/team',
     '/dashboard/leave/requests',
     '/dashboard/leave/approvals',
     '/dashboard/leave-types',

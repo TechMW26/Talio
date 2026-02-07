@@ -20,6 +20,15 @@ import { ActionableToastProvider } from '@/contexts/ActionableToastContext'
 import { ChatWidgetProvider, useChatWidget } from '@/contexts/ChatWidgetContext'
 import { PageTransitionProvider, usePageTransition } from '@/contexts/PageTransitionContext'
 import { getCurrentUser, getEmployeeId, syncUserData, getToken } from '@/utils/userHelper'
+import { 
+  getOptimisticAuth, 
+  validateAuthBackground, 
+  getCachedProfileStatus, 
+  setCachedProfileStatus,
+  getCachedEmployeeData,
+  setCachedEmployeeData,
+  clearAllSessionCaches
+} from '@/utils/sessionCache'
 import CallAlertReceiver from '@/components/CallAlertReceiver'
 
 // Page transition loading overlay
@@ -59,16 +68,19 @@ export default function DashboardLayout({ children }) {
   const router = useRouter()
 
   // Check if user needs to change password on first login
+  // OPTIMIZED: Use optimistic auth check to render immediately, validate in background
   useEffect(() => {
     const checkPasswordChangeRequired = async () => {
-      const token = getToken()
-      const user = getCurrentUser()
-
-      if (!token || !user) {
+      // STEP 1: Optimistic check - render immediately with localStorage data
+      const optimisticAuth = getOptimisticAuth()
+      
+      if (!optimisticAuth) {
         // No auth, redirect to login
         window.location.href = '/login'
         return
       }
+
+      const { token, user } = optimisticAuth
 
       // Check if localStorage user data indicates password change needed
       if (user.forcePasswordChange) {
@@ -77,54 +89,55 @@ export default function DashboardLayout({ children }) {
         return
       }
 
-      // Verify with server
+      // STEP 2: Allow rendering immediately while validating in background
+      setIsCheckingAuth(false)
+
+      // STEP 3: Background validation (non-blocking)
+      const handleInvalidSession = (message) => {
+        console.log('[Dashboard] Session invalid:', message)
+        clearAllSessionCaches()
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+        localStorage.removeItem('userId')
+        document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+        window.location.href = '/login'
+      }
+
       try {
-        const response = await fetch('/api/auth/validate', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-
-        if (!response.ok) {
-          // Token invalid, redirect to login
-          localStorage.removeItem('token')
-          localStorage.removeItem('user')
-          localStorage.removeItem('userId')
-          document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
-          window.location.href = '/login'
-          return
-        }
-
-        const data = await response.json()
-
-        if (data.forcePasswordChange) {
+        const validationResult = await validateAuthBackground(token, handleInvalidSession)
+        
+        if (validationResult.forcePasswordChange) {
           console.log('[Dashboard] Password change required (from server), redirecting...')
-          // Update localStorage to reflect this
           const updatedUser = { ...user, forcePasswordChange: true }
           localStorage.setItem('user', JSON.stringify(updatedUser))
           window.location.href = '/auth/change-password'
           return
         }
 
-        setIsCheckingAuth(false)
-
-        // Check profile completion status after auth is verified
-        // Small delay to ensure layout is mounted
-        setTimeout(() => {
-          checkProfileCompletionStatus(token)
-        }, 500)
+        // Check profile completion status (with caching)
+        checkProfileCompletionStatus(token)
       } catch (error) {
-        console.error('[Dashboard] Auth check error:', error)
-        // On network error, allow access but show warning
-        setIsCheckingAuth(false)
+        console.warn('[Dashboard] Background auth check error (allowing access):', error.message)
+        // On network error, allow access but check profile status later
+        setTimeout(() => checkProfileCompletionStatus(token), 2000)
       }
     }
 
     checkPasswordChangeRequired()
   }, [])
 
-  // Check profile completion status
+  // Check profile completion status (with caching for performance)
   const checkProfileCompletionStatus = async (token) => {
+    // Check cache first
+    const cachedStatus = getCachedProfileStatus()
+    if (cachedStatus) {
+      console.log('[Dashboard] Using cached profile completion status')
+      handleProfileCompletionData(cachedStatus)
+      return
+    }
+
     try {
-      console.log('[Dashboard] Checking profile completion status...')
+      console.log('[Dashboard] Fetching profile completion status...')
       const response = await fetch('/api/profile/completion-status', {
         headers: { 'Authorization': `Bearer ${token}` }
       })
@@ -133,40 +146,43 @@ export default function DashboardLayout({ children }) {
         const data = await response.json()
         console.log('[Dashboard] Profile completion data:', data)
         if (data.success && data.data) {
-          setProfileCompletionStatus(data.data)
-
-          // Show modal if profile is not complete and not on profile page
-          const shouldShowModal = data.data.showModal
-          const isOnProfilePage = pathname?.includes('/profile')
-
-          console.log('[Dashboard] Modal check - showModal:', shouldShowModal, 'isOnProfilePage:', isOnProfilePage)
-
-          if (shouldShowModal && !isOnProfilePage) {
-            // Check if user has dismissed the modal in this session
-            // Use a more specific key that includes user ID to avoid cross-session issues
-            const userId = data.data.firstLoginAt ? 'user' : 'unknown'
-            const dismissedKey = `profileModal_dismissed_${new Date().toDateString()}`
-            const dismissed = sessionStorage.getItem(dismissedKey)
-
-            console.log('[Dashboard] Modal dismissed today:', dismissed)
-
-            if (!dismissed) {
-              console.log('[Dashboard] *** SHOWING PROFILE COMPLETION MODAL ***')
-              setShowProfileCompletionModal(true)
-            }
-          }
-
-          // If account is suspended, show suspension message
-          if (data.data.status === 'suspended') {
-            console.log('[Dashboard] Account suspended due to incomplete profile')
-            // Could redirect to a suspension page or show a blocking modal
-          }
+          // Cache the result
+          setCachedProfileStatus(data.data)
+          handleProfileCompletionData(data.data)
         }
       } else {
         console.log('[Dashboard] Profile completion API returned non-ok status:', response.status)
       }
     } catch (error) {
-      console.error('[Dashboard] Profile completion check error:', error)
+      console.warn('[Dashboard] Profile completion check error (non-blocking):', error.message)
+    }
+  }
+
+  // Handle profile completion data (shared between cache and fresh fetch)
+  const handleProfileCompletionData = (data) => {
+    setProfileCompletionStatus(data)
+
+    // Show modal if profile is not complete and not on profile page
+    const shouldShowModal = data.showModal
+    const isOnProfilePage = pathname?.includes('/profile')
+
+    console.log('[Dashboard] Modal check - showModal:', shouldShowModal, 'isOnProfilePage:', isOnProfilePage)
+
+    if (shouldShowModal && !isOnProfilePage) {
+      const dismissedKey = `profileModal_dismissed_${new Date().toDateString()}`
+      const dismissed = sessionStorage.getItem(dismissedKey)
+
+      console.log('[Dashboard] Modal dismissed today:', dismissed)
+
+      if (!dismissed) {
+        console.log('[Dashboard] *** SHOWING PROFILE COMPLETION MODAL ***')
+        setShowProfileCompletionModal(true)
+      }
+    }
+
+    // If account is suspended, show suspension message
+    if (data.status === 'suspended') {
+      console.log('[Dashboard] Account suspended due to incomplete profile')
     }
   }
 
@@ -178,7 +194,7 @@ export default function DashboardLayout({ children }) {
     sessionStorage.setItem(dismissedKey, 'true')
   }
 
-  // Sync user data on mount to ensure employee info is complete
+  // Sync user data on mount to ensure employee info is complete (with caching)
   useEffect(() => {
     if (isCheckingAuth) return // Don't sync while checking auth
 
@@ -196,6 +212,14 @@ export default function DashboardLayout({ children }) {
       if (needsSync) {
         const empId = getEmployeeId(user)
         if (empId) {
+          // Check cache first
+          const cachedEmployee = getCachedEmployeeData(empId)
+          if (cachedEmployee) {
+            console.log('[Dashboard] Using cached employee data:', cachedEmployee.firstName)
+            syncUserData(cachedEmployee)
+            return
+          }
+
           try {
             console.log('[Dashboard] Syncing employee data...')
             const response = await fetch(`/api/employees/${empId}`, {
@@ -203,18 +227,20 @@ export default function DashboardLayout({ children }) {
             })
             const result = await response.json()
             if (result.success && result.data) {
+              // Cache the result
+              setCachedEmployeeData(result.data)
               syncUserData(result.data)
               console.log('[Dashboard] Employee data synced:', result.data.firstName, result.data.lastName)
             }
           } catch (error) {
-            console.error('[Dashboard] Error syncing employee data:', error)
+            console.warn('[Dashboard] Error syncing employee data (non-blocking):', error.message)
           }
         }
       }
     }
 
     syncEmployeeData()
-  }, [])
+  }, [isCheckingAuth])
 
   // Get user ID from localStorage and initialize desktop app
   useEffect(() => {

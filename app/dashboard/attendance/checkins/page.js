@@ -18,9 +18,9 @@ export default function EmployeeCheckinsPage() {
       const parsedUser = JSON.parse(userData)
       setUser(parsedUser)
 
-      // Check if user is admin
-      if (parsedUser.role !== 'admin') {
-        toast.error('Access denied. Only Admin can view employee check-ins.')
+      // Check if user is admin or HR
+      if (parsedUser.role !== 'admin' && parsedUser.role !== 'hr') {
+        toast.error('Access denied. Only Admin or HR can view employee check-ins.')
         window.location.href = '/dashboard'
         return
       }

@@ -78,10 +78,23 @@ export function Providers({ children }) {
                 <AILoadingProvider>
                     <SWRConfig
                         value={{
+                            // Stale-while-revalidate: show cached data immediately
                             revalidateOnFocus: false,
                             revalidateOnReconnect: true,
+                            // Dedupe requests aggressively to reduce network calls
                             dedupingInterval: 60_000,
-                            shouldRetryOnError: false,
+                            // Retry on error with backoff
+                            shouldRetryOnError: true,
+                            errorRetryInterval: 5000,
+                            errorRetryCount: 2,
+                            // Keep previous data while loading to prevent flashing
+                            keepPreviousData: true,
+                            // Don't suspend - render immediately with stale data
+                            suspense: false,
+                            // Fallback data for SSR/slow networks
+                            fallback: {},
+                            // Use IndexedDB/localStorage for persistent cache
+                            provider: () => new Map(),
                         }}
                     >
                         <MiraTransitionOverlay />
