@@ -16,6 +16,12 @@ let io;
 
 // In-memory presence tracking (employeeId -> { sockets: Set, lastSeenAt: Date|null })
 const presenceByEmployee = new Map();
+// Also track by userId for live users API
+const presenceByUserId = new Map();
+
+// Expose globally for API routes
+global.presenceByEmployee = presenceByEmployee;
+global.presenceByUserId = presenceByUserId;
 
 app.prepare().then(() => {
   const server = createServer(async (req, res) => {
@@ -56,6 +62,11 @@ app.prepare().then(() => {
         socket.userId = resolvedUserId.toString();
         socket.join(`user:${socket.userId}`);
         console.log(`🔐 [Socket.IO] User ${socket.userId} authenticated`);
+        
+        // Track user presence by userId
+        const userEntry = presenceByUserId.get(socket.userId) || { sockets: new Set(), lastSeenAt: null };
+        userEntry.sockets.add(socket.id);
+        presenceByUserId.set(socket.userId, userEntry);
       }
 
       if (resolvedEmployeeId) {
@@ -302,6 +313,19 @@ app.prepare().then(() => {
 
     socket.on('disconnect', () => {
       console.log('❌ [Socket.IO] Client disconnected:', socket.id);
+
+      // Clean up user presence by userId
+      if (socket.userId) {
+        const userId = socket.userId.toString();
+        const userEntry = presenceByUserId.get(userId);
+        if (userEntry) {
+          userEntry.sockets.delete(socket.id);
+          if (userEntry.sockets.size === 0) {
+            userEntry.lastSeenAt = new Date();
+            presenceByUserId.set(userId, userEntry);
+          }
+        }
+      }
 
       if (socket.employeeId) {
         const employeeId = socket.employeeId.toString();

@@ -225,6 +225,9 @@ export default function UnifiedDashboard({ user: userProp }) {
     const [departments, setDepartments] = useState([])
     const [leaveRequests, setLeaveRequests] = useState([])
     const [attendanceData, setAttendanceData] = useState([])
+    
+    // Unified widget data (fetched in single API call for performance)
+    const [unifiedWidgetData, setUnifiedWidgetData] = useState(null)
 
     // Employee data for the logged-in user
     const [employeeData, setEmployeeData] = useState(() => {
@@ -393,6 +396,22 @@ export default function UnifiedDashboard({ user: userProp }) {
         }
     }, [employeeIdStr])
 
+    // Fetch unified widget data (single API call for holidays, announcements, assets, expenses, helpdesk, policies)
+    const fetchUnifiedWidgetData = useCallback(async () => {
+        try {
+            const token = localStorage.getItem('token')
+            const response = await fetch('/api/dashboard/unified', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            const data = await response.json()
+            if (data.success) {
+                setUnifiedWidgetData(data.data)
+            }
+        } catch (error) {
+            console.error('Error fetching unified widget data:', error)
+        }
+    }, [])
+
     // Real-time update handlers - MUST come after fetch functions
     const handleRealtimeUpdate = useCallback((data) => {
         console.log('🔄 [Unified Dashboard] Real-time update received')
@@ -434,22 +453,21 @@ export default function UnifiedDashboard({ user: userProp }) {
         }
     }, [userProp])
 
-    // Initial data load
+    // Initial data load - progressive loading (don't block render)
     useEffect(() => {
-        const loadAllData = async () => {
-            const promises = [fetchDashboardData(), fetchCompanySettings()]
+        // Show dashboard immediately - widgets will show their own loading states
+        setLoading(false)
+        
+        // Fetch data in parallel (non-blocking)
+        fetchDashboardData()
+        fetchCompanySettings()
+        fetchUnifiedWidgetData()
 
-            if (employeeIdStr) {
-                promises.push(fetchTodayAttendance())
-                promises.push(fetchEmployeeData())
-            }
-
-            await Promise.allSettled(promises)
-            setLoading(false)
+        if (employeeIdStr) {
+            fetchTodayAttendance()
+            fetchEmployeeData()
         }
-
-        loadAllData()
-    }, [user, employeeIdStr, fetchDashboardData, fetchTodayAttendance, fetchEmployeeData, fetchCompanySettings])
+    }, [user, employeeIdStr, fetchDashboardData, fetchTodayAttendance, fetchEmployeeData, fetchCompanySettings, fetchUnifiedWidgetData])
 
     // Countdown timer effect
     useEffect(() => {
@@ -832,12 +850,12 @@ export default function UnifiedDashboard({ user: userProp }) {
 
         // Announcements Widget
         if (permissions.announcements) {
-            components['announcements'] = <AnnouncementsWidget />
+            components['announcements'] = <AnnouncementsWidget initialData={unifiedWidgetData?.announcements} />
         }
 
         // Holidays Widget
         if (permissions.holidays) {
-            components['holidays'] = <HolidaysWidget />
+            components['holidays'] = <HolidaysWidget initialData={unifiedWidgetData?.holidays} />
         }
 
         // Birthday Widget
@@ -849,22 +867,22 @@ export default function UnifiedDashboard({ user: userProp }) {
 
         // My Assets Widget
         if (permissions.myAssets) {
-            components['my-assets'] = <MyAssetsWidget user={user} />
+            components['my-assets'] = <MyAssetsWidget user={user} initialData={unifiedWidgetData?.assets} />
         }
 
         // My Expenses Widget
         if (permissions.myExpenses) {
-            components['my-expenses'] = <MyExpensesWidget user={user} />
+            components['my-expenses'] = <MyExpensesWidget user={user} initialData={unifiedWidgetData?.expenses} />
         }
 
         // My Helpdesk Widget
         if (permissions.myHelpdesk) {
-            components['my-helpdesk'] = <MyHelpdeskWidget user={user} />
+            components['my-helpdesk'] = <MyHelpdeskWidget user={user} initialData={unifiedWidgetData?.helpdesk} />
         }
 
         // Policies Widget
         if (permissions.policies) {
-            components['policies'] = <PoliciesWidget />
+            components['policies'] = <PoliciesWidget initialData={unifiedWidgetData?.policies} />
         }
 
         // Quick Actions Widget
@@ -898,7 +916,8 @@ export default function UnifiedDashboard({ user: userProp }) {
         handleCheckIn,
         handleCheckOut,
         formatCountdown,
-        fetchDashboardData
+        fetchDashboardData,
+        unifiedWidgetData
     ])
 
     // Role display names

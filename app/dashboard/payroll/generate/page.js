@@ -1257,7 +1257,7 @@ export default function GeneratePayrollPage() {
             <div className="grid gap-4 p-4 bg-default-50 border-b border-default-200 grid-cols-2 md:grid-cols-5">
               <div className="bg-content1 p-4 rounded-lg shadow-sm">
                 <p className="text-xs text-default-500 uppercase">Working Days</p>
-                <p className="text-xl font-bold text-foreground">{formData.workingDays}</p>
+                <p className="text-xl font-bold text-foreground">{payrollConfig.workingDaysPerMonth || 26}</p>
               </div>
               <div className="bg-content1 p-4 rounded-lg shadow-sm">
                 <p className="text-xs text-default-500 uppercase">Total Paid Days</p>

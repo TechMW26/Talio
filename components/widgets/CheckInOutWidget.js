@@ -131,7 +131,11 @@ export default function CheckInOutWidget({
             size="lg"
             radius="full"
             startContent={!attendanceLoading && <FaSignInAlt className="w-4 h-4" />}
-            className="flex-1 font-bold bg-white/20 hover:bg-white/30 text-white border-2 border-white/30 backdrop-blur-sm transition-all shadow-lg"
+            className={`flex-1 font-bold backdrop-blur-sm transition-all shadow-lg border-2 ${
+              attendanceLoading || (todayAttendance && todayAttendance.checkIn)
+                ? 'bg-gray-400/30 text-white/50 border-white/20 cursor-not-allowed'
+                : 'bg-white/20 hover:bg-white/30 text-white border-white/30'
+            }`}
             variant="flat"
           >
             Check In
@@ -143,7 +147,11 @@ export default function CheckInOutWidget({
             size="lg"
             radius="full"
             startContent={!attendanceLoading && <FaSignOutAlt className="w-4 h-4" />}
-            className="flex-1 font-bold bg-white text-primary-600 hover:bg-default-100 transition-all shadow-lg"
+            className={`flex-1 font-bold transition-all shadow-lg ${
+              attendanceLoading || !todayAttendance || !todayAttendance.checkIn || todayAttendance.checkOut
+                ? 'bg-gray-300 text-gray-400 cursor-not-allowed'
+                : 'bg-white text-primary-600 hover:bg-default-100'
+            }`}
             variant="solid"
           >
             Check Out

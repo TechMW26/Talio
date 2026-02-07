@@ -9,23 +9,28 @@ export const dynamic = 'force-dynamic'
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Employee', 'Leave', 'Attendance', 'Recruitment', 'Performance', 'Payroll'])
+    const auth = await getAuthAndModels(request, ['Employee', 'Leave', 'Attendance', 'Recruitment', 'Performance', 'Payroll', 'User', 'Department'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
   const { user, models, tenant } = auth
-    const { Employee, Leave, Attendance, Recruitment, Performance, Payroll } = models
+    const { Employee, Leave, Attendance, Recruitment, Performance, Payroll, User, Department } = models
 
     // Check role authorization
     if (!['admin', 'hr'].includes(user.role)) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 403 })
     }
 
+    // Get user record to check department head status
+    const userRecord = await User.findById(user._id || user.userId)
+      .select('employeeId isDepartmentHead headOfDepartments')
+      .lean()
+
     const todayKey = new Date().toISOString().slice(0, 10)
     const cacheKey = buildCacheKey({
       tenantId: tenant?.databaseName,
       role: user.role,
-      userId: 'all',
+      userId: userRecord?.isDepartmentHead ? user._id : 'all',
       namespace: 'dashboard:hr-stats',
       params: { date: todayKey }
     })
@@ -102,9 +107,24 @@ export async function GET(request) {
     })
 
     // 9. Pending Leave Approvals
-    const pendingLeaves = await Leave.countDocuments({
-      status: 'pending'
-    })
+    // HR users who are NOT department heads should NOT see pending approvals
+    // Only admin sees all pending leaves, HR dept heads see only their department's
+    let pendingLeaves = 0
+    if (user.role === 'admin') {
+      pendingLeaves = await Leave.countDocuments({ status: 'pending' })
+    } else if (user.role === 'hr' && userRecord?.isDepartmentHead && userRecord?.headOfDepartments?.length > 0) {
+      // HR who is dept head - only count their department's leaves
+      const deptEmployees = await Employee.find({ 
+        department: { $in: userRecord.headOfDepartments },
+        _id: { $ne: userRecord.employeeId }
+      }).select('_id').lean()
+      const deptEmployeeIds = deptEmployees.map(e => e._id)
+      pendingLeaves = await Leave.countDocuments({ 
+        status: 'pending',
+        employee: { $in: deptEmployeeIds }
+      })
+    }
+    // Regular HR (not dept head) - pendingLeaves stays 0
 
     // 10. Open Positions
     const openPositions = await Recruitment.countDocuments({

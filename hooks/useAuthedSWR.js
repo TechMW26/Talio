@@ -1,6 +1,44 @@
 'use client'
 
 import useSWR from 'swr'
+import { clearAllSessionCaches } from '@/utils/sessionCache'
+
+// Flag to prevent multiple redirects
+let isRedirecting = false
+
+/**
+ * Reset the redirect flag - call this after successful login
+ */
+export function resetAuthRedirectFlag() {
+  isRedirecting = false
+}
+
+/**
+ * Handle 401 Unauthorized - redirect to login (deduplicated)
+ */
+const handle401 = () => {
+  if (isRedirecting) return
+  isRedirecting = true
+  
+  console.log('[Auth] Session expired, redirecting to login...')
+  
+  // Clear all auth data
+  localStorage.removeItem('token')
+  localStorage.removeItem('user')
+  localStorage.removeItem('userId')
+  document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+  
+  // Clear session cache
+  clearAllSessionCaches()
+  
+  // Reset flag after a delay to handle edge cases
+  setTimeout(() => {
+    isRedirecting = false
+  }, 5000)
+  
+  // Redirect to login
+  window.location.href = '/login'
+}
 
 /**
  * Fetch with retry and timeout for network resilience
@@ -42,6 +80,13 @@ const authedFetcher = async (url) => {
 
   try {
     const response = await fetchWithRetry(url, { headers })
+    
+    // Handle 401 Unauthorized - session expired
+    if (response.status === 401) {
+      handle401()
+      throw new Error('Session expired')
+    }
+    
     const data = await response.json()
 
     if (!response.ok || data?.success === false) {

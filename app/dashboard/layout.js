@@ -29,6 +29,7 @@ import {
   setCachedEmployeeData,
   clearAllSessionCaches
 } from '@/utils/sessionCache'
+import WebAccessRestriction, { shouldRestrictWebAccess } from '@/components/WebAccessRestriction'
 import CallAlertReceiver from '@/components/CallAlertReceiver'
 
 // Page transition loading overlay
@@ -62,16 +63,28 @@ export default function DashboardLayout({ children }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true) // Desktop sidebar starts collapsed
   const [userId, setUserId] = useState(null)
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
+  const [isWebRestricted, setIsWebRestricted] = useState(false)
   const [showProfileCompletionModal, setShowProfileCompletionModal] = useState(false)
   const [profileCompletionStatus, setProfileCompletionStatus] = useState(null)
   const pathname = usePathname()
   const router = useRouter()
 
+  // Check if non-admin user is accessing via web browser
+  useEffect(() => {
+    // Small delay to ensure all app detection globals are set
+    const timer = setTimeout(() => {
+      const restricted = shouldRestrictWebAccess()
+      console.log('[Dashboard] Web access restriction check:', restricted)
+      setIsWebRestricted(restricted)
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [])
+
   // Check if user needs to change password on first login
-  // OPTIMIZED: Use optimistic auth check to render immediately, validate in background
+  // OPTIMIZED: Render immediately with localStorage data, validate in background
   useEffect(() => {
     const checkPasswordChangeRequired = async () => {
-      // STEP 1: Optimistic check - render immediately with localStorage data
+      // STEP 1: Check for auth data in localStorage
       const optimisticAuth = getOptimisticAuth()
       
       if (!optimisticAuth) {
@@ -89,10 +102,10 @@ export default function DashboardLayout({ children }) {
         return
       }
 
-      // STEP 2: Allow rendering immediately while validating in background
+      // STEP 2: Allow rendering immediately (optimistic)
       setIsCheckingAuth(false)
 
-      // STEP 3: Background validation (non-blocking)
+      // STEP 3: Validate token in background (non-blocking)
       const handleInvalidSession = (message) => {
         console.log('[Dashboard] Session invalid:', message)
         clearAllSessionCaches()
@@ -117,8 +130,8 @@ export default function DashboardLayout({ children }) {
         // Check profile completion status (with caching)
         checkProfileCompletionStatus(token)
       } catch (error) {
-        console.warn('[Dashboard] Background auth check error (allowing access):', error.message)
-        // On network error, allow access but check profile status later
+        console.warn('[Dashboard] Auth validation error (non-blocking):', error.message)
+        // On network error, still check profile status later
         setTimeout(() => checkProfileCompletionStatus(token), 2000)
       }
     }
@@ -304,6 +317,11 @@ export default function DashboardLayout({ children }) {
         </div>
       </div>
     )
+  }
+
+  // Show download prompt for non-admin users on web browser
+  if (isWebRestricted) {
+    return <WebAccessRestriction />
   }
 
   // For meeting room pages, render children directly without any layout chrome

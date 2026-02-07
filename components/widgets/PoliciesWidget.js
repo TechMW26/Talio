@@ -4,14 +4,20 @@ import { FaFileContract } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
 import { Card, CardBody, Button, Skeleton, ScrollShadow } from '@heroui/react'
 
-export default function PoliciesWidget() {
+export default function PoliciesWidget({ initialData }) {
   const router = useRouter()
   const [policies, setPolicies] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!initialData)
 
   useEffect(() => {
+    // Skip fetch if initialData provided from unified dashboard call
+    if (initialData) {
+      setPolicies(initialData)
+      setLoading(false)
+      return
+    }
     fetchPolicies()
-  }, [])
+  }, [initialData])
 
   const fetchPolicies = async () => {
     try {

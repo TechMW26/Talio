@@ -350,8 +350,8 @@ export default function ProjectsPage() {
         </div>
       ) : filteredProjects.length === 0 ? (
         <Card shadow="sm" className="text-center py-12">
-          <CardBody>
-            <HiOutlineRectangleStack className="w-16 h-16 mx-auto text-default-300 mb-4" />
+          <CardBody className="flex flex-col items-center">
+            <HiOutlineRectangleStack className="w-16 h-16 text-default-300 mb-4" />
             <h3 className="text-lg font-medium text-default-800 mb-2">
               No projects found
             </h3>
@@ -362,6 +362,7 @@ export default function ProjectsPage() {
               <Button
                 color="primary"
                 onPress={() => router.push('/dashboard/projects/create')}
+                startContent={<HiOutlinePlus className="w-4 h-4" />}
               >
                 Create Project
               </Button>

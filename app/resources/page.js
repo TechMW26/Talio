@@ -28,13 +28,6 @@ const DOWNLOADS = {
       label: 'Windows 10/11 (64-bit)',
       size: '~147 MB'
     }
-  },
-  android: {
-    apk: {
-      url: 'https://github.com/avirajsharma-ops/Talio/releases/download/v3.1.0/talio-hrms.apk',
-      label: 'Android APK',
-      size: '~7 MB'
-    }
   }
 };
 
@@ -51,12 +44,6 @@ const WindowsIcon = () => (
   </svg>
 );
 
-const AndroidIcon = () => (
-  <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
-    <path d="M17.6 9.48L19.44 6.3C19.54 6.12 19.48 5.88 19.3 5.78C19.12 5.68 18.88 5.74 18.78 5.92L16.92 9.14C15.42 8.44 13.76 8.06 12 8.06C10.24 8.06 8.58 8.44 7.08 9.14L5.22 5.92C5.12 5.74 4.88 5.68 4.7 5.78C4.52 5.88 4.46 6.12 4.56 6.3L6.4 9.48C3.06 11.38 0.84 14.84 0.5 18.78H23.5C23.16 14.84 20.94 11.38 17.6 9.48ZM7 15.25C6.31 15.25 5.75 14.69 5.75 14C5.75 13.31 6.31 12.75 7 12.75C7.69 12.75 8.25 13.31 8.25 14C8.25 14.69 7.69 15.25 7 15.25ZM17 15.25C16.31 15.25 15.75 14.69 15.75 14C15.75 13.31 16.31 12.75 17 12.75C17.69 12.75 18.25 13.31 18.25 14C18.25 14.69 17.69 15.25 17 15.25Z"/>
-  </svg>
-);
-
 export default function ResourcesPage() {
   const [detectedPlatform, setDetectedPlatform] = useState('mac');
   const [macArch, setMacArch] = useState('arm64');
@@ -64,12 +51,6 @@ export default function ResourcesPage() {
   useEffect(() => {
     const userAgent = navigator.userAgent.toLowerCase();
     const platform = navigator.platform?.toLowerCase() || '';
-
-    // Detect Android
-    if (userAgent.includes('android')) {
-      setDetectedPlatform('android');
-      return;
-    }
 
     // Detect Windows
     if (platform.includes('win') || userAgent.includes('win')) {
@@ -101,13 +82,6 @@ export default function ResourcesPage() {
   }, []);
 
   const getRecommendedDownload = () => {
-    if (detectedPlatform === 'android') {
-      return {
-        ...DOWNLOADS.android.apk,
-        platform: 'Android',
-        icon: <AndroidIcon />
-      };
-    }
     if (detectedPlatform === 'windows') {
       return {
         ...DOWNLOADS.windows.x64,
@@ -187,9 +161,7 @@ export default function ResourcesPage() {
             <a
               href={recommended.url}
               className={`flex items-center justify-between gap-4 w-full max-w-md mx-auto p-5 rounded-2xl text-white font-semibold transition transform hover:scale-[1.02] hover:shadow-lg ${
-                detectedPlatform === 'android' 
-                  ? 'bg-green-600 hover:bg-green-700' 
-                  : detectedPlatform === 'windows'
+                detectedPlatform === 'windows'
                   ? 'bg-blue-600 hover:bg-blue-700'
                   : 'bg-gray-900 hover:bg-gray-800'
               }`}
@@ -267,57 +239,13 @@ export default function ResourcesPage() {
                   </a>
                 </div>
               </div>
-
-              {/* Android */}
-              <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center text-green-600">
-                    <AndroidIcon />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900">Android</h3>
-                    <p className="text-xs text-gray-500">v{RELEASE_VERSION}</p>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <a 
-                    href={DOWNLOADS.android.apk.url}
-                    className="flex justify-between items-center p-3 bg-gray-50 hover:bg-gray-100 rounded-xl transition text-sm"
-                  >
-                    <span className="text-gray-700">Android APK</span>
-                    <span className="text-gray-400">{DOWNLOADS.android.apk.size}</span>
-                  </a>
-                </div>
-                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-xl flex items-start gap-2">
-                  <Info className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-green-800">
-                    Enable "Install from unknown sources" in your device Settings to install the APK.
-                  </p>
-                </div>
-              </div>
-
-              {/* iOS - Coming Soon */}
-              <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 opacity-60">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-gray-500">
-                    <AppleIcon />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-600">iOS</h3>
-                    <p className="text-xs text-gray-400">Coming Soon</p>
-                  </div>
-                </div>
-                <div className="p-3 bg-gray-100 rounded-xl text-center">
-                  <span className="text-sm text-gray-500">🚀 Coming Q1 2025</span>
-                </div>
-              </div>
             </div>
           </div>
 
           {/* System Requirements */}
           <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
             <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide text-center mb-6">System Requirements</h2>
-            <div className="grid md:grid-cols-3 gap-6">
+            <div className="grid md:grid-cols-2 gap-6">
               <div>
                 <h4 className="font-semibold text-gray-900 mb-3">macOS</h4>
                 <ul className="space-y-2">
@@ -349,23 +277,6 @@ export default function ResourcesPage() {
                   <li className="flex items-center gap-2 text-sm text-gray-600">
                     <Check className="w-4 h-4 text-blue-600" />
                     200 MB disk space
-                  </li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="font-semibold text-gray-900 mb-3">Android</h4>
-                <ul className="space-y-2">
-                  <li className="flex items-center gap-2 text-sm text-gray-600">
-                    <Check className="w-4 h-4 text-green-600" />
-                    Android 8.0 (Oreo) or later
-                  </li>
-                  <li className="flex items-center gap-2 text-sm text-gray-600">
-                    <Check className="w-4 h-4 text-green-600" />
-                    50 MB storage space
-                  </li>
-                  <li className="flex items-center gap-2 text-sm text-gray-600">
-                    <Check className="w-4 h-4 text-green-600" />
-                    Location services enabled
                   </li>
                 </ul>
               </div>

@@ -613,104 +613,105 @@ export default function MyTasksPage() {
       {/* Filters and Search */}
       <Card shadow="sm" className="mb-6">
         <CardBody className="p-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            {/* Search */}
-            <div className="relative flex-1">
-              <HiOutlineMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-default-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search tasks..."
-                className="w-full pl-10 pr-4 py-2.5 border border-default-300 rounded-lg bg-content1 text-default-800 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
-            </div>
+          {/* Search Row */}
+          <div className="relative mb-4">
+            <HiOutlineMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-default-400" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search tasks..."
+              className="w-full pl-10 pr-4 py-2.5 border border-default-300 rounded-lg bg-content1 text-default-800 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+          </div>
 
-            {/* Filters */}
-            <div className="flex flex-wrap gap-2">
-              <Select
-                selectedKeys={[filters.project]}
-                onSelectionChange={(keys) => setFilters(prev => ({ ...prev, project: Array.from(keys)[0] }))}
-                className="min-w-[150px]"
-                size="sm"
-                aria-label="Filter by Project"
+          {/* Filters Row */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <Select
+              selectedKeys={[filters.project]}
+              onSelectionChange={(keys) => setFilters(prev => ({ ...prev, project: Array.from(keys)[0] }))}
+              className="w-[160px]"
+              size="sm"
+              aria-label="Filter by Project"
+            >
+              <SelectItem key="all">All Projects</SelectItem>
+              {projects.map(project => (
+                <SelectItem key={project._id}>
+                  {project.name}
+                </SelectItem>
+              ))}
+            </Select>
+
+            <Select
+              selectedKeys={[filters.status]}
+              onSelectionChange={(keys) => setFilters(prev => ({ ...prev, status: Array.from(keys)[0] }))}
+              className="w-[140px]"
+              size="sm"
+              aria-label="Filter by Status"
+            >
+              <SelectItem key="all">All Statuses</SelectItem>
+              <SelectItem key="todo">To Do</SelectItem>
+              <SelectItem key="in-progress">In Progress</SelectItem>
+              <SelectItem key="review">In Review</SelectItem>
+              <SelectItem key="completed">Completed</SelectItem>
+              <SelectItem key="blocked">Blocked</SelectItem>
+            </Select>
+
+            <Select
+              selectedKeys={[filters.priority]}
+              onSelectionChange={(keys) => setFilters(prev => ({ ...prev, priority: Array.from(keys)[0] }))}
+              className="w-[140px]"
+              size="sm"
+              aria-label="Filter by Priority"
+            >
+              <SelectItem key="all">All Priorities</SelectItem>
+              <SelectItem key="low">Low</SelectItem>
+              <SelectItem key="medium">Medium</SelectItem>
+              <SelectItem key="high">High</SelectItem>
+              <SelectItem key="critical">Critical</SelectItem>
+            </Select>
+
+            <Select
+              selectedKeys={[filters.period]}
+              onSelectionChange={(keys) => setFilters(prev => ({ ...prev, period: Array.from(keys)[0] }))}
+              className="w-[130px]"
+              size="sm"
+              aria-label="Filter by Period"
+            >
+              <SelectItem key="all">All Time</SelectItem>
+              <SelectItem key="today">Today</SelectItem>
+              <SelectItem key="week">This Week</SelectItem>
+              <SelectItem key="month">This Month</SelectItem>
+              <SelectItem key="overdue">Overdue</SelectItem>
+            </Select>
+
+            {/* Spacer to push view toggle to the right */}
+            <div className="flex-1 hidden md:block" />
+
+            {/* View Toggle */}
+            <div className="flex border border-default-300 rounded-lg overflow-hidden">
+              <button
+                onClick={() => setViewMode('list')}
+                className={`px-3 py-2 flex items-center gap-1.5 transition-colors ${
+                  viewMode === 'list'
+                    ? 'bg-primary text-white'
+                    : 'bg-content1 text-default-600 hover:bg-default-100'
+                }`}
+                title="List View"
               >
-                <SelectItem key="all">All Projects</SelectItem>
-                {projects.map(project => (
-                  <SelectItem key={project._id}>
-                    {project.name}
-                  </SelectItem>
-                ))}
-              </Select>
-
-              <Select
-                selectedKeys={[filters.status]}
-                onSelectionChange={(keys) => setFilters(prev => ({ ...prev, status: Array.from(keys)[0] }))}
-                className="min-w-[140px]"
-                size="sm"
-                aria-label="Filter by Status"
+                <HiOutlineQueueList className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => setViewMode('kanban')}
+                className={`px-3 py-2 flex items-center gap-1.5 transition-colors border-l border-default-300 ${
+                  viewMode === 'kanban'
+                    ? 'bg-primary text-white'
+                    : 'bg-content1 text-default-600 hover:bg-default-100'
+                }`}
+                title="Kanban View"
               >
-                <SelectItem key="all">All Statuses</SelectItem>
-                <SelectItem key="todo">To Do</SelectItem>
-                <SelectItem key="in-progress">In Progress</SelectItem>
-                <SelectItem key="review">In Review</SelectItem>
-                <SelectItem key="completed">Completed</SelectItem>
-                <SelectItem key="blocked">Blocked</SelectItem>
-              </Select>
-
-              <Select
-                selectedKeys={[filters.priority]}
-                onSelectionChange={(keys) => setFilters(prev => ({ ...prev, priority: Array.from(keys)[0] }))}
-                className="min-w-[140px]"
-                size="sm"
-                aria-label="Filter by Priority"
-              >
-                <SelectItem key="all">All Priorities</SelectItem>
-                <SelectItem key="low">Low</SelectItem>
-                <SelectItem key="medium">Medium</SelectItem>
-                <SelectItem key="high">High</SelectItem>
-                <SelectItem key="critical">Critical</SelectItem>
-              </Select>
-
-              <Select
-                selectedKeys={[filters.period]}
-                onSelectionChange={(keys) => setFilters(prev => ({ ...prev, period: Array.from(keys)[0] }))}
-                className="min-w-[130px]"
-                size="sm"
-                aria-label="Filter by Period"
-              >
-                <SelectItem key="all">All Time</SelectItem>
-                <SelectItem key="today">Today</SelectItem>
-                <SelectItem key="week">This Week</SelectItem>
-                <SelectItem key="month">This Month</SelectItem>
-                <SelectItem key="overdue">Overdue</SelectItem>
-              </Select>
-
-              {/* View Toggle */}
-              <div className="flex border border-default-300 rounded-lg overflow-hidden">
-                <button
-                  onClick={() => setViewMode('list')}
-                  className={`px-3 py-2.5 flex items-center gap-1.5 transition-colors ${
-                    viewMode === 'list'
-                      ? 'bg-primary-500 text-white'
-                      : 'bg-content1 text-default-600 hover:bg-default-50'
-                  }`}
-                  title="List View"
-                >
-                  <HiOutlineQueueList className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => setViewMode('kanban')}
-                  className={`px-3 py-2.5 flex items-center gap-1.5 transition-colors border-l border-default-300 ${
-                    viewMode === 'kanban'
-                      ? 'bg-primary-500 text-white'
-                      : 'bg-content1 text-default-600 hover:bg-default-50'
-                  }`}
-                  title="Kanban View"
-                >
-                  <HiOutlineViewColumns className="w-5 h-5" />
-                </button>
-              </div>
+                <HiOutlineViewColumns className="w-5 h-5" />
+              </button>
             </div>
           </div>
         </CardBody>

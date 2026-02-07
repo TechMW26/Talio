@@ -144,61 +144,119 @@ export async function GET(request) {
       console.log(`[Team API] ${teamMembers.length} employees have userId linked`);
     }
     
-    // Get session summaries for each team member
-    const teamWithSessions = await Promise.all(
-      teamMembers.map(async (member) => {
-        const userId = member.user._id || member.user;
-        const employeeId = member._id; // The Employee document ID
-        
-        // Get sessions for this date - query by user OR employee
-        const sessions = await ProductivitySession.find({
-          $or: [
-            { user: userId },
-            { employee: employeeId }
-          ],
-          date: { $gte: date, $lt: dateEnd }
-        }).select('sessionNumber screenshotCount screenshots analysis startTime endTime').lean();
-        
-        // Calculate average score
-        const analyzedSessions = sessions.filter(s => s.analysis?.isAnalyzed && s.analysis?.score != null);
-        const avgScore = analyzedSessions.length > 0
-          ? Math.round(analyzedSessions.reduce((sum, s) => sum + s.analysis.score, 0) / analyzedSessions.length)
-          : null;
-        
-        // Get first screenshot URL from each session for preview
-        const sessionsWithPreview = sessions.map(s => ({
-          _id: s._id,
-          sessionNumber: s.sessionNumber,
-          screenshotCount: s.screenshotCount,
-          isAnalyzed: s.analysis?.isAnalyzed || false,
-          score: s.analysis?.score || null,
-          startTime: s.startTime,
-          endTime: s.endTime,
-          // Include first screenshot for preview
-          previewUrl: s.screenshots?.[0]?.url || s.screenshots?.[0]?.path || null,
-          // Include all screenshots for modal view
-          screenshots: s.screenshots || []
-        }));
-        
-        return {
-          _id: member._id,
-          firstName: member.firstName,
-          lastName: member.lastName,
-          email: member.email,
-          profilePicture: member.profilePicture,
-          department: member.department?.name || 'N/A',
-          designation: member.designation?.title || 'N/A',
-          userId: userId.toString(),
-          sessionsSummary: {
-            totalSessions: sessions.length,
-            totalScreenshots: sessions.reduce((sum, s) => sum + s.screenshotCount, 0),
-            analyzedSessions: analyzedSessions.length,
-            averageScore: avgScore,
-            sessions: sessionsWithPreview
-          }
-        };
-      })
-    );
+    // === OPTIMIZED: Batch fetch all sessions in ONE query instead of N queries ===
+    // Collect all userIds and employeeIds upfront
+    const allUserIds = [];
+    const allEmployeeIds = [];
+    const memberMap = new Map(); // Map to quickly look up members by userId/employeeId
+    
+    teamMembers.forEach(member => {
+      const userId = (member.user._id || member.user).toString();
+      const employeeId = member._id.toString();
+      
+      allUserIds.push(userId);
+      allEmployeeIds.push(employeeId);
+      
+      // Store member by both userId and employeeId for fast lookup
+      memberMap.set(`user:${userId}`, member);
+      memberMap.set(`emp:${employeeId}`, member);
+    });
+    
+    // Single batched query for ALL sessions
+    const allSessions = await ProductivitySession.find({
+      $or: [
+        { user: { $in: allUserIds } },
+        { employee: { $in: allEmployeeIds } }
+      ],
+      date: { $gte: date, $lt: dateEnd }
+    }).select('user employee sessionNumber screenshotCount screenshots analysis startTime endTime').lean();
+    
+    console.log(`[Team API] Fetched ${allSessions.length} sessions in single batched query`);
+    
+    // Group sessions by member (using userId or employeeId)
+    const sessionsByMember = new Map();
+    
+    // Initialize empty arrays for all members
+    teamMembers.forEach(member => {
+      const memberId = member._id.toString();
+      sessionsByMember.set(memberId, []);
+    });
+    
+    // Assign sessions to their respective members
+    allSessions.forEach(session => {
+      let memberId = null;
+      
+      // Try to match by user first
+      if (session.user) {
+        const userIdStr = session.user.toString();
+        const member = memberMap.get(`user:${userIdStr}`);
+        if (member) {
+          memberId = member._id.toString();
+        }
+      }
+      
+      // If not matched by user, try by employee
+      if (!memberId && session.employee) {
+        const empIdStr = session.employee.toString();
+        const member = memberMap.get(`emp:${empIdStr}`);
+        if (member) {
+          memberId = member._id.toString();
+        }
+      }
+      
+      // Add session to member's list
+      if (memberId && sessionsByMember.has(memberId)) {
+        sessionsByMember.get(memberId).push(session);
+      }
+    });
+    
+    // Process each member with their pre-fetched sessions (no more N queries!)
+    const teamWithSessions = teamMembers.map(member => {
+      const userId = member.user._id || member.user;
+      const memberId = member._id.toString();
+      
+      // Get pre-fetched sessions for this member
+      const sessions = sessionsByMember.get(memberId) || [];
+      
+      // Calculate average score
+      const analyzedSessions = sessions.filter(s => s.analysis?.isAnalyzed && s.analysis?.score != null);
+      const avgScore = analyzedSessions.length > 0
+        ? Math.round(analyzedSessions.reduce((sum, s) => sum + s.analysis.score, 0) / analyzedSessions.length)
+        : null;
+      
+      // Get first screenshot URL from each session for preview
+      const sessionsWithPreview = sessions.map(s => ({
+        _id: s._id,
+        sessionNumber: s.sessionNumber,
+        screenshotCount: s.screenshotCount,
+        isAnalyzed: s.analysis?.isAnalyzed || false,
+        score: s.analysis?.score || null,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        // Include first screenshot for preview
+        previewUrl: s.screenshots?.[0]?.url || s.screenshots?.[0]?.path || null,
+        // Include all screenshots for modal view
+        screenshots: s.screenshots || []
+      }));
+      
+      return {
+        _id: member._id,
+        firstName: member.firstName,
+        lastName: member.lastName,
+        email: member.email,
+        profilePicture: member.profilePicture,
+        department: member.department?.name || 'N/A',
+        designation: member.designation?.title || 'N/A',
+        userId: userId.toString(),
+        sessionsSummary: {
+          totalSessions: sessions.length,
+          totalScreenshots: sessions.reduce((sum, s) => sum + s.screenshotCount, 0),
+          analyzedSessions: analyzedSessions.length,
+          averageScore: avgScore,
+          sessions: sessionsWithPreview
+        }
+      };
+    });
     
     // Sort by average score (highest first), then by total sessions
     teamWithSessions.sort((a, b) => {

@@ -6,6 +6,7 @@ import { FaBars, FaBell, FaUser, FaSignOutAlt, FaCog, FaSearch, FaComments, FaTi
 import Loader from '@/components/ui/Loader'
 import MiraSphere from '@/components/ui/MiraSphere'
 import toast from '@/utils/toast'
+import { handleSessionExpired } from '@/utils/userHelper'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
@@ -130,6 +131,13 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
       const response = await fetch(`/api/employees/${employeeId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
+      
+      // Handle 401 - session expired
+      if (response.status === 401) {
+        handleSessionExpired()
+        return
+      }
+      
       const result = await response.json()
       if (result.success) {
         console.log('Employee Data Fetched:', result.data)
@@ -280,6 +288,13 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
         const response = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         })
+        
+        // Handle 401 - session expired
+        if (response.status === 401) {
+          handleSessionExpired()
+          return
+        }
+        
         const result = await response.json()
         if (result.success) {
           setSearchResults(result.data)

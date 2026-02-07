@@ -6,16 +6,24 @@ import { emitExpenseUpdate } from '@/lib/realtimeEvents'
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Expense', 'User'])
+    const auth = await getAuthAndModels(request, ['Expense', 'User', 'Employee', 'Department'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Expense, User } = models
+    const { Expense, User, Employee, Department } = models
 
     const { searchParams } = new URL(request.url)
     const employeeId = searchParams.get('employeeId')
     const status = searchParams.get('status')
+
+    // Get user record and role
+    const userRecord = await User.findById(user._id || user.userId)
+      .select('employeeId role isDepartmentHead headOfDepartments')
+      .lean()
+    
+    const userRole = userRecord?.role || user.role
+    const userEmployeeId = userRecord?.employeeId
 
     const query = {}
 
@@ -25,6 +33,82 @@ export async function GET(request) {
 
     if (status) {
       query.status = status
+    }
+
+    // Role-based filtering for pending/submitted expense approvals
+    // When fetching submitted expenses without a specific employeeId, scope based on role
+    if ((status === 'submitted' || status === 'pending') && !employeeId) {
+      // Admin sees all submitted expenses
+      if (userRole === 'admin') {
+        // No additional filter - admin sees everything
+      }
+      // HR users should ONLY see approvals if they're a department head (for their department)
+      else if (userRole === 'hr') {
+        if (userRecord?.isDepartmentHead && userRecord?.headOfDepartments?.length > 0) {
+          // HR who is dept head - only see their department's expenses
+          const deptEmployees = await Employee.find({ 
+            department: { $in: userRecord.headOfDepartments },
+            _id: { $ne: userEmployeeId }
+          }).select('_id').lean()
+          const deptEmployeeIds = deptEmployees.map(e => e._id)
+          query.employee = { $in: deptEmployeeIds }
+        } else {
+          // Regular HR (not dept head) - should not see pending approvals
+          return NextResponse.json({
+            success: true,
+            data: [],
+            message: 'Only your department head can approve expense requests'
+          })
+        }
+      }
+      // Department heads see their department's expenses
+      else if (userRole === 'department_head' || userRecord?.isDepartmentHead) {
+        let deptIds = []
+        
+        if (userRecord?.headOfDepartments?.length > 0) {
+          deptIds = userRecord.headOfDepartments
+        } else if (userEmployeeId) {
+          const managedDepts = await Department.find({
+            $or: [
+              { head: userEmployeeId },
+              { heads: userEmployeeId }
+            ]
+          }).select('_id').lean()
+          deptIds = managedDepts.map(d => d._id)
+        }
+        
+        if (deptIds.length > 0) {
+          const deptEmployees = await Employee.find({ 
+            department: { $in: deptIds },
+            _id: { $ne: userEmployeeId }
+          }).select('_id').lean()
+          const deptEmployeeIds = deptEmployees.map(e => e._id)
+          query.employee = { $in: deptEmployeeIds }
+        } else {
+          return NextResponse.json({
+            success: true,
+            data: [],
+            message: 'No department assigned'
+          })
+        }
+      }
+      // Managers see their direct reports' expenses
+      else if (userRole === 'manager' && userEmployeeId) {
+        const directReports = await Employee.find({ 
+          reportingManager: userEmployeeId,
+          _id: { $ne: userEmployeeId }
+        }).select('_id').lean()
+        const reportIds = directReports.map(e => e._id)
+        query.employee = { $in: reportIds }
+      }
+      // Regular employees should not see pending approvals
+      else {
+        return NextResponse.json({
+          success: true,
+          data: [],
+          message: 'Only department heads and admins can approve expense requests'
+        })
+      }
     }
 
     const expenses = await Expense.find(query)

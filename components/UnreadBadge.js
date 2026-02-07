@@ -10,15 +10,24 @@ export default function UnreadBadge({ count, className = '' }) {
 
   // Format count (show 99+ for counts over 99)
   const displayCount = count > 99 ? '99+' : count
+  
+  // Calculate size based on digit count for perfect circle
+  const isLargeNumber = count > 9
+  const size = isLargeNumber ? '22px' : '20px'
 
   return (
     <span
-      className={`absolute top-0 right-0 translate-x-1/3 -translate-y-1/3 text-white text-xs font-semibold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 shadow-md ring-2 ring-white ${className}`}
+      className={`absolute top-0 right-0 translate-x-1/3 -translate-y-1/3 text-white font-bold rounded-full flex items-center justify-center shadow-lg ring-2 ring-white ${className}`}
       style={{
-        fontSize: '9px',
-        backgroundColor: theme.primary[600],
+        fontSize: isLargeNumber ? '10px' : '11px',
+        backgroundColor: '#ef4444', // Bright red for better visibility
         zIndex: 50,
-        pointerEvents: 'none'
+        pointerEvents: 'none',
+        minWidth: size,
+        width: isLargeNumber ? 'auto' : size,
+        height: size,
+        paddingLeft: isLargeNumber ? '5px' : '0',
+        paddingRight: isLargeNumber ? '5px' : '0',
       }}
     >
       {displayCount}

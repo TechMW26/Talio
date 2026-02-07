@@ -5,14 +5,20 @@ import { useRouter } from 'next/navigation'
 import { getEmployeeId } from '@/utils/userHelper'
 import { Card, CardBody, Button, Chip, Skeleton, ScrollShadow } from '@heroui/react'
 
-export default function MyHelpdeskWidget({ user }) {
+export default function MyHelpdeskWidget({ user, initialData }) {
   const router = useRouter()
   const [tickets, setTickets] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!initialData)
 
   useEffect(() => {
+    // Skip fetch if initialData provided from unified dashboard call
+    if (initialData) {
+      setTickets(initialData)
+      setLoading(false)
+      return
+    }
     if (user) fetchTickets()
-  }, [user])
+  }, [user, initialData])
 
   const fetchTickets = async () => {
     try {

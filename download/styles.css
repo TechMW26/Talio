@@ -228,28 +228,6 @@ h1 {
   font-weight: 500;
 }
 
-/* Android-specific styling */
-.download-card.android-download-card .arch-badge {
-  background: rgba(22, 163, 74, 0.1);
-  color: var(--green);
-}
-
-.download-card.android-download-card .download-btn {
-  background: var(--green);
-}
-
-.download-card.android-download-card .download-btn:hover {
-  background: #15803d;
-}
-
-.os-btn.android-btn.active {
-  border-color: var(--green);
-}
-
-.os-btn.android-btn.active .os-icon {
-  color: var(--green);
-}
-
 .download-btn {
   display: inline-flex;
   align-items: center;
@@ -523,14 +501,6 @@ h1 {
   transform: translateY(-2px);
 }
 
-.download-main-btn.android-btn {
-  background: var(--green);
-}
-
-.download-main-btn.android-btn:hover {
-  background: #15803d;
-}
-
 .btn-content {
   display: flex;
   align-items: center;
@@ -629,10 +599,6 @@ h1 {
   fill: var(--text-primary);
 }
 
-.platform-icon.android-icon svg {
-  fill: var(--green);
-}
-
 .platform-card .platform-info {
   display: flex;
   flex-direction: column;
@@ -688,11 +654,6 @@ h1 {
   border-radius: 8px;
   font-size: 0.8rem;
   color: var(--text-secondary);
-}
-
-.install-notice.android-notice {
-  background: rgba(22, 163, 74, 0.1);
-  border-color: rgba(22, 163, 74, 0.2);
 }
 
 .install-notice a {

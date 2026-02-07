@@ -5,14 +5,20 @@ import { FaBullhorn } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
 import { Card, CardBody, Button, Skeleton, ScrollShadow } from '@heroui/react'
 
-export default function AnnouncementsWidget() {
+export default function AnnouncementsWidget({ initialData }) {
     const router = useRouter()
     const [announcements, setAnnouncements] = useState([])
-    const [loading, setLoading] = useState(true)
+    const [loading, setLoading] = useState(!initialData)
 
     useEffect(() => {
+        // Skip fetch if initialData provided from unified dashboard call
+        if (initialData) {
+            setAnnouncements(initialData)
+            setLoading(false)
+            return
+        }
         fetchAnnouncements()
-    }, [])
+    }, [initialData])
 
     const fetchAnnouncements = async () => {
         try {

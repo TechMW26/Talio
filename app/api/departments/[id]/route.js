@@ -3,8 +3,10 @@ import { getAuthAndModels } from '@/lib/auth'
 import { updateDepartmentHeadsForDepartment } from '@/lib/departmentHeadSync'
 
 // GET - Get single department
-export async function GET(request, { params }) {
+export async function GET(request, context) {
   try {
+    const { id } = await context.params
+    
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Department'])
     if (!auth.success) {
@@ -13,7 +15,7 @@ export async function GET(request, { params }) {
     const { user, models } = auth
     const { Department } = models
 
-    const department = await Department.findById(params.id)
+    const department = await Department.findById(id)
       .populate('head', 'firstName lastName employeeCode designation')
       .populate('heads', 'firstName lastName employeeCode designation')
 
@@ -38,8 +40,10 @@ export async function GET(request, { params }) {
 }
 
 // PUT - Update department
-export async function PUT(request, { params }) {
+export async function PUT(request, context) {
   try {
+    const { id } = await context.params
+    
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Department', 'User', 'Employee'])
     if (!auth.success) {
@@ -51,7 +55,7 @@ export async function PUT(request, { params }) {
     const data = await request.json()
     
     // Get current department to compare heads
-    const currentDepartment = await Department.findById(params.id).lean()
+    const currentDepartment = await Department.findById(id).lean()
     if (!currentDepartment) {
       return NextResponse.json(
         { success: false, message: 'Department not found' },
@@ -83,7 +87,7 @@ export async function PUT(request, { params }) {
     }
 
     const department = await Department.findByIdAndUpdate(
-      params.id,
+      id,
       data,
       { new: true, runValidators: true }
     )
@@ -105,7 +109,7 @@ export async function PUT(request, { params }) {
     }
     
     // Sync department head status to User meta (fire and forget)
-    updateDepartmentHeadsForDepartment(params.id, previousHeads, newHeads, { User, Employee, Department })
+    updateDepartmentHeadsForDepartment(id, previousHeads, newHeads, { User, Employee, Department })
       .catch(err => console.error('Error syncing department heads:', err))
 
     return NextResponse.json({
@@ -123,8 +127,10 @@ export async function PUT(request, { params }) {
 }
 
 // DELETE - Delete department
-export async function DELETE(request, { params }) {
+export async function DELETE(request, context) {
   try {
+    const { id } = await context.params
+    
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Department', 'User', 'Employee'])
     if (!auth.success) {
@@ -134,7 +140,7 @@ export async function DELETE(request, { params }) {
     const { Department, User, Employee } = models
 
     // Get department to remove heads
-    const department = await Department.findById(params.id).lean()
+    const department = await Department.findById(id).lean()
     if (!department) {
       return NextResponse.json(
         { success: false, message: 'Department not found' },
@@ -156,11 +162,11 @@ export async function DELETE(request, { params }) {
       })
     }
 
-    await Department.findByIdAndDelete(params.id)
+    await Department.findByIdAndDelete(id)
     
     // Sync department head status - remove this department from heads (fire and forget)
     if (previousHeads.length > 0) {
-      updateDepartmentHeadsForDepartment(params.id, previousHeads, [], { User, Employee, Department })
+      updateDepartmentHeadsForDepartment(id, previousHeads, [], { User, Employee, Department })
         .catch(err => console.error('Error syncing department heads:', err))
     }
 

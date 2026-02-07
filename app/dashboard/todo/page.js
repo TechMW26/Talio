@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Button, Input, Select, SelectItem } from '@heroui/react'
+import { handleSessionExpired } from '@/utils/userHelper'
 import {
   HiOutlineListBullet,
   HiOutlinePlus,
@@ -61,6 +62,13 @@ export default function TodoPage() {
           Authorization: `Bearer ${token}`
         }
       })
+      
+      // Handle 401 - session expired
+      if (response.status === 401) {
+        handleSessionExpired()
+        return
+      }
+      
       const data = await response.json()
       if (data.success) {
         setProjectTasks(data.data)
@@ -145,6 +153,12 @@ export default function TodoPage() {
         }
       })
 
+      // Handle 401 - session expired
+      if (response.status === 401) {
+        handleSessionExpired()
+        return
+      }
+
       const data = await response.json()
       if (data.success) {
         setTodos(data.data)
@@ -169,6 +183,12 @@ export default function TodoPage() {
         }
       })
 
+      // Handle 401 - session expired
+      if (response.status === 401) {
+        handleSessionExpired()
+        return
+      }
+
       const data = await response.json()
       if (data.success) {
         setCategories(data.data)
@@ -187,6 +207,12 @@ export default function TodoPage() {
           Authorization: `Bearer ${token}`
         }
       })
+
+      // Handle 401 - session expired
+      if (response.status === 401) {
+        handleSessionExpired()
+        return
+      }
 
       const data = await response.json()
       if (data.success) {

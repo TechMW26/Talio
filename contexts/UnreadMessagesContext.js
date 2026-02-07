@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useEffect } from 'react'
 import { useSocket } from './SocketContext'
+import { handleSessionExpired } from '@/utils/userHelper'
 
 const UnreadMessagesContext = createContext({
   unreadCount: 0,
@@ -26,8 +27,11 @@ export function UnreadMessagesProvider({ children }) {
       })
 
       if (!response.ok) {
-        // Don't log error for auth issues, just return silently
-        if (response.status === 401) return
+        // Handle 401 - session expired, redirect to login
+        if (response.status === 401) {
+          handleSessionExpired()
+          return
+        }
         console.error('[UnreadMessages] API error:', response.status)
         return
       }

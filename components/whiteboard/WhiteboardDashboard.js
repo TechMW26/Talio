@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { FiPlus, FiSearch, FiGrid, FiList, FiMoreHorizontal, FiTrash2, FiEdit2, FiShare2, FiClock, FiUser, FiUsers, FiX, FiLink, FiCopy, FiCheck } from 'react-icons/fi';
 import { useTheme } from '@/contexts/ThemeContext';
 import Loader from '@/components/ui/Loader';
+import { handleSessionExpired } from '@/utils/userHelper';
 
 export default function WhiteboardDashboard() {
   const router = useRouter();
@@ -42,6 +43,12 @@ export default function WhiteboardDashboard() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
+      // Handle 401 - session expired
+      if (response.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+      
       if (!response.ok) {
         const data = await response.json();
         throw new Error(data.error || 'Failed to fetch boards');
@@ -73,6 +80,10 @@ export default function WhiteboardDashboard() {
       });
       
       if (!response.ok) {
+        if (response.status === 401) {
+          handleSessionExpired();
+          return;
+        }
         const data = await response.json();
         throw new Error(data.error || 'Failed to create board');
       }
@@ -99,7 +110,13 @@ export default function WhiteboardDashboard() {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
-      if (!response.ok) throw new Error('Failed to delete board');
+      if (!response.ok) {
+        if (response.status === 401) {
+          handleSessionExpired();
+          return;
+        }
+        throw new Error('Failed to delete board');
+      }
       
       setBoards(boards.filter(b => b._id !== boardId));
       setActiveMenu(null);
@@ -124,7 +141,13 @@ export default function WhiteboardDashboard() {
         body: JSON.stringify({ title: newTitle.trim() })
       });
       
-      if (!response.ok) throw new Error('Failed to rename board');
+      if (!response.ok) {
+        if (response.status === 401) {
+          handleSessionExpired();
+          return;
+        }
+        throw new Error('Failed to rename board');
+      }
       
       setBoards(boards.map(b => 
         b._id === renameBoard._id ? { ...b, title: newTitle.trim(), name: newTitle.trim() } : b

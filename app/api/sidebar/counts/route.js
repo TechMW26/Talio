@@ -94,16 +94,23 @@ export async function GET(request) {
     counts.notifications = notificationCount
 
     // For managers, department heads, HR, and admins - count pending approvals
-    const canApprove = ['admin', 'hr', 'manager', 'department_head'].includes(userRole)
+    // NOTE: HR users should ONLY see approvals if they're a department head (for their own department)
+    // This prevents regular HR employees from seeing all company-wide approvals - only their dept head handles their approvals
+    const isDeptHead = userRecord?.isDepartmentHead === true
+    
+    // Only admin sees company-wide counts
+    // HR users need to be department heads to see their department's counts
+    // Managers and department_head role users see their department's counts
+    const canApprove = userRole === 'admin' || 
+                       isDeptHead || 
+                       (userRole === 'manager') ||
+                       (userRole === 'department_head')
 
     if (canApprove) {
-      // Check if user is a department head (via User model flag OR role)
-      const isDeptHead = userRole === 'department_head' || userRecord?.isDepartmentHead === true
-
       // Determine if this user should have department-scoped view
-      // Only admin and HR see company-wide counts
-      // Managers and department heads see only their department's counts
-      const hasDeptScopedView = !['admin', 'hr'].includes(userRole)
+      // Only admin sees company-wide counts
+      // Everyone else (including HR who is dept head) sees only their department's counts
+      const hasDeptScopedView = userRole !== 'admin'
 
       // For users with department-scoped view, find departments they manage
       let departmentEmployeeIds = []

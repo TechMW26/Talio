@@ -5,21 +5,37 @@ import toast from '@/utils/toast'
 import { FaUsers, FaBuilding, FaArrowLeft, FaCalendarAlt, FaClock, FaChevronLeft, FaChevronRight, FaSearch, FaUserCircle, FaMapMarkerAlt, FaFilter } from 'react-icons/fa'
 import { Card, CardBody, Button, Chip, Skeleton, Input, Select, SelectItem } from '@heroui/react'
 
+// Department color palette
+const DEPARTMENT_COLORS = [
+  { bg: 'bg-blue-100', border: 'border-blue-400', text: 'text-blue-700', badge: 'bg-blue-500' },
+  { bg: 'bg-purple-100', border: 'border-purple-400', text: 'text-purple-700', badge: 'bg-purple-500' },
+  { bg: 'bg-emerald-100', border: 'border-emerald-400', text: 'text-emerald-700', badge: 'bg-emerald-500' },
+  { bg: 'bg-amber-100', border: 'border-amber-400', text: 'text-amber-700', badge: 'bg-amber-500' },
+  { bg: 'bg-rose-100', border: 'border-rose-400', text: 'text-rose-700', badge: 'bg-rose-500' },
+  { bg: 'bg-cyan-100', border: 'border-cyan-400', text: 'text-cyan-700', badge: 'bg-cyan-500' },
+  { bg: 'bg-indigo-100', border: 'border-indigo-400', text: 'text-indigo-700', badge: 'bg-indigo-500' },
+  { bg: 'bg-teal-100', border: 'border-teal-400', text: 'text-teal-700', badge: 'bg-teal-500' },
+  { bg: 'bg-orange-100', border: 'border-orange-400', text: 'text-orange-700', badge: 'bg-orange-500' },
+  { bg: 'bg-pink-100', border: 'border-pink-400', text: 'text-pink-700', badge: 'bg-pink-500' },
+]
+
 export default function TeamAttendancePage() {
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState(null)
-  const [view, setView] = useState('initial') // 'initial', 'department', 'employees', 'calendar'
+  const [view, setView] = useState('initial') // 'initial', 'employees', 'calendar'
   const [departments, setDepartments] = useState([])
   const [headedDepartments, setHeadedDepartments] = useState([]) // Departments user heads
   const [employees, setEmployees] = useState([])
   const [selectedDepartment, setSelectedDepartment] = useState(null)
-  const [selectedDepartmentFilter, setSelectedDepartmentFilter] = useState('all') // Filter for multi-dept heads
+  const [selectedDepartmentFilter, setSelectedDepartmentFilter] = useState('all') // Filter for departments
   const [selectedEmployee, setSelectedEmployee] = useState(null)
   const [attendance, setAttendance] = useState([])
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [searchTerm, setSearchTerm] = useState('')
   const [isDepartmentHead, setIsDepartmentHead] = useState(false)
   const [departmentInfo, setDepartmentInfo] = useState(null)
+  const [departmentColorMap, setDepartmentColorMap] = useState({})
+  const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
     const userData = localStorage.getItem('user')
@@ -33,6 +49,8 @@ export default function TeamAttendancePage() {
   const checkUserRoleAndFetchData = async (parsedUser) => {
     try {
       const token = localStorage.getItem('token')
+      const userIsAdmin = ['admin', 'hr'].includes(parsedUser.role)
+      setIsAdmin(userIsAdmin)
 
       // Check if user is a department head
       const checkHeadResponse = await fetch('/api/team/check-head', {
@@ -42,33 +60,64 @@ export default function TeamAttendancePage() {
 
       if (checkHeadData.success && checkHeadData.isDepartmentHead) {
         setIsDepartmentHead(true)
-        
-        // Support multiple departments
         const depts = checkHeadData.departments || []
         setHeadedDepartments(depts)
         
-        // For backward compatibility, set departmentInfo to first department
         if (depts.length > 0) {
           setDepartmentInfo({
             id: depts[0]._id,
             name: depts.length > 1 ? 'Multiple Departments' : depts[0].name
           })
         }
-        
-        // Fetch employees from all headed departments
-        const deptIds = depts.map(d => d._id)
+      }
+
+      // Admin/HR sees all employees, Dept Head sees only their dept employees
+      if (userIsAdmin) {
+        // Fetch all departments for filtering
+        await fetchDepartments()
+        // Fetch ALL employees for admin
+        await fetchAllEmployees()
+        setView('employees')
+      } else if (checkHeadData.success && checkHeadData.isDepartmentHead) {
+        // Dept head without admin role - only their departments
+        const deptIds = (checkHeadData.departments || []).map(d => d._id)
         await fetchDepartmentEmployees(deptIds)
         setView('employees')
-      } else if (['admin', 'hr'].includes(parsedUser.role)) {
-        // Admin/HR - show departments first
-        await fetchDepartments()
-        setView('departments')
       } else {
         toast.error('You do not have permission to view team attendance')
       }
     } catch (error) {
       console.error('Error checking user role:', error)
       toast.error('Failed to load data')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchAllEmployees = async () => {
+    try {
+      setLoading(true)
+      const token = localStorage.getItem('token')
+      
+      const response = await fetch('/api/employees?status=active&limit=1000', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      const data = await response.json()
+      if (data.success) {
+        const allEmployees = data.data || []
+        setEmployees(allEmployees)
+        
+        // Build department color map
+        const uniqueDepts = [...new Set(allEmployees.map(e => e.department?._id || e.department).filter(Boolean))]
+        const colorMap = {}
+        uniqueDepts.forEach((deptId, index) => {
+          colorMap[deptId] = DEPARTMENT_COLORS[index % DEPARTMENT_COLORS.length]
+        })
+        setDepartmentColorMap(colorMap)
+      }
+    } catch (error) {
+      console.error('Error fetching all employees:', error)
+      toast.error('Failed to fetch employees')
     } finally {
       setLoading(false)
     }
@@ -116,6 +165,14 @@ export default function TeamAttendancePage() {
       )
       
       setEmployees(uniqueEmployees)
+      
+      // Build department color map
+      const uniqueDepts = [...new Set(uniqueEmployees.map(e => e.department?._id || e.department).filter(Boolean))]
+      const colorMap = {}
+      uniqueDepts.forEach((deptId, index) => {
+        colorMap[deptId] = DEPARTMENT_COLORS[index % DEPARTMENT_COLORS.length]
+      })
+      setDepartmentColorMap(colorMap)
     } catch (error) {
       console.error('Error fetching employees:', error)
       toast.error('Failed to fetch employees')
@@ -147,12 +204,6 @@ export default function TeamAttendancePage() {
     }
   }
 
-  const handleDepartmentClick = async (department) => {
-    setSelectedDepartment(department)
-    await fetchDepartmentEmployees(department._id)
-    setView('employees')
-  }
-
   const handleEmployeeClick = async (employee) => {
     setSelectedEmployee(employee)
     await fetchEmployeeAttendance(employee._id)
@@ -164,10 +215,6 @@ export default function TeamAttendancePage() {
       setView('employees')
       setSelectedEmployee(null)
       setAttendance([])
-    } else if (view === 'employees' && !isDepartmentHead) {
-      setView('departments')
-      setSelectedDepartment(null)
-      setEmployees([])
     }
   }
 
@@ -272,23 +319,62 @@ export default function TeamAttendancePage() {
     })
   }
 
-  const filteredEmployees = employees.filter(emp => {
-    const fullName = `${emp.firstName} ${emp.lastName}`.toLowerCase()
-    const code = (emp.employeeCode || '').toLowerCase()
-    const matchesSearch = fullName.includes(searchTerm.toLowerCase()) || code.includes(searchTerm.toLowerCase())
+  const filteredEmployees = useMemo(() => {
+    let result = employees.filter(emp => {
+      const fullName = `${emp.firstName} ${emp.lastName}`.toLowerCase()
+      const code = (emp.employeeCode || '').toLowerCase()
+      const matchesSearch = fullName.includes(searchTerm.toLowerCase()) || code.includes(searchTerm.toLowerCase())
+      
+      // Apply department filter
+      if (selectedDepartmentFilter !== 'all') {
+        const empDeptId = emp.department?._id || emp.department
+        return matchesSearch && empDeptId?.toString() === selectedDepartmentFilter
+      }
+      
+      return matchesSearch
+    })
     
-    // Apply department filter for multi-department heads
-    if (isDepartmentHead && headedDepartments.length > 1 && selectedDepartmentFilter !== 'all') {
-      const empDeptId = emp.department?._id || emp.department
-      return matchesSearch && empDeptId?.toString() === selectedDepartmentFilter
+    // For admin who is also a dept head, sort their dept employees first
+    if (isAdmin && isDepartmentHead && headedDepartments.length > 0) {
+      const headedDeptIds = headedDepartments.map(d => d._id?.toString())
+      result.sort((a, b) => {
+        const aDeptId = (a.department?._id || a.department)?.toString()
+        const bDeptId = (b.department?._id || b.department)?.toString()
+        const aInHeaded = headedDeptIds.includes(aDeptId)
+        const bInHeaded = headedDeptIds.includes(bDeptId)
+        
+        if (aInHeaded && !bInHeaded) return -1
+        if (!aInHeaded && bInHeaded) return 1
+        
+        // Secondary sort by department name for grouping
+        const aDeptName = a.department?.name || ''
+        const bDeptName = b.department?.name || ''
+        return aDeptName.localeCompare(bDeptName)
+      })
+    } else {
+      // Sort by department name for grouping
+      result.sort((a, b) => {
+        const aDeptName = a.department?.name || ''
+        const bDeptName = b.department?.name || ''
+        return aDeptName.localeCompare(bDeptName)
+      })
     }
     
-    return matchesSearch
-  })
-
-  const filteredDepartments = departments.filter(dept =>
-    dept.name.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+    return result
+  }, [employees, searchTerm, selectedDepartmentFilter, isAdmin, isDepartmentHead, headedDepartments])
+  
+  // Get unique departments from employees for filter dropdown
+  const availableDepartments = useMemo(() => {
+    const depts = new Map()
+    employees.forEach(emp => {
+      const deptId = emp.department?._id || emp.department
+      const deptName = emp.department?.name
+      if (deptId && deptName) {
+        depts.set(deptId.toString(), { _id: deptId, name: deptName })
+      }
+    })
+    return Array.from(depts.values()).sort((a, b) => a.name.localeCompare(b.name))
+  }, [employees])
 
   if (loading && view === 'initial') {
     return (
@@ -310,7 +396,7 @@ export default function TeamAttendancePage() {
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center space-x-4 mb-2">
-          {(view === 'employees' && !isDepartmentHead) || view === 'calendar' ? (
+          {view === 'calendar' ? (
             <Button
               isIconOnly
               variant="flat"
@@ -321,13 +407,14 @@ export default function TeamAttendancePage() {
           ) : null}
           <div>
             <h1 className="text-3xl font-bold text-default-800">
-              {view === 'departments' && 'Team Attendance'}
-              {view === 'employees' && (isDepartmentHead ? `${departmentInfo?.name || 'My Team'} Attendance` : `${selectedDepartment?.name || ''} Department`)}
+              {view === 'employees' && (isAdmin ? 'Team Attendance' : `${departmentInfo?.name || 'My Team'} Attendance`)}
               {view === 'calendar' && `${selectedEmployee?.firstName} ${selectedEmployee?.lastName}`}
             </h1>
             <p className="text-default-500 mt-1">
-              {view === 'departments' && 'Select a department to view employee attendance'}
-              {view === 'employees' && 'Select an employee to view their attendance calendar'}
+              {view === 'employees' && (isAdmin 
+                ? `View attendance for all ${employees.length} employees${isDepartmentHead ? ' (your department shown first)' : ''}`
+                : 'Select an employee to view their attendance calendar'
+              )}
               {view === 'calendar' && 'View attendance calendar and work hours'}
             </p>
           </div>
@@ -335,14 +422,14 @@ export default function TeamAttendancePage() {
       </div>
 
       {/* Search Bar and Department Filter */}
-      {(view === 'departments' || view === 'employees') && (
+      {view === 'employees' && (
         <div className="mb-6">
           <div className="flex flex-col sm:flex-row gap-4">
             {/* Search Input */}
             <div className="flex-1">
               <Input
                 type="text"
-                placeholder={view === 'departments' ? 'Search departments...' : 'Search employees...'}
+                placeholder="Search employees by name or code..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 startContent={<FaSearch className="text-default-400" />}
@@ -353,69 +440,59 @@ export default function TeamAttendancePage() {
               />
             </div>
             
-            {/* Department Filter for multi-department heads */}
-            {isDepartmentHead && headedDepartments.length > 1 && view === 'employees' && (
-              <div className="sm:w-64">
+            {/* Department Filter for all users with multiple departments available */}
+            {availableDepartments.length > 1 && (
+              <div className="sm:w-72">
                 <Select
                   selectedKeys={[selectedDepartmentFilter]}
                   onChange={(e) => setSelectedDepartmentFilter(e.target.value)}
                   aria-label="Department Filter"
+                  placeholder="Filter by department"
                   startContent={<FaFilter className="text-default-400" />}
                   classNames={{ trigger: "bg-content1" }}
                 >
-                  <SelectItem key="all">All Departments</SelectItem>
-                  {headedDepartments.map((dept) => (
-                    <SelectItem key={dept._id}>
-                      {dept.name}
-                    </SelectItem>
-                  ))}
+                  <SelectItem key="all">All Departments ({employees.length})</SelectItem>
+                  {availableDepartments.map((dept) => {
+                    const count = employees.filter(e => (e.department?._id || e.department)?.toString() === dept._id.toString()).length
+                    return (
+                      <SelectItem key={dept._id} textValue={dept.name}>
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className={`w-3 h-3 rounded-full ${departmentColorMap[dept._id]?.badge || 'bg-gray-500'}`}
+                          />
+                          <span>{dept.name}</span>
+                          <span className="text-default-400 ml-auto">({count})</span>
+                        </div>
+                      </SelectItem>
+                    )
+                  })}
                 </Select>
               </div>
             )}
           </div>
-        </div>
-      )}
-
-      {/* Departments Grid (Admin View) */}
-      {view === 'departments' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredDepartments.length === 0 ? (
-            <div className="col-span-full text-center py-12 text-default-500">
-              <FaBuilding className="w-12 h-12 mx-auto mb-4 text-default-300" />
-              <p>No departments found</p>
+          
+          {/* Department Color Legend */}
+          {availableDepartments.length > 1 && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {availableDepartments.slice(0, 10).map((dept) => (
+                <Chip
+                  key={dept._id}
+                  size="sm"
+                  variant="flat"
+                  className={`${departmentColorMap[dept._id]?.bg || 'bg-gray-100'} ${departmentColorMap[dept._id]?.text || 'text-gray-700'}`}
+                  startContent={
+                    <div className={`w-2 h-2 rounded-full ${departmentColorMap[dept._id]?.badge || 'bg-gray-500'}`} />
+                  }
+                >
+                  {dept.name}
+                </Chip>
+              ))}
+              {availableDepartments.length > 10 && (
+                <Chip size="sm" variant="flat" className="bg-default-100">
+                  +{availableDepartments.length - 10} more
+                </Chip>
+              )}
             </div>
-          ) : (
-            filteredDepartments.map((dept) => (
-              <Card
-                key={dept._id}
-                isPressable
-                onPress={() => handleDepartmentClick(dept)}
-                className="shadow-md hover:shadow-lg transition-all duration-200 border-2 border-transparent hover:border-primary"
-              >
-                <CardBody className="p-6">
-                  <div className="flex items-center space-x-4">
-                    <div className="bg-primary-100 p-4 rounded-lg">
-                      <FaBuilding className="w-8 h-8 text-primary" />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-lg font-semibold text-default-800">{dept.name}</h3>
-                      <p className="text-sm text-default-500">{dept.description || 'No description'}</p>
-                      {dept.head && (
-                        <p className="text-xs text-default-400 mt-1">
-                          Head: {dept.head.firstName} {dept.head.lastName}
-                        </p>
-                      )}
-                    </div>
-                    <div className="text-right">
-                      <Chip variant="flat" color="default" size="sm">
-                        <FaUsers className="inline mr-1" />
-                        {dept.employeeCount || 0}
-                      </Chip>
-                    </div>
-                  </div>
-                </CardBody>
-              </Card>
-            ))
           )}
         </div>
       )}
@@ -428,48 +505,74 @@ export default function TeamAttendancePage() {
               {[1,2,3,4,5,6,7,8].map(i => <Skeleton key={i} className="h-48 rounded-xl" />)}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {filteredEmployees.length === 0 ? (
                 <div className="col-span-full text-center py-12 text-default-500">
                   <FaUsers className="w-12 h-12 mx-auto mb-4 text-default-300" />
                   <p>No employees found</p>
                 </div>
               ) : (
-                filteredEmployees.map((emp) => (
-                  <Card
-                    key={emp._id}
-                    isPressable
-                    onPress={() => handleEmployeeClick(emp)}
-                    className="shadow-md hover:shadow-lg transition-all duration-200 border-2 border-transparent hover:border-primary"
-                  >
-                    <CardBody className="p-6">
-                      <div className="flex flex-col items-center text-center">
-                        {emp.avatar ? (
-                          <img
-                            src={emp.avatar}
-                            alt={`${emp.firstName} ${emp.lastName}`}
-                            className="w-20 h-20 rounded-full object-cover mb-4"
-                          />
-                        ) : (
-                          <div className="w-20 h-20 rounded-full bg-primary-100 flex items-center justify-center mb-4">
-                            <span className="text-2xl font-bold text-primary">
-                              {emp.firstName?.[0]}{emp.lastName?.[0]}
-                            </span>
+                filteredEmployees.map((emp) => {
+                  const empDeptId = (emp.department?._id || emp.department)?.toString()
+                  const deptColor = departmentColorMap[empDeptId] || { bg: 'bg-default-100', border: 'border-default-300', text: 'text-default-700', badge: 'bg-default-500' }
+                  const isHeadedDept = isDepartmentHead && headedDepartments.some(d => d._id?.toString() === empDeptId)
+                  
+                  return (
+                    <Card
+                      key={emp._id}
+                      isPressable
+                      onPress={() => handleEmployeeClick(emp)}
+                      className={`shadow-md hover:shadow-lg transition-all duration-200 border-l-4 ${deptColor.border} ${isHeadedDept ? 'ring-2 ring-primary ring-offset-1' : ''}`}
+                    >
+                      <CardBody className="p-4">
+                        <div className="flex items-start gap-3">
+                          {/* Avatar */}
+                          {emp.profilePicture ? (
+                            <img
+                              src={emp.profilePicture}
+                              alt={`${emp.firstName} ${emp.lastName}`}
+                              className="w-12 h-12 rounded-full object-cover flex-shrink-0"
+                            />
+                          ) : (
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${deptColor.bg}`}>
+                              <span className={`text-lg font-bold ${deptColor.text}`}>
+                                {emp.firstName?.[0]}{emp.lastName?.[0]}
+                              </span>
+                            </div>
+                          )}
+                          
+                          {/* Info */}
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-sm font-semibold text-default-800 truncate">
+                              {emp.firstName} {emp.lastName}
+                            </h3>
+                            <p className="text-xs text-default-500 truncate">{emp.designation?.title || 'No Designation'}</p>
+                            <p className="text-xs text-default-400">{emp.employeeCode || ''}</p>
+                            
+                            {/* Department Badge */}
+                            {emp.department?.name && (
+                              <Chip
+                                size="sm"
+                                variant="flat"
+                                className={`mt-2 ${deptColor.bg} ${deptColor.text}`}
+                                startContent={
+                                  <div className={`w-1.5 h-1.5 rounded-full ${deptColor.badge}`} />
+                                }
+                              >
+                                {emp.department.name}
+                              </Chip>
+                            )}
                           </div>
-                        )}
-                        <h3 className="text-lg font-semibold text-default-800">
-                          {emp.firstName} {emp.lastName}
-                        </h3>
-                        <p className="text-sm text-default-500">{emp.designation?.title || 'No Designation'}</p>
-                        <p className="text-xs text-default-400 mt-1">{emp.employeeCode || ''}</p>
-                        <div className="mt-3 flex items-center space-x-1 text-primary">
-                          <FaCalendarAlt className="w-4 h-4" />
-                          <span className="text-sm">View Attendance</span>
+                          
+                          {/* Action indicator */}
+                          <div className="text-primary">
+                            <FaCalendarAlt className="w-4 h-4" />
+                          </div>
                         </div>
-                      </div>
-                    </CardBody>
-                  </Card>
-                ))
+                      </CardBody>
+                    </Card>
+                  )
+                })
               )}
             </div>
           )}

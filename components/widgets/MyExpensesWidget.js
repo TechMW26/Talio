@@ -5,14 +5,20 @@ import { useRouter } from 'next/navigation'
 import { getEmployeeId } from '@/utils/userHelper'
 import { Card, CardBody, Button, Skeleton, ScrollShadow } from '@heroui/react'
 
-export default function MyExpensesWidget({ user }) {
+export default function MyExpensesWidget({ user, initialData }) {
   const router = useRouter()
   const [expenses, setExpenses] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!initialData)
 
   useEffect(() => {
+    // Skip fetch if initialData provided from unified dashboard call
+    if (initialData) {
+      setExpenses(initialData)
+      setLoading(false)
+      return
+    }
     if (user) fetchExpenses()
-  }, [user])
+  }, [user, initialData])
 
   const fetchExpenses = async () => {
     try {

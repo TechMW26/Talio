@@ -772,7 +772,14 @@ function handleAuthentication(data) {
     employeeId: userData.employeeId,
     role: userData.role,
     token: data.token,
-    mainWindow: mainWindow
+    mainWindow: mainWindow,
+    onPermissionError: function(message) {
+      showNotification('Screen Recording Permission Required', message);
+      // Also open system preferences on macOS
+      if (process.platform === 'darwin') {
+        shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
+      }
+    }
   });
 
   // Initialize socket

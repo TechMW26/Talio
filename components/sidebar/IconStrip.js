@@ -73,7 +73,9 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {} }) {
   const menuItems = useMemo(() => {
     if (!user) return []
 
-    const effectiveRole = isDepartmentHead ? 'department_head' : user.role
+    // For admin users, keep admin role even if they're department heads (they should see both Employees and Team)
+    // For other users, switch to department_head role if they're a department head
+    const effectiveRole = (isDepartmentHead && user.role !== 'admin') ? 'department_head' : user.role
     let baseMenuItems = getMenuItemsForRole(effectiveRole)
 
     if (isDepartmentHead) {
@@ -93,17 +95,19 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {} }) {
       const attendanceMenuIndex = baseMenuItems.findIndex(item => item.name === 'Attendance & Leaves')
       if (attendanceMenuIndex !== -1) {
         baseMenuItems = [...baseMenuItems]
-        baseMenuItems[attendanceMenuIndex] = {
-          ...baseMenuItems[attendanceMenuIndex],
-          submenu: [
-            { name: 'My Attendance', path: '/dashboard/attendance' },
-            { name: 'Team Attendance', path: '/dashboard/attendance/team' },
-            { name: 'Attendance Regularisation', path: '/dashboard/team/regularisation' },
-            { name: 'Apply Leave', path: '/dashboard/leave/apply' },
-            { name: 'My Leave Balance', path: '/dashboard/leave/balance' },
-            { name: 'My Leave Requests', path: '/dashboard/leave/requests' },
-            { name: 'Leave Approvals', path: '/dashboard/leave/approvals' },
-          ]
+        // For admin with dept head, merge admin's attendance submenu with team attendance
+        const currentSubmenu = baseMenuItems[attendanceMenuIndex].submenu || []
+        const hasTeamAttendance = currentSubmenu.some(item => item.path === '/dashboard/attendance/team')
+        
+        if (!hasTeamAttendance) {
+          // Add Team Attendance after My Attendance
+          const myAttendanceIndex = currentSubmenu.findIndex(item => item.path === '/dashboard/attendance')
+          const newSubmenu = [...currentSubmenu]
+          newSubmenu.splice(myAttendanceIndex + 1, 0, { name: 'Team Attendance', path: '/dashboard/attendance/team' })
+          baseMenuItems[attendanceMenuIndex] = {
+            ...baseMenuItems[attendanceMenuIndex],
+            submenu: newSubmenu
+          }
         }
       }
 

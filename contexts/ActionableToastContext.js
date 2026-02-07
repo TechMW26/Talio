@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useCallback, useEffect, useRef } f
 import { useSocket } from './SocketContext'
 import ActionableToast from '@/components/ActionableToast'
 import { playNotificationSound, NotificationSoundTypes } from '@/lib/notificationSounds'
+import { handleSessionExpired } from '@/utils/userHelper'
 
 const ActionableToastContext = createContext({
   notifications: [],
@@ -34,6 +35,12 @@ export function ActionableToastProvider({ children }) {
           'Authorization': `Bearer ${token}`
         }
       })
+
+      // Handle 401 - session expired
+      if (response.status === 401) {
+        handleSessionExpired()
+        return
+      }
 
       if (response.ok) {
         const data = await response.json()

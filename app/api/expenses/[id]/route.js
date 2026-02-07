@@ -6,14 +6,98 @@ import { emitExpenseUpdate } from '@/lib/realtimeEvents'
 export async function PUT(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Expense', 'User', 'Employee'])
+    const auth = await getAuthAndModels(request, ['Expense', 'User', 'Employee', 'Department'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Expense, User, Employee } = models
+    const { Expense, User, Employee, Department } = models
 
     const data = await request.json()
+
+    // Get the existing expense to check authorization
+    const existingExpense = await Expense.findById(params.id).lean()
+    if (!existingExpense) {
+      return NextResponse.json(
+        { success: false, message: 'Expense not found' },
+        { status: 404 }
+      )
+    }
+
+    // Authorization check for approval/rejection actions
+    if (data.status && (data.status === 'approved' || data.status === 'rejected')) {
+      const userRecord = await User.findById(user._id || user.userId)
+        .select('employeeId role isDepartmentHead headOfDepartments')
+        .lean()
+      
+      const userRole = userRecord?.role || user.role
+      const userEmployeeId = userRecord?.employeeId
+
+      // Admin can approve all expenses
+      if (userRole !== 'admin') {
+        // Get the employee who submitted expense
+        const expenseEmployee = await Employee.findById(existingExpense.employee).select('department').lean()
+        
+        if (userRole === 'hr') {
+          // HR users can ONLY approve if they're a department head of the employee's department
+          if (!userRecord?.isDepartmentHead || !userRecord?.headOfDepartments?.length) {
+            return NextResponse.json(
+              { success: false, message: 'Only your department head can approve expense requests' },
+              { status: 403 }
+            )
+          }
+          // Check if employee is in HR's department
+          const isInHRDept = userRecord.headOfDepartments.some(d => 
+            d.toString() === expenseEmployee?.department?.toString()
+          )
+          if (!isInHRDept) {
+            return NextResponse.json(
+              { success: false, message: 'You can only approve expenses for your own department' },
+              { status: 403 }
+            )
+          }
+        } else if (userRole === 'department_head' || userRecord?.isDepartmentHead) {
+          // Department heads can approve for their department
+          let canApprove = false
+          
+          if (userRecord?.headOfDepartments?.length > 0) {
+            canApprove = userRecord.headOfDepartments.some(d => 
+              d.toString() === expenseEmployee?.department?.toString()
+            )
+          }
+          
+          if (!canApprove && userEmployeeId) {
+            // Check via Department.head/heads
+            const dept = await Department.findById(expenseEmployee?.department).lean()
+            if (dept) {
+              canApprove = dept.head?.toString() === userEmployeeId.toString() ||
+                (dept.heads && dept.heads.some(h => h.toString() === userEmployeeId.toString()))
+            }
+          }
+          
+          if (!canApprove) {
+            return NextResponse.json(
+              { success: false, message: 'You can only approve expenses for your own department' },
+              { status: 403 }
+            )
+          }
+        } else if (userRole === 'manager') {
+          // Managers can approve for their direct reports
+          const isDirectReport = expenseEmployee?.reportingManager?.toString() === userEmployeeId?.toString()
+          if (!isDirectReport) {
+            return NextResponse.json(
+              { success: false, message: 'You can only approve expenses for your direct reports' },
+              { status: 403 }
+            )
+          }
+        } else {
+          return NextResponse.json(
+            { success: false, message: 'You do not have permission to approve expense requests' },
+            { status: 403 }
+          )
+        }
+      }
+    }
 
     const expense = await Expense.findByIdAndUpdate(
       params.id,

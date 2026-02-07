@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { toast } from '@/utils/toast'
+import { handleSessionExpired } from '@/utils/userHelper'
 import { getCurrentISTDate, getCurrentISTMinutesSinceMidnight, getCurrentISTDayName } from '@/lib/timezone'
 
 export default function useGeofencing() {
@@ -81,6 +82,13 @@ export default function useGeofencing() {
           'Authorization': `Bearer ${token}`
         }
       })
+      
+      // Handle 401 - session expired
+      if (response.status === 401) {
+        handleSessionExpired()
+        return null
+      }
+      
       const data = await response.json()
       if (data.success && data.data.geofence) {
         setGeofenceSettings(data.data)
@@ -110,6 +118,12 @@ export default function useGeofencing() {
           reason
         })
       })
+
+      // Handle 401 - session expired
+      if (response.status === 401) {
+        handleSessionExpired()
+        return null
+      }
 
       const data = await response.json()
       if (data.success) {

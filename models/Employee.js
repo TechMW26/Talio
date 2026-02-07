@@ -127,12 +127,12 @@ const EmployeeSchema = new mongoose.Schema({
     esiNumber: String,
     enrollmentDate: Date,
   },
-  // Professional Tax
+  // Professional Tax - disabled by default (0 deduction until manually enabled)
   professionalTax: {
-    applicable: { type: Boolean, default: true },
-    amount: { type: Number, default: 200 }, // Monthly PT amount
+    applicable: { type: Boolean, default: false },
+    amount: { type: Number, default: 0 }, // Monthly PT amount
   },
-  // TDS (Tax Deducted at Source) configuration
+  // TDS (Tax Deducted at Source) configuration - disabled by default
   tdsConfiguration: {
     enabled: { type: Boolean, default: false }, // TDS disabled by default - must be configured manually
     percentage: { type: Number, default: 0 }, // Custom TDS percentage for employee (0 = no TDS)

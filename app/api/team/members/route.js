@@ -82,14 +82,38 @@ export async function GET(request) {
         .populate('heads', 'firstName lastName employeeCode email phone dateOfJoining designation designationLevel designationLevelName department reportingManager profilePicture skills')
         .lean()
 
-      // Collect all department head employee IDs
-      const existingMemberIds = new Set(teamMembers.map(m => m._id.toString()))
-      const additionalHeads = []
+      // Build a map of employee IDs to department names for all department heads
+      const headEmployeeIdToDeptName = new Map()
+      for (const dept of deptDetails) {
+        if (dept.head) {
+          headEmployeeIdToDeptName.set(dept.head._id?.toString() || dept.head.toString(), dept.name)
+        }
+        if (dept.heads && dept.heads.length > 0) {
+          for (const head of dept.heads) {
+            if (head) {
+              headEmployeeIdToDeptName.set(head._id?.toString() || head.toString(), dept.name)
+            }
+          }
+        }
+      }
 
+      // Mark existing team members who are department heads
+      const existingMemberIds = new Set(teamMembers.map(m => m._id.toString()))
+      teamMembers = teamMembers.map(member => {
+        const deptName = headEmployeeIdToDeptName.get(member._id.toString())
+        if (deptName) {
+          return { ...member, isDepartmentHead: true, headOfDepartment: deptName }
+        }
+        return member
+      })
+
+      // Add department heads who are NOT already in the team (different department)
+      const additionalHeads = []
       for (const dept of deptDetails) {
         // Add single head if exists and not already in list
-        if (dept.head && !existingMemberIds.has(dept.head._id.toString())) {
-          const headEmployee = await Employee.findById(dept.head._id)
+        if (dept.head && !existingMemberIds.has(dept.head._id?.toString() || dept.head.toString())) {
+          const headId = dept.head._id || dept.head
+          const headEmployee = await Employee.findById(headId)
             .populate('designation', 'title level levelName')
             .populate('department', 'name code')
             .populate('reportingManager', 'firstName lastName employeeCode')
@@ -105,8 +129,9 @@ export async function GET(request) {
         // Add multiple heads if exist
         if (dept.heads && dept.heads.length > 0) {
           for (const head of dept.heads) {
-            if (head && !existingMemberIds.has(head._id.toString())) {
-              const headEmployee = await Employee.findById(head._id)
+            if (head && !existingMemberIds.has(head._id?.toString() || head.toString())) {
+              const headId = head._id || head
+              const headEmployee = await Employee.findById(headId)
                 .populate('designation', 'title level levelName')
                 .populate('department', 'name code')
                 .populate('reportingManager', 'firstName lastName employeeCode')
@@ -157,14 +182,38 @@ export async function GET(request) {
           .sort({ firstName: 1 })
           .lean()
 
-        // Also include department heads who might not be in the department directly
-        const existingMemberIds = new Set(teamMembers.map(m => m._id.toString()))
-        const additionalHeads = []
+        // Build a map of employee IDs to department names for all department heads
+        const headEmployeeIdToDeptName = new Map()
+        for (const dept of headDepartments) {
+          if (dept.head) {
+            headEmployeeIdToDeptName.set(dept.head._id?.toString() || dept.head.toString(), dept.name)
+          }
+          if (dept.heads && dept.heads.length > 0) {
+            for (const head of dept.heads) {
+              if (head) {
+                headEmployeeIdToDeptName.set(head._id?.toString() || head.toString(), dept.name)
+              }
+            }
+          }
+        }
 
+        // Mark existing team members who are department heads
+        const existingMemberIds = new Set(teamMembers.map(m => m._id.toString()))
+        teamMembers = teamMembers.map(member => {
+          const deptName = headEmployeeIdToDeptName.get(member._id.toString())
+          if (deptName) {
+            return { ...member, isDepartmentHead: true, headOfDepartment: deptName }
+          }
+          return member
+        })
+
+        // Add department heads who are NOT already in team members (different department)
+        const additionalHeads = []
         for (const dept of headDepartments) {
           // Add single head if exists and not already in list
-          if (dept.head && !existingMemberIds.has(dept.head._id.toString())) {
-            const headEmployee = await Employee.findById(dept.head._id)
+          if (dept.head && !existingMemberIds.has(dept.head._id?.toString() || dept.head.toString())) {
+            const headId = dept.head._id || dept.head
+            const headEmployee = await Employee.findById(headId)
               .populate('designation', 'title level levelName')
               .populate('department', 'name code')
               .populate('reportingManager', 'firstName lastName employeeCode')
@@ -180,8 +229,9 @@ export async function GET(request) {
           // Add multiple heads if exist
           if (dept.heads && dept.heads.length > 0) {
             for (const head of dept.heads) {
-              if (head && !existingMemberIds.has(head._id.toString())) {
-                const headEmployee = await Employee.findById(head._id)
+              if (head && !existingMemberIds.has(head._id?.toString() || head.toString())) {
+                const headId = head._id || head
+                const headEmployee = await Employee.findById(headId)
                   .populate('designation', 'title level levelName')
                   .populate('department', 'name code')
                   .populate('reportingManager', 'firstName lastName employeeCode')

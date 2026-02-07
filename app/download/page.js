@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Download, Smartphone, Monitor, Apple, CheckCircle, AlertCircle } from 'lucide-react'
+import { Download, Monitor, Apple, CheckCircle, AlertCircle } from 'lucide-react'
 
 export default function DownloadPage() {
   const [platform, setPlatform] = useState('unknown')
@@ -10,14 +10,10 @@ export default function DownloadPage() {
   useEffect(() => {
     // Detect user platform
     const userAgent = navigator.userAgent.toLowerCase()
-    if (userAgent.includes('android')) {
-      setPlatform('android')
-    } else if (userAgent.includes('mac')) {
+    if (userAgent.includes('mac')) {
       setPlatform('mac')
     } else if (userAgent.includes('win')) {
       setPlatform('windows')
-    } else if (userAgent.includes('iphone') || userAgent.includes('ipad')) {
-      setPlatform('ios')
     } else {
       setPlatform('other')
     }
@@ -30,7 +26,6 @@ export default function DownloadPage() {
 
   // GitHub release URLs
   const downloadLinks = {
-    android: '/downloads/talio-hrms-app.apk',
     macIntel: 'https://github.com/avirajsharma-ops/Talio/releases/download/v1.2.0/Talio-macOS-Intel.dmg',
     macArm: 'https://github.com/avirajsharma-ops/Talio/releases/download/v1.2.0/Talio-macOS-ARM.dmg',
     windows: 'https://github.com/avirajsharma-ops/Talio/releases/download/v1.2.0/Talio-Windows.exe',
@@ -42,7 +37,6 @@ export default function DownloadPage() {
         {/* Header */}
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-8 text-white text-center">
           <div className="flex justify-center gap-4 mb-4">
-            <Smartphone className="w-12 h-12" />
             <Monitor className="w-12 h-12" />
           </div>
           <h1 className="text-3xl font-bold mb-2">Talio</h1>
@@ -63,7 +57,7 @@ export default function DownloadPage() {
           </div>
 
           {/* Download Options */}
-          <div className="grid md:grid-cols-2 gap-4 mb-6">
+          <div className="mb-6">
             {/* Desktop Apps */}
             <div className="border border-gray-200 rounded-lg p-5">
               <div className="flex items-center gap-2 mb-4">
@@ -111,36 +105,6 @@ export default function DownloadPage() {
                 </a>
               </div>
             </div>
-
-            {/* Mobile App */}
-            <div className="border border-gray-200 rounded-lg p-5">
-              <div className="flex items-center gap-2 mb-4">
-                <Smartphone className="w-6 h-6 text-gray-700" />
-                <h3 className="font-semibold text-gray-900">Mobile App</h3>
-              </div>
-              
-              {/* Android */}
-              <div className="mb-4">
-                <p className="text-sm text-gray-600 mb-2">Android</p>
-                <a
-                  href={downloadLinks.android}
-                  download
-                  onClick={handleDownload}
-                  className="block w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white text-sm font-medium py-2.5 px-4 rounded-lg transition-all text-center"
-                >
-                  <Download className="w-4 h-4 inline mr-2" />
-                  Download APK
-                </a>
-              </div>
-
-              {/* iOS - Coming Soon */}
-              <div>
-                <p className="text-sm text-gray-600 mb-2">iOS</p>
-                <div className="w-full bg-gray-100 text-gray-500 text-sm font-medium py-2.5 px-4 rounded-lg text-center cursor-not-allowed">
-                  Coming Soon
-                </div>
-              </div>
-            </div>
           </div>
 
           {downloadStarted && (
@@ -185,24 +149,13 @@ export default function DownloadPage() {
             <h3 className="font-semibold text-gray-900 mb-3">Installation</h3>
             
             {/* Desktop Instructions */}
-            <div className="mb-4">
+            <div>
               <h4 className="text-sm font-medium text-gray-700 mb-2">Desktop (macOS/Windows)</h4>
               <ol className="space-y-1 text-sm text-gray-600 list-decimal list-inside">
                 <li>Download the installer for your platform</li>
                 <li>Open the downloaded file and follow the installation prompts</li>
                 <li>Grant screen recording permission when prompted (macOS)</li>
                 <li>Login with your Talio credentials</li>
-              </ol>
-            </div>
-
-            {/* Android Instructions */}
-            <div>
-              <h4 className="text-sm font-medium text-gray-700 mb-2">Android</h4>
-              <ol className="space-y-1 text-sm text-gray-600 list-decimal list-inside">
-                <li>Download the APK file</li>
-                <li>Enable "Install from Unknown Sources" in Settings</li>
-                <li>Open the APK and tap Install</li>
-                <li>Grant location and notification permissions</li>
               </ol>
             </div>
           </div>
@@ -214,8 +167,7 @@ export default function DownloadPage() {
               <div>
                 <h4 className="font-semibold text-amber-900 mb-1">Important</h4>
                 <p className="text-sm text-amber-700">
-                  Desktop apps require screen recording permission for productivity monitoring. 
-                  Mobile apps require location permission for attendance tracking.
+                  Desktop apps require screen recording permission for productivity monitoring.
                 </p>
               </div>
             </div>

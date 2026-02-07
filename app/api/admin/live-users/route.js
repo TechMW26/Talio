@@ -163,14 +163,22 @@ export async function GET(request) {
       todayAttendance.map(a => a.employee?.toString()).filter(Boolean)
     );
 
-    // Calculate active threshold (5 minutes - for socket connection based activity)
-    const activeThreshold = new Date(now.getTime() - 5 * 60 * 1000);
+    // Get active users from socket presence (real-time connection tracking)
+    const presenceByUserId = global.presenceByUserId || new Map();
+    
+    // Helper function to check if a user is currently connected via socket
+    const isUserActiveNow = (userId) => {
+      if (!userId) return false;
+      const userIdStr = userId.toString();
+      const entry = presenceByUserId.get(userIdStr);
+      return entry && entry.sockets && entry.sockets.size > 0;
+    };
 
     // Categorize users
     const allUsers = [];
     const loggedInToday = [];
     const checkedInToday = [];
-    const activeNow = []; // Users with recent lastLogin (within 5 mins) - approximation
+    const activeNow = []; // Users with active socket connections
 
     for (const u of users) {
       if (!u.employeeId) continue; // Skip users without employee profile
@@ -226,8 +234,9 @@ export async function GET(request) {
         checkedInToday.push(userData);
       }
 
-      // Active now (last login within 5 minutes - rough approximation)
-      if (u.lastLogin && new Date(u.lastLogin) >= activeThreshold) {
+      // Active now - check if user has an active socket connection
+      if (isUserActiveNow(u._id)) {
+        userData.isActiveNow = true;
         activeNow.push(userData);
       }
     }

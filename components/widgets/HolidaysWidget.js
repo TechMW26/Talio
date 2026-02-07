@@ -5,14 +5,20 @@ import { FaCalendarAlt, FaGift } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
 import { Card, CardBody, Button, Chip, Skeleton, ScrollShadow } from '@heroui/react'
 
-export default function HolidaysWidget({ limit = 5 }) {
+export default function HolidaysWidget({ limit = 5, initialData }) {
     const router = useRouter()
     const [holidays, setHolidays] = useState([])
-    const [loading, setLoading] = useState(true)
+    const [loading, setLoading] = useState(!initialData)
 
     useEffect(() => {
+        // Skip fetch if initialData provided from unified dashboard call
+        if (initialData) {
+            setHolidays(initialData)
+            setLoading(false)
+            return
+        }
         fetchHolidays()
-    }, [])
+    }, [initialData])
 
     const fetchHolidays = async () => {
         try {

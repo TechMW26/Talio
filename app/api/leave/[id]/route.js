@@ -7,12 +7,12 @@ import { emitLeaveUpdate, emitDashboardRefresh } from '@/lib/realtimeEvents'
 export async function PUT(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Leave', 'LeaveBalance', 'Employee', 'User'])
+    const auth = await getAuthAndModels(request, ['Leave', 'LeaveBalance', 'Employee', 'User', 'Department'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Leave, LeaveBalance, Employee, User } = models
+    const { Leave, LeaveBalance, Employee, User, Department } = models
 
     const data = await request.json()
     const { status, approvedBy, rejectionReason } = data
@@ -23,6 +23,79 @@ export async function PUT(request, { params }) {
         { success: false, message: 'Leave request not found' },
         { status: 404 }
       )
+    }
+
+    // Authorization check: Verify user can approve this leave
+    const userRecord = await User.findById(user._id || user.userId)
+      .select('employeeId role isDepartmentHead headOfDepartments')
+      .lean()
+    
+    const userRole = userRecord?.role || user.role
+    const userEmployeeId = userRecord?.employeeId
+
+    // Admin can approve all leaves
+    if (userRole !== 'admin') {
+      // Get the employee who requested leave
+      const leaveEmployee = await Employee.findById(leave.employee).select('department').lean()
+      
+      if (userRole === 'hr') {
+        // HR users can ONLY approve if they're a department head of the employee's department
+        if (!userRecord?.isDepartmentHead || !userRecord?.headOfDepartments?.length) {
+          return NextResponse.json(
+            { success: false, message: 'Only your department head can approve leave requests' },
+            { status: 403 }
+          )
+        }
+        // Check if employee is in HR's department
+        const isInHRDept = userRecord.headOfDepartments.some(d => 
+          d.toString() === leaveEmployee?.department?.toString()
+        )
+        if (!isInHRDept) {
+          return NextResponse.json(
+            { success: false, message: 'You can only approve leaves for your own department' },
+            { status: 403 }
+          )
+        }
+      } else if (userRole === 'department_head' || userRecord?.isDepartmentHead) {
+        // Department heads can approve for their department
+        let canApprove = false
+        
+        if (userRecord?.headOfDepartments?.length > 0) {
+          canApprove = userRecord.headOfDepartments.some(d => 
+            d.toString() === leaveEmployee?.department?.toString()
+          )
+        }
+        
+        if (!canApprove && userEmployeeId) {
+          // Check via Department.head/heads
+          const dept = await Department.findById(leaveEmployee?.department).lean()
+          if (dept) {
+            canApprove = dept.head?.toString() === userEmployeeId.toString() ||
+              (dept.heads && dept.heads.some(h => h.toString() === userEmployeeId.toString()))
+          }
+        }
+        
+        if (!canApprove) {
+          return NextResponse.json(
+            { success: false, message: 'You can only approve leaves for your own department' },
+            { status: 403 }
+          )
+        }
+      } else if (userRole === 'manager') {
+        // Managers can approve for their direct reports
+        const isDirectReport = leaveEmployee?.reportingManager?.toString() === userEmployeeId?.toString()
+        if (!isDirectReport) {
+          return NextResponse.json(
+            { success: false, message: 'You can only approve leaves for your direct reports' },
+            { status: 403 }
+          )
+        }
+      } else {
+        return NextResponse.json(
+          { success: false, message: 'You do not have permission to approve leave requests' },
+          { status: 403 }
+        )
+      }
     }
 
     if (leave.status !== 'pending') {

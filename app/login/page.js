@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import toast from '@/utils/toast'
 import { FaEnvelope, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa'
+import { resetRedirectFlag } from '@/utils/userHelper'
+import { resetAuthRedirectFlag } from '@/hooks/useAuthedSWR'
 import { 
   Card, 
   CardBody, 
@@ -38,6 +40,10 @@ export default function LoginPage() {
 
   // Check if user is already logged in
   useEffect(() => {
+    // Reset any stale redirect flags when landing on login page
+    resetRedirectFlag()
+    resetAuthRedirectFlag()
+    
     // Check if we're already in the process of redirecting (prevents loop)
     if (sessionStorage.getItem('__login_redirecting')) {
       console.log('[Login Page] Already redirecting, skipping check...')
@@ -196,6 +202,10 @@ export default function LoginPage() {
       const data = await response.json()
 
       if (response.ok) {
+        // Reset redirect flags from any previous session expiry
+        resetRedirectFlag()
+        resetAuthRedirectFlag()
+        
         // Set flag for dashboard to play login success sound
         sessionStorage.setItem('playLoginSound', 'true')
 

@@ -45,6 +45,18 @@ export async function GET(request) {
     const skip = (page - 1) * limit
     const sortObj = { [sortBy]: sortOrder === 'asc' ? 1 : -1 }
     
+    // Check if OnboardingEmail model is available
+    if (!OnboardingEmail) {
+      console.error('OnboardingEmail model not available')
+      return NextResponse.json({
+        success: true,
+        data: [],
+        pagination: { page, limit, total: 0, pages: 0 },
+        stats: { sent: 0, failed: 0, pending: 0, total: 0 },
+        onboardingEmailsEnabled: true,
+      })
+    }
+    
     const [emails, total, settings] = await Promise.all([
       OnboardingEmail.find(query)
         .populate('employee', 'firstName lastName employeeCode profilePicture')
@@ -52,16 +64,20 @@ export async function GET(request) {
         .sort(sortObj)
         .skip(skip)
         .limit(limit)
-        .lean(),
-      OnboardingEmail.countDocuments(query),
-      CompanySettings.findOne().select('notifications.onboardingEmailsEnabled').lean(),
+        .lean()
+        .catch(err => {
+          console.error('Failed to fetch onboarding emails:', err.message)
+          return []
+        }),
+      OnboardingEmail.countDocuments(query).catch(() => 0),
+      CompanySettings?.findOne().select('notifications.onboardingEmailsEnabled').lean().catch(() => null),
     ])
     
-    // Get stats
+    // Get stats - with fallback to handle errors
     const [sentCount, failedCount, pendingCount] = await Promise.all([
-      OnboardingEmail.countDocuments({ status: 'sent' }),
-      OnboardingEmail.countDocuments({ status: 'failed' }),
-      OnboardingEmail.countDocuments({ status: 'pending' }),
+      OnboardingEmail.countDocuments({ status: 'sent' }).catch(() => 0),
+      OnboardingEmail.countDocuments({ status: 'failed' }).catch(() => 0),
+      OnboardingEmail.countDocuments({ status: 'pending' }).catch(() => 0),
     ])
     
     // Get onboarding emails enabled status (default to true if not set)

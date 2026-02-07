@@ -168,6 +168,76 @@ export function isAuthenticated() {
   return !!getToken() && !!getCurrentUser()
 }
 
+// Flag to prevent multiple redirects
+let isRedirecting = false
+
+/**
+ * Reset the redirect flag (for testing or after navigation)
+ */
+export function resetRedirectFlag() {
+  isRedirecting = false
+}
+
+/**
+ * Handle session expiration - clear auth and redirect to login
+ */
+export function handleSessionExpired() {
+  // Prevent multiple redirects
+  if (isRedirecting) {
+    console.log('[Auth] Already redirecting, skipping...')
+    return false
+  }
+  isRedirecting = true
+  
+  console.log('[Auth] Session expired, redirecting to login...')
+  
+  // Clear all auth data from localStorage
+  localStorage.removeItem('token')
+  localStorage.removeItem('user')
+  localStorage.removeItem('userId')
+  
+  // Clear cookie
+  document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+  
+  // Reset flag after delay to handle edge cases (module hot reload, etc.)
+  setTimeout(() => {
+    isRedirecting = false
+  }, 5000)
+  
+  // Use setTimeout to ensure redirect happens after current call stack
+  setTimeout(() => {
+    window.location.href = '/login'
+  }, 0)
+  
+  return true
+}
+
+/**
+ * Authenticated fetch wrapper that handles 401 responses
+ * Use this for manual fetch calls instead of plain fetch
+ * 
+ * @param {string} url - The URL to fetch
+ * @param {Object} options - Fetch options (headers, method, body, etc.)
+ * @returns {Promise<Response>} Fetch response
+ */
+export async function authedFetch(url, options = {}) {
+  const token = getToken()
+  
+  const headers = {
+    ...options.headers,
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  }
+  
+  const response = await fetch(url, { ...options, headers })
+  
+  // Handle 401 Unauthorized - session expired
+  if (response.status === 401) {
+    handleSessionExpired()
+  }
+  
+  return response
+}
+
 /**
  * Sync user data in localStorage with fresh employee data
  * @param {Object} employeeData - Fresh employee data from API

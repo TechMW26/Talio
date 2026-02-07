@@ -27,6 +27,8 @@ class ScreenshotService {
     this.mainWindow = null;
     this.captureCount = 0;
     this.lastCaptureTime = null;
+    this.onPermissionError = null; // Callback for permission errors
+    this.permissionErrorShown = false; // Only show once per session
   }
 
   initialize(config) {
@@ -35,6 +37,8 @@ class ScreenshotService {
     this.userRole = config.role;
     this.token = config.token;
     this.mainWindow = config.mainWindow;
+    this.onPermissionError = config.onPermissionError || null;
+    this.permissionErrorShown = false;
     
     // Initialize offline queue with upload function
     var self = this;
@@ -46,6 +50,14 @@ class ScreenshotService {
     sessionManager.initialize(this.userId);
     
     logger.log('info', 'ScreenshotService', 'Initialized for user ' + this.userId + ' (role: ' + this.userRole + ')');
+  }
+
+  // Show permission error notification (only once per session)
+  showPermissionError(message) {
+    if (!this.permissionErrorShown && this.onPermissionError) {
+      this.onPermissionError(message);
+      this.permissionErrorShown = true;
+    }
   }
 
   shouldCapture() {
@@ -122,7 +134,10 @@ class ScreenshotService {
       });
       
       if (!sources || sources.length === 0) {
-        throw new Error('No screen sources available');
+        logger.log('error', 'ScreenshotService', 'No screen sources available - check Screen Recording permission in System Preferences');
+        // Notify user about permission issue
+        this.showPermissionError('Screen Recording permission may be required. Please check System Preferences → Privacy & Security → Screen Recording');
+        throw new Error('No screen sources available - Screen Recording permission may not be granted');
       }
       
       // Get primary display
@@ -131,9 +146,24 @@ class ScreenshotService {
         return s.display_id === String(primaryDisplay.id); 
       }) || sources[0];
       
-      // Get thumbnail as NativeImage and convert to JPEG buffer
+      // Check if thumbnail is empty (permission denied often results in blank thumbnail)
       const thumbnail = primarySource.thumbnail;
+      if (thumbnail.isEmpty()) {
+        logger.log('error', 'ScreenshotService', 'Screenshot is empty - Screen Recording permission likely not granted');
+        this.showPermissionError('Screenshots are blank. Please grant Screen Recording permission in System Preferences');
+        throw new Error('Screenshot is empty - Screen Recording permission not granted');
+      }
+      
+      // Get thumbnail as NativeImage and convert to JPEG buffer
       const buffer = thumbnail.toJPEG(JPEG_QUALITY);
+      
+      // Additional check for buffer size (very small = likely failed capture)
+      if (buffer.length < 1000) {
+        logger.log('error', 'ScreenshotService', 'Screenshot buffer too small (' + buffer.length + ' bytes) - capture likely failed');
+        throw new Error('Screenshot capture failed - buffer too small');
+      }
+      
+      logger.log('info', 'ScreenshotService', 'Screenshot captured successfully (' + buffer.length + ' bytes)');
       
       this.captureCount++;
       this.lastCaptureTime = new Date().toISOString();

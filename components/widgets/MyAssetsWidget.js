@@ -5,14 +5,20 @@ import { useRouter } from 'next/navigation'
 import { getEmployeeId } from '@/utils/userHelper'
 import { Card, CardBody, Chip, Skeleton, ScrollShadow } from '@heroui/react'
 
-export default function MyAssetsWidget({ user }) {
+export default function MyAssetsWidget({ user, initialData }) {
   const router = useRouter()
-  const [assets, setAssets] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [assets, setAssets] = useState(initialData || [])
+  const [loading, setLoading] = useState(!initialData)
 
   useEffect(() => {
+    // Skip fetch if initialData was provided
+    if (initialData) {
+      setAssets(initialData)
+      setLoading(false)
+      return
+    }
     if (user) fetchAssets()
-  }, [user])
+  }, [user, initialData])
 
   const fetchAssets = async () => {
     try {
