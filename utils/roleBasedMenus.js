@@ -69,6 +69,7 @@ export const roleBasedMenus = {
       path: '/dashboard/attendance',
       submenu: [
         { name: 'My Attendance', path: '/dashboard/attendance' },
+        { name: 'Team Attendance', path: '/dashboard/attendance/team' },
         { name: 'Attendance Report', path: '/dashboard/attendance/report' },
         { name: 'Employee Check-ins', path: '/dashboard/attendance/checkins' },
         { name: 'Attendance Regularisation', path: '/dashboard/team/regularisation' },
@@ -188,6 +189,7 @@ export const roleBasedMenus = {
       path: '/dashboard/attendance',
       submenu: [
         { name: 'My Attendance', path: '/dashboard/attendance' },
+        { name: 'Team Attendance', path: '/dashboard/attendance/team' },
         { name: 'Attendance Report', path: '/dashboard/attendance/report' },
         { name: 'Employee Check-ins', path: '/dashboard/attendance/checkins' },
         { name: 'Attendance Regularisation', path: '/dashboard/team/regularisation' },

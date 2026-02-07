@@ -31,7 +31,20 @@ export async function GET(request) {
     }
 
     const payrolls = await Payroll.find(query)
-      .populate('employee', 'firstName lastName employeeCode bankDetails')
+      .populate({
+        path: 'employee',
+        select: 'firstName lastName employeeCode bankDetails company designationLevel designation',
+        populate: [
+          {
+            path: 'company',
+            select: 'name code'
+          },
+          {
+            path: 'designation',
+            select: 'title level'
+          }
+        ]
+      })
       .sort({ year: -1, month: -1 })
 
     return NextResponse.json({

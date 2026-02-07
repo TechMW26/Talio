@@ -65,6 +65,8 @@ export default function PayrollPage() {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [statusFilter, setStatusFilter] = useState('all')
+  const [selectedVenture, setSelectedVenture] = useState('all')
+  const [ventures, setVentures] = useState([])
   const [selectedPayrolls, setSelectedPayrolls] = useState([])
   const [bulkProcessing, setBulkProcessing] = useState(false)
   const [sendEmailsOnProcess, setSendEmailsOnProcess] = useState(true)
@@ -80,6 +82,22 @@ export default function PayrollPage() {
   // Real-time updates
   const { socket, isConnected, subscribe, onPayrollUpdate } = useSocket()
 
+  // Fetch ventures/companies
+  const fetchVentures = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/companies', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
+      const data = await response.json()
+      if (data.success) {
+        setVentures(data.data)
+      }
+    } catch (error) {
+      console.error('Fetch ventures error:', error)
+    }
+  }
+
   useEffect(() => {
     const parsedUser = getCurrentUser()
     if (parsedUser) {
@@ -88,8 +106,9 @@ export default function PayrollPage() {
       setIsAdmin(adminCheck)
       
       if (adminCheck) {
-        // Admin/HR - fetch all payrolls
+        // Admin/HR - fetch all payrolls and ventures
         fetchAllPayrolls()
+        fetchVentures()
       } else {
         // Employee - fetch personal payrolls
         const empId = getEmployeeId(parsedUser)
@@ -179,9 +198,37 @@ export default function PayrollPage() {
   }
 
   const filteredPayrolls = useMemo(() => {
-    if (statusFilter === 'all') return payrolls
-    return payrolls.filter(p => p.status === statusFilter)
-  }, [payrolls, statusFilter])
+    let filtered = payrolls
+    
+    // Filter by status
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(p => p.status === statusFilter)
+    }
+    
+    // Filter by venture/company
+    if (selectedVenture !== 'all') {
+      filtered = filtered.filter(p => p.employee?.company?._id === selectedVenture)
+    }
+    
+    // Sort by hierarchy (higher designationLevel = higher hierarchy = comes first)
+    // Then by designation title to group same designations together
+    filtered = [...filtered].sort((a, b) => {
+      const levelA = a.employee?.designationLevel || a.employee?.designation?.level || 0
+      const levelB = b.employee?.designationLevel || b.employee?.designation?.level || 0
+      
+      // First sort by level (higher = higher hierarchy, so descending)
+      if (levelA !== levelB) {
+        return levelB - levelA
+      }
+      
+      // Within same level, group by designation title
+      const titleA = a.employee?.designation?.title || ''
+      const titleB = b.employee?.designation?.title || ''
+      return titleA.localeCompare(titleB)
+    })
+    
+    return filtered
+  }, [payrolls, statusFilter, selectedVenture])
 
   const stats = useMemo(() => {
     const monthPayrolls = payrolls.filter(p => 
@@ -344,6 +391,7 @@ export default function PayrollPage() {
     const exportData = filteredPayrolls.map(p => ({
       'Employee Name': `${p.employee?.firstName || ''} ${p.employee?.lastName || ''}`,
       'Employee Code': p.employee?.employeeCode || '',
+      'Venture': p.employee?.company?.name || '',
       'Month': getMonthName(p.month),
       'Year': p.year,
       'Basic Salary': p.earnings?.basic || 0,
@@ -377,7 +425,10 @@ export default function PayrollPage() {
     }))
     ws['!cols'] = colWidths
 
-    const fileName = `Payroll_${getMonthName(selectedMonth)}_${selectedYear}.xlsx`
+    // Include venture code in filename if a specific venture is selected
+    const selectedVentureData = ventures.find(v => v._id === selectedVenture)
+    const ventureCode = selectedVentureData?.code ? `_${selectedVentureData.code}` : ''
+    const fileName = `Payroll_${getMonthName(selectedMonth)}_${selectedYear}${ventureCode}.xlsx`
     XLSX.writeFile(wb, fileName)
     toast.success('Excel file downloaded!')
   }
@@ -535,7 +586,10 @@ export default function PayrollPage() {
     }))
     ws['!cols'] = colWidths
 
-    const fileName = `BankSheet_${bankFormat?.format || 'GENERIC'}_${getMonthName(selectedMonth)}_${selectedYear}.xlsx`
+    // Include venture code in filename if a specific venture is selected
+    const selectedVentureData = ventures.find(v => v._id === selectedVenture)
+    const ventureCode = selectedVentureData?.code ? `_${selectedVentureData.code}` : ''
+    const fileName = `BankSheet_${bankFormat?.format || 'GENERIC'}_${getMonthName(selectedMonth)}_${selectedYear}${ventureCode}.xlsx`
     XLSX.writeFile(wb, fileName)
     toast.success(`Bank sheet downloaded for ${bankFormat?.name || 'Generic'}!`)
     bankSheetModal.onClose()
@@ -801,6 +855,24 @@ export default function PayrollPage() {
                     <SelectItem key="paid">Paid</SelectItem>
                     <SelectItem key="on-hold">On Hold</SelectItem>
                   </Select>
+                  
+                  {ventures.length > 0 && (
+                    <Select
+                      selectedKeys={[selectedVenture]}
+                      onSelectionChange={(keys) => setSelectedVenture(Array.from(keys)[0])}
+                      size="sm"
+                      className="min-w-[180px] max-w-[280px]"
+                      aria-label="Filter by venture"
+                      popoverProps={{ className: "min-w-[250px]" }}
+                    >
+                      <SelectItem key="all">All Ventures</SelectItem>
+                      {ventures.map(v => (
+                        <SelectItem key={v._id} textValue={v.name}>
+                          {v.name}
+                        </SelectItem>
+                      ))}
+                    </Select>
+                  )}
                 </>
               )}
             </div>
@@ -999,6 +1071,7 @@ export default function PayrollPage() {
               >
                 <TableHeader>
                   {isAdmin && <TableColumn>EMPLOYEE</TableColumn>}
+                  {isAdmin && <TableColumn>VENTURE</TableColumn>}
                   <TableColumn>MONTH/YEAR</TableColumn>
                   <TableColumn align="end">GROSS</TableColumn>
                   <TableColumn align="end">DEDUCTIONS</TableColumn>
@@ -1017,6 +1090,11 @@ export default function PayrollPage() {
                           <div className="text-xs text-default-400">
                             {payroll.employee?.employeeCode}
                           </div>
+                        </TableCell>
+                      )}
+                      {isAdmin && (
+                        <TableCell className="text-xs sm:text-sm">
+                          {payroll.employee?.company?.name || '-'}
                         </TableCell>
                       )}
                       <TableCell className="text-xs sm:text-sm">
