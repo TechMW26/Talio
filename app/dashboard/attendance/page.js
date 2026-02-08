@@ -985,9 +985,9 @@ export default function AttendancePage() {
                           <strong>Requested:</strong> {correction.requestedCheckIn ? formatTime(correction.requestedCheckIn) : formatTime(correction.currentCheckIn)} - {correction.requestedCheckOut ? formatTime(correction.requestedCheckOut) : formatTime(correction.currentCheckOut)}
                         </p>
                         {expectedWorkHours > 0 && (
-                          <p className="text-xs sm:text-sm text-success mt-1 font-medium">
+                          <div className="text-xs sm:text-sm text-success mt-1 font-medium flex items-center gap-1 flex-wrap">
                             <strong>If approved:</strong> {expectedWorkHours.toFixed(1)}h worked → <Chip size="sm" color={expectedStatus === 'present' ? 'success' : expectedStatus === 'half-day' ? 'warning' : 'danger'}>{expectedStatus}</Chip>
-                          </p>
+                          </div>
                         )}
                         <p className="text-xs sm:text-sm text-default-600 mt-2 italic line-clamp-2">&quot;{correction.reason}&quot;</p>
                       </div>
