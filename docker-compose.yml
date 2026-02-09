@@ -1,14 +1,43 @@
 services:
+  # Redis for caching - critical for production performance
+  redis:
+    image: redis:7-alpine
+    container_name: talio-redis
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 300M
+        reservations:
+          memory: 100M
+
   app:
     build:
       context: .
       dockerfile: Dockerfile
     image: talio-app:latest
     container_name: talio-app
+    depends_on:
+      redis:
+        condition: service_healthy
     env_file:
       - .env
     environment:
       - NODE_ENV=production
+      # Redis connection for caching
+      - REDIS_URL=redis://redis:6379
+      # Node.js performance settings
+      - NODE_OPTIONS=--max-old-space-size=3072 --max-http-header-size=32768
+      - UV_THREADPOOL_SIZE=16
+      # MongoDB
       - MONGODB_URI=${MONGODB_URI}
       - JWT_SECRET=${JWT_SECRET}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
@@ -49,10 +78,25 @@ services:
     volumes:
       - ./public/uploads:/app/public/uploads
     restart: unless-stopped
+    # Health check for container monitoring
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     deploy:
       resources:
         limits:
-          memory: 2G
+          memory: 4G
         reservations:
-          memory: 512M
+          memory: 1G
+    # DNS configuration for faster resolution
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+      - 1.1.1.1
     stop_grace_period: 30s
+
+volumes:
+  redis_data:

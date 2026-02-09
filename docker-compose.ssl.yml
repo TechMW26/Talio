@@ -1,4 +1,26 @@
 services:
+  # Redis for caching - critical for production performance
+  redis:
+    image: redis:7-alpine
+    container_name: talio-redis
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - hrms-network
+    deploy:
+      resources:
+        limits:
+          memory: 300M
+        reservations:
+          memory: 100M
+
   hrms-app:
     build:
       context: .
@@ -17,13 +39,37 @@ services:
         - NEXT_PUBLIC_FIREBASE_APP_ID=${NEXT_PUBLIC_FIREBASE_APP_ID}
         - NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=${NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID:-}
         - NEXT_PUBLIC_FIREBASE_VAPID_KEY=${NEXT_PUBLIC_FIREBASE_VAPID_KEY}
+    depends_on:
+      redis:
+        condition: service_healthy
     ports:
       - "3000:3000"
     env_file:
       - .env
     environment:
       - NODE_ENV=production
+      # Redis connection for caching
+      - REDIS_URL=redis://redis:6379
+      # Node.js performance settings
+      - NODE_OPTIONS=--max-old-space-size=3072 --max-http-header-size=32768
+      - UV_THREADPOOL_SIZE=16
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 1G
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+      - 1.1.1.1
     networks:
       - hrms-network
 
@@ -54,3 +100,6 @@ services:
 networks:
   hrms-network:
     driver: bridge
+
+volumes:
+  redis_data:

@@ -372,4 +372,48 @@ app.prepare().then(() => {
       }).catch(() => { });
     }
   });
+  
+  // Graceful shutdown handling for Docker
+  const gracefulShutdown = async (signal) => {
+    console.log(`\n⚠️ Received ${signal}. Starting graceful shutdown...`);
+    
+    // Stop accepting new connections
+    server.close(() => {
+      console.log('✅ HTTP server closed');
+    });
+    
+    // Close Socket.IO connections
+    if (io) {
+      console.log('🔌 Closing Socket.IO connections...');
+      io.close(() => {
+        console.log('✅ Socket.IO server closed');
+      });
+    }
+    
+    // Close database connections
+    try {
+      const mongoose = require('mongoose');
+      if (mongoose.connection.readyState === 1) {
+        await mongoose.connection.close();
+        console.log('✅ MongoDB connection closed');
+      }
+      
+      // Close tenant connections
+      const { closeAllTenantConnections } = await import('./lib/tenantDb.js');
+      await closeAllTenantConnections();
+      console.log('✅ Tenant DB connections closed');
+    } catch (error) {
+      console.warn('⚠️ Error closing database connections:', error.message);
+    }
+    
+    // Give time for cleanup, then exit
+    setTimeout(() => {
+      console.log('👋 Shutdown complete');
+      process.exit(0);
+    }, 2000);
+  };
+  
+  // Handle Docker stop signals
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 });

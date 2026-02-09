@@ -98,9 +98,11 @@ RUN npm run build && npm prune --production
 FROM node:20-slim AS runner
 WORKDIR /app
 
-# Install only runtime deps
+# Install only runtime deps and dnsmasq for DNS caching
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libvips42 \
+    dnsutils \
+    curl \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* \
     && addgroup --system --gid 1001 nodejs \
     && adduser --system --uid 1001 nextjs
@@ -108,7 +110,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
-    HOSTNAME="0.0.0.0"
+    HOSTNAME="0.0.0.0" \
+    # Node.js performance optimizations\
+    UV_THREADPOOL_SIZE=16
 
 # Copy only what's needed for production
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
@@ -134,4 +138,9 @@ RUN mkdir -p /app/public/uploads/chat \
 USER nextjs
 EXPOSE 3000
 
-CMD ["node", "server.js"]
+# Health check for Docker
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD curl -f http://localhost:3000/api/health || exit 1
+
+# Run with optimized Node.js settings
+CMD ["node", "--max-old-space-size=3072", "--max-http-header-size=32768", "server.js"]
