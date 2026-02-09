@@ -11,7 +11,8 @@ export async function GET(request, { params }) {
     const { user, models } = auth
     const { Employee } = models
 
-    const { id } = params
+    // Await params in Next.js 15
+    const { id } = await params
     
     // Check if user has permission to view reviews
     if (user.role === 'employee' && user.employeeId !== id) {
@@ -62,7 +63,8 @@ export async function POST(request, { params }) {
       return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
     }
 
-    const { id } = params
+    // Await params in Next.js 15
+    const { id } = await params
     const body = await request.json()
     const { type, content, rating, category } = body
 
@@ -139,7 +141,8 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
     }
 
-    const { id } = params
+    // Await params in Next.js 15
+    const { id } = await params
     const { searchParams } = new URL(request.url)
     const reviewId = searchParams.get('reviewId')
 

@@ -12,7 +12,8 @@ export async function GET(request, { params }) {
     const { user, models } = auth
     const { Employee, Department, Designation, User, Task, TaskAssignee, Project } = models
 
-    const { id } = params
+    // Await params in Next.js 15
+    const { id } = await params
 
     // Get user to find employee ID and department head info
     const userRecord = await User.findById(user._id || user.userId)
@@ -168,7 +169,8 @@ export async function POST(request, { params }) {
     const { user, models } = auth
     const { Employee, Department, User } = models
 
-    const { id } = params
+    // Await params in Next.js 15
+    const { id } = await params
 
     const body = await request.json()
     const { type, content, rating, category } = body

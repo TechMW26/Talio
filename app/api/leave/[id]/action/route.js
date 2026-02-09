@@ -14,7 +14,8 @@ export async function PUT(request, { params }) {
   const { user, models, tenant } = auth
     const { Leave, LeaveBalance, User, Employee } = models
 
-    const { id } = params
+    // Await params in Next.js 15
+    const { id } = await params
     const { action, reason, approvedBy } = await request.json()
 
     if (!['approve', 'reject'].includes(action)) {

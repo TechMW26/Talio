@@ -3,6 +3,11 @@
    Comprehensive dark theme support for Talio
    ============================================ */
 
+/* Global ring-offset fix — default offset color is white, override to dark bg */
+html.dark * {
+  --tw-ring-offset-color: #0F172A;
+}
+
 /* ---- Login / Auth Pages ---- */
 html.dark .login-container,
 html.dark .auth-container {

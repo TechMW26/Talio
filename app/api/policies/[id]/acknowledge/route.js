@@ -10,7 +10,8 @@ export async function POST(request, { params }) {
     const { user, models } = auth
     const { Policy, Employee } = models
 
-    const { id } = params
+    // Await params in Next.js 15
+    const { id } = await params
     const { employeeId } = await request.json()
 
     if (!employeeId) {
