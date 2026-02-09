@@ -1,0 +1,1306 @@
+/* ============================================
+   DARK MODE - Additional Component Overrides
+   Comprehensive dark theme support for Talio
+   ============================================ */
+
+/* ---- Login / Auth Pages ---- */
+html.dark .login-container,
+html.dark .auth-container {
+  background-color: #0F172A;
+}
+
+html.dark .login-card,
+html.dark .auth-card {
+  background-color: #1E293B;
+  border-color: #334155;
+}
+
+/* ---- Notification Panels ---- */
+html.dark .notification-panel {
+  background-color: #1E293B;
+  border-color: #334155;
+}
+
+html.dark .notification-item:hover {
+  background-color: #334155;
+}
+
+/* ---- Profile / Settings Cards ---- */
+html.dark .profile-card,
+html.dark .settings-card {
+  background-color: #1E293B;
+}
+
+/* ---- Chat Components ---- */
+html.dark .chat-container {
+  background-color: #0F172A;
+}
+
+html.dark .chat-sidebar {
+  background-color: #1E293B;
+  border-color: #334155;
+}
+
+html.dark .chat-message-bubble {
+  background-color: #334155;
+  color: #E2E8F0;
+}
+
+html.dark .chat-input-container {
+  background-color: #1E293B;
+  border-color: #334155;
+}
+
+/* ---- Dashboard Widgets ---- */
+html.dark .widget-container {
+  background-color: #1E293B;
+  border-color: #334155;
+}
+
+/* ---- Skeleton Loaders ---- */
+html.dark .skeleton,
+html.dark [data-slot="base"].skeleton {
+  background-color: #334155 !important;
+}
+
+/* Animate-pulse skeleton blocks — override light gray backgrounds */
+html.dark .animate-pulse .bg-gray-200,
+html.dark .animate-pulse .bg-gray-100,
+html.dark .animate-pulse .bg-slate-200,
+html.dark .animate-pulse .bg-slate-100 {
+  background-color: #334155 !important;
+}
+
+/* Standalone skeleton blocks outside animate-pulse parents */
+html.dark .animate-pulse > div[class*="bg-gray-200"],
+html.dark .animate-pulse > div[class*="bg-gray-100"] {
+  background-color: #334155 !important;
+}
+
+/* ---- Popovers & Tooltips ---- */
+html.dark .popover-content,
+html.dark [role="tooltip"] {
+  background-color: #1E293B;
+  border-color: transparent;
+  color: #E2E8F0;
+}
+
+/* ---- Dividers ---- */
+html.dark hr,
+html.dark .divider {
+  border-color: rgba(51, 65, 85, 0.4);
+}
+
+/* HeroUI DropdownSection dividers */
+html.dark [data-slot="base"] [data-slot="divider"],
+html.dark [role="group"] + [role="group"]::before {
+  background-color: rgba(51, 65, 85, 0.4) !important;
+  border-color: rgba(51, 65, 85, 0.4) !important;
+}
+
+/* ---- Status Indicators ---- */
+html.dark .status-badge-neutral {
+  background-color: #334155;
+  color: #94A3B8;
+}
+
+/* ---- Breadcrumbs ---- */
+html.dark .breadcrumb-link {
+  color: #94A3B8;
+}
+
+html.dark .breadcrumb-link:hover {
+  color: #E2E8F0;
+}
+
+html.dark .breadcrumb-separator {
+  color: #475569;
+}
+
+/* ---- Progress Bars ---- */
+html.dark .progress-track {
+  background-color: #334155;
+}
+
+/* ---- Tag / Chip ---- */
+html.dark .tag,
+html.dark .chip-neutral {
+  background-color: #334155;
+  color: #CBD5E1;
+  border-color: #475569;
+}
+
+/* ---- Accordion / Collapsible ---- */
+html.dark .accordion-header {
+  border-color: #334155;
+}
+
+html.dark .accordion-header:hover {
+  background-color: #334155;
+}
+
+html.dark .accordion-content {
+  border-color: #334155;
+}
+
+/* ---- Calendar / Date Picker ---- */
+html.dark .calendar-header {
+  background-color: #1E293B;
+  color: #E2E8F0;
+}
+
+html.dark .calendar-day {
+  color: #CBD5E1;
+}
+
+html.dark .calendar-day:hover {
+  background-color: #334155;
+}
+
+html.dark .calendar-day-today {
+  border-color: var(--color-primary-500);
+}
+
+/* ---- File Upload Zones ---- */
+html.dark .dropzone,
+html.dark .file-upload-zone {
+  background-color: #0F172A;
+  border-color: #475569;
+}
+
+html.dark .dropzone:hover,
+html.dark .file-upload-zone:hover {
+  background-color: #1E293B;
+  border-color: var(--color-primary-500);
+}
+
+/* ---- Kanban / Board Views ---- */
+html.dark .kanban-column {
+  background-color: #0F172A;
+}
+
+html.dark .kanban-card {
+  background-color: #1E293B;
+  border-color: #334155;
+}
+
+html.dark .kanban-card:hover {
+  border-color: #475569;
+}
+
+/* ---- Timeline / Activity Feed ---- */
+html.dark .timeline-line {
+  background-color: #334155;
+}
+
+html.dark .timeline-item-content {
+  background-color: #1E293B;
+  border-color: #334155;
+}
+
+/* ---- Image placeholders ---- */
+html.dark .image-placeholder {
+  background-color: #334155;
+}
+
+/* ---- Code blocks ---- */
+html.dark pre,
+html.dark code {
+  background-color: #0F172A;
+  color: #E2E8F0;
+  border-color: #334155;
+}
+
+/* ---- Selection highlight ---- */
+html.dark ::selection {
+  background-color: var(--color-primary-500);
+  color: white;
+}
+
+/* ---- Focus visible outlines ---- */
+html.dark *:focus-visible {
+  outline: none !important;
+}
+
+/* ---- Inline styles color overrides ----
+   These rules handle scenarios where components
+   use direct color strings like #F9FAFB etc. */
+html.dark [style*="background-color: #F9FAFB"],
+html.dark [style*="background-color: #f9fafb"],
+html.dark [style*="background-color: rgb(249, 250, 251)"] {
+  background-color: #0F172A !important;
+}
+
+html.dark [style*="background-color: #FFFFFF"],
+html.dark [style*="background-color: #ffffff"],
+html.dark [style*="background-color: white"],
+html.dark [style*="background-color: rgb(255, 255, 255)"] {
+  background-color: #1E293B !important;
+}
+
+html.dark [style*="color: #111827"],
+html.dark [style*="color: rgb(17, 24, 39)"] {
+  color: #F1F5F9 !important;
+}
+
+html.dark [style*="color: #374151"],
+html.dark [style*="color: rgb(55, 65, 81)"] {
+  color: #CBD5E1 !important;
+}
+
+html.dark [style*="color: #6B7280"],
+html.dark [style*="color: #6b7280"],
+html.dark [style*="color: rgb(107, 114, 128)"] {
+  color: #94A3B8 !important;
+}
+
+html.dark [style*="color: #1f2937"],
+html.dark [style*="color: #1F2937"],
+html.dark [style*="color: rgb(31, 41, 55)"] {
+  color: #E2E8F0 !important;
+}
+
+html.dark [style*="border-color: #E5E7EB"],
+html.dark [style*="border-color: #e5e7eb"],
+html.dark [style*="border-color: rgb(229, 231, 235)"] {
+  border-color: #334155 !important;
+}
+
+html.dark [style*="border-color: #D1D5DB"],
+html.dark [style*="border-color: #d1d5db"] {
+  border-color: #475569 !important;
+}
+
+/* ---- Specific background overrides for common inline patterns ---- */
+html.dark [style*="background-color: #F3F4F6"],
+html.dark [style*="background-color: #f3f4f6"] {
+  background-color: #273548 !important;
+}
+
+html.dark [style*="background-color: #E5E7EB"] {
+  background-color: #334155 !important;
+}
+
+/* ---- Smooth transitions for dark mode switching ----
+   NOTE: We do NOT set transition shorthand here because it
+   overrides existing transform/opacity transitions and kills
+   animations (sidebar slide, modal fade, etc.).
+   Instead we use transition-property additions only. ---- */
+
+/* ============================================
+   MAIL PAGE - Custom hex color overrides
+   Mail page uses unique hex colors for its Gmail-like UI
+   ============================================ */
+html.dark .bg-\[\#f6f8fc\],
+html.dark .bg-\[\#F6F8FC\] {
+  background-color: #0F172A !important;
+}
+
+html.dark .bg-\[\#eaf1fb\],
+html.dark .bg-\[\#EAF1FB\] {
+  background-color: #1E293B !important;
+}
+
+html.dark .hover\:bg-\[\#dde3ea\]:hover,
+html.dark .hover\:bg-\[\#DDE3EA\]:hover {
+  background-color: #334155 !important;
+}
+
+html.dark .hover\:bg-\[\#e8eaed\]:hover,
+html.dark .hover\:bg-\[\#E8EAED\]:hover {
+  background-color: #334155 !important;
+}
+
+html.dark .bg-\[\#dde3ea\] {
+  background-color: #273548 !important;
+}
+
+html.dark .bg-\[\#e8eaed\] {
+  background-color: #273548 !important;
+}
+
+/* ============================================
+   COMPREHENSIVE INLINE STYLE OVERRIDES
+   Catches inline style={ backgroundColor: '...' }
+   ============================================ */
+
+/* White and near-white inline backgrounds */
+html.dark [style*="background-color: white"],
+html.dark [style*="backgroundColor: 'white'"],
+html.dark [style*="background-color:white"],
+html.dark [style*="background: white"] {
+  background-color: #1E293B !important;
+  background: #1E293B !important;
+}
+
+html.dark [style*="background: rgba(248"],
+html.dark [style*="background: rgba(249"],
+html.dark [style*="background: rgba(255, 255, 255"],
+html.dark [style*="background:rgba(255,255,255"],
+html.dark [style*="background-color: rgba(255, 255, 255"],
+html.dark [style*="background-color:rgba(255,255,255"] {
+  background: rgba(30, 41, 59, 0.85) !important;
+  background-color: rgba(30, 41, 59, 0.85) !important;
+}
+
+/* Even more inline background catches */
+html.dark [style*="background-color: #fff"],
+html.dark [style*="background-color: #FFF"],
+html.dark [style*="background-color:#fff"],
+html.dark [style*="background-color:#FFF"] {
+  background-color: #1E293B !important;
+}
+
+html.dark [style*="background: #fff"],
+html.dark [style*="background: #FFF"],
+html.dark [style*="background:#fff"],
+html.dark [style*="background:#FFF"] {
+  background: #1E293B !important;
+}
+
+/* Gray inline backgrounds */
+html.dark [style*="background-color: #f0f0f0"],
+html.dark [style*="background-color: #F0F0F0"],
+html.dark [style*="background-color: #fafafa"],
+html.dark [style*="background-color: #FAFAFA"],
+html.dark [style*="background-color: #f5f5f5"],
+html.dark [style*="background-color: #F5F5F5"],
+html.dark [style*="background-color: #eeeeee"],
+html.dark [style*="background-color: #EEEEEE"],
+html.dark [style*="background-color: #e0e0e0"],
+html.dark [style*="background-color: #E0E0E0"] {
+  background-color: #273548 !important;
+}
+
+/* Inline text color overrides */
+html.dark [style*="color: #333"],
+html.dark [style*="color: #333333"],
+html.dark [style*="color: black"],
+html.dark [style*="color: #000"],
+html.dark [style*="color: #000000"],
+html.dark [style*="color: rgb(0, 0, 0)"],
+html.dark [style*="color: rgb(51, 51, 51)"] {
+  color: #E2E8F0 !important;
+}
+
+html.dark [style*="color: #555"],
+html.dark [style*="color: #666"],
+html.dark [style*="color: #777"],
+html.dark [style*="color: #888"],
+html.dark [style*="color: #999"],
+html.dark [style*="color: #555555"],
+html.dark [style*="color: #666666"],
+html.dark [style*="color: #777777"],
+html.dark [style*="color: #888888"],
+html.dark [style*="color: #999999"] {
+  color: #94A3B8 !important;
+}
+
+/* ============================================
+   HEROUI / NEXTUI COMPONENTS - Dark Overrides
+   Ensures all HeroUI data-slot components respect dark mode
+   ============================================ */
+
+/* HeroUI Modal */
+html.dark [data-slot="base"][role="dialog"],
+html.dark [data-slot="wrapper"] [data-slot="base"] {
+  background-color: #1E293B !important;
+  color: #E2E8F0 !important;
+}
+
+html.dark [data-slot="header"] {
+  border-color: #334155 !important;
+}
+
+html.dark [data-slot="footer"] {
+  border-color: #334155 !important;
+}
+
+html.dark [data-slot="body"] {
+  color: #CBD5E1 !important;
+}
+
+/* HeroUI Card */
+html.dark [data-slot="base"].bg-white,
+html.dark div[class*="bg-content1"] {
+  background-color: #1E293B !important;
+}
+
+/* HeroUI Input */
+html.dark [data-slot="input-wrapper"] {
+  background-color: #0F172A !important;
+  border-color: rgba(51, 65, 85, 0.5) !important;
+  outline: none !important;
+}
+
+html.dark [data-slot="input-wrapper"]:focus-within,
+html.dark [data-slot="input-wrapper"]:hover,
+html.dark [data-slot="input-wrapper"][data-focus-within="true"],
+html.dark [data-slot="input-wrapper"][data-focus="true"] {
+  outline: none !important;
+  box-shadow: none !important;
+  --tw-ring-shadow: none !important;
+  --tw-ring-color: transparent !important;
+}
+
+/* Suppress focus ring/outline on ALL HeroUI interactive elements */
+html.dark [data-focus-visible="true"],
+html.dark [data-focus="true"] {
+  outline: none !important;
+  --tw-ring-shadow: none !important;
+  --tw-ring-color: transparent !important;
+}
+
+/* HeroUI Select trigger — dark background */
+html.dark [data-slot="trigger"] {
+  background-color: #0F172A !important;
+  border-color: rgba(51, 65, 85, 0.5) !important;
+}
+
+/* HeroUI Select listbox / popover */
+html.dark [data-slot="listbox"] {
+  background-color: #1E293B !important;
+}
+
+html.dark [data-slot="input"] {
+  color: #E2E8F0 !important;
+}
+
+html.dark [data-slot="label"] {
+  color: #94A3B8 !important;
+}
+
+html.dark [data-slot="innerWrapper"] {
+  background-color: transparent !important;
+}
+
+html.dark [data-slot="helperWrapper"] {
+  color: #64748B !important;
+}
+
+/* HeroUI Dropdown/Listbox */
+html.dark [data-slot="content"][role="listbox"],
+html.dark [data-slot="listbox"],
+html.dark [role="listbox"] {
+  background-color: #1E293B !important;
+  border-color: transparent !important;
+}
+
+html.dark [data-slot="option"]:hover,
+html.dark [role="option"]:hover {
+  background-color: #334155 !important;
+}
+
+/* HeroUI Popover */
+html.dark [data-slot="content"][data-placement] {
+  background-color: #1E293B !important;
+  border-color: transparent !important;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(51, 65, 85, 0.3) !important;
+}
+
+/* HeroUI Table */
+html.dark [data-slot="th"] {
+  background-color: #0F172A !important;
+  color: #94A3B8 !important;
+}
+
+html.dark [data-slot="td"] {
+  color: #CBD5E1 !important;
+}
+
+html.dark [data-slot="tr"]:hover {
+  background-color: #273548 !important;
+}
+
+/* HeroUI Chip/Badge in dark mode */
+html.dark [data-slot="base"].bg-default-100 {
+  background-color: #334155 !important;
+}
+
+/* HeroUI Divider */
+html.dark [data-slot="divider"],
+html.dark [role="separator"] {
+  background-color: #334155 !important;
+  border-color: #334155 !important;
+}
+
+/* ============================================
+   SPECIFIC PAGE OVERRIDES
+   ============================================ */
+
+/* Meeting cards & details */
+html.dark .meeting-card,
+html.dark [class*="meeting"] .bg-white {
+  background-color: #1E293B !important;
+}
+
+/* Todo page */
+html.dark .todo-item {
+  background-color: #1E293B !important;
+  border-color: #334155 !important;
+}
+
+/* ============================================
+   HOVER STATE OVERRIDES FOR COLORED BACKGROUNDS
+   ============================================ */
+html.dark .hover\:bg-blue-50:hover {
+  background-color: rgba(59, 130, 246, 0.18) !important;
+}
+
+html.dark .hover\:bg-green-50:hover {
+  background-color: rgba(16, 185, 129, 0.18) !important;
+}
+
+html.dark .hover\:bg-red-50:hover {
+  background-color: rgba(239, 68, 68, 0.18) !important;
+}
+
+html.dark .hover\:bg-yellow-50:hover {
+  background-color: rgba(245, 158, 11, 0.18) !important;
+}
+
+html.dark .hover\:bg-purple-50:hover {
+  background-color: rgba(139, 92, 246, 0.18) !important;
+}
+
+html.dark .hover\:bg-orange-50:hover {
+  background-color: rgba(249, 115, 22, 0.18) !important;
+}
+
+html.dark .hover\:bg-blue-100:hover {
+  background-color: rgba(59, 130, 246, 0.25) !important;
+}
+
+html.dark .hover\:bg-green-100:hover {
+  background-color: rgba(16, 185, 129, 0.25) !important;
+}
+
+html.dark .hover\:bg-red-100:hover {
+  background-color: rgba(239, 68, 68, 0.25) !important;
+}
+
+html.dark .hover\:bg-white\/60:hover {
+  background-color: rgba(30, 41, 59, 0.6) !important;
+}
+
+/* ============================================
+   ADDITIONAL UTILITY CLASS OVERRIDES
+   ============================================ */
+
+/* from-* gradient stops */
+html.dark .from-white {
+  --tw-gradient-from: #1E293B !important;
+}
+
+html.dark .to-white {
+  --tw-gradient-to: #1E293B !important;
+}
+
+html.dark .from-gray-50 {
+  --tw-gradient-from: #0F172A !important;
+}
+
+html.dark .from-gray-100 {
+  --tw-gradient-from: #1E293B !important;
+}
+
+html.dark .to-gray-50 {
+  --tw-gradient-to: #0F172A !important;
+}
+
+/* Colored gradient stops */
+html.dark .from-blue-50 {
+  --tw-gradient-from: rgba(59, 130, 246, 0.12) !important;
+}
+
+html.dark .to-blue-50 {
+  --tw-gradient-to: rgba(59, 130, 246, 0.12) !important;
+}
+
+html.dark .from-green-50 {
+  --tw-gradient-from: rgba(16, 185, 129, 0.12) !important;
+}
+
+html.dark .to-green-50 {
+  --tw-gradient-to: rgba(16, 185, 129, 0.12) !important;
+}
+
+html.dark .from-purple-50 {
+  --tw-gradient-from: rgba(139, 92, 246, 0.12) !important;
+}
+
+html.dark .to-purple-50 {
+  --tw-gradient-to: rgba(139, 92, 246, 0.12) !important;
+}
+
+html.dark .from-indigo-50 {
+  --tw-gradient-from: rgba(99, 102, 241, 0.12) !important;
+}
+
+html.dark .to-indigo-50 {
+  --tw-gradient-to: rgba(99, 102, 241, 0.12) !important;
+}
+
+html.dark .from-red-50 {
+  --tw-gradient-from: rgba(239, 68, 68, 0.12) !important;
+}
+
+html.dark .to-red-50 {
+  --tw-gradient-to: rgba(239, 68, 68, 0.12) !important;
+}
+
+html.dark .from-yellow-50 {
+  --tw-gradient-from: rgba(245, 158, 11, 0.12) !important;
+}
+
+html.dark .to-yellow-50 {
+  --tw-gradient-to: rgba(245, 158, 11, 0.12) !important;
+}
+
+html.dark .from-orange-50 {
+  --tw-gradient-from: rgba(249, 115, 22, 0.12) !important;
+}
+
+html.dark .to-orange-50 {
+  --tw-gradient-to: rgba(249, 115, 22, 0.12) !important;
+}
+
+html.dark .from-violet-50 {
+  --tw-gradient-from: rgba(139, 92, 246, 0.12) !important;
+}
+
+html.dark .to-violet-50 {
+  --tw-gradient-to: rgba(139, 92, 246, 0.12) !important;
+}
+
+/* Emerald gradients (profile page) */
+html.dark .from-emerald-50 {
+  --tw-gradient-from: rgba(16, 185, 129, 0.12) !important;
+}
+html.dark .to-emerald-50 {
+  --tw-gradient-to: rgba(16, 185, 129, 0.12) !important;
+}
+
+/* Amber gradients (profile page) */
+html.dark .from-amber-50 {
+  --tw-gradient-from: rgba(245, 158, 11, 0.12) !important;
+}
+html.dark .to-amber-50 {
+  --tw-gradient-to: rgba(245, 158, 11, 0.12) !important;
+}
+
+/* bg-white/X opacity variants */
+html.dark .bg-white\/50,
+html.dark .bg-white\/60,
+html.dark .bg-white\/70,
+html.dark .bg-white\/80,
+html.dark .bg-white\/90,
+html.dark .bg-white\/95 {
+  background-color: rgba(30, 41, 59, 0.85) !important;
+}
+
+html.dark .bg-gray-50\/50 {
+  background-color: rgba(15, 23, 42, 0.5) !important;
+}
+
+/* ============================================
+   COMPREHENSIVE BORDER REMOVAL FOR DARK MODE
+   Cards should use background elevation, not borders.
+   ============================================ */
+
+/* Generic border class → very subtle in dark mode (not invisible) */
+html.dark .border:not(table):not(input):not(select):not(textarea):not([data-slot="input-wrapper"]) {
+  border-color: rgba(51, 65, 85, 0.3) !important;
+}
+
+/* Specific border utilities that should be invisible on cards */
+html.dark .border-gray-100\/50,
+html.dark .border-gray-50,
+html.dark .border-slate-100,
+html.dark .border-white,
+html.dark .border-white\/10,
+html.dark .border-white\/20 {
+  border-color: transparent !important;
+}
+
+/* HeroUI semantic borders — transparent in dark */
+html.dark .border-default-100,
+html.dark .border-default-200,
+html.dark .border-default-50,
+html.dark .border-content1,
+html.dark .border-content2 {
+  border-color: transparent !important;
+}
+
+html.dark .border-success-100,
+html.dark .border-success-200,
+html.dark .border-danger-100,
+html.dark .border-danger-200,
+html.dark .border-primary-100,
+html.dark .border-primary-200,
+html.dark .border-secondary-100,
+html.dark .border-secondary-200,
+html.dark .border-warning-100,
+html.dark .border-warning-200 {
+  border-color: transparent !important;
+}
+
+/* Keep divider borders subtly visible */
+html.dark .border-divider,
+html.dark [data-slot="divider"],
+html.dark .border-b.border-divider,
+html.dark .border-t.border-divider {
+  border-color: rgba(51, 65, 85, 0.5) !important;
+}
+
+/* Table / list borders should be subtle, not invisible */
+html.dark table,
+html.dark table td,
+html.dark table th,
+html.dark thead,
+html.dark tbody tr {
+  border-color: rgba(51, 65, 85, 0.4) !important;
+}
+
+/* Calendar / grid borders — subtle */
+html.dark .border-gray-200,
+html.dark .border-slate-200 {
+  border-color: rgba(51, 65, 85, 0.4) !important;
+}
+
+/* Inputs need visible but subtle borders */
+html.dark input,
+html.dark select,
+html.dark textarea {
+  border-color: rgba(51, 65, 85, 0.5) !important;
+}
+
+/* Native form inputs in modals — dark background + subtle border */
+html.dark input[type="date"],
+html.dark input[type="time"],
+html.dark input[type="text"],
+html.dark input[type="email"],
+html.dark input[type="tel"],
+html.dark input[type="number"],
+html.dark input[type="password"],
+html.dark input[type="search"],
+html.dark input[type="url"],
+html.dark select,
+html.dark textarea {
+  background-color: #0F172A !important;
+  color: #E2E8F0 !important;
+  border-color: rgba(51, 65, 85, 0.5) !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #64748B !important;
+}
+
+/* Native input focus ring in dark mode — clean, no inner outline */
+html.dark input:focus,
+html.dark select:focus,
+html.dark textarea:focus {
+  border-color: var(--color-primary-500, #3B82F6) !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+html.dark input:focus-visible,
+html.dark select:focus-visible,
+html.dark textarea:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* ============================================
+   CARD ELEVATION SYSTEM FOR DARK MODE
+   Instead of borders, use subtle background differences
+   ============================================ */
+
+/* Level 0 (page bg): #0F172A */
+/* Level 1 (cards):   #1E293B */
+/* Level 2 (hover):   #273548 */
+/* Level 3 (active):  #334155 */
+
+/* HeroUI Card component — elevated background, no border */
+html.dark [data-slot="base"].bg-content1,
+html.dark .bg-content1 {
+  background-color: #1E293B !important;
+  border-color: transparent !important;
+}
+
+/* Nested cards / inner cards — slightly elevated */
+html.dark .bg-content1 .bg-content1,
+html.dark .bg-content1 [data-slot="base"] {
+  background-color: #273548 !important;
+}
+
+/* ============================================
+   HEROUI SEMANTIC COLOR DARK OVERRIDES
+   -50 and -100 shades are too light for dark mode
+   ============================================ */
+
+html.dark .bg-success-50 {
+  background-color: rgba(16, 185, 129, 0.15) !important;
+}
+
+html.dark .bg-danger-50 {
+  background-color: rgba(239, 68, 68, 0.15) !important;
+}
+
+html.dark .bg-warning-50 {
+  background-color: rgba(245, 158, 11, 0.15) !important;
+}
+
+html.dark .bg-secondary-50 {
+  background-color: rgba(113, 113, 122, 0.15) !important;
+}
+
+html.dark .bg-success-100 {
+  background-color: rgba(16, 185, 129, 0.22) !important;
+}
+
+html.dark .bg-danger-100 {
+  background-color: rgba(239, 68, 68, 0.22) !important;
+}
+
+html.dark .bg-warning-100 {
+  background-color: rgba(245, 158, 11, 0.22) !important;
+}
+
+html.dark .bg-secondary-100 {
+  background-color: rgba(113, 113, 122, 0.22) !important;
+}
+
+/* HeroUI primary-50/100 (differs from Tailwind blue-50) */
+html.dark .bg-primary-50 {
+  background-color: var(--color-primary-50, rgba(59, 130, 246, 0.12)) !important;
+}
+
+html.dark .bg-primary-100 {
+  background-color: var(--color-primary-100, rgba(59, 130, 246, 0.18)) !important;
+}
+
+/* ============================================
+   ATTENDANCE CALENDAR DARK MODE
+   ============================================ */
+
+html.dark .border-dashed {
+  border-color: rgba(51, 65, 85, 0.5) !important;
+}
+
+/* Shadow overrides — cards get very subtle dark glow instead of white shadow */
+html.dark .shadow-xs {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25) !important;
+}
+
+html.dark .shadow-sm {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
+}
+
+html.dark .shadow-md {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3) !important;
+}
+
+html.dark .shadow-lg {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.3) !important;
+}
+
+html.dark .shadow-xl {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Focus ring (Tailwind ring-*) suppression for inputs in dark mode */
+html.dark input:focus,
+html.dark select:focus,
+html.dark textarea:focus {
+  --tw-ring-shadow: none !important;
+  --tw-ring-offset-shadow: none !important;
+}
+
+/* ============================================
+   PROFILE PAGE — Pastel Gradient Card Overrides
+   These use from-{color}-50 to-{color}-100 gradients
+   ============================================ */
+
+/* Pink */
+html.dark .from-pink-50 {
+  --tw-gradient-from: rgba(236, 72, 153, 0.12) !important;
+}
+html.dark .to-pink-50 {
+  --tw-gradient-to: rgba(236, 72, 153, 0.12) !important;
+}
+html.dark .to-pink-100 {
+  --tw-gradient-to: rgba(236, 72, 153, 0.18) !important;
+}
+
+/* Rose */
+html.dark .from-rose-50 {
+  --tw-gradient-from: rgba(244, 63, 94, 0.12) !important;
+}
+html.dark .to-rose-50 {
+  --tw-gradient-to: rgba(244, 63, 94, 0.12) !important;
+}
+html.dark .to-rose-100 {
+  --tw-gradient-to: rgba(244, 63, 94, 0.18) !important;
+}
+
+/* Teal */
+html.dark .from-teal-50 {
+  --tw-gradient-from: rgba(20, 184, 166, 0.12) !important;
+}
+html.dark .to-teal-50 {
+  --tw-gradient-to: rgba(20, 184, 166, 0.12) !important;
+}
+html.dark .to-teal-100 {
+  --tw-gradient-to: rgba(20, 184, 166, 0.18) !important;
+}
+
+/* Cyan */
+html.dark .from-cyan-50 {
+  --tw-gradient-from: rgba(6, 182, 212, 0.12) !important;
+}
+html.dark .to-cyan-50 {
+  --tw-gradient-to: rgba(6, 182, 212, 0.12) !important;
+}
+html.dark .to-cyan-100 {
+  --tw-gradient-to: rgba(6, 182, 212, 0.18) !important;
+}
+
+/* Fuchsia */
+html.dark .from-fuchsia-50 {
+  --tw-gradient-from: rgba(192, 38, 211, 0.12) !important;
+}
+html.dark .to-fuchsia-50 {
+  --tw-gradient-to: rgba(192, 38, 211, 0.12) !important;
+}
+html.dark .to-fuchsia-100 {
+  --tw-gradient-to: rgba(192, 38, 211, 0.18) !important;
+}
+
+/* Lime */
+html.dark .from-lime-50 {
+  --tw-gradient-from: rgba(132, 204, 22, 0.12) !important;
+}
+html.dark .to-lime-50 {
+  --tw-gradient-to: rgba(132, 204, 22, 0.12) !important;
+}
+html.dark .to-lime-100 {
+  --tw-gradient-to: rgba(132, 204, 22, 0.18) !important;
+}
+
+/* -100 gradient stops for existing colors (complete the pairs) */
+html.dark .to-blue-100 {
+  --tw-gradient-to: rgba(59, 130, 246, 0.18) !important;
+}
+html.dark .to-emerald-100 {
+  --tw-gradient-to: rgba(16, 185, 129, 0.18) !important;
+}
+html.dark .to-purple-100 {
+  --tw-gradient-to: rgba(139, 92, 246, 0.18) !important;
+}
+html.dark .to-amber-100 {
+  --tw-gradient-to: rgba(245, 158, 11, 0.18) !important;
+}
+html.dark .to-indigo-100 {
+  --tw-gradient-to: rgba(99, 102, 241, 0.18) !important;
+}
+html.dark .to-violet-100 {
+  --tw-gradient-to: rgba(139, 92, 246, 0.18) !important;
+}
+
+/* Profile page text overrides */
+html.dark .text-slate-900 {
+  color: #F1F5F9 !important;
+}
+html.dark .text-blue-700 {
+  color: #93C5FD !important;
+}
+html.dark .text-emerald-700 {
+  color: #6EE7B7 !important;
+}
+html.dark .text-purple-700 {
+  color: #C4B5FD !important;
+}
+html.dark .text-pink-700 {
+  color: #F9A8D4 !important;
+}
+html.dark .text-rose-700 {
+  color: #FDA4AF !important;
+}
+html.dark .text-amber-700 {
+  color: #FCD34D !important;
+}
+html.dark .text-indigo-700 {
+  color: #A5B4FC !important;
+}
+html.dark .text-teal-700 {
+  color: #5EEAD4 !important;
+}
+html.dark .text-cyan-700 {
+  color: #67E8F9 !important;
+}
+html.dark .text-violet-700 {
+  color: #C4B5FD !important;
+}
+html.dark .text-fuchsia-700 {
+  color: #E879F9 !important;
+}
+html.dark .text-lime-700 {
+  color: #BEF264 !important;
+}
+
+/* Profile card colored borders → transparent in dark */
+html.dark .border-blue-200\/70,
+html.dark .border-emerald-200\/70,
+html.dark .border-purple-200\/70,
+html.dark .border-pink-200\/70,
+html.dark .border-rose-200\/70,
+html.dark .border-amber-200\/70,
+html.dark .border-indigo-200\/70,
+html.dark .border-teal-200\/70,
+html.dark .border-cyan-200\/70,
+html.dark .border-violet-200\/70,
+html.dark .border-fuchsia-200\/70,
+html.dark .border-lime-200\/70 {
+  border-color: transparent !important;
+}
+
+/* Profile page colored input borders — subtle in dark */
+html.dark .border-emerald-300,
+html.dark .border-purple-300,
+html.dark .border-pink-300,
+html.dark .border-rose-300,
+html.dark .border-amber-300,
+html.dark .border-indigo-300,
+html.dark .border-teal-300,
+html.dark .border-cyan-300,
+html.dark .border-violet-300,
+html.dark .border-fuchsia-300,
+html.dark .border-lime-300,
+html.dark .border-blue-300,
+html.dark .border-slate-300 {
+  border-color: rgba(51, 65, 85, 0.5) !important;
+}
+
+/* Colored text in profile card labels — lighter in dark mode */
+html.dark .text-blue-700\/70,
+html.dark .text-emerald-700\/70,
+html.dark .text-purple-700\/70,
+html.dark .text-pink-700\/70,
+html.dark .text-rose-700\/70,
+html.dark .text-amber-700\/70 {
+  opacity: 0.85 !important;
+}
+
+/* ============================================
+   LANYARD ID CARD — Dark Mode Overrides
+   ============================================ */
+
+/* Card face — dark background + dark shadow */
+html.dark .card-face {
+  box-shadow:
+    0 25px 50px -12px rgba(0, 0, 0, 0.5),
+    0 12px 24px -8px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(51, 65, 85, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+}
+
+html.dark .card-face.front,
+html.dark .card-face.back {
+  background: #1E293B !important;
+  background-image: linear-gradient(165deg, #1E293B 0%, #1a2536 40%, #162032 100%) !important;
+}
+
+/* Decorative overlay — darker */
+html.dark .card-face::before {
+  background:
+    radial-gradient(circle at 0% 0%, rgba(51, 65, 85, 0.3) 0%, transparent 50%),
+    radial-gradient(circle at 100% 100%, rgba(51, 65, 85, 0.2) 0%, transparent 50%) !important;
+}
+
+/* Top accent line — subtle in dark */
+html.dark .card-face::after {
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(71, 85, 105, 0.3) 20%,
+    rgba(71, 85, 105, 0.5) 50%,
+    rgba(71, 85, 105, 0.3) 80%,
+    transparent 100%) !important;
+}
+
+/* Card clip — dark metal */
+html.dark .card-clip {
+  background: linear-gradient(180deg, #334155 0%, #1E293B 50%, #0F172A 100%) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5) !important;
+}
+
+html.dark .card-clip::before {
+  background: linear-gradient(135deg, #475569 0%, #334155 100%) !important;
+}
+
+/* Lanyard ribbon — darker */
+html.dark .lanyard-path {
+  stroke: #475569 !important;
+}
+
+html.dark .lanyard-path-border {
+  stroke: #334155 !important;
+}
+
+/* Anchor dot */
+html.dark .anchor-dot {
+  background: linear-gradient(135deg, #334155 0%, #1E293B 100%) !important;
+}
+
+/* Company logo placeholder */
+html.dark .company-logo-small {
+  background: linear-gradient(135deg, #334155 0%, #1E293B 100%) !important;
+  color: #94A3B8 !important;
+}
+
+/* Company text */
+html.dark .company-name {
+  color: #94A3B8 !important;
+}
+
+html.dark .company-tagline {
+  color: #64748B !important;
+}
+
+/* Divider — dark */
+html.dark .lanyard-scene .divider {
+  background: linear-gradient(90deg, transparent 0%, #334155 20%, #334155 80%, transparent 100%) !important;
+}
+
+/* Avatar ring */
+html.dark .avatar-container::before {
+  background: linear-gradient(135deg, #334155 0%, #1E293B 50%, #334155 100%) !important;
+}
+
+/* Avatar */
+html.dark .avatar {
+  background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%) !important;
+  border-color: #334155 !important;
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.4),
+    inset 0 0 0 1px rgba(51, 65, 85, 0.4) !important;
+}
+
+html.dark .avatar-placeholder {
+  color: #64748B !important;
+}
+
+/* Camera button border — dark */
+html.dark .avatar-camera-btn {
+  border-color: #1E293B !important;
+}
+
+/* Employee info text */
+html.dark .emp-name {
+  color: #F1F5F9 !important;
+}
+
+html.dark .emp-designation {
+  color: #94A3B8 !important;
+}
+
+html.dark .emp-id {
+  background: linear-gradient(135deg, #0F172A 0%, #1a2536 100%) !important;
+  color: #94A3B8 !important;
+}
+
+/* Info section — dark panel */
+html.dark .info-section {
+  background: linear-gradient(135deg, #0F172A 0%, #162032 100%) !important;
+  border-color: rgba(51, 65, 85, 0.4) !important;
+}
+
+html.dark .info-row:not(:last-child) {
+  border-bottom-color: rgba(51, 65, 85, 0.4) !important;
+}
+
+html.dark .label {
+  color: #64748B !important;
+}
+
+html.dark .lanyard-scene .value {
+  color: #CBD5E1 !important;
+}
+
+/* Blood badge — dark */
+html.dark .blood-badge {
+  background: #0F172A !important;
+  border-color: rgba(51, 65, 85, 0.5) !important;
+  color: #ef4444 !important;
+}
+
+/* Footer — dark */
+html.dark .footer-row {
+  background: linear-gradient(to top, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.5) 100%) !important;
+  color: #64748B !important;
+  border-top-color: rgba(51, 65, 85, 0.4) !important;
+}
+
+/* BACK FACE */
+html.dark .back-logo-container {
+  background: linear-gradient(135deg, #0F172A 0%, #162032 100%) !important;
+  border-color: rgba(51, 65, 85, 0.4) !important;
+}
+
+html.dark .company-name-fallback {
+  color: #F1F5F9 !important;
+}
+
+html.dark .back-company-name {
+  color: #CBD5E1 !important;
+}
+
+html.dark .back-tagline {
+  color: #64748B !important;
+}
+
+html.dark .back-contact {
+  background: linear-gradient(135deg, #0F172A 0%, #162032 100%) !important;
+  border-color: rgba(51, 65, 85, 0.4) !important;
+  color: #94A3B8 !important;
+}
+
+html.dark .back-contact-icon {
+  color: #64748B !important;
+}
+
+html.dark .back-footer {
+  background: linear-gradient(to top, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.5) 100%) !important;
+  color: #64748B !important;
+  border-top-color: rgba(51, 65, 85, 0.4) !important;
+}
+
+html.dark .back-footer span {
+  color: #94A3B8 !important;
+}
+
+html.dark .helper-text {
+  color: #64748B !important;
+  text-shadow: none !important;
+}
+
+html.dark .helper-text strong {
+  color: #94A3B8 !important;
+}
+
+/* Card shine overlay — subtle in dark */
+html.dark .card-shine {
+  background: linear-gradient(105deg,
+    transparent 40%,
+    rgba(255, 255, 255, 0.05) 45%,
+    rgba(255, 255, 255, 0.12) 50%,
+    rgba(255, 255, 255, 0.05) 55%,
+    transparent 60%) !important;
+}
+
+/* Talio fallback logo */
+html.dark .back-logo.talio-fallback {
+  background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%) !important;
+}

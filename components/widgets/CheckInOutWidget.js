@@ -58,12 +58,12 @@ export default function CheckInOutWidget({
 
   return (
     <Card
-      className="relative shadow-xl overflow-hidden h-full bg-gradient-to-br from-primary-500 via-primary-600 to-secondary-600"
+      className="relative shadow-xl overflow-hidden h-full bg-gradient-to-br from-primary-500 via-primary-600 to-secondary-600 dark:from-[#0F172A] dark:via-[#162644] dark:to-[#1a2744]"
       radius="lg"
     >
       {/* Decorative elements */}
-      <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
-      <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/10 rounded-full translate-y-1/2 -translate-x-1/2 blur-2xl" />
+      <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 dark:bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
+      <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/10 dark:bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2 blur-2xl" />
 
       <CardBody className="p-5 sm:p-6 text-white h-full flex flex-col justify-between relative z-10">
         {/* Profile Row */}
@@ -95,7 +95,7 @@ export default function CheckInOutWidget({
               startContent={
                 <StatusIcon className={`w-3 h-3 ${status.pulse ? 'animate-pulse' : ''}`} />
               }
-              className="mb-2 bg-white/90 backdrop-blur-sm"
+              className="mb-2 bg-white/90 dark:bg-white/10 backdrop-blur-sm"
               classNames={{
                 content: "font-semibold text-xs",
               }}
@@ -149,8 +149,8 @@ export default function CheckInOutWidget({
             startContent={!attendanceLoading && <FaSignOutAlt className="w-4 h-4" />}
             className={`flex-1 font-bold transition-all shadow-lg ${
               attendanceLoading || !todayAttendance || !todayAttendance.checkIn || todayAttendance.checkOut
-                ? 'bg-gray-300 text-gray-400 cursor-not-allowed'
-                : 'bg-white text-primary-600 hover:bg-default-100'
+                ? 'bg-gray-300 dark:bg-gray-600 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+                : 'bg-white dark:bg-white/90 text-primary-600 hover:bg-default-100 dark:hover:bg-white'
             }`}
             variant="solid"
           >

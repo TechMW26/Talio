@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { FaTimes, FaComment, FaTasks, FaBullhorn, FaBell } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
+import { useTheme } from '@/contexts/ThemeContext'
 
 export default function InAppNotification({ notification, onClose }) {
   const [isVisible, setIsVisible] = useState(false)
@@ -11,6 +12,7 @@ export default function InAppNotification({ notification, onClose }) {
   const timersRef = useRef([])
   const router = useRouter()
   const { openChat, openWidget } = useChatWidget()
+  const { isDarkMode } = useTheme()
 
   const clearAllTimers = useCallback(() => {
     timersRef.current.forEach(timer => clearTimeout(timer))
@@ -153,8 +155,8 @@ export default function InAppNotification({ notification, onClose }) {
       case 'message':
         return {
           icon: <FaComment className="w-5 h-5" />,
-          bgColor: '#EFF6FF',
-          iconColor: '#2563EB',
+          bgColor: isDarkMode ? 'rgba(59, 130, 246, 0.15)' : '#EFF6FF',
+          iconColor: isDarkMode ? '#60A5FA' : '#2563EB',
           progressColor: '#3B82F6'
         }
       case 'task_assigned':
@@ -162,22 +164,22 @@ export default function InAppNotification({ notification, onClose }) {
       case 'task_completed':
         return {
           icon: <FaTasks className="w-5 h-5" />,
-          bgColor: '#ECFDF5',
-          iconColor: '#059669',
+          bgColor: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5',
+          iconColor: isDarkMode ? '#34D399' : '#059669',
           progressColor: '#10B981'
         }
       case 'announcement':
         return {
           icon: <FaBullhorn className="w-5 h-5" />,
-          bgColor: '#FFF7ED',
-          iconColor: '#EA580C',
+          bgColor: isDarkMode ? 'rgba(249, 115, 22, 0.15)' : '#FFF7ED',
+          iconColor: isDarkMode ? '#FB923C' : '#EA580C',
           progressColor: '#F97316'
         }
       default:
         return {
           icon: <FaBell className="w-5 h-5" />,
-          bgColor: '#EFF6FF',
-          iconColor: '#2563EB',
+          bgColor: isDarkMode ? 'rgba(59, 130, 246, 0.15)' : '#EFF6FF',
+          iconColor: isDarkMode ? '#60A5FA' : '#2563EB',
           progressColor: '#3B82F6'
         }
     }
@@ -187,7 +189,7 @@ export default function InAppNotification({ notification, onClose }) {
 
   return (
     <div
-      className={`max-w-sm w-full bg-white rounded-xl shadow-2xl border overflow-hidden transition-all duration-300 transform ${
+      className={`max-w-sm w-full rounded-xl shadow-2xl border overflow-hidden transition-all duration-300 transform ${
         isVisible ? 'translate-x-0 opacity-100 scale-100' : 'translate-x-full opacity-0 scale-95'
       } ${notification.url ? 'cursor-pointer hover:shadow-3xl active:scale-95' : ''}`}
       onClick={handleClick}
@@ -200,6 +202,7 @@ export default function InAppNotification({ notification, onClose }) {
         }
       }}
       style={{
+        backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
         borderColor: progressColor,
         borderWidth: '2px',
         pointerEvents: 'auto'
@@ -227,7 +230,7 @@ export default function InAppNotification({ notification, onClose }) {
           {/* Content */}
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
-              <h4 className="text-sm font-bold text-gray-900 line-clamp-1">
+              <h4 className="text-sm font-bold line-clamp-1" style={{ color: isDarkMode ? '#F1F5F9' : '#111827' }}>
                 {notification.title}
               </h4>
               <button
@@ -235,13 +238,14 @@ export default function InAppNotification({ notification, onClose }) {
                   e.stopPropagation()
                   handleClose()
                 }}
-                className="flex-shrink-0 text-gray-400 hover:text-gray-700 transition-colors p-1 rounded-full hover:bg-gray-100"
+                className="flex-shrink-0 transition-colors p-1 rounded-full"
+                style={{ color: isDarkMode ? '#64748B' : '#9CA3AF' }}
                 aria-label="Close notification"
               >
                 <FaTimes className="w-3.5 h-3.5" />
               </button>
             </div>
-            <p className="text-sm text-gray-600 mt-1.5 line-clamp-2 leading-relaxed">
+            <p className="text-sm mt-1.5 line-clamp-2 leading-relaxed" style={{ color: isDarkMode ? '#94A3B8' : '#4B5563' }}>
               {notification.message}
             </p>
             {notification.url && (
@@ -254,7 +258,7 @@ export default function InAppNotification({ notification, onClose }) {
       </div>
 
       {/* Animated progress bar */}
-      <div className="h-1 bg-gray-100">
+      <div className="h-1" style={{ backgroundColor: isDarkMode ? '#334155' : '#F3F4F6' }}>
         <div
           className="h-full transition-all duration-[5000ms] ease-linear"
           style={{

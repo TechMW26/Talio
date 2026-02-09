@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { Select, SelectItem, Button } from '@heroui/react'
-import { FaBuilding, FaBriefcase, FaCalendarAlt, FaUmbrellaBeach, FaCog, FaMapMarkerAlt, FaClock, FaImage, FaPalette, FaCheck, FaBell, FaMoneyBillWave, FaArrowLeft } from 'react-icons/fa'
+import { FaBuilding, FaBriefcase, FaCalendarAlt, FaUmbrellaBeach, FaCog, FaMapMarkerAlt, FaClock, FaImage, FaPalette, FaCheck, FaBell, FaMoneyBillWave, FaArrowLeft, FaSun, FaMoon, FaDesktop } from 'react-icons/fa'
 import { HiOutlineOfficeBuilding, HiOutlineCog, HiOutlineArrowLeft } from 'react-icons/hi2'
 import { toast } from '@/utils/toast'
 import dynamic from 'next/dynamic'
@@ -2104,7 +2104,7 @@ function GeneralTab() {
 }
 
 function PersonalizationTab() {
-  const { currentTheme, changeTheme, themes } = useTheme()
+  const { currentTheme, changeTheme, themes, isDarkMode, darkModePref, setDarkModePreference } = useTheme()
 
   const themeColors = {
     default: {
@@ -2147,8 +2147,62 @@ function PersonalizationTab() {
       </h2>
       <p className="text-gray-600 mb-6">Customize the look and feel of your dashboard</p>
 
+      {/* Appearance Mode Selector */}
+      <div className="rounded-xl border p-5 mb-6" style={{ 
+        backgroundColor: 'var(--color-bg-card)', 
+        borderColor: isDarkMode ? '#334155' : '#E5E7EB' 
+      }}>
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-4">
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center"
+              style={{
+                backgroundColor: isDarkMode ? '#334155' : '#F1F5F9',
+                color: isDarkMode ? '#F59E0B' : '#F59E0B',
+              }}
+            >
+              {darkModePref === 'auto' ? <FaDesktop className="text-lg" /> : isDarkMode ? <FaMoon className="text-lg" /> : <FaSun className="text-lg" />}
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold" style={{ color: isDarkMode ? '#F1F5F9' : '#111827' }}>Appearance</h3>
+              <p className="text-sm text-gray-500">
+                {darkModePref === 'auto'
+                  ? 'Automatically matches your device settings'
+                  : isDarkMode
+                    ? 'Dark mode is always on'
+                    : 'Light mode is always on'}
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-3 gap-2 p-1 rounded-xl" style={{ backgroundColor: isDarkMode ? '#0F172A' : '#F1F5F9' }}>
+            {[
+              { key: 'auto', label: 'Auto', icon: <FaDesktop className="text-sm" /> },
+              { key: 'light', label: 'Light', icon: <FaSun className="text-sm" /> },
+              { key: 'dark', label: 'Dark', icon: <FaMoon className="text-sm" /> },
+            ].map((opt) => (
+              <button
+                key={opt.key}
+                onClick={() => {
+                  setDarkModePreference(opt.key)
+                  const msgs = { auto: 'Following device settings', light: 'Switched to Light Mode!', dark: 'Switched to Dark Mode!' }
+                  toast.success(msgs[opt.key], { duration: 2000 })
+                }}
+                className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${darkModePref === opt.key ? 'shadow-md' : ''}`}
+                style={{
+                  backgroundColor: darkModePref === opt.key ? (isDarkMode ? '#334155' : '#FFFFFF') : 'transparent',
+                  color: darkModePref === opt.key ? (isDarkMode ? '#F1F5F9' : '#111827') : (isDarkMode ? '#94A3B8' : '#6B7280'),
+                }}
+              >
+                {opt.icon}
+                <span>{opt.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
       <div className="rounded-lg" style={{ backgroundColor: 'var(--color-bg-card)' }}>
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Choose Your Theme</h3>
+        <h3 className="text-lg font-semibold mb-4" style={{ color: isDarkMode ? '#F1F5F9' : '#111827' }}>Choose Your Theme</h3>
         <p className="text-sm text-gray-600 mb-6">Select a color theme that suits your preference. The theme will be applied across the entire application.</p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -2169,8 +2223,8 @@ function PersonalizationTab() {
                 }}
                 className="relative p-6 rounded-xl border-2 transition-all hover:shadow-lg"
                 style={{
-                  borderColor: isActive ? colors.border : '#E5E7EB',
-                  backgroundColor: isActive ? colors.bgLight : '#FFFFFF',
+                  borderColor: isActive ? colors.border : (isDarkMode ? '#334155' : '#E5E7EB'),
+                  backgroundColor: isActive ? (isDarkMode ? '#334155' : colors.bgLight) : (isDarkMode ? '#1E293B' : '#FFFFFF'),
                 }}
               >
                 {/* Active Indicator */}

@@ -330,7 +330,6 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
           <aside
             className={`
               fixed inset-y-0 left-0 z-[60]
-              text-gray-800
               flex flex-col h-screen shadow-[0_6px_24px_rgba(15,23,42,0.08)]
               ${isOpen ? 'translate-x-0' : '-translate-x-full'}
               w-full max-w-[280px]
@@ -351,7 +350,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                 <button
                   onClick={() => setIsOpen(false)}
                   className="hover:opacity-70 focus:outline-none"
-                  style={{ color: '#374151' }}
+                  style={{ color: 'var(--color-text-primary)' }}
                 >
                   <HiOutlineXMark className="w-5 h-5" />
                 </button>
@@ -372,7 +371,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                           className="w-full flex items-center text-left rounded-xl transition-all duration-200 group relative justify-between px-4 py-3"
                           style={{
                             backgroundColor: expandedMenus[item.name] ? 'var(--color-bg-hover)' : 'transparent',
-                            color: '#111827'
+                            color: 'var(--color-text-primary)'
                           }}
                         >
                           <div className="flex items-center gap-3 flex-1">
@@ -410,7 +409,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                                 className="w-full text-left flex items-center justify-between px-3 py-2 text-sm rounded-lg transition-all duration-200 cursor-pointer"
                                 style={{
                                   backgroundColor: pathname === subItem.path ? 'var(--color-primary-500)' : 'transparent',
-                                  color: pathname === subItem.path ? 'white' : '#6B7280'
+                                  color: pathname === subItem.path ? 'white' : 'var(--color-text-secondary)'
                                 }}
                               >
                                 <span>{subItem.name}</span>
@@ -429,7 +428,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                         className="w-full flex items-center text-left rounded-xl transition-all duration-200 group cursor-pointer relative px-4 py-3"
                         style={{
                           backgroundColor: 'transparent',
-                          color: '#111827'
+                          color: 'var(--color-text-primary)'
                         }}
                       >
                         <div className="flex items-center gap-3 flex-1">
@@ -455,7 +454,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                         className="w-full flex items-center text-left rounded-xl transition-all duration-200 group cursor-pointer relative px-4 py-3"
                         style={{
                           backgroundColor: isActive ? 'var(--color-primary-500)' : 'transparent',
-                          color: isActive ? 'white' : '#111827'
+                          color: isActive ? 'white' : 'var(--color-text-primary)'
                         }}
                       >
                         <div className="flex items-center gap-3 flex-1">
@@ -492,8 +491,8 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                 {/* Chat Button */}
                 <button
                   onClick={() => toggleWidget('sidebar')}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl transition-all duration-200 hover:bg-white/50 relative"
-                  style={{ color: '#111827' }}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl transition-all duration-200 hover:bg-white/50 dark:hover:bg-white/10 relative"
+                  style={{ color: 'var(--color-text-primary)' }}
                 >
                   <HiOutlineChatBubbleLeftRight
                     className="w-5 h-5"
@@ -509,8 +508,8 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                 <Link
                   href="/dashboard/settings"
                   onClick={() => handleLinkClick('/dashboard/settings')}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl transition-all duration-200 hover:bg-white/50"
-                  style={{ color: '#111827' }}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl transition-all duration-200 hover:bg-white/50 dark:hover:bg-white/10"
+                  style={{ color: 'var(--color-text-primary)' }}
                 >
                   <HiOutlineCog6Tooth
                     className="w-5 h-5"
@@ -522,8 +521,8 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                 {/* Logout Button */}
                 <button
                   onClick={() => setShowLogoutConfirm(true)}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl transition-all duration-200 hover:bg-red-50"
-                  style={{ color: '#111827' }}
+                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl transition-all duration-200 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  style={{ color: 'var(--color-text-primary)' }}
                 >
                   <HiOutlineArrowRightOnRectangle
                     className="w-5 h-5"

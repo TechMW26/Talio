@@ -935,17 +935,17 @@ export default function UnifiedDashboard({ user: userProp }) {
     // Loading skeleton
     if (loading) {
         return (
-            <div className="min-h-screen bg-gray-50 p-4 sm:p-6">
+            <div className="min-h-screen bg-gray-50 dark:bg-[#0F172A] p-4 sm:p-6">
                 <div className="animate-pulse space-y-4">
-                    <div className="h-16 bg-white rounded-xl shadow-sm"></div>
+                    <div className="h-16 bg-white dark:bg-[#1E293B] rounded-xl shadow-sm dark:shadow-none"></div>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         {[1, 2, 3, 4].map(i => (
-                            <div key={i} className="h-24 bg-white rounded-xl shadow-sm"></div>
+                            <div key={i} className="h-24 bg-white dark:bg-[#1E293B] rounded-xl shadow-sm dark:shadow-none"></div>
                         ))}
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {[1, 2, 3, 4, 5, 6].map(i => (
-                            <div key={i} className="h-48 bg-white rounded-xl shadow-sm"></div>
+                            <div key={i} className="h-48 bg-white dark:bg-[#1E293B] rounded-xl shadow-sm dark:shadow-none"></div>
                         ))}
                     </div>
                 </div>

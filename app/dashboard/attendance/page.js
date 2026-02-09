@@ -350,11 +350,19 @@ export default function AttendancePage() {
 
   const handleMissingEntryRequest = async () => {
     // Use selectedDayForMissingEntry if available, otherwise use form date
-    const dateToUse = selectedDayForMissingEntry || missingEntryForm.date
+    const rawDate = selectedDayForMissingEntry || missingEntryForm.date
 
-    if (!dateToUse || !missingEntryForm.reason) {
+    if (!rawDate || !missingEntryForm.reason) {
       toast.error('Please provide date and reason')
       return
+    }
+
+    // Ensure dateToUse is a YYYY-MM-DD string (selectedDayForMissingEntry is a Date object)
+    let dateToUse
+    if (rawDate instanceof Date) {
+      dateToUse = `${rawDate.getFullYear()}-${String(rawDate.getMonth() + 1).padStart(2, '0')}-${String(rawDate.getDate()).padStart(2, '0')}`
+    } else {
+      dateToUse = rawDate
     }
 
     setSubmittingCorrection(true)
@@ -1650,7 +1658,7 @@ export default function AttendancePage() {
                   selectedKeys={[correctionForm.correctionType]}
                   onChange={(e) => setCorrectionForm({ ...correctionForm, correctionType: e.target.value })}
                   aria-label="Correction Type"
-                  classNames={{ trigger: "bg-white" }}
+                  classNames={{ trigger: "bg-white dark:bg-slate-900" }}
                 >
                   <SelectItem key="check-in">Check-In Time</SelectItem>
                   <SelectItem key="check-out">Check-Out Time</SelectItem>
@@ -1666,7 +1674,7 @@ export default function AttendancePage() {
                       type="time"
                       value={correctionForm.requestedCheckIn}
                       onChange={(e) => setCorrectionForm({ ...correctionForm, requestedCheckIn: e.target.value })}
-                      className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="w-full px-3 py-2 border border-default-300 rounded-lg bg-white dark:bg-slate-900 dark:text-slate-100 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                   </div>
                 )}
@@ -1678,7 +1686,7 @@ export default function AttendancePage() {
                       type="time"
                       value={correctionForm.requestedCheckOut}
                       onChange={(e) => setCorrectionForm({ ...correctionForm, requestedCheckOut: e.target.value })}
-                      className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      className="w-full px-3 py-2 border border-default-300 rounded-lg bg-white dark:bg-slate-900 dark:text-slate-100 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-primary"
                     />
                   </div>
                 )}
@@ -1690,7 +1698,7 @@ export default function AttendancePage() {
                       selectedKeys={correctionForm.requestedStatus ? [correctionForm.requestedStatus] : []}
                       onChange={(e) => setCorrectionForm({ ...correctionForm, requestedStatus: e.target.value })}
                       aria-label="Requested Status"
-                      classNames={{ trigger: "bg-white" }}
+                      classNames={{ trigger: "bg-white dark:bg-slate-900" }}
                     >
                       <SelectItem key="present">Present</SelectItem>
                       <SelectItem key="half-day">Half Day</SelectItem>
@@ -1706,7 +1714,7 @@ export default function AttendancePage() {
                     onChange={(e) => setCorrectionForm({ ...correctionForm, reason: e.target.value })}
                     placeholder="Please explain why this correction is needed..."
                     rows={3}
-                    className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                    className="w-full px-3 py-2 border border-default-300 rounded-lg bg-white dark:bg-slate-900 dark:text-slate-100 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                   />
                 </div>
               </div>
@@ -1771,7 +1779,7 @@ export default function AttendancePage() {
                     value={missingEntryForm.date}
                     onChange={(e) => setMissingEntryForm({ ...missingEntryForm, date: e.target.value })}
                     max={formatDateLocal(new Date())}
-                    className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                    className="w-full px-3 py-2 border border-default-300 rounded-lg bg-white dark:bg-slate-900 dark:text-slate-100 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
               )}
@@ -1782,7 +1790,7 @@ export default function AttendancePage() {
                   type="time"
                   value={missingEntryForm.checkIn}
                   onChange={(e) => setMissingEntryForm({ ...missingEntryForm, checkIn: e.target.value })}
-                  className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-3 py-2 border border-default-300 rounded-lg bg-white dark:bg-slate-900 dark:text-slate-100 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
 
@@ -1792,7 +1800,7 @@ export default function AttendancePage() {
                   type="time"
                   value={missingEntryForm.checkOut}
                   onChange={(e) => setMissingEntryForm({ ...missingEntryForm, checkOut: e.target.value })}
-                  className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="w-full px-3 py-2 border border-default-300 rounded-lg bg-white dark:bg-slate-900 dark:text-slate-100 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
 
@@ -1803,7 +1811,7 @@ export default function AttendancePage() {
                   onChange={(e) => setMissingEntryForm({ ...missingEntryForm, reason: e.target.value })}
                   placeholder="Why did you miss clocking in/out?"
                   rows={3}
-                  className="w-full px-3 py-2 border border-default-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                  className="w-full px-3 py-2 border border-default-300 rounded-lg bg-white dark:bg-slate-900 dark:text-slate-100 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-primary resize-none"
                 />
               </div>
             </div>

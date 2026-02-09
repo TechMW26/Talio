@@ -375,7 +375,7 @@ export default function DashboardLayout({ children }) {
                 <Header toggleSidebar={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
 
                 {/* Main Content Area - Scrollable */}
-                <main className={`z-0 flex-1 overflow-y-auto ${isChatPage ? 'bg-white md:bg-transparent' : ''}`}>
+                <main className={`z-0 flex-1 overflow-y-auto ${isChatPage ? 'bg-white dark:bg-slate-800 md:bg-transparent' : ''}`}>
                   <div className={`min-h-full ${isChatPage ? 'sm:pb-16 px-0 md:px-4 lg:px-8' : 'px-0 sm:px-6 lg:px-8 pt-2 pb-6 sm:py-6'}`}>
                     {children}
                   </div>

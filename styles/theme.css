@@ -64,3 +64,35 @@ nav.sidebar {
               0 2px 4px -1px rgba(var(--color-primary-500-rgb), 0.06) !important;
 }
 
+/* ============================================
+   DARK MODE - Theme-specific overrides
+   ============================================ */
+
+/* Dark sidebar */
+html.dark .sidebar,
+html.dark .sidebar-container,
+html.dark nav.sidebar {
+  border-color: #334155 !important;
+}
+
+/* Dark active menu items */
+html.dark .menu-item.active,
+html.dark .nav-item.active {
+  background-color: var(--color-primary-900) !important;
+  color: var(--color-primary-300) !important;
+}
+
+/* Dark card borders */
+html.dark .card {
+  border-color: #334155;
+}
+
+html.dark .card-bordered {
+  border-color: #334155 !important;
+}
+
+/* Dark theme borders */
+html.dark .border-theme {
+  border-color: #334155 !important;
+}
+

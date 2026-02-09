@@ -28,6 +28,9 @@ module.exports = {
           primary: 'var(--color-text-primary, #111827)',
           secondary: 'var(--color-text-secondary, #6B7280)',
         },
+        'theme-border': {
+          DEFAULT: 'var(--color-border, #E5E7EB)',
+        },
       },
       backgroundColor: {
         'theme-main': 'var(--color-bg-main, #F3F4F6)',

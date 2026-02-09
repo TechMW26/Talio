@@ -321,10 +321,10 @@ export default function SlidingSidebar({
               setIsOpen(false)
               setActiveSubmenu(null)
             }}
-            className="p-2 rounded-lg transition-colors hover:bg-gray-100"
+            className="p-2 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-slate-700"
             title="Close sidebar"
           >
-            <HiOutlineChevronRight className="w-4 h-4 text-gray-600 rotate-180" />
+            <HiOutlineChevronRight className="w-4 h-4 text-gray-600 dark:text-gray-400 rotate-180" />
           </button>
         </div>
 
@@ -347,7 +347,7 @@ export default function SlidingSidebar({
                       className="w-full flex items-center text-left rounded-xl transition-all duration-200 group relative justify-between px-4 py-3"
                       style={{
                         backgroundColor: expandedMenus[item.name] ? 'var(--color-bg-hover)' : isTargeted ? 'var(--color-primary-50)' : 'transparent',
-                        color: '#111827'
+                        color: 'var(--color-text-primary)'
                       }}
                     >
                       <div className="flex items-center gap-3 flex-1">
@@ -385,7 +385,7 @@ export default function SlidingSidebar({
                             className="w-full text-left flex items-center justify-between px-3 py-2 text-sm rounded-lg transition-all duration-200 cursor-pointer"
                             style={{
                               backgroundColor: pathname === subItem.path ? 'var(--color-primary-500)' : 'transparent',
-                              color: pathname === subItem.path ? 'white' : '#6B7280'
+                              color: pathname === subItem.path ? 'white' : 'var(--color-text-secondary)'
                             }}
                           >
                             <span>{subItem.name}</span>
@@ -404,7 +404,7 @@ export default function SlidingSidebar({
                     className="w-full flex items-center text-left rounded-xl transition-all duration-200 group cursor-pointer relative px-4 py-3"
                     style={{
                       backgroundColor: 'transparent',
-                      color: '#111827'
+                      color: 'var(--color-text-primary)'
                     }}
                   >
                     <div className="flex items-center gap-3 flex-1">
@@ -430,7 +430,7 @@ export default function SlidingSidebar({
                     className="w-full flex items-center text-left rounded-xl transition-all duration-200 group cursor-pointer relative px-4 py-3"
                     style={{
                       backgroundColor: isActive ? 'var(--color-primary-500)' : 'transparent',
-                      color: isActive ? 'white' : '#111827'
+                      color: isActive ? 'white' : 'var(--color-text-primary)'
                     }}
                   >
                     <div className="flex items-center gap-3 flex-1">

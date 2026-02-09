@@ -6,6 +6,7 @@ import '../styles/mobile-fix.css'
 import '../styles/card-redesign.css'
 import '../styles/theme.css'
 import '../styles/ui-components.css'
+import '../styles/dark-mode.css'
 import { Toaster } from 'react-hot-toast'
 import { Providers } from '@/components/Providers'
 import ErrorPageCache from '@/components/ErrorPageCache'
@@ -58,6 +59,19 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/* Dark mode flash prevention - applies dark class before paint */}
+        <script dangerouslySetInnerHTML={{
+          __html: `
+            (function() {
+              try {
+                var pref = localStorage.getItem('app-dark-mode-pref') || 'auto';
+                var dark = pref === 'dark' || (pref === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                if (dark) document.documentElement.classList.add('dark');
+              } catch(e) {}
+            })();
+          `
+        }} />
+        
         {/* DNS Prefetch for faster external resource loading */}
         <link rel="dns-prefetch" href="https://cdn.socket.io" />
         <link rel="dns-prefetch" href="https://fonts.googleapis.com" />

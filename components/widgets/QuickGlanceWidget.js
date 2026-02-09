@@ -159,7 +159,7 @@ export default function QuickGlanceWidget({
 
       <div className="grid grid-cols-2 gap-2 flex-1">
         {/* Check In Time */}
-        <Card className="bg-success-50 border border-success-100">
+        <Card className="bg-success-50 dark:bg-success-900/30 border border-success-100 dark:border-transparent">
           <CardBody className="p-3">
             <div className="flex items-center gap-2 mb-2">
               <div className="w-6 h-6 rounded-full bg-success-100 flex items-center justify-center">
@@ -180,7 +180,7 @@ export default function QuickGlanceWidget({
         </Card>
 
         {/* Check Out Time */}
-        <Card className="bg-danger-50 border border-danger-100">
+        <Card className="bg-danger-50 dark:bg-danger-900/30 border border-danger-100 dark:border-transparent">
           <CardBody className="p-3">
             <div className="flex items-center gap-2 mb-2">
               <div className="w-6 h-6 rounded-full bg-danger-100 flex items-center justify-center">
@@ -201,7 +201,7 @@ export default function QuickGlanceWidget({
         </Card>
 
         {/* Work Hours */}
-        <Card className="bg-primary-50 border border-primary-100">
+        <Card className="bg-primary-50 dark:bg-primary-900/30 border border-primary-100 dark:border-transparent">
           <CardBody className="p-3">
             <div className="flex items-center gap-2 mb-2">
               <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center">
@@ -216,7 +216,7 @@ export default function QuickGlanceWidget({
         </Card>
 
         {/* Work Status */}
-        <Card className="bg-secondary-50 border border-secondary-100">
+        <Card className="bg-secondary-50 dark:bg-secondary-900/30 border border-secondary-100 dark:border-transparent">
           <CardBody className="p-3">
             <div className="flex items-center gap-2 mb-2">
               <div className="w-6 h-6 rounded-full bg-secondary-100 flex items-center justify-center">

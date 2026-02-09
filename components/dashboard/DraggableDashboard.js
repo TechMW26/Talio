@@ -72,8 +72,8 @@ export default function DraggableDashboard({
                         className="rounded-2xl p-6 animate-pulse"
                         style={{ backgroundColor: 'var(--color-bg-card)', minHeight: '150px' }}
                     >
-                        <div className="h-6 bg-gray-200 rounded w-1/4 mb-4"></div>
-                        <div className="h-24 bg-gray-200 rounded"></div>
+                        <div className="h-6 bg-gray-200 dark:bg-slate-600 rounded w-1/4 mb-4"></div>
+                        <div className="h-24 bg-gray-200 dark:bg-slate-600 rounded"></div>
                     </div>
                 ))}
             </div>

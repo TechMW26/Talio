@@ -115,3 +115,31 @@ button.shadow-lg,
   }
 }
 
+/* ============================================
+   DARK MODE - Card Redesign Overrides
+   ============================================ */
+
+/* Keep header and bottom bar dark in dark mode */
+html.dark header,
+html.dark header.bg-white,
+html.dark .bottom-nav,
+html.dark .bottom-nav.bg-white {
+  background-color: #1E293B !important;
+}
+
+/* Dark tooltip */
+html.dark .recharts-default-tooltip {
+  background-color: #1E293B !important;
+  border-color: #334155 !important;
+}
+
+/* Dark chart grid */
+html.dark .recharts-cartesian-grid-horizontal line,
+html.dark .recharts-cartesian-grid-vertical line {
+  stroke: #334155;
+}
+
+html.dark .recharts-text {
+  fill: #94A3B8;
+}
+

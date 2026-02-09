@@ -1570,9 +1570,9 @@ export default function MailPage() {
                   <Loader size="md" />
                 </div>
               ) : filteredEmails.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-64 text-gray-500">
-                  <MdInbox className="text-6xl mb-4 text-gray-300" />
-                  <p className="text-lg text-gray-600">No emails in {selectedFolder}</p>
+                <div className="flex flex-col items-center justify-center h-64 text-gray-500 dark:text-gray-400">
+                  <MdInbox className="text-6xl mb-4 text-gray-300 dark:text-gray-600" />
+                  <p className="text-lg text-gray-600 dark:text-gray-400">No emails in {selectedFolder}</p>
                 </div>
               ) : (
                 filteredEmails.map(email => {
@@ -1584,19 +1584,19 @@ export default function MailPage() {
                         setSelectedEmail(email);
                         if (!email.isRead) toggleRead(email);
                       }}
-                      className={`flex items-start gap-2 px-2 py-2 border-b border-gray-100 cursor-pointer group transition-colors ${isSelected
-                        ? 'bg-[#c2e7ff]'
+                      className={`flex items-start gap-2 px-2 py-2 border-b border-gray-100 dark:border-gray-700/40 cursor-pointer group transition-colors ${isSelected
+                        ? 'bg-[#c2e7ff] dark:bg-blue-500/20'
                         : selectedEmail?.messageId === email.messageId
-                          ? 'bg-[#c2dbff]'
+                          ? 'bg-[#c2dbff] dark:bg-blue-500/15'
                           : !email.isRead
-                            ? 'bg-[#f2f6fc] hover:shadow-sm'
-                            : 'hover:bg-gray-50'
+                            ? 'bg-[#f2f6fc] dark:bg-slate-800/60 hover:shadow-sm'
+                            : 'hover:bg-gray-50 dark:hover:bg-slate-700/40'
                         }`}
                     >
                       {/* Checkbox */}
                       <button
                         onClick={(e) => toggleEmailSelection(email, e)}
-                        className={`p-1.5 hover:bg-gray-200 rounded transition-opacity hidden sm:block ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                        className={`p-1.5 hover:bg-gray-200 dark:hover:bg-slate-600 rounded transition-opacity hidden sm:block ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                       >
                         {isSelected ? (
                           <MdCheckBox className="text-lg text-[#1a73e8]" />
@@ -1608,7 +1608,7 @@ export default function MailPage() {
                       {/* Star */}
                       <button
                         onClick={(e) => toggleStar(email, e)}
-                        className="p-1 hover:bg-gray-200 rounded"
+                        className="p-1 hover:bg-gray-200 dark:hover:bg-slate-600 rounded"
                       >
                         {email.isStarred ? (
                           <MdStar className="text-lg text-yellow-500" />
@@ -1625,7 +1625,7 @@ export default function MailPage() {
                       {/* Content */}
                       <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-start">
                         {/* Sender */}
-                        <div className={`sm:w-44 truncate text-sm ${!email.isRead ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>
+                        <div className={`sm:w-44 truncate text-sm ${!email.isRead ? 'font-semibold text-gray-900 dark:text-gray-100' : 'text-gray-700 dark:text-gray-300'}`}>
                           {email.from?.name || email.from?.email || '?'}
                           {/* Show account indicator when viewing all accounts */}
                           {showAllAccounts && email.accountEmail && (
@@ -1637,11 +1637,11 @@ export default function MailPage() {
 
                         {/* Subject & Snippet */}
                         <div className="flex-1 flex items-center min-w-0 gap-1">
-                          <span className={`truncate text-sm ${!email.isRead ? 'font-semibold text-gray-900' : 'text-gray-700'}`}>
+                          <span className={`truncate text-sm ${!email.isRead ? 'font-semibold text-gray-900 dark:text-gray-100' : 'text-gray-700 dark:text-gray-300'}`}>
                             {email.subject || '(no subject)'}
                           </span>
-                          <span className="text-gray-500 text-sm hidden sm:inline">-</span>
-                          <span className="text-gray-500 text-sm truncate flex-1 hidden sm:inline">
+                          <span className="text-gray-500 dark:text-gray-400 text-sm hidden sm:inline">-</span>
+                          <span className="text-gray-500 dark:text-gray-400 text-sm truncate flex-1 hidden sm:inline">
                             {email.snippet}
                           </span>
                         </div>
@@ -1651,21 +1651,21 @@ export default function MailPage() {
                       <div className="hidden sm:group-hover:flex items-center gap-0.5">
                         <button
                           onClick={(e) => archiveEmail(email, e)}
-                          className="p-2 hover:bg-gray-200 rounded"
+                          className="p-2 hover:bg-gray-200 dark:hover:bg-slate-600 rounded"
                           title="Archive"
                         >
-                          <MdArchive className="text-lg text-gray-500" />
+                          <MdArchive className="text-lg text-gray-500 dark:text-gray-400" />
                         </button>
                         <button
                           onClick={(e) => deleteEmail(email, e)}
-                          className="p-2 hover:bg-gray-200 rounded"
+                          className="p-2 hover:bg-gray-200 dark:hover:bg-slate-600 rounded"
                           title="Delete"
                         >
-                          <MdDelete className="text-lg text-gray-500" />
+                          <MdDelete className="text-lg text-gray-500 dark:text-gray-400" />
                         </button>
                         <button
                           onClick={(e) => toggleRead(email, e)}
-                          className="p-2 hover:bg-gray-200 rounded"
+                          className="p-2 hover:bg-gray-200 dark:hover:bg-slate-600 rounded"
                           title={email.isRead ? 'Mark as unread' : 'Mark as read'}
                         >
                           {email.isRead ? (
@@ -1676,7 +1676,7 @@ export default function MailPage() {
                         </button>
                         <button
                           onClick={(e) => handleSnoozeEmail(email, e)}
-                          className="p-2 hover:bg-gray-200 rounded"
+                          className="p-2 hover:bg-gray-200 dark:hover:bg-slate-600 rounded"
                           title="Snooze"
                         >
                           <MdSchedule className="text-lg text-gray-500" />
@@ -1684,7 +1684,7 @@ export default function MailPage() {
                       </div>
 
                       {/* Date */}
-                      <div className={`text-xs text-gray-500 w-16 text-right sm:group-hover:hidden ${!email.isRead ? 'font-semibold text-gray-900' : ''}`}>
+                      <div className={`text-xs text-gray-500 dark:text-gray-400 w-16 text-right sm:group-hover:hidden ${!email.isRead ? 'font-semibold text-gray-900 dark:text-gray-100' : ''}`}>
                         {formatDate(email.date)}
                       </div>
 
@@ -2091,9 +2091,9 @@ export default function MailPage() {
                 </div>
               </>
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
-                <MdInbox className="text-8xl mb-4 text-gray-200" />
-                <p className="text-lg text-gray-500">Select an email to read</p>
+              <div className="flex-1 flex flex-col items-center justify-center text-gray-400 dark:text-gray-500">
+                <MdInbox className="text-8xl mb-4 text-gray-200 dark:text-gray-600" />
+                <p className="text-lg text-gray-500 dark:text-gray-400">Select an email to read</p>
               </div>
             )}
           </div>

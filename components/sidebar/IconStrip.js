@@ -180,10 +180,10 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {} }) {
           <Tooltip content="Expand Menu" placement="right" delay={200} closeDelay={0}>
             <button
               onClick={() => onExpandClick(null)}
-              className="p-1.5 rounded-lg transition-colors hover:bg-gray-100"
+              className="p-1.5 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-slate-700"
               title="Expand sidebar"
             >
-              <HiOutlineChevronRight className="w-4 h-4 text-gray-600" />
+              <HiOutlineChevronRight className="w-4 h-4 text-gray-600 dark:text-gray-400" />
             </button>
           </Tooltip>
         </div>
@@ -206,7 +206,7 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {} }) {
                 >
                   <button
                     onClick={() => toggleWidget('sidebar')}
-                    className={`w-full flex items-center justify-center p-2.5 rounded-xl transition-all duration-200 group relative hover:bg-gray-800`}
+                    className={`w-full flex items-center justify-center p-2.5 rounded-xl transition-all duration-200 group relative hover:bg-black/10 dark:hover:bg-white/10`}
                     style={{
                       backgroundColor: 'var(--color-primary-100)',
                     }}
@@ -232,7 +232,7 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {} }) {
                 >
                   <button
                     onClick={() => onExpandClick(item.name, index)}
-                    className={`w-full flex items-center justify-center p-2.5 rounded-xl transition-all duration-200 group relative hover:bg-gray-800`}
+                    className={`w-full flex items-center justify-center p-2.5 rounded-xl transition-all duration-200 group relative hover:bg-black/10 dark:hover:bg-white/10`}
                     style={{
                       backgroundColor: isActive ? 'var(--color-primary-500)' : 'var(--color-primary-100)',
                     }}
@@ -261,7 +261,7 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {} }) {
                 <Link
                   href={item.path}
                   onClick={() => handleLinkClick(item.path)}
-                  className={`w-full flex items-center justify-center p-2.5 rounded-xl transition-all duration-200 group relative hover:bg-gray-800`}
+                  className={`w-full flex items-center justify-center p-2.5 rounded-xl transition-all duration-200 group relative hover:bg-black/10 dark:hover:bg-white/10`}
                   style={{
                     backgroundColor: isActive ? 'var(--color-primary-500)' : 'var(--color-primary-100)',
                   }}

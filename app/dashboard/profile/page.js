@@ -483,7 +483,7 @@ export default function ProfilePage() {
 
   if (loading || !user || !employee) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-slate-50">
+      <div className="fixed inset-0 flex items-center justify-center bg-slate-50 dark:bg-[#0F172A]">
         <div className="flex flex-col items-center gap-3">
           <Loader size="lg" />
         </div>
@@ -496,8 +496,8 @@ export default function ProfilePage() {
     <div className="flex items-center justify-center lg:justify-end gap-3 flex-wrap">
       <span
         className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold shadow-sm ${employee.status === 'active'
-          ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100'
-          : 'bg-amber-50 text-amber-700 ring-1 ring-amber-100'
+          ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-400 dark:ring-emerald-500/30'
+          : 'bg-amber-50 text-amber-700 ring-1 ring-amber-100 dark:bg-amber-500/15 dark:text-amber-400 dark:ring-amber-500/30'
           }`}
       >
         <span className="h-2 w-2 rounded-full mr-1.5 bg-current" />
@@ -509,7 +509,7 @@ export default function ProfilePage() {
       {!isEditing ? (
         <button
           onClick={handleEditClick}
-          className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs sm:text-sm font-semibold text-slate-800 shadow-sm hover:bg-slate-50 transition-colors"
+          className="inline-flex items-center gap-2 rounded-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-4 py-2 text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
         >
           <FaEdit className="text-xs" />
           <span>Edit Profile</span>
@@ -519,7 +519,7 @@ export default function ProfilePage() {
           <button
             onClick={handleCancelEdit}
             disabled={saving}
-            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-60"
           >
             <FaTimes className="text-xs" />
             <span>Cancel</span>
@@ -527,7 +527,7 @@ export default function ProfilePage() {
           <button
             onClick={handleSaveProfile}
             disabled={saving}
-            className="inline-flex items-center gap-1.5 rounded-full bg-slate-900 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-black disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded-full bg-slate-900 dark:bg-slate-100 px-4 py-2 text-xs font-semibold text-white dark:text-slate-900 shadow-sm hover:bg-black dark:hover:bg-white disabled:opacity-60"
           >
             <FaSave className="text-xs" />
             <span>{saving ? 'Saving…' : 'Save Changes'}</span>
@@ -649,7 +649,7 @@ export default function ProfilePage() {
     return (
       <section className={`rounded-3xl border shadow-sm p-4 sm:p-6 ${hasMismatch
         ? 'bg-red-50 border-red-200 shadow-red-900/5'
-        : 'bg-white border-slate-100 shadow-slate-900/5'
+        : 'bg-white dark:bg-[#1E293B] border-slate-100 dark:border-transparent shadow-slate-900/5 dark:shadow-black/20'
         }`}>
         {/* Section Header */}
         <div className="flex items-center justify-between mb-4">
@@ -865,8 +865,8 @@ export default function ProfilePage() {
     return (
       <div className="page-container pb-24 md:pb-6 px-2 sm:px-4 lg:px-8">
         <div className="animate-pulse space-y-4">
-          <div className="h-10 bg-gray-200 rounded w-1/4"></div>
-          <div className="h-64 bg-gray-200 rounded"></div>
+          <div className="h-10 bg-gray-200 dark:bg-slate-700 rounded w-1/4"></div>
+          <div className="h-64 bg-gray-200 dark:bg-slate-700 rounded"></div>
         </div>
       </div>
     )
@@ -940,10 +940,10 @@ export default function ProfilePage() {
             )}
 
             {/* Personal Information */}
-            <section className="bg-white rounded-3xl border border-slate-100 shadow-sm shadow-slate-900/5 p-4 sm:p-6">
+            <section className="bg-white dark:bg-[#1E293B] rounded-3xl border border-slate-100 dark:border-transparent shadow-sm shadow-slate-900/5 dark:shadow-black/20 p-4 sm:p-6">
               <div className="flex items-center justify-between mb-4 sm:mb-5">
                 <div>
-                  <h3 className="text-base sm:text-lg font-semibold text-slate-900">
+                  <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-slate-100">
                     Personal Information
                   </h3>
                   <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
@@ -1242,10 +1242,10 @@ export default function ProfilePage() {
             </section>
 
             {/* Employment Information */}
-            <section className="bg-white rounded-3xl border border-slate-100 shadow-sm shadow-slate-900/5 p-4 sm:p-6">
+            <section className="bg-white dark:bg-[#1E293B] rounded-3xl border border-slate-100 dark:border-transparent shadow-sm shadow-slate-900/5 dark:shadow-black/20 p-4 sm:p-6">
               <div className="flex items-center justify-between mb-4 sm:mb-5">
                 <div>
-                  <h3 className="text-base sm:text-lg font-semibold text-slate-900">
+                  <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-slate-100">
                     Employment Information
                   </h3>
                   <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
@@ -1320,10 +1320,10 @@ export default function ProfilePage() {
             </section>
 
             {/* Emergency Contact */}
-            <section className="bg-white rounded-3xl border border-slate-100 shadow-sm shadow-slate-900/5 p-4 sm:p-6">
+            <section className="bg-white dark:bg-[#1E293B] rounded-3xl border border-slate-100 dark:border-transparent shadow-sm shadow-slate-900/5 dark:shadow-black/20 p-4 sm:p-6">
               <div className="flex items-center justify-between mb-4 sm:mb-5">
                 <div>
-                  <h3 className="text-base sm:text-lg font-semibold text-slate-900">
+                  <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-slate-100">
                     Emergency Contact
                   </h3>
                   <p className="text-xs sm:text-sm text-slate-500 mt-0.5">

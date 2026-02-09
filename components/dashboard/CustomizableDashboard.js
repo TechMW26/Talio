@@ -102,8 +102,8 @@ export default function CustomizableDashboard({
     return (
       <div className={className}>
         <div className="flex justify-end mb-4 gap-2">
-          <div className="h-9 w-32 bg-gray-200 rounded-lg animate-pulse"></div>
-          <div className="h-9 w-32 bg-gray-200 rounded-lg animate-pulse"></div>
+          <div className="h-9 w-32 bg-gray-200 dark:bg-slate-700 rounded-lg animate-pulse"></div>
+          <div className="h-9 w-32 bg-gray-200 dark:bg-slate-700 rounded-lg animate-pulse"></div>
         </div>
         {[1, 2, 3].map((i) => (
           <div
@@ -111,8 +111,8 @@ export default function CustomizableDashboard({
             className="rounded-2xl p-6 animate-pulse"
             style={{ backgroundColor: 'var(--color-bg-card)', minHeight: '150px' }}
           >
-            <div className="h-6 bg-gray-200 rounded w-1/4 mb-4"></div>
-            <div className="h-24 bg-gray-200 rounded"></div>
+            <div className="h-6 bg-gray-200 dark:bg-slate-700 rounded w-1/4 mb-4"></div>
+            <div className="h-24 bg-gray-200 dark:bg-slate-700 rounded"></div>
           </div>
         ))}
       </div>

@@ -15,7 +15,7 @@ import { formatDesignation as formatDesignationLib, formatDepartments, getLevelN
 import { Button, Input, Avatar, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, DropdownSection, Skeleton, ScrollShadow, Modal, ModalContent, ModalBody, Divider } from '@heroui/react'
 
 export default function Header({ toggleSidebar, sidebarCollapsed }) {
-  const { theme } = useTheme()
+  const { theme, isDarkMode } = useTheme()
   const router = useRouter()
   const pathname = usePathname()
   const { unreadCount } = useUnreadMessages()
@@ -388,7 +388,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
 
   return (
     <header
-      className="h-[60.5px] bg-content1 w-full z-[50] shadow-[0_2px_6px_rgba(15,23,42,0.08)] transition-all duration-300 flex-shrink-0"
+      className="h-[60.5px] bg-content1 w-full z-[50] shadow-[0_2px_6px_rgba(15,23,42,0.08)] dark:shadow-[0_2px_6px_rgba(0,0,0,0.3)] transition-all duration-300 flex-shrink-0"
     >
       <div className="flex items-center justify-between px-1 sm:px-4 lg:px-6 h-[60.5px] lg:h-[60px]">
         {/* Left side */}
@@ -403,7 +403,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
               src="/hamburger.png"
               alt="Menu"
               className="w-5 h-5"
-              style={{ filter: 'brightness(0) saturate(100%) invert(44%) sepia(8%) saturate(400%) hue-rotate(180deg)' }}
+              style={{ filter: isDarkMode ? 'brightness(0) saturate(100%) invert(70%) sepia(8%) saturate(400%) hue-rotate(180deg)' : 'brightness(0) saturate(100%) invert(44%) sepia(8%) saturate(400%) hue-rotate(180deg)' }}
             />
           </Button>
 
@@ -499,7 +499,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
 
         {/* Center - Page Title */}
         <div className="absolute left-1/2 transform -translate-x-1/2">
-          <h1 className="text-lg font-semibold" style={{ color: window.innerWidth >= 768 ? primaryColor : '#000000' }}>{pageTitle}</h1>
+          <h1 className="text-lg font-semibold" style={{ color: window.innerWidth >= 768 ? primaryColor : 'var(--color-text-primary)' }}>{pageTitle}</h1>
         </div>
 
         {/* Right side */}
@@ -513,7 +513,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
             onMouseLeave={() => setIsMiraHovered(false)}
           >
             <MiraSphere size={55} isHovered={isMiraHovered} />
-            <span className="absolute top-full left-1/2 -translate-x-1/2 mt-1 px-2 py-1 text-xs font-medium text-white bg-default-900 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+            <span className="absolute top-full left-1/2 -translate-x-1/2 mt-1 px-2 py-1 text-xs font-medium text-white bg-gray-900 dark:bg-gray-800 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
               MIRA Cloud
             </span>
           </div>

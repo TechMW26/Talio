@@ -9,7 +9,7 @@ import { Button } from '@heroui/react'
 export default function BottomNav() {
   const pathname = usePathname()
   const router = useRouter()
-  const { currentTheme, themes } = useTheme()
+  const { currentTheme, themes, isDarkMode } = useTheme()
   const { unreadCount } = useUnreadMessages()
 
   // Get theme colors with fallbacks
@@ -98,7 +98,9 @@ export default function BottomNav() {
                   style={{
                     filter: item.active
                       ? 'brightness(0) invert(1)' // White icon for active (on colored background)
-                      : 'brightness(0) saturate(100%) invert(44%) sepia(8%) saturate(400%) hue-rotate(180deg)', // Gray icon for inactive
+                      : isDarkMode
+                        ? 'brightness(0) saturate(100%) invert(70%) sepia(8%) saturate(400%) hue-rotate(180deg)' // Lighter gray for dark mode
+                        : 'brightness(0) saturate(100%) invert(44%) sepia(8%) saturate(400%) hue-rotate(180deg)', // Gray icon for inactive
                     transition: 'filter 0.6s ease-in-out, transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)',
                     transform: item.active ? 'scale(1.1)' : 'scale(1)'
                   }}

@@ -1,8 +1,26 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 
 const ThemeContext = createContext()
+
+// Dark mode background/text overrides applied on top of any color theme
+const darkOverrides = {
+  background: {
+    main: '#0F172A',       // Slate-900
+    card: '#1E293B',       // Slate-800
+    sidebar: '#1E293B',    // Slate-800
+    hover: '#334155',      // Slate-700
+  },
+  text: {
+    primary: '#F1F5F9',    // Slate-100
+    secondary: '#94A3B8',  // Slate-400
+  },
+  accent: {
+    profile: '#0F172A',
+  },
+  border: '#334155',       // Slate-700
+}
 
 // Theme configurations
 export const themes = {
@@ -160,63 +178,135 @@ export const themes = {
 
 export function ThemeProvider({ children }) {
   const [currentTheme, setCurrentTheme] = useState('default')
+  const [isDarkMode, setIsDarkMode] = useState(false)
+  const [darkModePref, setDarkModePref] = useState('auto') // 'auto' | 'light' | 'dark'
   const [isInitialized, setIsInitialized] = useState(false)
 
-  // Load theme from localStorage on mount - NON-BLOCKING
-  useEffect(() => {
-    // Wrap in try-catch for Electron/SSR safety
-    try {
-      const savedTheme = localStorage.getItem('app-theme')
-      if (savedTheme && themes[savedTheme]) {
-        setCurrentTheme(savedTheme)
-        applyTheme(savedTheme)
-      } else {
-        applyTheme('default')
-      }
-    } catch (err) {
-      console.warn('[ThemeProvider] localStorage not available:', err)
-      applyTheme('default')
-    }
-    setIsInitialized(true)
-  }, [])
-
-  const applyTheme = (themeName) => {
+  // Apply CSS variables for the current theme + dark mode
+  const applyTheme = useCallback((themeName, darkMode) => {
     const theme = themes[themeName]
     if (!theme) return
 
-    // Wrap in try-catch for SSR/Electron safety
     try {
       if (typeof document === 'undefined') return
       
       const root = document.documentElement
 
-      // Apply primary colors
+      // Apply primary colors (same for light and dark)
       Object.keys(theme.primary).forEach(shade => {
         root.style.setProperty(`--color-primary-${shade}`, theme.primary[shade])
       })
 
-    // Apply background colors
-    root.style.setProperty('--color-bg-main', theme.background.main)
-    root.style.setProperty('--color-bg-card', theme.background.card)
-    root.style.setProperty('--color-bg-sidebar', theme.background.sidebar)
-    root.style.setProperty('--color-bg-hover', theme.background.hover)
-
-    // Apply text colors
-    root.style.setProperty('--color-text-primary', theme.text.primary)
-    root.style.setProperty('--color-text-secondary', theme.text.secondary)
-
-    // Apply accent colors
-    root.style.setProperty('--color-accent-profile', theme.accent.profile)
-    root.style.setProperty('--color-accent-gradient', theme.accent.gradient)
+      if (darkMode) {
+        // Dark mode: override background and text with dark values
+        root.style.setProperty('--color-bg-main', darkOverrides.background.main)
+        root.style.setProperty('--color-bg-card', darkOverrides.background.card)
+        root.style.setProperty('--color-bg-sidebar', darkOverrides.background.sidebar)
+        root.style.setProperty('--color-bg-hover', darkOverrides.background.hover)
+        root.style.setProperty('--color-text-primary', darkOverrides.text.primary)
+        root.style.setProperty('--color-text-secondary', darkOverrides.text.secondary)
+        root.style.setProperty('--color-accent-profile', darkOverrides.accent.profile)
+        root.style.setProperty('--color-accent-gradient', theme.accent.gradient)
+        root.style.setProperty('--color-border', darkOverrides.border)
+        // Override light primary shades to dark-appropriate tints
+        root.style.setProperty('--color-primary-50', `color-mix(in srgb, ${theme.primary[500]} 8%, #0F172A)`)
+        root.style.setProperty('--color-primary-100', `color-mix(in srgb, ${theme.primary[500]} 18%, #1E293B)`)
+        root.style.setProperty('--color-primary-200', `color-mix(in srgb, ${theme.primary[500]} 28%, #1E293B)`)
+        root.classList.add('dark')
+      } else {
+        // Light mode: use theme's own values
+        root.style.setProperty('--color-bg-main', theme.background.main)
+        root.style.setProperty('--color-bg-card', theme.background.card)
+        root.style.setProperty('--color-bg-sidebar', theme.background.sidebar)
+        root.style.setProperty('--color-bg-hover', theme.background.hover)
+        root.style.setProperty('--color-text-primary', theme.text.primary)
+        root.style.setProperty('--color-text-secondary', theme.text.secondary)
+        root.style.setProperty('--color-accent-profile', theme.accent.profile)
+        root.style.setProperty('--color-accent-gradient', theme.accent.gradient)
+        root.style.setProperty('--color-border', '#E5E7EB')
+        // Restore original primary shades
+        root.style.setProperty('--color-primary-50', theme.primary[50])
+        root.style.setProperty('--color-primary-100', theme.primary[100])
+        root.style.setProperty('--color-primary-200', theme.primary[200])
+        root.classList.remove('dark')
+      }
     } catch (err) {
       console.warn('[ThemeProvider] Failed to apply theme:', err)
     }
-  }
+  }, [])
+
+  // Resolve whether dark mode is active based on preference + system
+  const resolveDarkMode = useCallback((pref) => {
+    if (pref === 'dark') return true
+    if (pref === 'light') return false
+    // 'auto' — follow system
+    if (typeof window !== 'undefined') {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches
+    }
+    return false
+  }, [])
+
+  // Load theme + dark mode preference on mount
+  useEffect(() => {
+    try {
+      const savedTheme = localStorage.getItem('app-theme')
+      const savedPref = localStorage.getItem('app-dark-mode-pref') || 'auto'
+      
+      const themeToApply = (savedTheme && themes[savedTheme]) ? savedTheme : 'default'
+      const resolvedDark = resolveDarkMode(savedPref)
+
+      setCurrentTheme(themeToApply)
+      setDarkModePref(savedPref)
+      setIsDarkMode(resolvedDark)
+      applyTheme(themeToApply, resolvedDark)
+    } catch (err) {
+      console.warn('[ThemeProvider] localStorage not available:', err)
+      const systemDark = resolveDarkMode('auto')
+      setIsDarkMode(systemDark)
+      applyTheme('default', systemDark)
+    }
+    setIsInitialized(true)
+  }, [applyTheme, resolveDarkMode])
+
+  // Listen for system color-scheme changes when preference is 'auto'
+  useEffect(() => {
+    if (darkModePref !== 'auto') return
+    if (typeof window === 'undefined') return
+
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+
+    // Handler for live system theme changes
+    const handleChange = (e) => {
+      setIsDarkMode(e.matches)
+      applyTheme(currentTheme, e.matches)
+    }
+
+    // Re-check system theme when tab becomes visible (some browsers
+    // don't fire matchMedia 'change' while the tab is backgrounded)
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        const systemDark = mq.matches
+        setIsDarkMode(prev => {
+          if (prev !== systemDark) {
+            applyTheme(currentTheme, systemDark)
+          }
+          return systemDark
+        })
+      }
+    }
+
+    mq.addEventListener('change', handleChange)
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => {
+      mq.removeEventListener('change', handleChange)
+      document.removeEventListener('visibilitychange', handleVisibility)
+    }
+  }, [darkModePref, currentTheme, applyTheme])
 
   const changeTheme = (themeName) => {
     if (themes[themeName]) {
       setCurrentTheme(themeName)
-      applyTheme(themeName)
+      applyTheme(themeName, isDarkMode)
       try {
         localStorage.setItem('app-theme', themeName)
       } catch (err) {
@@ -225,8 +315,29 @@ export function ThemeProvider({ children }) {
     }
   }
 
+  // Set dark mode preference: 'auto' | 'light' | 'dark'
+  const setDarkModePreference = (pref) => {
+    setDarkModePref(pref)
+    const resolved = resolveDarkMode(pref)
+    setIsDarkMode(resolved)
+    applyTheme(currentTheme, resolved)
+    try {
+      localStorage.setItem('app-dark-mode-pref', pref)
+      // Keep legacy key in sync for flash-prevention script
+      localStorage.setItem('app-dark-mode', String(resolved))
+    } catch (err) {
+      console.warn('[ThemeProvider] Failed to save dark mode:', err)
+    }
+  }
+
+  // Legacy toggle — cycles auto → dark → light → auto
+  const toggleDarkMode = () => {
+    const next = darkModePref === 'auto' ? 'dark' : darkModePref === 'dark' ? 'light' : 'auto'
+    setDarkModePreference(next)
+  }
+
   return (
-    <ThemeContext.Provider value={{ currentTheme, changeTheme, themes, theme: themes[currentTheme] }}>
+    <ThemeContext.Provider value={{ currentTheme, changeTheme, themes, theme: themes[currentTheme], isDarkMode, darkModePref, setDarkModePreference, toggleDarkMode }}>
       {children}
     </ThemeContext.Provider>
   )

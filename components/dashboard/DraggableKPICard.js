@@ -47,10 +47,10 @@ export default function DraggableKPICard({
             <div
                 {...attributes}
                 {...listeners}
-                className="absolute top-2 right-2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing hover:bg-gray-100"
+                className="absolute top-2 right-2 p-1.5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing hover:bg-gray-100 dark:hover:bg-white/10"
                 onClick={(e) => e.stopPropagation()}
             >
-                <FaGripVertical className="w-4 h-4 text-gray-400" />
+                <FaGripVertical className="w-4 h-4 text-gray-400 dark:text-gray-500" />
             </div>
 
             <div className="flex items-center justify-between">

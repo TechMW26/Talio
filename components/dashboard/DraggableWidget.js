@@ -51,10 +51,10 @@ export default function DraggableWidget({
       ref={setNodeRef}
       style={sortableStyle}
       className={`
-        relative group bg-white border border-gray-100/50 h-full
+        relative group bg-white dark:bg-[#1E293B] border border-gray-100/50 dark:border-transparent h-full rounded-2xl
         ${isDragging ? '' : 'transition-all duration-500 ease-out'}
         ${entranceClasses}
-        ${isDragging ? 'ring-2 ring-primary-500 shadow-2xl' : 'shadow-sm hover:shadow-xl hover:scale-[1.01]'}
+        ${isDragging ? 'ring-2 ring-primary-500 shadow-2xl' : 'shadow-sm dark:shadow-none hover:shadow-xl dark:hover:shadow-lg dark:hover:shadow-black/20 hover:scale-[1.01]'}
         ${className}
       `}
       onMouseEnter={() => setShowControls(true)}
@@ -84,7 +84,7 @@ export default function DraggableWidget({
         <div
           {...attributes}
           {...listeners}
-          className="p-1.5 rounded-md bg-white/80 hover:bg-gray-100 cursor-grab active:cursor-grabbing transition-colors shadow-sm"
+          className="p-1.5 rounded-md bg-white/80 dark:bg-white/10 hover:bg-gray-100 dark:hover:bg-white/20 cursor-grab active:cursor-grabbing transition-colors shadow-sm"
           title="Drag to reorder"
         >
           <FaGripVertical className="w-3 h-3 text-gray-500" />
