@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 
+export const dynamic = 'force-dynamic'
+
 // GET - Get pending counts for sidebar badges
 export async function GET(request) {
   try {

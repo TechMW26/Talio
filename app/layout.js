@@ -11,23 +11,23 @@ import { Providers } from '@/components/Providers'
 import ErrorPageCache from '@/components/ErrorPageCache'
 import SplashVideo from '@/components/SplashVideo'
 
-// Primary font - Montserrat (preload for faster rendering)
+// Primary font - Montserrat
 const montserrat = Montserrat({ 
   weight: ['400', '500', '600', '700'],
   subsets: ['latin'],
   variable: '--font-montserrat',
   display: 'swap',
-  preload: true,
+  preload: false,
   adjustFontFallback: true,
 })
 
-// Secondary font - Inter (load on demand, not preloaded to avoid unused preload warning)  
+// Secondary font - Inter
 const inter = Inter({ 
   weight: ['400', '500', '600', '700'],
   subsets: ['latin'],
   variable: '--font-inter',
   display: 'swap',
-  preload: false,  // Avoid preload warning - loaded when needed
+  preload: false,
   adjustFontFallback: true,
 })
 
@@ -73,9 +73,6 @@ export default function RootLayout({ children }) {
           rel="stylesheet" 
           fetchPriority="low"
         />
-        
-        {/* Preload splash animation for immediate loading */}
-        <link rel="preload" href="/splash-animation.json" as="fetch" type="application/json" crossOrigin="anonymous" />
         
         {/* FCM Handler - For Android App Token Registration */}
         <script src="/fcm-handler.js" defer></script>

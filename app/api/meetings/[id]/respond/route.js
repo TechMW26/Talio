@@ -55,7 +55,6 @@ export async function POST(request, { params }) {
         path: 'organizer',
         select: 'firstName lastName userId email'
       })
-      .lean()
 
     if (!meeting) {
       return NextResponse.json({ success: false, message: 'Meeting not found' }, { status: 404 })
@@ -81,7 +80,7 @@ export async function POST(request, { params }) {
 
     // Find user's invitation
     const inviteeIndex = meeting.invitees.findIndex(
-      inv => inv.employee.toString() === employee._id.toString()
+      inv => inv.employee?.toString() === employee._id.toString()
     )
 
     if (inviteeIndex === -1) {

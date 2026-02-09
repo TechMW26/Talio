@@ -89,7 +89,6 @@ export const roleBasedMenus = {
         { name: 'Process Payroll', path: '/dashboard/payroll' },
         { name: 'Generate Payroll', path: '/dashboard/payroll/generate' },
         { name: 'Payslips', path: '/dashboard/payroll/payslips' },
-        { name: 'Salary Structure', path: '/dashboard/payroll/structure' },
       ]
     },
     {
@@ -209,7 +208,6 @@ export const roleBasedMenus = {
         { name: 'Process Payroll', path: '/dashboard/payroll' },
         { name: 'Generate Payroll', path: '/dashboard/payroll/generate' },
         { name: 'Payslips', path: '/dashboard/payroll/payslips' },
-        { name: 'Salary Structure', path: '/dashboard/payroll/structure' },
       ]
     },
     {

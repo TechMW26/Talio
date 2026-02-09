@@ -34,6 +34,7 @@ export default function SlidingSidebar({
   setIsOpen,
   activeSubmenu,
   setActiveSubmenu,
+  activeMenuIndex,
   sidebarCounts = {}
 }) {
   const pathname = usePathname()
@@ -47,6 +48,8 @@ export default function SlidingSidebar({
   const { toggleWidget } = useChatWidget()
   const { startNavigation } = usePageTransition()
   const sidebarRef = useRef(null)
+  const menuItemRefs = useRef({})
+  const scrollContainerRef = useRef(null)
 
   // Auto-close timer ref
   const autoCloseTimerRef = useRef(null)
@@ -94,6 +97,29 @@ export default function SlidingSidebar({
       }))
     }
   }, [activeSubmenu])
+
+  // Scroll to active menu item when sidebar opens
+  useEffect(() => {
+    if (isOpen && activeMenuIndex !== null && activeMenuIndex !== undefined) {
+      // Small delay to ensure the sidebar has finished animating
+      const timer = setTimeout(() => {
+        const menuItemElement = menuItemRefs.current[activeMenuIndex]
+        if (menuItemElement && scrollContainerRef.current) {
+          const container = scrollContainerRef.current
+          // Use getBoundingClientRect for reliable offset calculation
+          const containerRect = container.getBoundingClientRect()
+          const itemRect = menuItemElement.getBoundingClientRect()
+          const relativeTop = itemRect.top - containerRect.top + container.scrollTop
+          const scrollTop = relativeTop - (container.clientHeight / 2) + (itemRect.height / 2)
+          container.scrollTo({
+            top: Math.max(0, scrollTop),
+            behavior: 'smooth'
+          })
+        }
+      }, 150)
+      return () => clearTimeout(timer)
+    }
+  }, [isOpen, activeMenuIndex])
 
   // Load user only once on mount
   useEffect(() => {
@@ -303,11 +329,16 @@ export default function SlidingSidebar({
         </div>
 
         {/* Scrollable Menu Section */}
-        <ScrollShadow className="pt-4 pb-8 flex-1 scrollbar-hide px-3 space-y-2">
-          {menuItems.map((item) => {
+        <ScrollShadow ref={scrollContainerRef} className="pt-4 pb-8 flex-1 scrollbar-hide px-3 space-y-2">
+          {menuItems.map((item, index) => {
             const isActive = isMenuItemActive(item)
+            const isTargeted = activeSubmenu === item.name
             return (
-              <div key={item.name} className="w-full">
+              <div key={item.name} ref={el => menuItemRefs.current[index] = el} className="w-full rounded-xl transition-all duration-300" style={{
+                  boxShadow: isTargeted ? '0 0 0 2px var(--color-primary-300)' : 'none',
+                  backgroundColor: isTargeted ? 'color-mix(in srgb, var(--color-primary-100) 40%, transparent)' : 'transparent',
+                  paddingBottom: isTargeted ? '4px' : '0',
+                }}>
                 {item.submenu ? (
                   <div className="w-full">
                     <button
@@ -315,7 +346,7 @@ export default function SlidingSidebar({
                       onClick={() => toggleSubmenu(item.name)}
                       className="w-full flex items-center text-left rounded-xl transition-all duration-200 group relative justify-between px-4 py-3"
                       style={{
-                        backgroundColor: expandedMenus[item.name] ? 'var(--color-bg-hover)' : 'transparent',
+                        backgroundColor: expandedMenus[item.name] ? 'var(--color-bg-hover)' : isTargeted ? 'var(--color-primary-50)' : 'transparent',
                         color: '#111827'
                       }}
                     >

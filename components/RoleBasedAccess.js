@@ -27,7 +27,6 @@ const rolePermissions = {
     '/dashboard/leave-types',
     '/dashboard/payroll/generate',
     '/dashboard/payroll/payslips',
-    '/dashboard/payroll/structure',
     '/dashboard/performance/ratings',
     '/dashboard/performance/create',
     '/dashboard/recruitment',

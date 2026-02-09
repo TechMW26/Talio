@@ -493,7 +493,9 @@ export default function AttendancePage() {
   const fetchTodayAttendance = async (employeeId) => {
     try {
       const token = localStorage.getItem('token')
-      const today = new Date().toISOString().split('T')[0]
+      // Use local timezone date, not UTC (toISOString gives UTC which can be a day off)
+      const now = new Date()
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
       const response = await fetch(
         `/api/attendance?employeeId=${employeeId}&date=${today}`,
         {
@@ -629,11 +631,15 @@ export default function AttendancePage() {
     const todayKey = getLocalDateKey(new Date())
 
     // Create attendance lookup map
+    // Keep the most recent record for each date (array is sorted desc by date)
     const attendanceMap = {}
     attendance.forEach(record => {
       const recordDate = new Date(record.date)
       const dateKey = getLocalDateKey(recordDate)
-      attendanceMap[dateKey] = record
+      // Only set if not already set (first occurrence = most recent due to desc sort)
+      if (!attendanceMap[dateKey]) {
+        attendanceMap[dateKey] = record
+      }
     })
 
     const days = []
@@ -1298,11 +1304,16 @@ export default function AttendancePage() {
                           // Pass dayData.date for accurate timezone handling
                           openCorrectionModal(dayData.record, dayData.date)
                         } else if (dayData.isCurrentMonth && !isWeekend && !isHoliday && new Date(dayData.date) < new Date()) {
-                          // Handle missing entry click
-                          setMissingEntryForm(prev => ({
-                            ...prev,
-                            date: dayData.date.toISOString().split('T')[0]
-                          }))
+                          // Handle missing entry click - use local date to avoid UTC offset issues
+                          const d = dayData.date
+                          const localDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+                          setSelectedDayForMissingEntry(d)
+                          setMissingEntryForm({
+                            date: localDateStr,
+                            checkIn: '',
+                            checkOut: '',
+                            reason: ''
+                          })
                           setShowMissingEntryModal(true)
                         }
                       }}
@@ -1362,10 +1373,15 @@ export default function AttendancePage() {
                         <button
                           onClick={(e) => {
                             e.stopPropagation()
-                            setMissingEntryForm(prev => ({
-                              ...prev,
-                              date: dayData.date.toISOString().split('T')[0]
-                            }))
+                            const d = dayData.date
+                            const localDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+                            setSelectedDayForMissingEntry(d)
+                            setMissingEntryForm({
+                              date: localDateStr,
+                              checkIn: '',
+                              checkOut: '',
+                              reason: ''
+                            })
                             setShowMissingEntryModal(true)
                           }}
                           className="absolute top-0.5 sm:top-1 right-0.5 sm:right-1 p-0.5 sm:p-1 rounded-full bg-content1 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-success-50 z-10"
@@ -1566,7 +1582,9 @@ export default function AttendancePage() {
               <CardBody className="py-3">
                 <p className="text-sm font-medium text-primary-800">
                   <FaCalendarAlt className="inline mr-2" />
-                  Date: {selectedRecord && formatDate(selectedRecord.date)}
+                  Date: {selectedDayForEdit 
+                    ? selectedDayForEdit.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
+                    : selectedRecord && formatDate(selectedRecord.date)}
                 </p>
                 {(() => {
                   // Dynamically calculate status based on actual work hours

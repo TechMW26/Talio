@@ -29,8 +29,8 @@ export default function ExpenseApprovalsPage() {
   const fetchPendingExpenses = async () => {
     try {
       const token = localStorage.getItem('token')
-      // Fetch all submitted expenses
-      const response = await fetch('/api/expenses?status=submitted', {
+      // Fetch all pending expenses awaiting approval
+      const response = await fetch('/api/expenses?status=pending', {
         headers: { 'Authorization': `Bearer ${token}` },
       })
 

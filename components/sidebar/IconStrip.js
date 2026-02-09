@@ -36,6 +36,7 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {} }) {
   const [tooltipContent, setTooltipContent] = useState(null)
   const tooltipY = useRef(0)
   const tooltipRef = useRef(null)
+  const menuContainerRef = useRef(null)
 
   // Load user only once on mount
   useEffect(() => {
@@ -188,8 +189,8 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {} }) {
         </div>
 
         {/* Menu Icons */}
-        <div className="flex-1 overflow-y-auto scrollbar-hide py-4 px-2 space-y-2">
-          {menuItems.map((item) => {
+        <div ref={menuContainerRef} className="flex-1 overflow-y-auto scrollbar-hide py-4 px-2 space-y-2">
+          {menuItems.map((item, index) => {
             const isActive = isMenuItemActive(item)
             const badgeCount = getBadgeCount(item.name)
 
@@ -230,7 +231,7 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {} }) {
                   closeDelay={0}
                 >
                   <button
-                    onClick={() => onExpandClick(item.name)}
+                    onClick={() => onExpandClick(item.name, index)}
                     className={`w-full flex items-center justify-center p-2.5 rounded-xl transition-all duration-200 group relative hover:bg-gray-800`}
                     style={{
                       backgroundColor: isActive ? 'var(--color-primary-500)' : 'var(--color-primary-100)',

@@ -4,8 +4,11 @@ import { getAuthAndModels } from '@/lib/auth'
 import { sendPushToUser } from '@/lib/pushNotification'
 
 // GET - Get single ticket
-export async function GET(request, { params }) {
+export async function GET(request, context) {
   try {
+    // Await params (required in Next.js 15)
+    const { id } = await context.params
+    
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Helpdesk'])
     if (!auth.success) {
@@ -14,14 +17,14 @@ export async function GET(request, { params }) {
     const { models } = auth
     const { Helpdesk } = models
 
-    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
         { success: false, message: 'Invalid ticket id' },
         { status: 400 }
       )
     }
 
-    const ticket = await Helpdesk.findById(params.id)
+    const ticket = await Helpdesk.findById(id)
       .populate('createdBy', 'firstName lastName employeeCode userId')
       .populate('assignedTo', 'firstName lastName')
       // Helpdesk schema defines comments as { content, author, createdAt }
@@ -50,8 +53,11 @@ export async function GET(request, { params }) {
 }
 
 // PUT - Update ticket
-export async function PUT(request, { params }) {
+export async function PUT(request, context) {
   try {
+    // Await params (required in Next.js 15)
+    const { id } = await context.params
+    
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Helpdesk', 'Employee'])
     if (!auth.success) {
@@ -60,7 +66,7 @@ export async function PUT(request, { params }) {
     const { models } = auth
     const { Helpdesk, Employee } = models
 
-    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
         { success: false, message: 'Invalid ticket id' },
         { status: 400 }
@@ -71,7 +77,7 @@ export async function PUT(request, { params }) {
     data = cleanAttachments(data)
 
     const ticket = await Helpdesk.findByIdAndUpdate(
-      params.id,
+      id,
       data,
       { new: true, runValidators: true }
     )
@@ -202,9 +208,19 @@ export async function PUT(request, { params }) {
 }
 
 // DELETE - Delete ticket
-export async function DELETE(request, { params }) {
+export async function DELETE(request, context) {
   try {
-    const { id } = await params
+    // Await params (required in Next.js 15)
+    const { id } = await context.params
+    
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Helpdesk'])
+    if (!auth.success) {
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Helpdesk } = models
+    
     const ticket = await Helpdesk.findByIdAndDelete(id)
 
     if (!ticket) {
@@ -230,9 +246,19 @@ export async function DELETE(request, { params }) {
 
 
 // PATCH - Partial update ticket
-export async function PATCH(request, { params }) {
+export async function PATCH(request, context) {
   try {
-    const { id } = await params
+    // Await params (required in Next.js 15)
+    const { id } = await context.params
+    
+    // Get authenticated user and tenant-specific models
+    const auth = await getAuthAndModels(request, ['Helpdesk'])
+    if (!auth.success) {
+      return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Helpdesk } = models
+    
     const data = await request.json()
 
     const ticket = await Helpdesk.findByIdAndUpdate(

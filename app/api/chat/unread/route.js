@@ -52,26 +52,32 @@ export async function GET(request) {
     }
 
     // Use aggregation to count unread messages efficiently in MongoDB
-    const unreadCounts = await Chat.aggregate([
-      // Match only chats where user is a participant
-      { $match: { participants: employeeId } },
-      // Unwind messages array
-      { $unwind: { path: '$messages', preserveNullAndEmptyArrays: false } },
-      // Filter: message not from current user AND not read by current user
-      {
-        $match: {
-          'messages.sender': { $ne: employeeId },
-          'messages.isRead.user': { $ne: employeeId }
+    let unreadCounts = []
+    try {
+      unreadCounts = await Chat.aggregate([
+        // Match only chats where user is a participant
+        { $match: { participants: employeeId } },
+        // Unwind messages array
+        { $unwind: { path: '$messages', preserveNullAndEmptyArrays: false } },
+        // Filter: message not from current user AND not read by current user
+        {
+          $match: {
+            'messages.sender': { $ne: employeeId },
+            'messages.isRead.user': { $ne: employeeId }
+          }
+        },
+        // Group by chat ID and count unread messages
+        {
+          $group: {
+            _id: '$_id',
+            unreadCount: { $sum: 1 }
+          }
         }
-      },
-      // Group by chat ID and count unread messages
-      {
-        $group: {
-          _id: '$_id',
-          unreadCount: { $sum: 1 }
-        }
-      }
-    ])
+      ])
+    } catch (aggError) {
+      console.warn('[API] Chat aggregation error (collection may not exist):', aggError.message)
+      unreadCounts = []
+    }
 
     // Build response
     let totalUnread = 0

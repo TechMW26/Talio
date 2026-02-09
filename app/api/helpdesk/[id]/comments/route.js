@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-export async function POST(request, { params }) {
+export async function POST(request, context) {
   try {
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Helpdesk', 'Employee'])
@@ -10,6 +10,9 @@ export async function POST(request, { params }) {
     const { user, models } = auth
     const { Helpdesk, Employee } = models
 
+    // Await params (required in Next.js 15)
+    const { id } = await context.params
+    
     const { comment, commentedBy } = await request.json()
 
     if (!comment || !commentedBy) {
@@ -21,7 +24,7 @@ export async function POST(request, { params }) {
 
     const now = new Date()
     const ticket = await Helpdesk.findByIdAndUpdate(
-      params.id,
+      id,
       {
         $push: {
           comments: {

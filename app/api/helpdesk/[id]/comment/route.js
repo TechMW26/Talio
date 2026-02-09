@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 
 // POST - Add comment to ticket
-export async function POST(request, { params }) {
+export async function POST(request, context) {
   try {
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Helpdesk', 'User']);
@@ -12,7 +12,8 @@ export async function POST(request, { params }) {
     const { user, models } = auth;
     const { Helpdesk, User } = models;
 
-    const { id } = await params;
+    // Await params (required in Next.js 15)
+    const { id } = await context.params;
     
     const userId = user._id || user.userId;
     const userRecord = await User.findById(userId).populate('employeeId');

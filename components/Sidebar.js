@@ -60,6 +60,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
   // Sliding sidebar state for desktop
   const [slidingSidebarOpen, setSlidingSidebarOpen] = useState(false)
   const [activeSubmenu, setActiveSubmenu] = useState(null)
+  const [activeMenuIndex, setActiveMenuIndex] = useState(null)
 
   // Sidebar pending counts
   const [sidebarCounts, setSidebarCounts] = useState({
@@ -281,9 +282,11 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
   }
 
   // Handle expand click from icon strip
-  const handleIconStripExpand = (submenuName) => {
+  const handleIconStripExpand = (submenuName, menuIndex) => {
     setSlidingSidebarOpen(true)
     setActiveSubmenu(submenuName)
+    // Pass the menu index so SlidingSidebar can scroll to it
+    setActiveMenuIndex(menuIndex)
   }
 
   if (!mounted) {
@@ -304,6 +307,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
             setIsOpen={setSlidingSidebarOpen}
             activeSubmenu={activeSubmenu}
             setActiveSubmenu={setActiveSubmenu}
+            activeMenuIndex={activeMenuIndex}
             sidebarCounts={sidebarCounts}
           />
           {/* Spacer for icon strip width */}

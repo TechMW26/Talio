@@ -97,6 +97,11 @@ export async function POST(request) {
  */
 export async function GET(request) {
   try {
+    const auth = await getAuthAndModels(request, ['Meeting'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { Meeting } = auth.models
     const now = new Date()
 
     const expiredCount = await Meeting.countDocuments({

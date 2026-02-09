@@ -124,7 +124,16 @@ export default function HelpdeskPage() {
   const fetchTickets = async (employeeId) => {
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch(`/api/helpdesk?employeeId=${employeeId}`, {
+      const parsedUser = getCurrentUser()
+      const userRole = parsedUser?.role
+      
+      // Admin/HR see all tickets, others see only their own
+      const isManagerRole = ['admin', 'hr'].includes(userRole)
+      const url = isManagerRole 
+        ? '/api/helpdesk'  // All tickets for admin/HR
+        : `/api/helpdesk?employeeId=${employeeId}`  // Only user's tickets
+        
+      const response = await fetch(url, {
         headers: { 'Authorization': `Bearer ${token}` },
       })
 
