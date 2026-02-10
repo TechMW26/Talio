@@ -453,7 +453,7 @@ export async function DELETE(request, { params }) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { models, tenant } = auth
     const { Employee, User } = models
 
     if (!Employee || !User) {
@@ -471,8 +471,9 @@ export async function DELETE(request, { params }) {
       )
     }
 
-    // Find and delete the associated user
+    // Find the associated user BEFORE deletion (needed for cache clearing)
     const user = await User.findOne({ employeeId: id })
+    const deletedUserId = user?._id?.toString() || '*'
     
     if (user) {
       // Delete user from backup database (fire-and-forget)
@@ -503,14 +504,11 @@ export async function DELETE(request, { params }) {
     // Clear cache
     queryCache.delete(queryCache.generateKey('employee', id))
 
-  const deletedUser = await User.findOne({ employeeId: id }).select('_id')
-  const deletedUserId = deletedUser?._id?.toString() || '*'
-
-  await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'auth:user', userId: deletedUserId }))
-  await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'profile', userId: deletedUserId }))
-  await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:employee-stats', userId: deletedUserId }))
-  await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:manager-stats', userId: '*' }))
-  await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:hr-stats', userId: '*' }))
+    await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'auth:user', userId: deletedUserId }))
+    await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'profile', userId: deletedUserId }))
+    await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:employee-stats', userId: deletedUserId }))
+    await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:manager-stats', userId: '*' }))
+    await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:hr-stats', userId: '*' }))
 
     // Emit real-time update for employee deletion
     emitEmployeeUpdate({
