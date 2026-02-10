@@ -256,6 +256,7 @@ export async function POST(request, { params }) {
     }
 
     teamMember.reviews.push(review)
+    teamMember.markModified('reviews')
     await teamMember.save()
 
     return NextResponse.json({

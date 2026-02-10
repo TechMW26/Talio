@@ -101,7 +101,13 @@ export async function POST(request, { params }) {
       createdAt: new Date()
     }
 
+    // Initialize reviews array if it doesn't exist
+    if (!employee.reviews) {
+      employee.reviews = []
+    }
+
     employee.reviews.push(newReview)
+    employee.markModified('reviews')
     await employee.save()
 
     // Populate the reviewer info

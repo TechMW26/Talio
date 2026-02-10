@@ -433,8 +433,9 @@ html.dark div[class*="bg-content1"] {
 
 /* HeroUI Input */
 html.dark [data-slot="input-wrapper"] {
-  background-color: #0F172A !important;
-  border-color: rgba(51, 65, 85, 0.5) !important;
+  background-color: #273548 !important;
+  border-color: #334155 !important;
+  box-shadow: none !important;
   outline: none !important;
 }
 
@@ -458,8 +459,10 @@ html.dark [data-focus="true"] {
 
 /* HeroUI Select trigger — dark background */
 html.dark [data-slot="trigger"] {
-  background-color: #0F172A !important;
-  border-color: rgba(51, 65, 85, 0.5) !important;
+  background-color: #273548 !important;
+  border-color: #334155 !important;
+  box-shadow: none !important;
+  outline: none !important;
 }
 
 /* HeroUI Select listbox / popover */
@@ -500,7 +503,7 @@ html.dark [role="option"]:hover {
 html.dark [data-slot="content"][data-placement] {
   background-color: #1E293B !important;
   border-color: transparent !important;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(51, 65, 85, 0.3) !important;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4) !important;
 }
 
 /* HeroUI Table */
@@ -777,7 +780,7 @@ html.dark .border-slate-200 {
 html.dark input,
 html.dark select,
 html.dark textarea {
-  border-color: rgba(51, 65, 85, 0.5) !important;
+  border-color: #334155 !important;
 }
 
 /* Native form inputs in modals — dark background + subtle border */
@@ -792,9 +795,9 @@ html.dark input[type="search"],
 html.dark input[type="url"],
 html.dark select,
 html.dark textarea {
-  background-color: #0F172A !important;
+  background-color: #273548 !important;
   color: #E2E8F0 !important;
-  border-color: rgba(51, 65, 85, 0.5) !important;
+  border-color: #334155 !important;
 }
 
 html.dark input::placeholder,
@@ -896,11 +899,12 @@ html.dark .border-dashed {
 }
 
 /* Shadow overrides — cards get very subtle dark glow instead of white shadow */
-html.dark .shadow-xs {
+/* Exclude input-wrapper and trigger so their box-shadow: none is respected */
+html.dark .shadow-xs:not([data-slot="input-wrapper"]):not([data-slot="trigger"]) {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25) !important;
 }
 
-html.dark .shadow-sm {
+html.dark .shadow-sm:not([data-slot="input-wrapper"]):not([data-slot="trigger"]) {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3) !important;
 }
 
