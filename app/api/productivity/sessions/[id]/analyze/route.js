@@ -15,9 +15,9 @@ const MAX_IMAGES_PER_ANALYSIS = 10; // Limit images to avoid API limits
 export async function POST(request, { params }) {
   try {
     const { id: sessionId } = await params;
-    
+
     console.log(`[ProductivityAnalysis] Starting analysis for session: ${sessionId}`);
-    
+
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['ProductivitySession', 'User', 'Task', 'TaskAssignee', 'Project'])
     if (!auth.success) {
@@ -29,9 +29,9 @@ export async function POST(request, { params }) {
 
     const currentUserId = user._id || user.userId;
     const currentUserRole = user.role;
-    
+
     console.log(`[ProductivityAnalysis] User: ${currentUserId}, Role: ${currentUserRole}`);
-    
+
     // Get session
     const session = await ProductivitySession.findById(sessionId);
     if (!session) {
@@ -41,13 +41,13 @@ export async function POST(request, { params }) {
         { status: 404 }
       );
     }
-    
+
     // Get session owner - could be stored as 'user' or 'employee'
     const sessionUserId = session.user?.toString();
     const sessionEmployeeId = session.employee?.toString();
-    
+
     console.log(`[ProductivityAnalysis] Session found. User: ${sessionUserId}, Employee: ${sessionEmployeeId}, Screenshots: ${session.screenshots?.length || 0}`);
-    
+
     // Permission check - be more lenient for department heads
     // Check ownership by user ID or by employee ID
     let isOwner = false;
@@ -58,34 +58,34 @@ export async function POST(request, { params }) {
       const currentEmployeeId = user.employeeId._id?.toString() || user.employeeId?.toString();
       isOwner = sessionEmployeeId === currentEmployeeId;
     }
-    
+
     const isAdminOrHR = ['admin', 'hr', 'manager', 'department_head'].includes(currentUserRole);
     const isDepartmentHead = user.isDepartmentHead === true;
-    
+
     console.log(`[ProductivityAnalysis] Permission check - Owner: ${isOwner}, AdminHR: ${isAdminOrHR}, DeptHead: ${isDepartmentHead}`);
-    
+
     if (!isOwner && !isAdminOrHR && !isDepartmentHead) {
       return NextResponse.json(
         { success: false, error: 'Permission denied' },
         { status: 403 }
       );
     }
-    
+
     // Check if already analyzed
     if (session.analysis?.isAnalyzed) {
       // Check if screenshots need cleanup (analyzed but not deleted)
       if (!session.screenshotsDeleted && session.screenshots?.length > 0) {
         console.log(`[ProductivityAnalysis] Session ${sessionId} already analyzed but screenshots not cleaned up. Running cleanup...`);
-        
+
         try {
           // Get Screenshot model for cleanup
           const { Screenshot } = await getTenantModels(auth.tenant.databaseName, ['Screenshot']);
-          
+
           // Collect ImageKit file IDs from session screenshots
           const imagekitFileIds = [];
-          const screenshots = session.screenshots || [];
-          
-          for (const screenshot of screenshots) {
+          const screenshotsForCleanup = session.screenshots || [];
+
+          for (const screenshot of screenshotsForCleanup) {
             if (screenshot.fileId) {
               imagekitFileIds.push(screenshot.fileId);
             }
@@ -93,7 +93,26 @@ export async function POST(request, { params }) {
               imagekitFileIds.push(screenshot.imagekitFileId);
             }
           }
-          
+
+          // Also query Screenshot DB for imagekitFileIds
+          try {
+            const dbLookupQuery = { capturedAt: { $gte: session.startTime, $lte: session.endTime } };
+            if (session.user) dbLookupQuery.user = session.user;
+            else if (session.employee) dbLookupQuery.employee = session.employee;
+
+            const dbScreenshotsLookup = await Screenshot.find(dbLookupQuery)
+              .select('imagekitFileId')
+              .lean();
+
+            for (const ss of dbScreenshotsLookup) {
+              if (ss.imagekitFileId && !imagekitFileIds.includes(ss.imagekitFileId)) {
+                imagekitFileIds.push(ss.imagekitFileId);
+              }
+            }
+          } catch (lookupErr) {
+            console.error(`[ProductivityAnalysis] DB lookup error:`, lookupErr.message);
+          }
+
           // Delete from ImageKit (bulk delete)
           if (imagekitFileIds.length > 0) {
             console.log(`[ProductivityAnalysis] Deleting ${imagekitFileIds.length} images from ImageKit...`);
@@ -104,18 +123,18 @@ export async function POST(request, { params }) {
               console.error(`[ProductivityAnalysis] ImageKit deletion failed:`, imagekitError.message);
             }
           }
-          
+
           // Delete raw captures from Screenshot collection
           const deleteQuery = {
             capturedAt: { $gte: session.startTime, $lte: session.endTime }
           };
-          
+
           if (session.user) {
             deleteQuery.user = session.user;
           } else if (session.employee) {
             deleteQuery.employee = session.employee;
           }
-          
+
           if (imagekitFileIds.length > 0) {
             deleteQuery.$or = [
               { imagekitFileId: { $in: imagekitFileIds } },
@@ -123,10 +142,10 @@ export async function POST(request, { params }) {
             ];
             delete deleteQuery.capturedAt;
           }
-          
+
           const deleteResult = await Screenshot.deleteMany(deleteQuery);
           console.log(`[ProductivityAnalysis] Deleted ${deleteResult.deletedCount} raw captures from Screenshot collection`);
-          
+
           // Store original count and mark as deleted
           const originalScreenshotCount = session.screenshots?.length || 0;
           session.screenshots = session.screenshots.map((s, index) => ({
@@ -139,40 +158,40 @@ export async function POST(request, { params }) {
           session.screenshotsDeleted = true;
           session.screenshotsDeletedAt = new Date();
           await session.save();
-          
+
           console.log(`[ProductivityAnalysis] Cleanup complete for previously analyzed session ${sessionId}`);
-          
+
           // Re-fetch to get updated data
           const updatedSession = await ProductivitySession.findById(sessionId).lean();
           if (updatedSession && updatedSession._id) {
             updatedSession._id = updatedSession._id.toString();
           }
-          
+
           return NextResponse.json({
             success: true,
             message: 'Session already analyzed, screenshots cleaned up',
             data: updatedSession
           });
-          
+
         } catch (cleanupError) {
           console.error(`[ProductivityAnalysis] Cleanup error:`, cleanupError.message);
         }
       }
-      
+
       return NextResponse.json({
         success: true,
         message: 'Session already analyzed',
         data: session
       });
     }
-    
+
     // Get user info for context - try user first, then employee
     let employeeName = 'Employee';
     let employeeRole = 'Employee';
     let employeeDesignation = '';
     let employeeDepartment = '';
     let employeeId = null;
-    
+
     if (sessionUserId) {
       const userRecord = await User.findById(sessionUserId).populate({
         path: 'employeeId',
@@ -197,11 +216,11 @@ export async function POST(request, { params }) {
         employeeId = employee._id;
       }
     }
-    
+
     // Fetch user's ongoing tasks for context
     let ongoingTasks = [];
     let taskContextStr = 'No active tasks assigned';
-    
+
     if (employeeId) {
       try {
         // Get task assignments for this employee
@@ -209,23 +228,23 @@ export async function POST(request, { params }) {
           user: employeeId,
           assignmentStatus: { $in: ['pending', 'accepted'] }
         }).select('task').lean();
-        
+
         const taskIds = taskAssignments.map(ta => ta.task);
-        
+
         if (taskIds.length > 0) {
           // Fetch actual tasks that are in progress or todo
           const tasks = await Task.find({
             _id: { $in: taskIds },
             status: { $in: ['todo', 'in-progress', 'review'] }
           })
-          .populate('project', 'name')
-          .select('title description status priority dueDate project tags')
-          .sort({ priority: -1, dueDate: 1 })
-          .limit(10)
-          .lean();
-          
+            .populate('project', 'name')
+            .select('title description status priority dueDate project tags')
+            .sort({ priority: -1, dueDate: 1 })
+            .limit(10)
+            .lean();
+
           ongoingTasks = tasks;
-          
+
           if (tasks.length > 0) {
             taskContextStr = tasks.map((task, idx) => {
               const projectName = task.project?.name || 'No Project';
@@ -235,13 +254,13 @@ export async function POST(request, { params }) {
             }).join('\n');
           }
         }
-        
+
         console.log(`[ProductivityAnalysis] Found ${ongoingTasks.length} ongoing tasks for employee ${employeeId}`);
       } catch (taskError) {
         console.error(`[ProductivityAnalysis] Error fetching tasks:`, taskError.message);
       }
     }
-    
+
     // Prepare images for analysis
     const screenshots = session.screenshots || [];
     if (screenshots.length === 0) {
@@ -250,27 +269,27 @@ export async function POST(request, { params }) {
         { status: 400 }
       );
     }
-    
+
     // Select screenshots evenly distributed across the session
     const selectedIndices = selectEvenlyDistributed(screenshots.length, MAX_IMAGES_PER_ANALYSIS);
     const selectedScreenshots = selectedIndices.map(i => screenshots[i]);
-    
+
     // Load images - handle both ImageKit URLs and local filesystem paths
     const images = [];
     const screenshotSummaries = [];
-    
+
     for (const screenshot of selectedScreenshots) {
       try {
         let base64;
         let mimeType = 'image/jpeg'; // Default
         // Support both url and path fields
         const screenshotUrl = screenshot.url || screenshot.path || screenshot.imagekitUrl;
-        
+
         if (!screenshotUrl) {
           console.warn(`[ProductivityAnalysis] Screenshot missing url/path:`, screenshot);
           continue;
         }
-        
+
         // Check if it's a URL (ImageKit) or filesystem path
         if (screenshotUrl.startsWith('http://') || screenshotUrl.startsWith('https://')) {
           // Fetch image from URL
@@ -281,7 +300,7 @@ export async function POST(request, { params }) {
           }
           const arrayBuffer = await response.arrayBuffer();
           base64 = Buffer.from(arrayBuffer).toString('base64');
-          
+
           // Determine mime type from URL or content-type header
           const contentType = response.headers.get('content-type');
           if (contentType) {
@@ -300,12 +319,12 @@ export async function POST(request, { params }) {
         } else {
           throw new Error('No valid screenshot URL or path');
         }
-        
+
         images.push({
           mimeType,
           data: base64
         });
-        
+
         screenshotSummaries.push({
           screenshotPath: screenshotUrl,
           timestamp: screenshot.capturedAt || screenshot.timestamp,
@@ -317,25 +336,25 @@ export async function POST(request, { params }) {
         console.error(`Failed to load image ${screenshot.url || screenshot.path}:`, error.message);
       }
     }
-    
+
     if (images.length === 0) {
       return NextResponse.json(
         { success: false, error: 'Failed to load screenshots. Images may not be accessible.' },
         { status: 500 }
       );
     }
-    
+
     // Calculate session duration for context
     const sessionDurationMs = new Date(session.endTime) - new Date(session.startTime);
     const sessionDurationMinutes = Math.round(sessionDurationMs / (1000 * 60));
     const sessionDurationHours = (sessionDurationMinutes / 60).toFixed(1);
-    
+
     // Build role context for better analysis - DESIGNATION is PRIMARY, department is fallback
     // Designation tells us WHAT the employee does (Developer, Designer, HR Manager)
     // Department only tells us WHERE they work (Engineering, Marketing) - less useful for work analysis
     let primaryRoleContext = '';
     let fallbackContext = '';
-    
+
     if (employeeDesignation) {
       primaryRoleContext = `Designation/Job Title: ${employeeDesignation}`;
     }
@@ -346,9 +365,9 @@ export async function POST(request, { params }) {
     if (employeeRole && employeeRole !== 'employee') {
       fallbackContext += fallbackContext ? `\n- System Role: ${employeeRole}` : `System Role: ${employeeRole}`;
     }
-    
+
     const roleContextStr = primaryRoleContext || fallbackContext || 'Not specified - evaluate based on observed activities';
-    
+
     // Build analysis prompt with comprehensive KPIs
     // IMPORTANT: Emphasize this is workplace productivity analysis, not facial recognition
     const analysisPrompt = `You are a STRICT and PRECISE workplace productivity analyst. Your task is to analyze computer desktop screenshots to assess ACTUAL work activities and productivity metrics.
@@ -520,55 +539,55 @@ CRITICAL REMINDERS:
 7. If employee has IN-PROGRESS tasks but screenshots show unrelated activities = RED FLAG`;
 
     let analysisResult;
-    
+
     try {
       console.log(`[ProductivityAnalysis] Analyzing session ${sessionId} with ${images.length} images...`);
-      
+
       const responseText = await generateVisionContent(analysisPrompt, images);
-      
+
       console.log(`[ProductivityAnalysis] Raw AI response length: ${responseText?.length || 0}`);
       console.log(`[ProductivityAnalysis] Raw AI response (first 500 chars):`, responseText?.substring(0, 500));
-      
+
       if (!responseText || responseText.trim().length === 0) {
         throw new Error('Empty response from AI');
       }
-      
+
       // Parse JSON from response - handle markdown code blocks
       let jsonText = responseText.trim();
-      
+
       // Remove markdown code block wrappers if present
       const codeBlockMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/);
       if (codeBlockMatch) {
         jsonText = codeBlockMatch[1].trim();
         console.log(`[ProductivityAnalysis] Extracted JSON from markdown code block`);
       }
-      
+
       // Try to parse the entire response as JSON first
       try {
         analysisResult = JSON.parse(jsonText);
         console.log(`[ProductivityAnalysis] Direct JSON parse succeeded`);
       } catch (directParseError) {
         console.log(`[ProductivityAnalysis] Direct parse failed, trying to fix truncated JSON...`);
-        
+
         // Find JSON object using regex
         let jsonMatch = jsonText.match(/\{[\s\S]*\}/);
-        
+
         if (jsonMatch) {
           let jsonCandidate = jsonMatch[0];
-          
+
           // Try to fix truncated JSON by closing unclosed structures
           try {
             analysisResult = JSON.parse(jsonCandidate);
             console.log(`[ProductivityAnalysis] Regex JSON parse succeeded`);
           } catch (parseError) {
             console.log(`[ProductivityAnalysis] JSON appears truncated, attempting repair...`);
-            
+
             // Count unclosed brackets/braces
             let openBraces = (jsonCandidate.match(/\{/g) || []).length;
             let closeBraces = (jsonCandidate.match(/\}/g) || []).length;
             let openBrackets = (jsonCandidate.match(/\[/g) || []).length;
             let closeBrackets = (jsonCandidate.match(/\]/g) || []).length;
-            
+
             // Try to extract key fields even from truncated JSON
             const summaryMatch = jsonCandidate.match(/"summary"\s*:\s*"([^"]+(?:\\.[^"]*)*?)"/);
             const scoreMatch = jsonCandidate.match(/"score"\s*:\s*(\d+)/);
@@ -576,11 +595,11 @@ CRITICAL REMINDERS:
             const achievementsMatch = jsonCandidate.match(/"achievements"\s*:\s*\[(.*?)\]/s);
             const suggestionsMatch = jsonCandidate.match(/"suggestions"\s*:\s*\[(.*?)\]/s);
             const insightsMatch = jsonCandidate.match(/"insights"\s*:\s*\[(.*?)\]/s);
-            
+
             if (summaryMatch && scoreMatch) {
               // Build a valid JSON from extracted fields
               console.log(`[ProductivityAnalysis] Extracting key fields from truncated response`);
-              
+
               const parseArrayField = (match) => {
                 if (!match) return [];
                 try {
@@ -595,7 +614,7 @@ CRITICAL REMINDERS:
                   return strings ? strings.map(s => s.replace(/"/g, '')) : [];
                 }
               };
-              
+
               analysisResult = {
                 summary: summaryMatch[1].replace(/\\"/g, '"').replace(/\\n/g, '\n'),
                 score: parseInt(scoreMatch[1], 10),
@@ -615,26 +634,26 @@ CRITICAL REMINDERS:
         } else {
           console.error(`[ProductivityAnalysis] No JSON object found in response`);
           console.log(`[ProductivityAnalysis] Full response:`, jsonText.substring(0, 1000));
-          
+
           // Check if this is a policy/refusal response from the AI
           const lowerResponse = jsonText.toLowerCase();
-          const isRefusal = lowerResponse.includes('unable to') || 
-                           lowerResponse.includes('cannot analyze') || 
-                           lowerResponse.includes('cannot process') ||
-                           lowerResponse.includes('cannot identify') ||
-                           lowerResponse.includes("can't analyze") ||
-                           lowerResponse.includes("i'm sorry") ||
-                           lowerResponse.includes('policy');
-          
+          const isRefusal = lowerResponse.includes('unable to') ||
+            lowerResponse.includes('cannot analyze') ||
+            lowerResponse.includes('cannot process') ||
+            lowerResponse.includes('cannot identify') ||
+            lowerResponse.includes("can't analyze") ||
+            lowerResponse.includes("i'm sorry") ||
+            lowerResponse.includes('policy');
+
           if (isRefusal) {
             console.log(`[ProductivityAnalysis] AI refused to analyze - likely content policy issue`);
             throw new Error('AI_POLICY_REFUSAL: The AI service could not process these images. This may be due to content policies. Please try again or contact support.');
           }
-          
+
           throw new Error('Invalid AI response format - no JSON found');
         }
       }
-      
+
       // Validate required fields
       if (typeof analysisResult.score !== 'number' || analysisResult.score < 0 || analysisResult.score > 100) {
         console.warn(`[ProductivityAnalysis] Score is invalid:`, analysisResult.score);
@@ -650,21 +669,21 @@ CRITICAL REMINDERS:
           analysisResult.score = 60; // Conservative default
         }
       }
-      
+
       console.log(`[ProductivityAnalysis] Analysis complete. Score: ${analysisResult.score}, Summary length: ${analysisResult.summary?.length || 0}`);
-      
+
     } catch (aiError) {
       console.error('[ProductivityAnalysis] AI analysis failed:', aiError.message);
-      
+
       // Check if this is a policy refusal
       const isPolicyRefusal = aiError.message?.includes('AI_POLICY_REFUSAL');
-      
+
       // DON'T mark as analyzed if AI completely failed - let user retry
       // Return error response without saving
       return NextResponse.json(
-        { 
-          success: false, 
-          error: isPolicyRefusal 
+        {
+          success: false,
+          error: isPolicyRefusal
             ? 'AI could not analyze these screenshots due to content policies. The screenshots may contain content that triggered safety filters. Please try again later.'
             : 'AI analysis failed. Please try again later.',
           details: aiError.message?.replace('AI_POLICY_REFUSAL: ', '') || 'Unknown error',
@@ -674,7 +693,7 @@ CRITICAL REMINDERS:
         { status: 503 }
       );
     }
-    
+
     // Only reach here if AI succeeded - update screenshot summaries from analysis
     if (analysisResult.screenshotAnalysis) {
       for (const sa of analysisResult.screenshotAnalysis) {
@@ -692,7 +711,7 @@ CRITICAL REMINDERS:
         }
       }
     }
-    
+
     // Generate session title from AI or create one from detected apps
     let sessionTitle = analysisResult.sessionTitle || '';
     if (!sessionTitle && analysisResult.applications?.length > 0) {
@@ -705,7 +724,7 @@ CRITICAL REMINDERS:
     }
     // Store the AI-generated title on the session
     session.sessionTitle = sessionTitle;
-    
+
     // Update session with analysis - include all new KPI fields
     session.analysis = {
       isAnalyzed: true,
@@ -766,40 +785,62 @@ CRITICAL REMINDERS:
       } : null,
       error: analysisResult.error || null
     };
-    
+
     // Add taskAlignmentPercentage to overallAssessment if available
     if (session.analysis.overallAssessment && analysisResult.overallAssessment?.taskAlignmentPercentage !== undefined) {
       session.analysis.overallAssessment.taskAlignmentPercentage = analysisResult.overallAssessment.taskAlignmentPercentage;
     }
-    
+
     await session.save();
-    
+
     // ========== CLEANUP: Delete screenshots after successful analysis ==========
     console.log(`[ProductivityAnalysis] Starting cleanup for session ${sessionId}...`);
-    
+
     try {
       // Get Screenshot model for cleanup
       const { Screenshot } = await getTenantModels(auth.tenant.databaseName, ['Screenshot']);
-      
+
       // Collect ImageKit file IDs from session screenshots
       const imagekitFileIds = [];
       const screenshotIds = [];
-      
+
       for (const screenshot of screenshots) {
-        // Collect ImageKit file IDs
+        // Collect ImageKit file IDs from session subdocuments
         if (screenshot.fileId) {
           imagekitFileIds.push(screenshot.fileId);
         }
         if (screenshot.imagekitFileId) {
           imagekitFileIds.push(screenshot.imagekitFileId);
         }
-        
+
         // Collect screenshot document IDs if referenced
         if (screenshot._id) {
           screenshotIds.push(screenshot._id);
         }
       }
-      
+
+      // FIX: Also query Screenshot DB records for imagekitFileId
+      // Session screenshots often don't have fileId populated, but the
+      // Screenshot collection always stores imagekitFileId from upload
+      try {
+        const dbQuery = { capturedAt: { $gte: session.startTime, $lte: session.endTime } };
+        if (session.user) dbQuery.user = session.user;
+        else if (session.employee) dbQuery.employee = session.employee;
+
+        const dbScreenshots = await Screenshot.find(dbQuery)
+          .select('imagekitFileId')
+          .lean();
+
+        for (const ss of dbScreenshots) {
+          if (ss.imagekitFileId && !imagekitFileIds.includes(ss.imagekitFileId)) {
+            imagekitFileIds.push(ss.imagekitFileId);
+          }
+        }
+        console.log(`[ProductivityAnalysis] Found ${dbScreenshots.length} Screenshot DB records, total ImageKit fileIds: ${imagekitFileIds.length}`);
+      } catch (dbLookupError) {
+        console.error(`[ProductivityAnalysis] Screenshot DB lookup failed:`, dbLookupError.message);
+      }
+
       // Delete from ImageKit (bulk delete)
       if (imagekitFileIds.length > 0) {
         console.log(`[ProductivityAnalysis] Deleting ${imagekitFileIds.length} images from ImageKit...`);
@@ -811,24 +852,24 @@ CRITICAL REMINDERS:
           // Don't fail the whole operation if ImageKit deletion fails
         }
       }
-      
+
       // Delete raw captures from Screenshot collection
       // CRITICAL: Only delete screenshots for THIS SPECIFIC SESSION, not the whole day!
       // Use the session's exact time range to avoid deleting screenshots from other sessions
       const deleteQuery = {
-        capturedAt: { 
-          $gte: session.startTime, 
-          $lte: session.endTime 
+        capturedAt: {
+          $gte: session.startTime,
+          $lte: session.endTime
         }
       };
-      
+
       // Add user/employee filter - REQUIRED to avoid deleting other users' data
       if (session.user) {
         deleteQuery.user = session.user;
       } else if (session.employee) {
         deleteQuery.employee = session.employee;
       }
-      
+
       // If we have specific ImageKit file IDs, also delete by those (as a safety net)
       // But KEEP the time range constraint to avoid deleting from other sessions
       if (imagekitFileIds.length > 0) {
@@ -838,22 +879,22 @@ CRITICAL REMINDERS:
         // This is more precise than deleting the whole day
         deleteQuery.$or = [
           { imagekitFileId: { $in: imagekitFileIds } },
-          { 
-            capturedAt: { 
-              $gte: session.startTime, 
-              $lte: session.endTime 
+          {
+            capturedAt: {
+              $gte: session.startTime,
+              $lte: session.endTime
             }
           }
         ];
         delete deleteQuery.capturedAt; // Remove top-level since we're using $or
       }
-      
+
       const deleteResult = await Screenshot.deleteMany(deleteQuery);
       console.log(`[ProductivityAnalysis] Deleted ${deleteResult.deletedCount} raw captures from Screenshot collection`);
-      
+
       // Store the original screenshot count before clearing
       const originalScreenshotCount = session.screenshots?.length || 0;
-      
+
       // Clear the screenshots array in the session (keep only metadata)
       // Store a summary instead of full screenshot data
       session.screenshots = session.screenshots.map((s, index) => ({
@@ -867,23 +908,23 @@ CRITICAL REMINDERS:
       session.screenshotsDeleted = true;
       session.screenshotsDeletedAt = new Date();
       await session.save();
-      
+
       console.log(`[ProductivityAnalysis] Cleanup complete for session ${sessionId}`);
-      
+
     } catch (cleanupError) {
       console.error(`[ProductivityAnalysis] Cleanup error (non-fatal):`, cleanupError.message);
       // Don't fail the analysis if cleanup fails
     }
     // ========== END CLEANUP ==========
-    
+
     // Re-fetch the session to ensure we have the latest data with proper structure
     const updatedSession = await ProductivitySession.findById(sessionId).lean();
-    
+
     // Convert _id to string for consistent frontend handling
     if (updatedSession && updatedSession._id) {
       updatedSession._id = updatedSession._id.toString();
     }
-    
+
     console.log(`[ProductivityAnalysis] Session saved. Analysis:`, {
       sessionId: updatedSession?._id,
       isAnalyzed: updatedSession?.analysis?.isAnalyzed,
@@ -893,13 +934,13 @@ CRITICAL REMINDERS:
       suggestionsCount: updatedSession?.analysis?.suggestions?.length,
       insightsCount: updatedSession?.analysis?.insights?.length
     });
-    
+
     return NextResponse.json({
       success: true,
       message: 'Session analyzed successfully',
       data: updatedSession
     });
-    
+
   } catch (error) {
     console.error('Analyze session error:', error);
     return NextResponse.json(
@@ -916,7 +957,7 @@ CRITICAL REMINDERS:
 export async function GET(request, { params }) {
   try {
     const { id: sessionId } = await params;
-    
+
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['ProductivitySession'])
     if (!auth.success) {
@@ -924,7 +965,7 @@ export async function GET(request, { params }) {
     }
     const { user, models } = auth
     const { ProductivitySession } = models
-    
+
     const session = await ProductivitySession.findById(sessionId);
     if (!session) {
       return NextResponse.json(
@@ -932,7 +973,7 @@ export async function GET(request, { params }) {
         { status: 404 }
       );
     }
-    
+
     return NextResponse.json({
       success: true,
       data: {
@@ -941,7 +982,7 @@ export async function GET(request, { params }) {
         analysis: session.analysis || null
       }
     });
-    
+
   } catch (error) {
     console.error('Get analysis error:', error);
     return NextResponse.json(
@@ -958,13 +999,13 @@ function selectEvenlyDistributed(totalCount, maxSelect) {
   if (totalCount <= maxSelect) {
     return Array.from({ length: totalCount }, (_, i) => i);
   }
-  
+
   const indices = [];
   const step = (totalCount - 1) / (maxSelect - 1);
-  
+
   for (let i = 0; i < maxSelect; i++) {
     indices.push(Math.round(i * step));
   }
-  
+
   return indices;
 }

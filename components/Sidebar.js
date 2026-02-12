@@ -28,7 +28,7 @@ function InlineBadge({ count }) {
   if (!count || count <= 0) return null
   const isLargeNumber = count > 9
   return (
-    <span 
+    <span
       className="flex items-center justify-center text-white font-bold rounded-full shadow-md"
       style={{
         backgroundColor: '#ef4444',
@@ -190,7 +190,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
         // For admin with dept head, merge admin's attendance submenu with team attendance
         const currentSubmenu = baseMenuItems[attendanceMenuIndex].submenu || []
         const hasTeamAttendance = currentSubmenu.some(item => item.path === '/dashboard/attendance/team')
-        
+
         if (!hasTeamAttendance) {
           // Add Team Attendance after My Attendance
           const myAttendanceIndex = currentSubmenu.findIndex(item => item.path === '/dashboard/attendance')
@@ -228,6 +228,14 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
   }
 
   const handleLogout = () => {
+    // Fire-and-forget: trigger server-side logout (enqueues productivity analysis)
+    const token = localStorage.getItem('token')
+    if (token) {
+      fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      }).catch(() => { }) // Non-blocking
+    }
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     localStorage.removeItem('userId')

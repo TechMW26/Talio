@@ -182,7 +182,7 @@ export default function SlidingSidebar({
         // For admin with dept head, merge admin's attendance submenu with team attendance
         const currentSubmenu = baseMenuItems[attendanceMenuIndex].submenu || []
         const hasTeamAttendance = currentSubmenu.some(item => item.path === '/dashboard/attendance/team')
-        
+
         if (!hasTeamAttendance) {
           // Add Team Attendance after My Attendance
           const myAttendanceIndex = currentSubmenu.findIndex(item => item.path === '/dashboard/attendance')
@@ -223,6 +223,14 @@ export default function SlidingSidebar({
   }
 
   const handleLogout = () => {
+    // Fire-and-forget: trigger server-side logout (enqueues productivity analysis)
+    const token = localStorage.getItem('token')
+    if (token) {
+      fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      }).catch(() => { }) // Non-blocking
+    }
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     localStorage.removeItem('userId')
@@ -335,10 +343,10 @@ export default function SlidingSidebar({
             const isTargeted = activeSubmenu === item.name
             return (
               <div key={item.name} ref={el => menuItemRefs.current[index] = el} className="w-full rounded-xl transition-all duration-300" style={{
-                  boxShadow: isTargeted ? '0 0 0 2px var(--color-primary-300)' : 'none',
-                  backgroundColor: isTargeted ? 'color-mix(in srgb, var(--color-primary-100) 40%, transparent)' : 'transparent',
-                  paddingBottom: isTargeted ? '4px' : '0',
-                }}>
+                boxShadow: isTargeted ? '0 0 0 2px var(--color-primary-300)' : 'none',
+                backgroundColor: isTargeted ? 'color-mix(in srgb, var(--color-primary-100) 40%, transparent)' : 'transparent',
+                paddingBottom: isTargeted ? '4px' : '0',
+              }}>
                 {item.submenu ? (
                   <div className="w-full">
                     <button

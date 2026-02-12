@@ -3,9 +3,19 @@ import { jwtVerify } from 'jose'
 
 const TOKEN_CACHE = global.__tokenCache || new Map()
 const TOKEN_CACHE_TTL = 5 * 60 * 1000
+const TOKEN_CACHE_MAX_SIZE = 500 // Prevent unbounded memory growth
 
 if (!global.__tokenCache) {
   global.__tokenCache = TOKEN_CACHE
+}
+
+// Cache the encoded JWT secret globally — avoids re-encoding on every request
+let _cachedJwtSecret = null
+function getJwtSecret() {
+  if (!_cachedJwtSecret) {
+    _cachedJwtSecret = new TextEncoder().encode(process.env.JWT_SECRET)
+  }
+  return _cachedJwtSecret
 }
 
 function getCachedPayload(token) {
@@ -19,6 +29,11 @@ function getCachedPayload(token) {
 }
 
 function setCachedPayload(token, payload) {
+  // Evict oldest entries if cache is too large
+  if (TOKEN_CACHE.size >= TOKEN_CACHE_MAX_SIZE) {
+    const firstKey = TOKEN_CACHE.keys().next().value
+    TOKEN_CACHE.delete(firstKey)
+  }
   TOKEN_CACHE.set(token, {
     payload,
     expiresAt: Date.now() + TOKEN_CACHE_TTL
@@ -103,9 +118,8 @@ export async function middleware(request) {
     }
 
     try {
-      const secret = new TextEncoder().encode(process.env.JWT_SECRET)
       const cachedPayload = getCachedPayload(token)
-      const payload = cachedPayload || (await jwtVerify(token, secret)).payload
+      const payload = cachedPayload || (await jwtVerify(token, getJwtSecret())).payload
       if (!cachedPayload) {
         setCachedPayload(token, payload)
       }
@@ -115,6 +129,13 @@ export async function middleware(request) {
       // However, we add a header to indicate we should check password change
       const response = NextResponse.next()
       response.headers.set('x-user-id', payload.userId)
+      // Pass verified payload data as headers so auth.js can skip re-verification
+      if (payload.userId) response.headers.set('x-verified-user-id', payload.userId)
+      if (payload.databaseName) response.headers.set('x-verified-database', payload.databaseName)
+      if (payload.email) response.headers.set('x-verified-email', payload.email)
+      if (payload.companySlug) response.headers.set('x-verified-company-slug', payload.companySlug)
+      if (payload.companyName) response.headers.set('x-verified-company-name', payload.companyName)
+      if (payload.role) response.headers.set('x-verified-role', payload.role)
       return response
     } catch (error) {
       return NextResponse.json(
@@ -142,10 +163,9 @@ export async function middleware(request) {
   // For authenticated page routes (like dashboard), verify token
   if (token && request.nextUrl.pathname.startsWith('/dashboard')) {
     try {
-      const secret = new TextEncoder().encode(process.env.JWT_SECRET)
       const cachedPayload = getCachedPayload(token)
       if (!cachedPayload) {
-        const { payload } = await jwtVerify(token, secret)
+        const { payload } = await jwtVerify(token, getJwtSecret())
         setCachedPayload(token, payload)
       }
       // Token is valid - the frontend will handle forcePasswordChange redirect

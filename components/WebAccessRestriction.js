@@ -10,17 +10,17 @@ import { getCurrentUser } from '@/utils/userHelper'
  */
 export function isNativeApp() {
   if (typeof window === 'undefined') return false
-  
+
   // Desktop app (Electron) detection
   if (window.talioDesktop) return true
   if (window.electronAPI) return true
   if (window.isElectron === true) return true
   if (navigator.userAgent.toLowerCase().includes('electron')) return true
-  
+
   // PWA detection (standalone mode)
   if (window.matchMedia('(display-mode: standalone)').matches) return true
   if (window.navigator.standalone === true) return true
-  
+
   return false
 }
 
@@ -30,14 +30,14 @@ export function isNativeApp() {
  */
 export function shouldRestrictWebAccess() {
   if (typeof window === 'undefined') return false
-  
+
   // Allow access if using native app
   if (isNativeApp()) return false
-  
+
   // Check user role
   const user = getCurrentUser()
   if (!user) return false
-  
+
   // Only admin can access via web
   return user.role !== 'admin'
 }
@@ -48,26 +48,34 @@ export function shouldRestrictWebAccess() {
  */
 export default function WebAccessRestriction() {
   const [userName, setUserName] = useState('')
-  
+
   useEffect(() => {
     const user = getCurrentUser()
     if (user) {
       setUserName(user.firstName || user.email?.split('@')[0] || 'User')
     }
   }, [])
-  
+
   const handleDownload = () => {
     window.open('https://talio.in/downloads/index.html', '_blank')
   }
-  
+
   const handleLogout = () => {
+    // Fire-and-forget: trigger server-side logout (enqueues productivity analysis)
+    const token = localStorage.getItem('token')
+    if (token) {
+      fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      }).catch(() => { })
+    }
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     localStorage.removeItem('userId')
     document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
     window.location.href = '/login'
   }
-  
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 p-4">
       <div className="max-w-md w-full">
@@ -83,7 +91,7 @@ export default function WebAccessRestriction() {
               Hey {userName}! Please use our app for the best experience.
             </p>
           </div>
-          
+
           {/* Content */}
           <div className="p-6 space-y-4">
             <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-100 dark:border-blue-800">
@@ -91,7 +99,7 @@ export default function WebAccessRestriction() {
                 For security and productivity tracking, the dashboard is only accessible through our official apps. Please download the app for your device.
               </p>
             </div>
-            
+
             {/* Download Button */}
             <Button
               color="primary"
@@ -102,7 +110,7 @@ export default function WebAccessRestriction() {
             >
               Download App
             </Button>
-            
+
             {/* Platform Icons */}
             <div className="flex justify-center gap-4 py-2">
               <div className="flex flex-col items-center gap-1">
@@ -118,7 +126,7 @@ export default function WebAccessRestriction() {
                 <span className="text-xs text-gray-500">macOS</span>
               </div>
             </div>
-            
+
             {/* Features */}
             <div className="border-t dark:border-gray-700 pt-4 mt-4">
               <p className="text-xs text-gray-500 dark:text-gray-400 text-center mb-3">
@@ -144,7 +152,7 @@ export default function WebAccessRestriction() {
               </div>
             </div>
           </div>
-          
+
           {/* Footer */}
           <div className="px-6 pb-6">
             <button
@@ -155,7 +163,7 @@ export default function WebAccessRestriction() {
             </button>
           </div>
         </div>
-        
+
         {/* Help text */}
         <p className="text-center text-xs text-gray-500 dark:text-gray-400 mt-4">
           Having trouble? Contact your administrator or IT support.

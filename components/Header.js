@@ -131,13 +131,13 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
       const response = await fetch(`/api/employees/${employeeId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       })
-      
+
       // Handle 401 - session expired
       if (response.status === 401) {
         handleSessionExpired()
         return
       }
-      
+
       const result = await response.json()
       if (result.success) {
         console.log('Employee Data Fetched:', result.data)
@@ -288,13 +288,13 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
         const response = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         })
-        
+
         // Handle 401 - session expired
         if (response.status === 401) {
           handleSessionExpired()
           return
         }
-        
+
         const result = await response.json()
         if (result.success) {
           setSearchResults(result.data)
@@ -315,6 +315,14 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
   }, [searchQuery])
 
   const handleLogout = () => {
+    // Fire-and-forget: trigger server-side logout (enqueues productivity analysis)
+    const token = localStorage.getItem('token')
+    if (token) {
+      fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      }).catch(() => { }) // Non-blocking
+    }
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     localStorage.removeItem('userId')

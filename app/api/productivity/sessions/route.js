@@ -31,40 +31,41 @@ function parseScreenshotTimestamp(filename) {
 async function syncScreenshotsToSessions(userId, date, models) {
   const { User, ProductivitySession, Screenshot } = models;
   const dateFolder = date.toISOString().split('T')[0];
-  
+
   let screenshots = [];
-  
+
   // First, try to get screenshots from the Screenshot model (primary source)
   if (Screenshot) {
     const dbScreenshots = await Screenshot.find({
       user: userId,
       dateString: dateFolder
     }).sort({ capturedAt: 1 }).lean();
-    
+
     for (const ss of dbScreenshots) {
       const displayPath = ss.imagekitUrl || ss.path || `/api/activity/screenshot?id=${ss._id}`;
       screenshots.push({
         path: displayPath,
         filename: ss.filename || `screenshot_${ss._id}.webp`,
         timestamp: ss.capturedAt,
-        size: ss.metadata?.fileSize || 0
+        size: ss.metadata?.fileSize || 0,
+        imagekitFileId: ss.imagekitFileId || null
       });
     }
   }
-  
+
   // Fallback: also check filesystem if no DB screenshots found
   if (screenshots.length === 0) {
     const activityDir = path.join(process.cwd(), 'public', 'activity', userId.toString());
     const datePath = path.join(activityDir, dateFolder);
-    
+
     try {
       const files = await readdir(datePath);
       const imageFiles = files.filter(f => /\.(webp|png|jpg|jpeg)$/i.test(f));
-      
+
       for (const file of imageFiles) {
         const filePath = path.join(datePath, file);
         const fileStat = await stat(filePath);
-        
+
         screenshots.push({
           path: `/activity/${userId}/${dateFolder}/${file}`,
           filename: file,
@@ -72,40 +73,41 @@ async function syncScreenshotsToSessions(userId, date, models) {
           size: fileStat.size
         });
       }
-      
+
       // Sort by timestamp
       screenshots.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
     } catch (error) {
       // Directory doesn't exist or is empty - that's fine if we have DB screenshots
     }
   }
-  
+
   if (screenshots.length === 0) {
     console.log(`No screenshots found for user ${userId} on ${dateFolder}`);
     return [];
   }
-  
+
   console.log(`Found ${screenshots.length} screenshots for user ${userId} on ${dateFolder}`);
-  
+
   // Get user and employee info
   const user = await User.findById(userId).select('employeeId');
   const employeeId = user?.employeeId;
-  
+
   // Group into sessions of 30
   const sessions = [];
   for (let i = 0; i < screenshots.length; i += SCREENSHOTS_PER_SESSION) {
     const sessionScreenshots = screenshots.slice(i, i + SCREENSHOTS_PER_SESSION);
     const sessionNumber = Math.floor(i / SCREENSHOTS_PER_SESSION) + 1;
-    
+
     // Map screenshot data to match ProductivitySession schema
     const mappedScreenshots = sessionScreenshots.map(ss => ({
       path: ss.path, // path contains the URL or relative path (matches schema)
       url: ss.path,  // Also keep url for frontend compatibility
+      fileId: ss.imagekitFileId || null, // ImageKit fileId for cleanup
       timestamp: ss.timestamp,
       capturedAt: ss.timestamp, // For frontend compatibility
       filename: ss.filename
     }));
-    
+
     // Check if session already exists
     let session = await ProductivitySession.findOne({
       user: userId,
@@ -115,7 +117,7 @@ async function syncScreenshotsToSessions(userId, date, models) {
       },
       sessionNumber
     });
-    
+
     if (!session) {
       // Create new session
       session = new ProductivitySession({
@@ -138,10 +140,10 @@ async function syncScreenshotsToSessions(userId, date, models) {
       session.endTime = sessionScreenshots[sessionScreenshots.length - 1].timestamp;
       await session.save();
     }
-    
+
     sessions.push(session);
   }
-  
+
   return sessions;
 }
 
@@ -161,19 +163,19 @@ export async function GET(request) {
 
     const currentUserId = user._id.toString();
     const currentUserRole = user.role;
-    
+
     const { searchParams } = new URL(request.url);
     const targetUserId = searchParams.get('userId') || currentUserId;
     const dateParam = searchParams.get('date') || new Date().toISOString().split('T')[0];
     const date = new Date(dateParam);
-    
+
     // Permission check: Can only view others' sessions if admin/hr or department head
     if (targetUserId !== currentUserId) {
       const currentUser = await User.findById(currentUserId).populate('employeeId');
       const targetUser = await User.findById(targetUserId).populate('employeeId');
-      
+
       const isAdminOrHR = ['admin', 'hr'].includes(currentUserRole);
-      
+
       // Check if current user is department head of target user's department
       let isDeptHead = false;
       if (!isAdminOrHR && targetUser?.employeeId?.department) {
@@ -184,11 +186,11 @@ export async function GET(request) {
           const isLegacyHead = dept.head?.toString() === currentEmployeeId;
           const isInHeadsArray = dept.heads?.some(h => h?.toString() === currentEmployeeId);
           isDeptHead = isLegacyHead || isInHeadsArray;
-          
+
           console.log(`[Sessions API] Permission check - currentEmployee: ${currentEmployeeId}, dept.head: ${dept.head}, dept.heads: ${JSON.stringify(dept.heads)}, isDeptHead: ${isDeptHead}`);
         }
       }
-      
+
       // Also check if current user has isDepartmentHead flag and manages target's department
       if (!isAdminOrHR && !isDeptHead && currentUser?.isDepartmentHead) {
         const headOfDepts = currentUser.headOfDepartments || [];
@@ -196,7 +198,7 @@ export async function GET(request) {
         isDeptHead = headOfDepts.some(d => d?.toString() === targetDeptId);
         console.log(`[Sessions API] Checking User.headOfDepartments: ${JSON.stringify(headOfDepts)}, targetDept: ${targetDeptId}, isDeptHead: ${isDeptHead}`);
       }
-      
+
       if (!isAdminOrHR && !isDeptHead) {
         return NextResponse.json(
           { success: false, error: 'Permission denied' },
@@ -204,10 +206,10 @@ export async function GET(request) {
         );
       }
     }
-    
+
     // Sync screenshots from filesystem and get sessions
     const sessions = await syncScreenshotsToSessions(targetUserId, date, models);
-    
+
     // Fetch from database to get full session data with analysis
     const dbSessions = await ProductivitySession.find({
       user: targetUserId,
@@ -216,7 +218,7 @@ export async function GET(request) {
         $lt: new Date(date.getTime() + 24 * 60 * 60 * 1000)
       }
     }).sort({ startTime: -1 }); // Sort by latest session first
-    
+
     return NextResponse.json({
       success: true,
       data: dbSessions,
@@ -225,7 +227,7 @@ export async function GET(request) {
       totalSessions: dbSessions.length,
       totalScreenshots: dbSessions.reduce((sum, s) => sum + s.screenshotCount, 0)
     });
-    
+
   } catch (error) {
     console.error('Get sessions error:', error);
     return NextResponse.json(
@@ -249,18 +251,18 @@ export async function POST(request) {
     const { user, models } = auth;
 
     const userId = user._id.toString();
-    
+
     const body = await request.json();
     const date = body.date ? new Date(body.date) : new Date();
-    
+
     const sessions = await syncScreenshotsToSessions(userId, date, models);
-    
+
     return NextResponse.json({
       success: true,
       message: 'Sessions synced successfully',
       sessionsCreated: sessions.length
     });
-    
+
   } catch (error) {
     console.error('Sync sessions error:', error);
     return NextResponse.json(
