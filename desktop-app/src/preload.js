@@ -1,6 +1,7 @@
 /**
- * Preload Script v4.0.0
+ * Preload Script v4.1.0
  * Exposes secure IPC channels to the renderer process
+ * With enhanced screen sharing support for Windows multi-display
  */
 
 const { contextBridge, ipcRenderer, desktopCapturer } = require('electron');
@@ -49,11 +50,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   
   // Desktop capture for screen sharing (used by meetings)
+  // Returns all available screens and windows with display info
   getDesktopSources: async function(options) {
     try {
       const sources = await desktopCapturer.getSources(options || {
         types: ['window', 'screen'],
-        thumbnailSize: { width: 150, height: 150 },
+        thumbnailSize: { width: 320, height: 180 },
         fetchWindowIcons: true
       });
       return sources.map(function(source) {
@@ -69,6 +71,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
       console.error('[Preload] Error getting desktop sources:', error);
       return [];
     }
+  },
+  
+  // Get all connected displays for multi-monitor selection
+  getDisplays: function() {
+    return ipcRenderer.invoke('get-displays');
+  },
+  
+  // Request screen sharing with source picker (for Windows)
+  requestScreenShare: function() {
+    return ipcRenderer.invoke('request-screen-share');
+  },
+  
+  // Get screen share stream directly via IPC
+  getScreenShareStream: async function(sourceId) {
+    return ipcRenderer.invoke('get-screen-share-stream', sourceId);
   },
   
   // Session management
@@ -143,6 +160,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Load main app (for offline page retry)
   loadApp: function() {
     return ipcRenderer.invoke('load-app');
+  },
+  
+  // Check if running on Windows (for screen share workaround)
+  isWindows: function() {
+    return process.platform === 'win32';
+  },
+  
+  // Check platform
+  getPlatform: function() {
+    return process.platform;
   }
 });
 

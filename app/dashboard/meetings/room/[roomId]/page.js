@@ -471,20 +471,78 @@ export default function MeetingRoomPage({ params }) {
     } else {
       try {
         let screenStream = null
-        try {
-          screenStream = await navigator.mediaDevices.getDisplayMedia({
-            video: {
-              frameRate: { ideal: 30, max: 60 }
-            },
-            audio: true
-          })
-        } catch (primaryError) {
-          screenStream = await navigator.mediaDevices.getDisplayMedia({
-            video: {
-              frameRate: { ideal: 30, max: 60 }
-            },
-            audio: false
-          })
+        
+        // Check if running in Electron desktop app
+        const isElectronApp = typeof window !== 'undefined' && window.isElectron
+        const isWindows = isElectronApp && window.platform === 'win32'
+        
+        if (isElectronApp && isWindows && window.electronAPI) {
+          // Windows Electron: Use desktopCapturer for proper screen share with multi-display support
+          try {
+            // First trigger the display media request which will show our custom dialog
+            screenStream = await navigator.mediaDevices.getDisplayMedia({
+              video: {
+                frameRate: { ideal: 30, max: 60 }
+              },
+              audio: true
+            })
+          } catch (primaryError) {
+            // If audio capture fails, try without audio
+            try {
+              screenStream = await navigator.mediaDevices.getDisplayMedia({
+                video: {
+                  frameRate: { ideal: 30, max: 60 }
+                },
+                audio: false
+              })
+            } catch (fallbackError) {
+              // Last resort: use Electron's getUserMedia with desktop source
+              console.log('[Meeting] Trying Electron getUserMedia fallback...')
+              const sources = await window.electronAPI.getDesktopSources({
+                types: ['screen'],
+                thumbnailSize: { width: 320, height: 180 }
+              })
+              
+              if (sources && sources.length > 0) {
+                // Use the first screen source
+                const sourceId = sources[0].id
+                screenStream = await navigator.mediaDevices.getUserMedia({
+                  audio: false,
+                  video: {
+                    mandatory: {
+                      chromeMediaSource: 'desktop',
+                      chromeMediaSourceId: sourceId,
+                      minWidth: 1280,
+                      maxWidth: 1920,
+                      minHeight: 720,
+                      maxHeight: 1080,
+                      minFrameRate: 15,
+                      maxFrameRate: 30
+                    }
+                  }
+                })
+              } else {
+                throw new Error('No screens available to share')
+              }
+            }
+          }
+        } else {
+          // Standard browser or macOS Electron: use getDisplayMedia normally
+          try {
+            screenStream = await navigator.mediaDevices.getDisplayMedia({
+              video: {
+                frameRate: { ideal: 30, max: 60 }
+              },
+              audio: true
+            })
+          } catch (primaryError) {
+            screenStream = await navigator.mediaDevices.getDisplayMedia({
+              video: {
+                frameRate: { ideal: 30, max: 60 }
+              },
+              audio: false
+            })
+          }
         }
         screenStreamRef.current = screenStream
         setHasScreenStream(true) // Trigger re-render and useEffect to attach stream

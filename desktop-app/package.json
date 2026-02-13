@@ -1,9 +1,9 @@
 {
   "name": "talio-desktop",
-  "version": "3.2.0",
+  "version": "3.3.0",
   "description": "Talio HRMS Desktop - Productivity Monitoring with Screen Capture",
   "main": "src/main.js",
-  "author": "Talio <support@talio.in>",
+  "author": "MW FutureTech <support@talio.in>",
   "license": "MIT",
   "private": true,
   "scripts": {
@@ -14,6 +14,7 @@
     "build:mac-intel": "electron-builder --mac --x64",
     "build:mac-arm": "electron-builder --mac --arm64",
     "build:win": "electron-builder --win --x64",
+    "build:signed": "CSC_LINK=$CSC_LINK CSC_KEY_PASSWORD=$CSC_KEY_PASSWORD npm run build",
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
@@ -24,6 +25,7 @@
     "socket.io-client": "^4.7.4"
   },
   "devDependencies": {
+    "@electron/notarize": "^2.5.0",
     "cross-env": "^7.0.3",
     "electron": "^28.1.0",
     "electron-builder": "^24.9.1"
@@ -31,7 +33,7 @@
   "build": {
     "appId": "in.talio.desktop",
     "productName": "Talio",
-    "copyright": "Copyright © 2026 Talio Technologies Pvt. Ltd.",
+    "copyright": "Copyright © 2026 MW FutureTech. All rights reserved.",
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -46,30 +48,40 @@
       "target": [
         {
           "target": "dmg",
-          "arch": ["x64", "arm64"]
+          "arch": [
+            "x64",
+            "arm64"
+          ]
         }
       ],
       "icon": "build/icon.icns",
-      "hardenedRuntime": false,
+      "hardenedRuntime": true,
       "gatekeeperAssess": false,
-      "identity": null,
       "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.plist"
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "signIgnore": [],
+      "type": "distribution",
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "dmg": {
-      "sign": false
+      "sign": false,
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
+    "afterSign": "scripts/notarize.js",
     "win": {
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "build/icon.ico",
-      "publisherName": "Talio Technologies Pvt. Ltd.",
-      "legalTrademarks": "Talio is a trademark of Talio Technologies Pvt. Ltd.",
-      "requestedExecutionLevel": "asInvoker"
+      "publisherName": "MW FutureTech",
+      "legalTrademarks": "Talio is a registered trademark of MW FutureTech.",
+      "requestedExecutionLevel": "asInvoker",
+      "artifactName": "${productName}.Setup.${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -80,7 +92,13 @@
       "installerHeaderIcon": "build/icon.ico",
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Talio"
+      "shortcutName": "Talio",
+      "artifactName": "${productName}.Setup.${version}.${ext}"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "avirajsharma-ops",
+      "repo": "Talio"
     }
   }
 }

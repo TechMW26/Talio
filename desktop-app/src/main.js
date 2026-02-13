@@ -1,9 +1,12 @@
 /**
- * Talio Desktop App v4.0.0
+ * Talio Desktop App v4.1.0
  * Main Electron process
+ * 
+ * Performance optimized for smooth rendering
+ * With whitescreen recovery and network change handling
  */
 
-const { app, BrowserWindow, ipcMain, Tray, Menu, Notification, shell, nativeImage, session, systemPreferences, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, Notification, shell, nativeImage, session, systemPreferences, dialog, desktopCapturer, screen, powerMonitor } = require('electron');
 const path = require('path');
 const Store = require('electron-store');
 const AutoLaunch = require('auto-launch');
@@ -11,14 +14,43 @@ const logger = require('./logger');
 const screenshotService = require('./screenshotService');
 const socketHandler = require('./socketHandler');
 
-// CRITICAL: Disable GPU hardware acceleration to prevent renderer crashes
-// This helps with SIGSEGV (exit code 11) issues
-app.disableHardwareAcceleration();
+// PERFORMANCE: Balanced GPU settings for smooth rendering without flickering
+const forceDisableGPU = process.env.TALIO_DISABLE_GPU === '1';
 
-// Stability flags for Electron
-app.commandLine.appendSwitch('disable-gpu');
-app.commandLine.appendSwitch('disable-software-rasterizer');
-app.commandLine.appendSwitch('disable-features', 'VizDisplayCompositor');
+if (forceDisableGPU) {
+  app.disableHardwareAcceleration();
+  app.commandLine.appendSwitch('disable-gpu');
+  logger.log('warn', 'Main', 'GPU acceleration disabled via environment flag');
+} else {
+  // Enable hardware acceleration with BALANCED settings to prevent flickering
+  // DO NOT use disable-frame-rate-limit as it causes screen tearing/flickering
+  
+  // Basic GPU acceleration (safe defaults)
+  app.commandLine.appendSwitch('enable-gpu-rasterization');
+  
+  // Smooth scrolling
+  app.commandLine.appendSwitch('enable-smooth-scrolling');
+  
+  // Use hardware acceleration for animations
+  app.commandLine.appendSwitch('enable-accelerated-2d-canvas');
+  
+  // Force enable VSYNC to prevent tearing and flickering
+  app.commandLine.appendSwitch('disable-gpu-vsync', 'false');
+  
+  // Platform-specific optimizations
+  if (process.platform === 'win32') {
+    // Use D3D11 on Windows for best compatibility
+    app.commandLine.appendSwitch('use-angle', 'd3d11');
+    // Disable DXGI swap chain for older systems
+    app.commandLine.appendSwitch('disable-direct-composition');
+  } else if (process.platform === 'darwin') {
+    // macOS-specific: use Metal for best performance
+    app.commandLine.appendSwitch('enable-features', 'Metal');
+  }
+  
+  // Prevent GPU process crashes from affecting the main process
+  app.commandLine.appendSwitch('disable-gpu-process-crash-limit');
+}
 
 // Note: The actual fix for the "Checking session" crash loop requires
 // deploying the Providers.js fix to production (app.talio.in)
@@ -133,17 +165,27 @@ function createWindow() {
       allowRunningInsecureContent: false,
       // Enable DevTools for debugging
       devTools: true,
-      // Stability options
+      // PERFORMANCE: Disable background throttling for smooth animations
       backgroundThrottling: false,
-      offscreen: false,
-      // Disable experimental features that may cause crashes
-      experimentalFeatures: false
+      // PERFORMANCE: Enable hardware acceleration in renderer
+      enablePreferredSizeMode: false,
+      // Media features for screen sharing
+      mediaStreamShareSecurityOrigin: true,
+      // Spellcheck can cause jank - disable if not needed
+      spellcheck: false,
+      // Enable WebGL for smooth rendering
+      webgl: true,
+      // V8 code caching for faster JS execution
+      v8CacheOptions: 'bypassHeatCheck'
     },
     icon: getAppIcon(),
     show: false, // Don't show until ready-to-show
     backgroundColor: '#ffffff', // White background for loader
-    autoHideMenuBar: true
-    // Removed titleBarStyle and titleBarOverlay - causes blank screen issues
+    autoHideMenuBar: true,
+    // PERFORMANCE: Use native window frame for better performance
+    frame: true,
+    // Enable smooth resizing
+    hasShadow: true
   });
 
   // Show window when ready to prevent white flash
@@ -385,11 +427,19 @@ function setupWindowEvents() {
       } else if (errorCode === -200 || errorCode === -201 || errorCode === -202) { // SSL errors
         errorType = 'ssl';
       } else if (errorCode === -21) { // ERR_NETWORK_CHANGED
-        errorType = 'offline';
+        // Network changed - don't show offline page, try to reload instead
+        logger.log('warn', 'Main', 'Network changed, will retry loading...');
+        scheduleReload(2000);
+        return;
       } else if (errorCode === -100 || errorCode === -101) { // ERR_CONNECTION_CLOSED, ERR_CONNECTION_RESET
         errorType = 'server-error';
       } else if (errorCode === -3) { // ERR_ABORTED - usually navigation was cancelled
         // Don't show offline page for aborted requests (e.g., navigation change)
+        return;
+      } else if (errorCode === -6) { // ERR_FILE_NOT_FOUND
+        // Might be a whitescreen issue, try to reload
+        logger.log('warn', 'Main', 'File not found error, attempting reload...');
+        scheduleReload(1000);
         return;
       }
 
@@ -747,6 +797,117 @@ function setupIPCHandlers() {
     loadApp();
     return { success: true };
   });
+
+  // Get all connected displays for multi-monitor screen sharing
+  ipcMain.handle('get-displays', function () {
+    const displays = screen.getAllDisplays();
+    const primaryDisplay = screen.getPrimaryDisplay();
+    
+    return displays.map(function (display, index) {
+      const isPrimary = display.id === primaryDisplay.id;
+      return {
+        id: display.id,
+        label: isPrimary ? 'Primary Display' : ('Display ' + (index + 1)),
+        bounds: display.bounds,
+        workArea: display.workArea,
+        scaleFactor: display.scaleFactor,
+        rotation: display.rotation,
+        isPrimary: isPrimary
+      };
+    });
+  });
+
+  // Request screen share with source picker (Windows compatibility)
+  ipcMain.handle('request-screen-share', async function () {
+    try {
+      logger.log('info', 'Main', 'Screen share requested');
+      
+      // Get all available sources (screens and windows)
+      const sources = await desktopCapturer.getSources({
+        types: ['screen', 'window'],
+        thumbnailSize: { width: 320, height: 180 },
+        fetchWindowIcons: true
+      });
+      
+      if (sources.length === 0) {
+        logger.log('warn', 'Main', 'No screen sources available');
+        return { success: false, error: 'No screens or windows available' };
+      }
+      
+      // On Windows, we need to show our own picker since getDisplayMedia doesn't work well
+      if (process.platform === 'win32') {
+        // Return sources for the renderer to show a picker UI
+        return {
+          success: true,
+          requiresPicker: true,
+          sources: sources.map(function (source) {
+            return {
+              id: source.id,
+              name: source.name,
+              thumbnail: source.thumbnail.toDataURL(),
+              appIcon: source.appIcon ? source.appIcon.toDataURL() : null,
+              display_id: source.display_id,
+              isScreen: source.id.startsWith('screen:')
+            };
+          })
+        };
+      }
+      
+      // On macOS, return the sources and let navigator.mediaDevices.getDisplayMedia handle it
+      return {
+        success: true,
+        requiresPicker: false,
+        sources: sources.map(function (source) {
+          return {
+            id: source.id,
+            name: source.name,
+            thumbnail: source.thumbnail.toDataURL(),
+            appIcon: source.appIcon ? source.appIcon.toDataURL() : null,
+            display_id: source.display_id,
+            isScreen: source.id.startsWith('screen:')
+          };
+        })
+      };
+    } catch (error) {
+      logger.log('error', 'Main', 'Screen share request failed: ' + error.message);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Get screen share stream for a specific source
+  ipcMain.handle('get-screen-share-stream', async function (event, sourceId) {
+    try {
+      logger.log('info', 'Main', 'Getting screen share stream for source: ' + sourceId);
+      // Return the source ID to be used with getUserMedia constraints
+      return {
+        success: true,
+        sourceId: sourceId,
+        constraints: {
+          audio: {
+            mandatory: {
+              chromeMediaSource: 'desktop',
+              chromeMediaSourceId: sourceId
+            }
+          },
+          video: {
+            mandatory: {
+              chromeMediaSource: 'desktop',
+              chromeMediaSourceId: sourceId,
+              minWidth: 1280,
+              maxWidth: 1920,
+              minHeight: 720,
+              maxHeight: 1080,
+              minFrameRate: 15,
+              maxFrameRate: 30
+            }
+          }
+        }
+      };
+    } catch (error) {
+      logger.log('error', 'Main', 'Get screen share stream failed: ' + error.message);
+      return { success: false, error: error.message };
+    }
+  });
 }
 
 /**
@@ -1043,38 +1204,180 @@ function setupSessionPermissions() {
   });
 
   // Handle desktop capturer permission for screen sharing
-  session.defaultSession.setDisplayMediaRequestHandler(function (request, callback) {
+  // IMPROVED: Better handling for Windows multi-display and proper source selection
+  session.defaultSession.setDisplayMediaRequestHandler(async function (request, callback) {
     logger.log('info', 'Main', 'Display media request from: ' + request.frame.url);
 
-    // For the main app, automatically allow screen sharing
-    // The user will still see the OS-level screen picker
-    const { desktopCapturer } = require('electron');
-
-    desktopCapturer.getSources({ types: ['screen', 'window'] }).then(function (sources) {
-      if (sources.length > 0) {
-        // Return the first screen source - user can pick in the web app
-        callback({ video: sources[0], audio: 'loopback' });
-      } else {
+    try {
+      // Get all available sources
+      const sources = await desktopCapturer.getSources({ 
+        types: ['screen', 'window'],
+        thumbnailSize: { width: 320, height: 180 }
+      });
+      
+      if (sources.length === 0) {
+        logger.log('warn', 'Main', 'No display sources available');
         callback({});
+        return;
       }
-    }).catch(function (error) {
+
+      // On Windows, we need special handling because getDisplayMedia doesn't work properly
+      if (process.platform === 'win32') {
+        // Get all screens first
+        const screens = sources.filter(function(s) { return s.id.startsWith('screen:'); });
+        const displays = screen.getAllDisplays();
+        
+        if (screens.length > 1) {
+          // Multiple displays - show picker dialog
+          logger.log('info', 'Main', 'Multiple displays detected: ' + screens.length);
+          
+          // Build options for dialog
+          const displayOptions = screens.map(function(s, index) {
+            const displayInfo = displays[index];
+            const label = displayInfo ? 
+              (displayInfo.id === screen.getPrimaryDisplay().id ? 'Primary Display' : 'Display ' + (index + 1)) + 
+              ' (' + displayInfo.bounds.width + 'x' + displayInfo.bounds.height + ')' :
+              s.name;
+            return label;
+          });
+          
+          // Show display picker dialog
+          const result = await dialog.showMessageBox(mainWindow, {
+            type: 'question',
+            title: 'Select Display to Share',
+            message: 'Which display would you like to share?',
+            buttons: [...displayOptions, 'Cancel'],
+            defaultId: 0,
+            cancelId: displayOptions.length
+          });
+          
+          if (result.response < screens.length) {
+            const selectedSource = screens[result.response];
+            logger.log('info', 'Main', 'Selected screen: ' + selectedSource.name);
+            callback({ video: selectedSource, audio: 'loopback' });
+          } else {
+            logger.log('info', 'Main', 'Screen share cancelled by user');
+            callback({});
+          }
+          return;
+        } else if (screens.length === 1) {
+          // Single display - use it directly
+          logger.log('info', 'Main', 'Single display, using: ' + screens[0].name);
+          callback({ video: screens[0], audio: 'loopback' });
+          return;
+        }
+      }
+      
+      // For macOS or fallback: Return the first screen source
+      // macOS will show its own system picker
+      const screenSources = sources.filter(function(s) { return s.id.startsWith('screen:'); });
+      if (screenSources.length > 0) {
+        callback({ video: screenSources[0], audio: 'loopback' });
+      } else {
+        callback({ video: sources[0], audio: 'loopback' });
+      }
+    } catch (error) {
       logger.log('error', 'Main', 'Failed to get display sources: ' + error.message);
       callback({});
-    });
+    }
   });
 
   logger.log('info', 'Main', 'Session permissions configured');
 }
 
 /**
+ * Schedule a reload with debouncing to prevent multiple rapid reloads
+ */
+let pendingReloadTimeout = null;
+let lastReloadAttempt = 0;
+const MIN_RELOAD_INTERVAL = 3000; // Minimum 3 seconds between reload attempts
+
+function scheduleReload(delayMs) {
+  const now = Date.now();
+  
+  // Debounce - don't reload too frequently
+  if (now - lastReloadAttempt < MIN_RELOAD_INTERVAL) {
+    logger.log('info', 'Main', 'Skipping reload - too soon since last attempt');
+    return;
+  }
+  
+  // Clear any pending reload
+  if (pendingReloadTimeout) {
+    clearTimeout(pendingReloadTimeout);
+  }
+  
+  pendingReloadTimeout = setTimeout(function() {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    
+    lastReloadAttempt = Date.now();
+    logger.log('info', 'Main', 'Executing scheduled reload');
+    loadRetries = 0;
+    loadApp();
+  }, delayMs || 1000);
+}
+
+/**
+ * Check if the page is showing a whitescreen (blank page)
+ */
+async function checkForWhitescreen() {
+  if (!mainWindow || mainWindow.isDestroyed()) return false;
+  
+  try {
+    const result = await mainWindow.webContents.executeJavaScript(`
+      (function() {
+        // Check if body has any visible content
+        var body = document.body;
+        if (!body) return { isBlank: true, reason: 'no-body' };
+        
+        // Check if the page has meaningful content
+        var text = body.innerText || '';
+        var hasText = text.trim().length > 10;
+        
+        // Check for React root
+        var root = document.getElementById('__next') || document.getElementById('root');
+        var hasRoot = !!root;
+        var rootHasContent = hasRoot && root.innerHTML.trim().length > 50;
+        
+        // Check background color (whitescreen often has default white)
+        var bgColor = window.getComputedStyle(body).backgroundColor;
+        var isDefaultBg = bgColor === 'rgb(255, 255, 255)' || bgColor === 'rgba(0, 0, 0, 0)';
+        
+        // Check if page appears to be loading
+        var isLoading = document.querySelector('.loader, .loading, [class*="spinner"]') !== null;
+        
+        // Determine if whitescreen
+        var isBlank = !hasText && !rootHasContent && isDefaultBg && !isLoading;
+        
+        return {
+          isBlank: isBlank,
+          hasText: hasText,
+          hasRoot: hasRoot,
+          rootHasContent: rootHasContent,
+          isLoading: isLoading
+        };
+      })()
+    `);
+    
+    return result.isBlank;
+  } catch (e) {
+    // If we can't execute JS, page might be broken
+    logger.log('warn', 'Main', 'Could not check for whitescreen: ' + e.message);
+    return false;
+  }
+}
+
+/**
  * Setup network connectivity monitoring
  * Automatically reloads the app when internet connection is restored
+ * Also handles system sleep/wake events
  */
 let isOnOfflinePage = false;
 let networkCheckInterval = null;
+let whitescreenCheckInterval = null;
+let systemWasAsleep = false;
 
 function setupNetworkMonitoring() {
-  // Check network connectivity periodically when on offline page
+  // Check network connectivity
   const checkNetworkAndReload = async function () {
     if (!mainWindow || mainWindow.isDestroyed()) return;
 
@@ -1112,21 +1415,142 @@ function setupNetworkMonitoring() {
       }
     }
   };
+  
+  // Check for whitescreen and recover
+  const checkAndRecoverWhitescreen = async function() {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    
+    const currentUrl = mainWindow.webContents.getURL();
+    
+    // Only check on app pages, not offline/loader pages
+    if (!currentUrl.startsWith('https://app.talio.in')) return;
+    
+    const isBlank = await checkForWhitescreen();
+    
+    if (isBlank) {
+      logger.log('warn', 'Main', 'Whitescreen detected, attempting recovery...');
+      scheduleReload(1000);
+    }
+  };
 
   // Start periodic network check (every 10 seconds)
   networkCheckInterval = setInterval(checkNetworkAndReload, 10000);
+  
+  // Start periodic whitescreen check (every 30 seconds, less aggressive)
+  whitescreenCheckInterval = setInterval(checkAndRecoverWhitescreen, 30000);
 
-  // Also check immediately when the window gains focus (user returns to app)
+  // Handle system suspend (sleep)
+  powerMonitor.on('suspend', function() {
+    logger.log('info', 'Main', 'System going to sleep');
+    systemWasAsleep = true;
+  });
+  
+  // Handle system resume (wake)
+  powerMonitor.on('resume', function() {
+    logger.log('info', 'Main', 'System waking up from sleep');
+    
+    if (systemWasAsleep) {
+      systemWasAsleep = false;
+      
+      // Wait a bit for network to reconnect, then check and reload if needed
+      setTimeout(async function() {
+        if (!mainWindow || mainWindow.isDestroyed()) return;
+        
+        const currentUrl = mainWindow.webContents.getURL();
+        
+        // If on offline page, try to reload
+        if (currentUrl.includes('offline.html') || currentUrl.startsWith('file://')) {
+          logger.log('info', 'Main', 'On offline page after wake, checking network...');
+          checkNetworkAndReload();
+          return;
+        }
+        
+        // Check for whitescreen after resume
+        const isBlank = await checkForWhitescreen();
+        if (isBlank) {
+          logger.log('warn', 'Main', 'Whitescreen detected after system resume, reloading...');
+          scheduleReload(500);
+          return;
+        }
+        
+        // Even if not blank, do a soft check by injecting a heartbeat
+        try {
+          const isAlive = await mainWindow.webContents.executeJavaScript(`
+            (function() {
+              // Check if the app is responsive
+              return typeof window !== 'undefined' && document.readyState === 'complete';
+            })()
+          `);
+          
+          if (!isAlive) {
+            logger.log('warn', 'Main', 'Page unresponsive after resume, reloading...');
+            scheduleReload(500);
+          }
+        } catch (e) {
+          // Page might be in a bad state
+          logger.log('warn', 'Main', 'Could not check page health after resume: ' + e.message);
+          scheduleReload(1000);
+        }
+      }, 3000); // Wait 3 seconds for network to stabilize
+    }
+  });
+  
+  // Handle lock screen (user locked their screen)
+  powerMonitor.on('lock-screen', function() {
+    logger.log('info', 'Main', 'Screen locked');
+  });
+  
+  // Handle unlock screen
+  powerMonitor.on('unlock-screen', function() {
+    logger.log('info', 'Main', 'Screen unlocked');
+    
+    // Brief check after unlock - sometimes pages get stuck
+    setTimeout(async function() {
+      if (!mainWindow || mainWindow.isDestroyed()) return;
+      
+      const currentUrl = mainWindow.webContents.getURL();
+      if (currentUrl.startsWith('https://app.talio.in')) {
+        const isBlank = await checkForWhitescreen();
+        if (isBlank) {
+          logger.log('warn', 'Main', 'Whitescreen detected after unlock, reloading...');
+          scheduleReload(500);
+        }
+      }
+    }, 2000);
+  });
+
+  // Handle window focus - check for issues when user returns to app
   if (mainWindow) {
     mainWindow.on('focus', function () {
-      if (isOnOfflinePage) {
+      const currentUrl = mainWindow.webContents.getURL();
+      
+      if (currentUrl.includes('offline.html') || currentUrl.startsWith('file://')) {
         logger.log('info', 'Main', 'Window focused while on offline page, checking network...');
         setTimeout(checkNetworkAndReload, 1000);
+      } else if (currentUrl.startsWith('https://app.talio.in')) {
+        // Check for whitescreen when window regains focus
+        setTimeout(checkAndRecoverWhitescreen, 500);
       }
+    });
+    
+    // Also handle window show (might be restored from minimized/hidden state)
+    mainWindow.on('show', function() {
+      setTimeout(async function() {
+        if (!mainWindow || mainWindow.isDestroyed()) return;
+        
+        const currentUrl = mainWindow.webContents.getURL();
+        if (currentUrl.startsWith('https://app.talio.in')) {
+          const isBlank = await checkForWhitescreen();
+          if (isBlank) {
+            logger.log('warn', 'Main', 'Whitescreen detected on window show, reloading...');
+            scheduleReload(500);
+          }
+        }
+      }, 1000);
     });
   }
 
-  logger.log('info', 'Main', 'Network monitoring setup complete');
+  logger.log('info', 'Main', 'Network and power monitoring setup complete');
 }
 
 // App lifecycle events

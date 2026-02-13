@@ -22,7 +22,8 @@ import {
   HiOutlineExclamationCircle,
   HiOutlineBuildingOffice2,
   HiOutlineClipboardDocumentList,
-  HiOutlineEye
+  HiOutlineEye,
+  HiOutlineMagnifyingGlass
 } from 'react-icons/hi2'
 import RawCaptureViewer from '@/components/productivity/RawCaptureViewer'
 import ManualCapturePanel from '@/components/productivity/ManualCapturePanel'
@@ -54,6 +55,7 @@ export default function ProductivityPage() {
   const [loadingEmployeeSessions, setLoadingEmployeeSessions] = useState(false)
   const [departments, setDepartments] = useState([]) // Department list for filtering
   const [selectedDepartment, setSelectedDepartment] = useState('all') // Selected department filter
+  const [teamSearchQuery, setTeamSearchQuery] = useState('') // Search query for team members
   
   // Global AI loading animation
   const { startAILoading, stopAILoading } = useAILoading()
@@ -946,17 +948,63 @@ export default function ProductivityPage() {
           ) : (
             /* Team Grid View */
             <>
-          {teamSessions.length === 0 ? (
+          {/* Search Box */}
+          <div className="mb-6">
+            <div className="relative max-w-md">
+              <HiOutlineMagnifyingGlass className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search employees by name, email, or department..."
+                value={teamSearchQuery}
+                onChange={(e) => setTeamSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition placeholder:text-gray-400"
+              />
+              {teamSearchQuery && (
+                <button
+                  onClick={() => setTeamSearchQuery('')}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <HiOutlineXMark className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {(() => {
+            // Filter team sessions based on search query
+            const filteredTeamSessions = teamSessions.filter((member) => {
+              if (!teamSearchQuery.trim()) return true;
+              const query = teamSearchQuery.toLowerCase();
+              const name = (member.name || `${member.firstName || ''} ${member.lastName || ''}`).toLowerCase();
+              const email = (member.email || '').toLowerCase();
+              const designation = (member.designation || '').toLowerCase();
+              const department = (member.department || '').toLowerCase();
+              return name.includes(query) || email.includes(query) || designation.includes(query) || department.includes(query);
+            });
+
+            return filteredTeamSessions.length === 0 ? (
             <div className="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-100">
               <HiOutlineUsers className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-              <h3 className="text-lg font-medium text-gray-800 mb-2">No team activity</h3>
+              <h3 className="text-lg font-medium text-gray-800 mb-2">
+                {teamSearchQuery ? 'No matching employees' : 'No team activity'}
+              </h3>
               <p className="text-gray-500">
-                No team members have recorded activity on this date.
+                {teamSearchQuery 
+                  ? `No employees match "${teamSearchQuery}". Try a different search term.`
+                  : 'No team members have recorded activity on this date.'}
               </p>
+              {teamSearchQuery && (
+                <button
+                  onClick={() => setTeamSearchQuery('')}
+                  className="mt-4 px-4 py-2 text-primary-600 hover:text-primary-700 font-medium"
+                >
+                  Clear search
+                </button>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {teamSessions.map((member) => {
+              {filteredTeamSessions.map((member) => {
                 // Get sessions from sessionsSummary
                 const memberSessions = member.sessionsSummary?.sessions || [];
                 const firstSession = memberSessions[0];
@@ -1036,7 +1084,8 @@ export default function ProductivityPage() {
                 </div>
               )})}
             </div>
-          )}
+          );
+          })()}
             </>
           )}
         </div>
