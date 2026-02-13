@@ -1,6 +1,7 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import useAutoRefresh from '@/hooks/useAutoRefresh'
 
 /**
@@ -13,6 +14,7 @@ import useAutoRefresh from '@/hooks/useAutoRefresh'
  */
 export default function AutoRefresh() {
   const pathname = usePathname()
+  const router = useRouter()
   
   // Only enable auto-refresh on dashboard pages
   const isAuthenticatedPage = pathname?.startsWith('/dashboard')
@@ -22,9 +24,14 @@ export default function AutoRefresh() {
     minAwayTime: 2 * 60 * 1000, // Refresh if away for 2+ minutes
     refreshOnVisibilityChange: true,
     enabled: isAuthenticatedPage,
+    hardRefreshOnInactivity: false,
     onRefresh: () => {
       // Optional: Clear any stale state before refresh
       console.log('🔄 [AutoRefresh] Refreshing page for fresh data...')
+    },
+    onSoftRefresh: ({ reason }) => {
+      console.log(`🔄 [AutoRefresh] Soft refresh via router.refresh() (${reason})`)
+      router.refresh()
     }
   })
 

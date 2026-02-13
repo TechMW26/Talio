@@ -8,6 +8,7 @@ import { AILoadingProvider } from '@/contexts/AILoadingContext'
 import GlobalAILoadingOverlay from '@/components/ui/GlobalAILoadingOverlay'
 import MiraTransitionOverlay from '@/components/ui/MiraTransitionOverlay'
 import AutoRefresh from '@/components/AutoRefresh'
+import WebNetworkRecovery from '@/components/WebNetworkRecovery'
 
 // Cache operations completely disabled - no imports needed
 // import { checkAndClearCaches } from '@/lib/cacheManager'
@@ -98,6 +99,7 @@ export function Providers({ children }) {
                     >
                         <MiraTransitionOverlay />
                         <GlobalAILoadingOverlay />
+                        <WebNetworkRecovery />
                         <AutoRefresh />
                         {children}
                     </SWRConfig>

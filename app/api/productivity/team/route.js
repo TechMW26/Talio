@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
 
+const SCREENSHOTS_PER_SESSION = 30;
+
 /**
  * GET /api/productivity/team
  * Get team members with their session summaries for department heads and admins
@@ -8,12 +10,12 @@ import { getAuthAndModels } from '@/lib/auth';
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['ProductivitySession', 'User', 'Employee', 'Department']);
+    const auth = await getAuthAndModels(request, ['ProductivitySession', 'User', 'Employee', 'Department', 'Screenshot']);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
     const { user, models } = auth;
-    const { ProductivitySession, User, Employee, Department } = models;
+    const { ProductivitySession, User, Employee, Department, Screenshot } = models;
 
     const currentUserId = (user._id || user.userId).toString();
     const currentUserRole = user.role;
@@ -172,6 +174,36 @@ export async function GET(request) {
     }).select('user employee sessionNumber screenshotCount screenshots analysis startTime endTime').lean();
     
     console.log(`[Team API] Fetched ${allSessions.length} sessions in single batched query`);
+
+    // Fallback source: raw screenshots for users whose sessions are not yet synced
+    const rawScreenshots = Screenshot
+      ? await Screenshot.find({
+          user: { $in: allUserIds },
+          dateString: dateParam
+        })
+          .select('user imagekitUrl path capturedAt')
+          .sort({ capturedAt: -1 })
+          .lean()
+      : [];
+
+    const screenshotsByUser = new Map();
+    rawScreenshots.forEach((shot) => {
+      const userId = shot?.user?.toString();
+      if (!userId) return;
+
+      if (!screenshotsByUser.has(userId)) {
+        screenshotsByUser.set(userId, {
+          count: 0,
+          latestPreview: null
+        });
+      }
+
+      const bucket = screenshotsByUser.get(userId);
+      bucket.count += 1;
+      if (!bucket.latestPreview) {
+        bucket.latestPreview = shot.imagekitUrl || shot.path || null;
+      }
+    });
     
     // Group sessions by member (using userId or employeeId)
     const sessionsByMember = new Map();
@@ -217,6 +249,7 @@ export async function GET(request) {
       
       // Get pre-fetched sessions for this member
       const sessions = sessionsByMember.get(memberId) || [];
+      const fallbackShots = screenshotsByUser.get(userId.toString()) || { count: 0, latestPreview: null };
       
       // Calculate average score
       const analyzedSessions = sessions.filter(s => s.analysis?.isAnalyzed && s.analysis?.score != null);
@@ -238,6 +271,26 @@ export async function GET(request) {
         // Include all screenshots for modal view
         screenshots: s.screenshots || []
       }));
+
+      const fallbackSessions = fallbackShots.count > 0 ? [{
+        _id: `fallback-${memberId}`,
+        sessionNumber: 1,
+        screenshotCount: fallbackShots.count,
+        isAnalyzed: false,
+        score: null,
+        startTime: null,
+        endTime: null,
+        previewUrl: fallbackShots.latestPreview,
+        screenshots: fallbackShots.latestPreview ? [{ url: fallbackShots.latestPreview, path: fallbackShots.latestPreview }] : []
+      }] : [];
+
+      const totalSessions = sessions.length > 0
+        ? sessions.length
+        : Math.ceil(fallbackShots.count / SCREENSHOTS_PER_SESSION);
+
+      const totalScreenshots = sessions.length > 0
+        ? sessions.reduce((sum, s) => sum + (s.screenshotCount || 0), 0)
+        : fallbackShots.count;
       
       return {
         _id: member._id,
@@ -249,11 +302,11 @@ export async function GET(request) {
         designation: member.designation?.title || 'N/A',
         userId: userId.toString(),
         sessionsSummary: {
-          totalSessions: sessions.length,
-          totalScreenshots: sessions.reduce((sum, s) => sum + s.screenshotCount, 0),
+          totalSessions,
+          totalScreenshots,
           analyzedSessions: analyzedSessions.length,
           averageScore: avgScore,
-          sessions: sessionsWithPreview
+          sessions: sessionsWithPreview.length > 0 ? sessionsWithPreview : fallbackSessions
         }
       };
     });

@@ -2,6 +2,14 @@
 
 import { useEffect, useRef, useCallback } from 'react'
 
+function isElectronApp() {
+  if (typeof window === 'undefined') return false
+  if (window.electronAPI) return true
+  if (window.talioDesktop?.isDesktopApp) return true
+  if (navigator.userAgent.toLowerCase().includes('electron')) return true
+  return false
+}
+
 /**
  * Auto-refresh hook that triggers page refresh on:
  * 1. User inactivity (default 5 minutes)
@@ -20,7 +28,9 @@ export default function useAutoRefresh({
   refreshOnVisibilityChange = true,
   minAwayTime = 2 * 60 * 1000, // 2 minutes minimum away time before refresh
   enabled = true,
-  onRefresh = null
+  onRefresh = null,
+  onSoftRefresh = null,
+  hardRefreshOnInactivity = false
 } = {}) {
   const inactivityTimerRef = useRef(null)
   const lastActivityRef = useRef(Date.now())
@@ -28,11 +38,11 @@ export default function useAutoRefresh({
   const isRefreshingRef = useRef(false)
 
   // Perform refresh with optional callback
-  const performRefresh = useCallback(() => {
+  const performRefresh = useCallback(({ hard = false, reason = 'auto-refresh' } = {}) => {
     if (isRefreshingRef.current) return
     isRefreshingRef.current = true
 
-    console.log('🔄 [AutoRefresh] Triggering page refresh...')
+    console.log(`🔄 [AutoRefresh] Triggering ${hard ? 'hard' : 'soft'} refresh (${reason})...`)
     
     // Call optional cleanup callback
     if (onRefresh && typeof onRefresh === 'function') {
@@ -43,9 +53,29 @@ export default function useAutoRefresh({
       }
     }
 
-    // Use location.reload() for a clean refresh
-    window.location.reload()
-  }, [onRefresh])
+    const shouldHardRefresh = hard || isElectronApp()
+
+    if (shouldHardRefresh) {
+      window.location.reload()
+      return
+    }
+
+    try {
+      if (onSoftRefresh && typeof onSoftRefresh === 'function') {
+        onSoftRefresh({ reason })
+      } else {
+        window.dispatchEvent(new CustomEvent('talio:soft-refresh', { detail: { reason } }))
+      }
+    } catch (error) {
+      console.warn('[AutoRefresh] Soft refresh failed, falling back to hard refresh:', error)
+      window.location.reload()
+      return
+    }
+
+    setTimeout(() => {
+      isRefreshingRef.current = false
+    }, 1500)
+  }, [onRefresh, onSoftRefresh])
 
   // Reset inactivity timer
   const resetInactivityTimer = useCallback(() => {
@@ -58,10 +88,10 @@ export default function useAutoRefresh({
     if (enabled) {
       inactivityTimerRef.current = setTimeout(() => {
         console.log('⏰ [AutoRefresh] Inactivity timeout reached')
-        performRefresh()
+        performRefresh({ hard: hardRefreshOnInactivity, reason: 'inactivity-timeout' })
       }, inactivityTimeout)
     }
-  }, [enabled, inactivityTimeout, performRefresh])
+  }, [enabled, inactivityTimeout, performRefresh, hardRefreshOnInactivity])
 
   // Handle visibility change (tab focus/blur, laptop lid open/close)
   const handleVisibilityChange = useCallback(() => {
@@ -74,7 +104,7 @@ export default function useAutoRefresh({
       // Refresh if user was away for more than minAwayTime
       if (timeAway >= minAwayTime) {
         console.log('🔄 [AutoRefresh] User was away long enough, refreshing...')
-        performRefresh()
+        performRefresh({ reason: 'visibility-return' })
       } else {
         // Just reset the inactivity timer
         resetInactivityTimer()
@@ -96,7 +126,7 @@ export default function useAutoRefresh({
       const timeAway = Date.now() - lastVisibleRef.current
       
       if (timeAway >= minAwayTime) {
-        performRefresh()
+        performRefresh({ reason: 'pageshow-persisted' })
       }
     }
   }, [enabled, minAwayTime, performRefresh])
@@ -110,7 +140,7 @@ export default function useAutoRefresh({
 
     // If we've been inactive for a while and just came back online, refresh
     if (timeAway >= minAwayTime) {
-      performRefresh()
+      performRefresh({ reason: 'network-reconnected' })
     }
   }, [enabled, minAwayTime, performRefresh])
 
@@ -123,7 +153,7 @@ export default function useAutoRefresh({
     // Only refresh if inactive for more than minAwayTime
     if (timeAway >= minAwayTime) {
       console.log('🎯 [AutoRefresh] Window focused after long inactivity')
-      performRefresh()
+      performRefresh({ reason: 'window-focus' })
     } else {
       resetInactivityTimer()
     }
