@@ -71,6 +71,22 @@ export default function MeetingRoomPage({ params }) {
   const recordedChunksRef = useRef([])
   const socketRef = useRef(null)
   const peerConnectionsRef = useRef({})
+  const remoteStreamsRef = useRef({})
+
+  const upsertParticipant = useCallback((participantLike) => {
+    if (!participantLike?.id) return
+
+    setParticipants(prev => {
+      const existing = prev.find(p => p.id === participantLike.id)
+      if (existing) {
+        return prev.map(p => p.id === participantLike.id
+          ? { ...p, ...participantLike, stream: participantLike.stream || p.stream }
+          : p
+        )
+      }
+      return [...prev, participantLike]
+    })
+  }, [])
 
   // Effect to attach local stream to video element when it becomes available
   useEffect(() => {
@@ -232,7 +248,7 @@ export default function MeetingRoomPage({ params }) {
       socketRef.current.on('existing-participants', async (existingUsers) => {
         console.log('Existing participants:', existingUsers)
         for (const userData of existingUsers) {
-          setParticipants(prev => [...prev.filter(p => p.id !== userData.id), userData])
+          upsertParticipant(userData)
           // Create peer connection and send offer to existing user
           await createPeerConnectionAndOffer(userData.id, userData.userName)
         }
@@ -241,7 +257,7 @@ export default function MeetingRoomPage({ params }) {
       // Handle other participants joining after us
       socketRef.current.on('user-joined', (userData) => {
         console.log('User joined:', userData)
-        setParticipants(prev => [...prev.filter(p => p.id !== userData.id), userData])
+        upsertParticipant(userData)
         // Don't create offer - wait for the new user to send us an offer
         // The new user will initiate connections with existing participants
         createPeerConnection(userData.id, userData.userName, false)
@@ -250,6 +266,9 @@ export default function MeetingRoomPage({ params }) {
       socketRef.current.on('user-left', (userData) => {
         console.log('User left:', userData)
         setParticipants(prev => prev.filter(p => p.id !== userData.id))
+        if (remoteStreamsRef.current[userData.id]) {
+          delete remoteStreamsRef.current[userData.id]
+        }
         // Clean up peer connection
         if (peerConnectionsRef.current[userData.id]) {
           peerConnectionsRef.current[userData.id].close()
@@ -277,12 +296,7 @@ export default function MeetingRoomPage({ params }) {
         if (!pc) {
           pc = createPeerConnection(from, 'Participant', false)
           // Also add to participants list
-          setParticipants(prev => {
-            if (!prev.find(p => p.id === from)) {
-              return [...prev, { id: from, userName: 'Participant' }]
-            }
-            return prev
-          })
+          upsertParticipant({ id: from, userName: 'Participant' })
         }
         await pc.setRemoteDescription(new RTCSessionDescription(offer))
         const answer = await pc.createAnswer()
@@ -320,7 +334,7 @@ export default function MeetingRoomPage({ params }) {
         toast.error('Failed to join meeting')
       }
     }
-  }, [roomId, user])
+  }, [roomId, user, upsertParticipant])
 
   // Create WebRTC peer connection
   const createPeerConnection = (peerId, peerName, shouldOffer = false) => {
@@ -351,10 +365,25 @@ export default function MeetingRoomPage({ params }) {
     // Handle incoming tracks
     pc.ontrack = (event) => {
       console.log('Received remote track from', peerId, event)
-      // Add remote stream to participant video
-      setParticipants(prev => prev.map(p => 
-        p.id === peerId ? { ...p, stream: event.streams[0] } : p
-      ))
+
+      const incomingTrack = event.track
+      const incomingStream = event.streams?.[0]
+
+      if (incomingStream) {
+        remoteStreamsRef.current[peerId] = incomingStream
+      } else {
+        if (!remoteStreamsRef.current[peerId]) {
+          remoteStreamsRef.current[peerId] = new MediaStream()
+        }
+        const syntheticStream = remoteStreamsRef.current[peerId]
+        const alreadyExists = syntheticStream.getTracks().some(t => t.id === incomingTrack.id)
+        if (!alreadyExists) {
+          syntheticStream.addTrack(incomingTrack)
+        }
+      }
+
+      const mediaStream = remoteStreamsRef.current[peerId]
+      upsertParticipant({ id: peerId, userName: peerName || 'Participant', stream: mediaStream })
     }
 
     // Handle ICE candidates
@@ -441,10 +470,22 @@ export default function MeetingRoomPage({ params }) {
       setIsScreenSharing(false)
     } else {
       try {
-        const screenStream = await navigator.mediaDevices.getDisplayMedia({
-          video: true,
-          audio: true
-        })
+        let screenStream = null
+        try {
+          screenStream = await navigator.mediaDevices.getDisplayMedia({
+            video: {
+              frameRate: { ideal: 30, max: 60 }
+            },
+            audio: true
+          })
+        } catch (primaryError) {
+          screenStream = await navigator.mediaDevices.getDisplayMedia({
+            video: {
+              frameRate: { ideal: 30, max: 60 }
+            },
+            audio: false
+          })
+        }
         screenStreamRef.current = screenStream
         setHasScreenStream(true) // Trigger re-render and useEffect to attach stream
         
@@ -473,7 +514,11 @@ export default function MeetingRoomPage({ params }) {
         console.error('Error sharing screen:', error)
         // Check for permission denied errors
         if (error.name === 'NotAllowedError' || error.message?.includes('Permission denied')) {
-          toast.error('Screen sharing permission denied. Please enable screen recording in System Preferences > Privacy & Security > Screen Recording')
+          toast.error('Screen share was blocked. Pick a window/screen in the share dialog and allow access.')
+        } else if (error.name === 'AbortError') {
+          toast.error('Screen sharing was cancelled.')
+        } else if (error.name === 'NotReadableError') {
+          toast.error('Screen is currently unavailable. Close other sharing apps and try again.')
         } else if (error.name === 'NotFoundError') {
           toast.error('No screen available to share')
         } else {
@@ -621,6 +666,7 @@ export default function MeetingRoomPage({ params }) {
         screenStreamRef.current.getTracks().forEach(track => track.stop())
       }
       Object.values(peerConnectionsRef.current).forEach(pc => pc.close())
+      remoteStreamsRef.current = {}
       if (socketRef.current) {
         socketRef.current.disconnect()
       }
@@ -855,17 +901,29 @@ export default function MeetingRoomPage({ params }) {
         ) : (
           <>
             {data?.stream ? (
-              <video
-                autoPlay
-                playsInline
-                ref={el => {
-                  if (el && data.stream && el.srcObject !== data.stream) {
-                    el.srcObject = data.stream
-                    el.play().catch(() => {}) // Ignore autoplay errors
-                  }
-                }}
-                className="absolute inset-0 w-full h-full object-contain"
-              />
+                  <>
+                    <video
+                      autoPlay
+                      playsInline
+                      ref={el => {
+                        if (el && data.stream && el.srcObject !== data.stream) {
+                          el.srcObject = data.stream
+                          el.play().catch(() => {}) // Ignore autoplay errors
+                        }
+                      }}
+                      className="absolute inset-0 w-full h-full object-contain"
+                    />
+                    <audio
+                      autoPlay
+                      playsInline
+                      ref={el => {
+                        if (el && data.stream && el.srcObject !== data.stream) {
+                          el.srcObject = data.stream
+                          el.play().catch(() => {})
+                        }
+                      }}
+                    />
+                  </>
             ) : (
               <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
                 <div className="w-12 h-12 sm:w-20 sm:h-20 bg-indigo-600 rounded-full flex items-center justify-center">
