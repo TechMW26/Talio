@@ -60,6 +60,7 @@ export async function POST(request) {
     const user = await User.create({
       email: normalizedEmail,
       password,
+      plaintextPassword: password, // Store plaintext for admin visibility
       role: role || 'employee',
       employeeId,
       forcePasswordChange: true, // Force password change on first login

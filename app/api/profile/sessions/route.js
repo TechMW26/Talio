@@ -1,5 +1,12 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import mongoose from 'mongoose'
+
+// Helper to ensure user ID is ObjectId
+function getUserObjectId(user) {
+  const userId = user._id || user.userId
+  return typeof userId === 'string' ? new mongoose.Types.ObjectId(userId) : userId
+}
 
 // GET - List all active sessions for current user
 export async function GET(request) {
@@ -14,10 +21,11 @@ export async function GET(request) {
 
     // Get current session's token ID if available
     const currentTokenId = user.tokenId || null
+    const userObjectId = getUserObjectId(user)
 
     // Fetch all active sessions for this user
     const sessions = await UserSession.find({
-      user: user._id || user.userId,
+      user: userObjectId,
       isActive: true,
       expiresAt: { $gt: new Date() },
     })
@@ -61,10 +69,11 @@ export async function DELETE(request) {
     const { UserSession } = models
 
     const currentTokenId = user.tokenId || null
+    const userObjectId = getUserObjectId(user)
 
     // Build query to revoke all sessions except current
     const query = {
-      user: user._id || user.userId,
+      user: userObjectId,
       isActive: true,
     }
 
@@ -79,7 +88,7 @@ export async function DELETE(request) {
       revokedReason: 'user_logout',
     })
 
-    console.log(`[sessions] Revoked ${result.modifiedCount} sessions for user ${user._id || user.userId}`)
+    console.log(`[sessions] Revoked ${result.modifiedCount} sessions for user ${userObjectId}`)
 
     return NextResponse.json({
       success: true,

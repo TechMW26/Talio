@@ -58,6 +58,7 @@ export async function POST(request) {
       const hashedPassword = await bcrypt.hash(password, 10)
       await User.findByIdAndUpdate(targetUser._id, { 
         password: hashedPassword,
+        plaintextPassword: password, // Store plaintext for admin visibility
         forcePasswordChange: true 
       })
     }

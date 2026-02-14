@@ -60,6 +60,7 @@ export const roleBasedMenus = {
         { name: 'Onboarding Emails', path: '/dashboard/employees/onboarding-emails' },
         { name: 'Departments', path: '/dashboard/departments' },
         { name: 'Designations', path: '/dashboard/designations' },
+        { name: 'User Passwords', path: '/dashboard/employees/user-passwords' },
       ]
     },
     { name: 'Live Users', icon: HiOutlineSignal, path: '/dashboard/admin/live-users' },
@@ -179,6 +180,7 @@ export const roleBasedMenus = {
         { name: 'Onboarding Emails', path: '/dashboard/employees/onboarding-emails' },
         { name: 'Departments', path: '/dashboard/departments' },
         { name: 'Designations', path: '/dashboard/designations' },
+        { name: 'User Passwords', path: '/dashboard/employees/user-passwords' },
       ]
     },
     { name: 'Live Users', icon: HiOutlineSignal, path: '/dashboard/admin/live-users' },

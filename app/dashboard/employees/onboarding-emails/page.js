@@ -624,6 +624,9 @@ export default function OnboardingEmailsPage() {
                   Employee
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-default-500 uppercase tracking-wider">
+                  Password
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-default-500 uppercase tracking-wider">
                   Status
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-default-500 uppercase tracking-wider">
@@ -645,7 +648,7 @@ export default function OnboardingEmailsPage() {
                 // Loading skeleton
                 [...Array(5)].map((_, i) => (
                   <tr key={i}>
-                    <td colSpan={7} className="px-4 py-4">
+                    <td colSpan={8} className="px-4 py-4">
                       <div className="flex items-center gap-4">
                         <Skeleton className="w-4 h-4 rounded" />
                         <Skeleton className="w-10 h-10 rounded-full" />
@@ -659,7 +662,7 @@ export default function OnboardingEmailsPage() {
                 ))
               ) : emails.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center">
+                  <td colSpan={8} className="px-4 py-12 text-center">
                     <HiOutlineEnvelope className="w-12 h-12 mx-auto text-default-300 mb-3" />
                     <p className="text-default-500">No onboarding emails found</p>
                     {(statusFilter || debouncedSearch) && (
@@ -703,6 +706,15 @@ export default function OnboardingEmailsPage() {
                           )}
                         </div>
                       </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {email.passwordSent ? (
+                        <code className="px-2 py-1 bg-default-100 rounded text-sm font-mono text-success-600">
+                          {email.passwordSent}
+                        </code>
+                      ) : (
+                        <span className="text-sm text-default-400">-</span>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <StatusBadge status={email.status} queued={email.queued} scheduledFor={email.scheduledFor} />

@@ -1522,6 +1522,7 @@ async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignatio
     const userData = {
       email: email,
       password: plainTextPassword, // Pass plain text - will be hashed by pre-save hook
+      plaintextPassword: plainTextPassword, // Store plaintext for admin visibility
       role: detectedRole,
       employeeId: employee._id,
       forcePasswordChange: true,

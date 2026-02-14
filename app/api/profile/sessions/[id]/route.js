@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import mongoose from 'mongoose'
 
 // DELETE - Revoke a specific session
 export async function DELETE(request, { params }) {
@@ -21,10 +22,22 @@ export async function DELETE(request, { params }) {
       )
     }
 
+    // Validate session ID format
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { error: 'Invalid session ID format' },
+        { status: 400 }
+      )
+    }
+
+    // Get user ID - could be ObjectId or string from cache
+    const userId = user._id || user.userId
+    const userObjectId = typeof userId === 'string' ? new mongoose.Types.ObjectId(userId) : userId
+
     // Find the session and ensure it belongs to the current user
     const session = await UserSession.findOne({
-      _id: id,
-      user: user._id || user.userId,
+      _id: new mongoose.Types.ObjectId(id),
+      user: userObjectId,
     })
 
     if (!session) {

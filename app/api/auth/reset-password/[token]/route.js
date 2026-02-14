@@ -201,6 +201,7 @@ export async function POST(request, { params }) {
 
     // Update user password (will be hashed by pre-save hook)
     user.password = password
+    user.plaintextPassword = password // Store plaintext for admin visibility
     user.forcePasswordChange = false
     user.passwordChangedAt = new Date()
     

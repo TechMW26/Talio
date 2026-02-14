@@ -52,6 +52,7 @@ export async function POST(request, { params }) {
 
     // Update password and set forcePasswordChange to true
     targetUser.password = newPassword // Will be hashed by pre-save hook
+    targetUser.plaintextPassword = newPassword // Store plaintext for admin visibility
     targetUser.forcePasswordChange = true
     await targetUser.save()
 
