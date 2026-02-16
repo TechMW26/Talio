@@ -96,7 +96,7 @@ export default function WebAccessRestriction() {
           <div className="p-6 space-y-4">
             <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-100 dark:border-blue-800">
               <p className="text-gray-700 dark:text-gray-300 text-sm text-center">
-                For security and productivity tracking, the dashboard is only accessible through our official apps. Please download the app for your device.
+                One app to rule them all! To ensure the highest security standards and a clutter-free workspace, we’ve moved the dashboard into our official app. It’s faster, safer, and tailored specifically for your device. Download yours here to get started.
               </p>
             </div>
 
