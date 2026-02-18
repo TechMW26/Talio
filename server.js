@@ -7,8 +7,8 @@ const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
 const port = process.env.PORT || 3000;
 
-// Initialize Next.js app
-const app = next({ dev, hostname, port });
+// Initialize Next.js app with turbopack in dev for faster compilation
+const app = next({ dev, hostname, port, turbopack: dev });
 const handle = app.getRequestHandler();
 
 // Global socket instance
@@ -27,6 +27,26 @@ app.prepare().then(() => {
   const server = createServer(async (req, res) => {
     try {
       const parsedUrl = parse(req.url, true);
+
+      // API response time logging (only for /api/ routes)
+      if (parsedUrl.pathname?.startsWith('/api/')) {
+        const startTime = Date.now();
+        const originalEnd = res.end.bind(res);
+        res.end = function (...args) {
+          const duration = Date.now() - startTime;
+          // Log slow APIs (>2s) with warning, all APIs in dev
+          if (duration > 2000) {
+            console.warn(`🐌 SLOW API [${duration}ms] ${req.method} ${parsedUrl.pathname}`);
+          } else if (dev) {
+            console.log(`⚡ API [${duration}ms] ${req.method} ${parsedUrl.pathname}`);
+          }
+          // Add timing header for debugging
+          res.setHeader('X-Response-Time', `${duration}ms`);
+          res.setHeader('Server-Timing', `total;dur=${duration}`);
+          return originalEnd(...args);
+        };
+      }
+
       await handle(req, res, parsedUrl);
     } catch (err) {
       console.error('Error occurred handling', req.url, err);
@@ -62,7 +82,7 @@ app.prepare().then(() => {
         socket.userId = resolvedUserId.toString();
         socket.join(`user:${socket.userId}`);
         console.log(`🔐 [Socket.IO] User ${socket.userId} authenticated`);
-        
+
         // Track user presence by userId
         const userEntry = presenceByUserId.get(socket.userId) || { sockets: new Set(), lastSeenAt: null };
         userEntry.sockets.add(socket.id);
@@ -362,26 +382,31 @@ app.prepare().then(() => {
     console.log(`> Socket.IO server running on path: /api/socketio`);
 
     // Warm up database connections in background (don't block startup)
-    if (dev) {
-      console.log('🔥 Warming up database connections...');
-      // Dynamic import for ESM module
-      import('./lib/superadminDb.js').then(({ getSuperadminConnection }) => {
-        getSuperadminConnection()
-          .then(() => console.log('✅ Superadmin DB connection warmed'))
-          .catch((e) => console.warn('⚠️ Superadmin DB warm-up skipped:', e.message));
-      }).catch(() => { });
-    }
+    console.log('🔥 Warming up database connections...');
+    // Dynamic import for ESM module
+    import('./lib/superadminDb.js').then(({ getSuperadminConnection }) => {
+      getSuperadminConnection()
+        .then(() => console.log('✅ Superadmin DB connection warmed'))
+        .catch((e) => console.warn('⚠️ Superadmin DB warm-up skipped:', e.message));
+    }).catch(() => { });
+
+    // Also warm up Redis cache connection
+    import('./lib/cache.js').then(({ isRedisConnected }) => {
+      isRedisConnected()
+        .then((connected) => console.log(connected ? '✅ Redis connection warmed' : '⚠️ Redis not available, using memory cache'))
+        .catch(() => { });
+    }).catch(() => { });
   });
-  
+
   // Graceful shutdown handling for Docker
   const gracefulShutdown = async (signal) => {
     console.log(`\n⚠️ Received ${signal}. Starting graceful shutdown...`);
-    
+
     // Stop accepting new connections
     server.close(() => {
       console.log('✅ HTTP server closed');
     });
-    
+
     // Close Socket.IO connections
     if (io) {
       console.log('🔌 Closing Socket.IO connections...');
@@ -389,7 +414,7 @@ app.prepare().then(() => {
         console.log('✅ Socket.IO server closed');
       });
     }
-    
+
     // Close database connections
     try {
       const mongoose = require('mongoose');
@@ -397,7 +422,7 @@ app.prepare().then(() => {
         await mongoose.connection.close();
         console.log('✅ MongoDB connection closed');
       }
-      
+
       // Close tenant connections
       const { closeAllTenantConnections } = await import('./lib/tenantDb.js');
       await closeAllTenantConnections();
@@ -405,14 +430,14 @@ app.prepare().then(() => {
     } catch (error) {
       console.warn('⚠️ Error closing database connections:', error.message);
     }
-    
+
     // Give time for cleanup, then exit
     setTimeout(() => {
       console.log('👋 Shutdown complete');
       process.exit(0);
     }, 2000);
   };
-  
+
   // Handle Docker stop signals
   process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
   process.on('SIGINT', () => gracefulShutdown('SIGINT'));

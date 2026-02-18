@@ -17,20 +17,21 @@ export async function GET(request) {
     const includeAll = includeWidgets.includes('all')
 
     // Get authenticated user and tenant-specific models
+    // Only load models that are actually queried in this route
     const auth = await getAuthAndModels(request, [
-      'Attendance', 'LeaveBalance', 'LeaveType', 'Leave', 'Payroll', 
-      'Employee', 'Designation', 'Department', 'User', 'Performance',
+      'Attendance', 'LeaveBalance', 'LeaveType', 'Leave',
+      'Employee', 'Department', 'User',
       'Holiday', 'Announcement', 'Asset', 'Expense', 'Ticket', 'Policy'
     ])
-    
+
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    
+
     const { user, models, tenant } = auth
-    const { 
-      Attendance, LeaveBalance, LeaveType, Leave, Payroll,
-      Employee, Designation, Department, User, Performance,
+    const {
+      Attendance, LeaveBalance, LeaveType, Leave,
+      Employee, Department, User,
       Holiday, Announcement, Asset, Expense, Ticket, Policy
     } = models
 
@@ -38,14 +39,17 @@ export async function GET(request) {
     const isManagement = ['admin', 'department_head', 'hr', 'manager'].includes(userRole)
     const isHRLevel = ['admin', 'department_head', 'hr'].includes(userRole)
 
-    // Get user with employee data
-    const userWithEmployee = await User.findById(user._id || user.userId).populate({
-      path: 'employeeId',
-      populate: [
-        { path: 'designation', select: 'title code levelName' },
-        { path: 'department', select: 'name' }
-      ]
-    })
+    // Get user with employee data (lean for performance)
+    const userWithEmployee = await User.findById(user._id || user.userId)
+      .populate({
+        path: 'employeeId',
+        select: 'firstName lastName employeeCode designation department profilePicture status _id',
+        populate: [
+          { path: 'designation', select: 'title' },
+          { path: 'department', select: 'name' }
+        ]
+      })
+      .lean()
 
     const employee = userWithEmployee?.employeeId
     const employeeId = employee?._id
@@ -97,36 +101,36 @@ export async function GET(request) {
     // === HOLIDAYS (for all roles) ===
     if (includeAll || includeWidgets.includes('holidays')) {
       fetchPromises.push(
-        Holiday.find({ 
+        Holiday.find({
           date: { $gte: new Date() }
         })
-        .sort({ date: 1 })
-        .limit(5)
-        .lean()
-        .then(holidays => {
-          dashboardData.holidays = holidays
-        })
-        .catch(() => { dashboardData.holidays = [] })
+          .sort({ date: 1 })
+          .limit(5)
+          .lean()
+          .then(holidays => {
+            dashboardData.holidays = holidays
+          })
+          .catch(() => { dashboardData.holidays = [] })
       )
     }
 
     // === ANNOUNCEMENTS (for all roles) ===
     if (includeAll || includeWidgets.includes('announcements')) {
       fetchPromises.push(
-        Announcement.find({ 
+        Announcement.find({
           isActive: true,
           $or: [
             { expiresAt: { $gte: new Date() } },
             { expiresAt: null }
           ]
         })
-        .sort({ createdAt: -1 })
-        .limit(5)
-        .lean()
-        .then(announcements => {
-          dashboardData.announcements = announcements
-        })
-        .catch(() => { dashboardData.announcements = [] })
+          .sort({ createdAt: -1 })
+          .limit(5)
+          .lean()
+          .then(announcements => {
+            dashboardData.announcements = announcements
+          })
+          .catch(() => { dashboardData.announcements = [] })
       )
     }
 
@@ -134,12 +138,12 @@ export async function GET(request) {
     if (employeeId && (includeAll || includeWidgets.includes('assets'))) {
       fetchPromises.push(
         Asset.find({ assignedTo: employeeId })
-        .select('name type serialNumber status')
-        .lean()
-        .then(assets => {
-          dashboardData.myAssets = assets
-        })
-        .catch(() => { dashboardData.myAssets = [] })
+          .select('name type serialNumber status')
+          .lean()
+          .then(assets => {
+            dashboardData.myAssets = assets
+          })
+          .catch(() => { dashboardData.myAssets = [] })
       )
     }
 
@@ -147,31 +151,31 @@ export async function GET(request) {
     if (employeeId && (includeAll || includeWidgets.includes('expenses'))) {
       fetchPromises.push(
         Expense.find({ employee: employeeId })
-        .sort({ createdAt: -1 })
-        .limit(5)
-        .select('title amount status category createdAt')
-        .lean()
-        .then(expenses => {
-          dashboardData.myExpenses = expenses
-        })
-        .catch(() => { dashboardData.myExpenses = [] })
+          .sort({ createdAt: -1 })
+          .limit(5)
+          .select('title amount status category createdAt')
+          .lean()
+          .then(expenses => {
+            dashboardData.myExpenses = expenses
+          })
+          .catch(() => { dashboardData.myExpenses = [] })
       )
     }
 
     // === MY HELPDESK TICKETS (for employees) ===
     if (employeeId && (includeAll || includeWidgets.includes('helpdesk'))) {
       fetchPromises.push(
-        Ticket.find({ 
+        Ticket.find({
           $or: [{ createdBy: employeeId }, { assignedTo: employeeId }]
         })
-        .sort({ createdAt: -1 })
-        .limit(5)
-        .select('title status priority category createdAt')
-        .lean()
-        .then(tickets => {
-          dashboardData.myHelpdesk = tickets
-        })
-        .catch(() => { dashboardData.myHelpdesk = [] })
+          .sort({ createdAt: -1 })
+          .limit(5)
+          .select('title status priority category createdAt')
+          .lean()
+          .then(tickets => {
+            dashboardData.myHelpdesk = tickets
+          })
+          .catch(() => { dashboardData.myHelpdesk = [] })
       )
     }
 
@@ -179,14 +183,14 @@ export async function GET(request) {
     if (includeAll || includeWidgets.includes('policies')) {
       fetchPromises.push(
         Policy.find({ isActive: true })
-        .sort({ createdAt: -1 })
-        .limit(5)
-        .select('title category effectiveDate')
-        .lean()
-        .then(policies => {
-          dashboardData.policies = policies
-        })
-        .catch(() => { dashboardData.policies = [] })
+          .sort({ createdAt: -1 })
+          .limit(5)
+          .select('title category effectiveDate')
+          .lean()
+          .then(policies => {
+            dashboardData.policies = policies
+          })
+          .catch(() => { dashboardData.policies = [] })
       )
     }
 
@@ -202,11 +206,11 @@ export async function GET(request) {
           employee: employeeId,
           date: { $gte: today, $lt: tomorrow }
         })
-        .lean()
-        .then(attendance => {
-          dashboardData.todayAttendance = attendance
-        })
-        .catch(() => { dashboardData.todayAttendance = null })
+          .lean()
+          .then(attendance => {
+            dashboardData.todayAttendance = attendance
+          })
+          .catch(() => { dashboardData.todayAttendance = null })
       )
     }
 
@@ -214,12 +218,12 @@ export async function GET(request) {
     if (employeeId && (includeAll || includeWidgets.includes('leaveBalance'))) {
       fetchPromises.push(
         LeaveBalance.find({ employee: employeeId })
-        .populate('leaveType', 'name code color')
-        .lean()
-        .then(balances => {
-          dashboardData.leaveBalance = balances
-        })
-        .catch(() => { dashboardData.leaveBalance = [] })
+          .populate('leaveType', 'name code color')
+          .lean()
+          .then(balances => {
+            dashboardData.leaveBalance = balances
+          })
+          .catch(() => { dashboardData.leaveBalance = [] })
       )
     }
 
@@ -229,15 +233,15 @@ export async function GET(request) {
       if (includeAll || includeWidgets.includes('leaveRequests')) {
         fetchPromises.push(
           Leave.find({ status: 'pending' })
-          .populate('employee', 'firstName lastName profilePicture employeeCode')
-          .populate('leaveType', 'name code')
-          .sort({ createdAt: -1 })
-          .limit(10)
-          .lean()
-          .then(leaves => {
-            dashboardData.pendingLeaveRequests = leaves
-          })
-          .catch(() => { dashboardData.pendingLeaveRequests = [] })
+            .populate('employee', 'firstName lastName profilePicture employeeCode')
+            .populate('leaveType', 'name code')
+            .sort({ createdAt: -1 })
+            .limit(10)
+            .lean()
+            .then(leaves => {
+              dashboardData.pendingLeaveRequests = leaves
+            })
+            .catch(() => { dashboardData.pendingLeaveRequests = [] })
         )
       }
     }
@@ -248,12 +252,12 @@ export async function GET(request) {
       if (includeAll || includeWidgets.includes('departments')) {
         fetchPromises.push(
           Department.find({ isActive: true })
-          .select('name employeeCount')
-          .lean()
-          .then(departments => {
-            dashboardData.departments = departments
-          })
-          .catch(() => { dashboardData.departments = [] })
+            .select('name employeeCount')
+            .lean()
+            .then(departments => {
+              dashboardData.departments = departments
+            })
+            .catch(() => { dashboardData.departments = [] })
         )
       }
 
@@ -268,27 +272,27 @@ export async function GET(request) {
           Promise.all([
             Employee.countDocuments({ status: 'active' }),
             Attendance.countDocuments({ date: { $gte: today, $lt: tomorrow } }),
-            Attendance.countDocuments({ 
+            Attendance.countDocuments({
               date: { $gte: today, $lt: tomorrow },
               status: 'late'
             })
           ])
-          .then(([totalEmployees, presentToday, lateToday]) => {
-            dashboardData.attendanceSummary = {
-              totalEmployees,
-              presentToday,
-              absentToday: totalEmployees - presentToday,
-              lateToday
-            }
-          })
-          .catch(() => {
-            dashboardData.attendanceSummary = {
-              totalEmployees: 0,
-              presentToday: 0,
-              absentToday: 0,
-              lateToday: 0
-            }
-          })
+            .then(([totalEmployees, presentToday, lateToday]) => {
+              dashboardData.attendanceSummary = {
+                totalEmployees,
+                presentToday,
+                absentToday: totalEmployees - presentToday,
+                lateToday
+              }
+            })
+            .catch(() => {
+              dashboardData.attendanceSummary = {
+                totalEmployees: 0,
+                presentToday: 0,
+                absentToday: 0,
+                lateToday: 0
+              }
+            })
         )
       }
     }

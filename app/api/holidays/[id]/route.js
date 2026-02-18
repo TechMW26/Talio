@@ -36,6 +36,13 @@ export async function GET(request, { params }) {
 // PUT - Update holiday
 export async function PUT(request, { params }) {
   try {
+    const auth = await getAuthAndModels(request, ['Holiday'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Holiday } = models
+
     const data = await request.json()
 
     const holiday = await Holiday.findByIdAndUpdate(
@@ -68,6 +75,13 @@ export async function PUT(request, { params }) {
 // DELETE - Delete holiday
 export async function DELETE(request, { params }) {
   try {
+    const auth = await getAuthAndModels(request, ['Holiday'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Holiday } = models
+
     const holiday = await Holiday.findByIdAndDelete(params.id)
 
     if (!holiday) {

@@ -3,12 +3,12 @@ const nextConfig = {
   // Production optimizations
   poweredByHeader: false, // Remove X-Powered-By header
   compress: true, // Enable gzip compression
-  
+
   // Enable React strict mode for better debugging
   reactStrictMode: false, // Disable in prod for performance
-  
+
   // Note: swcMinify is now default in Next.js 15+, no need to specify
-  
+
   // Increase body size limit for file uploads (10MB)
   experimental: {
     serverActions: {
@@ -56,38 +56,64 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
 
-  // Headers for NO CACHING (to prevent white screen issues)
+  // Headers for caching strategy
   async headers() {
     return [
       {
-        // ALL routes - NO CACHING
-        source: '/:path*',
+        // Static assets (Next.js _next/static/) - cache aggressively (immutable hashed filenames)
+        source: '/_next/static/:path*',
         headers: [
           {
             key: 'Cache-Control',
-            value: 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
-          },
-          {
-            key: 'Pragma',
-            value: 'no-cache',
-          },
-          {
-            key: 'Expires',
-            value: '0',
-          },
-          {
-            key: 'X-DNS-Prefetch-Control',
-            value: 'on',
+            value: 'public, max-age=31536000, immutable',
           },
         ],
       },
       {
-        // API routes - explicit no caching
+        // Images - cache for 1 day
+        source: '/_next/image/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=86400, stale-while-revalidate=604800',
+          },
+        ],
+      },
+      {
+        // Public static files (fonts, icons, etc.)
+        source: '/public/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=86400, stale-while-revalidate=604800',
+          },
+        ],
+      },
+      {
+        // API routes - NO CACHING
         source: '/api/:path*',
         headers: [
           {
             key: 'Cache-Control',
             value: 'no-store, no-cache, must-revalidate',
+          },
+          {
+            key: 'Pragma',
+            value: 'no-cache',
+          },
+        ],
+      },
+      {
+        // Dashboard pages - short cache with revalidation to prevent white screen
+        source: '/dashboard/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-cache, must-revalidate',
+          },
+          {
+            key: 'X-DNS-Prefetch-Control',
+            value: 'on',
           },
         ],
       },
@@ -110,7 +136,7 @@ const nextConfig = {
       test: /\.(glb|gltf)$/,
       type: 'asset/resource',
     });
-    
+
     // Production optimizations
     if (!isServer) {
       // Reduce bundle size by excluding unused locales
@@ -120,7 +146,7 @@ const nextConfig = {
         moment: 'moment/moment.js',
       };
     }
-    
+
     return config;
   },
 };

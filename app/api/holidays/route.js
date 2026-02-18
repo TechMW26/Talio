@@ -17,10 +17,23 @@ export async function GET(request) {
     const year = searchParams.get('year')
     const startDateParam = searchParams.get('startDate')
     const endDateParam = searchParams.get('endDate')
+    const upcoming = searchParams.get('upcoming')
+    const limit = searchParams.get('limit')
+    const type = searchParams.get('type')
 
     const query = {}
 
-    if (startDateParam && endDateParam) {
+    // Filter by holiday type (e.g. 'public', 'optional', 'restricted')
+    if (type) {
+      query.type = type
+    }
+
+    if (upcoming === 'true') {
+      // Only return holidays from today onwards
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      query.date = { $gte: today }
+    } else if (startDateParam && endDateParam) {
       // Support for date range queries (used by report page)
       const startDate = new Date(startDateParam)
       startDate.setHours(0, 0, 0, 0)
@@ -33,8 +46,13 @@ export async function GET(request) {
       query.date = { $gte: startDate, $lte: endDate }
     }
 
-    const holidays = await Holiday.find(query)
-      .sort({ date: 1 })
+    let holidayQuery = Holiday.find(query).sort({ date: 1 })
+
+    if (limit) {
+      holidayQuery = holidayQuery.limit(parseInt(limit))
+    }
+
+    const holidays = await holidayQuery
 
     return NextResponse.json({
       success: true,
@@ -52,6 +70,13 @@ export async function GET(request) {
 // POST - Create holiday
 export async function POST(request) {
   try {
+    const auth = await getAuthAndModels(request, ['Holiday'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Holiday } = models
+
     const data = await request.json()
 
     const holiday = await Holiday.create(data)

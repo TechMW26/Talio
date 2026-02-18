@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "cross-env NODE_OPTIONS=--max-old-space-size=12288 NEXT_DISABLE_REACT_DEV_OVERLAY=1 node server.js",
+    "dev": "cross-env NODE_OPTIONS=--max-old-space-size=4096 NEXT_DISABLE_REACT_DEV_OVERLAY=1 node server.js",
     "dev:next": "next dev",
     "build": "SKIP_ENV_VALIDATION=true next build",
     "start": "NODE_OPTIONS=--max-old-space-size=12288 NODE_ENV=production node server.js",
