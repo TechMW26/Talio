@@ -271,7 +271,7 @@ export default function SlidingSidebar({
       {/* Overlay for clicking outside to close */}
       {isOpen && (
         <div
-          className="hidden lg:block fixed inset-0 z-[49] bg-black/20"
+          className="hidden lg:block fixed inset-0 z-[49] bg-black/20 backdrop-blur-[10px]"
           onClick={() => {
             setIsOpen(false)
             setActiveSubmenu(null)

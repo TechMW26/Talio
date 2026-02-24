@@ -86,21 +86,17 @@ export default function ProfileCompletionModal({
   return (
     <ModalPortal show={true}>
       <div 
-        className={`fixed inset-0 z-[9999] flex items-center justify-center p-4 transition-opacity duration-200 ${
+        className={`modal-overlay transition-opacity duration-200 ${
           isClosing ? 'opacity-0' : 'opacity-100'
         }`}
+        onClick={handleClose}
       >
-        {/* Backdrop */}
-        <div 
-          className="absolute inset-0 modal-overlay-dark"
-          onClick={handleClose}
-        />
-        
         {/* Modal Content */}
         <div 
-          className={`relative bg-white rounded-3xl shadow-2xl max-w-md w-full mx-auto transform transition-all duration-200 overflow-hidden ${
+          className={`relative bg-white rounded-[30px] shadow-2xl max-w-md w-full mx-auto transform transition-all duration-200 overflow-hidden animate-modal-enter ${
             isClosing ? 'scale-95 opacity-0' : 'scale-100 opacity-100'
           }`}
+          onClick={e => e.stopPropagation()}
         >
           {/* Header */}
           <div className="relative px-6 pt-6 pb-4">

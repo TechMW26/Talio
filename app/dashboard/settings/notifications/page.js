@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { FaBell, FaClock, FaRedo, FaPaperPlane, FaUsers, FaBuilding, FaUserTag, FaCalendar, FaTrash, FaEdit, FaPause, FaPlay, FaHistory, FaPlus, FaEye, FaCheck, FaTimes, FaExclamationTriangle } from 'react-icons/fa'
 import toast from '@/utils/toast'
 import Loader from '@/components/ui/Loader'
+import ModalPortal from '@/components/ui/ModalPortal'
 
 export default function NotificationsPage() {
   const [activeTab, setActiveTab] = useState('send')
@@ -564,9 +565,9 @@ function ScheduledNotificationsTab({ userRole, userDepartment }) {
       )}
 
       {/* Create Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
-          <div className="bg-white rounded-lg w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <ModalPortal isOpen={showCreateModal}>
+        <div className="modal-overlay">
+          <div className="bg-white rounded-[30px] animate-modal-enter w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="p-4 border-b border-gray-200 flex justify-between items-center">
               <h3 className="text-lg font-semibold">Schedule Notification</h3>
               <button onClick={() => setShowCreateModal(false)} className="text-gray-500 hover:text-gray-700">
@@ -676,7 +677,7 @@ function ScheduledNotificationsTab({ userRole, userDepartment }) {
             </form>
           </div>
         </div>
-      )}
+      </ModalPortal>
     </div>
   )
 }
@@ -950,9 +951,9 @@ function RecurringNotificationsTab({ userRole, userDepartment }) {
       )}
 
       {/* Create Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
-          <div className="bg-white rounded-lg w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <ModalPortal isOpen={showCreateModal}>
+        <div className="modal-overlay">
+          <div className="bg-white rounded-[30px] animate-modal-enter w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="p-4 border-b border-gray-200 flex justify-between items-center">
               <h3 className="text-lg font-semibold">Create Recurring Notification</h3>
               <button onClick={() => setShowCreateModal(false)} className="text-gray-500 hover:text-gray-700">
@@ -1165,7 +1166,7 @@ function RecurringNotificationsTab({ userRole, userDepartment }) {
             </form>
           </div>
         </div>
-      )}
+      </ModalPortal>
     </div>
   )
 }
@@ -1369,9 +1370,9 @@ function NotificationHistoryTab({ userRole, userDepartment }) {
       )}
 
       {/* Detail Modal */}
-      {selectedNotification && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
-          <div className="bg-white rounded-lg w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <ModalPortal isOpen={!!selectedNotification}>
+        <div className="modal-overlay">
+          <div className="bg-white rounded-[30px] animate-modal-enter w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="p-4 border-b border-gray-200 flex justify-between items-center">
               <h3 className="text-lg font-semibold">Notification Details</h3>
               <button onClick={() => setSelectedNotification(null)} className="text-gray-500 hover:text-gray-700">
@@ -1468,7 +1469,7 @@ function NotificationHistoryTab({ userRole, userDepartment }) {
             </div>
           </div>
         </div>
-      )}
+      </ModalPortal>
     </div>
   )
 }

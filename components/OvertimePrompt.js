@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import toast from '@/utils/toast'
 import { FaClock, FaCheck, FaTimes, FaBell, FaMapMarkerAlt } from 'react-icons/fa'
 import Loader from '@/components/ui/Loader'
+import ModalPortal from '@/components/ui/ModalPortal'
 
 /**
  * OvertimePrompt Component
@@ -171,8 +172,9 @@ export default function OvertimePrompt({ userId, onClose, onResponse }) {
   })
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-[9950] animate-fadeIn" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
-      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden animate-slideUp">
+    <ModalPortal isOpen={true}>
+    <div className="modal-overlay">
+      <div className="bg-white rounded-[30px] shadow-2xl max-w-md w-full mx-4 overflow-hidden animate-modal-enter" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="bg-gradient-to-r from-orange-500 to-red-500 px-6 py-4 text-white">
           <div className="flex items-center space-x-3">
@@ -247,24 +249,8 @@ export default function OvertimePrompt({ userId, onClose, onResponse }) {
           </p>
         </div>
       </div>
-
-      <style jsx>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes slideUp {
-          from { transform: translateY(20px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-        .animate-fadeIn {
-          animation: fadeIn 0.3s ease-out;
-        }
-        .animate-slideUp {
-          animation: slideUp 0.4s ease-out;
-        }
-      `}</style>
     </div>
+    </ModalPortal>
   )
 }
 

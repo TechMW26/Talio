@@ -11,10 +11,21 @@ export default function ModalPortal({ children, show }) {
     return () => setMounted(false)
   }, [])
 
+  useEffect(() => {
+    if (show) {
+      document.body.style.overflow = 'hidden'
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [show])
+
   if (!show || !mounted) return null
 
   return createPortal(
-    children,
+    <div style={{ position: 'relative', zIndex: 99999 }}>
+      {children}
+    </div>,
     document.body
   )
 }

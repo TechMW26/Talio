@@ -200,6 +200,7 @@ export default function GlobalAILoadingOverlay() {
   const { isAILoading, transitionComplete } = useAILoading()
   const { theme } = useTheme()
   const canvasRef = useRef(null)
+  const overlayRef = useRef(null)
   const animationRef = useRef(null)
   const particlesRef = useRef([])
   const morphProgressRef = useRef(0)
@@ -291,6 +292,12 @@ export default function GlobalAILoadingOverlay() {
     let currentPhase = PHASE.HOLDING
     let phaseStartTime = Date.now()
     let lastFrameTime = performance.now()
+    
+    // Pulsating blur state — synced with particle motion speed
+    let smoothedBlur = 2
+    const BLUR_MIN = 2
+    const BLUR_MAX = 12
+    const BLUR_SMOOTHING = 0.06 // Lower = smoother transitions
 
     const resize = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 1.5) // Cap DPR for performance
@@ -491,13 +498,33 @@ export default function GlobalAILoadingOverlay() {
       const frameCount = Math.floor(time * 60) % 3
       const particles = particlesRef.current
 
-      // Update positions first (always)
+      // Update positions first (always) & sample velocity for blur
+      let totalVelocity = 0
       for (let i = 0; i < particles.length; i++) {
         const p = particles[i]
+        // Compute displacement before moving (for blur mapping)
+        const dx = (p.targetX - p.x) * currentLerpSpeed
+        const dy = (p.targetY - p.y) * currentLerpSpeed
+        const dz = (p.targetZ - p.z) * currentLerpSpeed
+        totalVelocity += Math.abs(dx) + Math.abs(dy) + Math.abs(dz)
         // Move towards target with delta-time adjusted speed
-        p.x += (p.targetX - p.x) * currentLerpSpeed
-        p.y += (p.targetY - p.y) * currentLerpSpeed
-        p.z += (p.targetZ - p.z) * currentLerpSpeed
+        p.x += dx
+        p.y += dy
+        p.z += dz
+      }
+      
+      // Map average particle velocity to blur (2px–12px)
+      const avgVelocity = totalVelocity / particles.length
+      // Normalize: ~0 when holding still, ~2-5 when scattering/morphing
+      const velocityNorm = Math.min(avgVelocity / 3, 1)
+      const targetBlur = BLUR_MIN + velocityNorm * (BLUR_MAX - BLUR_MIN)
+      smoothedBlur += (targetBlur - smoothedBlur) * BLUR_SMOOTHING
+      
+      // Apply pulsating blur to overlay
+      if (overlayRef.current) {
+        const blurPx = Math.round(smoothedBlur * 10) / 10
+        overlayRef.current.style.backdropFilter = `blur(${blurPx}px)`
+        overlayRef.current.style.webkitBackdropFilter = `blur(${blurPx}px)`
       }
 
       // Only sort occasionally for depth ordering (reduces sort overhead by 66%)
@@ -603,12 +630,15 @@ export default function GlobalAILoadingOverlay() {
     <>
       {/* Main overlay container - blocks interaction and has fade-in white background */}
       <div 
+        ref={overlayRef}
         className={`fixed inset-0 z-[999999] ${
           isAnimatingOut ? 'ai-loading-exit' : 'ai-loading-enter'
         }`}
         style={{ 
           pointerEvents: 'auto',
-          backgroundColor: 'rgba(255, 255, 255, 0.8)'
+          backgroundColor: 'rgba(255, 255, 255, 0.8)',
+          backdropFilter: 'blur(2px)',
+          WebkitBackdropFilter: 'blur(2px)',
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -629,14 +659,20 @@ export default function GlobalAILoadingOverlay() {
           0% { 
             opacity: 0;
             background-color: rgba(255, 255, 255, 0);
+            backdrop-filter: blur(0px);
+            -webkit-backdrop-filter: blur(0px);
           }
           40% { 
             opacity: 1;
             background-color: rgba(255, 255, 255, 0);
+            backdrop-filter: blur(1px);
+            -webkit-backdrop-filter: blur(1px);
           }
           100% { 
             opacity: 1;
             background-color: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(2px);
+            -webkit-backdrop-filter: blur(2px);
           }
         }
 
@@ -648,10 +684,14 @@ export default function GlobalAILoadingOverlay() {
           0% { 
             opacity: 1;
             background-color: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(2px);
+            -webkit-backdrop-filter: blur(2px);
           }
           100% { 
             opacity: 0;
             background-color: rgba(255, 255, 255, 0);
+            backdrop-filter: blur(0px);
+            -webkit-backdrop-filter: blur(0px);
           }
         }
       `}</style>

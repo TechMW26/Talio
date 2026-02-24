@@ -1319,15 +1319,14 @@ function GeofenceLocationsManager() {
       {/* Modal - Rendered using Portal */}
       {isMounted && showModal && createPortal(
         <div
-          className="fixed inset-0 flex items-center justify-center p-4 z-[99999]"
-          style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
+          className="modal-overlay"
           onClick={() => {
             setShowModal(false)
             setEditingLocation(null)
           }}
         >
           <div
-            className="rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col bg-white border border-gray-200"
+            className="rounded-[30px] animate-modal-enter shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col bg-white border border-gray-200"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -1572,7 +1571,7 @@ function GeofencingTab() {
       const data = await response.json()
       if (data.success) {
         setSettings(data.data)
-        setBreakTimings(data.data.breakTimings || [])
+        setBreakTimings(Array.isArray(data.data.breakTimings) ? data.data.breakTimings : [])
       }
     } catch (error) {
       console.error('Error fetching settings:', error)

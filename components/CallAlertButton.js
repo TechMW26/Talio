@@ -347,14 +347,11 @@ export default function CallAlertButton({ user }) {
       {/* Modal via Portal */}
       <ModalPortal show={isOpen}>
         <div 
-          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+          className="modal-overlay"
           onClick={handleBackdropClick}
         >
-          {/* Backdrop */}
-          <div className="absolute inset-0 bg-black/50" />
-          
           {/* Modal Content */}
-          <div className="relative bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+          <div className="relative bg-white rounded-[30px] shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden animate-modal-enter" onClick={e => e.stopPropagation()}>
             {/* Header with gradient */}
             <div 
               className="px-6 py-5"

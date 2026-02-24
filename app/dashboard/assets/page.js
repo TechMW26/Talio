@@ -6,6 +6,7 @@ import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaLaptop, FaCheckCircle, FaClock, FaTools, FaTimes, FaBox } from 'react-icons/fa'
 import { getCurrentUser } from '@/utils/userHelper'
 import Loader from '@/components/ui/Loader'
+import ModalPortal from '@/components/ui/ModalPortal'
 import { Select, SelectItem, Input, Textarea, Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@heroui/react'
 
 export default function AssetsPage() {
@@ -334,9 +335,9 @@ export default function AssetsPage() {
       </div>
 
       {/* Add Asset Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
-          <div className="bg-white rounded-lg w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
+      <ModalPortal isOpen={isModalOpen}>
+        <div className="modal-overlay">
+          <div className="bg-white rounded-[30px] animate-modal-enter w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold">Add New Asset</h2>
               <button onClick={() => setIsModalOpen(false)} className="text-gray-500 hover:text-gray-700">
@@ -483,7 +484,7 @@ export default function AssetsPage() {
             </form>
           </div>
         </div>
-      )}
+      </ModalPortal>
     </div>
   )
 }

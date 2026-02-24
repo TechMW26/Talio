@@ -351,7 +351,7 @@ export default function RawCaptureViewer({ userId = null, date = null, showFilte
       <ModalPortal show={!!selectedCapture}>
         {selectedCapture && (
         <div
-          className="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center p-4"
+          className="fixed inset-0 z-[9999] bg-black/90 backdrop-blur-[10px] flex items-center justify-center p-4 animate-[overlay-blur-in_0.3s_cubic-bezier(0.16,1,0.3,1)_forwards]"
           onClick={() => setSelectedCapture(null)}
         >
           <button

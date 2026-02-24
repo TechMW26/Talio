@@ -16,6 +16,7 @@ import {
 } from 'react-icons/fa'
 import { formatDepartments } from '@/lib/formatters'
 import Portal from '@/components/ui/Portal'
+import ModalPortal from '@/components/ui/ModalPortal'
 import { useAILoading } from '@/contexts/AILoadingContext'
 
 export default function CreateProjectPage() {
@@ -601,10 +602,9 @@ export default function CreateProjectPage() {
       </form>
 
       {/* Employee Search Modal */}
-      {showEmployeeSearch && (
-      <Portal>
+      <ModalPortal isOpen={showEmployeeSearch}>
         <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
-          <div className="bg-content1 rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
+          <div className="bg-content1 rounded-[30px] shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col animate-modal-enter">
             <div className="p-4 border-b border-default-200 flex items-center justify-between flex-shrink-0">
               <h3 className="text-lg font-semibold">Add Team Member</h3>
               <Button
@@ -765,14 +765,12 @@ export default function CreateProjectPage() {
             </div>
           </div>
         </div>
-      </Portal>
-      )}
+      </ModalPortal>
 
       {/* Project Head Search Modal */}
-      {showHeadSearch && (
-      <Portal>
+      <ModalPortal isOpen={showHeadSearch}>
         <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
-          <div className="bg-content1 rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
+          <div className="bg-content1 rounded-[30px] shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col animate-modal-enter">
             <div className="p-4 border-b border-default-200 flex items-center justify-between flex-shrink-0">
               <h3 className="text-lg font-semibold">Add Project Head</h3>
               <Button
@@ -926,8 +924,7 @@ export default function CreateProjectPage() {
             </div>
           </div>
         </div>
-      </Portal>
-      )}
+      </ModalPortal>
     </div>
   )
 }

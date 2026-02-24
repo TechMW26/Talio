@@ -10,7 +10,7 @@ import { cn } from '@/utils/cn'
 export function PageLoader({ message = 'Loading...', className }) {
   return (
     <div className={cn(
-      'fixed inset-0 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm z-50',
+      'fixed inset-0 flex flex-col items-center justify-center bg-background/80 backdrop-blur-[10px] z-50',
       className
     )}>
       <Spinner size="lg" color="primary" />

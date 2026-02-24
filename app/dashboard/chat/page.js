@@ -1070,7 +1070,7 @@ export default function ChatPage() {
                 {/* Reaction Picker Backdrop */}
                 {showReactionPicker && (
                   <div
-                    className="fixed inset-0 bg-black/20 z-[199]"
+                    className="fixed inset-0 bg-black/20 backdrop-blur-[10px] z-[199]"
                     onClick={() => setShowReactionPicker(null)}
                   />
                 )}
@@ -1316,7 +1316,7 @@ export default function ChatPage() {
       {/* Lightbox for images */}
       {lightboxImage && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-90 z-[200] flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black bg-opacity-90 backdrop-blur-[10px] z-[200] flex items-center justify-center p-4"
           onClick={() => setLightboxImage(null)}
         >
           <button
@@ -1339,8 +1339,8 @@ export default function ChatPage() {
 
       {/* Group Members Modal */}
       {showMembersModal && selectedChat?.isGroup && (
-        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[90] p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full max-h-[80vh] overflow-hidden shadow-2xl">
+        <div className="fixed inset-0 modal-overlay flex items-center justify-center p-4">
+          <div className="bg-white rounded-[30px] max-w-md w-full max-h-[80vh] overflow-hidden shadow-2xl">
             {/* Modal Header */}
             <div
               className="px-5 py-4 flex items-center justify-between border-b border-gray-100"

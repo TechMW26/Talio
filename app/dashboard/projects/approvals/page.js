@@ -11,6 +11,7 @@ import {
 } from 'react-icons/fa'
 import { playNotificationSound, NotificationSoundTypes } from '@/lib/notificationSounds'
 import Portal from '@/components/ui/Portal'
+import ModalPortal from '@/components/ui/ModalPortal'
 
 const requestTypeLabels = {
   'task_deletion': 'Task Deletion',
@@ -553,10 +554,9 @@ export default function ApprovalsPage() {
       )}
 
       {/* Reject Modal */}
-      {showRejectModal && selectedRequest && (
-      <Portal>
+      <ModalPortal isOpen={showRejectModal && selectedRequest}>
         <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4 overflow-y-auto">
-          <div className="bg-content1 rounded-2xl shadow-2xl w-full max-w-2xl animate-modal-enter my-8">
+          <div className="bg-content1 rounded-[30px] shadow-2xl w-full max-w-2xl animate-modal-enter my-8">
             <div className="px-6 py-4 bg-default-50 border-b border-default-200">
               <h3 className="text-xl font-bold text-default-800">Reject Task Review</h3>
               {selectedRequest.relatedTask?.title && (
@@ -722,8 +722,7 @@ export default function ApprovalsPage() {
             </div>
           </div>
         </div>
-      </Portal>
-      )}
+      </ModalPortal>
     </div>
   )
 }

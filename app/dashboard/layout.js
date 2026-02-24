@@ -39,7 +39,7 @@ function PageTransitionOverlay() {
   if (!isNavigating) return null
   
   return (
-    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-[9998]">
+    <div className="fixed inset-0 bg-background/80 backdrop-blur-[10px] flex items-center justify-center z-[9998]">
       <div className="flex flex-col items-center">
         <Spinner size="lg" color="primary" />
       </div>

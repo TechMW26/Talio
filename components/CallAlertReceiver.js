@@ -5,6 +5,7 @@ import { FaPhoneAlt, FaVolumeUp, FaVolumeMute, FaCheck, FaUser, FaExclamationTri
 import { useSocket } from '@/contexts/SocketContext';
 import toast from '@/utils/toast';
 import Loader from '@/components/ui/Loader';
+import ModalPortal from '@/components/ui/ModalPortal';
 
 // Alert sound URL - using existing notification sound
 const ALERT_SOUND_URL = '/sounds/notification.mp3';
@@ -453,7 +454,7 @@ export default function CallAlertReceiver() {
   const config = priorityConfig[activeAlert.priority] || priorityConfig.medium;
 
   return (
-    <>
+    <ModalPortal isOpen={true}>
       {/* Urgent alert overlay effect */}
       {activeAlert.priority === 'urgent' && (
         <div className="fixed inset-0 bg-red-500/10 z-[99997] animate-pulse pointer-events-none" />
@@ -577,6 +578,6 @@ export default function CallAlertReceiver() {
           </div>
         </div>
       </div>
-    </>
+    </ModalPortal>
   );
 }

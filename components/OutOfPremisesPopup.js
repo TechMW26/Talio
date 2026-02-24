@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { FaMapMarkerAlt, FaTimes } from 'react-icons/fa'
 import { toast } from '@/utils/toast'
+import ModalPortal from '@/components/ui/ModalPortal'
 
 export default function OutOfPremisesPopup() {
   const [isOpen, setIsOpen] = useState(false)
@@ -70,13 +71,12 @@ export default function OutOfPremisesPopup() {
     }
   }
 
-  if (!isOpen) return null
-
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-[9950] p-4" style={{ backgroundColor: "rgba(0,0,0,0.6)" }}>
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+    <ModalPortal isOpen={isOpen}>
+    <div className="modal-overlay">
+      <div className="bg-white rounded-[30px] shadow-xl max-w-md w-full animate-modal-enter" onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div className="bg-red-500 text-white px-6 py-4 rounded-t-lg flex items-center justify-between">
+        <div className="bg-red-500 text-white px-6 py-4 rounded-t-[30px] flex items-center justify-between">
           <div className="flex items-center gap-3">
             <FaMapMarkerAlt className="text-2xl" />
             <div>
@@ -142,6 +142,7 @@ export default function OutOfPremisesPopup() {
         </form>
       </div>
     </div>
+    </ModalPortal>
   )
 }
 

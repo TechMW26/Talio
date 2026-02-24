@@ -2102,8 +2102,8 @@ export default function MailPage() {
 
       {/* AI Compose Modal */}
       {showAiCompose && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+        <div className="modal-overlay">
+          <div className="bg-white rounded-[30px] shadow-xl w-full max-w-md p-6 animate-modal-enter">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
                 <FaMagic className="text-purple-600" />
@@ -2163,16 +2163,16 @@ export default function MailPage() {
 
       {/* Compose Modal - Gmail Style with Full Functionality */}
       {showCompose && (
-        <div className={`fixed ${composeFullscreen ? 'inset-0 p-4' : 'bottom-0 right-0 sm:right-8 left-0 sm:left-auto'} z-50`}>
-          <div className={`bg-white rounded-t-lg sm:rounded-lg shadow-2xl flex flex-col ${composeFullscreen
-            ? 'w-full h-full rounded-lg'
+        <div className={`fixed ${composeFullscreen ? 'inset-0 p-4' : 'bottom-0 right-0 sm:right-8 left-0 sm:left-auto'} z-[99999]`}>
+          <div className={`bg-white rounded-t-[30px] sm:rounded-[30px] shadow-2xl flex flex-col ${composeFullscreen
+            ? 'w-full h-full rounded-[30px]'
             : composeMinimized
-              ? 'w-72 h-10 hidden sm:flex'
+              ? 'w-72 h-10 hidden sm:flex rounded-lg'
               : 'w-full sm:w-[600px] h-[80vh] sm:h-[520px]'
             }`}>
             {/* Header */}
             <div
-              className={`flex items-center justify-between px-3 py-2 bg-[#404040] text-white rounded-t-lg cursor-pointer ${composeMinimized ? 'rounded-b-lg' : ''}`}
+              className={`flex items-center justify-between px-3 py-2 bg-[#404040] text-white rounded-t-[30px] cursor-pointer ${composeMinimized ? 'rounded-b-[30px]' : ''}`}
               onClick={() => composeMinimized && setComposeMinimized(false)}
             >
               <span className="font-medium text-sm truncate">{composeData.subject || 'New Message'}</span>

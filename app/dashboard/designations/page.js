@@ -6,6 +6,7 @@ import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaEdit, FaTrash, FaBriefcase } from 'react-icons/fa'
 import Loader from '@/components/ui/Loader'
+import ModalPortal from '@/components/ui/ModalPortal'
 
 export default function DesignationsPage() {
   const [designations, setDesignations] = useState([])
@@ -252,9 +253,9 @@ export default function DesignationsPage() {
       </div>
 
       {/* Add/Edit Modal */}
-      {showModal && (
-        <div className="fixed inset-0 modal-overlay flex items-center justify-center style={{ zIndex: 99999 }}">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+      <ModalPortal isOpen={showModal}>
+        <div className="modal-overlay">
+          <div className="bg-white rounded-[30px] animate-modal-enter p-6 w-full max-w-md">
             <h2 className="text-2xl font-bold text-gray-800 mb-4">
               {editingDesig ? 'Edit Designation' : 'Add Designation'}
             </h2>
@@ -303,7 +304,7 @@ export default function DesignationsPage() {
             </form>
           </div>
         </div>
-      )}
+      </ModalPortal>
     </div>
   )
 }

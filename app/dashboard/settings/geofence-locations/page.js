@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { FaMapMarkerAlt, FaPlus, FaEdit, FaTrash, FaStar, FaRegStar, FaClock } from 'react-icons/fa'
 import GeofenceMap from '@/components/GeofenceMap'
 import Loader from '@/components/ui/Loader'
+import ModalPortal from '@/components/ui/ModalPortal'
 
 export default function GeofenceLocationsPage() {
   const [locations, setLocations] = useState([])
@@ -322,9 +323,9 @@ export default function GeofenceLocationsPage() {
       )}
 
       {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 flex items-center justify-center z-[9100] p-4" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
-          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <ModalPortal isOpen={showModal}>
+        <div className="modal-overlay">
+          <div className="bg-white rounded-[30px] animate-modal-enter max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
               <h2 className="text-xl font-bold text-gray-900">
                 {editingLocation ? 'Edit Location' : 'Add New Location'}
@@ -543,7 +544,7 @@ export default function GeofenceLocationsPage() {
             </form>
           </div>
         </div>
-      )}
+      </ModalPortal>
     </div>
   )
 }

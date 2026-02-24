@@ -610,8 +610,8 @@ export default function AdminDashboard({ user }) {
 
       {/* Employee Details Modal - kept outside draggable area */}
       {showEmployeeModal && selectedEmployee && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9100]">
-          <div className="rounded-lg p-6 w-full max-w-2xl max-h-screen overflow-y-auto" style={{ backgroundColor: 'var(--color-bg-card)' }}>
+        <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-[10px] flex items-center justify-center z-[9100]">
+          <div className="rounded-[30px] p-6 w-full max-w-2xl max-h-screen overflow-y-auto" style={{ backgroundColor: 'var(--color-bg-card)' }}>
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold text-gray-800">Employee Details</h2>
               <button

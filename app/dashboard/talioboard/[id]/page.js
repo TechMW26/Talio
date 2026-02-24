@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import WhiteboardCanvas from '@/components/whiteboard/WhiteboardCanvas';
 import Loader from '@/components/ui/Loader';
 import { FiArrowLeft, FiShare2, FiX, FiUsers, FiMaximize, FiMinimize } from 'react-icons/fi';
+import ModalPortal from '@/components/ui/ModalPortal';
 
 export default function WhiteboardEditorPage() {
   const router = useRouter();
@@ -382,14 +383,14 @@ export default function WhiteboardEditorPage() {
   return (
     <div ref={containerRef} className="h-screen flex flex-col bg-gray-50">
       {/* Saving overlay */}
-      {isSaving && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
-          <div className="bg-white rounded-xl px-6 py-4 flex items-center gap-3 shadow-xl">
+      <ModalPortal isOpen={isSaving}>
+        <div className="modal-overlay">
+          <div className="bg-white rounded-[30px] animate-modal-enter px-6 py-4 flex items-center gap-3 shadow-xl">
             <Loader size="sm" />
             <span className="text-gray-700 font-medium">Saving...</span>
           </div>
         </div>
-      )}
+      </ModalPortal>
 
       {/* Header - FigJam style */}
       <div className="flex items-center gap-4 px-4 py-3 bg-white border-b border-gray-200">
@@ -452,9 +453,9 @@ export default function WhiteboardEditorPage() {
       </div>
 
       {/* Share Modal */}
-      {showShareModal && (
-        <div className="fixed inset-0 z-[9100] flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden">
+      <ModalPortal isOpen={showShareModal}>
+        <div className="modal-overlay">
+          <div className="bg-white rounded-[30px] animate-modal-enter shadow-xl w-full max-w-md overflow-hidden">
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-semibold text-gray-900">Share board</h2>
@@ -577,12 +578,12 @@ export default function WhiteboardEditorPage() {
             </div>
           </div>
         </div>
-      )}
+      </ModalPortal>
 
       {/* Rename Modal */}
-      {showRenameModal && (
-        <div className="fixed inset-0 z-[9200] flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden">
+      <ModalPortal isOpen={showRenameModal}>
+        <div className="modal-overlay">
+          <div className="bg-white rounded-[30px] animate-modal-enter shadow-xl w-full max-w-sm overflow-hidden">
             <div className="p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Rename board</h2>
               <form onSubmit={handleRename}>
@@ -612,7 +613,7 @@ export default function WhiteboardEditorPage() {
             </div>
           </div>
         </div>
-      )}
+      </ModalPortal>
     </div>
   );
 }

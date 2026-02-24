@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { FaTrophy, FaDownload, FaShare, FaCalendar, FaClock, FaAward, FaMedal } from 'react-icons/fa'
 import toast from '@/utils/toast'
 import Loader from '@/components/ui/Loader'
+import ModalPortal from '@/components/ui/ModalPortal'
 
 export default function CertificatesPage() {
   const [mounted, setMounted] = useState(false)
@@ -278,9 +279,9 @@ export default function CertificatesPage() {
       )}
 
       {/* Certificate Detail Modal */}
-      {selectedCertificate && (
-        <div className="fixed inset-0 flex items-center justify-center z-[9100] p-4" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
-          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <ModalPortal isOpen={!!selectedCertificate}>
+        <div className="modal-overlay">
+          <div className="bg-white rounded-[30px] animate-modal-enter max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-bold text-gray-800">Certificate Details</h2>
@@ -308,7 +309,7 @@ export default function CertificatesPage() {
             </div>
           </div>
         </div>
-      )}
+      </ModalPortal>
     </div>
   )
 }

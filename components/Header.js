@@ -434,7 +434,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
             {/* Backdrop overlay when search is active */}
             {(showSearchResults || searchQuery.length >= 2) && (
               <div
-                className="fixed inset-0 z-[100] bg-black/60"
+                className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-[10px]"
                 onClick={() => {
                   setSearchQuery('')
                   setShowSearchResults(false)
@@ -812,7 +812,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
       {/* Backdrop overlay with blur animation - renders below iframe */}
       {(showMiraModal || miraModalClosing) && (
         <div
-          className={`fixed inset-0 bg-black/60 ${miraModalClosing ? 'animate-mira-backdrop-out' : 'animate-mira-backdrop-in'}`}
+          className={`fixed inset-0 bg-black/60 backdrop-blur-[10px] ${miraModalClosing ? 'animate-mira-backdrop-out' : 'animate-mira-backdrop-in'}`}
           style={{ zIndex: 99998, pointerEvents: 'none' }}
           onAnimationEnd={() => {
             if (miraModalClosing) {

@@ -1099,14 +1099,15 @@ export default function ProductivityPage() {
         scrollBehavior="inside"
         radius="lg"
         classNames={{ 
-          wrapper: 'z-[9999] flex items-center justify-center',
-          base: '!rounded-2xl !max-w-none !max-h-none m-0',
-          body: 'rounded-b-2xl',
-          header: 'rounded-t-2xl',
+          wrapper: 'z-[99999] flex items-center justify-center',
+          backdrop: 'bg-black/50 backdrop-blur-[10px] animate-[overlay-blur-in_0.3s_cubic-bezier(0.16,1,0.3,1)_forwards]',
+          base: '!rounded-[30px] !max-w-none !max-h-none m-0',
+          body: 'rounded-b-[30px]',
+          header: 'rounded-t-[30px]',
           closeButton: 'top-3 right-3 z-50'
         }}
       >
-        <ModalContent className="!rounded-2xl overflow-hidden" style={{ width: '80vw', height: '85vh', maxWidth: '80vw', maxHeight: '85vh' }}>
+        <ModalContent className="!rounded-[30px] overflow-hidden" style={{ width: '80vw', height: '85vh', maxWidth: '80vw', maxHeight: '85vh' }}>
         {selectedSession && (
         <>
           <ModalHeader className="flex items-center justify-between border-b bg-default-50 pr-12">

@@ -34,5 +34,10 @@ export default function ModalPortal({ isOpen, children }) {
   // SSR check
   if (typeof window === 'undefined') return null
 
-  return createPortal(children, document.body)
+  return createPortal(
+    <div style={{ position: 'relative', zIndex: 99999 }}>
+      {children}
+    </div>,
+    document.body
+  )
 }

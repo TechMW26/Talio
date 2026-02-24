@@ -261,7 +261,7 @@ export function MobileModal({ isOpen, onClose, title, children, footer }) {
         />
 
         {/* Modal Content */}
-        <div className="relative bg-white rounded-t-2xl sm:rounded-2xl shadow-xl transform transition-all w-full sm:max-w-lg sm:w-full max-h-[90vh] flex flex-col">
+        <div className="relative bg-white rounded-t-[30px] sm:rounded-[30px] shadow-xl transform transition-all w-full sm:max-w-lg sm:w-full max-h-[90vh] flex flex-col animate-modal-enter">
           {/* Header */}
           {title && (
             <div className="px-4 sm:px-6 py-4 border-b border-gray-200 flex items-center justify-between">

@@ -5386,11 +5386,10 @@ const WhiteboardCanvas = forwardRef(({
       {confirmModal && (
         <>
           <div 
-            className="fixed inset-0 z-[999]" 
-            style={{ backgroundColor: "rgba(0,0,0,0.6)" }} 
+            className="fixed inset-0 z-[99999] bg-black/60 backdrop-blur-[10px] animate-[overlay-blur-in_0.3s_cubic-bezier(0.16,1,0.3,1)_forwards]" 
             onClick={() => !confirmModal.onConfirm && setConfirmModal(null)} 
           />
-          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-xl shadow-2xl p-6 z-[1000] min-w-[320px]">
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-[30px] shadow-2xl p-6 z-[99999] min-w-[320px] animate-modal-enter">
             <p className="text-gray-800 text-center mb-6">{confirmModal.message}</p>
             <div className="flex gap-3 justify-center">
               {confirmModal.onConfirm ? (

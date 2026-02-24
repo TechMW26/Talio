@@ -331,7 +331,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
           {/* Mobile overlay with tinted background */}
           {isOpen && (
             <div
-              className="fixed inset-0 z-[60] animate-fade-in bg-black/60"
+              className="fixed inset-0 z-[60] animate-fade-in bg-black/60 backdrop-blur-[10px]"
               onClick={() => setIsOpen(false)}
             />
           )}

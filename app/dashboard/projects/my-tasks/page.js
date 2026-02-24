@@ -29,6 +29,7 @@ import {
 } from 'react-icons/fa'
 import { playNotificationSound, NotificationSoundTypes } from '@/lib/notificationSounds'
 import Portal from '@/components/ui/Portal'
+import ModalPortal from '@/components/ui/ModalPortal'
 import KanbanBoard from '@/components/tasks/KanbanBoard'
 
 const statusColors = {
@@ -1079,10 +1080,9 @@ export default function MyTasksPage() {
       </Modal>
 
       {/* Task Detail Modal - Opens when clicking task in Kanban view */}
-      {selectedTask && !showRejectModal && (
-        <Portal>
-          <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4" onClick={(e) => e.target === e.currentTarget && setSelectedTask(null)}>
-            <div className="bg-content1 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
+      <ModalPortal isOpen={!!selectedTask && !showRejectModal}>
+          <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setSelectedTask(null)}>
+            <div className="bg-content1 rounded-[30px] shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
               <div className="px-6 py-4 bg-default-50 flex items-center justify-between flex-shrink-0">
                 <h3 className="text-lg font-semibold text-default-800">Task Details</h3>
                 <div className="flex items-center gap-2">
@@ -1440,8 +1440,7 @@ export default function MyTasksPage() {
               </div>
             </div>
           </div>
-        </Portal>
-      )}
+      </ModalPortal>
     </div>
   )
 }

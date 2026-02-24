@@ -28,6 +28,7 @@ import { Button, Select, SelectItem } from '@heroui/react'
 import ProjectOverview from '@/components/projects/ProjectOverview'
 import KanbanBoard from '@/components/tasks/KanbanBoard'
 import Portal from '@/components/ui/Portal'
+import ModalPortal from '@/components/ui/ModalPortal'
 import Loader from '@/components/ui/Loader'
 
 const statusColors = {
@@ -2367,10 +2368,9 @@ export default function ProjectDetailPage() {
       </div>
 
       {/* Create Task Modal */}
-      {showCreateTask && (
-      <Portal>
-        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
+      <ModalPortal isOpen={showCreateTask}>
+        <div className="modal-overlay">
+          <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between flex-shrink-0">
               <h3 className="text-xl font-bold text-gray-900">Create New Task</h3>
               <button
@@ -2612,14 +2612,12 @@ export default function ProjectDetailPage() {
             </form>
           </div>
         </div>
-      </Portal>
-      )}
+      </ModalPortal>
 
       {/* Task ETA Modal (for self-assignment) */}
-      {showTaskEtaModal && pendingTaskData && (
-      <Portal>
-        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
+      <ModalPortal isOpen={showTaskEtaModal && !!pendingTaskData}>
+        <div className="modal-overlay">
+          <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between">
               <h3 className="text-xl font-bold text-gray-900">Set Your ETA</h3>
               <button
@@ -2768,14 +2766,12 @@ export default function ProjectDetailPage() {
             </div>
           </div>
         </div>
-      </Portal>
-      )}
+      </ModalPortal>
 
       {/* Edit Task Modal */}
-      {showEditTaskModal && editTaskForm && (
-      <Portal>
-        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
+      <ModalPortal isOpen={showEditTaskModal && !!editTaskForm}>
+        <div className="modal-overlay">
+          <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between">
               <h3 className="text-xl font-bold text-gray-900">Edit Task</h3>
               <button
@@ -3018,14 +3014,12 @@ export default function ProjectDetailPage() {
             </form>
           </div>
         </div>
-      </Portal>
-      )}
+      </ModalPortal>
 
       {/* Reject Invitation Modal */}
-      {showRejectInvitationModal && (
-      <Portal>
-        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-modal-enter">
+      <ModalPortal isOpen={showRejectInvitationModal}>
+        <div className="modal-overlay">
+          <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-lg animate-modal-enter">
             <div className="p-6">
               <h3 className="text-lg font-semibold text-gray-800 mb-4">Reject Project Invitation</h3>
               <p className="text-gray-600 text-sm mb-4">
@@ -3060,14 +3054,12 @@ export default function ProjectDetailPage() {
             </div>
           </div>
         </div>
-      </Portal>
-      )}
+      </ModalPortal>
 
       {/* Task Detail Modal */}
-      {selectedTask && (
-      <Portal>
-        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
+      <ModalPortal isOpen={!!selectedTask}>
+        <div className="modal-overlay">
+          <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between flex-shrink-0">
               <h3 className="text-lg font-semibold text-gray-800">Task Details</h3>
               <div className="flex items-center gap-2">
@@ -3643,14 +3635,12 @@ export default function ProjectDetailPage() {
             </div>
           </div>
         </div>
-      </Portal>
-      )}
+      </ModalPortal>
 
       {/* Delete Task Modal */}
-      {showDeleteTaskModal && taskToDelete && (
-      <Portal>
-        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-modal-enter">
+      <ModalPortal isOpen={showDeleteTaskModal && !!taskToDelete}>
+        <div className="modal-overlay">
+          <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-lg animate-modal-enter">
             <div className="p-6">
               <h3 className="text-lg font-semibold text-gray-800 mb-4">
                 {isProjectHead ? 'Delete Task' : 'Request Task Deletion'}
@@ -3696,14 +3686,12 @@ export default function ProjectDetailPage() {
             </div>
           </div>
         </div>
-      </Portal>
-      )}
+      </ModalPortal>
 
       {/* Reassign Task Modal */}
-      {showReassignModal && reassignTask && (
-      <Portal>
-        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg animate-modal-enter">
+      <ModalPortal isOpen={showReassignModal && !!reassignTask}>
+        <div className="modal-overlay">
+          <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-lg animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-800">Reassign Task</h3>
               <button
@@ -3770,14 +3758,12 @@ export default function ProjectDetailPage() {
             </div>
           </div>
         </div>
-      </Portal>
-      )}
+      </ModalPortal>
 
       {/* Reason Modal for Status Changes */}
-      {showReasonModal && pendingStatusChange && (
-        <Portal>
-          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}>
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md transform transition-all">
+      <ModalPortal isOpen={showReasonModal && !!pendingStatusChange}>
+          <div className="modal-overlay">
+            <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-md transform transition-all">
               <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-amber-500 to-orange-500 rounded-t-xl">
                 <h3 className="text-lg font-semibold text-white">Reason Required</h3>
                 <p className="text-amber-100 text-sm">Please provide a reason for this status change</p>
@@ -3826,8 +3812,7 @@ export default function ProjectDetailPage() {
               </div>
             </div>
           </div>
-        </Portal>
-      )}
+      </ModalPortal>
     </div>
   )
 }

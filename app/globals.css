@@ -1259,7 +1259,56 @@ html.dark .animate-mira-backdrop-in {
 }
 
 .animate-modal-enter {
-  animation: modal-enter 0.2s ease-out forwards;
+  animation: modal-enter 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Overlay backdrop blur entrance/exit */
+@keyframes overlay-blur-in {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+    -webkit-backdrop-filter: blur(0px);
+  }
+  to {
+    opacity: 1;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+}
+
+@keyframes overlay-blur-out {
+  from {
+    opacity: 1;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  to {
+    opacity: 0;
+    backdrop-filter: blur(0px);
+    -webkit-backdrop-filter: blur(0px);
+  }
+}
+
+/* ============================================
+   HEROUI MODAL OVERRIDES — Global
+   Ensures all HeroUI modals have 30px radius,
+   blur backdrop, and smooth animation
+   ============================================ */
+[data-slot="backdrop"].backdrop-opacity-disabled,
+[data-slot="backdrop"],
+div[class*="backdrop-blur"] + div[role="dialog"],
+.z-50[data-slot="wrapper"] {
+  z-index: 99999 !important;
+}
+
+[data-slot="base"][role="dialog"],
+section[role="dialog"],
+div[role="dialog"] > section {
+  border-radius: 30px !important;
+}
+
+[data-slot="backdrop"] {
+  animation: overlay-blur-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards !important;
 }
 
 /* ============================================
@@ -1268,19 +1317,24 @@ html.dark .animate-mira-backdrop-in {
    for better performance on mobile devices
    ============================================ */
 
-/* Overlay backgrounds with transparent black tint - GLOBAL STANDARD */
-/* All modals use rgba(0, 0, 0, 0.6) for consistent transparent black backdrop */
-/* NO backdrop-blur - just color and transparency */
+/* Overlay backgrounds with transparent black tint + blur - GLOBAL STANDARD */
+/* All modals use rgba(0, 0, 0, 0.6) with 10px backdrop blur */
 .modal-overlay-bg {
   background-color: rgba(0, 0, 0, 0.6);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
 
 .modal-overlay-dark {
   background-color: rgba(0, 0, 0, 0.6);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
 
 .modal-overlay-light {
   background-color: rgba(0, 0, 0, 0.6);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
 
 /* Overlay with animation - no blur */
@@ -1295,7 +1349,9 @@ html.dark .animate-mira-backdrop-in {
 
 .modal-overlay-animated {
   background-color: rgba(0, 0, 0, 0.6);
-  animation: overlay-fade-in 0.2s ease-out;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  animation: overlay-blur-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Card Hover Effect */
@@ -1500,6 +1556,9 @@ textarea::placeholder {
   padding: 1rem;
   overflow-y: auto;
   background-color: rgba(0, 0, 0, 0.6);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  animation: overlay-blur-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Modal Backdrop - Transparent black background - GLOBAL STANDARD */
@@ -1507,7 +1566,10 @@ textarea::placeholder {
   position: fixed;
   inset: 0;
   background-color: rgba(0, 0, 0, 0.6);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
   z-index: 99998;
+  animation: overlay-blur-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Modal Container - The white modal box */
@@ -1515,14 +1577,14 @@ textarea::placeholder {
   position: relative;
   z-index: 99999;
   background-color: #ffffff;
-  border-radius: 1rem;
+  border-radius: 30px;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   width: 100%;
   max-height: 90vh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  animation: modal-enter 0.2s ease-out forwards;
+  animation: modal-enter 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 /* Modal Size Variants */

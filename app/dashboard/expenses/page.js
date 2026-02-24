@@ -6,6 +6,7 @@ import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaMoneyBillWave, FaCheckCircle, FaClock, FaTimesCircle } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
 import Loader from '@/components/ui/Loader'
+import ModalPortal from '@/components/ui/ModalPortal'
 import { Select, SelectItem, Input, Textarea, Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@heroui/react'
 
 export default function ExpensesPage() {
@@ -283,9 +284,9 @@ export default function ExpensesPage() {
       </div>
 
       {/* Submit Expense Modal */}
-      {showModal && (
-        <div className="fixed inset-0 modal-overlay flex items-center justify-center" style={{ zIndex: 99999 }}>
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+      <ModalPortal isOpen={showModal}>
+        <div className="modal-overlay">
+          <div className="bg-white rounded-[30px] animate-modal-enter p-6 w-full max-w-md">
             <h2 className="text-2xl font-bold text-gray-800 mb-4">Submit Expense</h2>
             <form onSubmit={handleSubmit}>
               <div className="space-y-4">
@@ -369,7 +370,7 @@ export default function ExpensesPage() {
             </form>
           </div>
         </div>
-      )}
+      </ModalPortal>
     </div>
   )
 }
