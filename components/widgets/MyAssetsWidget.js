@@ -7,16 +7,17 @@ import { Card, CardBody, Chip, Skeleton, ScrollShadow } from '@heroui/react'
 
 export default function MyAssetsWidget({ user, initialData }) {
   const router = useRouter()
-  const [assets, setAssets] = useState(initialData || [])
-  const [loading, setLoading] = useState(!initialData)
+  const [assets, setAssets] = useState([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Skip fetch if initialData was provided
-    if (initialData) {
+    // Data provided from unified dashboard call (including empty array)
+    if (initialData !== undefined) {
       setAssets(initialData)
       setLoading(false)
       return
     }
+    // undefined = standalone mode, self-fetch
     if (user) fetchAssets()
   }, [user, initialData])
 

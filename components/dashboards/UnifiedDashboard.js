@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { useTheme } from '@/contexts/ThemeContext'
@@ -221,11 +221,10 @@ export default function UnifiedDashboard({ user: userProp }) {
 
     // Dashboard data states
     const [dashboardStats, setDashboardStats] = useState(null)
-    const [employees, setEmployees] = useState([])
     const [departments, setDepartments] = useState([])
     const [leaveRequests, setLeaveRequests] = useState([])
     const [attendanceData, setAttendanceData] = useState([])
-    
+
     // Unified widget data (fetched in single API call for performance)
     const [unifiedWidgetData, setUnifiedWidgetData] = useState(null)
 
@@ -245,6 +244,10 @@ export default function UnifiedDashboard({ user: userProp }) {
         }
         return null
     })
+
+    // Ref to avoid re-creating fetchUnifiedWidgetData when employeeData changes
+    const employeeDataRef = useRef(employeeData)
+    employeeDataRef.current = employeeData
 
     // Get employee ID and role
     const employeeIdStr = getEmployeeId(user)
@@ -275,14 +278,14 @@ export default function UnifiedDashboard({ user: userProp }) {
         }
     }, [])
 
-    // Fetch dashboard data based on role - MUST be defined before realtime handlers
+    // Fetch dashboard stats based on role - ONLY fetches KPI stats
+    // Other data (departments, leave requests, attendance) comes from the unified endpoint
     const fetchDashboardData = useCallback(async () => {
         try {
             const token = localStorage.getItem('token')
             const role = user?.role || 'employee'
 
             // Determine which stats endpoint to use based on role
-            // Admin and HR share the same stats endpoint
             let statsEndpoint = '/api/dashboard/employee-stats'
             if (isAdminLevel(role) || role === 'hr') {
                 statsEndpoint = '/api/dashboard/hr-stats'
@@ -290,73 +293,21 @@ export default function UnifiedDashboard({ user: userProp }) {
                 statsEndpoint = '/api/dashboard/manager-stats'
             }
 
-            const fetchPromises = [
-                fetch(statsEndpoint, { headers: { 'Authorization': `Bearer ${token}` } })
-            ]
-
-            // Fetch additional data for management roles
-            if (isManagementRole(role)) {
-                fetchPromises.push(
-                    fetch('/api/employees?limit=1000', { headers: { 'Authorization': `Bearer ${token}` } }),
-                    fetch('/api/leave?status=pending&limit=10', { headers: { 'Authorization': `Bearer ${token}` } })
-                )
+            // Only fetch the stats endpoint — departments, leave requests,
+            // attendance summary, and employee data all come from the unified endpoint
+            const response = await fetch(statsEndpoint, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
+            const statsData = await response.json()
+            if (statsData.success) {
+                setDashboardStats(statsData.data)
             }
-
-            if (isHRLevel(role)) {
-                fetchPromises.push(
-                    fetch('/api/departments', { headers: { 'Authorization': `Bearer ${token}` } }),
-                    fetch('/api/attendance/summary', { headers: { 'Authorization': `Bearer ${token}` } })
-                )
-            }
-
-            const responses = await Promise.allSettled(fetchPromises)
-
-            // Process stats response
-            if (responses[0].status === 'fulfilled') {
-                const statsData = await responses[0].value.json()
-                if (statsData.success) {
-                    setDashboardStats(statsData.data)
-                }
-            }
-
-            // Process employees response (for management roles)
-            if (responses[1]?.status === 'fulfilled') {
-                const empData = await responses[1].value.json()
-                if (empData.success) {
-                    setEmployees(empData.data || [])
-                }
-            }
-
-            // Process leave requests response (for management roles)
-            if (responses[2]?.status === 'fulfilled') {
-                const leaveData = await responses[2].value.json()
-                if (leaveData.success) {
-                    setLeaveRequests(leaveData.data || [])
-                }
-            }
-
-            // Process departments response (for HR/Admin roles)
-            if (responses[3]?.status === 'fulfilled') {
-                const deptData = await responses[3].value.json()
-                if (deptData.success) {
-                    setDepartments(deptData.data || [])
-                }
-            }
-
-            // Process attendance summary response (for HR/Admin roles)
-            if (responses[4]?.status === 'fulfilled') {
-                const attData = await responses[4].value.json()
-                if (attData.success) {
-                    setAttendanceData(attData.data || [])
-                }
-            }
-
         } catch (error) {
-            console.error('Fetch dashboard data error:', error)
+            console.error('Fetch dashboard stats error:', error)
         }
     }, [user?.role])
 
-    // Fetch today's attendance - MUST be defined before realtime handlers
+    // Fetch today's attendance - used for real-time updates only (initial load uses unified endpoint)
     const fetchTodayAttendance = useCallback(async () => {
         if (!employeeIdStr) return
         try {
@@ -379,24 +330,9 @@ export default function UnifiedDashboard({ user: userProp }) {
         }
     }, [employeeIdStr])
 
-    // Fetch employee data
-    const fetchEmployeeData = useCallback(async () => {
-        if (!employeeIdStr) return
-        try {
-            const token = localStorage.getItem('token')
-            const response = await fetch(`/api/employees/${employeeIdStr}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            })
-            const result = await response.json()
-            if (result.success) {
-                setEmployeeData(result.data)
-            }
-        } catch (error) {
-            console.error('Error fetching employee data:', error)
-        }
-    }, [employeeIdStr])
-
-    // Fetch unified widget data (single API call for holidays, announcements, assets, expenses, helpdesk, policies)
+    // Fetch unified widget data — single API call for holidays, announcements, assets, expenses, helpdesk, policies
+    // ALSO populates: departments, leave requests, attendance summary, employee data, and today's attendance
+    // This eliminates 5+ separate API calls that were causing browser connection queue stalling
     const fetchUnifiedWidgetData = useCallback(async () => {
         try {
             const token = localStorage.getItem('token')
@@ -405,18 +341,50 @@ export default function UnifiedDashboard({ user: userProp }) {
             })
             const data = await response.json()
             if (data.success) {
-                setUnifiedWidgetData(data.data)
+                setUnifiedWidgetData(data)
+
+                // Populate departments from unified response (eliminates /api/departments call)
+                if (data.departments) {
+                    setDepartments(data.departments)
+                }
+
+                // Populate leave requests from unified response (eliminates /api/leave?status=pending call)
+                if (data.pendingLeaveRequests) {
+                    setLeaveRequests(data.pendingLeaveRequests)
+                }
+
+                // Populate attendance summary from unified response (eliminates /api/attendance/summary call)
+                if (data.attendanceSummary) {
+                    setAttendanceData(data.attendanceSummary)
+                }
+
+                // Populate employee data from unified response (eliminates /api/employees/:id call)
+                // Use ref to avoid dependency cycle: employeeData change → callback recreated → useEffect re-fires
+                if (data.employee && !employeeDataRef.current) {
+                    setEmployeeData(data.employee)
+                }
+
+                // Populate today's attendance from unified response (eliminates /api/attendance?employeeId=... call)
+                if (data.todayAttendance !== undefined) {
+                    setTodayAttendance(data.todayAttendance)
+                }
+
+                // Populate company settings from unified response (eliminates /api/settings/company call)
+                if (data.companySettings) {
+                    setCompanySettings(data.companySettings)
+                }
             }
         } catch (error) {
             console.error('Error fetching unified widget data:', error)
         }
-    }, [])
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps — uses employeeDataRef to avoid re-fetch cycle
 
     // Real-time update handlers - MUST come after fetch functions
     const handleRealtimeUpdate = useCallback((data) => {
         console.log('🔄 [Unified Dashboard] Real-time update received')
         fetchDashboardData()
-    }, [fetchDashboardData])
+        fetchUnifiedWidgetData()
+    }, [fetchDashboardData, fetchUnifiedWidgetData])
 
     const handleAttendanceUpdate = useCallback((data) => {
         console.log('🔄 [Unified Dashboard] Attendance update received')
@@ -454,20 +422,23 @@ export default function UnifiedDashboard({ user: userProp }) {
     }, [userProp])
 
     // Initial data load - progressive loading (don't block render)
+    // OPTIMIZED: Only 2 API calls instead of 7+
+    // - fetchUnifiedWidgetData() → single call that provides: holidays, announcements, assets,
+    //   expenses, helpdesk, policies, departments, leave requests, attendance summary,
+    //   employee data, today's attendance, and company settings
+    // - fetchDashboardData() → KPI stats only (hr-stats/manager-stats/employee-stats)
+    // Previously: 7+ calls including separate /api/employees/:id, /api/attendance?employeeId=...,
+    //   /api/employees?limit=1000, /api/leave, /api/departments, /api/attendance/summary,
+    //   /api/settings/company
     useEffect(() => {
+        if (!user || !employeeIdStr) return
         // Show dashboard immediately - widgets will show their own loading states
         setLoading(false)
-        
-        // Fetch data in parallel (non-blocking)
-        fetchDashboardData()
-        fetchCompanySettings()
-        fetchUnifiedWidgetData()
 
-        if (employeeIdStr) {
-            fetchTodayAttendance()
-            fetchEmployeeData()
-        }
-    }, [user, employeeIdStr, fetchDashboardData, fetchTodayAttendance, fetchEmployeeData, fetchCompanySettings, fetchUnifiedWidgetData])
+        // Fetch data in parallel (non-blocking) — only 2 API calls from UnifiedDashboard
+        fetchUnifiedWidgetData()  // Single aggregated call (replaces 6+ separate calls, includes company settings)
+        fetchDashboardData()       // KPI stats only
+    }, [user, employeeIdStr]) // eslint-disable-line react-hooks/exhaustive-deps — callbacks are stable or use refs
 
     // Countdown timer effect
     useEffect(() => {
@@ -689,8 +660,8 @@ export default function UnifiedDashboard({ user: userProp }) {
                 }
                 if (dashboardStats.onLeaveToday) {
                     // onLeaveToday can be an array or an object with value
-                    const onLeaveCount = Array.isArray(dashboardStats.onLeaveToday) 
-                        ? dashboardStats.onLeaveToday.length 
+                    const onLeaveCount = Array.isArray(dashboardStats.onLeaveToday)
+                        ? dashboardStats.onLeaveToday.length
                         : (dashboardStats.onLeaveToday?.value ?? dashboardStats.onLeaveToday)
                     statsArray.push({
                         title: 'On Leave',
@@ -701,8 +672,8 @@ export default function UnifiedDashboard({ user: userProp }) {
                 }
                 if (dashboardStats.lateToday) {
                     // lateToday can be an array or an object with value
-                    const lateCount = Array.isArray(dashboardStats.lateToday) 
-                        ? dashboardStats.lateToday.length 
+                    const lateCount = Array.isArray(dashboardStats.lateToday)
+                        ? dashboardStats.lateToday.length
                         : (dashboardStats.lateToday?.value ?? dashboardStats.lateToday)
                     statsArray.push({
                         title: 'Late Today',
@@ -738,8 +709,8 @@ export default function UnifiedDashboard({ user: userProp }) {
                 }
                 if (dashboardStats.presentToday !== undefined) {
                     // presentToday can be an array or a number
-                    const presentCount = Array.isArray(dashboardStats.presentToday) 
-                        ? dashboardStats.presentToday.length 
+                    const presentCount = Array.isArray(dashboardStats.presentToday)
+                        ? dashboardStats.presentToday.length
                         : dashboardStats.presentToday
                     statsArray.push({
                         title: 'Present Today',
@@ -790,13 +761,23 @@ export default function UnifiedDashboard({ user: userProp }) {
         // === HR/ADMIN WIDGETS ===
 
         // Department Chart Widget
+        // OPTIMIZED: Use pre-aggregated departmentStats from hr-stats endpoint
+        // instead of loading all 1000+ employees and filtering client-side
         if (permissions.departmentChart) {
+            // Build department stats from hr-stats aggregated data + department names
+            const deptStats = departments.map(dept => {
+                const statEntry = dashboardStats?.departmentStats?.find(
+                    s => s._id === dept._id || s._id?.toString() === dept._id?.toString()
+                )
+                return {
+                    name: dept.name,
+                    value: statEntry?.count || 0
+                }
+            }).filter(d => d.value > 0)
+
             components['department-distribution'] = (
                 <DepartmentChartWidget
-                    departmentStats={departments.map(dept => ({
-                        name: dept.name,
-                        value: employees.filter(emp => emp.department?._id === dept._id || emp.department === dept._id).length
-                    }))}
+                    departmentStats={deptStats}
                 />
             )
         }
@@ -817,11 +798,12 @@ export default function UnifiedDashboard({ user: userProp }) {
             )
         }
 
-        // Leave Balance Widget
-        if (permissions.leaveBalance) {
+        // Leave Balance Widget (only create when unified data is loaded)
+        if (permissions.leaveBalance && unifiedWidgetData) {
             components['leave-balance'] = (
                 <LeaveBalanceWidget
                     employeeId={employeeIdStr}
+                    initialData={unifiedWidgetData.leaveBalance}
                 />
             )
         }
@@ -848,14 +830,14 @@ export default function UnifiedDashboard({ user: userProp }) {
             components['role-news'] = <RoleNewsWidget />
         }
 
-        // Announcements Widget
-        if (permissions.announcements) {
-            components['announcements'] = <AnnouncementsWidget initialData={unifiedWidgetData?.announcements} />
+        // Announcements Widget (only create when unified data is loaded to prevent self-fetch)
+        if (permissions.announcements && unifiedWidgetData) {
+            components['announcements'] = <AnnouncementsWidget initialData={unifiedWidgetData.announcements} />
         }
 
         // Holidays Widget
-        if (permissions.holidays) {
-            components['holidays'] = <HolidaysWidget initialData={unifiedWidgetData?.holidays} />
+        if (permissions.holidays && unifiedWidgetData) {
+            components['holidays'] = <HolidaysWidget initialData={unifiedWidgetData.holidays} />
         }
 
         // Birthday Widget
@@ -866,23 +848,23 @@ export default function UnifiedDashboard({ user: userProp }) {
         // === PERSONAL WIDGETS ===
 
         // My Assets Widget
-        if (permissions.myAssets) {
-            components['my-assets'] = <MyAssetsWidget user={user} initialData={unifiedWidgetData?.assets} />
+        if (permissions.myAssets && unifiedWidgetData) {
+            components['my-assets'] = <MyAssetsWidget user={user} initialData={unifiedWidgetData.myAssets} />
         }
 
         // My Expenses Widget
-        if (permissions.myExpenses) {
-            components['my-expenses'] = <MyExpensesWidget user={user} initialData={unifiedWidgetData?.expenses} />
+        if (permissions.myExpenses && unifiedWidgetData) {
+            components['my-expenses'] = <MyExpensesWidget user={user} initialData={unifiedWidgetData.myExpenses} />
         }
 
         // My Helpdesk Widget
-        if (permissions.myHelpdesk) {
-            components['my-helpdesk'] = <MyHelpdeskWidget user={user} initialData={unifiedWidgetData?.helpdesk} />
+        if (permissions.myHelpdesk && unifiedWidgetData) {
+            components['my-helpdesk'] = <MyHelpdeskWidget user={user} initialData={unifiedWidgetData.myHelpdesk} />
         }
 
         // Policies Widget
-        if (permissions.policies) {
-            components['policies'] = <PoliciesWidget initialData={unifiedWidgetData?.policies} />
+        if (permissions.policies && unifiedWidgetData) {
+            components['policies'] = <PoliciesWidget initialData={unifiedWidgetData.policies} />
         }
 
         // Quick Actions Widget
@@ -905,7 +887,6 @@ export default function UnifiedDashboard({ user: userProp }) {
         todayAttendance,
         attendanceLoading,
         dashboardStats,
-        employees,
         departments,
         leaveRequests,
         attendanceData,
@@ -916,7 +897,6 @@ export default function UnifiedDashboard({ user: userProp }) {
         handleCheckIn,
         handleCheckOut,
         formatCountdown,
-        fetchDashboardData,
         unifiedWidgetData
     ])
 

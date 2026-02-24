@@ -309,6 +309,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
           <IconStrip
             onExpandClick={handleIconStripExpand}
             sidebarCounts={sidebarCounts}
+            isDepartmentHead={isDepartmentHead}
           />
           <SlidingSidebar
             isOpen={slidingSidebarOpen}
@@ -317,6 +318,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
             setActiveSubmenu={setActiveSubmenu}
             activeMenuIndex={activeMenuIndex}
             sidebarCounts={sidebarCounts}
+            isDepartmentHead={isDepartmentHead}
           />
           {/* Spacer for icon strip width */}
           <div className="hidden lg:block w-[4.5rem] flex-shrink-0" />

@@ -8,15 +8,16 @@ import { Card, CardBody, Button, Skeleton, ScrollShadow } from '@heroui/react'
 export default function MyExpensesWidget({ user, initialData }) {
   const router = useRouter()
   const [expenses, setExpenses] = useState([])
-  const [loading, setLoading] = useState(!initialData)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Skip fetch if initialData provided from unified dashboard call
-    if (initialData) {
+    // Data provided from unified dashboard call (including empty array)
+    if (initialData !== undefined) {
       setExpenses(initialData)
       setLoading(false)
       return
     }
+    // undefined = standalone mode, self-fetch
     if (user) fetchExpenses()
   }, [user, initialData])
 

@@ -25,11 +25,10 @@ function SidebarBadge({ count }) {
   )
 }
 
-export default function IconStrip({ onExpandClick, sidebarCounts = {} }) {
+export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartmentHead = false }) {
   const pathname = usePathname()
   const [user, setUser] = useState(null)
   const [mounted, setMounted] = useState(false)
-  const [isDepartmentHead, setIsDepartmentHead] = useState(false)
   const { unreadCount } = useUnreadMessages()
   const { toggleWidget } = useChatWidget()
   const { startNavigation } = usePageTransition()
@@ -45,30 +44,8 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {} }) {
     if (userData) {
       const parsedUser = JSON.parse(userData)
       setUser(parsedUser)
-      checkDepartmentHead()
     }
   }, [])
-
-  // Check if user is a department head
-  const checkDepartmentHead = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      if (!token) return
-
-      const response = await fetch('/api/team/check-head', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-
-      const data = await response.json()
-      if (data.success && data.isDepartmentHead) {
-        setIsDepartmentHead(true)
-      }
-    } catch (error) {
-      console.error('Error checking department head:', error)
-    }
-  }
 
   // Get menu items based on user role (memoized)
   const menuItems = useMemo(() => {
@@ -99,7 +76,7 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {} }) {
         // For admin with dept head, merge admin's attendance submenu with team attendance
         const currentSubmenu = baseMenuItems[attendanceMenuIndex].submenu || []
         const hasTeamAttendance = currentSubmenu.some(item => item.path === '/dashboard/attendance/team')
-        
+
         if (!hasTeamAttendance) {
           // Add Team Attendance after My Attendance
           const myAttendanceIndex = currentSubmenu.findIndex(item => item.path === '/dashboard/attendance')

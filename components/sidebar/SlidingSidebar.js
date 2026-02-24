@@ -35,14 +35,14 @@ export default function SlidingSidebar({
   activeSubmenu,
   setActiveSubmenu,
   activeMenuIndex,
-  sidebarCounts = {}
+  sidebarCounts = {},
+  isDepartmentHead = false
 }) {
   const pathname = usePathname()
   const router = useRouter()
   const [expandedMenus, setExpandedMenus] = useState({})
   const [user, setUser] = useState(null)
   const [mounted, setMounted] = useState(false)
-  const [isDepartmentHead, setIsDepartmentHead] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const { unreadCount } = useUnreadMessages()
   const { toggleWidget } = useChatWidget()
@@ -128,30 +128,8 @@ export default function SlidingSidebar({
     if (userData) {
       const parsedUser = JSON.parse(userData)
       setUser(parsedUser)
-      checkDepartmentHead()
     }
   }, [])
-
-  // Check if user is a department head
-  const checkDepartmentHead = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      if (!token) return
-
-      const response = await fetch('/api/team/check-head', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-
-      const data = await response.json()
-      if (data.success && data.isDepartmentHead) {
-        setIsDepartmentHead(true)
-      }
-    } catch (error) {
-      console.error('Error checking department head:', error)
-    }
-  }
 
   // Get menu items based on user role (memoized)
   const menuItems = useMemo(() => {

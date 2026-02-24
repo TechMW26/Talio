@@ -21,7 +21,8 @@ export async function GET(request) {
     const auth = await getAuthAndModels(request, [
       'Attendance', 'LeaveBalance', 'LeaveType', 'Leave',
       'Employee', 'Department', 'User',
-      'Holiday', 'Announcement', 'Asset', 'Expense', 'Ticket', 'Policy'
+      'Holiday', 'Announcement', 'Asset', 'Expense', 'Ticket', 'Policy',
+      'CompanySettings'
     ])
 
     if (!auth.success) {
@@ -32,7 +33,8 @@ export async function GET(request) {
     const {
       Attendance, LeaveBalance, LeaveType, Leave,
       Employee, Department, User,
-      Holiday, Announcement, Asset, Expense, Ticket, Policy
+      Holiday, Announcement, Asset, Expense, Ticket, Policy,
+      CompanySettings
     } = models
 
     const userRole = user.role || 'employee'
@@ -99,6 +101,15 @@ export async function GET(request) {
     }
 
     // === HOLIDAYS (for all roles) ===
+    // === COMPANY SETTINGS (for CheckInOutWidget work hours config) ===
+    fetchPromises.push(
+      CompanySettings.findOne().lean()
+        .then(settings => {
+          dashboardData.companySettings = settings || null
+        })
+        .catch(() => { dashboardData.companySettings = null })
+    )
+
     if (includeAll || includeWidgets.includes('holidays')) {
       fetchPromises.push(
         Holiday.find({

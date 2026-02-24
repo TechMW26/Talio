@@ -12,6 +12,7 @@ import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
 import UnreadBadge from '@/components/UnreadBadge'
 import { formatDesignation as formatDesignationLib, formatDepartments, getLevelNameFromNumber } from '@/lib/formatters'
+import { getCachedEmployeeData, setCachedEmployeeData } from '@/utils/sessionCache'
 import { Button, Input, Avatar, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, DropdownSection, Skeleton, ScrollShadow, Modal, ModalContent, ModalBody, Divider } from '@heroui/react'
 
 export default function Header({ toggleSidebar, sidebarCollapsed }) {
@@ -102,7 +103,8 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
         })
       }
 
-      // Always fetch fresh employee data to ensure it's up to date
+      // OPTIMIZED: Check sessionCache first to avoid duplicate /api/employees/:id call
+      // (dashboard/layout.js already fetches and caches this data)
       // Handle both string ID and object with _id
       const empId = parsedUser.employeeId
         ? (typeof parsedUser.employeeId === 'object'
@@ -111,7 +113,16 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
         : null
 
       if (empId) {
-        fetchEmployeeData(empId)
+        const cached = getCachedEmployeeData(empId)
+        if (cached) {
+          console.log('[Header] Using cached employee data, skipping API call')
+          setEmployeeData(cached)
+          if (cached.company?.timezone) {
+            setTimezone(cached.company.timezone)
+          }
+        } else {
+          fetchEmployeeData(empId)
+        }
       }
     }
   }, [])
@@ -147,6 +158,9 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
         console.log('Employee Designation Level:', result.data.designationLevel)
         console.log('Employee Designation Level Name:', result.data.designationLevelName)
         setEmployeeData(result.data)
+
+        // Cache the employee data so other components don't re-fetch
+        setCachedEmployeeData(result.data)
 
         if (result.data.company && result.data.company.timezone) {
           setTimezone(result.data.company.timezone)

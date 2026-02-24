@@ -42,7 +42,7 @@ export async function GET(request) {
     // Calculate days remaining
     let daysRemaining = null
     let deadline = null
-    
+
     if (profileCompletion.profileCompletionDeadline) {
       deadline = new Date(profileCompletion.profileCompletionDeadline)
       const now = new Date()
@@ -55,7 +55,7 @@ export async function GET(request) {
     let personalInfoComplete = false
     let missingPersonalFields = []
     let filledPersonalFields = []
-    
+
     if (user.employeeId) {
       const employee = await Employee.findById(user.employeeId)
         .select('firstName lastName email phone dateOfBirth gender address bloodGroup')
@@ -72,7 +72,7 @@ export async function GET(request) {
           'Gender': !!employee.gender,
           // Address can be a string or object - handle both
           'Address': !!(employee.address && (
-            typeof employee.address === 'string' 
+            typeof employee.address === 'string'
               ? employee.address.trim().length > 0
               : (employee.address.city || employee.address.street || employee.address.state)
           ))
@@ -100,7 +100,7 @@ export async function GET(request) {
     // Check OCR verification status
     const ocrStatus = profileCompletion.ocrVerification?.status || 'pending'
     const ocrComplete = ocrStatus === 'verified' || ocrStatus === 'matched'
-    
+
     // Get extracted data from OCR (including address)
     const ocrExtractedData = profileCompletion.ocrVerification?.extractedData || null
 
@@ -135,8 +135,8 @@ export async function GET(request) {
           personalInfo: {
             complete: personalInfoComplete,
             label: 'Personal Information',
-            description: missingPersonalFields.length > 0 
-              ? `Missing: ${missingPersonalFields.join(', ')}` 
+            description: missingPersonalFields.length > 0
+              ? `Missing: ${missingPersonalFields.join(', ')}`
               : 'All personal details are complete',
             filledFields: filledPersonalFields,
             missingFields: missingPersonalFields,
@@ -148,7 +148,7 @@ export async function GET(request) {
             frontUploaded: aadhaarFrontUploaded,
             backUploaded: aadhaarBackUploaded,
             label: 'Aadhaar Upload',
-            description: aadhaarComplete 
+            description: aadhaarComplete
               ? 'Front & Back uploaded'
               : aadhaarFrontUploaded
                 ? 'Back side pending'
@@ -171,8 +171,8 @@ export async function GET(request) {
                   : 'Verify your identity through Aadhaar OCR'
           }
         },
-        warning: daysRemaining !== null && daysRemaining <= 7 ? {
-          message: daysRemaining === 0 
+        warning: (!isFullyComplete && daysRemaining !== null && daysRemaining <= 7) ? {
+          message: daysRemaining === 0
             ? 'Your profile completion deadline has passed. Your account may be suspended.'
             : `You have ${daysRemaining} day${daysRemaining !== 1 ? 's' : ''} left to complete your profile.`,
           urgent: daysRemaining <= 2

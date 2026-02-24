@@ -7,15 +7,16 @@ import { Card, CardBody, Button, Skeleton, ScrollShadow } from '@heroui/react'
 export default function PoliciesWidget({ initialData }) {
   const router = useRouter()
   const [policies, setPolicies] = useState([])
-  const [loading, setLoading] = useState(!initialData)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Skip fetch if initialData provided from unified dashboard call
-    if (initialData) {
+    // Data provided from unified dashboard call (including empty array)
+    if (initialData !== undefined) {
       setPolicies(initialData)
       setLoading(false)
       return
     }
+    // undefined = standalone mode, self-fetch
     fetchPolicies()
   }, [initialData])
 

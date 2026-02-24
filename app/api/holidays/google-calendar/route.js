@@ -176,6 +176,11 @@ export async function POST(request) {
 
             const holidayType = mapEventType(event.description || '')
 
+            // Only sync public holidays
+            if (holidayType !== 'public') {
+                continue
+            }
+
             const holidayData = {
                 name,
                 date: holidayDate,
@@ -219,9 +224,20 @@ export async function POST(request) {
             skippedCount = events.length - addedCount - updatedCount
         }
 
+        // Remove any non-public holidays previously synced from Google Calendar
+        const cleanupResult = await Holiday.deleteMany({
+            source: 'google-calendar',
+            year: parseInt(year),
+            type: { $ne: 'public' },
+        })
+        const removedCount = cleanupResult.deletedCount || 0
+        if (removedCount > 0) {
+            console.log(`[Google Calendar] Cleaned up ${removedCount} non-public holidays from DB`)
+        }
+
         return NextResponse.json({
             success: true,
-            message: `Google Calendar sync complete. Added ${addedCount} new holidays, updated ${updatedCount}, skipped ${skippedCount} (${events.length} total from Google).`,
+            message: `Google Calendar sync complete. Added ${addedCount} new holidays, updated ${updatedCount}, skipped ${skippedCount}, removed ${removedCount} non-public (${events.length} total from Google).`,
             data: {
                 country,
                 year,
@@ -229,6 +245,7 @@ export async function POST(request) {
                 added: addedCount,
                 updated: updatedCount,
                 skipped: skippedCount,
+                removedNonPublic: removedCount,
                 holidays: processedHolidays,
             },
         })

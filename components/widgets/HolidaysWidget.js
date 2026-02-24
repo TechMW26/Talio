@@ -9,15 +9,16 @@ import { Card, CardBody, Button, Chip, Skeleton, ScrollShadow } from '@heroui/re
 export default function HolidaysWidget({ limit = 5, initialData }) {
     const router = useRouter()
     const [holidays, setHolidays] = useState([])
-    const [loading, setLoading] = useState(!initialData)
+    const [loading, setLoading] = useState(true)
 
     useEffect(() => {
-        // Skip fetch if initialData provided from unified dashboard call
-        if (initialData) {
+        // Data provided from unified dashboard call (including empty array)
+        if (initialData !== undefined) {
             setHolidays(initialData)
             setLoading(false)
             return
         }
+        // undefined = standalone mode, self-fetch
         fetchHolidays()
     }, [initialData])
 

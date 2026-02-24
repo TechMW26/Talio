@@ -4,10 +4,16 @@ import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { FaCalendarAlt } from 'react-icons/fa'
 import { Card, CardBody, Progress, Skeleton, ScrollShadow } from '@heroui/react'
 
-export default function LeaveBalanceWidget({ employeeId }) {
+export default function LeaveBalanceWidget({ employeeId, initialData }) {
+    // OPTIMIZED: If initialData is provided (from unified endpoint), use it as SWR fallbackData
+    // to prevent a duplicate API call. SWR will still revalidate in the background.
     const { data, error, isLoading } = useAuthedSWR(
         employeeId ? `/api/leave/balance?employeeId=${employeeId}` : null,
-        { refreshInterval: 300_000 }
+        {
+            refreshInterval: 300_000,
+            fallbackData: initialData ? { success: true, data: initialData } : undefined,
+            revalidateOnMount: !initialData, // Skip initial fetch if we have data from unified
+        }
     )
 
     const balances = data?.data || []

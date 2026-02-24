@@ -20,15 +20,17 @@ function isElectronApp() {
 
 /**
  * SplashVideo Component
- * Plays a full-screen Lottie splash animation on first session start
- * NON-BLOCKING: Children always render immediately, splash is just an overlay on top
+ * Shows a lightweight CSS-based splash screen on first session start.
+ * 
+ * PERFORMANCE FIX: Previously used a 936KB Lottie animation (splash-animation.json)
+ * containing 83 embedded base64 webp images, causing 166+ network requests on page load.
+ * Now uses a pure CSS animation with the existing app icon — zero extra requests.
+ * 
+ * NON-BLOCKING: Children always render immediately, splash is just an overlay on top.
  */
 export default function SplashVideo({ children }) {
   const [showSplash, setShowSplash] = useState(false);
-  const [animationData, setAnimationData] = useState(null);
   const [isAnimating, setIsAnimating] = useState(false);
-  const [Lottie, setLottie] = useState(null);
-  const lottieRef = useRef(null);
   const initRef = useRef(false);
 
   useEffect(() => {
@@ -36,7 +38,7 @@ export default function SplashVideo({ children }) {
     if (initRef.current) return;
     initRef.current = true;
 
-    // Skip splash entirely for desktop app - prevents potential blocking issues
+    // Skip splash entirely for desktop app
     if (isElectronApp()) {
       console.log('[SplashVideo] Desktop app detected, skipping splash');
       return;
@@ -45,72 +47,41 @@ export default function SplashVideo({ children }) {
     // Check if this is the first session start
     try {
       const hasSeenSplash = sessionStorage.getItem('talio_splash_shown');
-      
+
       if (!hasSeenSplash) {
         // Show splash overlay (children still render underneath)
         setShowSplash(true);
-        
+        setIsAnimating(true);
+
         // Set theme color for mobile
         const metaTheme = document.querySelector('meta[name="theme-color"]');
         if (metaTheme) {
           metaTheme.setAttribute('content', '#fbfcfc');
         }
-        
-        // Load Lottie and animation data
-        loadSplash();
+
+        // Auto-close after 2.5 seconds
+        setTimeout(() => {
+          handleAnimationEnd();
+        }, 2500);
       }
     } catch (e) {
-      // sessionStorage might not be available (private browsing, etc.)
       console.warn('[SplashVideo] sessionStorage not available:', e);
     }
   }, []);
 
-  const loadSplash = async () => {
-    try {
-      // Dynamically import Lottie only when needed
-      const lottieModule = await import('lottie-react');
-      setLottie(() => lottieModule.default);
-
-      // Fetch animation data
-      const response = await fetch('/splash-animation.json');
-      if (!response.ok) throw new Error('Failed to fetch animation');
-      
-      const data = await response.json();
-      setAnimationData(data);
-      setIsAnimating(true);
-      
-      // Set speed after animation loads
-      setTimeout(() => {
-        if (lottieRef.current) {
-          lottieRef.current.setSpeed(1.5);
-        }
-      }, 50);
-      
-      // Fallback: auto-close after 5 seconds if animation doesn't complete
-      setTimeout(() => {
-        handleAnimationEnd();
-      }, 5000);
-    } catch (error) {
-      console.warn('[SplashVideo] Error loading animation:', error.message);
-      // On error, just hide splash
-      handleAnimationEnd();
-    }
-  };
-
   const handleAnimationEnd = () => {
     try {
-      // Mark splash as shown for this session
       sessionStorage.setItem('talio_splash_shown', 'true');
     } catch (e) {
       // Ignore sessionStorage errors
     }
-    
+
     // Fade out and hide splash overlay
     setIsAnimating(false);
     setTimeout(() => {
       setShowSplash(false);
-    }, 300);
-    
+    }, 400);
+
     // Restore theme color
     const metaTheme = document.querySelector('meta[name="theme-color"]');
     if (metaTheme) {
@@ -122,10 +93,10 @@ export default function SplashVideo({ children }) {
     <SplashContext.Provider value={{ splashComplete: true }}>
       {/* ALWAYS render children immediately - never block */}
       {children}
-      
-      {/* Splash Screen Overlay - only shown on first session */}
+
+      {/* Lightweight CSS Splash Overlay - only shown on first session */}
       {showSplash && (
-        <div 
+        <div
           style={{
             position: 'fixed',
             top: 0,
@@ -135,40 +106,34 @@ export default function SplashVideo({ children }) {
             backgroundColor: '#fbfcfc',
             zIndex: 999999,
             display: 'flex',
-            alignItems: 'flex-end',
+            alignItems: 'center',
             justifyContent: 'center',
+            flexDirection: 'column',
             opacity: isAnimating ? 1 : 0,
-            transition: 'opacity 0.3s ease-out',
+            transition: 'opacity 0.4s ease-out',
             overflow: 'hidden',
             pointerEvents: isAnimating ? 'auto' : 'none',
           }}
         >
-          {Lottie && animationData && (
-            <div 
-              style={{
-                height: '100vh',
-                aspectRatio: '9 / 16',
-                maxWidth: '100vw',
-                display: 'flex',
-                alignItems: 'flex-end',
-              }}
-            >
-              <Lottie
-                lottieRef={lottieRef}
-                animationData={animationData}
-                loop={false}
-                autoplay={true}
-                onComplete={handleAnimationEnd}
-                style={{
-                  width: '100%',
-                  height: '100%',
-                }}
-                rendererSettings={{
-                  preserveAspectRatio: 'xMidYMax slice'
-                }}
-              />
-            </div>
-          )}
+          {/* Logo with CSS animation */}
+          <img
+            src="/icons/icon-192x192.png"
+            alt="Talio"
+            style={{
+              width: 100,
+              height: 100,
+              borderRadius: 20,
+              animation: 'splashLogoIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+            }}
+          />
+
+          {/* Keyframe animations injected via style tag */}
+          <style>{`
+            @keyframes splashLogoIn {
+              0% { opacity: 0; transform: scale(0.5); }
+              100% { opacity: 1; transform: scale(1); }
+            }
+          `}</style>
         </div>
       )}
     </SplashContext.Provider>

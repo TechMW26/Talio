@@ -7,8 +7,8 @@ const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
 const port = process.env.PORT || 3000;
 
-// Initialize Next.js app with turbopack in dev for faster compilation
-const app = next({ dev, hostname, port, turbopack: dev });
+// Initialize Next.js app (webpack mode for reliable compilation)
+const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
 // Global socket instance
@@ -396,6 +396,12 @@ app.prepare().then(() => {
         .then((connected) => console.log(connected ? '✅ Redis connection warmed' : '⚠️ Redis not available, using memory cache'))
         .catch(() => { });
     }).catch(() => { });
+
+    // Start periodic Google Calendar holiday sync cron job
+    try {
+      const { startHolidaySyncCron } = require('./lib/holidaySyncCron');
+      startHolidaySyncCron();
+    } catch (e) { console.warn('⚠️ Holiday sync cron setup skipped:', e.message); }
   });
 
   // Graceful shutdown handling for Docker
@@ -414,6 +420,12 @@ app.prepare().then(() => {
         console.log('✅ Socket.IO server closed');
       });
     }
+
+    // Stop scheduled cron jobs
+    try {
+      const { stopHolidaySyncCron } = require('./lib/holidaySyncCron');
+      stopHolidaySyncCron();
+    } catch (e) { /* ignore if not loaded */ }
 
     // Close database connections
     try {

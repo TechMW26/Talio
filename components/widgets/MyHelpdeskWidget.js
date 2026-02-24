@@ -8,15 +8,16 @@ import { Card, CardBody, Button, Chip, Skeleton, ScrollShadow } from '@heroui/re
 export default function MyHelpdeskWidget({ user, initialData }) {
   const router = useRouter()
   const [tickets, setTickets] = useState([])
-  const [loading, setLoading] = useState(!initialData)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Skip fetch if initialData provided from unified dashboard call
-    if (initialData) {
+    // Data provided from unified dashboard call (including empty array)
+    if (initialData !== undefined) {
       setTickets(initialData)
       setLoading(false)
       return
     }
+    // undefined = standalone mode, self-fetch
     if (user) fetchTickets()
   }, [user, initialData])
 
