@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import queryCache from '@/lib/queryCache'
+import { buildCacheKey, buildCachePattern, getCache, setCache, clearCachePattern } from '@/lib/cache'
 import bcrypt from 'bcryptjs'
 import { sendAndLogOnboardingEmail } from '@/lib/mailer'
 import { syncUserToBackup } from '@/lib/backupDb'
@@ -12,11 +13,11 @@ export async function GET(request) {
   try {
     // Get auth and tenant-aware models
     const auth = await getAuthAndModels(request, ['Employee', 'User', 'Department', 'Designation']);
-    
+
     if (!auth.success) {
       return NextResponse.json({ message: auth.message || 'Unauthorized' }, { status: 401 });
     }
-    
+
     const { models: { Employee: TenantEmployee, User: TenantUser, Department: TenantDepartment, Designation: TenantDesignation } } = auth;
 
     const { searchParams } = new URL(request.url)
@@ -31,7 +32,20 @@ export async function GET(request) {
     const sortBy = searchParams.get('sortBy') || 'createdAt'
     const sortOrder = searchParams.get('sortOrder') || 'desc'
 
-    // Generate cache key
+    // Redis-backed cache key (tenant-isolated)
+    const redisCacheKey = buildCacheKey({
+      tenantId: auth.tenant?.databaseName,
+      role: auth.user?.role || 'any',
+      userId: 'all',
+      namespace: 'employees:list',
+      params: { page, limit, search, department, departmentsParam, designation, level, status, sortBy, sortOrder },
+    })
+    const redisCached = await getCache(redisCacheKey)
+    if (redisCached) {
+      return NextResponse.json(redisCached)
+    }
+
+    // Fallback: in-memory queryCache
     const cacheKey = queryCache.generateKey('employees', page, limit, search, department, departmentsParam, designation, level, status, sortBy, sortOrder)
     const cached = queryCache.get(cacheKey)
     if (cached) {
@@ -144,7 +158,8 @@ export async function GET(request) {
       },
     }
 
-    // Cache for 30 seconds
+    // Store in Redis cache (30s TTL, tenant-isolated) AND in-memory fallback
+    await setCache(redisCacheKey, response, 30)
     queryCache.set(cacheKey, response, 30000)
 
     return NextResponse.json(response)
@@ -177,8 +192,8 @@ export async function POST(request) {
       const limitCheck = await checkUserLimit(auth.tenant.databaseName)
       if (!limitCheck.allowed) {
         return NextResponse.json(
-          { 
-            success: false, 
+          {
+            success: false,
             message: limitCheck.message || 'User limit reached',
             userLimitExceeded: true,
             currentCount: limitCheck.currentCount,
@@ -221,7 +236,7 @@ export async function POST(request) {
 
     // Prepare employee data - ensure company is properly set
     const employeeData = { ...data }
-    
+
     // Sanitize ObjectId fields - convert empty strings to null/undefined
     const objectIdFields = ['company', 'department', 'designation', 'reportingManager'];
     objectIdFields.forEach(field => {
@@ -323,7 +338,9 @@ export async function POST(request) {
       })
       .lean()
 
-    // Clear employee list cache
+    // Clear both Redis and in-memory employee list caches
+    const bustPattern = buildCachePattern({ tenantId: auth.tenant?.databaseName, namespace: 'employees:list' })
+    await clearCachePattern(bustPattern).catch(() => { })
     queryCache.clearPattern('employees')
 
     // Send onboarding email and log to database (async, don't block response)

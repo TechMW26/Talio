@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { sendPushToUser } from '@/lib/pushNotification'
 import { buildCachePattern, clearCachePattern } from '@/lib/cache'
+import { emitEvent, EVENTS } from '@/lib/eventBus'
 
 // PUT - Approve or reject leave request
 export async function PUT(request, { params }) {
@@ -11,7 +12,7 @@ export async function PUT(request, { params }) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-  const { user, models, tenant } = auth
+    const { user, models, tenant } = auth
     const { Leave, LeaveBalance, User, Employee } = models
 
     // Await params in Next.js 15
@@ -130,6 +131,20 @@ export async function PUT(request, { params }) {
       }
     } catch (notifError) {
       console.error('Failed to send leave status notification:', notifError)
+    }
+
+    // Emit sidebar counts update via eventBus
+    try {
+      emitEvent(EVENTS.LEAVE_STATUS_CHANGED, {
+        leaveId: id,
+        status: updateData.status,
+        employeeId: leaveRequest.employee.toString(),
+      }, {
+        userIds: [employeeUserId].filter(Boolean),
+        databaseName: tenant?.databaseName,
+      })
+    } catch (eventBusError) {
+      console.error('Failed to emit eventBus leave event:', eventBusError)
     }
 
     return NextResponse.json({

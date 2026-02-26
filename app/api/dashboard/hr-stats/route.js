@@ -13,7 +13,7 @@ export async function GET(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-  const { user, models, tenant } = auth
+    const { user, models, tenant } = auth
     const { Employee, Leave, Attendance, Recruitment, Performance, Payroll, User, Department } = models
 
     // Check role authorization
@@ -48,7 +48,7 @@ export async function GET(request) {
 
     // 1. Total Employees
     const totalEmployees = await Employee.countDocuments({ status: 'active' })
-    const lastMonthEmployees = await Employee.countDocuments({ 
+    const lastMonthEmployees = await Employee.countDocuments({
       status: 'active',
       createdAt: { $lt: startOfMonth }
     })
@@ -58,7 +58,7 @@ export async function GET(request) {
       { $match: { status: 'active' } },
       { $group: { _id: '$gender', count: { $sum: 1 } } }
     ])
-    
+
     const maleCount = genderStats.find(g => g._id === 'male')?.count || 0
     const femaleCount = genderStats.find(g => g._id === 'female')?.count || 0
 
@@ -114,12 +114,12 @@ export async function GET(request) {
       pendingLeaves = await Leave.countDocuments({ status: 'pending' })
     } else if (user.role === 'hr' && userRecord?.isDepartmentHead && userRecord?.headOfDepartments?.length > 0) {
       // HR who is dept head - only count their department's leaves
-      const deptEmployees = await Employee.find({ 
+      const deptEmployees = await Employee.find({
         department: { $in: userRecord.headOfDepartments },
         _id: { $ne: userRecord.employeeId }
       }).select('_id').lean()
       const deptEmployeeIds = deptEmployees.map(e => e._id)
-      pendingLeaves = await Leave.countDocuments({ 
+      pendingLeaves = await Leave.countDocuments({
         status: 'pending',
         employee: { $in: deptEmployeeIds }
       })
@@ -151,14 +151,14 @@ export async function GET(request) {
 
     // Calculate trends
     const employeeGrowth = totalEmployees - lastMonthEmployees
-    const employeeGrowthPercent = lastMonthEmployees > 0 ? 
+    const employeeGrowthPercent = lastMonthEmployees > 0 ?
       ((employeeGrowth / lastMonthEmployees) * 100).toFixed(1) : 0
 
     // Attendance rate calculation
     const totalAttendanceRecords = await Attendance.countDocuments({
       date: { $gte: todayStart, $lte: todayEnd }
     })
-    const attendanceRate = totalAttendanceRecords > 0 ? 
+    const attendanceRate = totalAttendanceRecords > 0 ?
       ((activeToday / totalAttendanceRecords) * 100).toFixed(1) : 0
 
     const stats = {
@@ -224,7 +224,7 @@ export async function GET(request) {
       data: stats
     }
 
-    await setCache(cacheKey, response, 2 * 60)
+    await setCache(cacheKey, response, 5 * 60) // 5 min TTL
 
     return NextResponse.json(response)
 

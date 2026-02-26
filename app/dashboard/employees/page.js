@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
-import { 
-  FaPlus, FaSearch, FaEdit, FaTrash, FaEye, FaFilter, FaSortAmountDown, FaSortAmountUp, 
-  FaExclamationTriangle, FaCheckSquare, FaSquare, FaTimes, FaBuilding, FaBriefcase, 
+import {
+  FaPlus, FaSearch, FaEdit, FaTrash, FaEye, FaFilter, FaSortAmountDown, FaSortAmountUp,
+  FaExclamationTriangle, FaCheckSquare, FaSquare, FaTimes, FaBuilding, FaBriefcase,
   FaLayerGroup, FaSave, FaUndo
 } from 'react-icons/fa'
 import { formatDesignation, formatDepartments, getLevelNameFromNumber } from '@/lib/formatters'
@@ -51,7 +51,7 @@ export default function EmployeesPage() {
   const [showFilters, setShowFilters] = useState(false)
   const [deleteModal, setDeleteModal] = useState({ show: false, employee: null })
   const [statusUpdating, setStatusUpdating] = useState(null)
-  
+
   // Filter states
   const [departments, setDepartments] = useState([])
   const [designations, setDesignations] = useState([])
@@ -59,7 +59,7 @@ export default function EmployeesPage() {
   const [selectedDesignation, setSelectedDesignation] = useState('')
   const [selectedLevel, setSelectedLevel] = useState('')
   const [selectedStatus, setSelectedStatus] = useState('')
-  
+
   // Bulk selection states
   const [selectedEmployees, setSelectedEmployees] = useState([])
   const [showBulkEditModal, setShowBulkEditModal] = useState(false)
@@ -77,6 +77,7 @@ export default function EmployeesPage() {
   const { socket, isConnected, onEmployeeCreated, onEmployeeUpdated, subscribe } = useSocket()
 
   const getLevelName = getLevelNameFromNumber
+  const isFirstRender = useRef(true)
 
   // Subscribe to real-time employee updates
   useEffect(() => {
@@ -103,7 +104,7 @@ export default function EmployeesPage() {
     if (userData) {
       const parsedUser = JSON.parse(userData)
       setUser(parsedUser)
-      
+
       // Check if user has access (admin or hr only)
       const allowedRoles = ['admin', 'hr']
       if (!allowedRoles.includes(parsedUser.role)) {
@@ -114,12 +115,11 @@ export default function EmployeesPage() {
     }
     fetchDepartments()
     fetchDesignations()
-    fetchManagers()
   }, [])
 
   useEffect(() => {
     fetchEmployees()
-  }, [page, search, sortBy, sortOrder, selectedDepartment, selectedDesignation, selectedLevel, selectedStatus])
+  }, [page, sortBy, sortOrder, selectedDepartment, selectedDesignation, selectedLevel, selectedStatus])
 
   const fetchDepartments = async () => {
     try {
@@ -154,13 +154,12 @@ export default function EmployeesPage() {
   const fetchManagers = async () => {
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch('/api/employees?limit=1000&status=active', {
+      const response = await fetch('/api/employees/managers', {
         headers: { 'Authorization': `Bearer ${token}` },
       })
       const data = await response.json()
       if (data.success) {
-        const potentialManagers = (data.data || []).filter(emp => (emp.designationLevel || 1) >= 4)
-        setManagers(potentialManagers)
+        setManagers(data.data || [])
       }
     } catch (error) {
       console.error('Fetch managers error:', error)
@@ -171,7 +170,7 @@ export default function EmployeesPage() {
     try {
       setLoading(true)
       const token = localStorage.getItem('token')
-      
+
       const params = new URLSearchParams({
         page: page.toString(),
         limit: '20',
@@ -179,12 +178,12 @@ export default function EmployeesPage() {
         sortBy,
         sortOrder,
       })
-      
+
       if (selectedDepartment) params.append('department', selectedDepartment)
       if (selectedDesignation) params.append('designation', selectedDesignation)
       if (selectedLevel) params.append('level', selectedLevel)
       if (selectedStatus) params.append('status', selectedStatus)
-      
+
       const response = await fetch(`/api/employees?${params.toString()}`, {
         headers: { 'Authorization': `Bearer ${token}` },
       })
@@ -265,7 +264,7 @@ export default function EmployeesPage() {
 
       if (data.success) {
         toast.success(data.message || 'Status updated successfully')
-        setEmployees(prev => prev.map(emp => 
+        setEmployees(prev => prev.map(emp =>
           emp._id === employeeId ? { ...emp, status: newStatus } : emp
         ))
       } else {
@@ -329,8 +328,8 @@ export default function EmployeesPage() {
       return
     }
 
-    if (!bulkEditData.department && !bulkEditData.designation && !bulkEditData.level && 
-        !bulkEditData.status && !bulkEditData.reportingManager) {
+    if (!bulkEditData.department && !bulkEditData.designation && !bulkEditData.level &&
+      !bulkEditData.status && !bulkEditData.reportingManager) {
       toast.error('Please select at least one field to update')
       return
     }
@@ -339,7 +338,7 @@ export default function EmployeesPage() {
 
     try {
       const token = localStorage.getItem('token')
-      
+
       const updatePayload = {}
       if (bulkEditData.department) {
         updatePayload.department = bulkEditData.department
@@ -350,7 +349,7 @@ export default function EmployeesPage() {
       if (bulkEditData.status) updatePayload.status = bulkEditData.status
       if (bulkEditData.reportingManager) updatePayload.reportingManager = bulkEditData.reportingManager
 
-      const updatePromises = selectedEmployees.map(empId => 
+      const updatePromises = selectedEmployees.map(empId =>
         fetch(`/api/employees/${empId}`, {
           method: 'PATCH',
           headers: {
@@ -378,7 +377,7 @@ export default function EmployeesPage() {
           reportingManager: '',
         })
       }
-      
+
       if (failCount > 0) {
         toast.error(`Failed to update ${failCount} employee(s)`)
       }
@@ -390,11 +389,21 @@ export default function EmployeesPage() {
     }
   }
 
+  // Lazy-load managers only when Bulk Edit modal opens
   useEffect(() => {
+    if (showBulkEditModal && managers.length === 0) {
+      fetchManagers()
+    }
+  }, [showBulkEditModal])
+
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false
+      return
+    }
     const timer = setTimeout(() => {
-      if (search !== undefined) {
-        fetchEmployees()
-      }
+      setPage(1)
+      fetchEmployees()
     }, 300)
     return () => clearTimeout(timer)
   }, [search])
@@ -409,7 +418,7 @@ export default function EmployeesPage() {
           </div>
           <h1 className="text-2xl font-bold text-default-800 mb-2">Access Denied</h1>
           <p className="text-default-500 text-center max-w-md mb-6">
-            You don't have permission to access the Employees section. 
+            You don't have permission to access the Employees section.
             This page is restricted to Admin and HR users only.
           </p>
           <Button
@@ -493,7 +502,7 @@ export default function EmployeesPage() {
                   <SelectItem key="dateOfJoining-desc">Recently Joined</SelectItem>
                   <SelectItem key="dateOfJoining-asc">Earliest Joined</SelectItem>
                 </Select>
-                <Button 
+                <Button
                   variant={showFilters || hasActiveFilters ? 'flat' : 'bordered'}
                   color={showFilters || hasActiveFilters ? 'primary' : 'default'}
                   onPress={() => setShowFilters(!showFilters)}
@@ -574,21 +583,21 @@ export default function EmployeesPage() {
                   </Select>
                 </div>
 
-              {hasActiveFilters && (
-                <div className="flex items-end">
-                  <Button
-                    variant="light"
-                    color="default"
-                    onPress={clearFilters}
-                    startContent={<FaTimes />}
-                    size="sm"
-                  >
-                    Clear
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
+                {hasActiveFilters && (
+                  <div className="flex items-end">
+                    <Button
+                      variant="light"
+                      color="default"
+                      onPress={clearFilters}
+                      startContent={<FaTimes />}
+                      size="sm"
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </CardBody>
       </Card>
@@ -619,151 +628,151 @@ export default function EmployeesPage() {
 
       <Card shadow="sm">
         <CardBody className="p-0">
-        {loading ? (
-          <div className="p-8 text-center">
-            <div className="space-y-4">
-              <Skeleton className="h-12 w-full rounded-lg" />
-              <Skeleton className="h-12 w-full rounded-lg" />
-              <Skeleton className="h-12 w-full rounded-lg" />
-              <Skeleton className="h-12 w-full rounded-lg" />
-              <Skeleton className="h-12 w-full rounded-lg" />
+          {loading ? (
+            <div className="p-8 text-center">
+              <div className="space-y-4">
+                <Skeleton className="h-12 w-full rounded-lg" />
+                <Skeleton className="h-12 w-full rounded-lg" />
+                <Skeleton className="h-12 w-full rounded-lg" />
+                <Skeleton className="h-12 w-full rounded-lg" />
+                <Skeleton className="h-12 w-full rounded-lg" />
+              </div>
+              <p className="mt-4 text-default-500">Loading employees...</p>
             </div>
-            <p className="mt-4 text-default-500">Loading employees...</p>
-          </div>
-        ) : employees.length === 0 ? (
-          <div className="p-8 text-center">
-            <p className="text-default-500">No employees found</p>
-            {hasActiveFilters && (
-              <Button variant="light" color="primary" onPress={clearFilters} className="mt-2">
-                Clear filters to see all employees
-              </Button>
-            )}
-          </div>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-default-50 border-b border-default-200">
-                  <tr>
-                    {canManageEmployees() && (
-                      <th className="px-4 py-3 text-left">
-                        <input
-                          type="checkbox"
-                          checked={isAllSelected}
-                          onChange={handleSelectAll}
-                          className="w-4 h-4 text-primary border-default-300 rounded focus:ring-primary"
-                        />
-                      </th>
-                    )}
-                    <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Employee</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Code</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Department</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Designation</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Level</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-content1 divide-y divide-default-200">
-                  {employees.map((employee) => (
-                    <tr key={employee._id} className={`hover:bg-default-50 ${selectedEmployees.includes(employee._id) ? 'bg-primary-50' : ''}`}>
+          ) : employees.length === 0 ? (
+            <div className="p-8 text-center">
+              <p className="text-default-500">No employees found</p>
+              {hasActiveFilters && (
+                <Button variant="light" color="primary" onPress={clearFilters} className="mt-2">
+                  Clear filters to see all employees
+                </Button>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-default-50 border-b border-default-200">
+                    <tr>
                       {canManageEmployees() && (
-                        <td className="px-4 py-4">
+                        <th className="px-4 py-3 text-left">
                           <input
                             type="checkbox"
-                            checked={selectedEmployees.includes(employee._id)}
-                            onChange={() => handleSelectEmployee(employee._id)}
+                            checked={isAllSelected}
+                            onChange={handleSelectAll}
                             className="w-4 h-4 text-primary border-default-300 rounded focus:ring-primary"
                           />
-                        </td>
+                        </th>
                       )}
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="flex-shrink-0 h-10 w-10">
-                            <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center text-white font-semibold overflow-hidden">
-                              {employee.profilePicture ? (
-                                <img src={employee.profilePicture} alt={`${employee.firstName} ${employee.lastName}`} className="w-full h-full object-cover" />
-                              ) : (
-                                <span>{employee.firstName?.[0]}{employee.lastName?.[0]}</span>
-                              )}
+                      <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Employee</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Code</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Department</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Designation</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Level</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-content1 divide-y divide-default-200">
+                    {employees.map((employee) => (
+                      <tr key={employee._id} className={`hover:bg-default-50 ${selectedEmployees.includes(employee._id) ? 'bg-primary-50' : ''}`}>
+                        {canManageEmployees() && (
+                          <td className="px-4 py-4">
+                            <input
+                              type="checkbox"
+                              checked={selectedEmployees.includes(employee._id)}
+                              onChange={() => handleSelectEmployee(employee._id)}
+                              className="w-4 h-4 text-primary border-default-300 rounded focus:ring-primary"
+                            />
+                          </td>
+                        )}
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-10 w-10">
+                              <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center text-white font-semibold overflow-hidden">
+                                {employee.profilePicture ? (
+                                  <img src={employee.profilePicture} alt={`${employee.firstName} ${employee.lastName}`} className="w-full h-full object-cover" />
+                                ) : (
+                                  <span>{employee.firstName?.[0]}{employee.lastName?.[0]}</span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-default-800">{employee.firstName} {employee.lastName}</div>
+                              <div className="text-sm text-default-500">{employee.email}</div>
                             </div>
                           </div>
-                          <div className="ml-4">
-                            <div className="text-sm font-medium text-default-800">{employee.firstName} {employee.lastName}</div>
-                            <div className="text-sm text-default-500">{employee.email}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-default-800">{employee.employeeCode}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-default-800">{formatDepartments(employee)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-default-800">{formatDesignation(employee.designation, employee)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-default-800">
+                          <Chip size="sm" variant="flat" color="default">L{employee.designationLevel || 1}</Chip>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {canManageEmployees() ? (
+                            <Select
+                              selectedKeys={[employee.status || 'active']}
+                              onChange={(e) => handleStatusChange(employee._id, e.target.value)}
+                              isDisabled={statusUpdating === employee._id}
+                              aria-label="Employee Status"
+                              size="sm"
+                              classNames={{ trigger: `bg-content1 ${statusUpdating === employee._id ? 'opacity-50' : ''}` }}
+                            >
+                              {STATUS_OPTIONS.map(option => (
+                                <SelectItem key={option.value}>{option.label}</SelectItem>
+                              ))}
+                            </Select>
+                          ) : (
+                            <Chip size="sm" color={STATUS_OPTIONS.find(s => s.value === employee.status)?.color || 'default'} variant="flat">
+                              {STATUS_OPTIONS.find(s => s.value === employee.status)?.label || employee.status}
+                            </Chip>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex space-x-2">
+                            {canViewEmployeeDetails() && (
+                              <Button isIconOnly variant="light" color="primary" size="sm" onPress={() => router.push(`/dashboard/employees/${employee._id}`)} title="View Details">
+                                <FaEye />
+                              </Button>
+                            )}
+                            {canManageEmployees() && (
+                              <>
+                                <Button isIconOnly variant="light" color="success" size="sm" onPress={() => router.push(`/dashboard/employees/edit/${employee._id}`)} title="Edit Employee">
+                                  <FaEdit />
+                                </Button>
+                                <Button isIconOnly variant="light" color="danger" size="sm" onPress={() => handleDelete(employee)} title="Permanently Delete Employee">
+                                  <FaTrash />
+                                </Button>
+                              </>
+                            )}
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-default-800">{employee.employeeCode}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-default-800">{formatDepartments(employee)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-default-800">{formatDesignation(employee.designation, employee)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-default-800">
-                        <Chip size="sm" variant="flat" color="default">L{employee.designationLevel || 1}</Chip>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {canManageEmployees() ? (
-                          <Select
-                            selectedKeys={[employee.status || 'active']}
-                            onChange={(e) => handleStatusChange(employee._id, e.target.value)}
-                            isDisabled={statusUpdating === employee._id}
-                            aria-label="Employee Status"
-                            size="sm"
-                            classNames={{ trigger: `bg-content1 ${statusUpdating === employee._id ? 'opacity-50' : ''}` }}
-                          >
-                            {STATUS_OPTIONS.map(option => (
-                              <SelectItem key={option.value}>{option.label}</SelectItem>
-                            ))}
-                          </Select>
-                        ) : (
-                          <Chip size="sm" color={STATUS_OPTIONS.find(s => s.value === employee.status)?.color || 'default'} variant="flat">
-                            {STATUS_OPTIONS.find(s => s.value === employee.status)?.label || employee.status}
-                          </Chip>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex space-x-2">
-                          {canViewEmployeeDetails() && (
-                            <Button isIconOnly variant="light" color="primary" size="sm" onPress={() => router.push(`/dashboard/employees/${employee._id}`)} title="View Details">
-                              <FaEye />
-                            </Button>
-                          )}
-                          {canManageEmployees() && (
-                            <>
-                              <Button isIconOnly variant="light" color="success" size="sm" onPress={() => router.push(`/dashboard/employees/edit/${employee._id}`)} title="Edit Employee">
-                                <FaEdit />
-                              </Button>
-                              <Button isIconOnly variant="light" color="danger" size="sm" onPress={() => handleDelete(employee)} title="Permanently Delete Employee">
-                                <FaTrash />
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="bg-content1 px-4 py-3 flex items-center justify-between border-t border-default-200 sm:px-6">
-              <div className="flex-1 flex justify-between sm:hidden">
-                <Button variant="bordered" size="sm" isDisabled={page === 1} onPress={() => setPage(page - 1)}>Previous</Button>
-                <Button variant="bordered" size="sm" isDisabled={page === totalPages} onPress={() => setPage(page + 1)}>Next</Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-              <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm text-default-600">
-                    Showing <span className="font-medium">{((page - 1) * 20) + 1}</span> to <span className="font-medium">{Math.min(page * 20, totalEmployees)}</span> of <span className="font-medium">{totalEmployees}</span> employees
-                  </p>
-                </div>
-                <div className="flex gap-2">
+
+              <div className="bg-content1 px-4 py-3 flex items-center justify-between border-t border-default-200 sm:px-6">
+                <div className="flex-1 flex justify-between sm:hidden">
                   <Button variant="bordered" size="sm" isDisabled={page === 1} onPress={() => setPage(page - 1)}>Previous</Button>
                   <Button variant="bordered" size="sm" isDisabled={page === totalPages} onPress={() => setPage(page + 1)}>Next</Button>
                 </div>
+                <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm text-default-600">
+                      Showing <span className="font-medium">{((page - 1) * 20) + 1}</span> to <span className="font-medium">{Math.min(page * 20, totalEmployees)}</span> of <span className="font-medium">{totalEmployees}</span> employees
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="bordered" size="sm" isDisabled={page === 1} onPress={() => setPage(page - 1)}>Previous</Button>
+                    <Button variant="bordered" size="sm" isDisabled={page === totalPages} onPress={() => setPage(page + 1)}>Next</Button>
+                  </div>
+                </div>
               </div>
-            </div>
-          </>
-        )}
+            </>
+          )}
         </CardBody>
       </Card>
 

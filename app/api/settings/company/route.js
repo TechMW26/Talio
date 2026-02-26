@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { buildCacheKey, buildCachePattern, getCache, setCache, clearCachePattern } from '@/lib/cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,8 +13,20 @@ export async function GET(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
+    const { user, models, tenant } = auth
     const { CompanySettings } = models
+
+    // Check Redis cache
+    const cacheKey = buildCacheKey({
+      tenantId: tenant?.databaseName,
+      role: 'shared',
+      userId: 'tenant',
+      namespace: 'settings:company'
+    })
+    const cached = await getCache(cacheKey)
+    if (cached) {
+      return NextResponse.json({ ...cached, cached: true })
+    }
 
     // Get company settings (there should only be one document)
     let settings = await CompanySettings.findOne()
@@ -37,10 +50,10 @@ export async function GET(request) {
 
     console.log('GET company settings - notifications:', settings.notifications)
 
-    return NextResponse.json({
-      success: true,
-      data: settings
-    })
+    const responseData = { success: true, data: settings }
+    await setCache(cacheKey, responseData, 5 * 60).catch(() => { })
+
+    return NextResponse.json(responseData)
 
   } catch (error) {
     console.error('Get company settings error:', error)
@@ -158,6 +171,15 @@ export async function PUT(request) {
       // Create new settings
       settings = await CompanySettings.create(body)
     }
+
+    // Bust company settings cache
+    const { tenant: putTenant } = auth
+    const cachePattern = buildCachePattern({
+      tenantId: putTenant?.databaseName,
+      role: 'shared',
+      namespace: 'settings:company'
+    })
+    await clearCachePattern(cachePattern).catch(() => { })
 
     return NextResponse.json({
       success: true,

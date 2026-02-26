@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { sendMessageNotification } from '@/lib/notificationService'
+import { emitChatUnreadUpdated } from '@/lib/eventBus'
 import mongoose from 'mongoose'
 
 const isValidObjectId = (id) => {
@@ -251,7 +252,7 @@ export async function POST(request, context) {
       const otherParticipantIds = chat.participants
         .map(p => p.toString())
         .filter(pId => pId !== employeeIdStr)
-      
+
       console.log(`[Chat Notification] Other participants count: ${otherParticipantIds.length}`)
 
       if (otherParticipantIds.length > 0) {
@@ -285,6 +286,33 @@ export async function POST(request, context) {
     } catch (notifError) {
       // Don't fail the message send if notification fails
       console.error('[Chat Notification] Failed to send push notification:', notifError)
+    }
+
+    // ── Emit chat.unread.updated to all recipients (event-driven push) ──
+    try {
+      // Get User IDs for recipients (excluding sender)
+      const recipientEmployeeIds = chat.participants
+        .map(p => p.toString())
+        .filter(pId => pId !== employeeIdStr)
+
+      if (recipientEmployeeIds.length > 0) {
+        const recipientUsers = await User.find({
+          employeeId: { $in: recipientEmployeeIds }
+        }).select('_id').lean()
+
+        const recipientUserIds = recipientUsers.map(u => u._id.toString())
+
+        if (recipientUserIds.length > 0) {
+          // Push a lightweight signal — the frontend will use its local state + this hint
+          emitChatUnreadUpdated(
+            { chatId, action: 'new_message', senderId: employeeIdStr },
+            recipientUserIds,
+            auth.tenant?.databaseName
+          ).catch(err => console.error('[Chat] emitChatUnreadUpdated error:', err.message))
+        }
+      }
+    } catch (eventErr) {
+      console.error('[Chat] Failed to emit unread update event:', eventErr)
     }
 
     return NextResponse.json({

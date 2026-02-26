@@ -145,8 +145,8 @@ export default function PerformancePage() {
           <h1 className="text-3xl font-bold text-gray-800">Performance Management</h1>
           <p className="text-gray-600 mt-1">
             {user?.role === 'employee' ? 'Track your performance and goals' :
-             user?.role === 'manager' ? 'Manage team performance and reviews' :
-             'Track and manage organizational performance'}
+              user?.role === 'manager' ? 'Manage team performance and reviews' :
+                'Track and manage organizational performance'}
           </p>
         </div>
         {canManagePerformance() && (
@@ -227,13 +227,13 @@ export default function PerformancePage() {
             <Loader size="lg" />
             <p className="mt-4 text-gray-600">Loading reviews...</p>
           </div>
-        ) : reviews.length === 0 ? (
+        ) : performanceData.reviews.length === 0 ? (
           <div className="p-8 text-center text-gray-500">
             No performance reviews found
           </div>
         ) : (
           <div className="divide-y divide-gray-200">
-            {reviews.map((review) => (
+            {performanceData.reviews.map((review) => (
               <div key={review._id} className="p-6 hover:bg-gray-50">
                 <div className="flex justify-between items-start mb-4">
                   <div>
@@ -256,7 +256,7 @@ export default function PerformancePage() {
                       {review.overallRating?.toFixed(1)}
                     </span>
                     <div className="flex">
-                      {renderStars(Math.round(review.overallRating || 0))}
+                      {getRatingStars(Math.round(review.overallRating || 0))}
                     </div>
                   </div>
                 </div>

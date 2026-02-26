@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { sendLeaveApprovedNotification, sendLeaveRejectedNotification } from '@/lib/notificationService'
 import { emitLeaveUpdate, emitDashboardRefresh } from '@/lib/realtimeEvents'
+import { emitEvent, EVENTS } from '@/lib/eventBus'
 
 // PUT - Update leave status (Approve/Reject)
 export async function PUT(request, { params }) {
@@ -29,7 +30,7 @@ export async function PUT(request, { params }) {
     const userRecord = await User.findById(user._id || user.userId)
       .select('employeeId role isDepartmentHead headOfDepartments')
       .lean()
-    
+
     const userRole = userRecord?.role || user.role
     const userEmployeeId = userRecord?.employeeId
 
@@ -37,7 +38,7 @@ export async function PUT(request, { params }) {
     if (userRole !== 'admin') {
       // Get the employee who requested leave
       const leaveEmployee = await Employee.findById(leave.employee).select('department').lean()
-      
+
       if (userRole === 'hr') {
         // HR users can ONLY approve if they're a department head of the employee's department
         if (!userRecord?.isDepartmentHead || !userRecord?.headOfDepartments?.length) {
@@ -47,7 +48,7 @@ export async function PUT(request, { params }) {
           )
         }
         // Check if employee is in HR's department
-        const isInHRDept = userRecord.headOfDepartments.some(d => 
+        const isInHRDept = userRecord.headOfDepartments.some(d =>
           d.toString() === leaveEmployee?.department?.toString()
         )
         if (!isInHRDept) {
@@ -59,13 +60,13 @@ export async function PUT(request, { params }) {
       } else if (userRole === 'department_head' || userRecord?.isDepartmentHead) {
         // Department heads can approve for their department
         let canApprove = false
-        
+
         if (userRecord?.headOfDepartments?.length > 0) {
-          canApprove = userRecord.headOfDepartments.some(d => 
+          canApprove = userRecord.headOfDepartments.some(d =>
             d.toString() === leaveEmployee?.department?.toString()
           )
         }
-        
+
         if (!canApprove && userEmployeeId) {
           // Check via Department.head/heads
           const dept = await Department.findById(leaveEmployee?.department).lean()
@@ -74,7 +75,7 @@ export async function PUT(request, { params }) {
               (dept.heads && dept.heads.some(h => h.toString() === userEmployeeId.toString()))
           }
         }
-        
+
         if (!canApprove) {
           return NextResponse.json(
             { success: false, message: 'You can only approve leaves for your own department' },
@@ -214,7 +215,7 @@ export async function PUT(request, { params }) {
     try {
       const adminUsers = await User.find({ role: { $in: ['admin', 'hr', 'manager'] }, isActive: true }).select('_id').lean()
       const targetUserIds = adminUsers.map(u => u._id.toString())
-      
+
       emitLeaveUpdate(
         {
           _id: leave._id,
@@ -231,6 +232,21 @@ export async function PUT(request, { params }) {
       )
     } catch (emitError) {
       console.error('Failed to emit leave update to dashboards:', emitError)
+    }
+
+    // Emit sidebar counts update via eventBus (triggers cache invalidation + webhook)
+    try {
+      const affectedUserIds = [employeeUserId].filter(Boolean)
+      emitEvent(EVENTS.LEAVE_STATUS_CHANGED, {
+        leaveId: leave._id.toString(),
+        status: leave.status,
+        employeeId: leave.employee.toString(),
+      }, {
+        userIds: affectedUserIds,
+        databaseName: auth.tenant?.databaseName,
+      })
+    } catch (eventBusError) {
+      console.error('Failed to emit eventBus leave event:', eventBusError)
     }
 
     return NextResponse.json({

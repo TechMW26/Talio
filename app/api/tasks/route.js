@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { buildCacheKey, getCache, setCache } from '@/lib/cache'
 export const dynamic = 'force-dynamic'
 
 /**
@@ -15,7 +16,7 @@ export async function GET(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
+    const { user, models, tenant } = auth
     const { Project, ProjectMember } = models
 
     const { searchParams } = new URL(request.url)
@@ -23,6 +24,19 @@ export async function GET(request) {
     const limit = parseInt(searchParams.get('limit')) || 50
     const view = searchParams.get('view')
     const dueDate = searchParams.get('dueDate')
+
+    // Check Redis cache (60s TTL — project list changes infrequently)
+    const cacheKey = buildCacheKey({
+      tenantId: tenant?.databaseName,
+      role: user.role || 'employee',
+      userId: user._id || user.userId,
+      namespace: 'tasks:personal',
+      params: { employeeId, limit, view, dueDate },
+    })
+    const cachedResult = await getCache(cacheKey)
+    if (cachedResult) {
+      return NextResponse.json(cachedResult)
+    }
 
     if (!user) {
       return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
@@ -55,9 +69,9 @@ export async function GET(request) {
       _id: project._id,
       title: project.name,
       description: project.description,
-      status: project.status === 'completed' ? 'completed' : 
-              project.status === 'in-progress' ? 'in_progress' : 
-              project.status === 'on-hold' ? 'on_hold' : 'pending',
+      status: project.status === 'completed' ? 'completed' :
+        project.status === 'in-progress' ? 'in_progress' :
+          project.status === 'on-hold' ? 'on_hold' : 'pending',
       priority: project.priority || 'medium',
       progress: project.progress || 0,
       dueDate: project.endDate,
@@ -72,16 +86,15 @@ export async function GET(request) {
       }
     }))
 
-    return NextResponse.json({
-      success: true,
-      data: tasks,
-      total: tasks.length
-    })
+    const resultData = { success: true, data: tasks, total: tasks.length }
+    await setCache(cacheKey, resultData, 60).catch(() => { })
+
+    return NextResponse.json(resultData)
 
   } catch (error) {
     console.error('Error in /api/tasks:', error)
-    return NextResponse.json({ 
-      success: false, 
+    return NextResponse.json({
+      success: false,
       message: error.message || 'Failed to fetch tasks',
       data: []
     }, { status: 500 })

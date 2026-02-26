@@ -2,13 +2,14 @@ import { NextResponse } from 'next/server'
 import mongoose from 'mongoose'
 import { getAuthAndModels } from '@/lib/auth'
 import { sendPushToUser } from '@/lib/pushNotification'
+import { emitEvent, EVENTS } from '@/lib/eventBus'
 
 // GET - Get single ticket
 export async function GET(request, context) {
   try {
     // Await params (required in Next.js 15)
     const { id } = await context.params
-    
+
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Helpdesk'])
     if (!auth.success) {
@@ -57,7 +58,7 @@ export async function PUT(request, context) {
   try {
     // Await params (required in Next.js 15)
     const { id } = await context.params
-    
+
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Helpdesk', 'Employee'])
     if (!auth.success) {
@@ -193,6 +194,26 @@ export async function PUT(request, context) {
       console.error('Failed to send helpdesk socket notification:', socketError)
     }
 
+    // Emit sidebar counts update via eventBus
+    try {
+      const affectedUserIds = [
+        ticket.createdBy?.userId?.toString(),
+        data.assignedTo ? (await Employee.findById(data.assignedTo).select('userId'))?.userId?.toString() : null
+      ].filter(Boolean)
+
+      emitEvent(EVENTS.HELPDESK_TICKET_CHANGED, {
+        ticketId: ticket._id.toString(),
+        ticketNumber: ticket.ticketNumber,
+        status: ticket.status,
+        action: data.status || (data.assignedTo ? 'assigned' : 'updated'),
+      }, {
+        userIds: affectedUserIds,
+        databaseName: auth.tenant?.databaseName,
+      })
+    } catch (eventBusError) {
+      console.error('Failed to emit eventBus helpdesk event:', eventBusError)
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Ticket updated successfully',
@@ -212,7 +233,7 @@ export async function DELETE(request, context) {
   try {
     // Await params (required in Next.js 15)
     const { id } = await context.params
-    
+
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Helpdesk'])
     if (!auth.success) {
@@ -220,7 +241,7 @@ export async function DELETE(request, context) {
     }
     const { models } = auth
     const { Helpdesk } = models
-    
+
     const ticket = await Helpdesk.findByIdAndDelete(id)
 
     if (!ticket) {
@@ -250,7 +271,7 @@ export async function PATCH(request, context) {
   try {
     // Await params (required in Next.js 15)
     const { id } = await context.params
-    
+
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Helpdesk'])
     if (!auth.success) {
@@ -258,7 +279,7 @@ export async function PATCH(request, context) {
     }
     const { models } = auth
     const { Helpdesk } = models
-    
+
     const data = await request.json()
 
     const ticket = await Helpdesk.findByIdAndUpdate(

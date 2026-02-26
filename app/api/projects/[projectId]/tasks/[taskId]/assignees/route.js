@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { createTimelineEvent } from '@/lib/projectService'
-import { 
+import {
   notifyTaskAssigned,
   notifyTaskAssignmentAccepted,
   notifyTaskAssignmentRejected
 } from '@/lib/projectNotifications'
 import { createTaskAssignmentNotification } from '@/lib/actionableNotifications'
+import { emitEvent, EVENTS } from '@/lib/eventBus'
 
 // GET - Get assignees for a task
 export async function GET(request, { params }) {
@@ -73,9 +74,9 @@ export async function POST(request, { params }) {
     })
 
     if (!isAdmin && !membership) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'You must be an accepted member to assign tasks' 
+      return NextResponse.json({
+        success: false,
+        message: 'You must be an accepted member to assign tasks'
       }, { status: 403 })
     }
 
@@ -83,9 +84,9 @@ export async function POST(request, { params }) {
     const { assigneeIds } = body
 
     if (!assigneeIds || !Array.isArray(assigneeIds) || assigneeIds.length === 0) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'At least one assignee is required' 
+      return NextResponse.json({
+        success: false,
+        message: 'At least one assignee is required'
       }, { status: 400 })
     }
 
@@ -94,7 +95,7 @@ export async function POST(request, { params }) {
 
     for (const assigneeId of assigneeIds) {
       const assigneeIdStr = assigneeId.toString()
-      
+
       // Check if already assigned
       const existingAssignment = await TaskAssignee.findOne({
         task: taskId,
@@ -133,16 +134,16 @@ export async function POST(request, { params }) {
         relatedTask: taskId,
         relatedMember: assigneeIdStr,
         description: `Task "${task.title}" was assigned to ${assigneeEmployee.firstName} ${assigneeEmployee.lastName}`,
-        metadata: { 
-          taskTitle: task.title, 
-          assigneeName: `${assigneeEmployee.firstName} ${assigneeEmployee.lastName}` 
+        metadata: {
+          taskTitle: task.title,
+          assigneeName: `${assigneeEmployee.firstName} ${assigneeEmployee.lastName}`
         }
       }, models)
 
       // Send notification if not self-assignment
       if (assigneeIdStr !== userRecord.employeeId.toString()) {
         await notifyTaskAssigned(project, task, assigneeEmployee, assignerEmployee, models)
-        
+
         // Create actionable notification for task assignment (persistent toast)
         try {
           const assigneeUser = await User.findOne({ employeeId: assigneeIdStr }).select('_id')
@@ -178,6 +179,30 @@ export async function POST(request, { params }) {
     const allAssignees = await TaskAssignee.find({ task: taskId })
       .populate('user', 'firstName lastName profilePicture employeeCode')
       .populate('assignedBy', 'firstName lastName')
+
+    // Emit sidebar counts update via eventBus for new assignees
+    try {
+      const assigneeUserIds = []
+      for (const assignee of createdAssignees) {
+        const assigneeUser = await User.findOne({ employeeId: assignee.user }).select('_id')
+        if (assigneeUser) assigneeUserIds.push(assigneeUser._id.toString())
+      }
+      if (assigneeUserIds.length > 0) {
+        emitEvent(EVENTS.TASK_ASSIGNMENT_CHANGED, {
+          taskId,
+          taskTitle: task.title,
+          projectId,
+          projectName: project.name,
+          action: 'assigned',
+          assigneeCount: createdAssignees.length,
+        }, {
+          userIds: assigneeUserIds,
+          databaseName: auth.tenant?.databaseName,
+        })
+      }
+    } catch (eventBusError) {
+      console.error('Failed to emit eventBus task assignment event:', eventBusError)
+    }
 
     return NextResponse.json({
       success: true,
@@ -237,9 +262,9 @@ export async function DELETE(request, { params }) {
     const isSelf = assignment.user._id.toString() === userRecord.employeeId.toString()
 
     if (!isAdmin && !isCreator && !isProjectHead && !isAssigner && !isSelf) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'You do not have permission to remove this assignee' 
+      return NextResponse.json({
+        success: false,
+        message: 'You do not have permission to remove this assignee'
       }, { status: 403 })
     }
 

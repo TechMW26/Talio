@@ -8,6 +8,7 @@ import {
   getProjectMemberUserIds
 } from '@/lib/projectNotifications'
 import { createProjectInvitationNotification } from '@/lib/actionableNotifications'
+import { emitEvent, EVENTS } from '@/lib/eventBus'
 
 // GET - Get project members
 export async function GET(request, { params }) {
@@ -75,20 +76,20 @@ export async function POST(request, { params }) {
     const isAdmin = ['admin'].includes(userRecord.role || user.role)
     const isHead = project.projectHead.toString() === userRecord.employeeId.toString()
     const isCreator = project.createdBy.toString() === userRecord.employeeId.toString()
-    
+
     // Check member permissions
     const currentMembership = await ProjectMember.findOne({
       project: projectId,
       user: userRecord.employeeId,
       invitationStatus: 'accepted'
     })
-    
+
     const canInvite = isAdmin || isHead || isCreator || currentMembership?.permissions?.canInviteMembers
 
     if (!canInvite) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'You do not have permission to invite members' 
+      return NextResponse.json({
+        success: false,
+        message: 'You do not have permission to invite members'
       }, { status: 403 })
     }
 
@@ -187,11 +188,33 @@ export async function POST(request, { params }) {
     }
 
     if (addedMembers.length === 0 && errors.length > 0) {
-      return NextResponse.json({ 
-        success: false, 
+      return NextResponse.json({
+        success: false,
         message: errors[0]?.message || 'Failed to add members',
-        errors 
+        errors
       }, { status: 400 })
+    }
+
+    // Emit sidebar counts update via eventBus for invited members
+    try {
+      const invitedUserIds = []
+      for (const member of addedMembers) {
+        const memberUser = await User.findOne({ employeeId: member.user?._id || member.user }).select('_id')
+        if (memberUser) invitedUserIds.push(memberUser._id.toString())
+      }
+      if (invitedUserIds.length > 0) {
+        emitEvent(EVENTS.PROJECT_INVITATION_CHANGED, {
+          projectId,
+          projectName: project.name,
+          action: 'invited',
+          memberCount: addedMembers.length,
+        }, {
+          userIds: invitedUserIds,
+          databaseName: auth.tenant?.databaseName,
+        })
+      }
+    } catch (eventBusError) {
+      console.error('Failed to emit eventBus project invitation event:', eventBusError)
     }
 
     return NextResponse.json({
@@ -242,9 +265,9 @@ export async function DELETE(request, { params }) {
 
     // Cannot remove the project head
     if (membership.role === 'head') {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'Cannot remove the project head' 
+      return NextResponse.json({
+        success: false,
+        message: 'Cannot remove the project head'
       }, { status: 400 })
     }
 
@@ -254,9 +277,9 @@ export async function DELETE(request, { params }) {
     const isSelf = membership.user._id.toString() === userRecord.employeeId.toString()
 
     if (!isAdmin && !isHead && !isSelf) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'You do not have permission to remove this member' 
+      return NextResponse.json({
+        success: false,
+        message: 'You do not have permission to remove this member'
       }, { status: 403 })
     }
 

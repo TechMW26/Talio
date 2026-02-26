@@ -67,28 +67,25 @@ export default function CalendarPage() {
       const token = localStorage.getItem('token')
       const headers = { Authorization: `Bearer ${token}` }
 
-      const holidaysRes = await fetch('/api/holidays?limit=100', { headers })
+      const [holidaysRes, birthdaysRes, announcementsRes] = await Promise.all([
+        fetch('/api/holidays?limit=100', { headers }),
+        fetch('/api/employees/birthdays', { headers }),
+        fetch('/api/announcements?limit=100', { headers })
+      ])
+
       const holidaysData = await holidaysRes.json()
       if (holidaysData.success) setHolidays(holidaysData.data)
 
-      const employeesRes = await fetch('/api/employees?limit=1000', { headers })
-      const employeesData = await employeesRes.json()
-      if (employeesData.success && employeesData.data) {
-        const employees = Array.isArray(employeesData.data)
-          ? employeesData.data
-          : employeesData.data.employees || []
-
+      const birthdaysData = await birthdaysRes.json()
+      if (birthdaysData.success && birthdaysData.data) {
         setBirthdays(
-          employees
-            .filter(emp => emp.dateOfBirth)
-            .map(emp => ({
-              ...emp,
-              dateOfBirth: new Date(emp.dateOfBirth)
-            }))
+          birthdaysData.data.map(emp => ({
+            ...emp,
+            dateOfBirth: new Date(emp.dateOfBirth)
+          }))
         )
       }
 
-      const announcementsRes = await fetch('/api/announcements?limit=100', { headers })
       const announcementsData = await announcementsRes.json()
       if (announcementsData.success) setAnnouncements(announcementsData.data)
     } catch (err) {
@@ -195,11 +192,10 @@ export default function CalendarPage() {
               <button
                 key={mode}
                 onClick={() => setViewMode(mode)}
-                className={`px-3 py-1.5 text-sm rounded-md flex items-center gap-1 ${
-                  viewMode === mode
+                className={`px-3 py-1.5 text-sm rounded-md flex items-center gap-1 ${viewMode === mode
                     ? 'bg-white shadow text-gray-800'
                     : 'text-gray-500 hover:text-gray-700'
-                }`}
+                  }`}
               >
                 {mode === 'calendar' ? <FaTh /> : <FaList />}
                 {mode}
@@ -238,9 +234,8 @@ export default function CalendarPage() {
               {calendarData.map((d, i) => (
                 <div
                   key={i}
-                  className={`min-h-[80px] sm:min-h-[120px] p-1.5 sm:p-2 rounded border ${
-                    d.day ? 'bg-white hover:shadow' : 'bg-gray-50 border-transparent'
-                  } ${d.isToday ? 'ring-2 ring-primary-500' : ''}`}
+                  className={`min-h-[80px] sm:min-h-[120px] p-1.5 sm:p-2 rounded border ${d.day ? 'bg-white hover:shadow' : 'bg-gray-50 border-transparent'
+                    } ${d.isToday ? 'ring-2 ring-primary-500' : ''}`}
                 >
                   {d.day && (
                     <>

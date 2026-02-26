@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
+import { buildCacheKey, getCache, setCache } from '@/lib/cache';
 import { buildSearchQuery, fetchRoleNews } from '@/lib/roleNews';
 
-// Cache for news (5 minutes)
-const newsCache = new Map();
-const CACHE_DURATION = 5 * 60 * 1000;
+// Redis cache TTLs (seconds)
+const ROLE_NEWS_TTL = 30 * 60      // 30 min for normal requests
+const ROLE_NEWS_FRESH_TTL = 10 * 60 // 10 min even for "fresh" requests
 
 export async function GET(request) {
     try {
@@ -13,7 +14,7 @@ export async function GET(request) {
             return NextResponse.json({ message: auth.message }, { status: 401 });
         }
 
-        const { user, models } = auth;
+        const { user, models, tenant } = auth;
         const role = user.role || 'employee';
 
         // Get employee designation
@@ -27,31 +28,29 @@ export async function GET(request) {
                 .populate('designation', 'title');
 
             if (employee) {
-                // Get designation title from populated field
                 designation = employee.designation?.title || employee.designationLevelName || '';
                 department = employee.department?.name || '';
             }
         }
 
-    const { searchParams } = new URL(request.url);
-    const fresh = searchParams.get('fresh') === 'true';
+        const { searchParams } = new URL(request.url);
+        const fresh = searchParams.get('fresh') === 'true';
 
-    // Build search query from designation and role
+        // Build search query from designation and role
         const searchQuery = buildSearchQuery(designation, department, role);
 
-        // Check cache
-        const cacheKey = `news_${searchQuery}`;
-        const cached = newsCache.get(cacheKey);
-
-        if (!fresh && cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
-            return NextResponse.json({
-                success: true,
-                news: cached.news,
-                designation,
-                role,
-                searchQuery,
-                cached: true
-            });
+        // Check Redis cache first — always serve from cache even for fresh=true
+        // (fresh=true only uses a shorter write-TTL, not a cache bypass)
+        const newsCacheKey = buildCacheKey({
+            tenantId: tenant?.databaseName,
+            role,
+            userId: 'all',
+            namespace: 'role-news',
+            params: { searchQuery },
+        })
+        const cachedNews = await getCache(newsCacheKey)
+        if (cachedNews) {
+            return NextResponse.json({ ...cachedNews, cached: true })
         }
 
         const freshnessOptions = fresh
@@ -90,12 +89,11 @@ export async function GET(request) {
             }
         }
 
-        // Cache results
+        // Cache results in Redis
         if (news.length > 0) {
-            newsCache.set(cacheKey, {
-                news,
-                timestamp: Date.now()
-            });
+            const ttl = fresh ? ROLE_NEWS_FRESH_TTL : ROLE_NEWS_TTL
+            const newsPayload = { success: true, news, designation, role, searchQuery, cached: false }
+            await setCache(newsCacheKey, newsPayload, ttl).catch(() => { })
         }
 
         return NextResponse.json({

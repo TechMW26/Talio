@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { sendPushToUsers } from '@/lib/pushNotification'
+import { emitEvent, EVENTS } from '@/lib/eventBus'
 
 export async function POST(request) {
   try {
@@ -46,7 +47,7 @@ export async function POST(request) {
 
     // Check if user has permission (admin, hr, admin, department_head role, or is a department head)
     const hasPermission = ['admin', 'hr', 'department_head'].includes(user.role) ||
-                         !!userDepartment
+      !!userDepartment
 
     console.log('[Notifications] Permission check:', {
       role: user.role,
@@ -306,7 +307,7 @@ export async function POST(request) {
     if (userIds.length > 0) {
       try {
         console.log(`[Firebase] Sending push notification to ${userIds.length} user(s)`)
-        
+
         pushResult = await sendPushToUsers(
           userIds,
           {
@@ -379,6 +380,21 @@ export async function POST(request) {
     } catch (historyError) {
       console.error('[History] Error saving to history:', historyError)
       // Don't fail the request if history save fails
+    }
+
+    // Emit sidebar counts update via eventBus for all recipients
+    try {
+      emitEvent(EVENTS.NOTIFICATION_CREATED, {
+        title,
+        message,
+        recipientCount: userIds.length,
+        sentBy: currentEmployee ? currentEmployee._id.toString() : userId,
+      }, {
+        userIds: userIds.map(id => id.toString()),
+        databaseName: auth.tenant?.databaseName,
+      })
+    } catch (eventBusError) {
+      console.error('Failed to emit eventBus notification event:', eventBusError)
     }
 
     return NextResponse.json({

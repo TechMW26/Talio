@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import mongoose from 'mongoose'
+import { buildCacheKey, getCache, setCache } from '@/lib/cache'
 
 /**
  * GET /api/actionable-notifications
@@ -14,7 +15,7 @@ export async function GET(request) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
 
-    const { user, models } = auth
+    const { user, models, tenant } = auth
     const { ActionableNotification } = models
 
     // Parse query params
@@ -22,6 +23,19 @@ export async function GET(request) {
     const type = searchParams.get('type')
     const status = searchParams.get('status') || 'pending'
     const limit = parseInt(searchParams.get('limit') || '50')
+
+    // Check Redis cache
+    const cacheKey = buildCacheKey({
+      tenantId: tenant?.databaseName,
+      role: user.role,
+      userId: user._id || user.userId,
+      namespace: 'actionable-notifications',
+      params: { status, type: type || 'all', limit }
+    })
+    const cached = await getCache(cacheKey)
+    if (cached) {
+      return NextResponse.json({ ...cached, cached: true })
+    }
 
     // Build query
     const query = {
@@ -39,11 +53,14 @@ export async function GET(request) {
       .populate('createdBy', 'firstName lastName avatar')
       .lean()
 
-    return NextResponse.json({
+    const responseData = {
       success: true,
       notifications,
       count: notifications.length
-    })
+    }
+    await setCache(cacheKey, responseData, 30).catch(() => { })
+
+    return NextResponse.json(responseData)
   } catch (error) {
     console.error('[GET /api/actionable-notifications] Error:', error)
     return NextResponse.json(

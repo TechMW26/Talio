@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { buildCacheKey, buildCachePattern, getCache, setCache, clearCachePattern } from '@/lib/cache'
 export const dynamic = 'force-dynamic'
 
 /**
@@ -13,8 +14,20 @@ export async function GET(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user: authUser, models } = auth
+    const { user: authUser, models, tenant } = auth
     const { User, Employee } = models
+
+    // Check Redis cache (5 min TTL — profile completion rarely changes mid-session)
+    const profileCacheKey = buildCacheKey({
+      tenantId: tenant?.databaseName,
+      role: 'any',
+      userId: authUser._id || authUser.userId,
+      namespace: 'profile:completion',
+    })
+    const cachedProfile = await getCache(profileCacheKey)
+    if (cachedProfile) {
+      return NextResponse.json(cachedProfile)
+    }
 
     const user = await User.findById(authUser._id)
       .select('employeeId isActive profileCompletion suspensionReason suspendedAt')
@@ -120,7 +133,7 @@ export async function GET(request) {
       displayStatus = 'partially_complete'
     }
 
-    return NextResponse.json({
+    const profileStatusResponse = {
       success: true,
       data: {
         status: displayStatus,
@@ -178,7 +191,10 @@ export async function GET(request) {
           urgent: daysRemaining <= 2
         } : null
       }
-    })
+    }
+    await setCache(profileCacheKey, profileStatusResponse, 5 * 60).catch(() => { })
+
+    return NextResponse.json(profileStatusResponse)
 
   } catch (error) {
     console.error('[Profile Status] Error:', error)
@@ -200,7 +216,7 @@ export async function POST(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user: authUser, models } = auth
+    const { user: authUser, models, tenant } = auth
     const { User, Employee } = models
 
     const user = await User.findById(authUser._id || authUser.userId)
@@ -263,6 +279,14 @@ export async function POST(request) {
       }
 
       await User.findByIdAndUpdate(authUser._id || authUser.userId, { $set: updateData })
+
+      // Bust the profile completion cache for this user
+      const bustKey = buildCachePattern({
+        tenantId: tenant?.databaseName,
+        namespace: 'profile:completion',
+        userId: authUser._id || authUser.userId,
+      })
+      await clearCachePattern(bustKey).catch(() => { })
 
       return NextResponse.json({
         success: true,

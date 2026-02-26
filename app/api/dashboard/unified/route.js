@@ -312,7 +312,7 @@ export async function GET(request) {
     await Promise.allSettled(fetchPromises)
 
     // Cache the result for 2 minutes
-    await setCache(cacheKey, dashboardData, 120)
+    await setCache(cacheKey, dashboardData, 5 * 60) // 5 min TTL
 
     return NextResponse.json(dashboardData)
 

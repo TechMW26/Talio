@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { buildCacheKey, getCache, setCache } from '@/lib/cache'
 import { getTodaysTasks, getUserProjectsSummaryForMira } from '@/lib/projectService'
 
 // GET - Get user's tasks (today's, pending, all)
@@ -10,7 +11,7 @@ export async function GET(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
+    const { user, models, tenant } = auth
     const { Task, TaskAssignee } = models
 
     const employeeId = user?.employeeId?._id || user?.employeeId
@@ -19,21 +20,36 @@ export async function GET(request) {
     }
 
     const { searchParams } = new URL(request.url)
-    const filter = searchParams.get('filter') || 'all' // Changed default from 'today' to 'all'
+    const filter = searchParams.get('filter') || 'all'
     const projectId = searchParams.get('projectId')
+    // Include today's date in cache key so it auto-refreshes daily
+    const todayKey = new Date().toISOString().slice(0, 10)
+
+    // Check Redis cache (30s TTL — task list is user-specific and changes moderately)
+    const cacheKey = buildCacheKey({
+      tenantId: tenant?.databaseName,
+      role: user.role || 'employee',
+      userId: user._id || user.userId,
+      namespace: 'my-tasks',
+      params: { filter, projectId, date: todayKey },
+    })
+    const cachedResult = await getCache(cacheKey)
+    if (cachedResult) {
+      return NextResponse.json(cachedResult)
+    }
 
     // Get all assignments for user
     const assignmentQuery = {
       user: employeeId,
       assignmentStatus: { $in: ['pending', 'accepted'] }
     }
-    
+
     const assignments = await TaskAssignee.find(assignmentQuery).select('task assignmentStatus')
     const taskIds = assignments.map(a => a.task)
 
     // Build task query
     const taskQuery = { _id: { $in: taskIds } }
-    
+
     if (projectId) {
       taskQuery.project = projectId
     }
@@ -118,9 +134,9 @@ export async function GET(request) {
       user: user.employeeId,
       assignmentStatus: { $in: ['pending', 'accepted'] }
     }).select('task')
-    
+
     const allTaskIds = allAssignments.map(a => a.task)
-    const allTasks = await Task.find({ 
+    const allTasks = await Task.find({
       _id: { $in: allTaskIds },
       status: { $ne: 'archived' }
     }).select('status dueDate')
@@ -129,20 +145,18 @@ export async function GET(request) {
       total: allTasks.length,
       completed: allTasks.filter(t => t.status === 'completed').length,
       pending: allTasks.filter(t => !['completed', 'archived'].includes(t.status)).length,
-      overdue: allTasks.filter(t => 
+      overdue: allTasks.filter(t =>
         t.dueDate && t.dueDate < now && t.status !== 'completed'
       ).length,
-      dueToday: allTasks.filter(t => 
+      dueToday: allTasks.filter(t =>
         t.dueDate && t.dueDate >= today && t.dueDate < tomorrow
       ).length
     }
 
-    return NextResponse.json({
-      success: true,
-      data: tasksWithAssignmentStatus,
-      stats,
-      filter
-    })
+    const myTasksResult = { success: true, data: tasksWithAssignmentStatus, stats, filter }
+    await setCache(cacheKey, myTasksResult, 60).catch(() => { }) // 60s TTL
+
+    return NextResponse.json(myTasksResult)
   } catch (error) {
     console.error('Get my tasks error:', error)
     return NextResponse.json({ success: false, message: error.message }, { status: 500 })

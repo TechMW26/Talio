@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { buildCacheKey, getCache, setCache } from '@/lib/cache'
 import mongoose from 'mongoose'
 
 export const dynamic = 'force-dynamic'
@@ -13,8 +14,20 @@ export async function GET(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
+    const { user, models, tenant } = auth
     const { Chat, Employee, User } = models
+
+    // Check Redis cache (15s TTL — unread counts update via socket; cache just avoids cold-start hammering)
+    const chatCacheKey = buildCacheKey({
+      tenantId: tenant?.databaseName,
+      role: 'any',
+      userId: user._id || user.userId,
+      namespace: 'chat:unread',
+    })
+    const cachedUnread = await getCache(chatCacheKey)
+    if (cachedUnread) {
+      return NextResponse.json(cachedUnread)
+    }
 
     // Get user to find employee ID
     const userDoc = await User.findById(user._id || user.userId).select('employeeId').lean()
@@ -88,11 +101,10 @@ export async function GET(request) {
       totalUnread += item.unreadCount
     }
 
-    return NextResponse.json({
-      success: true,
-      totalUnread,
-      unreadByChat
-    })
+    const unreadResponse = { success: true, totalUnread, unreadByChat }
+    await setCache(chatCacheKey, unreadResponse, 15).catch(() => { })
+
+    return NextResponse.json(unreadResponse)
   } catch (error) {
     console.error('[API] Error getting unread count:', error)
     return NextResponse.json(

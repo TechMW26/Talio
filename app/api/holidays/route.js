@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { emitHolidayUpdate } from '@/lib/realtimeEvents'
+import { buildCacheKey, buildCachePattern, getCache, setCache, clearCachePattern } from '@/lib/cache'
 
 // GET - List holidays
 export async function GET(request) {
@@ -10,7 +11,7 @@ export async function GET(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
+    const { user, models, tenant } = auth
     const { Holiday } = models
 
     const { searchParams } = new URL(request.url)
@@ -20,6 +21,19 @@ export async function GET(request) {
     const upcoming = searchParams.get('upcoming')
     const limit = searchParams.get('limit')
     const type = searchParams.get('type')
+
+    // Check Redis cache first (holidays change infrequently — 1 hour TTL)
+    const cacheKey = buildCacheKey({
+      tenantId: tenant?.databaseName,
+      role: 'any',
+      userId: 'all',
+      namespace: 'holidays:list',
+      params: { year, startDate: startDateParam, endDate: endDateParam, upcoming, limit, type },
+    })
+    const cached = await getCache(cacheKey)
+    if (cached) {
+      return NextResponse.json(cached)
+    }
 
     const query = {}
 
@@ -54,10 +68,11 @@ export async function GET(request) {
 
     const holidays = await holidayQuery
 
-    return NextResponse.json({
-      success: true,
-      data: holidays,
-    })
+    const responseData = { success: true, data: holidays }
+    // Cache for 1 hour
+    await setCache(cacheKey, responseData, 3600)
+
+    return NextResponse.json(responseData)
   } catch (error) {
     console.error('Get holidays error:', error)
     return NextResponse.json(

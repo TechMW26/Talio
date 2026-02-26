@@ -233,7 +233,7 @@ export async function GET(request) {
       }
     }
 
-    await setCache(cacheKey, response, 2 * 60)
+    await setCache(cacheKey, response, 5 * 60) // 5 min TTL
 
     return NextResponse.json(response)
 

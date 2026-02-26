@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { SignJWT } from 'jose'
 import { sendLoginAlertEmail } from '@/lib/mailer'
 import { sendPushToUser } from '@/lib/pushNotification'
+import { warmDashboardCaches } from '@/lib/cacheWarming'
 import crypto from 'crypto'
 
 // Multi-tenant imports
@@ -29,7 +30,7 @@ export async function POST(request) {
     // ============================================
     // Look up which tenant database this user belongs to
     let tenantInfo = null;
-  let TenantUser, TenantEmployee, TenantDepartment, TenantDesignation, TenantUserSession, TenantCompanySettings, TenantNotification;
+    let TenantUser, TenantEmployee, TenantDepartment, TenantDesignation, TenantUserSession, TenantCompanySettings, TenantNotification;
 
     // Retry logic for transient network errors (e.g., DNS timeouts)
     const MAX_RETRIES = 2;
@@ -94,7 +95,7 @@ export async function POST(request) {
     TenantDesignation = tenantModels.Designation;
     TenantUserSession = tenantModels.UserSession;
     TenantCompanySettings = tenantModels.CompanySettings;
-  TenantNotification = tenantModels.Notification;
+    TenantNotification = tenantModels.Notification;
 
     // Find user and include password field (forcePasswordChange and isActive are included by default)
     const user = await TenantUser.findOne({ email }).select('+password')
@@ -456,6 +457,15 @@ export async function POST(request) {
       sameSite: 'lax',
       path: '/',
       maxAge: 7 * 24 * 60 * 60 // 7 days
+    })
+
+    // 🔥 Pre-warm Redis caches for dashboard APIs in the background
+    // This ensures the first dashboard load after login hits warm caches
+    warmDashboardCaches({
+      token,
+      role: user.role,
+      employeeId: user.employeeId?.toString() || '',
+      userId: user._id.toString(),
     })
 
     return response

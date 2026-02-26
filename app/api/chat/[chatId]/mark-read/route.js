@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { emitChatUnreadUpdated } from '@/lib/eventBus'
 import mongoose from 'mongoose'
 
 const isValidObjectId = (id) => {
@@ -75,6 +76,18 @@ export async function POST(request, context) {
 
     if (markedCount > 0) {
       await chat.save()
+
+      // ── Emit chat.unread.updated so the frontend decrements counts in real-time ──
+      try {
+        const userId = (user._id || user.userId).toString()
+        emitChatUnreadUpdated(
+          { chatId: params.chatId, action: 'mark_read', markedCount },
+          [userId],
+          auth.tenant?.databaseName
+        ).catch(err => console.error('[MarkRead] emitChatUnreadUpdated error:', err.message))
+      } catch (eventErr) {
+        console.error('[MarkRead] Failed to emit unread update event:', eventErr)
+      }
     }
 
     return NextResponse.json({

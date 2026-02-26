@@ -3,6 +3,7 @@ import { getAuthAndModels } from '@/lib/auth'
 import { calculateEffectiveWorkHours, determineAttendanceStatus } from '@/lib/attendanceShrinkage'
 import queryCache from '@/lib/queryCache'
 import mongoose from 'mongoose'
+import { emitEvent, EVENTS } from '@/lib/eventBus'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,7 +43,7 @@ const isValidDateString = (value) => {
 // Helper to check if user can approve corrections (tenant-aware version)
 async function canApproveCorrections(userId, targetEmployeeId, models) {
   const { User, Employee, Department } = models
-  
+
   const user = await User.findById(userId).populate({
     path: 'employeeId',
     options: { strictPopulate: false }
@@ -145,7 +146,7 @@ export async function GET(request) {
         if (type === 'pending') {
           query.status = 'pending'
         }
-        
+
         // Apply department filter if specified
         if (departmentFilter && departmentFilter !== 'all') {
           const deptEmployees = await Employee.find({ department: departmentFilter }).select('_id').lean()
@@ -157,7 +158,7 @@ export async function GET(request) {
         // Regular HR employees should NOT see pending corrections - their dept head handles them
         if (userRecord?.isDepartmentHead && userRecord?.headOfDepartments?.length > 0) {
           // HR who is dept head - only see their department's corrections
-          const deptEmployees = await Employee.find({ 
+          const deptEmployees = await Employee.find({
             department: { $in: userRecord.headOfDepartments },
             _id: { $ne: userRecord.employeeId }
           }).select('_id').lean()
@@ -579,6 +580,21 @@ export async function PATCH(request) {
       console.log(`   Final Status: ${savedAttendance.status}`)
       console.log(`   Final Work Hours: ${savedAttendance.workHours}h\n`)
 
+      // Emit sidebar counts update via eventBus
+      try {
+        emitEvent(EVENTS.ATTENDANCE_CORRECTION_CHANGED, {
+          correctionId: correction._id.toString(),
+          action: 'approved',
+          employeeId: correction.employee.toString(),
+          date: savedAttendance.date,
+        }, {
+          userIds: employeeUser ? [employeeUser._id.toString()] : [],
+          databaseName: auth.tenant?.databaseName,
+        })
+      } catch (eventBusError) {
+        console.error('Failed to emit eventBus correction event:', eventBusError)
+      }
+
       return NextResponse.json({
         success: true,
         message: `Correction approved - Status: ${savedAttendance.status} (${savedAttendance.workHours?.toFixed(2) || 0}h worked)`,
@@ -609,6 +625,21 @@ export async function PATCH(request) {
           date: correction.date,
           message: `Your attendance correction for ${new Date(correction.date).toLocaleDateString('en-IN')} has been rejected.`
         })
+      }
+
+      // Emit sidebar counts update via eventBus
+      try {
+        emitEvent(EVENTS.ATTENDANCE_CORRECTION_CHANGED, {
+          correctionId: correction._id.toString(),
+          action: 'rejected',
+          employeeId: correction.employee.toString(),
+          date: correction.date,
+        }, {
+          userIds: employeeUser ? [employeeUser._id.toString()] : [],
+          databaseName: auth.tenant?.databaseName,
+        })
+      } catch (eventBusError) {
+        console.error('Failed to emit eventBus correction rejection event:', eventBusError)
       }
 
       return NextResponse.json({

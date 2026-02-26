@@ -17,6 +17,7 @@ import { handleSessionExpired } from '@/utils/userHelper'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
 import { usePageTransition } from '@/contexts/PageTransitionContext'
+import { useSocket } from '@/contexts/SocketContext'
 import UnreadBadge from './UnreadBadge'
 import { Button, Chip, ScrollShadow, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@heroui/react'
 
@@ -56,6 +57,9 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
   const { unreadCount } = useUnreadMessages()
   const { toggleWidget } = useChatWidget()
   const { startNavigation } = usePageTransition()
+  const { subscribe, isConnected } = useSocket()
+  const sidebarDebounceRef = useRef(null)
+  const wasConnectedRef = useRef(null) // null = never connected yet
 
   // Sliding sidebar state for desktop
   const [slidingSidebarOpen, setSlidingSidebarOpen] = useState(false)
@@ -148,18 +152,43 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
     }
   }, [])
 
-  // Fetch counts on mount and periodically
+  // Debounced sidebar fetch — prevents rapid-fire API calls
+  const debouncedFetchSidebarCounts = useCallback(() => {
+    if (sidebarDebounceRef.current) clearTimeout(sidebarDebounceRef.current)
+    sidebarDebounceRef.current = setTimeout(() => {
+      fetchSidebarCounts()
+    }, 500)
+  }, [fetchSidebarCounts])
+
+  // Fetch counts on mount and listen for real-time updates (pure event-driven, zero polling)
   useEffect(() => {
     if (mounted && user) {
       fetchSidebarCounts()
 
-      // Refresh counts every 60 seconds
-      const interval = setInterval(fetchSidebarCounts, 60000)
+      // Listen for server-pushed sidebar count updates instead of polling
+      const unsubscribe = subscribe('sidebar.counts.updated', (data) => {
+        console.log('[Sidebar] Received sidebar.counts.updated event')
+        debouncedFetchSidebarCounts()
+      })
+
       return () => {
-        clearInterval(interval)
+        if (unsubscribe) unsubscribe()
+        if (sidebarDebounceRef.current) clearTimeout(sidebarDebounceRef.current)
       }
     }
-  }, [mounted, user, fetchSidebarCounts])
+  }, [mounted, user, fetchSidebarCounts, subscribe, debouncedFetchSidebarCounts])
+
+  // Re-fetch on socket reconnect to catch any events missed during disconnect
+  // null→true (first connect): skip (mount useEffect already fetches)
+  // true→false (disconnect): no-op
+  // false→true (reconnect): re-fetch to sync missed events
+  useEffect(() => {
+    if (mounted && user && isConnected && wasConnectedRef.current === false) {
+      console.log('[Sidebar] Socket reconnected — syncing sidebar counts')
+      fetchSidebarCounts()
+    }
+    wasConnectedRef.current = isConnected
+  }, [isConnected, mounted, user, fetchSidebarCounts])
 
   // Get menu items based on user role (memoized)
   const menuItems = useMemo(() => {

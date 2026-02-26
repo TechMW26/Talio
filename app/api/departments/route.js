@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { updateDepartmentHeadsForDepartment } from '@/lib/departmentHeadSync'
 import { emitDepartmentUpdate } from '@/lib/realtimeEvents'
+import { buildCacheKey, buildCachePattern, getCache, setCache, clearCachePattern } from '@/lib/cache'
 
 // GET - List all departments
 export async function GET(request) {
@@ -11,8 +12,20 @@ export async function GET(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { models, tenant } = auth
     const { Department, Employee } = models
+
+    // Check Redis cache first (departments rarely change — 5 min TTL)
+    const cacheKey = buildCacheKey({
+      tenantId: tenant?.databaseName,
+      role: 'any',
+      userId: 'all',
+      namespace: 'departments:list',
+    })
+    const cached = await getCache(cacheKey)
+    if (cached) {
+      return NextResponse.json(cached)
+    }
 
     // Single aggregation to fetch departments with employee counts (avoids N+1 queries)
     const departmentsWithCount = await Department.aggregate([
@@ -79,10 +92,11 @@ export async function GET(request) {
       { $project: { employeeStats: 0 } }
     ])
 
-    return NextResponse.json({
-      success: true,
-      data: departmentsWithCount,
-    })
+    const responseData = { success: true, data: departmentsWithCount }
+    // Cache for 5 minutes
+    await setCache(cacheKey, responseData, 300)
+
+    return NextResponse.json(responseData)
   } catch (error) {
     console.error('Get departments error:', error)
     return NextResponse.json(
@@ -121,6 +135,10 @@ export async function POST(request) {
       updateDepartmentHeadsForDepartment(department._id.toString(), [], data.heads, { User, Employee, Department })
         .catch(err => console.error('Error syncing department heads:', err));
     }
+
+    // Bust departments cache for this tenant
+    const bustPattern = buildCachePattern({ tenantId: auth.tenant?.databaseName, namespace: 'departments:list' })
+    await clearCachePattern(bustPattern).catch(() => { })
 
     // Emit real-time event for department updates
     emitDepartmentUpdate(department.toObject ? department.toObject() : department, { action: 'create' })

@@ -56,7 +56,7 @@ export default function ProjectTasksWidget({ limit = 5, showPendingAcceptance = 
 
       const data = await response.json()
       if (data.success) {
-        const allTasks = data.data || []
+        const allTasks = (data.data || []).filter(t => t && t._id)
         setPendingTasks(allTasks.filter(t => t.assignmentStatus === 'pending'))
         setTasks(allTasks.filter(t => t.assignmentStatus !== 'pending'))
       }
@@ -205,7 +205,7 @@ export default function ProjectTasksWidget({ limit = 5, showPendingAcceptance = 
                       <FaClock className="w-3 h-3 text-warning-600" />
                       <span className="text-xs text-warning-700 font-medium">Pending Acceptance</span>
                     </div>
-                    <h4 className="text-sm font-medium text-default-900 truncate">{task.title}</h4>
+                    <h4 className="text-sm font-medium text-default-900 truncate">{task.title || 'Untitled Task'}</h4>
                     <div className="flex items-center gap-2 mt-1 text-xs text-default-500">
                       <span className="truncate">{task.project?.name}</span>
                       {task.dueDate && (
@@ -263,7 +263,7 @@ export default function ProjectTasksWidget({ limit = 5, showPendingAcceptance = 
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="text-sm font-medium text-default-900 truncate">{task.title}</h4>
+                          <h4 className="text-sm font-medium text-default-900 truncate">{task.title || 'Untitled Task'}</h4>
                           <Chip size="sm" color={priorityColors[task.priority]} variant="flat">
                             {task.priority}
                           </Chip>
@@ -295,8 +295,8 @@ export default function ProjectTasksWidget({ limit = 5, showPendingAcceptance = 
                         variant="flat"
                         color={
                           task.status === 'todo' ? 'default' :
-                          task.status === 'in-progress' ? 'primary' :
-                          task.status === 'review' ? 'secondary' : 'default'
+                            task.status === 'in-progress' ? 'primary' :
+                              task.status === 'review' ? 'secondary' : 'default'
                         }
                         className="flex-shrink-0 ml-2"
                       >

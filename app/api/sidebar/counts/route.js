@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { buildCacheKey, getCache, setCache } from '@/lib/cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,11 +28,23 @@ export async function GET(request) {
       })
     }
 
-    const { user, models } = auth
+    const { user, models, tenant } = auth
     const {
       User, Employee, Department, ProjectMember, Leave, AttendanceCorrection,
       Expense, Helpdesk, Notification, Task, TaskAssignee
     } = models
+
+    // Check Redis cache first (30s TTL — badge counts are near-real-time)
+    const cacheKey = buildCacheKey({
+      tenantId: tenant?.databaseName,
+      role: user.role || 'employee',
+      userId: user._id || user.userId,
+      namespace: 'sidebar:counts',
+    })
+    const cached = await getCache(cacheKey)
+    if (cached) {
+      return NextResponse.json(cached)
+    }
 
     const userRecord = await User.findById(user._id || user.userId)
       .select('employeeId role isDepartmentHead headOfDepartments')
@@ -99,14 +112,14 @@ export async function GET(request) {
     // NOTE: HR users should ONLY see approvals if they're a department head (for their own department)
     // This prevents regular HR employees from seeing all company-wide approvals - only their dept head handles their approvals
     const isDeptHead = userRecord?.isDepartmentHead === true
-    
+
     // Only admin sees company-wide counts
     // HR users need to be department heads to see their department's counts
     // Managers and department_head role users see their department's counts
-    const canApprove = userRole === 'admin' || 
-                       isDeptHead || 
-                       (userRole === 'manager') ||
-                       (userRole === 'department_head')
+    const canApprove = userRole === 'admin' ||
+      isDeptHead ||
+      (userRole === 'manager') ||
+      (userRole === 'department_head')
 
     if (canApprove) {
       // Determine if this user should have department-scoped view
@@ -195,10 +208,11 @@ export async function GET(request) {
       counts.helpdesk = helpdeskCount
     }
 
-    return NextResponse.json({
-      success: true,
-      data: counts
-    })
+    const responseData = { success: true, data: counts }
+    // Cache for 30s — short enough to reflect real changes, long enough to reduce DB hits
+    await setCache(cacheKey, responseData, 60).catch(() => { }) // 60s TTL
+
+    return NextResponse.json(responseData)
   } catch (error) {
     console.error('Sidebar counts error:', error)
     return NextResponse.json({ success: false, message: error.message }, { status: 500 })

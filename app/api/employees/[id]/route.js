@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import queryCache from '@/lib/queryCache'
-import { buildCachePattern, clearCachePattern } from '@/lib/cache'
+import { buildCacheKey, buildCachePattern, getCache, setCache, clearCachePattern } from '@/lib/cache'
 import { logActivity } from '@/lib/activityLogger'
 import { deleteUserFromBackup } from '@/lib/backupDb'
 import { emitEmployeeUpdate, emitDashboardRefresh } from '@/lib/realtimeEvents'
@@ -48,7 +48,7 @@ export async function GET(request, { params }) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-  const { models, tenant } = auth
+    const { models, tenant } = auth
     const { Employee, User, Department, Designation, Company } = models
 
     if (!Employee || !User) {
@@ -58,7 +58,20 @@ export async function GET(request, { params }) {
       )
     }
 
-    // Check cache first
+    // Check Redis cache first (2 min TTL), then fall back to in-memory queryCache
+    const redisCacheKey = buildCacheKey({
+      tenantId: auth.tenant?.databaseName,
+      role: 'any',
+      userId: 'all',
+      namespace: 'employee:detail',
+      params: { id },
+    })
+    const redisCached = await getCache(redisCacheKey)
+    if (redisCached) {
+      return NextResponse.json(redisCached)
+    }
+
+    // Fallback: in-memory queryCache
     const cacheKey = queryCache.generateKey('employee', id)
     const cached = queryCache.get(cacheKey)
     if (cached) {
@@ -95,7 +108,7 @@ export async function GET(request, { params }) {
 
     // If not found by employee ID, check if it's a user ID and get employee from there
     if (!employee) {
-  const userWithEmployee = await User.findById(id).select('employeeId').lean()
+      const userWithEmployee = await User.findById(id).select('employeeId').lean()
       if (userWithEmployee?.employeeId) {
         employee = await Employee.findById(userWithEmployee.employeeId)
           .populate({
@@ -145,7 +158,8 @@ export async function GET(request, { params }) {
       data: employeeWithUser,
     }
 
-    // Cache for 60 seconds
+    // Write to both Redis (2 min TTL) and in-memory queryCache
+    await setCache(redisCacheKey, response, 2 * 60).catch(() => { })
     queryCache.set(cacheKey, response, 60000)
 
     return NextResponse.json(response)
@@ -474,13 +488,13 @@ export async function DELETE(request, { params }) {
     // Find the associated user BEFORE deletion (needed for cache clearing)
     const user = await User.findOne({ employeeId: id })
     const deletedUserId = user?._id?.toString() || '*'
-    
+
     if (user) {
       // Delete user from backup database (fire-and-forget)
-      deleteUserFromBackup(user._id).catch(err => 
+      deleteUserFromBackup(user._id).catch(err =>
         console.error('[Employee Delete] Backup delete failed:', err)
       )
-      
+
       // Hard delete the user from main database
       await User.findByIdAndDelete(user._id)
       console.log(`[Employee Delete] Deleted user: ${user._id} (${user.email})`)
@@ -575,7 +589,7 @@ export async function PATCH(request, { params }) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-  const { models, tenant } = auth
+    const { models, tenant } = auth
     const { Employee, User } = models
 
     if (!Employee || !User) {
@@ -590,7 +604,7 @@ export async function PATCH(request, { params }) {
     // Check if at least one field is provided
     const allowedFields = ['status', 'department', 'departments', 'designation', 'designationLevel', 'reportingManager', 'level']
     const hasValidField = allowedFields.some(field => body[field] !== undefined && body[field] !== '')
-    
+
     if (!hasValidField) {
       return NextResponse.json(
         { success: false, message: 'At least one field is required to update' },
@@ -676,14 +690,14 @@ export async function PATCH(request, { params }) {
     // Clear cache
     queryCache.delete(queryCache.generateKey('employee', id))
 
-  const employeeUser = await User.findOne({ employeeId: id }).select('_id')
-  const employeeUserId = employeeUser?._id?.toString() || '*'
+    const employeeUser = await User.findOne({ employeeId: id }).select('_id')
+    const employeeUserId = employeeUser?._id?.toString() || '*'
 
-  await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'auth:user', userId: employeeUserId }))
-  await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'profile', userId: employeeUserId }))
-  await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:employee-stats', userId: employeeUserId }))
-  await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:manager-stats', userId: '*' }))
-  await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:hr-stats', userId: '*' }))
+    await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'auth:user', userId: employeeUserId }))
+    await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'profile', userId: employeeUserId }))
+    await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:employee-stats', userId: employeeUserId }))
+    await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:manager-stats', userId: '*' }))
+    await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:hr-stats', userId: '*' }))
 
     // Emit real-time update for employee patch update
     emitEmployeeUpdate({

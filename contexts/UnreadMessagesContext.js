@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
 import { useSocket } from './SocketContext'
 import { handleSessionExpired } from '@/utils/userHelper'
 
@@ -14,7 +14,9 @@ const UnreadMessagesContext = createContext({
 export function UnreadMessagesProvider({ children }) {
   const [unreadCount, setUnreadCount] = useState(0)
   const [unreadChats, setUnreadChats] = useState({}) // { chatId: count }
-  const { onNewMessage } = useSocket()
+  const { onNewMessage, subscribe, isConnected } = useSocket()
+  const debounceTimerRef = useRef(null)
+  const wasConnectedRef = useRef(null) // null = never connected yet
 
   // Fetch unread count from API
   const fetchUnreadCount = async () => {
@@ -171,15 +173,41 @@ export function UnreadMessagesProvider({ children }) {
     return unsubscribe
   }, [onNewMessage])
 
-  // Fetch unread count on mount and periodically
+  // Debounced fetch — prevents rapid-fire API calls when multiple socket events arrive
+  const debouncedFetchUnread = useCallback(() => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
+    debounceTimerRef.current = setTimeout(() => {
+      fetchUnreadCount()
+    }, 500) // Wait 500ms after last event before fetching
+  }, [])
+
+  // Fetch unread count on mount and listen for real-time updates (pure event-driven, zero polling)
   useEffect(() => {
     fetchUnreadCount()
 
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchUnreadCount, 30000)
+    // Listen for server-pushed unread count updates instead of polling
+    const unsubscribe = subscribe('chat.unread.updated', (data) => {
+      console.log('[UnreadMessages] Received chat.unread.updated event')
+      debouncedFetchUnread()
+    })
 
-    return () => clearInterval(interval)
-  }, [])
+    return () => {
+      if (unsubscribe) unsubscribe()
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
+    }
+  }, [subscribe, debouncedFetchUnread])
+
+  // Re-fetch on socket reconnect to catch any events missed during disconnect
+  // null→true (first connect): skip (mount useEffect already fetches)
+  // true→false (disconnect): no-op
+  // false→true (reconnect): re-fetch to sync missed events
+  useEffect(() => {
+    if (isConnected && wasConnectedRef.current === false) {
+      console.log('[UnreadMessages] Socket reconnected — syncing unread count')
+      fetchUnreadCount()
+    }
+    wasConnectedRef.current = isConnected
+  }, [isConnected])
 
   return (
     <UnreadMessagesContext.Provider value={{
