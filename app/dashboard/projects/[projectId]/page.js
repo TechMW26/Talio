@@ -2616,7 +2616,7 @@ export default function ProjectDetailPage() {
 
       {/* Task ETA Modal (for self-assignment) */}
       <ModalPortal isOpen={showTaskEtaModal && !!pendingTaskData}>
-        <div className="modal-overlay">
+        {pendingTaskData && <div className="modal-overlay">
           <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between">
               <h3 className="text-xl font-bold text-gray-900">Set Your ETA</h3>
@@ -2765,12 +2765,12 @@ export default function ProjectDetailPage() {
               </button>
             </div>
           </div>
-        </div>
+        </div>}
       </ModalPortal>
 
       {/* Edit Task Modal */}
       <ModalPortal isOpen={showEditTaskModal && !!editTaskForm}>
-        <div className="modal-overlay">
+        {editTaskForm && <div className="modal-overlay">
           <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between">
               <h3 className="text-xl font-bold text-gray-900">Edit Task</h3>
@@ -3013,7 +3013,7 @@ export default function ProjectDetailPage() {
               </div>
             </form>
           </div>
-        </div>
+        </div>}
       </ModalPortal>
 
       {/* Reject Invitation Modal */}
@@ -3058,7 +3058,7 @@ export default function ProjectDetailPage() {
 
       {/* Task Detail Modal */}
       <ModalPortal isOpen={!!selectedTask}>
-        <div className="modal-overlay">
+        {selectedTask && <div className="modal-overlay">
           <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between flex-shrink-0">
               <h3 className="text-lg font-semibold text-gray-800">Task Details</h3>
@@ -3634,12 +3634,12 @@ export default function ProjectDetailPage() {
               })()}
             </div>
           </div>
-        </div>
+        </div>}
       </ModalPortal>
 
       {/* Delete Task Modal */}
       <ModalPortal isOpen={showDeleteTaskModal && !!taskToDelete}>
-        <div className="modal-overlay">
+        {taskToDelete && <div className="modal-overlay">
           <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-lg animate-modal-enter">
             <div className="p-6">
               <h3 className="text-lg font-semibold text-gray-800 mb-4">
@@ -3685,12 +3685,12 @@ export default function ProjectDetailPage() {
               </div>
             </div>
           </div>
-        </div>
+        </div>}
       </ModalPortal>
 
       {/* Reassign Task Modal */}
       <ModalPortal isOpen={showReassignModal && !!reassignTask}>
-        <div className="modal-overlay">
+        {reassignTask && <div className="modal-overlay">
           <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-lg animate-modal-enter">
             <div className="px-6 py-4 bg-gray-50 flex items-center justify-between">
               <h3 className="text-lg font-semibold text-gray-800">Reassign Task</h3>
@@ -3757,12 +3757,12 @@ export default function ProjectDetailPage() {
               </div>
             </div>
           </div>
-        </div>
+        </div>}
       </ModalPortal>
 
       {/* Reason Modal for Status Changes */}
       <ModalPortal isOpen={showReasonModal && !!pendingStatusChange}>
-          <div className="modal-overlay">
+          {pendingStatusChange && <div className="modal-overlay">
             <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-md transform transition-all">
               <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-amber-500 to-orange-500 rounded-t-xl">
                 <h3 className="text-lg font-semibold text-white">Reason Required</h3>
@@ -3811,7 +3811,7 @@ export default function ProjectDetailPage() {
                 </div>
               </div>
             </div>
-          </div>
+          </div>}
       </ModalPortal>
     </div>
   )

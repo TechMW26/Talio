@@ -253,7 +253,7 @@ export default function ProjectTasksWidget({ limit = 5, showPendingAcceptance = 
             return (
               <Card
                 key={task._id}
-                className={taskOverdue ? 'bg-danger-50' : 'bg-default-50'}
+                className={taskOverdue ? 'bg-danger-50' : ''}
               >
                 <CardBody className="p-3">
                   <div className="flex items-start justify-between">

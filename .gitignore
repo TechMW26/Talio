@@ -23,9 +23,9 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+*.log
 
 # local env files
-# Use only .env (not .env.local) - but keep it private
 .env*.local
 .env
 .env.firebase
@@ -49,10 +49,6 @@ next-env.d.ts
 .DS_Store
 Thumbs.db
 
-# Logs
-logs
-*.log
-
 # Runtime data
 pids
 *.pid
@@ -65,32 +61,17 @@ pids
 # Optional eslint cache
 .eslintcache
 
-# SSL Certificates (Let's Encrypt)
+# SSL Certificates
 certbot/
 
-# prod secrets
+# Sensitive files
 SERVER_ENV_CREDENTIALS.txt
+CREDENTIALS.md
 
-# Windows app
-windows-app/node_modules/
-windows-app/dist/
-windows-app/release/
-
-# Mac app
-mac-app/node_modules/
-mac-app/dist/
-mac-app/release/
-
-# Desktop app
+# Desktop app builds
 desktop-app/node_modules/
 desktop-app/dist/
 desktop-app/release/
-
-# Android (Gradle)
-android/**/build/
-android/.gradle/
-android/**/.cxx/
-android/local.properties
 
 # Binary releases
 download/releases/
@@ -98,12 +79,10 @@ public/releases/
 *.dmg
 *.exe
 *.blockmap
-CREDENTIALS.md
-scripts/create-admin.js
 
-# Sensitive uploads (Aadhaar documents, etc.)
+# Sensitive uploads
 uploads/aadhaar/
 !uploads/aadhaar/.gitkeep
 
-# Sentry Config File
+# Sentry
 .env.sentry-build-plugin

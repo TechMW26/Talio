@@ -4,20 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "cross-env NODE_OPTIONS=--max-old-space-size=4096 NEXT_DISABLE_REACT_DEV_OVERLAY=1 node server.js",
-    "dev:next": "next dev",
     "build": "SKIP_ENV_VALIDATION=true next build",
-    "start": "NODE_OPTIONS=--max-old-space-size=12288 NODE_ENV=production node server.js",
+    "start": "next start",
     "lint": "next lint",
-    "seed": "node scripts/seed.js",
-    "migrate": "node scripts/migrate-to-atlas.js",
-    "migrate:backup-users": "node scripts/migrate-users-to-backup.js",
-    "setup-local": "node scripts/setup-local-env.js",
-    "restore-atlas": "node scripts/restore-atlas-env.js",
-    "migrate:levelnames": "node scripts/migrate-designation-levelnames.js",
-    "setup:activities": "node scripts/setup-activity-collection.js",
-    "drop:attendance-tasks": "node scripts/drop-attendance-tasks.js",
-    "migrate:sessions": "node scripts/migrate-productivity-to-sessions.js",
-    "rectify:salaries": "node scripts/rectify-truncated-salaries.js"
+    "seed": "node scripts/seed.js"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

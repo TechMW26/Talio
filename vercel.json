@@ -1,7 +1,10 @@
 {
+  "framework": "nextjs",
+  "buildCommand": "SKIP_ENV_VALIDATION=true next build",
   "functions": {
-    "app/**/*.js": {
-      "maxDuration": 60
+    "app/api/**/*.js": {
+      "maxDuration": 60,
+      "memory": 1024
     }
   },
   "crons": [
@@ -16,6 +19,24 @@
     {
       "path": "/api/cron/check-profile-deadlines",
       "schedule": "0 6 * * *"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store, no-cache, must-revalidate" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" }
+      ]
+    },
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(self), geolocation=(self)" }
+      ]
     }
   ]
 }

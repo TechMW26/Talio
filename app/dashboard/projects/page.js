@@ -404,10 +404,10 @@ export default function ProjectsPage() {
               <div
                 key={project._id}
                 onClick={() => router.push(`/dashboard/projects/${project._id}`)}
-                className={`bg-content1 rounded-xl shadow-sm border-2 hover:shadow-md transition-shadow cursor-pointer overflow-hidden ${getStatusBorderColor()}`}
+                className={`bg-content1 rounded-xl shadow-sm border-2 hover:shadow-md transition-shadow cursor-pointer overflow-hidden flex flex-col ${getStatusBorderColor()}`}
               >
                 {/* Project Header */}
-                <div className="p-5">
+                <div className="p-5 flex-1">
                   <div className="flex items-start justify-between mb-3">
                     <h3 className="text-lg font-semibold text-default-800 line-clamp-1">
                       {project.name}
