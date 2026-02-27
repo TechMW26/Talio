@@ -226,6 +226,11 @@ export default function ChatPage() {
     }
   }, [onPresenceStatus, onPresenceUpdate])
 
+  const getOtherParticipant = useCallback((chat) => {
+    if (!chat || chat.isGroup) return null
+    return chat.participants.find(p => p._id !== currentUserId) || null
+  }, [currentUserId])
+
   // Request presence for selected direct chat
   useEffect(() => {
     if (!selectedChat || selectedChat.isGroup) return
@@ -564,11 +569,6 @@ export default function ChatPage() {
       return next
     })
   }
-
-  const getOtherParticipant = useCallback((chat) => {
-    if (!chat || chat.isGroup) return null
-    return chat.participants.find(p => p._id !== currentUserId) || null
-  }, [currentUserId])
 
   const handleCreateChat = async (employeeId) => {
     try {

@@ -9,6 +9,7 @@ import GlobalAILoadingOverlay from '@/components/ui/GlobalAILoadingOverlay'
 import MiraTransitionOverlay from '@/components/ui/MiraTransitionOverlay'
 import AutoRefresh from '@/components/AutoRefresh'
 import WebNetworkRecovery from '@/components/WebNetworkRecovery'
+import ScrollToTop from '@/components/ScrollToTop'
 
 // Cache operations completely disabled - no imports needed
 // import { checkAndClearCaches } from '@/lib/cacheManager'
@@ -99,6 +100,7 @@ export function Providers({ children }) {
                     >
                         <MiraTransitionOverlay />
                         <GlobalAILoadingOverlay />
+                        <ScrollToTop />
                         <WebNetworkRecovery />
                         <AutoRefresh />
                         {children}

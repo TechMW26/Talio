@@ -6,8 +6,8 @@ import {
     FaShieldAlt, FaDatabase, FaBriefcase, FaMicrochip,
     FaExternalLinkAlt
 } from 'react-icons/fa'
-import { HiOutlineNewspaper } from 'react-icons/hi2'
-import { Button, Skeleton, ScrollShadow } from '@heroui/react'
+import { HiOutlineNewspaper, HiSparkles } from 'react-icons/hi2'
+import { Button, Skeleton, ScrollShadow, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Spinner } from '@heroui/react'
 
 // Category icons and colors matching other widgets
 const CATEGORY_CONFIG = {
@@ -28,6 +28,49 @@ export default function RoleNewsWidget() {
     const [error, setError] = useState(null)
     const [retryCount, setRetryCount] = useState(0)
     const MAX_RETRIES = 3
+
+    // Article popup state
+    const [selectedArticle, setSelectedArticle] = useState(null)
+    const [articleLoading, setArticleLoading] = useState(false)
+    const [articleData, setArticleData] = useState(null)
+    const [articleError, setArticleError] = useState(null)
+
+    const openArticle = useCallback(async (item) => {
+        setSelectedArticle(item)
+        setArticleData(null)
+        setArticleError(null)
+        setArticleLoading(true)
+
+        try {
+            const token = localStorage.getItem('token')
+            const response = await fetch('/api/dashboard/news-article', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ url: item.link, title: item.title, source: item.source }),
+            })
+
+            const data = await response.json()
+            if (data.success) {
+                setArticleData(data)
+            } else {
+                setArticleError(data.message || 'Failed to load article')
+            }
+        } catch (err) {
+            console.error('[RoleNewsWidget] Article fetch error:', err)
+            setArticleError('Could not load article content')
+        } finally {
+            setArticleLoading(false)
+        }
+    }, [])
+
+    const closeArticle = useCallback(() => {
+        setSelectedArticle(null)
+        setArticleData(null)
+        setArticleError(null)
+    }, [])
 
     const fetchNews = useCallback(async (isRetry = false) => {
         try {
@@ -168,12 +211,10 @@ export default function RoleNewsWidget() {
                             const Icon = config.icon
 
                             return (
-                                <a
+                                <button
                                     key={index}
-                                    href={item.link}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-3 p-3 rounded-xl transition-colors group border border-default-100"
+                                    onClick={() => openArticle(item)}
+                                    className="w-full flex items-center gap-3 p-3 rounded-xl transition-colors group border border-default-100 hover:bg-default-50 text-left cursor-pointer"
                                 >
                                     {/* Icon */}
                                     <div className={`w-10 h-10 ${config.bg} rounded-full flex items-center justify-center flex-shrink-0`}>
@@ -191,15 +232,124 @@ export default function RoleNewsWidget() {
                                             <span className="text-xs text-default-400">{item.time}</span>
                                         </div>
                                     </div>
-
-                                    {/* External link indicator */}
-                                    <FaExternalLinkAlt className="w-3 h-3 text-default-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
-                                </a>
+                                </button>
                             )
                         })
                     )}
                 </ScrollShadow>
             </div>
+
+            {/* ─── Article Popup Modal ─── */}
+            <Modal
+                isOpen={!!selectedArticle}
+                onClose={closeArticle}
+                size="2xl"
+                scrollBehavior="inside"
+                backdrop="blur"
+                classNames={{
+                    base: 'max-h-[85vh] rounded-2xl',
+                    wrapper: 'items-center',
+                    header: 'border-b border-default-100 rounded-t-2xl',
+                    body: '',
+                    footer: 'border-t border-default-100 rounded-b-2xl',
+                }}
+            >
+                <ModalContent>
+                    {() => (
+                        <>
+                            <ModalHeader className="flex flex-col gap-1">
+                                <h3 className="text-lg font-bold text-default-900 line-clamp-2">
+                                    {selectedArticle?.title}
+                                </h3>
+                                <div className="flex items-center gap-2 text-xs text-default-500">
+                                    <span>{selectedArticle?.source}</span>
+                                    {selectedArticle?.time && (
+                                        <>
+                                            <span>•</span>
+                                            <span>{selectedArticle?.time}</span>
+                                        </>
+                                    )}
+                                </div>
+                            </ModalHeader>
+
+                            <ModalBody className="py-4 gap-4">
+                                {articleLoading ? (
+                                    <div className="flex flex-col items-center justify-center py-12 gap-3">
+                                        <Spinner size="lg" color="primary" />
+                                        <p className="text-sm text-default-500">Fetching article & generating AI summary...</p>
+                                    </div>
+                                ) : articleError ? (
+                                    <div className="flex flex-col items-center justify-center py-12 gap-3">
+                                        <HiOutlineNewspaper className="w-10 h-10 text-default-300" />
+                                        <p className="text-sm text-default-500">{articleError}</p>
+                                        <Button
+                                            variant="flat"
+                                            color="primary"
+                                            size="sm"
+                                            onPress={() => selectedArticle && openArticle(selectedArticle)}
+                                        >
+                                            Retry
+                                        </Button>
+                                    </div>
+                                ) : articleData ? (
+                                    <>
+                                        {/* AI Summary */}
+                                        {articleData.summary && (
+                                            <div className="rounded-xl bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800 p-4">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <HiSparkles className="w-4 h-4 text-primary-600" />
+                                                    <span className="text-xs font-semibold text-primary-700 dark:text-primary-400 uppercase tracking-wide">
+                                                        AI Summary
+                                                    </span>
+                                                </div>
+                                                <p className="text-sm text-default-800 dark:text-default-200 leading-relaxed">
+                                                    {articleData.summary}
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {/* Article Image */}
+                                        {articleData.image && (
+                                            <div className="rounded-xl overflow-hidden border border-default-200">
+                                                <img
+                                                    src={articleData.image}
+                                                    alt={selectedArticle?.title || 'Article image'}
+                                                    className="w-full h-auto max-h-[300px] object-cover"
+                                                    onError={(e) => { e.target.style.display = 'none' }}
+                                                />
+                                            </div>
+                                        )}
+
+                                        {/* Article Content */}
+                                        <div className="text-sm text-default-700 dark:text-default-300 leading-relaxed whitespace-pre-line">
+                                            {articleData.content}
+                                        </div>
+                                    </>
+                                ) : null}
+                            </ModalBody>
+
+                            <ModalFooter>
+                                <Button variant="flat" color="default" onPress={closeArticle}>
+                                    Close
+                                </Button>
+                                {(articleData?.url || selectedArticle?.link) && (
+                                    <Button
+                                        as="a"
+                                        href={articleData?.url || selectedArticle.link}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        color="primary"
+                                        variant="flat"
+                                        startContent={<FaExternalLinkAlt className="w-3 h-3" />}
+                                    >
+                                        Open Original
+                                    </Button>
+                                )}
+                            </ModalFooter>
+                        </>
+                    )}
+                </ModalContent>
+            </Modal>
         </div>
     )
 }
