@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { buildCacheKey, deleteCache } from '@/lib/cache'
 import mongoose from 'mongoose'
 
 const isValidObjectId = (id) => {
@@ -58,6 +59,15 @@ export async function DELETE(request, { params }) {
     // Remove the message
     message.deleteOne()
     await chat.save()
+
+    // Invalidate message cache
+    const cacheKey = buildCacheKey({
+      tenantId: auth.tenant?.databaseName,
+      role: 'any',
+      userId: 'shared',
+      namespace: `chat:messages:${chatId}`,
+    })
+    deleteCache(cacheKey).catch(() => {})
 
     // Broadcast deletion via Socket.IO
     const io = (await import('@/lib/socket')).getIO()

@@ -353,7 +353,10 @@ export default function ChatPopup({ chat, index }) {
             if (senderId && currentEmpId && senderId !== currentEmpId) {
               playNotificationSound?.()
             }
-            return [...prev, newMessage]
+            const updated = [...prev, newMessage]
+            // Persist to sessionStorage cache
+            appendCachedMessage(chat._id, newMessage)
+            return updated
           })
           markChatAsRead?.(chat._id)
         }
@@ -427,22 +430,88 @@ export default function ChatPopup({ chat, index }) {
     }
   }, [messages])
 
+  // ── Message cache helpers (sessionStorage) ──
+  const MSG_CACHE_PREFIX = 'talio_chat_msgs_'
+
+  const getCachedMessages = useCallback((chatId) => {
+    try {
+      const raw = sessionStorage.getItem(`${MSG_CACHE_PREFIX}${chatId}`)
+      if (!raw) return null
+      const parsed = JSON.parse(raw)
+      if (!parsed?.messages?.length) return null
+      return parsed // { messages: [...], lastTimestamp: ISO string }
+    } catch { return null }
+  }, [])
+
+  const setCachedMessages = useCallback((chatId, msgs) => {
+    try {
+      if (!msgs?.length) return
+      const lastTimestamp = msgs[msgs.length - 1]?.createdAt
+      sessionStorage.setItem(`${MSG_CACHE_PREFIX}${chatId}`, JSON.stringify({
+        messages: msgs,
+        lastTimestamp,
+      }))
+    } catch { /* sessionStorage full — silently ignore */ }
+  }, [])
+
+  const appendCachedMessage = useCallback((chatId, msg) => {
+    try {
+      const raw = sessionStorage.getItem(`${MSG_CACHE_PREFIX}${chatId}`)
+      const parsed = raw ? JSON.parse(raw) : { messages: [] }
+      if (parsed.messages.some(m => m._id === msg._id)) return
+      parsed.messages.push(msg)
+      parsed.lastTimestamp = msg.createdAt
+      sessionStorage.setItem(`${MSG_CACHE_PREFIX}${chatId}`, JSON.stringify(parsed))
+    } catch { /* silently ignore */ }
+  }, [])
+
   const fetchMessages = async () => {
     try {
-      setLoading(true)
       const token = localStorage.getItem('token')
       if (!token) return
 
-      const response = await fetch(`/api/chat/${chat._id}/messages`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setMessages(data.data || [])
+      // 1. Show cached messages instantly
+      const cached = getCachedMessages(chat._id)
+      if (cached) {
+        setMessages(cached.messages)
+        setLoading(false) // remove spinner immediately
+
+        // 2. Fetch only new messages since last cached timestamp
+        const sinceParam = cached.lastTimestamp
+          ? `?since=${encodeURIComponent(cached.lastTimestamp)}`
+          : ''
+        const response = await fetch(`/api/chat/${chat._id}/messages${sinceParam}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+        const data = await response.json()
+        if (data.success) {
+          const newMsgs = data.data || []
+          if (newMsgs.length > 0) {
+            setMessages(prev => {
+              const existingIds = new Set(prev.map(m => m._id))
+              const deduped = newMsgs.filter(m => !existingIds.has(m._id))
+              const merged = [...prev, ...deduped]
+              setCachedMessages(chat._id, merged)
+              return merged
+            })
+          }
+        }
+      } else {
+        // 3. No cache — full fetch with loading spinner
+        setLoading(true)
+        const response = await fetch(`/api/chat/${chat._id}/messages`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+        const data = await response.json()
+        if (data.success) {
+          const msgs = data.data || []
+          setMessages(msgs)
+          setCachedMessages(chat._id, msgs)
+        }
+        setLoading(false)
       }
     } catch (error) {
       console.error('Error fetching messages:', error)
-    } finally {
       setLoading(false)
     }
   }
@@ -473,7 +542,9 @@ export default function ChatPopup({ chat, index }) {
         // Add message locally for immediate feedback
         setMessages(prev => {
           if (prev.some(msg => msg._id === data.data._id)) return prev
-          return [...prev, data.data]
+          const updated = [...prev, data.data]
+          setCachedMessages(chat._id, updated)
+          return updated
         })
       }
 
@@ -511,7 +582,9 @@ export default function ChatPopup({ chat, index }) {
       } else if (data.success) {
         setMessages(prev => {
           if (prev.some(msg => msg._id === data.data._id)) return prev;
-          return [...prev, data.data];
+          const updated = [...prev, data.data];
+          setCachedMessages(chat._id, updated);
+          return updated;
         });
       }
       sendStopTyping?.(chat._id);
@@ -689,7 +762,9 @@ export default function ChatPopup({ chat, index }) {
       if (data.success) {
         setMessages(prev => {
           if (prev.some(msg => msg._id === data.data._id)) return prev
-          return [...prev, data.data]
+          const updated = [...prev, data.data]
+          setCachedMessages(chat._id, updated)
+          return updated
         })
       }
     } catch (error) {

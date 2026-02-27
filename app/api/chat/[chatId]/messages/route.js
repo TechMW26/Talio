@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { sendMessageNotification } from '@/lib/notificationService'
 import { emitChatUnreadUpdated } from '@/lib/eventBus'
+import { buildCacheKey, getCache, setCache, deleteCache } from '@/lib/cache'
 import mongoose from 'mongoose'
 
 const isValidObjectId = (id) => {
@@ -9,7 +10,11 @@ const isValidObjectId = (id) => {
     (new mongoose.Types.ObjectId(id)).toString() === id
 }
 
+// Cache TTL for messages (5 minutes)
+const MESSAGES_CACHE_TTL = 300
+
 // GET - Fetch messages for a chat
+// Supports ?since=<ISO timestamp> to return only newer messages (incremental fetch)
 export async function GET(request, context) {
   try {
     // Get authenticated user and tenant-specific models
@@ -37,6 +42,38 @@ export async function GET(request, context) {
       return NextResponse.json({ success: false, message: 'Invalid employee ID' }, { status: 400 })
     }
 
+    // Check for incremental fetch via ?since= query param
+    const { searchParams } = new URL(request.url)
+    const sinceParam = searchParams.get('since')
+    const sinceDate = sinceParam ? new Date(sinceParam) : null
+    const isIncremental = sinceDate && !isNaN(sinceDate.getTime())
+
+    // ── Try cache for full fetches (not incremental) ──
+    const cacheKey = buildCacheKey({
+      tenantId: auth.tenant?.databaseName,
+      role: 'any',
+      userId: 'shared',
+      namespace: `chat:messages:${chatId}`,
+    })
+
+    if (!isIncremental) {
+      const cached = await getCache(cacheKey)
+      if (cached) {
+        // Verify user is a participant (from cached participant list)
+        const isParticipant = cached._participants?.includes(employeeId.toString())
+        if (isParticipant) {
+          return NextResponse.json({
+            success: true,
+            data: cached.messages,
+            cached: true,
+            cachedAt: cached.cachedAt,
+          })
+        }
+        // If not a participant, fall through to DB check (security)
+      }
+    }
+
+    // ── DB fetch ──
     // Get employee details
     const employee = await Employee.findById(employeeId)
     if (!employee) {
@@ -75,9 +112,31 @@ export async function GET(request, context) {
       return msgObj
     })
 
+    // ── Cache the full message list (shared across participants of this chat) ──
+    const cachedAt = new Date().toISOString()
+    setCache(cacheKey, {
+      messages: messagesWithReplies,
+      _participants: chat.participants.map(p => p.toString()),
+      cachedAt,
+    }, MESSAGES_CACHE_TTL).catch(() => {})
+
+    // If incremental, filter to only new messages
+    if (isIncremental) {
+      const newMessages = messagesWithReplies.filter(
+        msg => new Date(msg.createdAt) > sinceDate
+      )
+      return NextResponse.json({
+        success: true,
+        data: newMessages,
+        incremental: true,
+        since: sinceParam,
+      })
+    }
+
     return NextResponse.json({
       success: true,
-      data: messagesWithReplies
+      data: messagesWithReplies,
+      cachedAt,
     })
   } catch (error) {
     console.error('Get messages error:', error)
@@ -183,6 +242,15 @@ export async function POST(request, context) {
     chat.lastMessageAt = new Date()
 
     await chat.save()
+
+    // ── Invalidate message cache for this chat ──
+    const cacheKey = buildCacheKey({
+      tenantId: auth.tenant?.databaseName,
+      role: 'any',
+      userId: 'shared',
+      namespace: `chat:messages:${chatId}`,
+    })
+    deleteCache(cacheKey).catch(() => {})
 
     // Populate the new message
     const updatedChat = await Chat.findById(chatId)

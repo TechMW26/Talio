@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { buildCacheKey, deleteCache } from '@/lib/cache'
 import mongoose from 'mongoose'
 
 const isValidObjectId = (id) => {
@@ -73,6 +74,15 @@ export async function POST(request, { params }) {
     }
 
     await chat.save()
+
+    // Invalidate message cache
+    const cacheKey = buildCacheKey({
+      tenantId: auth.tenant?.databaseName,
+      role: 'any',
+      userId: 'shared',
+      namespace: `chat:messages:${chatId}`,
+    })
+    deleteCache(cacheKey).catch(() => {})
 
     // Populate sender for response
     await chat.populate('messages.sender', 'firstName lastName avatar')

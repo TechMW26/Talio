@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { FaBuilding } from 'react-icons/fa'
 import { Card, CardBody } from '@heroui/react'
 
@@ -23,29 +23,12 @@ const CHART_COLORS = [
   '#FBBF24', // Yellow
 ]
 
-// Minimum bar width before overflow kicks in
-const MIN_BAR_WIDTH = 24
-// Gap between bars
-const BAR_GAP = 12
+// Minimum bar width before horizontal scroll kicks in
+const MIN_BAR_WIDTH = 20
 
 export default function DepartmentChartWidget({ departmentStats = [] }) {
   const [hoveredIndex, setHoveredIndex] = useState(null)
-  const [containerWidth, setContainerWidth] = useState(0)
   const containerRef = useRef(null)
-  const widgetRef = useRef(null)
-
-  // Measure container width
-  useEffect(() => {
-    const updateWidth = () => {
-      if (containerRef.current) {
-        setContainerWidth(containerRef.current.offsetWidth)
-      }
-    }
-
-    updateWidth()
-    window.addEventListener('resize', updateWidth)
-    return () => window.removeEventListener('resize', updateWidth)
-  }, [])
 
   if (!departmentStats || departmentStats.length === 0) {
     return (
@@ -74,19 +57,12 @@ export default function DepartmentChartWidget({ departmentStats = [] }) {
   // Chart height in pixels
   const chartHeight = 160
 
-  // Calculate dynamic bar width
   const numBars = departmentStats.length
-  const totalGapWidth = (numBars - 1) * BAR_GAP
-  const availableWidth = containerWidth - 32 // Account for padding (px-4 = 16px * 2)
-  const calculatedBarWidth = numBars > 0 ? (availableWidth - totalGapWidth) / numBars : MIN_BAR_WIDTH
-
-  // Use calculated width if >= min, otherwise use min width (will trigger overflow)
-  const barWidth = Math.max(calculatedBarWidth, MIN_BAR_WIDTH)
-  const needsOverflow = calculatedBarWidth < MIN_BAR_WIDTH
-  const totalContentWidth = needsOverflow ? (numBars * MIN_BAR_WIDTH) + totalGapWidth + 32 : '100%'
+  // Dynamic gap: smaller when many bars, larger when few
+  const dynamicGap = numBars > 20 ? 2 : numBars > 10 ? 4 : 6
 
   return (
-    <div ref={widgetRef} className="p-4 sm:p-6 flex-1 flex flex-col h-full relative">
+    <div className="p-4 sm:p-6 flex-1 flex flex-col h-full relative">
       <div className="mb-4">
         <h3 className="text-base sm:text-lg font-bold text-default-900">Department Distribution</h3>
       </div>
@@ -134,45 +110,39 @@ export default function DepartmentChartWidget({ departmentStats = [] }) {
         )
       })()}
 
-      {/* Scrollable container for bar chart */}
-      <div
-        ref={containerRef}
-        className="flex-1 overflow-x-auto"
-      >
+      {/* Bar chart fills full width */}
+      <div ref={containerRef} className="flex-1">
         <div
-          className="flex items-end justify-between px-4"
+          className="flex items-end w-full h-full"
           style={{
             height: `${chartHeight}px`,
-            width: totalContentWidth,
-            minWidth: needsOverflow ? `${totalContentWidth}px` : undefined,
-            gap: `${BAR_GAP}px`
+            gap: `${dynamicGap}px`,
           }}
         >
           {departmentStats.map((dept, index) => {
             // Calculate height based on value relative to max
-            const barHeight = maxValue > 0 ? Math.max((dept.value / maxValue) * chartHeight, 20) : 20
+            const barHeight = maxValue > 0 ? Math.max((dept.value / maxValue) * chartHeight, 8) : 8
             const color = CHART_COLORS[index % CHART_COLORS.length]
             const isHovered = hoveredIndex === index
 
             return (
               <div
                 key={dept.name || index}
-                className="relative flex flex-col items-center"
-                style={{ flex: needsOverflow ? '0 0 auto' : 1 }}
+                className="flex-1 flex items-end h-full"
+                style={{ minWidth: 0 }}
                 onMouseEnter={() => setHoveredIndex(index)}
                 onMouseLeave={() => setHoveredIndex(null)}
               >
-                {/* Bar */}
+                {/* Bar — fills full slot width */}
                 <div
-                  className="cursor-pointer transition-all duration-200 rounded-t"
+                  className="w-full cursor-pointer transition-all duration-200 rounded-t"
                   style={{
-                    width: needsOverflow ? `${MIN_BAR_WIDTH}px` : '100%',
-                    maxWidth: '48px',
                     height: `${barHeight}px`,
                     backgroundColor: color,
                     boxShadow: isHovered ? '0 4px 12px rgba(0,0,0,0.2)' : '0 1px 3px rgba(0,0,0,0.1)',
-                    transform: isHovered ? 'scaleX(1.1)' : 'scaleX(1)',
-                    opacity: hoveredIndex !== null && !isHovered ? 0.5 : 1
+                    transform: isHovered ? 'scaleY(1.03)' : 'scaleY(1)',
+                    transformOrigin: 'bottom',
+                    opacity: hoveredIndex !== null && !isHovered ? 0.5 : 1,
                   }}
                 />
               </div>

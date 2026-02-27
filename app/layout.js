@@ -1,5 +1,4 @@
 import { Inter, Montserrat } from 'next/font/google'
-import Script from 'next/script'
 import './globals.css'
 import '../styles/mobile-responsive.css'
 import '../styles/mobile-fix.css'
@@ -73,7 +72,6 @@ export default function RootLayout({ children }) {
         }} />
         
         {/* DNS Prefetch for faster external resource loading */}
-        <link rel="dns-prefetch" href="https://cdn.socket.io" />
         <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
         <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
         
@@ -140,14 +138,6 @@ export default function RootLayout({ children }) {
       </head>
 
       <body className={`${montserrat.className} ${montserrat.variable} ${inter.variable}`} suppressHydrationWarning>
-        {/* Socket.IO Client - Load after interactive for faster initial paint */}
-        <Script 
-          src="https://cdn.socket.io/4.8.1/socket.io.min.js" 
-          integrity="sha384-mkQ3/7FUtcGyoppY6bz/PORYoGqOl7/aSUMn2ymDOJcapfS6PHqxhRTMh1RR0Q6+" 
-          crossOrigin="anonymous"
-          strategy="afterInteractive"
-        />
-        
         <Providers>
           <SplashVideo>
             <ErrorPageCache />
