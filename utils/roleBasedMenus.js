@@ -50,9 +50,9 @@ export const roleBasedMenus = {
         { name: 'Create Project', path: '/dashboard/projects/create' },
       ]
     },
-    { 
-      name: 'Employees', 
-      icon: HiOutlineUserGroup, 
+    {
+      name: 'Employees',
+      icon: HiOutlineUserGroup,
       path: '/dashboard/employees',
       submenu: [
         { name: 'All Employees', path: '/dashboard/employees' },
@@ -82,9 +82,9 @@ export const roleBasedMenus = {
         { name: 'Leave Allocations', path: '/dashboard/leave/allocations' },
       ]
     },
-    { 
-      name: 'Payroll', 
-      icon: HiOutlineBanknotes, 
+    {
+      name: 'Payroll',
+      icon: HiOutlineBanknotes,
       path: '/dashboard/payroll',
       submenu: [
         { name: 'Process Payroll', path: '/dashboard/payroll' },
@@ -103,21 +103,22 @@ export const roleBasedMenus = {
         { name: 'Performance Reports', path: '/dashboard/performance/reports' },
       ]
     },
-    { 
-      name: 'Recruitment', 
-      icon: HiOutlineBriefcase, 
+    {
+      name: 'Recruitment',
+      icon: HiOutlineBriefcase,
       path: '/dashboard/recruitment',
       submenu: [
-        { name: 'Job Openings', path: '/dashboard/recruitment/jobs' },
+        { name: 'Job Openings', path: '/dashboard/recruitment' },
         { name: 'Candidates', path: '/dashboard/recruitment/candidates' },
         { name: 'Interviews', path: '/dashboard/recruitment/interviews' },
+        { name: 'Analytics', path: '/dashboard/recruitment/analytics' },
       ]
     },
     { name: 'Documents', icon: HiOutlineDocumentText, path: '/dashboard/documents' },
     { name: 'Assets', icon: HiOutlineCube, path: '/dashboard/assets' },
-    { 
-      name: 'Expenses', 
-      icon: HiOutlineReceiptPercent, 
+    {
+      name: 'Expenses',
+      icon: HiOutlineReceiptPercent,
       path: '/dashboard/expenses',
       submenu: [
         { name: 'My Expenses', path: '/dashboard/expenses' },
@@ -126,9 +127,9 @@ export const roleBasedMenus = {
     },
     { name: 'Helpdesk', icon: HiOutlineLifebuoy, path: '/dashboard/helpdesk' },
     { name: 'Policies', icon: HiOutlineBookOpen, path: '/dashboard/policies' },
-    { 
-      name: 'Learning (LMS)', 
-      icon: HiOutlineAcademicCap, 
+    {
+      name: 'Learning (LMS)',
+      icon: HiOutlineAcademicCap,
       path: '/dashboard/learning',
       submenu: [
         { name: 'Courses', path: '/dashboard/learning/courses' },
@@ -170,9 +171,9 @@ export const roleBasedMenus = {
         { name: 'Create Project', path: '/dashboard/projects/create' },
       ]
     },
-    { 
-      name: 'Employees', 
-      icon: HiOutlineUserGroup, 
+    {
+      name: 'Employees',
+      icon: HiOutlineUserGroup,
       path: '/dashboard/employees',
       submenu: [
         { name: 'All Employees', path: '/dashboard/employees' },
@@ -202,9 +203,9 @@ export const roleBasedMenus = {
         { name: 'Leave Allocations', path: '/dashboard/leave/allocations' },
       ]
     },
-    { 
-      name: 'Payroll', 
-      icon: HiOutlineBanknotes, 
+    {
+      name: 'Payroll',
+      icon: HiOutlineBanknotes,
       path: '/dashboard/payroll',
       submenu: [
         { name: 'Process Payroll', path: '/dashboard/payroll' },
@@ -223,21 +224,22 @@ export const roleBasedMenus = {
         { name: 'Performance Reports', path: '/dashboard/performance/reports' },
       ]
     },
-    { 
-      name: 'Recruitment', 
-      icon: HiOutlineBriefcase, 
+    {
+      name: 'Recruitment',
+      icon: HiOutlineBriefcase,
       path: '/dashboard/recruitment',
       submenu: [
-        { name: 'Job Openings', path: '/dashboard/recruitment/jobs' },
+        { name: 'Job Openings', path: '/dashboard/recruitment' },
         { name: 'Candidates', path: '/dashboard/recruitment/candidates' },
         { name: 'Interviews', path: '/dashboard/recruitment/interviews' },
+        { name: 'Analytics', path: '/dashboard/recruitment/analytics' },
       ]
     },
     { name: 'Documents', icon: HiOutlineDocumentText, path: '/dashboard/documents' },
     { name: 'Assets', icon: HiOutlineCube, path: '/dashboard/assets' },
-    { 
-      name: 'Expenses', 
-      icon: HiOutlineReceiptPercent, 
+    {
+      name: 'Expenses',
+      icon: HiOutlineReceiptPercent,
       path: '/dashboard/expenses',
       submenu: [
         { name: 'My Expenses', path: '/dashboard/expenses' },
@@ -246,9 +248,9 @@ export const roleBasedMenus = {
     },
     { name: 'Policies', icon: HiOutlineBookOpen, path: '/dashboard/policies' },
     { name: 'Helpdesk', icon: HiOutlineLifebuoy, path: '/dashboard/helpdesk' },
-    { 
-      name: 'Learning (LMS)', 
-      icon: HiOutlineAcademicCap, 
+    {
+      name: 'Learning (LMS)',
+      icon: HiOutlineAcademicCap,
       path: '/dashboard/learning',
       submenu: [
         { name: 'Courses', path: '/dashboard/learning/courses' },
@@ -290,9 +292,9 @@ export const roleBasedMenus = {
         { name: 'Create Project', path: '/dashboard/projects/create' },
       ]
     },
-    { 
-      name: 'Attendance & Leaves', 
-      icon: HiOutlineClock, 
+    {
+      name: 'Attendance & Leaves',
+      icon: HiOutlineClock,
       path: '/dashboard/attendance',
       submenu: [
         { name: 'My Attendance', path: '/dashboard/attendance' },
@@ -305,9 +307,9 @@ export const roleBasedMenus = {
     { name: 'Payslips', icon: HiOutlineBanknotes, path: '/dashboard/payroll/payslips' },
     { name: 'Documents', icon: HiOutlineDocumentText, path: '/dashboard/documents' },
     { name: 'Assets', icon: HiOutlineCube, path: '/dashboard/assets' },
-    { 
-      name: 'Expenses', 
-      icon: HiOutlineReceiptPercent, 
+    {
+      name: 'Expenses',
+      icon: HiOutlineReceiptPercent,
       path: '/dashboard/expenses',
       submenu: [
         { name: 'My Expenses', path: '/dashboard/expenses' },
@@ -349,9 +351,9 @@ export const roleBasedMenus = {
         { name: 'Create Project', path: '/dashboard/projects/create' },
       ]
     },
-    { 
-      name: 'Attendance & Leaves', 
-      icon: HiOutlineClock, 
+    {
+      name: 'Attendance & Leaves',
+      icon: HiOutlineClock,
       path: '/dashboard/attendance',
       submenu: [
         { name: 'My Attendance', path: '/dashboard/attendance' },
@@ -363,9 +365,9 @@ export const roleBasedMenus = {
     { name: 'Payslips', icon: HiOutlineBanknotes, path: '/dashboard/payroll/payslips' },
     { name: 'Documents', icon: HiOutlineDocumentText, path: '/dashboard/documents' },
     { name: 'Assets', icon: HiOutlineCube, path: '/dashboard/assets' },
-    { 
-      name: 'Expenses', 
-      icon: HiOutlineReceiptPercent, 
+    {
+      name: 'Expenses',
+      icon: HiOutlineReceiptPercent,
       path: '/dashboard/expenses',
       submenu: [
         { name: 'My Expenses', path: '/dashboard/expenses' },
@@ -426,9 +428,9 @@ export const roleBasedMenus = {
     { name: 'Payslips', icon: HiOutlineBanknotes, path: '/dashboard/payroll/payslips' },
     { name: 'Documents', icon: HiOutlineDocumentText, path: '/dashboard/documents' },
     { name: 'Assets', icon: HiOutlineCube, path: '/dashboard/assets' },
-    { 
-      name: 'Expenses', 
-      icon: HiOutlineReceiptPercent, 
+    {
+      name: 'Expenses',
+      icon: HiOutlineReceiptPercent,
       path: '/dashboard/expenses',
       submenu: [
         { name: 'My Expenses', path: '/dashboard/expenses' },

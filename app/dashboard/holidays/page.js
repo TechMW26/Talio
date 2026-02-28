@@ -3,37 +3,27 @@
 import { useState, useEffect } from 'react'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
-import { useAILoading } from '@/contexts/AILoadingContext'
-import { 
-  FaPlus, FaEdit, FaTrash, FaCalendarAlt, FaSync, FaRobot, 
-  FaList, FaTh, FaChevronLeft, FaChevronRight 
+import {
+  FaPlus, FaEdit, FaTrash, FaCalendarAlt,
+  FaList, FaTh, FaChevronLeft, FaChevronRight
 } from 'react-icons/fa'
 import Loader from '@/components/ui/Loader'
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Select, SelectItem, Input, Textarea, Checkbox } from '@heroui/react'
-import { 
-  format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, 
-  eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, 
-  parseISO, isToday 
+import {
+  format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
+  eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths,
+  parseISO, isToday
 } from 'date-fns'
 
 export default function HolidaysPage() {
   const [holidays, setHolidays] = useState([])
   const [loading, setLoading] = useState(true)
-  const [syncing, setSyncing] = useState(false)
   const [showModal, setShowModal] = useState(false)
   const [editingHoliday, setEditingHoliday] = useState(null)
-  
+
   // View Mode State
   const [viewMode, setViewMode] = useState('calendar') // 'calendar' or 'list'
   const [currentMonth, setCurrentMonth] = useState(new Date())
-
-  // AI Fetch State
-  const [showAiModal, setShowAiModal] = useState(false)
-  const [fetchingAi, setFetchingAi] = useState(false)
-  const [aiForm, setAiForm] = useState({
-    country: '',
-    year: new Date().getFullYear()
-  })
 
   const [formData, setFormData] = useState({
     name: '',
@@ -50,9 +40,6 @@ export default function HolidaysPage() {
 
   // Real-time updates
   const { socket, isConnected, subscribe, onHolidayUpdate } = useSocket()
-  
-  // Global AI loading animation
-  const { startAILoading, stopAILoading } = useAILoading()
 
   useEffect(() => {
     fetchHolidays()
@@ -99,66 +86,6 @@ export default function HolidaysPage() {
       toast.error('Failed to fetch holidays')
     } finally {
       setLoading(false)
-    }
-  }
-
-  const handleSync = async () => {
-    setSyncing(true)
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/holidays/sync', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        toast.success(data.message)
-      } else {
-        toast.error(data.message)
-      }
-    } catch (error) {
-      console.error('Sync error:', error)
-      toast.error('Failed to sync holidays with attendance')
-    } finally {
-      setSyncing(false)
-    }
-  }
-
-  const handleAiFetch = async (e) => {
-    e.preventDefault()
-    if (!aiForm.country) {
-      toast.error('Please select a country')
-      return
-    }
-
-    setFetchingAi(true)
-    startAILoading('MIRA is fetching holidays for ' + aiForm.country + '...')
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/holidays/fetch-ai', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` 
-        },
-        body: JSON.stringify(aiForm)
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        toast.success(data.message)
-        setShowAiModal(false)
-        fetchHolidays()
-      } else {
-        toast.error(data.message)
-      }
-    } catch (error) {
-      console.error('AI Fetch error:', error)
-      toast.error('Failed to fetch holidays with AI')
-    } finally {
-      setFetchingAi(false)
-      stopAILoading()
     }
   }
 
@@ -242,10 +169,10 @@ export default function HolidaysPage() {
   const handleCloseModal = () => {
     setShowModal(false)
     setEditingHoliday(null)
-    setFormData({ 
-      name: '', 
-      date: '', 
-      type: 'public', 
+    setFormData({
+      name: '',
+      date: '',
+      type: 'public',
       description: '',
       locations: [],
       applicableTo: 'all'
@@ -338,7 +265,7 @@ export default function HolidaysPage() {
                     </span>
                     {holiday && (
                       <div className="flex space-x-1">
-                        <button 
+                        <button
                           onClick={(e) => { e.stopPropagation(); handleEdit(holiday); }}
                           className="text-blue-600 hover:text-blue-800"
                         >
@@ -347,7 +274,7 @@ export default function HolidaysPage() {
                       </div>
                     )}
                   </div>
-                  
+
                   {holiday && (
                     <div className={`mt-1 p-1 rounded text-[10px] sm:text-xs border ${getHolidayColor(holiday.type)}`}>
                       <div className="font-semibold truncate" title={holiday.name}>
@@ -411,25 +338,6 @@ export default function HolidaysPage() {
             </button>
           </div>
 
-          <button
-            onClick={() => setShowAiModal(true)}
-            className="btn-secondary flex items-center space-x-2 bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100 text-sm"
-          >
-            <FaRobot />
-            <span className="hidden sm:inline">Fetch with AI</span>
-            <span className="sm:hidden">AI</span>
-          </button>
-
-          <Button
-            onPress={handleSync}
-            isDisabled={syncing}
-            variant="flat"
-            startContent={<FaSync className={syncing ? 'animate-spin' : ''} />}
-            size="sm"
-          >
-            Sync
-          </Button>
-          
           <Button
             onPress={() => setShowModal(true)}
             color="primary"
@@ -517,11 +425,10 @@ export default function HolidaysPage() {
                                   <p className="text-gray-500 text-sm">{holiday.description}</p>
                                 )}
                                 <div className="mt-1 flex flex-wrap gap-2">
-                                  <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
-                                    holiday.type === 'public' ? 'bg-green-100 text-green-800' :
+                                  <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${holiday.type === 'public' ? 'bg-green-100 text-green-800' :
                                     holiday.type === 'optional' ? 'bg-blue-100 text-blue-800' :
-                                    'bg-gray-100 text-gray-800'
-                                  }`}>
+                                      'bg-gray-100 text-gray-800'
+                                    }`}>
                                     {holiday.type}
                                   </span>
                                   {holiday.locations && holiday.locations.length > 0 && (
@@ -605,35 +512,35 @@ export default function HolidaysPage() {
                     <SelectItem key="specific-locations">Specific Locations</SelectItem>
                   </Select>
 
-                {formData.applicableTo === 'specific-locations' && (
-                  <div>
-                    <label className="text-sm font-medium text-default-700 mb-2 block">Select Locations (Countries)</label>
-                    <div className="border border-default-200 rounded-lg p-2 max-h-40 overflow-y-auto">
-                      {countries.map((country) => (
-                        <Checkbox
-                          key={country}
-                          isSelected={formData.locations.includes(country)}
-                          onValueChange={(isSelected) => {
-                            if (isSelected) {
-                              setFormData({
-                                ...formData,
-                                locations: [...formData.locations, country]
-                              })
-                            } else {
-                              setFormData({
-                                ...formData,
-                                locations: formData.locations.filter(l => l !== country)
-                              })
-                            }
-                          }}
-                          className="w-full p-2"
-                        >
-                          {country}
-                        </Checkbox>
-                      ))}
+                  {formData.applicableTo === 'specific-locations' && (
+                    <div>
+                      <label className="text-sm font-medium text-default-700 mb-2 block">Select Locations (Countries)</label>
+                      <div className="border border-default-200 rounded-lg p-2 max-h-40 overflow-y-auto">
+                        {countries.map((country) => (
+                          <Checkbox
+                            key={country}
+                            isSelected={formData.locations.includes(country)}
+                            onValueChange={(isSelected) => {
+                              if (isSelected) {
+                                setFormData({
+                                  ...formData,
+                                  locations: [...formData.locations, country]
+                                })
+                              } else {
+                                setFormData({
+                                  ...formData,
+                                  locations: formData.locations.filter(l => l !== country)
+                                })
+                              }
+                            }}
+                            className="w-full p-2"
+                          >
+                            {country}
+                          </Checkbox>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
                   <Textarea
                     label="Description"
@@ -658,62 +565,6 @@ export default function HolidaysPage() {
         </ModalContent>
       </Modal>
 
-      {/* AI Fetch Modal */}
-      <Modal isOpen={showAiModal} onOpenChange={setShowAiModal} size="md">
-        <ModalContent>
-          {(onClose) => (
-            <>
-              <ModalHeader className="flex items-center gap-2">
-                <FaRobot className="text-purple-600" />
-                Fetch Holidays with AI
-              </ModalHeader>
-              <form onSubmit={handleAiFetch}>
-                <ModalBody className="space-y-4">
-                  <p className="text-sm text-default-500">
-                    Automatically fetch and populate public holidays for a specific country using MIRA AI.
-                  </p>
-                  
-                  <Select
-                    label="Country"
-                    isRequired
-                    selectedKeys={aiForm.country ? [aiForm.country] : []}
-                    onSelectionChange={(keys) => setAiForm({ ...aiForm, country: Array.from(keys)[0] || '' })}
-                    placeholder="Select Country"
-                  >
-                    {countries.map(c => (
-                      <SelectItem key={c}>{c}</SelectItem>
-                    ))}
-                  </Select>
-
-                  <Input
-                    type="number"
-                    label="Year"
-                    isRequired
-                    min="2020"
-                    max="2030"
-                    value={String(aiForm.year)}
-                    onChange={(e) => setAiForm({ ...aiForm, year: e.target.value })}
-                  />
-                </ModalBody>
-
-                <ModalFooter>
-                  <Button variant="light" onPress={onClose}>
-                    Cancel
-                  </Button>
-                  <Button 
-                    type="submit" 
-                    isLoading={fetchingAi}
-                    color="secondary"
-                    startContent={!fetchingAi && <FaRobot />}
-                  >
-                    {fetchingAi ? 'Fetching...' : 'Fetch Holidays'}
-                  </Button>
-                </ModalFooter>
-              </form>
-            </>
-          )}
-        </ModalContent>
-      </Modal>
     </div>
   )
 }

@@ -1,371 +1,549 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { useRouter, useParams } from 'next/navigation'
-import toast from '@/utils/toast'
-import { FaArrowLeft, FaEdit, FaTrash, FaBriefcase, FaMapMarkerAlt, FaClock, FaDollarSign, FaUsers, FaEye } from 'react-icons/fa'
-import Loader from '@/components/ui/Loader'
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter, useParams } from 'next/navigation';
+import {
+  Button, Chip, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter,
+  Input, Select, SelectItem, useDisclosure, Divider, Card, CardBody,
+  CardHeader, Skeleton, Tooltip
+} from '@heroui/react';
+import toast from '@/utils/toast';
+import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext';
+import {
+  FaArrowLeft, FaEdit, FaTrash, FaBriefcase, FaMapMarkerAlt, FaClock,
+  FaDollarSign, FaUsers, FaUserPlus, FaGraduationCap, FaCalendarAlt,
+  FaCheckCircle, FaChartBar, FaStar, FaBuilding, FaLaptop
+} from 'react-icons/fa';
 
-export default function JobDetailsPage() {
-  const router = useRouter()
-  const params = useParams()
-  const [job, setJob] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [applications, setApplications] = useState([])
-  const [user, setUser] = useState(null)
+const STATUS_COLORS = {
+  open: 'success', draft: 'default', 'on-hold': 'warning', closed: 'danger', cancelled: 'danger',
+};
+
+const STAGE_COLORS = {
+  applied: 'default', screening: 'primary', shortlisted: 'secondary',
+  interview: 'warning', assessment: 'primary', offer: 'success', hired: 'success',
+  rejected: 'danger', withdrawn: 'default',
+};
+
+const STAGE_LIST = ['applied', 'screening', 'shortlisted', 'interview', 'assessment', 'offer', 'hired', 'rejected', 'withdrawn'];
+const WORK_MODE_LABELS = { 'on-site': 'On-site', remote: 'Remote', hybrid: 'Hybrid' };
+const EMPLOYMENT_TYPE_LABELS = {
+  'full-time': 'Full-time', 'part-time': 'Part-time', contract: 'Contract',
+  internship: 'Internship', freelance: 'Freelance',
+};
+
+export default function JobDetailPage() {
+  const router = useRouter();
+  const params = useParams();
+  const [job, setJob] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const { isOpen: isAddOpen, onOpen: onAddOpen, onClose: onAddClose } = useDisclosure();
+  const [candidateForm, setCandidateForm] = useState({
+    firstName: '', lastName: '', email: '', phone: '',
+    source: 'direct', experience: '', currentCompany: '',
+    expectedSalary: '', skills: '',
+  });
+  const [submitting, setSubmitting] = useState(false);
+
+  const { socket, isConnected, subscribe } = useSocket();
+
+  const fetchJob = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/recruitment/${params.id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+      if (data.success) {
+        setJob(data.data);
+      } else {
+        toast.error(data.message || 'Job not found');
+        router.push('/dashboard/recruitment');
+      }
+    } catch (error) {
+      console.error('Fetch job error:', error);
+      toast.error('Failed to load job details');
+    } finally {
+      setLoading(false);
+    }
+  }, [params.id]);
 
   useEffect(() => {
-    const userData = localStorage.getItem('user')
-    if (userData) {
-      setUser(JSON.parse(userData))
-    }
-    fetchJob()
-    fetchApplications()
-  }, [params.id])
+    const userData = localStorage.getItem('user');
+    if (userData) setUser(JSON.parse(userData));
+    fetchJob();
+  }, [params.id]);
 
-  const fetchJob = async () => {
-    try {
-      // Mock data for now - replace with actual API call
-      const mockJob = {
-        _id: params.id,
-        title: 'Senior Software Engineer',
-        department: { name: 'Engineering', _id: 'dept1' },
-        location: 'New York, NY',
-        employmentType: 'full-time',
-        experienceLevel: 'senior-level',
-        salaryRange: { min: 80000, max: 120000, currency: 'USD' },
-        description: 'We are looking for a Senior Software Engineer to join our dynamic engineering team. You will be responsible for designing, developing, and maintaining high-quality software solutions that drive our business forward.',
-        requirements: [
-          '5+ years of experience in software development',
-          'Proficiency in JavaScript, React, and Node.js',
-          'Experience with cloud platforms (AWS, Azure, or GCP)',
-          'Strong problem-solving and analytical skills',
-          'Excellent communication and teamwork abilities'
-        ],
-        responsibilities: [
-          'Design and develop scalable web applications',
-          'Collaborate with cross-functional teams to define and implement new features',
-          'Write clean, maintainable, and well-documented code',
-          'Participate in code reviews and mentor junior developers',
-          'Troubleshoot and debug applications'
-        ],
-        benefits: [
-          'Competitive salary and equity package',
-          'Comprehensive health, dental, and vision insurance',
-          'Flexible work arrangements and remote work options',
-          'Professional development opportunities',
-          '401(k) with company matching'
-        ],
-        skills: ['JavaScript', 'React', 'Node.js', 'AWS', 'MongoDB'],
-        hiringManager: { firstName: 'Jane', lastName: 'Smith', position: 'Engineering Manager' },
-        applicationDeadline: '2025-02-28T00:00:00.000Z',
-        status: 'active',
-        remote: true,
-        educationLevel: 'bachelor',
-        postedDate: '2024-12-01T00:00:00.000Z',
-        applicationsCount: 15
-      }
-      
-      setJob(mockJob)
-    } catch (error) {
-      console.error('Fetch job error:', error)
-      toast.error('Failed to fetch job details')
-    } finally {
-      setLoading(false)
-    }
-  }
+  useEffect(() => {
+    if (!socket || !isConnected) return;
+    const unsub = subscribe ? subscribe(REALTIME_EVENTS.RECRUITMENT_UPDATE, fetchJob) : undefined;
+    return () => { if (unsub) unsub(); };
+  }, [socket, isConnected]);
 
-  const fetchApplications = async () => {
-    try {
-      // Mock applications data
-      const mockApplications = [
-        {
-          _id: 'app1',
-          candidate: { firstName: 'John', lastName: 'Doe', email: 'john.doe@email.com' },
-          appliedDate: '2024-12-10T00:00:00.000Z',
-          status: 'under-review',
-          experience: '6 years'
-        },
-        {
-          _id: 'app2',
-          candidate: { firstName: 'Alice', lastName: 'Johnson', email: 'alice.johnson@email.com' },
-          appliedDate: '2024-12-08T00:00:00.000Z',
-          status: 'shortlisted',
-          experience: '8 years'
-        }
-      ]
-      setApplications(mockApplications)
-    } catch (error) {
-      console.error('Fetch applications error:', error)
-    }
-  }
+  const canManage = user && ['admin', 'hr', 'manager'].includes(user.role);
 
   const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this job posting?')) return
-
+    if (!confirm('Are you sure you want to delete this job posting? This will also remove all associated candidates and interviews.')) return;
+    setDeleting(true);
     try {
-      // Mock delete - replace with actual API call
-      toast.success('Job posting deleted successfully')
-      router.push('/dashboard/recruitment')
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/recruitment/${params.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast.success('Job posting deleted');
+        router.push('/dashboard/recruitment');
+      } else {
+        toast.error(data.message || 'Failed to delete');
+      }
     } catch (error) {
-      console.error('Delete job error:', error)
-      toast.error('Failed to delete job posting')
+      toast.error('Failed to delete job posting');
+    } finally {
+      setDeleting(false);
     }
-  }
+  };
 
-  const canManageJobs = () => {
-    return user && ['admin', 'hr', 'manager'].includes(user.role)
-  }
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'active': return 'bg-green-100 text-green-800'
-      case 'draft': return 'bg-gray-100 text-gray-800'
-      case 'closed': return 'bg-red-100 text-red-800'
-      case 'on-hold': return 'bg-yellow-100 text-yellow-800'
-      default: return 'bg-gray-100 text-gray-800'
+  const handleStatusChange = async (newStatus) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/recruitment/${params.id}`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast.success(`Status updated to ${newStatus}`);
+        setJob(data.data);
+      } else {
+        toast.error(data.message || 'Failed to update status');
+      }
+    } catch (error) {
+      toast.error('Failed to update status');
     }
-  }
+  };
 
-  const getApplicationStatusColor = (status) => {
-    switch (status) {
-      case 'applied': return 'bg-blue-100 text-blue-800'
-      case 'under-review': return 'bg-yellow-100 text-yellow-800'
-      case 'shortlisted': return 'bg-green-100 text-green-800'
-      case 'rejected': return 'bg-red-100 text-red-800'
-      case 'hired': return 'bg-purple-100 text-purple-800'
-      default: return 'bg-gray-100 text-gray-800'
+  const handleAddCandidate = async () => {
+    if (!candidateForm.firstName || !candidateForm.lastName || !candidateForm.email) {
+      toast.error('First name, last name, and email are required');
+      return;
     }
-  }
+    setSubmitting(true);
+    try {
+      const token = localStorage.getItem('token');
+      const payload = {
+        ...candidateForm,
+        jobPosting: params.id,
+        experience: candidateForm.experience ? parseFloat(candidateForm.experience) : undefined,
+        expectedSalary: candidateForm.expectedSalary ? parseFloat(candidateForm.expectedSalary) : undefined,
+        skills: candidateForm.skills ? candidateForm.skills.split(',').map((s) => s.trim()).filter(Boolean) : [],
+      };
+      const response = await fetch('/api/recruitment/candidates', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json();
+      if (data.success) {
+        toast.success('Candidate added successfully');
+        onAddClose();
+        setCandidateForm({ firstName: '', lastName: '', email: '', phone: '', source: 'direct', experience: '', currentCompany: '', expectedSalary: '', skills: '' });
+        fetchJob();
+      } else {
+        toast.error(data.message || 'Failed to add candidate');
+      }
+    } catch (error) {
+      toast.error('Failed to add candidate');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader size="lg" />
-      </div>
-    )
-  }
-
-  if (!job) {
-    return (
-      <div className="p-6">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-800 mb-4">Job Not Found</h1>
-          <p className="text-gray-600 mb-4">The job posting you&apos;re looking for doesn&apos;t exist.</p>
-          <button
-            onClick={() => router.push('/dashboard/recruitment')}
-            className="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
-          >
-            Back to Recruitment
-          </button>
+      <div className="page-container">
+        <div className="space-y-4 sm:space-y-6">
+          <Skeleton className="h-10 w-64 rounded-lg" />
+          <Skeleton className="h-6 w-96 rounded-lg" />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+            <div className="lg:col-span-2 space-y-4">
+              <Skeleton className="h-32 rounded-xl" />
+              <Skeleton className="h-48 rounded-xl" />
+              <Skeleton className="h-40 rounded-xl" />
+            </div>
+            <div className="space-y-4">
+              <Skeleton className="h-24 rounded-xl" />
+              <Skeleton className="h-48 rounded-xl" />
+              <Skeleton className="h-32 rounded-xl" />
+            </div>
+          </div>
         </div>
       </div>
-    )
+    );
   }
+
+  if (!job) return null;
+
+  const formatSalary = (range) => {
+    if (!range || (!range.min && !range.max)) return null;
+    const currency = range.currency || 'INR';
+    const fmt = (v) => new Intl.NumberFormat('en-IN', { style: 'currency', currency, maximumFractionDigits: 0 }).format(v);
+    if (range.min && range.max) return `${fmt(range.min)} - ${fmt(range.max)}`;
+    if (range.min) return `${fmt(range.min)}+`;
+    return `Up to ${fmt(range.max)}`;
+  };
 
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center space-x-4">
-          <button
-            onClick={() => router.back()}
-            className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <FaArrowLeft className="w-5 h-5" />
-          </button>
-          <div>
-            <h1 className="text-3xl font-bold text-gray-800">{job.title}</h1>
-            <p className="text-gray-600 mt-1">{job.department.name} • {job.location}</p>
-          </div>
-        </div>
-        {canManageJobs() && (
-          <div className="flex space-x-3">
-            <button
-              onClick={() => router.push(`/dashboard/recruitment/edit/${job._id}`)}
-              className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center space-x-2"
-            >
-              <FaEdit className="w-4 h-4" />
-              <span>Edit</span>
-            </button>
-            <button
-              onClick={handleDelete}
-              className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors flex items-center space-x-2"
-            >
-              <FaTrash className="w-4 h-4" />
-              <span>Delete</span>
-            </button>
-          </div>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main Content */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Job Overview */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-2xl font-bold text-gray-800">Job Overview</h2>
-              <span className={`px-3 py-1 text-sm rounded-full ${getStatusColor(job.status)}`}>
-                {job.status.replace('-', ' ')}
-              </span>
-            </div>
-            
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              <div className="flex items-center space-x-2">
-                <FaBriefcase className="w-4 h-4 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-500">Type</p>
-                  <p className="font-medium capitalize">{job.employmentType.replace('-', ' ')}</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <FaMapMarkerAlt className="w-4 h-4 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-500">Location</p>
-                  <p className="font-medium">{job.location}</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <FaClock className="w-4 h-4 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-500">Experience</p>
-                  <p className="font-medium capitalize">{job.experienceLevel.replace('-', ' ')}</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <FaDollarSign className="w-4 h-4 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-500">Salary</p>
-                  <p className="font-medium">
-                    {job.salaryRange.min && job.salaryRange.max 
-                      ? `${job.salaryRange.currency} ${job.salaryRange.min.toLocaleString()} - ${job.salaryRange.max.toLocaleString()}`
-                      : 'Negotiable'
-                    }
-                  </p>
-                </div>
-              </div>
-            </div>
-
+    <div className="page-container">
+      <div className="space-y-4 sm:space-y-6">
+        {/* Header */}
+        <div className="flex md:justify-between md:items-start md:flex-row flex-col gap-4">
+          <div className="flex items-start gap-3">
+            <Button isIconOnly variant="light" size="sm" onPress={() => router.push('/dashboard/recruitment')} className="mt-0.5">
+              <FaArrowLeft className="w-4 h-4" />
+            </Button>
             <div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-3">Description</h3>
-              <p className="text-gray-700 leading-relaxed">{job.description}</p>
+              <div className="flex items-center flex-wrap gap-2">
+                <h1 className="text-2xl sm:text-3xl font-bold text-default-800">{job.jobTitle}</h1>
+                <Chip size="sm" variant="flat" color={STATUS_COLORS[job.status] || 'default'} className="capitalize">
+                  {job.status}
+                </Chip>
+                {job.jobCode && <Chip size="sm" variant="bordered" className="text-default-500">{job.jobCode}</Chip>}
+              </div>
+              <div className="flex flex-wrap items-center gap-3 mt-2 text-sm text-default-500">
+                {job.department?.name && (
+                  <span className="flex items-center gap-1.5"><FaBuilding className="w-3 h-3 text-default-400" />{job.department.name}</span>
+                )}
+                {job.location && (
+                  <span className="flex items-center gap-1.5"><FaMapMarkerAlt className="w-3 h-3 text-default-400" />{job.location}</span>
+                )}
+                <span className="flex items-center gap-1.5">
+                  <FaClock className="w-3 h-3 text-default-400" />{EMPLOYMENT_TYPE_LABELS[job.employmentType] || job.employmentType}
+                </span>
+                {job.workMode && (
+                  <span className="flex items-center gap-1.5"><FaLaptop className="w-3 h-3 text-default-400" />{WORK_MODE_LABELS[job.workMode] || job.workMode}</span>
+                )}
+              </div>
             </div>
           </div>
-
-          {/* Requirements */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-xl font-semibold text-gray-800 mb-4">Requirements</h3>
-            <ul className="space-y-2">
-              {job.requirements.map((req, index) => (
-                <li key={index} className="flex items-start space-x-2">
-                  <span className="w-2 h-2 bg-primary-500 rounded-full mt-2 flex-shrink-0"></span>
-                  <span className="text-gray-700">{req}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Responsibilities */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-xl font-semibold text-gray-800 mb-4">Responsibilities</h3>
-            <ul className="space-y-2">
-              {job.responsibilities.map((resp, index) => (
-                <li key={index} className="flex items-start space-x-2">
-                  <span className="w-2 h-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></span>
-                  <span className="text-gray-700">{resp}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Benefits */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-xl font-semibold text-gray-800 mb-4">Benefits</h3>
-            <ul className="space-y-2">
-              {job.benefits.map((benefit, index) => (
-                <li key={index} className="flex items-start space-x-2">
-                  <span className="w-2 h-2 bg-blue-500 rounded-full mt-2 flex-shrink-0"></span>
-                  <span className="text-gray-700">{benefit}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+          {canManage && (
+            <div className="flex items-center gap-2 ml-10 md:ml-0">
+              <Button size="sm" color="primary" variant="flat" onPress={onAddOpen} startContent={<FaUserPlus className="w-3.5 h-3.5" />}>
+                Add Candidate
+              </Button>
+              <Tooltip content="Edit">
+                <Button size="sm" isIconOnly variant="flat" onPress={() => router.push(`/dashboard/recruitment/edit/${params.id}`)}>
+                  <FaEdit className="w-3.5 h-3.5" />
+                </Button>
+              </Tooltip>
+              <Tooltip content="Delete">
+                <Button size="sm" isIconOnly variant="flat" color="danger" onPress={handleDelete} isLoading={deleting}>
+                  <FaTrash className="w-3.5 h-3.5" />
+                </Button>
+              </Tooltip>
+            </div>
+          )}
         </div>
 
-        {/* Sidebar */}
-        <div className="space-y-6">
-          {/* Job Info */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Job Information</h3>
-            <div className="space-y-3">
-              <div>
-                <p className="text-sm text-gray-500">Posted Date</p>
-                <p className="font-medium">{new Date(job.postedDate).toLocaleDateString()}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Application Deadline</p>
-                <p className="font-medium">{new Date(job.applicationDeadline).toLocaleDateString()}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Hiring Manager</p>
-                <p className="font-medium">{job.hiringManager.firstName} {job.hiringManager.lastName}</p>
-                <p className="text-sm text-gray-500">{job.hiringManager.position}</p>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Remote Work</p>
-                <p className="font-medium">{job.remote ? 'Available' : 'Not Available'}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Skills */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Required Skills</h3>
-            <div className="flex flex-wrap gap-2">
-              {job.skills.map((skill, index) => (
-                <span key={index} className="px-3 py-1 bg-primary-100 text-primary-800 text-sm rounded-full">
-                  {skill}
-                </span>
-              ))}
-            </div>
-          </div>
-
-          {/* Applications */}
-          <div className="bg-white rounded-lg shadow-md p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">Applications</h3>
-              <span className="bg-primary-100 text-primary-800 px-2 py-1 rounded-full text-sm font-medium">
-                {applications.length}
-              </span>
-            </div>
-            <div className="space-y-3">
-              {applications.slice(0, 3).map((app) => (
-                <div key={app._id} className="border border-gray-200 rounded-lg p-3">
-                  <div className="flex items-center justify-start mb-2">
-                    <p className="font-medium text-gray-800">
-                      {app.candidate.firstName} {app.candidate.lastName}
-                    </p>
-                    <span className={`px-2 py-1 text-xs rounded-full ${getApplicationStatusColor(app.status)}`}>
-                      {app.status.replace('-', ' ')}
-                    </span>
+        {/* Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+          {/* Main Content — 2/3 */}
+          <div className="lg:col-span-2 space-y-4 sm:space-y-6">
+            {/* Pipeline Stats */}
+            {job.pipeline && Object.keys(job.pipeline).length > 0 && (
+              <Card shadow="sm">
+                <CardHeader className="border-b border-default-200 px-4 sm:px-5 py-3">
+                  <div className="flex items-center gap-2">
+                    <FaChartBar className="w-4 h-4 text-primary" />
+                    <h2 className="text-base font-semibold text-default-800">Candidate Pipeline</h2>
+                    <Chip size="sm" variant="flat" color="primary">{job.candidateCount || 0} total</Chip>
                   </div>
-                  <p className="text-sm text-gray-600">{app.candidate.email}</p>
-                  <p className="text-sm text-gray-500">Applied: {new Date(app.appliedDate).toLocaleDateString()}</p>
-                </div>
-              ))}
-              {applications.length > 3 && (
-                <button
-                  onClick={() => router.push(`/dashboard/recruitment/${job._id}/applications`)}
-                  className="w-full text-center text-primary-600 hover:text-primary-800 text-sm font-medium py-2"
-                >
-                  View all {applications.length} applications
-                </button>
+                </CardHeader>
+                <CardBody className="p-4 sm:p-5">
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3">
+                    {STAGE_LIST.map((stage) => {
+                      const count = job.pipeline[stage] || 0;
+                      if (count === 0 && !['applied', 'screening', 'interview', 'offer', 'hired'].includes(stage)) return null;
+                      return (
+                        <div key={stage} className="text-center p-2 sm:p-3 rounded-lg bg-default-50">
+                          <p className="text-lg sm:text-xl font-bold text-default-800">{count}</p>
+                          <Chip size="sm" variant="flat" color={STAGE_COLORS[stage]} className="capitalize mt-1">{stage}</Chip>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardBody>
+              </Card>
+            )}
+
+            {/* Description */}
+            {job.jobDescription && (
+              <Card shadow="sm">
+                <CardHeader className="border-b border-default-200 px-4 sm:px-5 py-3">
+                  <h2 className="text-base font-semibold text-default-800">Job Description</h2>
+                </CardHeader>
+                <CardBody className="p-4 sm:p-5">
+                  <p className="text-sm text-default-600 whitespace-pre-wrap leading-relaxed">{job.jobDescription}</p>
+                </CardBody>
+              </Card>
+            )}
+
+            {/* Requirements & Responsibilities — side by side on desktop */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+              {job.requirements?.length > 0 && (
+                <Card shadow="sm">
+                  <CardHeader className="border-b border-default-200 px-4 sm:px-5 py-3">
+                    <h2 className="text-base font-semibold text-default-800">Requirements</h2>
+                  </CardHeader>
+                  <CardBody className="p-4 sm:p-5">
+                    <ul className="space-y-2">
+                      {job.requirements.map((req, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-default-600">
+                          <FaCheckCircle className="w-3.5 h-3.5 text-success mt-0.5 flex-shrink-0" />
+                          {req}
+                        </li>
+                      ))}
+                    </ul>
+                  </CardBody>
+                </Card>
+              )}
+
+              {job.responsibilities?.length > 0 && (
+                <Card shadow="sm">
+                  <CardHeader className="border-b border-default-200 px-4 sm:px-5 py-3">
+                    <h2 className="text-base font-semibold text-default-800">Responsibilities</h2>
+                  </CardHeader>
+                  <CardBody className="p-4 sm:p-5">
+                    <ul className="space-y-2">
+                      {job.responsibilities.map((resp, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm text-default-600">
+                          <FaCheckCircle className="w-3.5 h-3.5 text-primary mt-0.5 flex-shrink-0" />
+                          {resp}
+                        </li>
+                      ))}
+                    </ul>
+                  </CardBody>
+                </Card>
               )}
             </div>
+
+            {/* Recent Candidates */}
+            {job.recentCandidates?.length > 0 && (
+              <Card shadow="sm">
+                <CardHeader className="border-b border-default-200 px-4 sm:px-5 py-3 flex justify-between items-center">
+                  <h2 className="text-base font-semibold text-default-800">Recent Candidates</h2>
+                  <Button size="sm" variant="light" color="primary" onPress={() => router.push(`/dashboard/recruitment/candidates?jobPosting=${params.id}`)}>
+                    View All
+                  </Button>
+                </CardHeader>
+                <CardBody className="p-0">
+                  <div className="divide-y divide-default-100">
+                    {job.recentCandidates.map((candidate) => (
+                      <div
+                        key={candidate._id}
+                        className="flex items-center justify-between px-4 sm:px-5 py-3 hover:bg-default-50 cursor-pointer transition-colors"
+                        onClick={() => router.push(`/dashboard/recruitment/candidates/${candidate._id}`)}
+                      >
+                        <div>
+                          <p className="text-sm font-medium text-default-800">{candidate.firstName} {candidate.lastName}</p>
+                          <p className="text-xs text-default-400">{candidate.email}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {candidate.rating > 0 && (
+                            <span className="flex items-center gap-1 text-xs text-warning">
+                              <FaStar className="w-3 h-3" /> {candidate.rating}
+                            </span>
+                          )}
+                          <Chip size="sm" variant="flat" color={STAGE_COLORS[candidate.stage]} className="capitalize">{candidate.stage}</Chip>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardBody>
+              </Card>
+            )}
+          </div>
+
+          {/* Sidebar — 1/3 */}
+          <div className="space-y-4 sm:space-y-6">
+            {/* Status Actions */}
+            {canManage && (
+              <Card shadow="sm">
+                <CardHeader className="border-b border-default-200 px-4 py-3">
+                  <h3 className="text-sm font-semibold text-default-700">Status Actions</h3>
+                </CardHeader>
+                <CardBody className="p-4">
+                  <div className="flex flex-wrap gap-2">
+                    {job.status === 'draft' && (
+                      <Button size="sm" color="success" variant="flat" onPress={() => handleStatusChange('open')}>Publish</Button>
+                    )}
+                    {job.status === 'open' && (
+                      <>
+                        <Button size="sm" color="warning" variant="flat" onPress={() => handleStatusChange('on-hold')}>Put on Hold</Button>
+                        <Button size="sm" color="danger" variant="flat" onPress={() => handleStatusChange('closed')}>Close</Button>
+                      </>
+                    )}
+                    {(job.status === 'on-hold' || job.status === 'closed') && (
+                      <Button size="sm" color="success" variant="flat" onPress={() => handleStatusChange('open')}>Reopen</Button>
+                    )}
+                  </div>
+                </CardBody>
+              </Card>
+            )}
+
+            {/* Job Information */}
+            <Card shadow="sm">
+              <CardHeader className="border-b border-default-200 px-4 py-3">
+                <h3 className="text-sm font-semibold text-default-700">Job Information</h3>
+              </CardHeader>
+              <CardBody className="p-4 space-y-3">
+                {job.numberOfPositions > 0 && (
+                  <div className="flex items-center gap-2.5 text-sm">
+                    <FaUsers className="w-3.5 h-3.5 text-default-400 flex-shrink-0" />
+                    <span className="text-default-500">Positions:</span>
+                    <span className="font-medium text-default-800 ml-auto">{job.numberOfPositions}</span>
+                  </div>
+                )}
+                {job.experience && (job.experience.min || job.experience.max) && (
+                  <div className="flex items-center gap-2.5 text-sm">
+                    <FaBriefcase className="w-3.5 h-3.5 text-default-400 flex-shrink-0" />
+                    <span className="text-default-500">Experience:</span>
+                    <span className="font-medium text-default-800 ml-auto">{job.experience.min || 0} - {job.experience.max || 0} years</span>
+                  </div>
+                )}
+                {formatSalary(job.salaryRange) && !job.salaryRange?.isConfidential && (
+                  <div className="flex items-center gap-2.5 text-sm">
+                    <FaDollarSign className="w-3.5 h-3.5 text-default-400 flex-shrink-0" />
+                    <span className="text-default-500">Salary:</span>
+                    <span className="font-medium text-default-800 ml-auto">{formatSalary(job.salaryRange)}</span>
+                  </div>
+                )}
+                {job.educationLevel && job.educationLevel !== 'any' && (
+                  <div className="flex items-center gap-2.5 text-sm">
+                    <FaGraduationCap className="w-3.5 h-3.5 text-default-400 flex-shrink-0" />
+                    <span className="text-default-500">Education:</span>
+                    <span className="font-medium text-default-800 ml-auto capitalize">{job.educationLevel}</span>
+                  </div>
+                )}
+                {job.applicationDeadline && (
+                  <div className="flex items-center gap-2.5 text-sm">
+                    <FaCalendarAlt className="w-3.5 h-3.5 text-default-400 flex-shrink-0" />
+                    <span className="text-default-500">Deadline:</span>
+                    <span className="font-medium text-default-800 ml-auto">{new Date(job.applicationDeadline).toLocaleDateString()}</span>
+                  </div>
+                )}
+                <Divider />
+                {job.hiringManager && (
+                  <div className="text-sm">
+                    <span className="text-default-500">Hiring Manager</span>
+                    <p className="font-medium text-default-800">{job.hiringManager.firstName} {job.hiringManager.lastName}</p>
+                  </div>
+                )}
+                {job.createdBy && (
+                  <div className="text-sm">
+                    <span className="text-default-500">Created by</span>
+                    <p className="font-medium text-default-800">{job.createdBy.firstName} {job.createdBy.lastName}</p>
+                  </div>
+                )}
+                <div className="text-sm">
+                  <span className="text-default-500">Created</span>
+                  <p className="font-medium text-default-800">{new Date(job.createdAt).toLocaleDateString()}</p>
+                </div>
+              </CardBody>
+            </Card>
+
+            {/* Skills */}
+            {job.skills?.length > 0 && (
+              <Card shadow="sm">
+                <CardHeader className="border-b border-default-200 px-4 py-3">
+                  <h3 className="text-sm font-semibold text-default-700">Required Skills</h3>
+                </CardHeader>
+                <CardBody className="p-4">
+                  <div className="flex flex-wrap gap-1.5">
+                    {job.skills.map((skill, i) => (
+                      <Chip key={i} size="sm" variant="flat" color="primary">{skill}</Chip>
+                    ))}
+                  </div>
+                </CardBody>
+              </Card>
+            )}
+
+            {/* Benefits */}
+            {job.benefits?.length > 0 && (
+              <Card shadow="sm">
+                <CardHeader className="border-b border-default-200 px-4 py-3">
+                  <h3 className="text-sm font-semibold text-default-700">Benefits</h3>
+                </CardHeader>
+                <CardBody className="p-4">
+                  <ul className="space-y-1.5">
+                    {job.benefits.map((benefit, i) => (
+                      <li key={i} className="text-sm text-default-600 flex items-start gap-2">
+                        <FaCheckCircle className="w-3 h-3 text-success mt-0.5 flex-shrink-0" />
+                        {benefit}
+                      </li>
+                    ))}
+                  </ul>
+                </CardBody>
+              </Card>
+            )}
+
+            {/* Quick Links */}
+            <Card shadow="sm">
+              <CardHeader className="border-b border-default-200 px-4 py-3">
+                <h3 className="text-sm font-semibold text-default-700">Quick Links</h3>
+              </CardHeader>
+              <CardBody className="p-4 space-y-2">
+                <Button size="sm" variant="flat" fullWidth onPress={() => router.push(`/dashboard/recruitment/candidates?jobPosting=${params.id}`)} startContent={<FaUsers className="w-3.5 h-3.5" />}>
+                  View Candidates ({job.candidateCount || 0})
+                </Button>
+                <Button size="sm" variant="flat" fullWidth onPress={() => router.push('/dashboard/recruitment/interviews')} startContent={<FaCalendarAlt className="w-3.5 h-3.5" />}>
+                  View Interviews
+                </Button>
+              </CardBody>
+            </Card>
           </div>
         </div>
+
+        {/* Add Candidate Modal */}
+        <Modal isOpen={isAddOpen} onClose={onAddClose} size="2xl">
+          <ModalContent>
+            <ModalHeader>Add Candidate to {job.jobTitle}</ModalHeader>
+            <ModalBody>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input label="First Name" isRequired size="sm" value={candidateForm.firstName} onValueChange={(v) => setCandidateForm((p) => ({ ...p, firstName: v }))} />
+                <Input label="Last Name" isRequired size="sm" value={candidateForm.lastName} onValueChange={(v) => setCandidateForm((p) => ({ ...p, lastName: v }))} />
+                <Input label="Email" type="email" isRequired size="sm" value={candidateForm.email} onValueChange={(v) => setCandidateForm((p) => ({ ...p, email: v }))} />
+                <Input label="Phone" size="sm" value={candidateForm.phone} onValueChange={(v) => setCandidateForm((p) => ({ ...p, phone: v }))} />
+                <Select label="Source" size="sm" selectedKeys={[candidateForm.source]} onSelectionChange={(keys) => setCandidateForm((p) => ({ ...p, source: Array.from(keys)[0] }))}>
+                  <SelectItem key="direct">Direct</SelectItem>
+                  <SelectItem key="referral">Referral</SelectItem>
+                  <SelectItem key="job-portal">Job Portal</SelectItem>
+                  <SelectItem key="linkedin">LinkedIn</SelectItem>
+                  <SelectItem key="career-page">Career Page</SelectItem>
+                  <SelectItem key="recruitment-agency">Agency</SelectItem>
+                  <SelectItem key="campus">Campus</SelectItem>
+                  <SelectItem key="other">Other</SelectItem>
+                </Select>
+                <Input label="Experience (years)" type="number" size="sm" value={candidateForm.experience} onValueChange={(v) => setCandidateForm((p) => ({ ...p, experience: v }))} />
+                <Input label="Current Company" size="sm" value={candidateForm.currentCompany} onValueChange={(v) => setCandidateForm((p) => ({ ...p, currentCompany: v }))} />
+                <Input label="Expected Salary" type="number" size="sm" value={candidateForm.expectedSalary} onValueChange={(v) => setCandidateForm((p) => ({ ...p, expectedSalary: v }))} />
+                <div className="sm:col-span-2">
+                  <Input label="Skills (comma-separated)" size="sm" value={candidateForm.skills} onValueChange={(v) => setCandidateForm((p) => ({ ...p, skills: v }))} placeholder="React, Node.js, MongoDB..." />
+                </div>
+              </div>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="flat" onPress={onAddClose}>Cancel</Button>
+              <Button color="primary" onPress={handleAddCandidate} isLoading={submitting}>Add Candidate</Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
       </div>
     </div>
-  )
+  );
 }
