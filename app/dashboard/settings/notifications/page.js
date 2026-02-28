@@ -1468,7 +1468,7 @@ function NotificationHistoryTab({ userRole, userDepartment }) {
               </button>
             </div>
           </div>
-        </div>
+        </div>}
       </ModalPortal>
     </div>
   )
