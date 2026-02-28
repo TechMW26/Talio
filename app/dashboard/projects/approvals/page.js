@@ -555,7 +555,7 @@ export default function ApprovalsPage() {
 
       {/* Reject Modal */}
       <ModalPortal isOpen={showRejectModal && selectedRequest}>
-        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4 overflow-y-auto">
+        {selectedRequest && <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4 overflow-y-auto">
           <div className="bg-content1 rounded-[30px] shadow-2xl w-full max-w-2xl animate-modal-enter my-8">
             <div className="px-6 py-4 bg-default-50 border-b border-default-200">
               <h3 className="text-xl font-bold text-default-800">Reject Task Review</h3>
@@ -721,7 +721,7 @@ export default function ApprovalsPage() {
               </div>
             </div>
           </div>
-        </div>
+        </div>}
       </ModalPortal>
     </div>
   )

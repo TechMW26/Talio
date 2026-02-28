@@ -717,6 +717,7 @@ export default function EmployeesPage() {
                               isDisabled={statusUpdating === employee._id}
                               aria-label="Employee Status"
                               size="sm"
+                              className="min-w-[140px]"
                               classNames={{ trigger: `bg-content1 ${statusUpdating === employee._id ? 'opacity-50' : ''}` }}
                             >
                               {STATUS_OPTIONS.map(option => (

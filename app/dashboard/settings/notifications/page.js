@@ -1371,7 +1371,7 @@ function NotificationHistoryTab({ userRole, userDepartment }) {
 
       {/* Detail Modal */}
       <ModalPortal isOpen={!!selectedNotification}>
-        <div className="modal-overlay">
+        {selectedNotification && <div className="modal-overlay">
           <div className="bg-white rounded-[30px] animate-modal-enter w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="p-4 border-b border-gray-200 flex justify-between items-center">
               <h3 className="text-lg font-semibold">Notification Details</h3>

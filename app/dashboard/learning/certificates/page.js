@@ -280,7 +280,7 @@ export default function CertificatesPage() {
 
       {/* Certificate Detail Modal */}
       <ModalPortal isOpen={!!selectedCertificate}>
-        <div className="modal-overlay">
+        {selectedCertificate && <div className="modal-overlay">
           <div className="bg-white rounded-[30px] animate-modal-enter max-w-2xl w-full max-h-[90vh] overflow-y-auto">
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
@@ -308,7 +308,7 @@ export default function CertificatesPage() {
               </div>
             </div>
           </div>
-        </div>
+        </div>}
       </ModalPortal>
     </div>
   )

@@ -27,11 +27,13 @@ async function checkProfileDeadlinesForTenant(tenant, now) {
     // 1. Are currently active
     // 2. Have a profile completion deadline that has passed
     // 3. Profile is not complete
+    // 4. Are NOT admins (admins can only be deactivated by superadmin)
     const usersToSuspend = await User.find({
       isActive: true,
+      role: { $ne: 'admin' },
       'profileCompletion.profileCompletionDeadline': { $lt: now },
       'profileCompletion.status': { $ne: 'complete' }
-    }).select('_id email profileCompletion')
+    }).select('_id email role profileCompletion')
 
     if (usersToSuspend.length === 0) {
       return results
