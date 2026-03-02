@@ -170,13 +170,62 @@ const UserSchema = new mongoose.Schema({
   timestamps: true,
 });
 
-// Hash password before saving
+// Hash password before saving + audit isActive changes
 UserSchema.pre('save', async function (next) {
+  // Audit log: track isActive changes on save
+  if (this.isModified('isActive')) {
+    console.log(
+      `[USER AUDIT] isActive changed via save() — email: ${this.email}, ` +
+      `isActive: ${this.isActive}, reason: ${this.suspensionReason || 'none'}, ` +
+      `at: ${new Date().toISOString()}`
+    );
+  }
   if (!this.isModified('password')) {
     return next();
   }
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
+  next();
+});
+
+// Audit hooks: log all isActive deactivation attempts
+UserSchema.pre('updateMany', function (next) {
+  const update = this.getUpdate();
+  const flatUpdate = update?.$set || update || {};
+  if (flatUpdate.isActive === false) {
+    const filter = this.getFilter();
+    console.error(
+      `[USER AUDIT][CRITICAL] updateMany setting isActive=false — ` +
+      `filter: ${JSON.stringify(filter)}, at: ${new Date().toISOString()}, ` +
+      `stack: ${new Error().stack}`
+    );
+  }
+  next();
+});
+
+UserSchema.pre('updateOne', function (next) {
+  const update = this.getUpdate();
+  const flatUpdate = update?.$set || update || {};
+  if (flatUpdate.isActive === false) {
+    const filter = this.getFilter();
+    console.warn(
+      `[USER AUDIT] updateOne setting isActive=false — ` +
+      `filter: ${JSON.stringify(filter)}, at: ${new Date().toISOString()}`
+    );
+  }
+  next();
+});
+
+UserSchema.pre('findOneAndUpdate', function (next) {
+  const update = this.getUpdate();
+  const flatUpdate = update?.$set || update || {};
+  if (flatUpdate.isActive === false) {
+    const filter = this.getFilter();
+    console.warn(
+      `[USER AUDIT] findOneAndUpdate setting isActive=false — ` +
+      `filter: ${JSON.stringify(filter)}, at: ${new Date().toISOString()}`
+    );
+  }
   next();
 });
 

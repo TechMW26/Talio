@@ -6,14 +6,26 @@ import { getTenantModels } from '@/lib/tenantModels'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
+// ============================================================================
+// IMPORTANT: Auto-deactivation has been DISABLED.
+// Previously, this cron job would automatically set isActive=false for ALL
+// non-admin users whose profile completion deadline had passed. This caused
+// mass account deactivation across all tenants since most users never complete
+// the Aadhaar verification + profile flow within 7 days.
+//
+// Now this cron job only LOGS and REPORTS overdue users without deactivating.
+// Admins can still manually suspend users via the admin panel if needed.
+// ============================================================================
+
 /**
  * Process profile deadline checks for a single tenant
+ * NOTE: This now only reports overdue users — it does NOT deactivate them.
  */
 async function checkProfileDeadlinesForTenant(tenant, now) {
   const results = {
     tenantName: tenant.name,
     tenantSlug: tenant.slug,
-    suspended: 0,
+    overdue: 0,
     users: [],
     errors: []
   }
@@ -27,47 +39,31 @@ async function checkProfileDeadlinesForTenant(tenant, now) {
     // 1. Are currently active
     // 2. Have a profile completion deadline that has passed
     // 3. Profile is not complete
-    // 4. Are NOT admins (admins can only be deactivated by superadmin)
-    const usersToSuspend = await User.find({
+    // 4. Are NOT admins
+    const overdueUsers = await User.find({
       isActive: true,
       role: { $ne: 'admin' },
       'profileCompletion.profileCompletionDeadline': { $lt: now },
       'profileCompletion.status': { $ne: 'complete' }
     }).select('_id email role profileCompletion')
 
-    if (usersToSuspend.length === 0) {
+    if (overdueUsers.length === 0) {
       return results
     }
 
-    // Suspend each user
-    for (const user of usersToSuspend) {
-      try {
-        await User.updateOne(
-          { _id: user._id },
-          {
-            $set: {
-              isActive: false,
-              suspensionReason: 'profile_incomplete',
-              suspendedAt: now
-            }
-          }
-        )
-        
-        results.suspended++
-        results.users.push({
-          id: user._id.toString(),
-          email: user.email,
-          deadline: user.profileCompletion?.profileCompletionDeadline
-        })
-        
-      } catch (error) {
-        console.error(`[Profile Deadline Check] Error suspending user ${user.email} in tenant ${tenant.slug}:`, error)
-        results.errors.push({
-          id: user._id.toString(),
-          email: user.email,
-          error: error.message
-        })
-      }
+    // LOG overdue users but DO NOT deactivate them
+    for (const user of overdueUsers) {
+      console.log(
+        `[Profile Deadline Check] OVERDUE (not deactivated): ${user.email} in tenant ${tenant.slug}, ` +
+        `deadline was ${user.profileCompletion?.profileCompletionDeadline?.toISOString()}`
+      )
+
+      results.overdue++
+      results.users.push({
+        id: user._id.toString(),
+        email: user.email,
+        deadline: user.profileCompletion?.profileCompletionDeadline
+      })
     }
 
     return results
@@ -92,12 +88,12 @@ export async function GET(request) {
     const cronSecret = request.headers.get('x-cron-secret')
     const authHeader = request.headers.get('authorization')
     const expectedSecret = process.env.CRON_SECRET
-    
+
     // Accept either x-cron-secret header or Bearer token with cron secret
-    const isValidSecret = 
+    const isValidSecret =
       (expectedSecret && cronSecret === expectedSecret) ||
       (expectedSecret && authHeader === `Bearer ${expectedSecret}`)
-    
+
     if (expectedSecret && !isValidSecret) {
       console.log('[Profile Deadline Check] Invalid cron secret')
       return NextResponse.json(
@@ -123,24 +119,24 @@ export async function GET(request) {
 
     const allResults = {
       tenantsProcessed: activeTenants.length,
-      totalSuspended: 0,
+      totalOverdue: 0,
       tenantResults: []
     }
 
-    // Process each tenant
+    // Process each tenant (report only, no deactivation)
     for (const tenant of activeTenants) {
       console.log(`[Profile Deadline Check] Processing tenant: ${tenant.name}`)
       const tenantResult = await checkProfileDeadlinesForTenant(tenant, now)
       allResults.tenantResults.push(tenantResult)
-      allResults.totalSuspended += tenantResult.suspended
+      allResults.totalOverdue += tenantResult.overdue
     }
 
-    console.log(`[Profile Deadline Check] Completed. Total suspended: ${allResults.totalSuspended}`)
+    console.log(`[Profile Deadline Check] Completed. Total overdue (NOT deactivated): ${allResults.totalOverdue}`)
 
-    // Emit Socket.IO event if available (for real-time dashboard updates)
-    if (global.io && allResults.totalSuspended > 0) {
-      global.io.emit('users:suspended', {
-        count: allResults.totalSuspended,
+    // Emit Socket.IO event if available (for dashboard awareness, not deactivation)
+    if (global.io && allResults.totalOverdue > 0) {
+      global.io.emit('users:profile-overdue', {
+        count: allResults.totalOverdue,
         reason: 'profile_incomplete',
         timestamp: now
       })
@@ -148,7 +144,7 @@ export async function GET(request) {
 
     return NextResponse.json({
       success: true,
-      message: `Suspended ${allResults.totalSuspended} user(s) for incomplete profiles across ${activeTenants.length} tenants`,
+      message: `Found ${allResults.totalOverdue} user(s) with overdue profiles across ${activeTenants.length} tenants (no accounts deactivated)`,
       data: allResults
     })
 
@@ -176,9 +172,9 @@ export async function POST(request) {
     // Verify token and check if user is admin
     const { jwtVerify } = await import('jose')
     const secret = new TextEncoder().encode(process.env.JWT_SECRET)
-    
+
     const { payload } = await jwtVerify(token, secret)
-    
+
     if (!payload || !payload.userId) {
       return NextResponse.json({ success: false, message: 'Invalid token' }, { status: 401 })
     }
@@ -190,7 +186,7 @@ export async function POST(request) {
 
     const models = await getTenantModels(payload.databaseName, ['User'])
     const user = await models.User.findById(payload.userId).select('role')
-    
+
     if (!user || !['admin', 'hr'].includes(user.role)) {
       return NextResponse.json({ success: false, message: 'Admin access required' }, { status: 403 })
     }
