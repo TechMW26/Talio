@@ -97,10 +97,10 @@ export default function LeaveTypesPage() {
     })
   }
 
-  return(
-    <div className = "page-container space-y-4 sm:space-y-6" >
-        {/* Header */ }
-        < div className = "flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-3 sm:space-y-0" >
+  return (
+    <div className="page-container space-y-4 sm:space-y-6" >
+      {/* Header */}
+      < div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-3 sm:space-y-0" >
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-default-900">Leave Types</h1>
           <p className="text-default-500 mt-1 text-sm sm:text-base flex items-center gap-2">
@@ -118,8 +118,8 @@ export default function LeaveTypesPage() {
         </Button>
       </div>
 
-    {/* Stats Card */ }
-    < div className = "grid grid-cols-1 md:grid-cols-3 gap-4 mb-6" >
+      {/* Stats Card */}
+      < div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6" >
         <Card shadow="sm">
           <CardBody className="flex flex-row items-center justify-between">
             <div>
@@ -161,217 +161,217 @@ export default function LeaveTypesPage() {
         </Card>
       </div >
 
-    {/* Leave Types Grid */ }
-    < div className = "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" >
-    {
-      error?(
-          <div className = "col-span-full" >
-          <DataErrorState message="Failed to load leave types" onRetry={() => refreshLeaveTypes()} />
-          </div>
-        ) : isLoading ? (
-    <>
-      {[1, 2, 3, 4, 5, 6].map((i) => (
-        <Card key={i} shadow="sm">
-          <CardBody className="space-y-4">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center space-x-3">
-                <Skeleton className="w-12 h-12 rounded-lg" />
-                <div className="space-y-2">
-                  <Skeleton className="h-5 w-32 rounded-lg" />
-                  <Skeleton className="h-4 w-16 rounded-lg" />
-                </div>
-              </div>
+      {/* Leave Types Grid */}
+      < div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" >
+        {
+          error ? (
+            <div className="col-span-full" >
+              <DataErrorState message="Failed to load leave types" onRetry={() => refreshLeaveTypes()} />
             </div>
-            <Skeleton className="h-12 w-full rounded-lg" />
-            <div className="space-y-2">
-              <Skeleton className="h-4 w-full rounded-lg" />
-              <Skeleton className="h-4 w-full rounded-lg" />
-              <Skeleton className="h-4 w-full rounded-lg" />
+          ) : isLoading ? (
+            <>
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <Card key={i} shadow="sm">
+                  <CardBody className="space-y-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center space-x-3">
+                        <Skeleton className="w-12 h-12 rounded-lg" />
+                        <div className="space-y-2">
+                          <Skeleton className="h-5 w-32 rounded-lg" />
+                          <Skeleton className="h-4 w-16 rounded-lg" />
+                        </div>
+                      </div>
+                    </div>
+                    <Skeleton className="h-12 w-full rounded-lg" />
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-full rounded-lg" />
+                      <Skeleton className="h-4 w-full rounded-lg" />
+                      <Skeleton className="h-4 w-full rounded-lg" />
+                    </div>
+                  </CardBody>
+                </Card>
+              ))}
+            </>
+          ) : leaveTypes.length === 0 ? (
+            <div className="col-span-full">
+              <Card shadow="sm">
+                <CardBody className="py-12 text-center">
+                  <div className="w-16 h-16 bg-default-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <FaUmbrella className="text-default-300 h-8 w-8" />
+                  </div>
+                  <p className="text-default-500">No leave types found</p>
+                  <Button
+                    color="primary"
+                    variant="flat"
+                    startContent={<FaPlus />}
+                    onPress={() => setShowModal(true)}
+                    className="mt-4"
+                  >
+                    Add First Leave Type
+                  </Button>
+                </CardBody>
+              </Card>
             </div>
-          </CardBody>
-        </Card>
-      ))}
-    </>
-  ) : leaveTypes.length === 0 ? (
-    <div className="col-span-full">
-      <Card shadow="sm">
-        <CardBody className="py-12 text-center">
-          <div className="w-16 h-16 bg-default-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <FaUmbrella className="text-default-300 h-8 w-8" />
-          </div>
-          <p className="text-default-500">No leave types found</p>
-          <Button
-            color="primary"
-            variant="flat"
-            startContent={<FaPlus />}
-            onPress={() => setShowModal(true)}
-            className="mt-4"
-          >
-            Add First Leave Type
-          </Button>
-        </CardBody>
-      </Card>
-    </div>
-  ) : (
-    leaveTypes.map((type) => (
-      <Card
-        key={type._id}
-        shadow="sm"
-        className="hover:shadow-md transition-shadow"
-      >
-        <CardBody>
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex items-center space-x-3">
-              <div className="bg-primary-100 p-3 rounded-xl">
-                <FaUmbrella className="text-primary-500 text-xl" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-default-900">{type.name}</h3>
-                {type.code && (
-                  <p className="text-sm text-default-500">{type.code}</p>
-                )}
-              </div>
-            </div>
-            <div className="flex space-x-1">
-              <Button
-                isIconOnly
-                variant="light"
-                color="primary"
-                size="sm"
-                onPress={() => handleEdit(type)}
+          ) : (
+            leaveTypes.map((type) => (
+              <Card
+                key={type._id}
+                shadow="sm"
+                className="hover:shadow-md transition-shadow"
               >
-                <FaEdit />
-              </Button>
-              <Button
-                isIconOnly
-                variant="light"
-                color="danger"
-                size="sm"
-                onPress={() => handleDelete(type._id)}
-              >
-                <FaTrash />
-              </Button>
-            </div>
-          </div>
+                <CardBody>
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="bg-primary-100 p-3 rounded-xl">
+                        <FaUmbrella className="text-primary-500 text-xl" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-default-900">{type.name}</h3>
+                        {type.code && (
+                          <p className="text-sm text-default-500">{type.code}</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex space-x-1">
+                      <Button
+                        isIconOnly
+                        variant="light"
+                        color="primary"
+                        size="sm"
+                        onPress={() => handleEdit(type)}
+                      >
+                        <FaEdit />
+                      </Button>
+                      <Button
+                        isIconOnly
+                        variant="light"
+                        color="danger"
+                        size="sm"
+                        onPress={() => handleDelete(type._id)}
+                      >
+                        <FaTrash />
+                      </Button>
+                    </div>
+                  </div>
 
-          {type.description && (
-            <p className="text-default-600 text-sm mb-4">{type.description}</p>
-          )}
+                  {type.description && (
+                    <p className="text-default-600 text-sm mb-4">{type.description}</p>
+                  )}
 
-          <div className="space-y-3 pt-4 border-t border-default-200">
-            <div className="flex justify-between text-sm">
-              <span className="text-default-500">Max Days Per Year:</span>
-              <span className="font-semibold text-default-900">{type.maxDaysPerYear || 0}</span>
-            </div>
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-default-500">Type:</span>
-              <Chip
-                size="sm"
-                color={type.isPaid ? 'success' : 'default'}
-                variant="flat"
-              >
-                {type.isPaid ? 'Paid' : 'Unpaid'}
-              </Chip>
-            </div>
-            <div className="flex justify-between items-center text-sm">
-              <span className="text-default-500">Approval:</span>
-              <Chip
-                size="sm"
-                color={type.requiresApproval ? 'primary' : 'default'}
-                variant="flat"
-              >
-                {type.requiresApproval ? 'Required' : 'Not Required'}
-              </Chip>
-            </div>
-          </div>
-        </CardBody>
-      </Card>
-    ))
-  )
-}
+                  <div className="space-y-3 pt-4 border-t border-default-200">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-default-500">Max Days Per Year:</span>
+                      <span className="font-semibold text-default-900">{type.maxDaysPerYear || 0}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-default-500">Type:</span>
+                      <Chip
+                        size="sm"
+                        color={type.isPaid ? 'success' : 'default'}
+                        variant="flat"
+                      >
+                        {type.isPaid ? 'Paid' : 'Unpaid'}
+                      </Chip>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-default-500">Approval:</span>
+                      <Chip
+                        size="sm"
+                        color={type.requiresApproval ? 'primary' : 'default'}
+                        variant="flat"
+                      >
+                        {type.requiresApproval ? 'Required' : 'Not Required'}
+                      </Chip>
+                    </div>
+                  </div>
+                </CardBody>
+              </Card>
+            ))
+          )
+        }
       </div >
 
-  {/* Add/Edit Modal */ }
-  < Modal isOpen = { showModal } onClose = { handleCloseModal } size = "lg" >
-    <ModalContent>
-      <form onSubmit={handleSubmit}>
-        <ModalHeader className="flex flex-col gap-1">
-          <h2 className="text-xl font-bold">
-            {editingType ? 'Edit Leave Type' : 'Add Leave Type'}
-          </h2>
-        </ModalHeader>
-        <ModalBody>
-          <div className="space-y-4">
-            <Input
-              label="Leave Name"
-              placeholder="e.g., Casual Leave"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              isRequired
-              variant="bordered"
-            />
+      {/* Add/Edit Modal */}
+      < Modal isOpen={showModal} onClose={handleCloseModal} size="lg" >
+        <ModalContent>
+          <form onSubmit={handleSubmit}>
+            <ModalHeader className="flex flex-col gap-1">
+              <h2 className="text-xl font-bold">
+                {editingType ? 'Edit Leave Type' : 'Add Leave Type'}
+              </h2>
+            </ModalHeader>
+            <ModalBody>
+              <div className="space-y-4">
+                <Input
+                  label="Leave Name"
+                  placeholder="e.g., Casual Leave"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  isRequired
+                  variant="bordered"
+                />
 
-            <Input
-              label="Code"
-              placeholder="e.g., CL"
-              value={formData.code}
-              onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-              variant="bordered"
-            />
+                <Input
+                  label="Code"
+                  placeholder="e.g., CL"
+                  value={formData.code}
+                  onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                  variant="bordered"
+                />
 
-            <Input
-              type="number"
-              label="Max Days Per Year"
-              placeholder="0"
-              value={formData.maxDaysPerYear.toString()}
-              onChange={(e) => setFormData({ ...formData, maxDaysPerYear: parseInt(e.target.value) || 0 })}
-              isRequired
-              min={0}
-              variant="bordered"
-            />
+                <Input
+                  type="number"
+                  label="Max Days Per Year"
+                  placeholder="0"
+                  value={formData.maxDaysPerYear.toString()}
+                  onChange={(e) => setFormData({ ...formData, maxDaysPerYear: parseInt(e.target.value) || 0 })}
+                  isRequired
+                  min={0}
+                  variant="bordered"
+                />
 
-            <Textarea
-              label="Description"
-              placeholder="Leave type description"
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              variant="bordered"
-            />
+                <Textarea
+                  label="Description"
+                  placeholder="Leave type description"
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  variant="bordered"
+                />
 
-            <div className="flex flex-col gap-3 pt-2">
-              <Switch
-                isSelected={formData.isPaid}
-                onValueChange={(value) => setFormData({ ...formData, isPaid: value })}
-                size="sm"
+                <div className="flex flex-col gap-3 pt-2">
+                  <Switch
+                    isSelected={formData.isPaid}
+                    onValueChange={(value) => setFormData({ ...formData, isPaid: value })}
+                    size="sm"
+                  >
+                    Paid Leave
+                  </Switch>
+
+                  <Switch
+                    isSelected={formData.requiresApproval}
+                    onValueChange={(value) => setFormData({ ...formData, requiresApproval: value })}
+                    size="sm"
+                  >
+                    Requires Approval
+                  </Switch>
+                </div>
+              </div>
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="flat" onPress={handleCloseModal}>
+                Cancel
+              </Button>
+              <LoadingButton
+                color="primary"
+                type="submit"
+                isLoading={submitMutation.isLoading}
+                loadingText={editingType ? 'Updating...' : 'Creating...'}
               >
-                Paid Leave
-              </Switch>
-
-              <Switch
-                isSelected={formData.requiresApproval}
-                onValueChange={(value) => setFormData({ ...formData, requiresApproval: value })}
-                size="sm"
-              >
-                Requires Approval
-              </Switch>
-            </div>
-          </div>
-        </ModalBody>
-        <ModalFooter>
-          <Button variant="flat" onPress={handleCloseModal}>
-            Cancel
-          </Button>
-          <LoadingButton
-            color="primary"
-            type="submit"
-            isLoading={submitMutation.isLoading}
-            loadingText={editingType ? 'Updating...' : 'Creating...'}
-          >
-            {editingType ? 'Update' : 'Create'}
-          </LoadingButton>
-        </ModalFooter>
-      </form>
-    </ModalContent>
+                {editingType ? 'Update' : 'Create'}
+              </LoadingButton>
+            </ModalFooter>
+          </form>
+        </ModalContent>
       </Modal >
     </div >
   )
