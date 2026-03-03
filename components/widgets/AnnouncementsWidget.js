@@ -85,19 +85,36 @@ export default function AnnouncementsWidget({ initialData }) {
                                 key={announcement._id}
                                 isPressable
                                 isHoverable
-                                onPress={() => router.push(`/dashboard/announcements/${announcement._id}`)}
+                                onPress={() => router.push('/dashboard/announcements')}
                                 className="border border-default-100"
                             >
                                 <CardBody className="p-3">
-                                    <h4 className="text-sm font-semibold text-default-900 truncate mb-1">
-                                        {announcement.title}
-                                    </h4>
+                                    <div className="flex items-center gap-2 mb-1">
+                                        <h4 className="text-sm font-semibold text-default-900 truncate flex-1">
+                                            {announcement.title}
+                                        </h4>
+                                        {announcement.priority && (
+                                            <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded-full flex-shrink-0 ${announcement.priority === 'high' ? 'bg-red-100 text-red-700' :
+                                                    announcement.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                                                        'bg-blue-100 text-blue-700'
+                                                }`}>
+                                                {announcement.priority}
+                                            </span>
+                                        )}
+                                    </div>
                                     <p className="text-xs text-default-600 line-clamp-2">
-                                        {announcement.message}
+                                        {announcement.content || announcement.message}
                                     </p>
-                                    <p className="text-xs text-default-400 mt-2">
-                                        {new Date(announcement.createdAt).toLocaleDateString()}
-                                    </p>
+                                    <div className="flex items-center justify-between mt-2">
+                                        <p className="text-xs text-default-400">
+                                            {new Date(announcement.createdAt).toLocaleDateString()}
+                                        </p>
+                                        {announcement.createdBy && (
+                                            <p className="text-xs text-default-400">
+                                                {announcement.createdBy.firstName} {announcement.createdBy.lastName}
+                                            </p>
+                                        )}
+                                    </div>
                                 </CardBody>
                             </Card>
                         ))

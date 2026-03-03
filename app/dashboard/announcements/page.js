@@ -7,9 +7,9 @@ import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { Skeleton } from '@heroui/react'
 import { FaPlus, FaBullhorn, FaCalendarAlt, FaExclamationTriangle, FaUsers, FaEdit, FaTrash } from 'react-icons/fa'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
-import useApiMutation from '@/hooks/useApiMutation'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
+import { ConfirmModal } from '@/components/ui/heroui/Modal'
 
 export default function AnnouncementsPage() {
   const router = useRouter()
@@ -46,17 +46,48 @@ export default function AnnouncementsPage() {
     }
   })
 
-  // --- Delete mutation ---
-  const deleteMutation = useApiMutation({
-    method: 'DELETE',
-    invalidateKeys: ['/api/announcements'],
-    onSuccess: () => toast.success('Announcement deleted successfully'),
-    onError: (msg) => toast.error(msg || 'Failed to delete announcement'),
-  })
+  // --- Delete announcement with optimistic UI ---
+  const [deletingId, setDeletingId] = useState(null)
+  const [deleteConfirmId, setDeleteConfirmId] = useState(null)
 
-  const handleDelete = (announcementId) => {
-    if (!confirm('Are you sure you want to delete this announcement?')) return
-    deleteMutation.execute(`/api/announcements/${announcementId}`)
+  const handleDeleteClick = (announcementId) => {
+    setDeleteConfirmId(announcementId)
+  }
+
+  const handleDeleteConfirm = async () => {
+    const announcementId = deleteConfirmId
+    setDeleteConfirmId(null)
+    setDeletingId(announcementId)
+
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/announcements/${announcementId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
+      const data = await response.json()
+
+      if (response.ok && data.success !== false) {
+        toast.success('Announcement deleted successfully')
+        // Optimistic: update SWR cache immediately by filtering out the deleted item
+        await refreshAnnouncements(
+          (current) => {
+            if (!current) return current
+            return {
+              ...current,
+              data: (current.data || []).filter(a => a._id !== announcementId),
+            }
+          },
+          { revalidate: true }
+        )
+      } else {
+        toast.error(data.message || 'Failed to delete announcement')
+      }
+    } catch (err) {
+      toast.error('Failed to delete announcement')
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   const getPriorityColor = (priority) => {
@@ -78,7 +109,7 @@ export default function AnnouncementsPage() {
   }
 
   const canManageAnnouncements = () => {
-    return user && (user.role === 'admin' || user.role === 'admin' || user.role === 'hr' || user.role === 'department_head' || user.role === 'manager')
+    return user && (user.role === 'admin' || user.role === 'super_admin' || user.role === 'hr' || user.role === 'department_head' || user.role === 'manager')
   }
 
   return (
@@ -134,8 +165,8 @@ export default function AnnouncementsPage() {
             <div
               key={announcement._id}
               className={`rounded-lg shadow-md p-4 sm:p-6 hover:shadow-lg transition-shadow ${announcement.isDepartmentAnnouncement
-                  ? 'bg-purple-50 border-l-4 border-purple-500'
-                  : 'bg-white'
+                ? 'bg-purple-50 border-l-4 border-purple-500'
+                : 'bg-white'
                 }`}
             >
               <div className="flex items-start justify-between gap-3">
@@ -147,8 +178,8 @@ export default function AnnouncementsPage() {
                       {announcement.title}
                     </h3>
                     <span className={`px-2 sm:px-3 py-0.5 sm:py-1 text-xs font-semibold rounded-full ${announcement.priority === 'high' ? 'bg-red-100 text-red-800' :
-                        announcement.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-blue-100 text-blue-800'
+                      announcement.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-blue-100 text-blue-800'
                       }`}>
                       {announcement.priority}
                     </span>
@@ -187,11 +218,30 @@ export default function AnnouncementsPage() {
                   </div>
                 </div>
 
-                {announcement.isActive && (
-                  <span className="px-2 sm:px-3 py-0.5 sm:py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full h-fit flex-shrink-0">
-                    Active
-                  </span>
-                )}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {announcement.isActive && (
+                    <span className="px-2 sm:px-3 py-0.5 sm:py-1 bg-green-100 text-green-800 text-xs font-semibold rounded-full h-fit">
+                      Active
+                    </span>
+                  )}
+                  {canManageAnnouncements() && (
+                    <button
+                      onClick={() => handleDeleteClick(announcement._id)}
+                      disabled={deletingId === announcement._id}
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                      title="Delete announcement"
+                    >
+                      {deletingId === announcement._id ? (
+                        <svg className="animate-spin w-3.5 h-3.5 sm:w-4 sm:h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                      ) : (
+                        <FaTrash className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      )}
+                    </button>
+                  )}
+                </div>
               </div>
 
               {announcement.attachments && announcement.attachments.length > 0 && (
@@ -216,6 +266,19 @@ export default function AnnouncementsPage() {
           ))
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={!!deleteConfirmId}
+        onClose={() => setDeleteConfirmId(null)}
+        onConfirm={handleDeleteConfirm}
+        title="Delete Announcement"
+        message="Are you sure you want to delete this announcement? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+        isLoading={!!deletingId}
+      />
     </div>
   )
 }

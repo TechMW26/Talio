@@ -127,14 +127,25 @@ export async function GET(request) {
 
     // === ANNOUNCEMENTS (for all roles) ===
     if (includeAll || includeWidgets.includes('announcements')) {
+      const now = new Date()
       fetchPromises.push(
         Announcement.find({
-          isActive: true,
           $or: [
-            { expiresAt: { $gte: new Date() } },
-            { expiresAt: null }
-          ]
+            { status: 'published' },
+            { status: { $exists: false }, isActive: true },
+            { status: null, isActive: true },
+          ],
+          $and: [{
+            $or: [
+              { expiryDate: { $exists: false }, expiresAt: { $exists: false } },
+              { expiryDate: null, expiresAt: null },
+              { expiryDate: { $gte: now } },
+              { expiresAt: { $gte: now } },
+            ]
+          }]
         })
+          .populate('createdBy', 'firstName lastName')
+          .populate('departments', 'name')
           .sort({ createdAt: -1 })
           .limit(5)
           .lean()
