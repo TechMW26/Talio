@@ -65,38 +65,37 @@ export default function LeaveTypesPage() {
     const method = editingType ? 'PUT' : 'POST'
     submitMutation.execute(url, formData, { method })
   }
-  setEditingType(null)
-  setFormData({
-    const handleEdit = (type) => {
-      setEditingType(type)
-      setFormData({
-        name: type.name,
-        code: type.code || '',
-        maxDaysPerYear: type.maxDaysPerYear || 0,
-        description: type.description || '',
-        isPaid: type.isPaid !== false,
-        requiresApproval: type.requiresApproval !== false,
-      })
-      setShowModal(true)
-    }
+
+  const handleEdit = (type) => {
+    setEditingType(type)
+    setFormData({
+      name: type.name,
+      code: type.code || '',
+      maxDaysPerYear: type.maxDaysPerYear || 0,
+      description: type.description || '',
+      isPaid: type.isPaid !== false,
+      requiresApproval: type.requiresApproval !== false,
+    })
+    setShowModal(true)
+  }
 
   const handleDelete = (id) => {
-      if (!confirm('Are you sure you want to delete this leave type?')) return
-      deleteMutation.execute(`/api/leave/types/${id}`)
-    }
+    if (!confirm('Are you sure you want to delete this leave type?')) return
+    deleteMutation.execute(`/api/leave/types/${id}`)
+  }
 
   const handleCloseModal = () => {
-      setShowModal(false)
-      setEditingType(null)
-      setFormData({
-        name: '',
-        code: '',
-        maxDaysPerYear: 0,
-        description: '',
-        isPaid: true,
-        requiresApproval: true,
-      })
-    }
+    setShowModal(false)
+    setEditingType(null)
+    setFormData({
+      name: '',
+      code: '',
+      maxDaysPerYear: 0,
+      description: '',
+      isPaid: true,
+      requiresApproval: true,
+    })
+  }
 
   return(
     <div className = "page-container space-y-4 sm:space-y-6" >
