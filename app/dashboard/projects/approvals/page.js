@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { Card, CardBody, Button, Chip, Skeleton, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Spinner } from '@heroui/react'
-import { 
+import {
   FaArrowLeft, FaCheck, FaTimes, FaTrash, FaProjectDiagram,
   FaClock, FaCheckCircle, FaTimesCircle, FaFilter,
   FaExclamationTriangle, FaTasks, FaUser, FaCalendarAlt, FaEye
@@ -12,6 +12,9 @@ import {
 import { playNotificationSound, NotificationSoundTypes } from '@/lib/notificationSounds'
 import Portal from '@/components/ui/Portal'
 import ModalPortal from '@/components/ui/ModalPortal'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton from '@/components/ui/LoadingButton'
 
 const requestTypeLabels = {
   'task_deletion': 'Task Deletion',
@@ -54,13 +57,9 @@ const statusColors = {
 
 export default function ApprovalsPage() {
   const router = useRouter()
-  const [requests, setRequests] = useState([])
-  const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('pending')
   const [typeFilter, setTypeFilter] = useState('all')
   const [processingId, setProcessingId] = useState(null)
-  const [stats, setStats] = useState({ pending: 0, approved: 0, rejected: 0 })
-  const [typeStats, setTypeStats] = useState({})
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [selectedRequest, setSelectedRequest] = useState(null)
   const [rejectComment, setRejectComment] = useState('')
@@ -71,103 +70,69 @@ export default function ApprovalsPage() {
   const [taskDetails, setTaskDetails] = useState(null) // Full task details for rejection modal
   const [loadingTask, setLoadingTask] = useState(false)
 
-  // Auto-refresh refs
-  const refreshIntervalRef = useRef(null)
-  const lastFetchRef = useRef(Date.now())
+  // --- SWR: Approvals list ---
+  const approvalParams = new URLSearchParams({ status: statusFilter })
+  if (typeFilter !== 'all') approvalParams.append('type', typeFilter)
+  const approvalKey = `/api/projects/approvals?${approvalParams.toString()}`
 
-  const fetchRequests = useCallback(async (silent = false) => {
-    try {
-      if (!silent) setLoading(true)
-      const token = localStorage.getItem('token')
-      const params = new URLSearchParams({ status: statusFilter })
-      if (typeFilter !== 'all') {
-        params.append('type', typeFilter)
-      }
-      const response = await fetch(`/api/projects/approvals?${params.toString()}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
+  const { data: approvalsRes, isLoading: loading } = useAuthedSWR(approvalKey, {
+    refreshInterval: 10000, // auto-refresh every 10s
+    revalidateOnFocus: true,
+    keepPreviousData: true,
+  })
+  const requests = approvalsRes?.data || []
+  const stats = approvalsRes?.stats || { pending: 0, approved: 0, rejected: 0 }
+  const typeStats = approvalsRes?.typeStats || {}
 
-      const data = await response.json()
-      if (data.success) {
-        setRequests(prev => {
-          if (JSON.stringify(prev) !== JSON.stringify(data.data)) {
-            // Play sound if new pending requests arrived
-            if (silent && statusFilter === 'pending' && data.data.length > prev.length) {
-              playNotificationSound(NotificationSoundTypes.ALERT)
-            }
-            return data.data
-          }
-          return prev
-        })
-        if (data.stats) {
-          setStats(data.stats)
-        }
-        if (data.typeStats) {
-          setTypeStats(data.typeStats)
-        }
-        lastFetchRef.current = Date.now()
-      } else if (!silent) {
-        toast.error(data.message || 'Failed to fetch requests')
-      }
-    } catch (error) {
-      console.error('Fetch requests error:', error)
-      if (!silent) toast.error('An error occurred')
-    } finally {
-      if (!silent) setLoading(false)
-    }
-  }, [statusFilter, typeFilter])
-
+  // Sound notification on new pending requests
+  const prevCountRef = useRef(0)
   useEffect(() => {
-    fetchRequests()
-  }, [statusFilter, typeFilter, fetchRequests])
-
-  // Auto-refresh every 10 seconds
-  useEffect(() => {
-    refreshIntervalRef.current = setInterval(() => {
-      fetchRequests(true)
-    }, 10000)
-
-    const handleFocus = () => {
-      if (Date.now() - lastFetchRef.current > 5000) {
-        fetchRequests(true)
-      }
+    if (statusFilter === 'pending' && requests.length > prevCountRef.current && prevCountRef.current > 0) {
+      playNotificationSound(NotificationSoundTypes.ALERT)
     }
+    prevCountRef.current = requests.length
+  }, [requests.length, statusFilter])
 
-    window.addEventListener('focus', handleFocus)
+  // --- Approve mutation ---
+  const approveMutation = useApiMutation({
+    method: 'PUT',
+    invalidateKeys: [/^\/api\/projects\/approvals/],
+    onSuccess: () => {
+      playNotificationSound(NotificationSoundTypes.SUCCESS)
+      toast.success('Request approved')
+    },
+    onError: (msg) => {
+      playNotificationSound(NotificationSoundTypes.WARNING)
+      toast.error(msg || 'Failed to approve request')
+    },
+  })
 
-    return () => {
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current)
-      }
-      window.removeEventListener('focus', handleFocus)
-    }
-  }, [fetchRequests])
+  // --- Reject mutation ---
+  const rejectMutation = useApiMutation({
+    method: 'PUT',
+    invalidateKeys: [/^\/api\/projects\/approvals/],
+    onSuccess: () => {
+      playNotificationSound(NotificationSoundTypes.UPDATE)
+      toast.success('Request rejected')
+      setShowRejectModal(false)
+      setSelectedRequest(null)
+      setRejectComment('')
+      setUnmarkSubtasks(false)
+      setSubtasksToUnmark([])
+      setSubtaskComments({})
+      setNewStatus('in-progress')
+      setTaskDetails(null)
+    },
+    onError: (msg) => {
+      playNotificationSound(NotificationSoundTypes.WARNING)
+      toast.error(msg || 'Failed to reject request')
+    },
+  })
 
   const handleApprove = async (requestId) => {
+    setProcessingId(requestId)
     try {
-      setProcessingId(requestId)
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/projects/approvals/${requestId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ action: 'approve' })
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        playNotificationSound(NotificationSoundTypes.SUCCESS)
-        toast.success('Request approved')
-        fetchRequests()
-      } else {
-        playNotificationSound(NotificationSoundTypes.WARNING)
-        toast.error(data.message)
-      }
-    } catch (error) {
-      playNotificationSound(NotificationSoundTypes.WARNING)
-      toast.error('Failed to approve request')
+      await approveMutation.execute(`/api/projects/approvals/${requestId}`, { action: 'approve' })
     } finally {
       setProcessingId(null)
     }
@@ -207,58 +172,29 @@ export default function ApprovalsPage() {
   const handleReject = async () => {
     if (!selectedRequest) return
 
-    try {
-      setProcessingId(selectedRequest._id)
-      const token = localStorage.getItem('token')
-      
-      // Build request body based on task type
-      const requestBody = { 
-        action: 'reject', 
-        comment: rejectComment
-      }
-      
-      // For tasks with subtasks, include which ones to unmark
-      if (taskDetails?.subtasks && taskDetails.subtasks.length > 0) {
-        if (subtasksToUnmark.length > 0) {
-          requestBody.subtasksToUnmark = subtasksToUnmark
-          requestBody.subtaskComments = subtaskComments
-        } else if (unmarkSubtasks) {
-          requestBody.unmarkSubtasks = true
-        }
-      } else {
-        // For tasks without subtasks, include the new status
-        requestBody.newStatus = newStatus
-      }
-      
-      const response = await fetch(`/api/projects/approvals/${selectedRequest._id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(requestBody)
-      })
+    setProcessingId(selectedRequest._id)
 
-      const data = await response.json()
-      if (data.success) {
-        playNotificationSound(NotificationSoundTypes.UPDATE)
-        toast.success('Request rejected')
-        setShowRejectModal(false)
-        setSelectedRequest(null)
-        setRejectComment('')
-        setUnmarkSubtasks(false)
-        setSubtasksToUnmark([])
-        setSubtaskComments({})
-        setNewStatus('in-progress')
-        setTaskDetails(null)
-        fetchRequests()
-      } else {
-        playNotificationSound(NotificationSoundTypes.WARNING)
-        toast.error(data.message)
+    // Build request body based on task type
+    const requestBody = {
+      action: 'reject',
+      comment: rejectComment
+    }
+
+    // For tasks with subtasks, include which ones to unmark
+    if (taskDetails?.subtasks && taskDetails.subtasks.length > 0) {
+      if (subtasksToUnmark.length > 0) {
+        requestBody.subtasksToUnmark = subtasksToUnmark
+        requestBody.subtaskComments = subtaskComments
+      } else if (unmarkSubtasks) {
+        requestBody.unmarkSubtasks = true
       }
-    } catch (error) {
-      playNotificationSound(NotificationSoundTypes.WARNING)
-      toast.error('Failed to reject request')
+    } else {
+      // For tasks without subtasks, include the new status
+      requestBody.newStatus = newStatus
+    }
+
+    try {
+      await rejectMutation.execute(`/api/projects/approvals/${selectedRequest._id}`, requestBody)
     } finally {
       setProcessingId(null)
     }
@@ -296,12 +232,11 @@ export default function ApprovalsPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <Card 
+        <Card
           isPressable
           shadow="sm"
-          className={`cursor-pointer transition-all ${
-            statusFilter === 'pending' ? 'ring-2 ring-warning' : ''
-          }`}
+          className={`cursor-pointer transition-all ${statusFilter === 'pending' ? 'ring-2 ring-warning' : ''
+            }`}
           onPress={() => setStatusFilter('pending')}
         >
           <CardBody className="p-4">
@@ -316,12 +251,11 @@ export default function ApprovalsPage() {
             </div>
           </CardBody>
         </Card>
-        <Card 
+        <Card
           isPressable
           shadow="sm"
-          className={`cursor-pointer transition-all ${
-            statusFilter === 'approved' ? 'ring-2 ring-success' : ''
-          }`}
+          className={`cursor-pointer transition-all ${statusFilter === 'approved' ? 'ring-2 ring-success' : ''
+            }`}
           onPress={() => setStatusFilter('approved')}
         >
           <CardBody className="p-4">
@@ -336,12 +270,11 @@ export default function ApprovalsPage() {
             </div>
           </CardBody>
         </Card>
-        <Card 
+        <Card
           isPressable
           shadow="sm"
-          className={`cursor-pointer transition-all ${
-            statusFilter === 'rejected' ? 'ring-2 ring-danger' : ''
-          }`}
+          className={`cursor-pointer transition-all ${statusFilter === 'rejected' ? 'ring-2 ring-danger' : ''
+            }`}
           onPress={() => setStatusFilter('rejected')}
         >
           <CardBody className="p-4">
@@ -392,9 +325,8 @@ export default function ApprovalsPage() {
                 >
                   {requestTypeLabels[type]}
                   {count > 0 && (
-                    <span className={`ml-1 px-2 py-0.5 rounded-full text-xs ${
-                      typeFilter === type ? 'bg-white/30' : 'bg-default-200'
-                    }`}>
+                    <span className={`ml-1 px-2 py-0.5 rounded-full text-xs ${typeFilter === type ? 'bg-white/30' : 'bg-default-200'
+                      }`}>
                       {count}
                     </span>
                   )}
@@ -421,7 +353,7 @@ export default function ApprovalsPage() {
               {statusFilter === 'pending' ? 'No pending requests' : `No ${statusFilter} requests`}
             </h3>
             <p className="text-default-500">
-              {statusFilter === 'pending' 
+              {statusFilter === 'pending'
                 ? 'All caught up! No requests need your attention right now.'
                 : `You don't have any ${statusFilter} requests yet.`
               }
@@ -431,8 +363,8 @@ export default function ApprovalsPage() {
       ) : (
         <div className="space-y-4">
           {requests.map((request) => (
-            <Card 
-              key={request._id} 
+            <Card
+              key={request._id}
               shadow="sm"
               className="hover:shadow-md transition-shadow"
             >
@@ -472,7 +404,7 @@ export default function ApprovalsPage() {
                       </div>
                     </div>
                   )}
-                  
+
                   {request.reason && (
                     <div className="mt-3 pt-3 border-t border-default-200">
                       <p className="text-sm text-default-600">
@@ -487,8 +419,8 @@ export default function ApprovalsPage() {
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-primary-500 flex items-center justify-center text-white text-sm font-medium overflow-hidden">
                       {request.requestedBy?.profilePicture ? (
-                        <img 
-                          src={request.requestedBy.profilePicture} 
+                        <img
+                          src={request.requestedBy.profilePicture}
                           alt=""
                           className="w-full h-full object-cover"
                         />
@@ -608,9 +540,8 @@ export default function ApprovalsPage() {
                         {taskDetails.subtasks.map((subtask) => {
                           const isSelected = subtasksToUnmark.includes(subtask._id)
                           return (
-                            <div key={subtask._id} className={`p-3 rounded-lg border transition-all ${
-                              isSelected ? 'border-danger-300 bg-danger-50' : 'border-default-200 bg-content1'
-                            }`}>
+                            <div key={subtask._id} className={`p-3 rounded-lg border transition-all ${isSelected ? 'border-danger-300 bg-danger-50' : 'border-default-200 bg-content1'
+                              }`}>
                               <div className="flex items-start gap-3">
                                 <input
                                   type="checkbox"

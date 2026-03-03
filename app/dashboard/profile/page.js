@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Loader from '@/components/ui/Loader'
 import {
@@ -23,12 +23,15 @@ import {
   FaExclamationTriangle,
 } from 'react-icons/fa'
 import toast from '@/utils/toast'
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button } from '@heroui/react'
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Skeleton } from '@heroui/react'
 import { formatDesignation, formatDepartments, getLevelNameFromNumber } from '@/lib/formatters'
 import TiltWrapper from "@/components/TiltWrapper";
 import dynamic from 'next/dynamic'
 import AadhaarVerificationSection from '@/components/AadhaarVerificationSection'
 import ActiveSessionsSection from '@/components/ActiveSessionsSection'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton from '@/components/ui/LoadingButton'
 
 // Dynamically import Lanyard with no SSR and error boundary
 const Lanyard = dynamic(() => import('@/src/component/Lanyard').catch((error) => {
@@ -56,7 +59,6 @@ export default function ProfilePage() {
   }, [])
   const [user, setUser] = useState(null)
   const [employee, setEmployee] = useState(null)
-  const [loading, setLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
   const [editedEmployee, setEditedEmployee] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -65,8 +67,70 @@ export default function ProfilePage() {
   const [showPhotoGuidance, setShowPhotoGuidance] = useState(false)
 
   // Profile completion state
-  const [profileCompletionStatus, setProfileCompletionStatus] = useState(null)
   const [isCompleteProfileMode, setIsCompleteProfileMode] = useState(false)
+
+  // --- SWR: Profile data ---
+  const { data: profileRes, isLoading: profileLoading, mutate: refreshProfile } = useAuthedSWR('/api/profile')
+
+  // --- SWR: Profile completion status ---
+  const { data: completionRes, mutate: refreshCompletion } = useAuthedSWR('/api/profile/completion-status')
+  const profileCompletionStatus = useMemo(() => completionRes?.data || null, [completionRes])
+
+  // Initialize user/employee from SWR data
+  useEffect(() => {
+    if (profileRes?.success && profileRes.data) {
+      setUser(profileRes.data.user)
+      setEmployee(profileRes.data.employee)
+      setEditedEmployee(profileRes.data.employee)
+    } else if (profileRes && !profileRes.success) {
+      // Fallback to localStorage
+      const userData = localStorage.getItem('user')
+      if (userData) {
+        const parsedUser = JSON.parse(userData)
+        setUser(parsedUser)
+
+        let employeeData = null
+        if (parsedUser.employeeId && typeof parsedUser.employeeId === 'object') {
+          employeeData = {
+            ...parsedUser.employeeId,
+            dateOfBirth: parsedUser.employeeId.dateOfBirth || parsedUser.dateOfBirth,
+            gender: parsedUser.employeeId.gender || parsedUser.gender,
+            address: parsedUser.employeeId.address || parsedUser.address,
+            emergencyContact: parsedUser.employeeId.emergencyContact || parsedUser.emergencyContact,
+            designation: parsedUser.employeeId.designation || parsedUser.designation,
+            department: parsedUser.employeeId.department || parsedUser.department,
+            departments: parsedUser.employeeId.departments || parsedUser.departments,
+          }
+        } else {
+          employeeData = {
+            _id: parsedUser.employeeId,
+            employeeCode: parsedUser.employeeCode,
+            firstName: parsedUser.firstName,
+            lastName: parsedUser.lastName,
+            email: parsedUser.email,
+            phone: parsedUser.phone,
+            dateOfBirth: parsedUser.dateOfBirth,
+            gender: parsedUser.gender,
+            address: parsedUser.address,
+            designation: parsedUser.designation,
+            designationLevel: parsedUser.designationLevel,
+            designationLevelName: parsedUser.designationLevelName,
+            department: parsedUser.department,
+            departments: parsedUser.departments,
+            profilePicture: parsedUser.profilePicture,
+            status: parsedUser.status,
+            dateOfJoining: parsedUser.dateOfJoining,
+            emergencyContact: parsedUser.emergencyContact,
+          }
+        }
+
+        setEmployee(employeeData)
+        setEditedEmployee(employeeData)
+      }
+    }
+  }, [profileRes])
+
+  const loading = profileLoading
 
   // Use imported getLevelNameFromNumber for level name lookup
   const getLevelName = getLevelNameFromNumber
@@ -97,101 +161,6 @@ export default function ProfilePage() {
       setIsCompleteProfileMode(true)
     }
   }, [searchParams])
-
-  useEffect(() => {
-    fetchProfile()
-    fetchProfileCompletionStatus()
-  }, [])
-
-  const fetchProfileCompletionStatus = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/profile/completion-status', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-      const result = await response.json()
-      if (result.success) {
-        setProfileCompletionStatus(result.data)
-      }
-    } catch (error) {
-      console.error('Error fetching profile completion status:', error)
-    }
-  }
-
-  const fetchProfile = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/profile', {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      const result = await response.json()
-      if (result.success) {
-        console.log('Profile data - company:', result.data.employee?.company)
-        setUser(result.data.user)
-        setEmployee(result.data.employee)
-        setEditedEmployee(result.data.employee)
-      }
-    } catch (error) {
-      console.error('Error fetching profile:', error)
-      // Fallback to localStorage
-      const userData = localStorage.getItem('user')
-      if (userData) {
-        const parsedUser = JSON.parse(userData)
-        console.log('Loading from localStorage:', parsedUser)
-        setUser(parsedUser)
-
-        // Extract employee data - handle both structures
-        let employeeData = null
-        if (parsedUser.employeeId && typeof parsedUser.employeeId === 'object') {
-          // Employee data is in employeeId object
-          employeeData = {
-            ...parsedUser.employeeId,
-            // Fallback to top-level fields if not in employeeId
-            dateOfBirth: parsedUser.employeeId.dateOfBirth || parsedUser.dateOfBirth,
-            gender: parsedUser.employeeId.gender || parsedUser.gender,
-            address: parsedUser.employeeId.address || parsedUser.address,
-            emergencyContact: parsedUser.employeeId.emergencyContact || parsedUser.emergencyContact,
-            designation: parsedUser.employeeId.designation || parsedUser.designation,
-            department: parsedUser.employeeId.department || parsedUser.department,
-            departments: parsedUser.employeeId.departments || parsedUser.departments,
-          }
-        } else {
-          // Build employee object from top-level fields
-          employeeData = {
-            _id: parsedUser.employeeId,
-            employeeCode: parsedUser.employeeCode,
-            firstName: parsedUser.firstName,
-            lastName: parsedUser.lastName,
-            email: parsedUser.email,
-            phone: parsedUser.phone,
-            dateOfBirth: parsedUser.dateOfBirth,
-            gender: parsedUser.gender,
-            address: parsedUser.address,
-            designation: parsedUser.designation,
-            designationLevel: parsedUser.designationLevel,
-            designationLevelName: parsedUser.designationLevelName,
-            department: parsedUser.department,
-            departments: parsedUser.departments,
-            profilePicture: parsedUser.profilePicture,
-            status: parsedUser.status,
-            dateOfJoining: parsedUser.dateOfJoining,
-            emergencyContact: parsedUser.emergencyContact,
-          }
-        }
-
-        console.log('Extracted employee data:', employeeData)
-        setEmployee(employeeData)
-        setEditedEmployee(employeeData)
-      }
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const handleEditClick = () => {
     setEditedEmployee({ ...employee })
@@ -408,6 +377,7 @@ export default function ProfilePage() {
         }
 
         closeImageEditor()
+        refreshProfile()
       } else {
         toast.error(result.message || 'Failed to update profile picture')
       }
@@ -461,6 +431,8 @@ export default function ProfilePage() {
 
         setIsEditing(false)
         toast.success('Profile updated successfully!')
+        refreshProfile()
+        refreshCompletion()
       } else {
         toast.error(result.message || 'Failed to update profile')
       }
@@ -540,7 +512,7 @@ export default function ProfilePage() {
   // Handler for Aadhaar verification status changes
   const handleAadhaarStatusChange = async (status) => {
     // Refresh completion status first
-    await fetchProfileCompletionStatus()
+    await refreshCompletion()
 
     // If verification completed with extracted data, enable edit mode so user can see suggestions
     if (status?.extractedData) {
@@ -622,8 +594,8 @@ export default function ProfilePage() {
       if (result.success) {
         toast.success(`${field === 'dateofbirth' ? 'Date of Birth' : 'Address'} updated from Aadhaar!`)
         // Refresh profile data
-        fetchProfile()
-        fetchProfileCompletionStatus()
+        refreshProfile()
+        refreshCompletion()
       } else {
         toast.error(result.message || 'Failed to update profile')
       }

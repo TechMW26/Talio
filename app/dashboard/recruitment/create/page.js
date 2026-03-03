@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Button, Input, Select, SelectItem, Textarea, Chip, Checkbox,
@@ -8,14 +8,11 @@ import {
 } from '@heroui/react';
 import toast from '@/utils/toast';
 import { FaArrowLeft, FaSave, FaPlus, FaTimes } from 'react-icons/fa';
+import useAuthedSWR from '@/hooks/useAuthedSWR';
+import useApiMutation from '@/hooks/useApiMutation';
 
 export default function CreateJobPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [departments, setDepartments] = useState([]);
-  const [designations, setDesignations] = useState([]);
-  const [employees, setEmployees] = useState([]);
-  const [formLoading, setFormLoading] = useState(true);
   const [formData, setFormData] = useState({
     jobTitle: '',
     jobCode: '',
@@ -38,29 +35,14 @@ export default function CreateJobPage() {
     hiringManager: '',
   });
 
-  useEffect(() => { fetchFormData(); }, []);
-
-  const fetchFormData = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const headers = { Authorization: `Bearer ${token}` };
-      const [deptRes, desigRes, empRes] = await Promise.all([
-        fetch('/api/departments', { headers }),
-        fetch('/api/designations', { headers }).catch(() => ({ json: async () => ({ success: false }) })),
-        fetch('/api/employees', { headers }),
-      ]);
-      const [deptData, desigData, empData] = await Promise.all([
-        deptRes.json(), desigRes.json(), empRes.json(),
-      ]);
-      if (deptData.success) setDepartments(deptData.data || []);
-      if (desigData.success) setDesignations(desigData.data || []);
-      if (empData.success) setEmployees(empData.data || []);
-    } catch (error) {
-      console.error('Fetch form data error:', error);
-    } finally {
-      setFormLoading(false);
-    }
-  };
+  // Fetch dropdown data
+  const { data: deptRes, isLoading: deptLoading } = useAuthedSWR('/api/departments');
+  const { data: desigRes, isLoading: desigLoading } = useAuthedSWR('/api/designations');
+  const { data: empRes, isLoading: empLoading } = useAuthedSWR('/api/employees');
+  const departments = deptRes?.data || [];
+  const designations = desigRes?.data || [];
+  const employees = empRes?.data || [];
+  const formLoading = deptLoading || desigLoading || empLoading;
 
   const updateField = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -85,51 +67,40 @@ export default function CreateJobPage() {
     });
   };
 
+  const submitMutation = useApiMutation({
+    method: 'POST',
+    onSuccess: (data, { publish } = {}) => {
+      toast.success(publish ? 'Job published successfully' : 'Job saved as draft');
+      router.push('/dashboard/recruitment');
+    },
+    onError: (msg) => toast.error(msg || 'Failed to create job posting'),
+  });
+
   const handleSubmit = async (publish = false) => {
     if (!formData.jobTitle.trim()) { toast.error('Job title is required'); return; }
     if (!formData.department) { toast.error('Department is required'); return; }
     if (!formData.jobDescription.trim()) { toast.error('Job description is required'); return; }
 
-    setLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      const payload = {
-        ...formData,
-        status: publish ? 'open' : 'draft',
-        requirements: formData.requirements.filter((r) => r.trim()),
-        responsibilities: formData.responsibilities.filter((r) => r.trim()),
-        benefits: formData.benefits.filter((b) => b.trim()),
-        skills: formData.skills.filter((s) => s.trim()),
-        salaryRange: {
-          ...formData.salaryRange,
-          min: formData.salaryRange.min ? parseFloat(formData.salaryRange.min) : undefined,
-          max: formData.salaryRange.max ? parseFloat(formData.salaryRange.max) : undefined,
-        },
-        applicationDeadline: formData.applicationDeadline || undefined,
-      };
-      if (!payload.jobCode) delete payload.jobCode;
-      if (!payload.designation) delete payload.designation;
-      if (!payload.hiringManager) delete payload.hiringManager;
-      if (!payload.location) delete payload.location;
+    const payload = {
+      ...formData,
+      status: publish ? 'open' : 'draft',
+      requirements: formData.requirements.filter((r) => r.trim()),
+      responsibilities: formData.responsibilities.filter((r) => r.trim()),
+      benefits: formData.benefits.filter((b) => b.trim()),
+      skills: formData.skills.filter((s) => s.trim()),
+      salaryRange: {
+        ...formData.salaryRange,
+        min: formData.salaryRange.min ? parseFloat(formData.salaryRange.min) : undefined,
+        max: formData.salaryRange.max ? parseFloat(formData.salaryRange.max) : undefined,
+      },
+      applicationDeadline: formData.applicationDeadline || undefined,
+    };
+    if (!payload.jobCode) delete payload.jobCode;
+    if (!payload.designation) delete payload.designation;
+    if (!payload.hiringManager) delete payload.hiringManager;
+    if (!payload.location) delete payload.location;
 
-      const response = await fetch('/api/recruitment', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const data = await response.json();
-      if (data.success) {
-        toast.success(publish ? 'Job published successfully' : 'Job saved as draft');
-        router.push('/dashboard/recruitment');
-      } else {
-        toast.error(data.message || 'Failed to create job posting');
-      }
-    } catch (error) {
-      console.error('Create job error:', error);
-      toast.error('Failed to create job posting');
-    } finally {
-      setLoading(false);
-    }
+    submitMutation.execute('/api/recruitment', payload);
   };
 
   if (formLoading) {
@@ -157,10 +128,10 @@ export default function CreateJobPage() {
             <h1 className="text-2xl sm:text-3xl font-bold text-default-800">Create Job Posting</h1>
           </div>
           <div className="flex gap-2 ml-10 md:ml-0">
-            <Button variant="flat" onPress={() => handleSubmit(false)} isLoading={loading} startContent={<FaSave className="w-3.5 h-3.5" />}>
+            <Button variant="flat" onPress={() => handleSubmit(false)} isLoading={submitMutation.isLoading} startContent={<FaSave className="w-3.5 h-3.5" />}>
               Save as Draft
             </Button>
-            <Button color="primary" onPress={() => handleSubmit(true)} isLoading={loading}>
+            <Button color="primary" onPress={() => handleSubmit(true)} isLoading={submitMutation.isLoading}>
               Publish Job
             </Button>
           </div>
@@ -346,10 +317,10 @@ export default function CreateJobPage() {
         {/* Bottom Actions */}
         <div className="flex justify-end gap-3 pb-8">
           <Button variant="flat" onPress={() => router.push('/dashboard/recruitment')}>Cancel</Button>
-          <Button variant="flat" onPress={() => handleSubmit(false)} isLoading={loading} startContent={<FaSave className="w-3.5 h-3.5" />}>
+          <Button variant="flat" onPress={() => handleSubmit(false)} isLoading={submitMutation.isLoading} startContent={<FaSave className="w-3.5 h-3.5" />}>
             Save as Draft
           </Button>
-          <Button color="primary" onPress={() => handleSubmit(true)} isLoading={loading}>
+          <Button color="primary" onPress={() => handleSubmit(true)} isLoading={submitMutation.isLoading}>
             Publish Job
           </Button>
         </div>

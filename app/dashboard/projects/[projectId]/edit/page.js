@@ -1,29 +1,69 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import toast from '@/utils/toast'
 import { FaArrowLeft, FaSave, FaTrash, FaPlus, FaTimes, FaUsers, FaArchive, FaChevronDown, FaChevronRight, FaCheckSquare } from 'react-icons/fa'
-import { Button, Select, SelectItem } from '@heroui/react'
+import { Button, Select, SelectItem, Skeleton } from '@heroui/react'
 import Portal from '@/components/ui/Portal'
-import Loader from '@/components/ui/Loader'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton from '@/components/ui/LoadingButton'
 
 export default function EditProjectPage() {
   const { projectId } = useParams()
   const router = useRouter()
-  
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [project, setProject] = useState(null)
-  const [departments, setDepartments] = useState([])
-  const [employees, setEmployees] = useState([])
+
   const [showAddMemberModal, setShowAddMemberModal] = useState(false)
   const [showHeadSearch, setShowHeadSearch] = useState(false)
   const [searchHead, setSearchHead] = useState('')
   const [selectedNewMembers, setSelectedNewMembers] = useState([])
-  const [user, setUser] = useState(null)
   const [expandedMemberDepts, setExpandedMemberDepts] = useState({})
   const [expandedHeadDepts, setExpandedHeadDepts] = useState({})
+
+  // --- useMemo: user ---
+  const user = useMemo(() => { try { return JSON.parse(localStorage.getItem('user')) } catch { return null } }, [])
+
+  // --- SWR: Project data ---
+  const { data: projectRes, isLoading: loading, mutate: refreshProject } = useAuthedSWR(`/api/projects/${projectId}`)
+  const project = projectRes?.data || null
+
+  // --- SWR: Dropdown data ---
+  const { data: deptRes } = useAuthedSWR('/api/departments')
+  const departments = deptRes?.data || []
+
+  const { data: empRes } = useAuthedSWR('/api/employees?limit=1000')
+  const employees = empRes?.data || []
+
+  // --- Submit mutation ---
+  const submitMutation = useApiMutation({
+    method: 'PUT',
+    invalidateKeys: [`/api/projects/${projectId}`],
+    onSuccess: () => {
+      toast.success('Project updated successfully')
+      router.push(`/dashboard/projects/${projectId}`)
+    },
+    onError: (msg) => toast.error(msg || 'Failed to update project'),
+  })
+
+  // --- Add members mutation ---
+  const addMembersMutation = useApiMutation({
+    invalidateKeys: [`/api/projects/${projectId}`],
+    onSuccess: () => {
+      toast.success('Members added successfully')
+      setShowAddMemberModal(false)
+      setSelectedNewMembers([])
+    },
+    onError: (msg) => toast.error(msg || 'Failed to add members'),
+  })
+
+  // --- Remove member mutation ---
+  const removeMemberMutation = useApiMutation({
+    method: 'DELETE',
+    invalidateKeys: [`/api/projects/${projectId}`],
+    onSuccess: () => toast.success('Member removed'),
+    onError: (msg) => toast.error(msg || 'Failed to remove member'),
+  })
 
   const [form, setForm] = useState({
     name: '',
@@ -35,86 +75,25 @@ export default function EditProjectPage() {
     projectHeadIds: [] // Support multiple heads
   })
 
+  // Populate form when project data loads
   useEffect(() => {
-    const userData = localStorage.getItem('user')
-    if (userData) {
-      setUser(JSON.parse(userData))
+    if (!project) return
+    // Only project head can edit the project
+    if (!project.isProjectHead) {
+      toast.error('Only the project head can edit this project')
+      router.push(`/dashboard/projects/${projectId}`)
+      return
     }
-    fetchProject()
-    fetchDepartments()
-    fetchEmployees()
-  }, [projectId])
-
-  const fetchProject = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/projects/${projectId}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        const p = data.data
-        
-        // Only project head can edit the project
-        if (!p.isProjectHead) {
-          toast.error('Only the project head can edit this project')
-          router.push(`/dashboard/projects/${projectId}`)
-          return
-        }
-        
-        setProject(p)
-        setForm({
-          name: p.name || '',
-          description: p.description || '',
-          status: p.status || 'planned',
-          priority: p.priority || 'medium',
-          startDate: p.startDate ? new Date(p.startDate).toISOString().split('T')[0] : '',
-          endDate: p.endDate ? new Date(p.endDate).toISOString().split('T')[0] : '',
-          projectHeadIds: p.projectHeads?.map(h => h._id) || (p.projectHead?._id ? [p.projectHead._id] : [])
-        })
-      } else {
-        toast.error(data.message || 'Failed to load project')
-        router.push('/dashboard/projects')
-      }
-    } catch (error) {
-      console.error('Fetch project error:', error)
-      toast.error('An error occurred')
-      router.push('/dashboard/projects')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchDepartments = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/departments', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setDepartments(data.data)
-      }
-    } catch (error) {
-      console.error('Fetch departments error:', error)
-    }
-  }
-
-  const fetchEmployees = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/employees?limit=1000', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setEmployees(data.data)
-      }
-    } catch (error) {
-      console.error('Fetch employees error:', error)
-    }
-  }
+    setForm({
+      name: project.name || '',
+      description: project.description || '',
+      status: project.status || 'planned',
+      priority: project.priority || 'medium',
+      startDate: project.startDate ? new Date(project.startDate).toISOString().split('T')[0] : '',
+      endDate: project.endDate ? new Date(project.endDate).toISOString().split('T')[0] : '',
+      projectHeadIds: project.projectHeads?.map(h => h._id) || (project.projectHead?._id ? [project.projectHead._id] : [])
+    })
+  }, [project])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -139,40 +118,15 @@ export default function EditProjectPage() {
       return
     }
 
-    setSaving(true)
-
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/projects/${projectId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          name: form.name.trim(),
-          description: form.description.trim(),
-          status: form.status,
-          priority: form.priority,
-          startDate: form.startDate,
-          endDate: form.endDate,
-          projectHeadIds: form.projectHeadIds
-        })
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        toast.success('Project updated successfully')
-        router.push(`/dashboard/projects/${projectId}`)
-      } else {
-        toast.error(data.message || 'Failed to update project')
-      }
-    } catch (error) {
-      console.error('Update project error:', error)
-      toast.error('An error occurred')
-    } finally {
-      setSaving(false)
-    }
+    await submitMutation.execute(`/api/projects/${projectId}`, {
+      name: form.name.trim(),
+      description: form.description.trim(),
+      status: form.status,
+      priority: form.priority,
+      startDate: form.startDate,
+      endDate: form.endDate,
+      projectHeadIds: form.projectHeadIds
+    })
   }
 
   const handleAddMembers = async () => {
@@ -181,59 +135,15 @@ export default function EditProjectPage() {
       return
     }
 
-    setSaving(true)
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/projects/${projectId}/members`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          memberIds: selectedNewMembers,
-          role: 'member'
-        })
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        toast.success('Members added successfully')
-        setShowAddMemberModal(false)
-        setSelectedNewMembers([])
-        fetchProject()
-      } else {
-        toast.error(data.message || 'Failed to add members')
-      }
-    } catch (error) {
-      console.error('Add members error:', error)
-      toast.error('An error occurred')
-    } finally {
-      setSaving(false)
-    }
+    await addMembersMutation.execute(`/api/projects/${projectId}/members`, {
+      memberIds: selectedNewMembers,
+      role: 'member'
+    })
   }
 
   const handleRemoveMember = async (memberId) => {
     if (!confirm('Are you sure you want to remove this member?')) return
-
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/projects/${projectId}/members?memberId=${memberId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        toast.success('Member removed')
-        fetchProject()
-      } else {
-        toast.error(data.message || 'Failed to remove member')
-      }
-    } catch (error) {
-      console.error('Remove member error:', error)
-      toast.error('An error occurred')
-    }
+    await removeMemberMutation.execute(`/api/projects/${projectId}/members?memberId=${memberId}`)
   }
 
   const handleArchiveProject = async () => {
@@ -287,8 +197,14 @@ export default function EditProjectPage() {
   if (loading) {
     return (
       <div className="page-container">
-        <div className="flex items-center justify-center h-64">
-          <Loader size="lg" />
+        <div className="space-y-6 p-6">
+          <Skeleton className="w-1/3 h-8 rounded-lg" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Skeleton className="h-12 rounded-lg" />
+            <Skeleton className="h-12 rounded-lg" />
+            <Skeleton className="h-12 rounded-lg" />
+            <Skeleton className="h-12 rounded-lg" />
+          </div>
         </div>
       </div>
     )
@@ -298,10 +214,10 @@ export default function EditProjectPage() {
 
   // Get list of current member IDs
   const currentMemberIds = project.members?.map(m => m.user?._id || m.user) || []
-  
+
   // Filter available employees for adding
-  const availableEmployees = employees.filter(emp => 
-    !currentMemberIds.includes(emp._id) && 
+  const availableEmployees = employees.filter(emp =>
+    !currentMemberIds.includes(emp._id) &&
     emp._id !== form.projectHead
   )
 
@@ -461,7 +377,7 @@ export default function EditProjectPage() {
                     <FaPlus className="w-3 h-3" /> Add Head
                   </button>
                 </div>
-                
+
                 {form.projectHeadIds.length === 0 ? (
                   <p className="text-gray-500 text-sm py-4 text-center border border-dashed border-gray-300 rounded-lg">
                     No project heads assigned
@@ -488,9 +404,9 @@ export default function EditProjectPage() {
                           </div>
                           <button
                             type="button"
-                            onClick={() => setForm(prev => ({ 
-                              ...prev, 
-                              projectHeadIds: prev.projectHeadIds.filter(id => id !== headId) 
+                            onClick={() => setForm(prev => ({
+                              ...prev,
+                              projectHeadIds: prev.projectHeadIds.filter(id => id !== headId)
                             }))}
                             className="p-1 text-red-500 hover:bg-red-50 rounded"
                           >
@@ -511,14 +427,15 @@ export default function EditProjectPage() {
                 >
                   Cancel
                 </Button>
-                <Button
+                <LoadingButton
                   type="submit"
-                  isDisabled={saving}
                   color="primary"
+                  isLoading={submitMutation.isLoading}
+                  loadingText="Saving..."
                   startContent={<FaSave className="mr-2" />}
                 >
-                  {saving ? 'Saving...' : 'Save Changes'}
-                </Button>
+                  Save Changes
+                </LoadingButton>
               </div>
             </div>
           </form>
@@ -543,9 +460,8 @@ export default function EditProjectPage() {
               {project.members?.map(member => (
                 <div
                   key={member._id}
-                  className={`flex items-center justify-between p-3 rounded-lg ${
-                    member.role === 'head' ? 'bg-primary-50' : 'bg-gray-50'
-                  }`}
+                  className={`flex items-center justify-between p-3 rounded-lg ${member.role === 'head' ? 'bg-primary-50' : 'bg-gray-50'
+                    }`}
                 >
                   <div className="flex items-center">
                     <div className="w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center text-white text-sm overflow-hidden">
@@ -562,7 +478,7 @@ export default function EditProjectPage() {
                       <p className="text-xs text-gray-500 capitalize">{member.role}</p>
                     </div>
                   </div>
-                  
+
                   {canManage && member.role !== 'head' && (
                     <button
                       onClick={() => handleRemoveMember(member._id)}
@@ -584,250 +500,251 @@ export default function EditProjectPage() {
 
       {/* Add Member Modal */}
       {showAddMemberModal && (
-      <Portal>
-        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <FaUsers className="text-primary-500" />
-                <h3 className="text-lg font-semibold">Add Team Members</h3>
+        <Portal>
+          <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
+              <div className="p-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+                <div className="flex items-center gap-2">
+                  <FaUsers className="text-primary-500" />
+                  <h3 className="text-lg font-semibold">Add Team Members</h3>
+                </div>
+                <button
+                  onClick={() => { setShowAddMemberModal(false); setSelectedNewMembers([]) }}
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                >
+                  <FaTimes />
+                </button>
               </div>
-              <button
-                onClick={() => { setShowAddMemberModal(false); setSelectedNewMembers([]) }}
-                className="p-2 hover:bg-gray-100 rounded-lg"
-              >
-                <FaTimes />
-              </button>
-            </div>
-            
-            <div className="p-4 overflow-y-auto flex-1">
-              {Object.keys(employeesByDept).length > 0 ? (
-                Object.entries(employeesByDept).sort(([a], [b]) => a.localeCompare(b)).map(([deptName, deptEmployees]) => {
-                  const isExpanded = expandedMemberDepts[deptName] || false
-                  const allSelected = deptEmployees.every(emp => selectedNewMembers.includes(emp._id))
-                  const someSelected = deptEmployees.some(emp => selectedNewMembers.includes(emp._id))
-                  
-                  return (
-                    <div key={deptName} className="mb-2 border border-gray-200 rounded-lg overflow-hidden">
-                      <div 
-                        className="flex items-center justify-between px-3 py-2.5 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
-                        onClick={() => setExpandedMemberDepts(prev => ({ ...prev, [deptName]: !prev[deptName] }))}
-                      >
-                        <div className="flex items-center gap-2">
-                          {isExpanded ? (
-                            <FaChevronDown className="w-3 h-3 text-gray-500" />
-                          ) : (
-                            <FaChevronRight className="w-3 h-3 text-gray-500" />
-                          )}
-                          <span className="font-medium text-gray-700 text-sm">{deptName}</span>
-                          <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">
-                            {deptEmployees.length}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            const deptIds = deptEmployees.map(emp => emp._id)
-                            if (allSelected) {
-                              setSelectedNewMembers(prev => prev.filter(id => !deptIds.includes(id)))
-                            } else {
-                              setSelectedNewMembers(prev => [...new Set([...prev, ...deptIds])])
-                            }
-                          }}
-                          className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded transition-colors ${
-                            allSelected 
-                              ? 'bg-primary-100 text-primary-700 hover:bg-primary-200' 
-                              : someSelected
-                                ? 'bg-blue-50 text-blue-600 hover:bg-blue-100'
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                          }`}
+
+              <div className="p-4 overflow-y-auto flex-1">
+                {Object.keys(employeesByDept).length > 0 ? (
+                  Object.entries(employeesByDept).sort(([a], [b]) => a.localeCompare(b)).map(([deptName, deptEmployees]) => {
+                    const isExpanded = expandedMemberDepts[deptName] || false
+                    const allSelected = deptEmployees.every(emp => selectedNewMembers.includes(emp._id))
+                    const someSelected = deptEmployees.some(emp => selectedNewMembers.includes(emp._id))
+
+                    return (
+                      <div key={deptName} className="mb-2 border border-gray-200 rounded-lg overflow-hidden">
+                        <div
+                          className="flex items-center justify-between px-3 py-2.5 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
+                          onClick={() => setExpandedMemberDepts(prev => ({ ...prev, [deptName]: !prev[deptName] }))}
                         >
-                          <FaCheckSquare className={`w-3 h-3 ${allSelected ? 'text-primary-600' : someSelected ? 'text-blue-500' : 'text-gray-400'}`} />
-                          {allSelected ? 'Deselect All' : 'Select All'}
-                        </button>
-                      </div>
-                      
-                      {isExpanded && (
-                        <div className="p-2 space-y-1 bg-white">
-                          {deptEmployees.map(emp => (
-                            <label
-                              key={emp._id}
-                              className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer"
-                            >
-                              <input
-                                type="checkbox"
-                                checked={selectedNewMembers.includes(emp._id)}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setSelectedNewMembers(prev => [...prev, emp._id])
-                                  } else {
-                                    setSelectedNewMembers(prev => prev.filter(id => id !== emp._id))
-                                  }
-                                }}
-                                className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
-                              />
-                              <div className="w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center text-white text-sm overflow-hidden">
-                                {emp.profilePicture ? (
-                                  <img src={emp.profilePicture} alt="" className="w-full h-full object-cover" />
-                                ) : (
-                                  <span>{emp.firstName?.[0]}{emp.lastName?.[0]}</span>
-                                )}
-                              </div>
-                              <span className="text-sm text-gray-700">
-                                {emp.firstName} {emp.lastName}
-                              </span>
-                            </label>
-                          ))}
+                          <div className="flex items-center gap-2">
+                            {isExpanded ? (
+                              <FaChevronDown className="w-3 h-3 text-gray-500" />
+                            ) : (
+                              <FaChevronRight className="w-3 h-3 text-gray-500" />
+                            )}
+                            <span className="font-medium text-gray-700 text-sm">{deptName}</span>
+                            <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">
+                              {deptEmployees.length}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              const deptIds = deptEmployees.map(emp => emp._id)
+                              if (allSelected) {
+                                setSelectedNewMembers(prev => prev.filter(id => !deptIds.includes(id)))
+                              } else {
+                                setSelectedNewMembers(prev => [...new Set([...prev, ...deptIds])])
+                              }
+                            }}
+                            className={`flex items-center gap-1.5 text-xs px-2 py-1 rounded transition-colors ${allSelected
+                                ? 'bg-primary-100 text-primary-700 hover:bg-primary-200'
+                                : someSelected
+                                  ? 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              }`}
+                          >
+                            <FaCheckSquare className={`w-3 h-3 ${allSelected ? 'text-primary-600' : someSelected ? 'text-blue-500' : 'text-gray-400'}`} />
+                            {allSelected ? 'Deselect All' : 'Select All'}
+                          </button>
                         </div>
-                      )}
-                    </div>
-                  )
-                })
-              ) : (
-                <p className="text-center text-gray-500 py-8">
-                  All available employees are already members of this project
-                </p>
-              )}
-            </div>
-            
-            <div className="p-4 border-t border-gray-200 flex justify-end gap-3 flex-shrink-0">
-              <Button
-                onPress={() => { setShowAddMemberModal(false); setSelectedNewMembers([]) }}
-                variant="flat"
-              >
-                Cancel
-              </Button>
-              <Button
-                onPress={handleAddMembers}
-                isDisabled={saving || selectedNewMembers.length === 0}
-                color="primary"
-              >
-                {saving ? 'Adding...' : `Add ${selectedNewMembers.length} Member${selectedNewMembers.length !== 1 ? 's' : ''}`}
-              </Button>
+
+                        {isExpanded && (
+                          <div className="p-2 space-y-1 bg-white">
+                            {deptEmployees.map(emp => (
+                              <label
+                                key={emp._id}
+                                className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={selectedNewMembers.includes(emp._id)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedNewMembers(prev => [...prev, emp._id])
+                                    } else {
+                                      setSelectedNewMembers(prev => prev.filter(id => id !== emp._id))
+                                    }
+                                  }}
+                                  className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
+                                />
+                                <div className="w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center text-white text-sm overflow-hidden">
+                                  {emp.profilePicture ? (
+                                    <img src={emp.profilePicture} alt="" className="w-full h-full object-cover" />
+                                  ) : (
+                                    <span>{emp.firstName?.[0]}{emp.lastName?.[0]}</span>
+                                  )}
+                                </div>
+                                <span className="text-sm text-gray-700">
+                                  {emp.firstName} {emp.lastName}
+                                </span>
+                              </label>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })
+                ) : (
+                  <p className="text-center text-gray-500 py-8">
+                    All available employees are already members of this project
+                  </p>
+                )}
+              </div>
+
+              <div className="p-4 border-t border-gray-200 flex justify-end gap-3 flex-shrink-0">
+                <Button
+                  onPress={() => { setShowAddMemberModal(false); setSelectedNewMembers([]) }}
+                  variant="flat"
+                >
+                  Cancel
+                </Button>
+                <LoadingButton
+                  onPress={handleAddMembers}
+                  isLoading={addMembersMutation.isLoading}
+                  loadingText="Adding..."
+                  color="primary"
+                  isDisabled={selectedNewMembers.length === 0}
+                >
+                  {`Add ${selectedNewMembers.length} Member${selectedNewMembers.length !== 1 ? 's' : ''}`}
+                </LoadingButton>
+              </div>
             </div>
           </div>
-        </div>
-      </Portal>
+        </Portal>
       )}
 
       {/* Project Head Search Modal */}
       {showHeadSearch && (
-      <Portal>
-        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
-              <h3 className="text-lg font-semibold text-gray-800">Add Project Head</h3>
-              <button
-                onClick={() => {
-                  setShowHeadSearch(false)
-                  setSearchHead('')
-                }}
-                className="p-2 hover:bg-gray-100 rounded-lg"
-              >
-                <FaTimes />
-              </button>
-            </div>
+        <Portal>
+          <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[9999] p-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-hidden flex flex-col">
+              <div className="p-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+                <h3 className="text-lg font-semibold text-gray-800">Add Project Head</h3>
+                <button
+                  onClick={() => {
+                    setShowHeadSearch(false)
+                    setSearchHead('')
+                  }}
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                >
+                  <FaTimes />
+                </button>
+              </div>
 
-            <div className="p-4 border-b border-gray-200">
-              <input
-                type="text"
-                value={searchHead}
-                onChange={(e) => setSearchHead(e.target.value)}
-                placeholder="Search by name..."
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                autoFocus
-              />
-            </div>
+              <div className="p-4 border-b border-gray-200">
+                <input
+                  type="text"
+                  value={searchHead}
+                  onChange={(e) => setSearchHead(e.target.value)}
+                  placeholder="Search by name..."
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  autoFocus
+                />
+              </div>
 
-            <div className="flex-1 overflow-y-auto p-4">
-              {(() => {
-                const filteredEmps = employees.filter(emp => {
-                  const fullName = `${emp.firstName} ${emp.lastName}`.toLowerCase()
-                  const matchesSearch = searchHead === '' || fullName.includes(searchHead.toLowerCase())
-                  const notAlreadyHead = !form.projectHeadIds.includes(emp._id)
-                  return matchesSearch && notAlreadyHead
-                })
-                
-                if (filteredEmps.length === 0) {
-                  return <p className="text-center text-gray-500 py-8">No employees found</p>
-                }
-                
-                // Group by department
-                const grouped = filteredEmps.reduce((acc, emp) => {
-                  const deptName = emp.department?.name || 'No Department'
-                  if (!acc[deptName]) acc[deptName] = []
-                  acc[deptName].push(emp)
-                  return acc
-                }, {})
-                
-                return (
-                  <div className="space-y-2">
-                    {Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([deptName, deptEmployees]) => {
-                      const isExpanded = expandedHeadDepts[deptName] || false
-                      
-                      return (
-                        <div key={deptName} className="border border-gray-200 rounded-lg overflow-hidden">
-                          <div 
-                            className="flex items-center justify-between px-3 py-2.5 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
-                            onClick={() => setExpandedHeadDepts(prev => ({ ...prev, [deptName]: !prev[deptName] }))}
-                          >
-                            <div className="flex items-center gap-2">
-                              {isExpanded ? (
-                                <FaChevronDown className="w-3 h-3 text-gray-500" />
-                              ) : (
-                                <FaChevronRight className="w-3 h-3 text-gray-500" />
-                              )}
-                              <span className="font-medium text-gray-700 text-sm">{deptName}</span>
-                              <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">
-                                {deptEmployees.length}
-                              </span>
+              <div className="flex-1 overflow-y-auto p-4">
+                {(() => {
+                  const filteredEmps = employees.filter(emp => {
+                    const fullName = `${emp.firstName} ${emp.lastName}`.toLowerCase()
+                    const matchesSearch = searchHead === '' || fullName.includes(searchHead.toLowerCase())
+                    const notAlreadyHead = !form.projectHeadIds.includes(emp._id)
+                    return matchesSearch && notAlreadyHead
+                  })
+
+                  if (filteredEmps.length === 0) {
+                    return <p className="text-center text-gray-500 py-8">No employees found</p>
+                  }
+
+                  // Group by department
+                  const grouped = filteredEmps.reduce((acc, emp) => {
+                    const deptName = emp.department?.name || 'No Department'
+                    if (!acc[deptName]) acc[deptName] = []
+                    acc[deptName].push(emp)
+                    return acc
+                  }, {})
+
+                  return (
+                    <div className="space-y-2">
+                      {Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([deptName, deptEmployees]) => {
+                        const isExpanded = expandedHeadDepts[deptName] || false
+
+                        return (
+                          <div key={deptName} className="border border-gray-200 rounded-lg overflow-hidden">
+                            <div
+                              className="flex items-center justify-between px-3 py-2.5 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors"
+                              onClick={() => setExpandedHeadDepts(prev => ({ ...prev, [deptName]: !prev[deptName] }))}
+                            >
+                              <div className="flex items-center gap-2">
+                                {isExpanded ? (
+                                  <FaChevronDown className="w-3 h-3 text-gray-500" />
+                                ) : (
+                                  <FaChevronRight className="w-3 h-3 text-gray-500" />
+                                )}
+                                <span className="font-medium text-gray-700 text-sm">{deptName}</span>
+                                <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">
+                                  {deptEmployees.length}
+                                </span>
+                              </div>
                             </div>
+
+                            {isExpanded && (
+                              <div className="p-2 space-y-1 bg-white">
+                                {deptEmployees.map(emp => (
+                                  <button
+                                    key={emp._id}
+                                    type="button"
+                                    onClick={() => {
+                                      setForm(prev => ({ ...prev, projectHeadIds: [...prev.projectHeadIds, emp._id] }))
+                                      setShowHeadSearch(false)
+                                      setSearchHead('')
+                                      setExpandedHeadDepts({})
+                                    }}
+                                    className="w-full flex items-center p-2 hover:bg-gray-50 rounded-lg transition-colors text-left"
+                                  >
+                                    <div className="w-9 h-9 rounded-full bg-primary-500 flex items-center justify-center text-white text-sm overflow-hidden">
+                                      {emp.profilePicture ? (
+                                        <img src={emp.profilePicture} alt="" className="w-full h-full object-cover" />
+                                      ) : (
+                                        <span>{emp.firstName?.[0]}{emp.lastName?.[0]}</span>
+                                      )}
+                                    </div>
+                                    <div className="ml-3">
+                                      <p className="font-medium text-gray-900 text-sm">
+                                        {emp.firstName} {emp.lastName}
+                                      </p>
+                                      <p className="text-xs text-gray-500">
+                                        {emp.email}
+                                      </p>
+                                    </div>
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                          
-                          {isExpanded && (
-                            <div className="p-2 space-y-1 bg-white">
-                              {deptEmployees.map(emp => (
-                                <button
-                                  key={emp._id}
-                                  type="button"
-                                  onClick={() => {
-                                    setForm(prev => ({ ...prev, projectHeadIds: [...prev.projectHeadIds, emp._id] }))
-                                    setShowHeadSearch(false)
-                                    setSearchHead('')
-                                    setExpandedHeadDepts({})
-                                  }}
-                                  className="w-full flex items-center p-2 hover:bg-gray-50 rounded-lg transition-colors text-left"
-                                >
-                                  <div className="w-9 h-9 rounded-full bg-primary-500 flex items-center justify-center text-white text-sm overflow-hidden">
-                                    {emp.profilePicture ? (
-                                      <img src={emp.profilePicture} alt="" className="w-full h-full object-cover" />
-                                    ) : (
-                                      <span>{emp.firstName?.[0]}{emp.lastName?.[0]}</span>
-                                    )}
-                                  </div>
-                                  <div className="ml-3">
-                                    <p className="font-medium text-gray-900 text-sm">
-                                      {emp.firstName} {emp.lastName}
-                                    </p>
-                                    <p className="text-xs text-gray-500">
-                                      {emp.email}
-                                    </p>
-                                  </div>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
-                  </div>
-                )
-              })()}
+                        )
+                      })}
+                    </div>
+                  )
+                })()}
+              </div>
             </div>
           </div>
-        </div>
-      </Portal>
+        </Portal>
       )}
     </div>
   )

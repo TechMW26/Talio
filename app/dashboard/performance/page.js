@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import toast from '@/utils/toast'
@@ -8,34 +8,46 @@ import {
   FaChartLine, FaUsers, FaPlus, FaEye, FaEdit, FaAward,
   FaStar, FaTrophy, FaBullseye, FaCalendarAlt
 } from 'react-icons/fa'
-import Loader from '@/components/ui/Loader'
+import { Skeleton } from '@heroui/react'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 
 export default function PerformancePage() {
   const router = useRouter()
-  const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [performanceData, setPerformanceData] = useState({
-    reviews: [],
-    goals: [],
+
+  const user = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem('user')) } catch { return null }
+  }, [])
+
+  // SWR: fetch ratings
+  const { data: reviewsRes, error: reviewsError, isLoading: reviewsLoading, isValidating: reviewsValidating, mutate: refreshReviews } = useAuthedSWR('/api/performance/ratings')
+  const reviews = reviewsRes?.data || []
+
+  // SWR: fetch goals
+  const { data: goalsRes, error: goalsError, isLoading: goalsLoading, isValidating: goalsValidating, mutate: refreshGoals } = useAuthedSWR('/api/performance/goals')
+  const goals = goalsRes?.data || []
+
+  const isLoading = reviewsLoading || goalsLoading
+  const error = reviewsError || goalsError
+  const isValidating = reviewsValidating || goalsValidating
+  const refresh = () => { refreshReviews(); refreshGoals() }
+
+  const performanceData = useMemo(() => ({
+    reviews,
+    goals,
     stats: {
-      totalReviews: 0,
-      completedGoals: 0,
-      averageRating: 0,
-      pendingReviews: 0
+      totalReviews: reviews.length,
+      completedGoals: goals.filter(g => g.status === 'completed').length,
+      averageRating: reviews.length > 0
+        ? (reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length).toFixed(1)
+        : 0,
+      pendingReviews: reviews.filter(r => r.status === 'pending').length
     }
-  })
+  }), [reviews, goals])
 
   // Real-time updates
   const { socket, isConnected, subscribe, onPerformanceReview } = useSocket()
-
-  useEffect(() => {
-    const userData = localStorage.getItem('user')
-    if (userData) {
-      const parsedUser = JSON.parse(userData)
-      setUser(parsedUser)
-      fetchPerformanceData()
-    }
-  }, [])
 
   // Subscribe to real-time performance updates
   useEffect(() => {
@@ -43,7 +55,7 @@ export default function PerformancePage() {
 
     const handlePerformanceUpdate = (data) => {
       console.log('🔄 [Performance] Real-time update received:', data)
-      fetchPerformanceData()
+      refresh()
     }
 
     const unsub1 = onPerformanceReview?.(handlePerformanceUpdate)
@@ -56,51 +68,6 @@ export default function PerformancePage() {
       unsub3?.()
     }
   }, [socket, isConnected])
-
-  const fetchPerformanceData = async () => {
-    try {
-      const token = localStorage.getItem('token')
-
-      // Fetch reviews from API
-      const reviewsResponse = await fetch('/api/performance/ratings', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-
-      const reviewsData = await reviewsResponse.json()
-
-      // Fetch goals from API
-      const goalsResponse = await fetch('/api/performance/goals', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-
-      const goalsData = await goalsResponse.json()
-
-      const reviews = reviewsData.success ? reviewsData.data : []
-      const goals = goalsData.success ? goalsData.data : []
-
-      setPerformanceData({
-        reviews,
-        goals,
-        stats: {
-          totalReviews: reviews.length,
-          completedGoals: goals.filter(g => g.status === 'completed').length,
-          averageRating: reviews.length > 0
-            ? (reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length).toFixed(1)
-            : 0,
-          pendingReviews: reviews.filter(r => r.status === 'pending').length
-        }
-      })
-    } catch (error) {
-      console.error('Fetch performance data error:', error)
-      toast.error('Failed to fetch performance data')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const canManagePerformance = () => {
     return user && ['admin', 'hr', 'manager'].includes(user.role)
@@ -129,10 +96,51 @@ export default function PerformancePage() {
     return stars
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader size="lg" />
+      <div className="p-6 pb-24 md:pb-6">
+        <div className="mb-6">
+          <Skeleton className="h-8 w-72 rounded-lg mb-2" />
+          <Skeleton className="h-4 w-56 rounded-lg" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="bg-white rounded-lg shadow-md p-6">
+              <Skeleton className="h-4 w-24 rounded mb-3" />
+              <Skeleton className="h-8 w-16 rounded" />
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="bg-white rounded-lg shadow-md p-6">
+              <div className="flex items-center space-x-4">
+                <Skeleton className="w-12 h-12 rounded-lg" />
+                <div>
+                  <Skeleton className="h-5 w-32 rounded mb-2" />
+                  <Skeleton className="h-4 w-24 rounded" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="bg-white rounded-lg shadow-md p-8">
+          <Skeleton className="h-6 w-48 rounded mb-4" />
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="py-4">
+              <Skeleton className="h-5 w-40 rounded mb-2" />
+              <Skeleton className="h-4 w-64 rounded" />
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 pb-24 md:pb-6">
+        <DataErrorState message="Failed to load performance data" onRetry={refresh} />
       </div>
     )
   }
@@ -147,6 +155,7 @@ export default function PerformancePage() {
             {user?.role === 'employee' ? 'Track your performance and goals' :
               user?.role === 'manager' ? 'Manage team performance and reviews' :
                 'Track and manage organizational performance'}
+            {' '}<BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" />
           </p>
         </div>
         {canManagePerformance() && (
@@ -222,10 +231,10 @@ export default function PerformancePage() {
           <h2 className="text-xl font-semibold text-gray-800">Performance Reviews</h2>
         </div>
 
-        {loading ? (
+        {isLoading ? (
           <div className="p-8 text-center">
-            <Loader size="lg" />
-            <p className="mt-4 text-gray-600">Loading reviews...</p>
+            <Skeleton className="h-6 w-48 rounded mx-auto mb-4" />
+            {[...Array(2)].map((_, i) => <Skeleton key={i} className="h-20 w-full rounded-lg mb-3" />)}
           </div>
         ) : performanceData.reviews.length === 0 ? (
           <div className="p-8 text-center text-gray-500">

@@ -1,9 +1,13 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { Card, CardBody, Button, Chip, Skeleton, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Textarea, Progress, Spinner, Select, SelectItem } from '@heroui/react'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton from '@/components/ui/LoadingButton'
+import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
 import {
   HiOutlineClipboardDocumentList,
   HiOutlineClock,
@@ -76,10 +80,33 @@ const getProjectColor = (projectId) => {
   return projectColors[Math.abs(hash) % projectColors.length]
 }
 
+// Skeleton for loading state
+function MyTasksSkeleton() {
+  return (
+    <div className="page-container">
+      <div className="mb-6">
+        <Skeleton className="h-8 w-32 rounded-lg mb-2" />
+        <Skeleton className="h-4 w-56 rounded-lg" />
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+        {[...Array(6)].map((_, i) => (
+          <Card key={i} shadow="sm"><CardBody className="p-4"><Skeleton className="h-12 rounded-lg" /></CardBody></Card>
+        ))}
+      </div>
+      <Card shadow="sm" className="mb-6"><CardBody className="p-4"><Skeleton className="h-10 rounded-lg mb-4" /><Skeleton className="h-10 rounded-lg" /></CardBody></Card>
+      <div className="grid gap-4">
+        {[...Array(4)].map((_, i) => (
+          <Card key={i} shadow="sm"><CardBody className="p-4"><Skeleton className="h-28 rounded-lg" /></CardBody></Card>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function MyTasksPage() {
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
-  const [user, setUser] = useState(null)
+  const user = useMemo(() => getCurrentUser(), [])
 
   const formatFileSize = useCallback((bytes = 0) => {
     if (!bytes || Number.isNaN(bytes)) return '0 B'
@@ -91,8 +118,7 @@ export default function MyTasksPage() {
   useEffect(() => {
     setMounted(true)
   }, [])
-  const [tasks, setTasks] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [tasks, setTasks] = useState([]) // kept for optimistic local state updates in TaskCard
   const [filters, setFilters] = useState({
     status: 'all',
     priority: 'all',
@@ -109,7 +135,6 @@ export default function MyTasksPage() {
   const [taskForEta, setTaskForEta] = useState(null)
   const [eta, setEta] = useState({ days: '', hours: '' })
   const [subtaskEtas, setSubtaskEtas] = useState({}) // For subtask-wise ETAs: { subtaskId: { days, hours } }
-  const [projects, setProjects] = useState([]) // Store unique projects for filter
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [taskToDelete, setTaskToDelete] = useState(null)
   const [deleting, setDeleting] = useState(false)
@@ -118,90 +143,47 @@ export default function MyTasksPage() {
   const [modalUpdatingStatus, setModalUpdatingStatus] = useState(false) // For modal status change loading
   const [showModalStatusDropdown, setShowModalStatusDropdown] = useState(false) // For status dropdown visibility
 
-  // Auto-refresh refs
-  const refreshIntervalRef = useRef(null)
-  const lastFetchRef = useRef(Date.now())
-
-  const fetchTasks = useCallback(async (silent = false) => {
-    try {
-      if (!silent) setLoading(true)
-      const token = localStorage.getItem('token')
-      const params = new URLSearchParams()
-
-      if (filters.status !== 'all') params.append('status', filters.status)
-      if (filters.priority !== 'all') params.append('priority', filters.priority)
-      if (filters.period !== 'all') params.append('period', filters.period)
-
-      const response = await fetch(`/api/projects/my-tasks?${params.toString()}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        setTasks(prev => {
-          // Only update if data changed to prevent layout shifts
-          if (JSON.stringify(prev) !== JSON.stringify(data.data)) {
-            return data.data
-          }
-          return prev
-        })
-
-        // Extract unique projects for filter dropdown
-        const uniqueProjects = []
-        const projectIds = new Set()
-        data.data.forEach(task => {
-          if (task.project && !projectIds.has(task.project._id)) {
-            projectIds.add(task.project._id)
-            uniqueProjects.push({
-              _id: task.project._id,
-              name: task.project.name
-            })
-          }
-        })
-        setProjects(uniqueProjects.sort((a, b) => a.name.localeCompare(b.name)))
-      } else if (!silent) {
-        toast.error(data.message || 'Failed to load tasks')
-      }
-    } catch (error) {
-      console.error('Fetch tasks error:', error)
-      if (!silent) toast.error('An error occurred')
-    } finally {
-      if (!silent) setLoading(false)
-      lastFetchRef.current = Date.now()
-    }
+  // --- SWR Data Fetching ---
+  const tasksQueryString = useMemo(() => {
+    const params = new URLSearchParams()
+    if (filters.status !== 'all') params.append('status', filters.status)
+    if (filters.priority !== 'all') params.append('priority', filters.priority)
+    if (filters.period !== 'all') params.append('period', filters.period)
+    return params.toString()
   }, [filters])
 
+  const { data: tasksData, error: tasksError, isLoading: loading, mutate: mutateTasks } = useAuthedSWR(
+    `/api/projects/my-tasks?${tasksQueryString}`,
+    { refreshInterval: 10000 }
+  )
+
+  // Sync SWR data to local state (for TaskCard optimistic updates)
   useEffect(() => {
-    fetchTasks()
-  }, [fetchTasks])
-
-  // Load user from localStorage
-  useEffect(() => {
-    const userData = localStorage.getItem('user')
-    if (userData) {
-      setUser(JSON.parse(userData))
+    if (tasksData?.data) {
+      setTasks(prev => {
+        if (JSON.stringify(prev) !== JSON.stringify(tasksData.data)) {
+          return tasksData.data
+        }
+        return prev
+      })
     }
-  }, [])
+  }, [tasksData])
 
-  // Auto-refresh every 10 seconds for real-time sync
-  useEffect(() => {
-    refreshIntervalRef.current = setInterval(() => fetchTasks(true), 10000)
-
-    // Also refresh on window focus
-    const handleFocus = () => {
-      if (Date.now() - lastFetchRef.current > 5000) {
-        fetchTasks(true)
-      }
-    }
-    window.addEventListener('focus', handleFocus)
-
-    return () => {
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current)
-      }
-      window.removeEventListener('focus', handleFocus)
-    }
-  }, [fetchTasks])
+  // Derive projects from tasks for filter dropdown
+  const projects = useMemo(() => {
+    const uniqueProjects = []
+    const projectIds = new Set()
+      ; (tasksData?.data || []).forEach(task => {
+        if (task.project && !projectIds.has(task.project._id)) {
+          projectIds.add(task.project._id)
+          uniqueProjects.push({
+            _id: task.project._id,
+            name: task.project.name
+          })
+        }
+      })
+    return uniqueProjects.sort((a, b) => a.name.localeCompare(b.name))
+  }, [tasksData])
 
   const handleRespondToAssignment = async (task, action, estimatedDays = null, estimatedHours = null) => {
     try {
@@ -237,7 +219,7 @@ export default function MyTasksPage() {
           playNotificationSound(NotificationSoundTypes.UPDATE)
         }
         toast.success(data.message)
-        fetchTasks()
+        mutateTasks()
         setShowRejectModal(false)
         setRejectRemark('')
         setSelectedTask(null)
@@ -353,7 +335,7 @@ export default function MyTasksPage() {
         }
         setShowDeleteModal(false)
         setTaskToDelete(null)
-        fetchTasks()
+        mutateTasks()
       } else {
         playNotificationSound(NotificationSoundTypes.WARNING)
         toast.error(data.message || 'Failed to delete task')
@@ -369,11 +351,11 @@ export default function MyTasksPage() {
   const handleUpdateStatus = async (task, newStatus, skipLocalUpdate = false) => {
     // Immediately update local state for instant UI feedback
     if (!skipLocalUpdate) {
-      setTasks(prevTasks => prevTasks.map(t => 
+      setTasks(prevTasks => prevTasks.map(t =>
         t._id === task._id ? { ...t, status: newStatus } : t
       ))
     }
-    
+
     try {
       setRespondingTo(task._id)
       const token = localStorage.getItem('token')
@@ -394,19 +376,19 @@ export default function MyTasksPage() {
           playNotificationSound(NotificationSoundTypes.UPDATE)
         }
         toast.success('Task updated')
-        // Silent refresh to sync with server
-        fetchTasks(true)
+        // Revalidate to sync with server
+        mutateTasks()
       } else {
         playNotificationSound(NotificationSoundTypes.WARNING)
         toast.error(data.message)
         // Revert local state on error
-        fetchTasks(true)
+        mutateTasks()
       }
     } catch (error) {
       playNotificationSound(NotificationSoundTypes.WARNING)
       toast.error('Failed to update task')
       // Revert local state on error
-      fetchTasks(true)
+      mutateTasks()
     } finally {
       setRespondingTo(null)
     }
@@ -419,16 +401,16 @@ export default function MyTasksPage() {
       toast.error('Tasks with subtasks are auto-managed. Update subtasks to change status.')
       return
     }
-    
+
     // Don't allow status change for tasks pending acceptance
-    const isPendingAcceptance = task.assignmentStatus === 'pending' || 
+    const isPendingAcceptance = task.assignmentStatus === 'pending' ||
       task.assignees?.some(a => a.assignmentStatus === 'pending')
     const hasAcceptedAssignee = task.assignees?.some(a => a.assignmentStatus === 'accepted')
     if (isPendingAcceptance && !hasAcceptedAssignee) {
       toast.error('Task must be accepted before changing status.')
       return
     }
-    
+
     // Use the existing handleUpdateStatus function
     await handleUpdateStatus(task, newStatus)
   }
@@ -490,23 +472,11 @@ export default function MyTasksPage() {
 
   // Prevent hydration mismatch
   if (!mounted) {
-    return (
-      <div className="page-container">
-        <div className="flex items-center justify-center h-64">
-          <Spinner size="lg" />
-        </div>
-      </div>
-    )
+    return <MyTasksSkeleton />
   }
 
   if (loading) {
-    return (
-      <div className="page-container">
-        <div className="flex items-center justify-center h-64">
-          <Spinner size="lg" />
-        </div>
-      </div>
-    )
+    return <MyTasksSkeleton />
   }
 
   return (
@@ -693,22 +663,20 @@ export default function MyTasksPage() {
             <div className="flex border border-default-300 rounded-lg overflow-hidden">
               <button
                 onClick={() => setViewMode('list')}
-                className={`px-3 py-2 flex items-center gap-1.5 transition-colors ${
-                  viewMode === 'list'
+                className={`px-3 py-2 flex items-center gap-1.5 transition-colors ${viewMode === 'list'
                     ? 'bg-primary text-white'
                     : 'bg-content1 text-default-600 hover:bg-default-100'
-                }`}
+                  }`}
                 title="List View"
               >
                 <HiOutlineQueueList className="w-5 h-5" />
               </button>
               <button
                 onClick={() => setViewMode('kanban')}
-                className={`px-3 py-2 flex items-center gap-1.5 transition-colors border-l border-default-300 ${
-                  viewMode === 'kanban'
+                className={`px-3 py-2 flex items-center gap-1.5 transition-colors border-l border-default-300 ${viewMode === 'kanban'
                     ? 'bg-primary text-white'
                     : 'bg-content1 text-default-600 hover:bg-default-100'
-                }`}
+                  }`}
                 title="Kanban View"
               >
                 <HiOutlineViewColumns className="w-5 h-5" />
@@ -729,7 +697,7 @@ export default function MyTasksPage() {
             enableDragDrop={true}
             onProjectClick={(projectId) => router.push(`/dashboard/projects/${projectId}`)}
           />
-          
+
           {/* Show pending acceptance tasks above kanban for quick action */}
           {pendingAcceptance.length > 0 && (
             <div className="mt-6 p-4 bg-warning-50 border border-warning-200 rounded-lg">
@@ -753,128 +721,128 @@ export default function MyTasksPage() {
         <>
           {/* Pending Acceptance Tasks */}
           {pendingAcceptance.length > 0 && (
-        <div className="mb-6">
-          <h2 className="text-lg font-semibold text-default-800 mb-3 flex items-center gap-2">
-            <HiOutlineClock className="w-5 h-5 text-warning" />
-            Pending Acceptance ({pendingAcceptance.length})
-          </h2>
-          <div className="grid gap-4">
-            {pendingAcceptance.map(task => (
-              <TaskCard
-                key={task._id}
-                task={task}
-                onAccept={() => {
-                  setTaskForEta(task)
-                  // Initialize subtask ETAs if task has subtasks
-                  if (task.subtasks && task.subtasks.length > 0) {
-                    const initialEtas = {}
-                    task.subtasks.forEach(st => {
-                      initialEtas[st._id] = {
-                        days: st.estimatedDays || '',
-                        hours: st.estimatedHours || ''
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-default-800 mb-3 flex items-center gap-2">
+                <HiOutlineClock className="w-5 h-5 text-warning" />
+                Pending Acceptance ({pendingAcceptance.length})
+              </h2>
+              <div className="grid gap-4">
+                {pendingAcceptance.map(task => (
+                  <TaskCard
+                    key={task._id}
+                    task={task}
+                    onAccept={() => {
+                      setTaskForEta(task)
+                      // Initialize subtask ETAs if task has subtasks
+                      if (task.subtasks && task.subtasks.length > 0) {
+                        const initialEtas = {}
+                        task.subtasks.forEach(st => {
+                          initialEtas[st._id] = {
+                            days: st.estimatedDays || '',
+                            hours: st.estimatedHours || ''
+                          }
+                        })
+                        setSubtaskEtas(initialEtas)
+                      } else {
+                        setSubtaskEtas({})
                       }
-                    })
-                    setSubtaskEtas(initialEtas)
-                  } else {
-                    setSubtaskEtas({})
-                  }
-                  setShowEtaModal(true)
-                }}
-                onReject={() => { setSelectedTask(task); setShowRejectModal(true) }}
-                onStatusChange={handleUpdateStatus}
-                onViewProject={() => router.push(`/dashboard/projects/${task.project._id}`)}
-                onDelete={() => { setTaskToDelete(task); setShowDeleteModal(true) }}
-                respondingTo={respondingTo}
-                isPendingAcceptance
-                currentEmployeeId={currentEmployeeId}
-              />
-            ))}
-          </div>
-        </div>
-      )}
+                      setShowEtaModal(true)
+                    }}
+                    onReject={() => { setSelectedTask(task); setShowRejectModal(true) }}
+                    onStatusChange={handleUpdateStatus}
+                    onViewProject={() => router.push(`/dashboard/projects/${task.project._id}`)}
+                    onDelete={() => { setTaskToDelete(task); setShowDeleteModal(true) }}
+                    respondingTo={respondingTo}
+                    isPendingAcceptance
+                    currentEmployeeId={currentEmployeeId}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
 
-      {/* Overdue Tasks */}
-      {overdueTasks.length > 0 && (
-        <div className="mb-6">
-          <h2 className="text-lg font-semibold text-default-800 mb-3 flex items-center gap-2">
-            <HiOutlineExclamationTriangle className="w-5 h-5 text-danger" />
-            Overdue ({overdueTasks.length})
-          </h2>
-          <div className="grid gap-4">
-            {overdueTasks.filter(t => t.assignmentStatus !== 'pending').map(task => (
-              <TaskCard
-                key={task._id}
-                task={task}
-                onStatusChange={handleUpdateStatus}
-                onViewProject={() => router.push(`/dashboard/projects/${task.project._id}`)}
-                onDelete={() => { setTaskToDelete(task); setShowDeleteModal(true) }}
-                respondingTo={respondingTo}
-                isOverdue
-                currentEmployeeId={currentEmployeeId}
-              />
-            ))}
-          </div>
-        </div>
-      )}
+          {/* Overdue Tasks */}
+          {overdueTasks.length > 0 && (
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-default-800 mb-3 flex items-center gap-2">
+                <HiOutlineExclamationTriangle className="w-5 h-5 text-danger" />
+                Overdue ({overdueTasks.length})
+              </h2>
+              <div className="grid gap-4">
+                {overdueTasks.filter(t => t.assignmentStatus !== 'pending').map(task => (
+                  <TaskCard
+                    key={task._id}
+                    task={task}
+                    onStatusChange={handleUpdateStatus}
+                    onViewProject={() => router.push(`/dashboard/projects/${task.project._id}`)}
+                    onDelete={() => { setTaskToDelete(task); setShowDeleteModal(true) }}
+                    respondingTo={respondingTo}
+                    isOverdue
+                    currentEmployeeId={currentEmployeeId}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
 
-      {/* Today's Tasks */}
-      {todayTasks.length > 0 && (
-        <div className="mb-6">
-          <h2 className="text-lg font-semibold text-default-800 mb-3 flex items-center gap-2">
-            <HiOutlineClock className="w-5 h-5 text-primary" />
-            Due Today ({todayTasks.length})
-          </h2>
-          <div className="grid gap-4">
-            {todayTasks.filter(t => t.assignmentStatus !== 'pending').map(task => (
-              <TaskCard
-                key={task._id}
-                task={task}
-                onStatusChange={handleUpdateStatus}
-                onViewProject={() => router.push(`/dashboard/projects/${task.project._id}`)}
-                onDelete={() => { setTaskToDelete(task); setShowDeleteModal(true) }}
-                respondingTo={respondingTo}
-                currentEmployeeId={currentEmployeeId}
-              />
-            ))}
-          </div>
-        </div>
-      )}
+          {/* Today's Tasks */}
+          {todayTasks.length > 0 && (
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-default-800 mb-3 flex items-center gap-2">
+                <HiOutlineClock className="w-5 h-5 text-primary" />
+                Due Today ({todayTasks.length})
+              </h2>
+              <div className="grid gap-4">
+                {todayTasks.filter(t => t.assignmentStatus !== 'pending').map(task => (
+                  <TaskCard
+                    key={task._id}
+                    task={task}
+                    onStatusChange={handleUpdateStatus}
+                    onViewProject={() => router.push(`/dashboard/projects/${task.project._id}`)}
+                    onDelete={() => { setTaskToDelete(task); setShowDeleteModal(true) }}
+                    respondingTo={respondingTo}
+                    currentEmployeeId={currentEmployeeId}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
 
-      {/* Upcoming Tasks */}
-      {upcomingTasks.filter(t => t.assignmentStatus !== 'pending').length > 0 && (
-        <div className="mb-6">
-          <h2 className="text-lg font-semibold text-default-800 mb-3">
-            All Tasks
-          </h2>
-          <div className="grid gap-4">
-            {upcomingTasks.filter(t => t.assignmentStatus !== 'pending').map(task => (
-              <TaskCard
-                key={task._id}
-                task={task}
-                onStatusChange={handleUpdateStatus}
-                onViewProject={() => router.push(`/dashboard/projects/${task.project._id}`)}
-                onDelete={() => { setTaskToDelete(task); setShowDeleteModal(true) }}
-                respondingTo={respondingTo}
-                currentEmployeeId={currentEmployeeId}
-              />
-            ))}
-          </div>
-        </div>
-      )}
+          {/* Upcoming Tasks */}
+          {upcomingTasks.filter(t => t.assignmentStatus !== 'pending').length > 0 && (
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-default-800 mb-3">
+                All Tasks
+              </h2>
+              <div className="grid gap-4">
+                {upcomingTasks.filter(t => t.assignmentStatus !== 'pending').map(task => (
+                  <TaskCard
+                    key={task._id}
+                    task={task}
+                    onStatusChange={handleUpdateStatus}
+                    onViewProject={() => router.push(`/dashboard/projects/${task.project._id}`)}
+                    onDelete={() => { setTaskToDelete(task); setShowDeleteModal(true) }}
+                    respondingTo={respondingTo}
+                    currentEmployeeId={currentEmployeeId}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
 
-      {filteredTasks.length === 0 && (
-        <Card shadow="sm">
-          <CardBody className="text-center py-12">
-            <HiOutlineClipboardDocumentList className="w-16 h-16 mx-auto text-default-300 mb-4" />
-            <h3 className="text-lg font-medium text-default-800 mb-2">
-              No tasks found
-            </h3>
-            <p className="text-default-500">
-              Tasks assigned to you will appear here
-            </p>
-          </CardBody>
-        </Card>
-      )}
+          {filteredTasks.length === 0 && (
+            <Card shadow="sm">
+              <CardBody className="text-center py-12">
+                <HiOutlineClipboardDocumentList className="w-16 h-16 mx-auto text-default-300 mb-4" />
+                <h3 className="text-lg font-medium text-default-800 mb-2">
+                  No tasks found
+                </h3>
+                <p className="text-default-500">
+                  Tasks assigned to you will appear here
+                </p>
+              </CardBody>
+            </Card>
+          )}
         </>
       )}
 
@@ -1082,153 +1050,150 @@ export default function MyTasksPage() {
       {/* Task Detail Modal - Opens when clicking task in Kanban view */}
       <ModalPortal isOpen={!!selectedTask && !showRejectModal}>
         {selectedTask && <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setSelectedTask(null)}>
-            <div className="bg-content1 rounded-[30px] shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
-              <div className="px-6 py-4 bg-default-50 flex items-center justify-between flex-shrink-0">
-                <h3 className="text-lg font-semibold text-default-800">Task Details</h3>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => router.push(`/dashboard/projects/${selectedTask.project?._id || selectedTask.project}`)}
-                    className="btn-secondary flex items-center gap-2 text-sm py-1.5 px-3"
-                  >
-                    <FaProjectDiagram className="w-3 h-3" />
-                    View Project
-                  </button>
-                  <button
-                    onClick={() => setSelectedTask(null)}
-                    className="p-2 hover:bg-default-100 rounded-lg text-default-500"
-                  >
-                    <FaTimes />
-                  </button>
-                </div>
+          <div className="bg-content1 rounded-[30px] shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
+            <div className="px-6 py-4 bg-default-50 flex items-center justify-between flex-shrink-0">
+              <h3 className="text-lg font-semibold text-default-800">Task Details</h3>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => router.push(`/dashboard/projects/${selectedTask.project?._id || selectedTask.project}`)}
+                  className="btn-secondary flex items-center gap-2 text-sm py-1.5 px-3"
+                >
+                  <FaProjectDiagram className="w-3 h-3" />
+                  View Project
+                </button>
+                <button
+                  onClick={() => setSelectedTask(null)}
+                  className="p-2 hover:bg-default-100 rounded-lg text-default-500"
+                >
+                  <FaTimes />
+                </button>
               </div>
-              
-              <div className="p-6 overflow-y-auto flex-1">
-                {/* Task Title & Status */}
-                <div className="flex items-start justify-between mb-4">
-                  <h2 className="text-xl font-semibold text-default-800">{selectedTask.title}</h2>
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[selectedTask.status]}`}>
-                    {selectedTask.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1">
+              {/* Task Title & Status */}
+              <div className="flex items-start justify-between mb-4">
+                <h2 className="text-xl font-semibold text-default-800">{selectedTask.title}</h2>
+                <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[selectedTask.status]}`}>
+                  {selectedTask.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                </span>
+              </div>
+
+              {/* Project Badge */}
+              {selectedTask.project && (
+                <div className="mb-4">
+                  <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${getProjectColor(selectedTask.project?._id).badge} ${getProjectColor(selectedTask.project?._id).text}`}>
+                    <FaProjectDiagram className="w-3 h-3" />
+                    {selectedTask.project.name || 'Project'}
                   </span>
                 </div>
+              )}
 
-                {/* Project Badge */}
-                {selectedTask.project && (
-                  <div className="mb-4">
-                    <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${getProjectColor(selectedTask.project?._id).badge} ${getProjectColor(selectedTask.project?._id).text}`}>
-                      <FaProjectDiagram className="w-3 h-3" />
-                      {selectedTask.project.name || 'Project'}
-                    </span>
-                  </div>
-                )}
+              {/* Description */}
+              {selectedTask.description && (
+                <div className="mb-6">
+                  <h4 className="text-sm font-medium text-default-500 mb-2">Description</h4>
+                  <p className="text-default-700 whitespace-pre-wrap">{selectedTask.description}</p>
+                </div>
+              )}
 
-                {/* Description */}
-                {selectedTask.description && (
-                  <div className="mb-6">
-                    <h4 className="text-sm font-medium text-default-500 mb-2">Description</h4>
-                    <p className="text-default-700 whitespace-pre-wrap">{selectedTask.description}</p>
-                  </div>
-                )}
-
-                {/* Attachments */}
-                {selectedTask.attachments && selectedTask.attachments.length > 0 && (
-                  <div className="mb-6">
-                    <h4 className="text-sm font-medium text-default-500 mb-2">Attachments</h4>
-                    <div className="space-y-2">
-                      {selectedTask.attachments.map((file, index) => (
-                        <a
-                          key={`${file.url}-${index}`}
-                          href={file.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center justify-between p-3 bg-default-50 rounded-lg border border-default-200 hover:bg-default-100"
-                        >
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-default-800 truncate">{file.name || 'Attachment'}</p>
-                            <p className="text-xs text-default-500">{formatFileSize(file.size)}</p>
-                          </div>
-                          <span className="text-xs text-primary">Open</span>
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Details Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                  <div className="bg-default-50 p-3 rounded-lg">
-                    <p className="text-xs text-default-500 mb-1">Priority</p>
-                    <span className={`px-2 py-1 rounded text-sm font-medium ${priorityColors[selectedTask.priority]}`}>
-                      {selectedTask.priority.charAt(0).toUpperCase() + selectedTask.priority.slice(1)}
-                    </span>
-                  </div>
-                  <div className="bg-default-50 p-3 rounded-lg">
-                    <p className="text-xs text-default-500 mb-1">Due Date</p>
-                    <p className={`font-medium ${
-                      selectedTask.dueDate && new Date(selectedTask.dueDate) < new Date() && selectedTask.status !== 'completed'
-                        ? 'text-danger' : 'text-default-800'
-                    }`}>
-                      {selectedTask.dueDate ? new Date(selectedTask.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set'}
-                    </p>
-                  </div>
-                  {selectedTask.estimatedHours && (
-                    <div className="bg-default-50 p-3 rounded-lg">
-                      <p className="text-xs text-default-500 mb-1">Estimated Time</p>
-                      <p className="font-medium text-default-800">
-                        {selectedTask.estimatedHours >= 8 
-                          ? `${Math.floor(selectedTask.estimatedHours / 8)}d ${selectedTask.estimatedHours % 8}h`
-                          : `${selectedTask.estimatedHours}h`}
-                      </p>
-                    </div>
-                  )}
-                  <div className="bg-default-50 p-3 rounded-lg">
-                    <p className="text-xs text-default-500 mb-1">Progress</p>
-                    <p className="font-medium text-default-800">{selectedTask.progressPercentage || 0}%</p>
+              {/* Attachments */}
+              {selectedTask.attachments && selectedTask.attachments.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="text-sm font-medium text-default-500 mb-2">Attachments</h4>
+                  <div className="space-y-2">
+                    {selectedTask.attachments.map((file, index) => (
+                      <a
+                        key={`${file.url}-${index}`}
+                        href={file.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center justify-between p-3 bg-default-50 rounded-lg border border-default-200 hover:bg-default-100"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-default-800 truncate">{file.name || 'Attachment'}</p>
+                          <p className="text-xs text-default-500">{formatFileSize(file.size)}</p>
+                        </div>
+                        <span className="text-xs text-primary">Open</span>
+                      </a>
+                    ))}
                   </div>
                 </div>
+              )}
 
-                {/* Progress Bar */}
-                {selectedTask.subtasks && selectedTask.subtasks.length > 0 && (
-                  <div className="mb-6">
-                    <div className="flex items-center justify-start mb-2">
-                      <h4 className="text-sm font-medium text-default-500">Progress</h4>
-                      <span className="text-sm text-default-600">{selectedTask.progressPercentage || 0}%</span>
-                    </div>
-                    <div className="w-full bg-default-200 rounded-full h-2">
-                      <div
-                        className={`h-2 rounded-full transition-all ${
-                          selectedTask.progressPercentage === 100 ? 'bg-success' :
-                          selectedTask.progressPercentage >= 50 ? 'bg-primary' :
-                          'bg-warning'
-                        }`}
-                        style={{ width: `${selectedTask.progressPercentage || 0}%` }}
-                      />
-                    </div>
+              {/* Details Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div className="bg-default-50 p-3 rounded-lg">
+                  <p className="text-xs text-default-500 mb-1">Priority</p>
+                  <span className={`px-2 py-1 rounded text-sm font-medium ${priorityColors[selectedTask.priority]}`}>
+                    {selectedTask.priority.charAt(0).toUpperCase() + selectedTask.priority.slice(1)}
+                  </span>
+                </div>
+                <div className="bg-default-50 p-3 rounded-lg">
+                  <p className="text-xs text-default-500 mb-1">Due Date</p>
+                  <p className={`font-medium ${selectedTask.dueDate && new Date(selectedTask.dueDate) < new Date() && selectedTask.status !== 'completed'
+                      ? 'text-danger' : 'text-default-800'
+                    }`}>
+                    {selectedTask.dueDate ? new Date(selectedTask.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set'}
+                  </p>
+                </div>
+                {selectedTask.estimatedHours && (
+                  <div className="bg-default-50 p-3 rounded-lg">
+                    <p className="text-xs text-default-500 mb-1">Estimated Time</p>
+                    <p className="font-medium text-default-800">
+                      {selectedTask.estimatedHours >= 8
+                        ? `${Math.floor(selectedTask.estimatedHours / 8)}d ${selectedTask.estimatedHours % 8}h`
+                        : `${selectedTask.estimatedHours}h`}
+                    </p>
                   </div>
                 )}
+                <div className="bg-default-50 p-3 rounded-lg">
+                  <p className="text-xs text-default-500 mb-1">Progress</p>
+                  <p className="font-medium text-default-800">{selectedTask.progressPercentage || 0}%</p>
+                </div>
+              </div>
 
-                {/* Subtasks - Interactive */}
-                {selectedTask.subtasks && selectedTask.subtasks.length > 0 && (
-                  <div className="mb-6">
-                    <h4 className="text-sm font-medium text-default-500 mb-3">
-                      Subtasks ({selectedTask.subtasks.filter(st => st.completed).length}/{selectedTask.subtasks.length})
-                    </h4>
-                    <div className="space-y-2 max-h-60 overflow-y-auto">
-                      {selectedTask.subtasks.map((subtask, idx) => {
-                        const isTaskAccepted = selectedTask.assignmentStatus === 'accepted' || 
-                          selectedTask.assignees?.some(a => a.assignmentStatus === 'accepted')
-                        // Allow toggle if: task is accepted AND (subtask is completed OR not pending acceptance)
-                        const canToggle = isTaskAccepted && (subtask.completed || !subtask.pendingAcceptance)
-                        
-                        return (
-                          <div key={subtask._id || idx} className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
-                            subtask.completed ? 'bg-success-50' : 
+              {/* Progress Bar */}
+              {selectedTask.subtasks && selectedTask.subtasks.length > 0 && (
+                <div className="mb-6">
+                  <div className="flex items-center justify-start mb-2">
+                    <h4 className="text-sm font-medium text-default-500">Progress</h4>
+                    <span className="text-sm text-default-600">{selectedTask.progressPercentage || 0}%</span>
+                  </div>
+                  <div className="w-full bg-default-200 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full transition-all ${selectedTask.progressPercentage === 100 ? 'bg-success' :
+                          selectedTask.progressPercentage >= 50 ? 'bg-primary' :
+                            'bg-warning'
+                        }`}
+                      style={{ width: `${selectedTask.progressPercentage || 0}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Subtasks - Interactive */}
+              {selectedTask.subtasks && selectedTask.subtasks.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="text-sm font-medium text-default-500 mb-3">
+                    Subtasks ({selectedTask.subtasks.filter(st => st.completed).length}/{selectedTask.subtasks.length})
+                  </h4>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {selectedTask.subtasks.map((subtask, idx) => {
+                      const isTaskAccepted = selectedTask.assignmentStatus === 'accepted' ||
+                        selectedTask.assignees?.some(a => a.assignmentStatus === 'accepted')
+                      // Allow toggle if: task is accepted AND (subtask is completed OR not pending acceptance)
+                      const canToggle = isTaskAccepted && (subtask.completed || !subtask.pendingAcceptance)
+
+                      return (
+                        <div key={subtask._id || idx} className={`flex items-center gap-3 p-3 rounded-lg transition-all ${subtask.completed ? 'bg-success-50' :
                             subtask.pendingAcceptance ? 'bg-warning-50' : 'bg-default-50'
                           } ${canToggle ? 'hover:bg-default-100 cursor-pointer' : ''}`}
                           onClick={async () => {
                             if (!canToggle || modalUpdatingSubtask) return
                             const subtaskId = subtask._id
                             const projectId = selectedTask.project?._id || selectedTask.project
-                            
+
                             try {
                               setModalUpdatingSubtask(subtaskId)
                               const token = localStorage.getItem('token')
@@ -1248,8 +1213,8 @@ export default function MyTasksPage() {
                                 // Update selectedTask subtasks
                                 setSelectedTask(prev => ({
                                   ...prev,
-                                  subtasks: prev.subtasks.map(st => 
-                                    st._id === subtaskId 
+                                  subtasks: prev.subtasks.map(st =>
+                                    st._id === subtaskId
                                       ? { ...st, completed: data.data?.subtask?.completed ?? !subtask.completed, pendingAcceptance: data.data?.subtask?.pendingAcceptance || false }
                                       : st
                                   ),
@@ -1257,7 +1222,7 @@ export default function MyTasksPage() {
                                   status: data.data?.taskStatus || prev.status
                                 }))
                                 // Also refresh main task list
-                                fetchTasks(true)
+                                mutateTasks()
                                 toast.success(data.message || 'Subtask updated')
                               } else {
                                 toast.error(data.message || 'Failed to update subtask')
@@ -1268,178 +1233,174 @@ export default function MyTasksPage() {
                               setModalUpdatingSubtask(null)
                             }
                           }}
-                          >
-                            <div className={`w-5 h-5 rounded-full flex items-center justify-center transition-all ${
-                              modalUpdatingSubtask === subtask._id ? 'bg-primary animate-pulse' :
-                              subtask.completed ? 'bg-success text-white' : 
-                              subtask.pendingAcceptance ? 'bg-warning text-white' : 
-                              canToggle ? 'bg-default-300 hover:bg-default-400' : 'bg-default-200'
-                            }`}>
-                              {modalUpdatingSubtask === subtask._id ? (
-                                <Spinner size="sm" color="white" />
-                              ) : subtask.completed ? (
-                                <FaCheck className="w-3 h-3" />
-                              ) : subtask.pendingAcceptance ? (
-                                <FaClock className="w-3 h-3" />
-                              ) : null}
-                            </div>
-                            <div className="flex-1">
-                              <p className={`text-sm ${subtask.completed ? 'text-default-500 line-through' : 'text-default-800'}`}>
-                                {subtask.title}
-                              </p>
-                              {subtask.estimatedHours && (
-                                <p className="text-xs text-default-400 mt-0.5">
-                                  Est: {subtask.estimatedHours >= 8 ? `${Math.floor(subtask.estimatedHours / 8)}d ${subtask.estimatedHours % 8}h` : `${subtask.estimatedHours}h`}
-                                </p>
-                              )}
-                            </div>
-                            {subtask.pendingAcceptance && (
-                              <span className="text-xs bg-warning-100 text-warning-700 px-2 py-0.5 rounded">Pending Review</span>
-                            )}
-                            {!isTaskAccepted && (
-                              <span className="text-xs bg-default-100 text-default-500 px-2 py-0.5 rounded">Accept task first</span>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Assignees */}
-                {selectedTask.assignees && selectedTask.assignees.length > 0 && (
-                  <div className="mb-6">
-                    <h4 className="text-sm font-medium text-default-500 mb-3">Assignees</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedTask.assignees.map((assignee, idx) => (
-                        <div key={assignee._id || idx} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${
-                          assignee.assignmentStatus === 'accepted' ? 'bg-success-50 text-success-700' :
-                          assignee.assignmentStatus === 'rejected' ? 'bg-danger-50 text-danger-700' :
-                          'bg-warning-50 text-warning-700'
-                        }`}>
-                          <div className="w-6 h-6 rounded-full bg-primary-500 text-white flex items-center justify-center text-xs">
-                            {assignee.user?.profilePicture ? (
-                              <img src={assignee.user.profilePicture} alt="" className="w-full h-full rounded-full object-cover" />
-                            ) : (
-                              assignee.user?.firstName?.[0] || '?'
-                            )}
-                          </div>
-                          <span className="text-sm">{assignee.user?.firstName} {assignee.user?.lastName}</span>
-                          <span className="text-xs opacity-75">({assignee.assignmentStatus})</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Status Update - For tasks WITHOUT subtasks */}
-                {(!selectedTask.subtasks || selectedTask.subtasks.length === 0) && (
-                  (selectedTask.assignmentStatus === 'accepted' || selectedTask.assignees?.some(a => a.assignmentStatus === 'accepted')) && (
-                    <div className="mb-6">
-                      <h4 className="text-sm font-medium text-gray-500 mb-3">Update Status</h4>
-                      <div className="relative">
-                        <button
-                          onClick={() => setShowModalStatusDropdown(!showModalStatusDropdown)}
-                          disabled={modalUpdatingStatus}
-                          className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-all ${
-                            modalUpdatingStatus ? 'bg-gray-100 cursor-not-allowed' : 'bg-white hover:bg-gray-50 cursor-pointer'
-                          }`}
                         >
-                          <span className={`flex items-center gap-2 font-medium ${statusColors[selectedTask.status]?.split(' ')[1] || 'text-gray-700'}`}>
-                            {modalUpdatingStatus ? (
-                              <Loader size="xs" />
-                            ) : (
-                              selectedTask.status === 'completed' ? <FaCheckCircle /> :
-                              selectedTask.status === 'in-progress' ? <FaPlay /> :
-                              selectedTask.status === 'review' ? <FaEye /> :
-                              selectedTask.status === 'blocked' ? <FaExclamationTriangle /> :
-                              <FaClock />
-                            )}
-                            {selectedTask.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                          </span>
-                          <FaChevronDown className={`transition-transform ${showModalStatusDropdown ? 'rotate-180' : ''}`} />
-                        </button>
-                        
-                        {showModalStatusDropdown && (
-                          <div className="absolute top-full left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-10 overflow-hidden">
-                            {['todo', 'in-progress', 'review', 'completed', 'blocked'].map(status => (
-                              <button
-                                key={status}
-                                onClick={async () => {
-                                  if (status === selectedTask.status) {
-                                    setShowModalStatusDropdown(false)
-                                    return
-                                  }
-                                  try {
-                                    setModalUpdatingStatus(true)
-                                    setShowModalStatusDropdown(false)
-                                    const token = localStorage.getItem('token')
-                                    const projectId = selectedTask.project?._id || selectedTask.project
-                                    const response = await fetch(`/api/projects/${projectId}/tasks/${selectedTask._id}`, {
-                                      method: 'PUT',
-                                      headers: {
-                                        'Content-Type': 'application/json',
-                                        'Authorization': `Bearer ${token}`
-                                      },
-                                      body: JSON.stringify({ status })
-                                    })
-                                    const data = await response.json()
-                                    if (data.success) {
-                                      setSelectedTask(prev => ({ ...prev, status }))
-                                      fetchTasks(true)
-                                      playNotificationSound(status === 'completed' ? NotificationSoundTypes.SUCCESS : NotificationSoundTypes.UPDATE)
-                                      toast.success('Status updated')
-                                    } else {
-                                      toast.error(data.message || 'Failed to update status')
-                                    }
-                                  } catch (error) {
-                                    toast.error('Failed to update status')
-                                  } finally {
-                                    setModalUpdatingStatus(false)
-                                  }
-                                }}
-                                className={`w-full flex items-center gap-2 px-4 py-2.5 text-left hover:bg-gray-50 transition-colors ${
-                                  status === selectedTask.status ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                                }`}
-                              >
-                                {status === 'completed' ? <FaCheckCircle className="text-green-500" /> :
-                                 status === 'in-progress' ? <FaPlay className="text-blue-500" /> :
-                                 status === 'review' ? <FaEye className="text-purple-500" /> :
-                                 status === 'blocked' ? <FaExclamationTriangle className="text-red-500" /> :
-                                 <FaClock className="text-gray-400" />}
-                                {status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                                {status === selectedTask.status && <FaCheck className="ml-auto text-blue-500" />}
-                              </button>
-                            ))}
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center transition-all ${modalUpdatingSubtask === subtask._id ? 'bg-primary animate-pulse' :
+                              subtask.completed ? 'bg-success text-white' :
+                                subtask.pendingAcceptance ? 'bg-warning text-white' :
+                                  canToggle ? 'bg-default-300 hover:bg-default-400' : 'bg-default-200'
+                            }`}>
+                            {modalUpdatingSubtask === subtask._id ? (
+                              <Spinner size="sm" color="white" />
+                            ) : subtask.completed ? (
+                              <FaCheck className="w-3 h-3" />
+                            ) : subtask.pendingAcceptance ? (
+                              <FaClock className="w-3 h-3" />
+                            ) : null}
                           </div>
-                        )}
-                      </div>
-                    </div>
-                  )
-                )}
-
-                {/* Pending Acceptance Message */}
-                {!(selectedTask.assignmentStatus === 'accepted' || selectedTask.assignees?.some(a => a.assignmentStatus === 'accepted')) && (
-                  <div className="flex flex-wrap gap-3 pt-4 border-t">
-                    <p className="w-full text-sm text-amber-600 mb-2 flex items-center gap-2">
-                      <HiOutlineClock className="w-4 h-4" />
-                      This task is pending your acceptance.
-                    </p>
-                    <Button
-                      onPress={() => {
-                        setSelectedTask(null)
-                        setViewMode('list')
-                      }}
-                      color="primary"
-                      startContent={<HiOutlineQueueList className="w-4 h-4" />}
-                    >
-                      Switch to List View to Accept/Reject
-                    </Button>
+                          <div className="flex-1">
+                            <p className={`text-sm ${subtask.completed ? 'text-default-500 line-through' : 'text-default-800'}`}>
+                              {subtask.title}
+                            </p>
+                            {subtask.estimatedHours && (
+                              <p className="text-xs text-default-400 mt-0.5">
+                                Est: {subtask.estimatedHours >= 8 ? `${Math.floor(subtask.estimatedHours / 8)}d ${subtask.estimatedHours % 8}h` : `${subtask.estimatedHours}h`}
+                              </p>
+                            )}
+                          </div>
+                          {subtask.pendingAcceptance && (
+                            <span className="text-xs bg-warning-100 text-warning-700 px-2 py-0.5 rounded">Pending Review</span>
+                          )}
+                          {!isTaskAccepted && (
+                            <span className="text-xs bg-default-100 text-default-500 px-2 py-0.5 rounded">Accept task first</span>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
+
+              {/* Assignees */}
+              {selectedTask.assignees && selectedTask.assignees.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="text-sm font-medium text-default-500 mb-3">Assignees</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedTask.assignees.map((assignee, idx) => (
+                      <div key={assignee._id || idx} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${assignee.assignmentStatus === 'accepted' ? 'bg-success-50 text-success-700' :
+                          assignee.assignmentStatus === 'rejected' ? 'bg-danger-50 text-danger-700' :
+                            'bg-warning-50 text-warning-700'
+                        }`}>
+                        <div className="w-6 h-6 rounded-full bg-primary-500 text-white flex items-center justify-center text-xs">
+                          {assignee.user?.profilePicture ? (
+                            <img src={assignee.user.profilePicture} alt="" className="w-full h-full rounded-full object-cover" />
+                          ) : (
+                            assignee.user?.firstName?.[0] || '?'
+                          )}
+                        </div>
+                        <span className="text-sm">{assignee.user?.firstName} {assignee.user?.lastName}</span>
+                        <span className="text-xs opacity-75">({assignee.assignmentStatus})</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Status Update - For tasks WITHOUT subtasks */}
+              {(!selectedTask.subtasks || selectedTask.subtasks.length === 0) && (
+                (selectedTask.assignmentStatus === 'accepted' || selectedTask.assignees?.some(a => a.assignmentStatus === 'accepted')) && (
+                  <div className="mb-6">
+                    <h4 className="text-sm font-medium text-gray-500 mb-3">Update Status</h4>
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowModalStatusDropdown(!showModalStatusDropdown)}
+                        disabled={modalUpdatingStatus}
+                        className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-all ${modalUpdatingStatus ? 'bg-gray-100 cursor-not-allowed' : 'bg-white hover:bg-gray-50 cursor-pointer'
+                          }`}
+                      >
+                        <span className={`flex items-center gap-2 font-medium ${statusColors[selectedTask.status]?.split(' ')[1] || 'text-gray-700'}`}>
+                          {modalUpdatingStatus ? (
+                            <Loader size="xs" />
+                          ) : (
+                            selectedTask.status === 'completed' ? <FaCheckCircle /> :
+                              selectedTask.status === 'in-progress' ? <FaPlay /> :
+                                selectedTask.status === 'review' ? <FaEye /> :
+                                  selectedTask.status === 'blocked' ? <FaExclamationTriangle /> :
+                                    <FaClock />
+                          )}
+                          {selectedTask.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        </span>
+                        <FaChevronDown className={`transition-transform ${showModalStatusDropdown ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      {showModalStatusDropdown && (
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-10 overflow-hidden">
+                          {['todo', 'in-progress', 'review', 'completed', 'blocked'].map(status => (
+                            <button
+                              key={status}
+                              onClick={async () => {
+                                if (status === selectedTask.status) {
+                                  setShowModalStatusDropdown(false)
+                                  return
+                                }
+                                try {
+                                  setModalUpdatingStatus(true)
+                                  setShowModalStatusDropdown(false)
+                                  const token = localStorage.getItem('token')
+                                  const projectId = selectedTask.project?._id || selectedTask.project
+                                  const response = await fetch(`/api/projects/${projectId}/tasks/${selectedTask._id}`, {
+                                    method: 'PUT',
+                                    headers: {
+                                      'Content-Type': 'application/json',
+                                      'Authorization': `Bearer ${token}`
+                                    },
+                                    body: JSON.stringify({ status })
+                                  })
+                                  const data = await response.json()
+                                  if (data.success) {
+                                    setSelectedTask(prev => ({ ...prev, status }))
+                                    mutateTasks()
+                                    playNotificationSound(status === 'completed' ? NotificationSoundTypes.SUCCESS : NotificationSoundTypes.UPDATE)
+                                    toast.success('Status updated')
+                                  } else {
+                                    toast.error(data.message || 'Failed to update status')
+                                  }
+                                } catch (error) {
+                                  toast.error('Failed to update status')
+                                } finally {
+                                  setModalUpdatingStatus(false)
+                                }
+                              }}
+                              className={`w-full flex items-center gap-2 px-4 py-2.5 text-left hover:bg-gray-50 transition-colors ${status === selectedTask.status ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                                }`}
+                            >
+                              {status === 'completed' ? <FaCheckCircle className="text-green-500" /> :
+                                status === 'in-progress' ? <FaPlay className="text-blue-500" /> :
+                                  status === 'review' ? <FaEye className="text-purple-500" /> :
+                                    status === 'blocked' ? <FaExclamationTriangle className="text-red-500" /> :
+                                      <FaClock className="text-gray-400" />}
+                              {status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                              {status === selectedTask.status && <FaCheck className="ml-auto text-blue-500" />}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )
+              )}
+
+              {/* Pending Acceptance Message */}
+              {!(selectedTask.assignmentStatus === 'accepted' || selectedTask.assignees?.some(a => a.assignmentStatus === 'accepted')) && (
+                <div className="flex flex-wrap gap-3 pt-4 border-t">
+                  <p className="w-full text-sm text-amber-600 mb-2 flex items-center gap-2">
+                    <HiOutlineClock className="w-4 h-4" />
+                    This task is pending your acceptance.
+                  </p>
+                  <Button
+                    onPress={() => {
+                      setSelectedTask(null)
+                      setViewMode('list')
+                    }}
+                    color="primary"
+                    startContent={<HiOutlineQueueList className="w-4 h-4" />}
+                  >
+                    Switch to List View to Accept/Reject
+                  </Button>
+                </div>
+              )}
             </div>
-          </div>}
+          </div>
+        </div>}
       </ModalPortal>
     </div>
   )
@@ -1533,10 +1494,10 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
       toast.error('Subtask ID is missing')
       return
     }
-    
+
     // Check if task is pending acceptance - don't allow subtask marking
     if (task) {
-      const isPendingAcceptance = task.assignmentStatus === 'pending' || 
+      const isPendingAcceptance = task.assignmentStatus === 'pending' ||
         task.assignees?.some(a => a.assignmentStatus === 'pending')
       const hasAcceptedAssignee = task.assignees?.some(a => a.assignmentStatus === 'accepted')
       if (isPendingAcceptance && !hasAcceptedAssignee) {
@@ -1573,14 +1534,14 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
         // Update subtask with new state including pendingAcceptance
         setSubtasks(prevSubtasks => prevSubtasks.map(st =>
           (st._id?.toString() || st._id) === (subtaskId?.toString() || subtaskId)
-            ? { 
-                ...st, 
-                completed: data.data?.subtask?.completed ?? !currentCompleted, 
-                completedAt: !currentCompleted ? new Date() : null,
-                pendingAcceptance: data.data?.subtask?.pendingAcceptance || false,
-                acceptedBy: data.data?.subtask?.acceptedBy || [],
-                completedBy: data.data?.subtask?.completedBy
-              }
+            ? {
+              ...st,
+              completed: data.data?.subtask?.completed ?? !currentCompleted,
+              completedAt: !currentCompleted ? new Date() : null,
+              pendingAcceptance: data.data?.subtask?.pendingAcceptance || false,
+              acceptedBy: data.data?.subtask?.acceptedBy || [],
+              completedBy: data.data?.subtask?.completedBy
+            }
             : st
         ))
         // Update task progress and status
@@ -1666,12 +1627,12 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
       if (data.success) {
         setSubtasks(prevSubtasks => prevSubtasks.map(st =>
           (st._id?.toString() || st._id) === idToSend
-            ? { 
-                ...st, 
-                ...data.data.subtask,
-                pendingAcceptance: !data.data.allAccepted,
-                completed: data.data.allAccepted
-              }
+            ? {
+              ...st,
+              ...data.data.subtask,
+              pendingAcceptance: !data.data.allAccepted,
+              completed: data.data.allAccepted
+            }
             : st
         ))
         if (task && data.data) {
@@ -1717,12 +1678,12 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
       if (data.success) {
         setSubtasks(prevSubtasks => prevSubtasks.map(st =>
           (st._id?.toString() || st._id) === idToSend
-            ? { 
-                ...st, 
-                ...data.data.subtask,
-                completed: false,
-                pendingAcceptance: false
-              }
+            ? {
+              ...st,
+              ...data.data.subtask,
+              completed: false,
+              pendingAcceptance: false
+            }
             : st
         ))
         if (task && data.data) {
@@ -1862,8 +1823,8 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                   <div className="w-full bg-gray-200 rounded-full h-1.5">
                     <div
                       className={`h-1.5 rounded-full transition-all ${progressPercentage === 100 ? 'bg-green-500' :
-                          progressPercentage >= 50 ? 'bg-blue-500' :
-                            'bg-orange-500'
+                        progressPercentage >= 50 ? 'bg-blue-500' :
+                          'bg-orange-500'
                         }`}
                       style={{ width: `${progressPercentage}%` }}
                     />
@@ -1879,11 +1840,10 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                     {task.assignees.slice(0, 4).map((assignee, idx) => (
                       <div
                         key={assignee._id || idx}
-                        className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium border-2 border-white ${
-                          assignee.user?._id?.toString() === currentEmployeeId || assignee.user?.toString() === currentEmployeeId
+                        className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium border-2 border-white ${assignee.user?._id?.toString() === currentEmployeeId || assignee.user?.toString() === currentEmployeeId
                             ? 'bg-primary-500 text-white'
                             : 'bg-gray-200 text-gray-600'
-                        }`}
+                          }`}
                         title={`${assignee.user?.firstName || ''} ${assignee.user?.lastName || ''} (${assignee.assignmentStatus})`}
                       >
                         {assignee.user?.firstName?.[0] || '?'}
@@ -2044,21 +2004,20 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                           checked={subtask.completed || subtask.pendingAcceptance}
                           onChange={() => handleToggleSubtask(subtask._id, subtask.completed || subtask.pendingAcceptance)}
                           disabled={updatingSubtaskId === subtask._id || isPendingAcceptance || subtask.pendingAcceptance}
-                          className={`w-4 h-4 border-gray-300 rounded focus:ring-primary-500 cursor-pointer disabled:opacity-50 ${
-                            subtask.pendingAcceptance ? 'text-yellow-500' : 'text-primary-600'
-                          }`}
+                          className={`w-4 h-4 border-gray-300 rounded focus:ring-primary-500 cursor-pointer disabled:opacity-50 ${subtask.pendingAcceptance ? 'text-yellow-500' : 'text-primary-600'
+                            }`}
                         />
                         <span
                           className={`flex-1 text-sm ${subtask.completed
-                              ? 'line-through text-gray-400'
-                              : subtask.pendingAcceptance
+                            ? 'line-through text-gray-400'
+                            : subtask.pendingAcceptance
                               ? 'text-yellow-700'
                               : 'text-gray-700'
                             }`}
                         >
                           {subtask.title}
                         </span>
-                        
+
                         {/* Pending acceptance badge */}
                         {subtask.pendingAcceptance && (
                           <span className="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full border border-yellow-300 flex items-center gap-1">
@@ -2066,7 +2025,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                             Pending ({subtask.acceptedBy?.length || 1}/{task.assignees?.length || 2})
                           </span>
                         )}
-                        
+
                         {/* Show subtask ETA if available */}
                         {(subtask.estimatedDays > 0 || subtask.estimatedHours > 0) && !subtask.pendingAcceptance && (
                           <span className="text-xs text-blue-600 flex items-center gap-1">
@@ -2086,7 +2045,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                           </button>
                         )}
                       </div>
-                      
+
                       {/* Multi-assignee accept/reject buttons */}
                       {subtask.pendingAcceptance && isMultiAssignee && (
                         <div className="mt-2 flex items-center gap-2 pl-7">

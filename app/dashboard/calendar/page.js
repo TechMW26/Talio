@@ -12,7 +12,10 @@ import {
   FaTh
 } from 'react-icons/fa'
 import toast from '@/utils/toast'
-import Loader from '@/components/ui/Loader'
+import { Skeleton } from '@heroui/react'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 
 export default function CalendarPage() {
   const [currentMonth, setCurrentMonth] = useState(new Date())
@@ -166,16 +169,42 @@ export default function CalendarPage() {
     return days
   }, [currentMonth, holidays, birthdays, announcements])
 
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="p-6 flex justify-center items-center min-h-[400px]">
-        <Loader size="lg" />
+      <div className="p-4 sm:p-6">
+        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-6">
+          <div>
+            <Skeleton className="h-7 w-56 rounded-lg mb-2" />
+            <Skeleton className="h-4 w-72 rounded-lg" />
+          </div>
+          <div className="flex gap-3">
+            <Skeleton className="h-10 w-36 rounded-lg" />
+            <Skeleton className="h-10 w-48 rounded-lg" />
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow-md p-4">
+          <div className="grid grid-cols-7 gap-1 mb-2">
+            {[1, 2, 3, 4, 5, 6, 7].map(i => (
+              <Skeleton key={i} className="h-5 w-full rounded" />
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-1">
+            {Array.from({ length: 35 }).map((_, i) => (
+              <Skeleton key={i} className="h-24 w-full rounded" />
+            ))}
+          </div>
+        </div>
       </div>
     )
   }
 
+  if (error) {
+    return <DataErrorState error={error} onRetry={refreshAll} title="Failed to load calendar data" />
+  }
+
   return (
     <div className="p-4 sm:p-6">
+      <BackgroundRefreshIndicator isValidating={isValidating} />
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-6">
         <div>
@@ -193,8 +222,8 @@ export default function CalendarPage() {
                 key={mode}
                 onClick={() => setViewMode(mode)}
                 className={`px-3 py-1.5 text-sm rounded-md flex items-center gap-1 ${viewMode === mode
-                    ? 'bg-white shadow text-gray-800'
-                    : 'text-gray-500 hover:text-gray-700'
+                  ? 'bg-white shadow text-gray-800'
+                  : 'text-gray-500 hover:text-gray-700'
                   }`}
               >
                 {mode === 'calendar' ? <FaTh /> : <FaList />}

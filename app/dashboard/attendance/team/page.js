@@ -1,6 +1,9 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 import toast from '@/utils/toast'
 import { FaUsers, FaBuilding, FaArrowLeft, FaCalendarAlt, FaClock, FaChevronLeft, FaChevronRight, FaSearch, FaUserCircle, FaMapMarkerAlt, FaFilter } from 'react-icons/fa'
 import { Card, CardBody, Button, Chip, Skeleton, Input, Select, SelectItem } from '@heroui/react'
@@ -20,193 +23,104 @@ const DEPARTMENT_COLORS = [
 ]
 
 export default function TeamAttendancePage() {
-  const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState(null)
   const [view, setView] = useState('initial') // 'initial', 'employees', 'calendar'
-  const [departments, setDepartments] = useState([])
-  const [headedDepartments, setHeadedDepartments] = useState([]) // Departments user heads
   const [employees, setEmployees] = useState([])
-  const [selectedDepartment, setSelectedDepartment] = useState(null)
-  const [selectedDepartmentFilter, setSelectedDepartmentFilter] = useState('all') // Filter for departments
+  const [selectedDepartmentFilter, setSelectedDepartmentFilter] = useState('all')
   const [selectedEmployee, setSelectedEmployee] = useState(null)
-  const [attendance, setAttendance] = useState([])
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [searchTerm, setSearchTerm] = useState('')
-  const [isDepartmentHead, setIsDepartmentHead] = useState(false)
-  const [departmentInfo, setDepartmentInfo] = useState(null)
   const [departmentColorMap, setDepartmentColorMap] = useState({})
-  const [isAdmin, setIsAdmin] = useState(false)
+  const [employeesLoading, setEmployeesLoading] = useState(true)
 
+  const user = useMemo(() => { try { return JSON.parse(localStorage.getItem('user')) } catch { return null } }, [])
+  const isAdmin = user && ['admin', 'hr'].includes(user.role)
+
+  // SWR: Check if user is a department head
+  const { data: headCheckRes, isLoading: headCheckLoading, error: headCheckError } = useAuthedSWR(
+    user ? '/api/team/check-head' : null
+  )
+  const isDepartmentHead = headCheckRes?.success && headCheckRes?.isDepartmentHead
+  const headedDepartments = headCheckRes?.departments || []
+  const departmentInfo = useMemo(() => {
+    if (!isDepartmentHead || headedDepartments.length === 0) return null
+    return {
+      id: headedDepartments[0]._id,
+      name: headedDepartments.length > 1 ? 'Multiple Departments' : headedDepartments[0].name
+    }
+  }, [isDepartmentHead, headedDepartments])
+
+  // SWR: Departments list (admin filter dropdown)
+  const { data: deptsRes } = useAuthedSWR(isAdmin ? '/api/departments' : null)
+  const departments = deptsRes?.data || []
+
+  // Fetch employees when head-check resolves (dependent effect — branching fetch logic)
   useEffect(() => {
-    const userData = localStorage.getItem('user')
-    if (userData) {
-      const parsedUser = JSON.parse(userData)
-      setUser(parsedUser)
-      checkUserRoleAndFetchData(parsedUser)
-    }
-  }, [])
+    if (!headCheckRes) return
 
-  const checkUserRoleAndFetchData = async (parsedUser) => {
-    try {
+    const fetchEmployees = async () => {
+      setEmployeesLoading(true)
       const token = localStorage.getItem('token')
-      const userIsAdmin = ['admin', 'hr'].includes(parsedUser.role)
-      setIsAdmin(userIsAdmin)
+      const headers = { 'Authorization': `Bearer ${token}` }
 
-      // Check if user is a department head
-      const checkHeadResponse = await fetch('/api/team/check-head', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const checkHeadData = await checkHeadResponse.json()
-
-      if (checkHeadData.success && checkHeadData.isDepartmentHead) {
-        setIsDepartmentHead(true)
-        const depts = checkHeadData.departments || []
-        setHeadedDepartments(depts)
-        
-        if (depts.length > 0) {
-          setDepartmentInfo({
-            id: depts[0]._id,
-            name: depts.length > 1 ? 'Multiple Departments' : depts[0].name
-          })
+      try {
+        if (isAdmin) {
+          const response = await fetch('/api/employees?status=active&limit=1000', { headers })
+          const data = await response.json()
+          if (data.success) {
+            const allEmployees = data.data || []
+            setEmployees(allEmployees)
+            buildDepartmentColorMap(allEmployees)
+          }
+        } else if (isDepartmentHead && headedDepartments.length > 0) {
+          const allEmployees = []
+          for (const dept of headedDepartments) {
+            const response = await fetch(`/api/employees?department=${dept._id}&status=active&limit=500`, { headers })
+            const data = await response.json()
+            if (data.success) allEmployees.push(...(data.data || []))
+          }
+          const uniqueEmployees = allEmployees.filter((emp, i, self) => i === self.findIndex(e => e._id === emp._id))
+          setEmployees(uniqueEmployees)
+          buildDepartmentColorMap(uniqueEmployees)
+        } else {
+          toast.error('You do not have permission to view team attendance')
         }
-      }
-
-      // Admin/HR sees all employees, Dept Head sees only their dept employees
-      if (userIsAdmin) {
-        // Fetch all departments for filtering
-        await fetchDepartments()
-        // Fetch ALL employees for admin
-        await fetchAllEmployees()
+      } catch (error) {
+        console.error('Error fetching employees:', error)
+        toast.error('Failed to fetch employees')
+      } finally {
+        setEmployeesLoading(false)
         setView('employees')
-      } else if (checkHeadData.success && checkHeadData.isDepartmentHead) {
-        // Dept head without admin role - only their departments
-        const deptIds = (checkHeadData.departments || []).map(d => d._id)
-        await fetchDepartmentEmployees(deptIds)
-        setView('employees')
-      } else {
-        toast.error('You do not have permission to view team attendance')
       }
-    } catch (error) {
-      console.error('Error checking user role:', error)
-      toast.error('Failed to load data')
-    } finally {
-      setLoading(false)
     }
+
+    fetchEmployees()
+  }, [headCheckRes, isAdmin, isDepartmentHead, headedDepartments])
+
+  const buildDepartmentColorMap = (employeeList) => {
+    const uniqueDepts = [...new Set(employeeList.map(e => e.department?._id || e.department).filter(Boolean))]
+    const colorMap = {}
+    uniqueDepts.forEach((deptId, index) => {
+      colorMap[deptId] = DEPARTMENT_COLORS[index % DEPARTMENT_COLORS.length]
+    })
+    setDepartmentColorMap(colorMap)
   }
 
-  const fetchAllEmployees = async () => {
-    try {
-      setLoading(true)
-      const token = localStorage.getItem('token')
-      
-      const response = await fetch('/api/employees?status=active&limit=1000', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success) {
-        const allEmployees = data.data || []
-        setEmployees(allEmployees)
-        
-        // Build department color map
-        const uniqueDepts = [...new Set(allEmployees.map(e => e.department?._id || e.department).filter(Boolean))]
-        const colorMap = {}
-        uniqueDepts.forEach((deptId, index) => {
-          colorMap[deptId] = DEPARTMENT_COLORS[index % DEPARTMENT_COLORS.length]
-        })
-        setDepartmentColorMap(colorMap)
-      }
-    } catch (error) {
-      console.error('Error fetching all employees:', error)
-      toast.error('Failed to fetch employees')
-    } finally {
-      setLoading(false)
-    }
-  }
+  // SWR: Employee attendance for calendar view (auto-refetches on month change)
+  const attendanceKey = useMemo(() => {
+    if (!selectedEmployee) return null
+    const month = currentMonth.getMonth() + 1
+    const year = currentMonth.getFullYear()
+    return `/api/attendance?employeeId=${selectedEmployee._id}&month=${month}&year=${year}`
+  }, [selectedEmployee, currentMonth])
 
-  const fetchDepartments = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/departments', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setDepartments(data.data || [])
-      }
-    } catch (error) {
-      console.error('Error fetching departments:', error)
-      toast.error('Failed to fetch departments')
-    }
-  }
+  const { data: attendanceRes, isLoading: attLoading, isValidating: attValidating } = useAuthedSWR(
+    attendanceKey, { keepPreviousData: false }
+  )
+  const attendance = attendanceRes?.data || []
 
-  const fetchDepartmentEmployees = async (departmentIdOrIds) => {
-    try {
-      setLoading(true)
-      const token = localStorage.getItem('token')
-      
-      // Support single ID or array of IDs
-      let departmentIds = Array.isArray(departmentIdOrIds) ? departmentIdOrIds : [departmentIdOrIds]
-      
-      // Fetch employees for all departments
-      const allEmployees = []
-      for (const deptId of departmentIds) {
-        const response = await fetch(`/api/employees?department=${deptId}&status=active&limit=500`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-        const data = await response.json()
-        if (data.success) {
-          allEmployees.push(...(data.data || []))
-        }
-      }
-      
-      // Remove duplicates (in case an employee is in multiple departments somehow)
-      const uniqueEmployees = allEmployees.filter((emp, index, self) => 
-        index === self.findIndex(e => e._id === emp._id)
-      )
-      
-      setEmployees(uniqueEmployees)
-      
-      // Build department color map
-      const uniqueDepts = [...new Set(uniqueEmployees.map(e => e.department?._id || e.department).filter(Boolean))]
-      const colorMap = {}
-      uniqueDepts.forEach((deptId, index) => {
-        colorMap[deptId] = DEPARTMENT_COLORS[index % DEPARTMENT_COLORS.length]
-      })
-      setDepartmentColorMap(colorMap)
-    } catch (error) {
-      console.error('Error fetching employees:', error)
-      toast.error('Failed to fetch employees')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchEmployeeAttendance = async (employeeId, monthDate = currentMonth) => {
-    try {
-      setLoading(true)
-      const token = localStorage.getItem('token')
-      const month = monthDate.getMonth() + 1
-      const year = monthDate.getFullYear()
-
-      const response = await fetch(
-        `/api/attendance?employeeId=${employeeId}&month=${month}&year=${year}`,
-        { headers: { 'Authorization': `Bearer ${token}` } }
-      )
-      const data = await response.json()
-      if (data.success) {
-        setAttendance(data.data || [])
-      }
-    } catch (error) {
-      console.error('Error fetching attendance:', error)
-      toast.error('Failed to fetch attendance')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleEmployeeClick = async (employee) => {
+  const handleEmployeeClick = (employee) => {
     setSelectedEmployee(employee)
-    await fetchEmployeeAttendance(employee._id)
+    setCurrentMonth(new Date())
     setView('calendar')
   }
 
@@ -214,25 +128,16 @@ export default function TeamAttendancePage() {
     if (view === 'calendar') {
       setView('employees')
       setSelectedEmployee(null)
-      setAttendance([])
     }
   }
 
-  // Calendar navigation
+  // Calendar navigation — just update state, SWR auto-refetches
   const goToPreviousMonth = () => {
-    const newMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1)
-    setCurrentMonth(newMonth)
-    if (selectedEmployee) {
-      fetchEmployeeAttendance(selectedEmployee._id, newMonth)
-    }
+    setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))
   }
 
   const goToNextMonth = () => {
-    const newMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1)
-    setCurrentMonth(newMonth)
-    if (selectedEmployee) {
-      fetchEmployeeAttendance(selectedEmployee._id, newMonth)
-    }
+    setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))
   }
 
   // Helper function to format date as YYYY-MM-DD in local timezone
@@ -324,16 +229,16 @@ export default function TeamAttendancePage() {
       const fullName = `${emp.firstName} ${emp.lastName}`.toLowerCase()
       const code = (emp.employeeCode || '').toLowerCase()
       const matchesSearch = fullName.includes(searchTerm.toLowerCase()) || code.includes(searchTerm.toLowerCase())
-      
+
       // Apply department filter
       if (selectedDepartmentFilter !== 'all') {
         const empDeptId = emp.department?._id || emp.department
         return matchesSearch && empDeptId?.toString() === selectedDepartmentFilter
       }
-      
+
       return matchesSearch
     })
-    
+
     // For admin who is also a dept head, sort their dept employees first
     if (isAdmin && isDepartmentHead && headedDepartments.length > 0) {
       const headedDeptIds = headedDepartments.map(d => d._id?.toString())
@@ -342,10 +247,10 @@ export default function TeamAttendancePage() {
         const bDeptId = (b.department?._id || b.department)?.toString()
         const aInHeaded = headedDeptIds.includes(aDeptId)
         const bInHeaded = headedDeptIds.includes(bDeptId)
-        
+
         if (aInHeaded && !bInHeaded) return -1
         if (!aInHeaded && bInHeaded) return 1
-        
+
         // Secondary sort by department name for grouping
         const aDeptName = a.department?.name || ''
         const bDeptName = b.department?.name || ''
@@ -359,10 +264,10 @@ export default function TeamAttendancePage() {
         return aDeptName.localeCompare(bDeptName)
       })
     }
-    
+
     return result
   }, [employees, searchTerm, selectedDepartmentFilter, isAdmin, isDepartmentHead, headedDepartments])
-  
+
   // Get unique departments from employees for filter dropdown
   const availableDepartments = useMemo(() => {
     const depts = new Map()
@@ -376,7 +281,9 @@ export default function TeamAttendancePage() {
     return Array.from(depts.values()).sort((a, b) => a.name.localeCompare(b.name))
   }, [employees])
 
-  if (loading && view === 'initial') {
+  if (headCheckError) return <DataErrorState message="Failed to check team permissions" onRetry={() => window.location.reload()} />
+
+  if ((headCheckLoading || employeesLoading) && view === 'initial') {
     return (
       <div className="page-container space-y-6">
         <div className="flex flex-col gap-3">
@@ -385,7 +292,7 @@ export default function TeamAttendancePage() {
         </div>
         <Skeleton className="h-12 rounded-lg" />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1,2,3,4,5,6].map(i => <Skeleton key={i} className="h-32 rounded-xl" />)}
+          {[1, 2, 3, 4, 5, 6].map(i => <Skeleton key={i} className="h-32 rounded-xl" />)}
         </div>
       </div>
     )
@@ -411,11 +318,11 @@ export default function TeamAttendancePage() {
               {view === 'calendar' && `${selectedEmployee?.firstName} ${selectedEmployee?.lastName}`}
             </h1>
             <p className="text-default-500 mt-1">
-              {view === 'employees' && (isAdmin 
-                ? `View attendance for all ${employees.length} employees${isDepartmentHead ? ' (your department shown first)' : ''}`
+              {view === 'employees' && (isAdmin
+                ? <>{`View attendance for all ${employees.length} employees${isDepartmentHead ? ' (your department shown first)' : ''}`} <BackgroundRefreshIndicator isValidating={attValidating} /></>
                 : 'Select an employee to view their attendance calendar'
               )}
-              {view === 'calendar' && 'View attendance calendar and work hours'}
+              {view === 'calendar' && <>'View attendance calendar and work hours' <BackgroundRefreshIndicator isValidating={attValidating} /></>}
             </p>
           </div>
         </div>
@@ -439,7 +346,7 @@ export default function TeamAttendancePage() {
                 }}
               />
             </div>
-            
+
             {/* Department Filter for all users with multiple departments available */}
             {availableDepartments.length > 1 && (
               <div className="sm:w-72">
@@ -457,7 +364,7 @@ export default function TeamAttendancePage() {
                     return (
                       <SelectItem key={dept._id} textValue={dept.name}>
                         <div className="flex items-center gap-2">
-                          <div 
+                          <div
                             className={`w-3 h-3 rounded-full ${departmentColorMap[dept._id]?.badge || 'bg-gray-500'}`}
                           />
                           <span>{dept.name}</span>
@@ -470,7 +377,7 @@ export default function TeamAttendancePage() {
               </div>
             )}
           </div>
-          
+
           {/* Department Color Legend */}
           {availableDepartments.length > 1 && (
             <div className="mt-4 flex flex-wrap gap-2">
@@ -500,9 +407,9 @@ export default function TeamAttendancePage() {
       {/* Employees Grid */}
       {view === 'employees' && (
         <>
-          {loading ? (
+          {employeesLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {[1,2,3,4,5,6,7,8].map(i => <Skeleton key={i} className="h-48 rounded-xl" />)}
+              {[1, 2, 3, 4, 5, 6, 7, 8].map(i => <Skeleton key={i} className="h-48 rounded-xl" />)}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -516,7 +423,7 @@ export default function TeamAttendancePage() {
                   const empDeptId = (emp.department?._id || emp.department)?.toString()
                   const deptColor = departmentColorMap[empDeptId] || { bg: 'bg-default-100', border: 'border-default-300', text: 'text-default-700', badge: 'bg-default-500' }
                   const isHeadedDept = isDepartmentHead && headedDepartments.some(d => d._id?.toString() === empDeptId)
-                  
+
                   return (
                     <Card
                       key={emp._id}
@@ -540,7 +447,7 @@ export default function TeamAttendancePage() {
                               </span>
                             </div>
                           )}
-                          
+
                           {/* Info */}
                           <div className="flex-1 min-w-0">
                             <h3 className="text-sm font-semibold text-default-800 truncate">
@@ -548,7 +455,7 @@ export default function TeamAttendancePage() {
                             </h3>
                             <p className="text-xs text-default-500 truncate">{emp.designation?.title || 'No Designation'}</p>
                             <p className="text-xs text-default-400">{emp.employeeCode || ''}</p>
-                            
+
                             {/* Department Badge */}
                             {emp.department?.name && (
                               <Chip
@@ -563,7 +470,7 @@ export default function TeamAttendancePage() {
                               </Chip>
                             )}
                           </div>
-                          
+
                           {/* Action indicator */}
                           <div className="text-primary">
                             <FaCalendarAlt className="w-4 h-4" />
@@ -666,8 +573,8 @@ export default function TeamAttendancePage() {
               </div>
             </div>
 
-          {/* Calendar Grid */}
-          {loading ? (
+            {/* Calendar Grid */}
+            {attLoading ? (
               <div className="grid grid-cols-7 gap-2">
                 {[...Array(35)].map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)}
               </div>

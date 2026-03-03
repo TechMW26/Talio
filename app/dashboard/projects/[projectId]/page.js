@@ -1,21 +1,23 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter, useSearchParams, useParams } from 'next/navigation'
 import toast from '@/utils/toast'
 import { useSocket } from '@/contexts/SocketContext'
-import { 
-  HiOutlineArrowLeft, HiOutlinePencil, HiOutlinePlus, HiOutlineUsers, 
-  HiOutlineClipboardDocumentList, HiOutlineCalendarDays, HiOutlineCheckCircle, 
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
+import {
+  HiOutlineArrowLeft, HiOutlinePencil, HiOutlinePlus, HiOutlineUsers,
+  HiOutlineClipboardDocumentList, HiOutlineCalendarDays, HiOutlineCheckCircle,
   HiOutlineClock, HiOutlineExclamationTriangle, HiOutlineChatBubbleLeftRight,
-  HiOutlineChartBar, HiOutlineCheck, HiOutlineXMark, 
-  HiOutlineTrash, HiOutlineUserPlus, HiOutlineArchiveBox, HiOutlineChatBubbleOvalLeftEllipsis, 
-  HiOutlineClock as HiOutlineHistory, HiOutlineChevronDown, HiOutlineChevronUp, 
+  HiOutlineChartBar, HiOutlineCheck, HiOutlineXMark,
+  HiOutlineTrash, HiOutlineUserPlus, HiOutlineArchiveBox, HiOutlineChatBubbleOvalLeftEllipsis,
+  HiOutlineClock as HiOutlineHistory, HiOutlineChevronDown, HiOutlineChevronUp,
   HiOutlinePlay, HiOutlineEye, HiOutlineDocumentText, HiOutlineArrowRight,
   HiOutlineLockClosed, HiOutlineArrowPath, HiOutlineArrowsRightLeft,
   HiOutlineMagnifyingGlass
 } from 'react-icons/hi2'
-import { 
+import {
   FaArrowLeft, FaEdit, FaPlus, FaUsers, FaTasks, FaCalendarAlt,
   FaCheckCircle, FaClock, FaExclamationTriangle, FaComments,
   FaChartLine, FaEllipsisV, FaCheck, FaTimes, FaTrash,
@@ -24,7 +26,7 @@ import {
   FaThumbtack, FaLock, FaSync, FaExchangeAlt
 } from 'react-icons/fa'
 import { playNotificationSound, NotificationSoundTypes } from '@/lib/notificationSounds'
-import { Button, Select, SelectItem } from '@heroui/react'
+import { Button, Select, SelectItem, Skeleton } from '@heroui/react'
 import ProjectOverview from '@/components/projects/ProjectOverview'
 import KanbanBoard from '@/components/tasks/KanbanBoard'
 import Portal from '@/components/ui/Portal'
@@ -75,20 +77,72 @@ export default function ProjectDetailPage() {
   const { projectId } = useParams()
   const router = useRouter()
   const searchParams = useSearchParams()
-  
+
   // Socket for real-time updates
   const { joinProject, leaveProject, onTaskUpdated } = useSocket()
-  
-  const [project, setProject] = useState(null)
+
+  // User from localStorage
+  const user = useMemo(() => getCurrentUser(), [])
+
+  // SWR hooks for data fetching (replaces manual fetch + auto-refresh)
+  const { data: projectData, error: projectError, isLoading: loading, mutate: mutateProject } = useAuthedSWR(
+    projectId ? `/api/projects/${projectId}` : null,
+    { refreshInterval: 10000 }
+  )
+  const project = projectData?.data || null
+
+  const { data: tasksData, mutate: mutateTasks } = useAuthedSWR(
+    projectId ? `/api/projects/${projectId}/tasks` : null,
+    { refreshInterval: 10000 }
+  )
+
   const [tasks, setTasks] = useState([])
-  const [timeline, setTimeline] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [timelineLoading, setTimelineLoading] = useState(false)
-  const [timelineError, setTimelineError] = useState(null)
-  const [timelineFetched, setTimelineFetched] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
-  const [user, setUser] = useState(null)
-  const [currentEmployeeId, setCurrentEmployeeId] = useState(null)
+
+  const { data: timelineData, error: timelineErrorSWR, isLoading: timelineLoading, mutate: mutateTimeline } = useAuthedSWR(
+    activeTab === 'timeline' ? `/api/projects/${projectId}/timeline` : null,
+    { refreshInterval: 10000 }
+  )
+  const timeline = timelineData?.data || []
+  const timelineError = timelineErrorSWR ? 'Failed to load activity. Please try again.' : null
+
+  const { data: notesData, mutate: mutateNotes } = useAuthedSWR(
+    activeTab === 'notes' ? `/api/projects/${projectId}/notes` : null,
+    { refreshInterval: 10000 }
+  )
+  const notes = notesData?.data || []
+
+  const { data: completionData, mutate: mutateCompletionStatus } = useAuthedSWR(
+    projectId ? `/api/projects/${projectId}/complete` : null,
+    { refreshInterval: 10000 }
+  )
+  const completionStatus = completionData?.data || {
+    canComplete: false,
+    totalTasks: 0,
+    completedTasks: 0,
+    allTasksCompleted: false
+  }
+
+  // Sync tasks from SWR to local state (local state needed for socket + optimistic updates)
+  useEffect(() => {
+    if (tasksData?.data) {
+      setTasks(tasksData.data)
+    }
+  }, [tasksData])
+
+  // Derive currentEmployeeId from SWR data or user
+  const currentEmployeeId = useMemo(() => {
+    if (tasksData?.currentEmployeeId) return tasksData.currentEmployeeId
+    return getEmployeeId(user)
+  }, [tasksData, user])
+
+  // Redirect on project fetch error
+  useEffect(() => {
+    if (projectError) {
+      toast.error('Failed to load project')
+      router.push('/dashboard/projects')
+    }
+  }, [projectError, router])
   const [showCreateTask, setShowCreateTask] = useState(false)
   const [showAddMember, setShowAddMember] = useState(false)
   const [newComment, setNewComment] = useState('')
@@ -106,26 +160,13 @@ export default function ProjectDetailPage() {
   const [showEditTaskModal, setShowEditTaskModal] = useState(false)
   const [editTaskForm, setEditTaskForm] = useState(null)
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false)
-  
+
   // Reason modal state for status changes (requires justification)
   const [showReasonModal, setShowReasonModal] = useState(false)
   const [pendingStatusChange, setPendingStatusChange] = useState(null) // { task, newStatus }
   const [statusChangeReason, setStatusChangeReason] = useState('')
-  
-  // Project completion status
-  const [completionStatus, setCompletionStatus] = useState({
-    canComplete: false,
-    totalTasks: 0,
-    completedTasks: 0,
-    allTasksCompleted: false
-  })
-  
-  // Auto-refresh refs
-  const refreshIntervalRef = useRef(null)
-  const lastFetchRef = useRef(Date.now())
-  
-  // Notes state
-  const [notes, setNotes] = useState([])
+
+  // Notes form state
   const [showCreateNote, setShowCreateNote] = useState(false)
   const [editingNote, setEditingNote] = useState(null)
   const [noteForm, setNoteForm] = useState({
@@ -204,211 +245,11 @@ export default function ProjectDetailPage() {
     }
   }
 
-  // Fetch functions with silent refresh support
-  const fetchProject = useCallback(async (silent = false) => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/projects/${projectId}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        setProject(prev => {
-          // Only update if data changed to prevent layout shifts
-          if (JSON.stringify(prev) !== JSON.stringify(data.data)) {
-            return data.data
-          }
-          return prev
-        })
-      } else if (!silent) {
-        toast.error(data.message || 'Failed to load project')
-        router.push('/dashboard/projects')
-      }
-    } catch (error) {
-      console.error('Fetch project error:', error)
-      if (!silent) {
-        toast.error('An error occurred')
-        router.push('/dashboard/projects')
-      }
-    } finally {
-      if (!silent) setLoading(false)
-    }
-  }, [projectId, router])
-
-  const fetchTasks = useCallback(async (silent = false) => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/projects/${projectId}/tasks`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        setTasks(prev => {
-          // Only update if data changed to prevent layout shifts
-          if (JSON.stringify(prev) !== JSON.stringify(data.data)) {
-            return data.data
-          }
-          return prev
-        })
-        if (data.currentEmployeeId) {
-          setCurrentEmployeeId(data.currentEmployeeId)
-        }
-      }
-    } catch (error) {
-      console.error('Fetch tasks error:', error)
-    }
-  }, [projectId])
-
-  const fetchTimeline = useCallback(async (silent = false) => {
-    try {
-      if (!silent) {
-        setTimelineLoading(true)
-        setTimelineError(null)
-      }
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/projects/${projectId}/timeline`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        setTimeline(prev => {
-          if (JSON.stringify(prev) !== JSON.stringify(data.data)) {
-            return data.data
-          }
-          return prev
-        })
-        setTimelineError(null)
-        setTimelineFetched(true)
-      } else {
-        if (!silent) {
-          setTimelineError(data.message || 'Failed to load activity')
-        }
-      }
-    } catch (error) {
-      console.error('Fetch timeline error:', error)
-      if (!silent) {
-        setTimelineError('Failed to load activity. Please try again.')
-      }
-    } finally {
-      if (!silent) {
-        setTimelineLoading(false)
-      }
-    }
-  }, [projectId])
-
-  const fetchNotes = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/projects/${projectId}/notes`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        setNotes(prev => {
-          if (JSON.stringify(prev) !== JSON.stringify(data.data)) {
-            return data.data
-          }
-          return prev
-        })
-      }
-    } catch (error) {
-      console.error('Fetch notes error:', error)
-    }
-  }, [projectId])
-
-  // Fetch completion status (whether all tasks are completed)
-  const fetchCompletionStatus = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/projects/${projectId}/complete`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        setCompletionStatus(data.data)
-      }
-    } catch (error) {
-      console.error('Fetch completion status error:', error)
-    }
-  }, [projectId])
-
-  // Silent refresh function for auto-sync
-  const silentRefresh = useCallback(() => {
-    fetchProject(true)
-    fetchCompletionStatus() // Always check completion status
-    if (activeTab === 'tasks') fetchTasks(true)
-    if (activeTab === 'timeline') fetchTimeline(true) // Silent refresh for timeline
-    if (activeTab === 'notes') fetchNotes()
-    lastFetchRef.current = Date.now()
-  }, [activeTab, fetchProject, fetchTasks, fetchTimeline, fetchNotes, fetchCompletionStatus])
-
+  // Set active tab from URL search params
   useEffect(() => {
-    const userData = localStorage.getItem('user')
-    if (userData) {
-      const parsedUser = JSON.parse(userData)
-      setUser(parsedUser)
-      // Set currentEmployeeId from localStorage user data as fallback
-      if (parsedUser.employeeId && !currentEmployeeId) {
-        const empId = typeof parsedUser.employeeId === 'object' 
-          ? parsedUser.employeeId._id || parsedUser.employeeId
-          : parsedUser.employeeId
-        setCurrentEmployeeId(empId?.toString())
-      }
-    }
-    
     const tab = searchParams.get('tab')
     if (tab) setActiveTab(tab)
-    
-    fetchProject()
-  }, [projectId, fetchProject])
-
-  // Always fetch tasks and completion status, regardless of active tab
-  useEffect(() => {
-    if (project) {
-      fetchTasks() // Always fetch to ensure currentEmployeeId is set
-      fetchCompletionStatus() // Check if project can be marked complete
-    }
-  }, [project, fetchTasks, fetchCompletionStatus])
-
-  useEffect(() => {
-    if (project && activeTab === 'tasks') {
-      fetchTasks()
-    }
-    if (project && activeTab === 'timeline') {
-      fetchTimeline()
-    }
-    if (project && activeTab === 'notes') {
-      fetchNotes()
-    }
-  }, [project, activeTab, fetchTasks, fetchTimeline, fetchNotes])
-
-  // Auto-refresh every 10 seconds for real-time sync
-  useEffect(() => {
-    if (project) {
-      refreshIntervalRef.current = setInterval(silentRefresh, 10000)
-      
-      // Also refresh on window focus
-      const handleFocus = () => {
-        if (Date.now() - lastFetchRef.current > 5000) {
-          silentRefresh()
-        }
-      }
-      window.addEventListener('focus', handleFocus)
-      
-      return () => {
-        if (refreshIntervalRef.current) {
-          clearInterval(refreshIntervalRef.current)
-        }
-        window.removeEventListener('focus', handleFocus)
-      }
-    }
-  }, [project, silentRefresh])
+  }, [searchParams])
 
   // Set document title with project name
   useEffect(() => {
@@ -425,22 +266,24 @@ export default function ProjectDetailPage() {
     if (projectId) {
       // Join project room for real-time updates
       joinProject(projectId)
-      
+
       // Listen for task updates (e.g., when project head rejects/unmarks subtasks)
       const unsubscribe = onTaskUpdated((updatedTask) => {
         console.log('🔄 [Socket] Task updated in real-time:', updatedTask._id)
         // Update the task in the local state
-        setTasks(prev => prev.map(task => 
+        setTasks(prev => prev.map(task =>
           task._id === updatedTask._id ? { ...task, ...updatedTask } : task
         ))
         // If this task is currently selected, update it too
-        setSelectedTask(prev => 
+        setSelectedTask(prev =>
           prev && prev._id === updatedTask._id ? { ...prev, ...updatedTask } : prev
         )
+        // Also revalidate SWR cache
+        mutateTasks()
         // Show a notification
         toast.success('Task updated by project head', { icon: '🔄' })
       })
-      
+
       return () => {
         leaveProject(projectId)
         if (unsubscribe) unsubscribe()
@@ -472,7 +315,7 @@ export default function ProjectDetailPage() {
         toast.success('Note created successfully')
         setShowCreateNote(false)
         setNoteForm({ title: '', content: '', color: 'yellow', visibility: 'team' })
-        fetchNotes()
+        mutateNotes()
       } else {
         toast.error(data.message)
       }
@@ -506,7 +349,7 @@ export default function ProjectDetailPage() {
         toast.success('Note updated successfully')
         setEditingNote(null)
         setNoteForm({ title: '', content: '', color: 'yellow', visibility: 'team' })
-        fetchNotes()
+        mutateNotes()
       } else {
         toast.error(data.message)
       }
@@ -530,7 +373,7 @@ export default function ProjectDetailPage() {
       const data = await response.json()
       if (data.success) {
         toast.success('Note deleted successfully')
-        fetchNotes()
+        mutateNotes()
       } else {
         toast.error(data.message)
       }
@@ -554,7 +397,7 @@ export default function ProjectDetailPage() {
       const data = await response.json()
       if (data.success) {
         toast.success(note.isPinned ? 'Note unpinned' : 'Note pinned')
-        fetchNotes()
+        mutateNotes()
       } else {
         toast.error(data.message)
       }
@@ -604,7 +447,7 @@ export default function ProjectDetailPage() {
         toast.success(data.message)
         setShowRejectInvitationModal(false)
         setRejectReason('')
-        fetchProject()
+        mutateProject()
       } else {
         toast.error(data.message)
       }
@@ -624,7 +467,7 @@ export default function ProjectDetailPage() {
 
     // Check if current user is assigned to this task
     const isAssignedToSelf = taskForm.assigneeIds.includes(currentEmployeeId)
-    
+
     // If assigned to self and no ETA provided yet, show ETA modal
     if (isAssignedToSelf && !pendingTaskData) {
       setPendingTaskData(taskForm)
@@ -635,10 +478,10 @@ export default function ProjectDetailPage() {
     try {
       setSubmitting(true)
       const token = localStorage.getItem('token')
-      
+
       // Start with current form data
       const taskData = { ...taskForm }
-      
+
       // Handle subtask-wise ETAs
       if (pendingTaskData && pendingTaskData.subtasks?.length > 0 && Object.keys(subtaskEtas).length > 0) {
         // Add ETAs to each subtask
@@ -659,17 +502,17 @@ export default function ProjectDetailPage() {
         const hours = parseFloat(taskEta.hours) || 0
         taskData.estimatedHours = (days * 8) + hours
       }
-      
+
       // Sanitize attachments - ensure it's a clean array of plain objects
       const attachmentsToSend = Array.isArray(taskForm.attachments)
         ? taskForm.attachments
-            .filter((file) => file && typeof file === 'object' && file.name && file.url)
-            .map((file) => ({
-              name: String(file.name),
-              url: String(file.url),
-              type: file.type ? String(file.type) : undefined,
-              size: typeof file.size === 'number' ? file.size : undefined
-            }))
+          .filter((file) => file && typeof file === 'object' && file.name && file.url)
+          .map((file) => ({
+            name: String(file.name),
+            url: String(file.url),
+            type: file.type ? String(file.type) : undefined,
+            size: typeof file.size === 'number' ? file.size : undefined
+          }))
         : []
 
       // Build final payload
@@ -683,7 +526,7 @@ export default function ProjectDetailPage() {
         estimatedHours: taskData.estimatedHours,
         attachments: attachmentsToSend
       }
-      
+
       console.log('[CreateTask] Sending payload:', JSON.stringify(payload, null, 2))
 
       const response = await fetch(`/api/projects/${projectId}/tasks`, {
@@ -705,7 +548,7 @@ export default function ProjectDetailPage() {
         setPendingTaskData(null)
         setTaskEta({ days: '', hours: '' })
         setSubtaskEtas({})
-        
+
         // Show success feedback
         toast.success('Task created successfully')
         try {
@@ -714,11 +557,11 @@ export default function ProjectDetailPage() {
           // Ignore sound errors - they shouldn't affect UX
           console.warn('Sound playback failed:', soundError)
         }
-        
+
         // Refresh data in background
-        fetchTasks()
-        fetchProject() // Refresh completion percentage
-        fetchCompletionStatus() // Check if all tasks completed
+        mutateTasks()
+        mutateProject() // Refresh completion percentage
+        mutateCompletionStatus() // Check if all tasks completed
       } else {
         toast.error(data.message || 'Failed to create task')
         try {
@@ -750,7 +593,7 @@ export default function ProjectDetailPage() {
     try {
       setSubmitting(true)
       const token = localStorage.getItem('token')
-      
+
       // Calculate total estimated hours from subtasks
       let totalEstimatedHours = 0
       if (editTaskForm.subtasks && editTaskForm.subtasks.length > 0) {
@@ -758,7 +601,7 @@ export default function ProjectDetailPage() {
           totalEstimatedHours += ((st.estimatedDays || 0) * 8) + (st.estimatedHours || 0)
         })
       }
-      
+
       const response = await fetch(`/api/projects/${projectId}/tasks/${editTaskForm._id}`, {
         method: 'PUT',
         headers: {
@@ -783,7 +626,7 @@ export default function ProjectDetailPage() {
         setEditTaskForm(null)
         setSelectedTask(null)
         setNewSubtaskTitle('')
-        fetchTasks()
+        mutateTasks()
       } else {
         playNotificationSound(NotificationSoundTypes.WARNING)
         toast.error(data.message)
@@ -804,9 +647,9 @@ export default function ProjectDetailPage() {
       toast.error('Tasks with subtasks are auto-managed. Complete subtasks to update status.')
       return
     }
-    
+
     // Safety check: Don't allow status change for tasks pending acceptance
-    const isPendingAcceptance = task.assignmentStatus === 'pending' || 
+    const isPendingAcceptance = task.assignmentStatus === 'pending' ||
       task.assignees?.some(a => a.assignmentStatus === 'pending')
     const hasAcceptedAssignee = task.assignees?.some(a => a.assignmentStatus === 'accepted')
     if (isPendingAcceptance && !hasAcceptedAssignee) {
@@ -823,7 +666,7 @@ export default function ProjectDetailPage() {
   // Execute status change after reason is provided
   const executeStatusChange = async () => {
     if (!pendingStatusChange) return
-    
+
     if (!statusChangeReason.trim()) {
       toast.error('Please provide a reason for this status change')
       return
@@ -841,7 +684,7 @@ export default function ProjectDetailPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           status: newStatus,
           statusChangeReason: statusChangeReason.trim()
         })
@@ -850,7 +693,7 @@ export default function ProjectDetailPage() {
       const data = await response.json()
       if (data.success) {
         // Update local state immediately
-        setTasks(prevTasks => prevTasks.map(t => 
+        setTasks(prevTasks => prevTasks.map(t =>
           t._id === task._id ? { ...t, status: newStatus } : t
         ))
         if (newStatus === 'completed') {
@@ -859,8 +702,8 @@ export default function ProjectDetailPage() {
           playNotificationSound(NotificationSoundTypes.UPDATE)
         }
         toast.success(`Task moved to ${newStatus.replace('-', ' ')}`)
-        fetchTasks(true)
-        fetchCompletionStatus() // Update completion button state
+        mutateTasks()
+        mutateCompletionStatus() // Update completion button state
       } else {
         playNotificationSound(NotificationSoundTypes.WARNING)
         toast.error(data.message || 'Failed to update task status')
@@ -881,11 +724,11 @@ export default function ProjectDetailPage() {
       toast.error('Subtask ID is missing')
       return
     }
-    
+
     // Check if task is pending acceptance - don't allow subtask marking
     const taskToCheck = task || tasks.find(t => t._id === taskId) || selectedTask
     if (taskToCheck) {
-      const isPendingAcceptance = taskToCheck.assignmentStatus === 'pending' || 
+      const isPendingAcceptance = taskToCheck.assignmentStatus === 'pending' ||
         taskToCheck.assignees?.some(a => a.assignmentStatus === 'pending')
       const hasAcceptedAssignee = taskToCheck.assignees?.some(a => a.assignmentStatus === 'accepted')
       if (isPendingAcceptance && !hasAcceptedAssignee) {
@@ -893,22 +736,22 @@ export default function ProjectDetailPage() {
         return
       }
     }
-    
+
     try {
       const token = localStorage.getItem('token')
-      const idToSend = typeof subtaskId === 'object' && subtaskId._id 
-        ? subtaskId._id.toString() 
+      const idToSend = typeof subtaskId === 'object' && subtaskId._id
+        ? subtaskId._id.toString()
         : subtaskId.toString ? subtaskId.toString() : String(subtaskId)
-      
+
       const response = await fetch(`/api/projects/${projectId}/tasks/${taskId}/subtasks`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ 
-          subtaskId: idToSend, 
-          completed: !currentCompleted 
+        body: JSON.stringify({
+          subtaskId: idToSend,
+          completed: !currentCompleted
         })
       })
 
@@ -927,9 +770,9 @@ export default function ProjectDetailPage() {
                   completedAt: data.data.subtask.completedAt || (!currentCompleted ? new Date() : null)
                 }
               }
-              return { 
-                ...st, 
-                completed: !currentCompleted, 
+              return {
+                ...st,
+                completed: !currentCompleted,
                 completedAt: !currentCompleted ? new Date() : null,
                 pendingAcceptance: false
               }
@@ -944,8 +787,8 @@ export default function ProjectDetailPage() {
           }
         })
         // Refresh tasks to update the list
-        fetchTasks(true)
-        
+        mutateTasks()
+
         // Show appropriate toast message based on response
         if (data.data.subtask?.pendingAcceptance) {
           toast.success('Waiting for other assignees to accept completion', { icon: '⏳' })
@@ -973,7 +816,7 @@ export default function ProjectDetailPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           subtaskId,
           action: 'acceptCompletion'
         })
@@ -984,8 +827,8 @@ export default function ProjectDetailPage() {
         // Update subtask locally
         setSelectedTask(prev => {
           if (!prev) return prev
-          const updatedSubtasks = prev.subtasks.map(st => 
-            (st._id?.toString() || st._id) === subtaskId 
+          const updatedSubtasks = prev.subtasks.map(st =>
+            (st._id?.toString() || st._id) === subtaskId
               ? { ...st, ...data.data.subtask }
               : st
           )
@@ -995,8 +838,8 @@ export default function ProjectDetailPage() {
             progressPercentage: data.data.progressPercentage
           }
         })
-        fetchTasks(true)
-        
+        mutateTasks()
+
         if (data.data.allAccepted) {
           playNotificationSound(NotificationSoundTypes.SUCCESS)
           toast.success('All assignees accepted! Subtask is now complete.', { icon: '✅' })
@@ -1022,7 +865,7 @@ export default function ProjectDetailPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           subtaskId,
           action: 'rejectCompletion',
           reason: reason || 'Rejected by team member'
@@ -1034,8 +877,8 @@ export default function ProjectDetailPage() {
         // Update subtask locally - reset to incomplete
         setSelectedTask(prev => {
           if (!prev) return prev
-          const updatedSubtasks = prev.subtasks.map(st => 
-            (st._id?.toString() || st._id) === subtaskId 
+          const updatedSubtasks = prev.subtasks.map(st =>
+            (st._id?.toString() || st._id) === subtaskId
               ? { ...st, ...data.data.subtask, pendingAcceptance: false, completed: false }
               : st
           )
@@ -1045,7 +888,7 @@ export default function ProjectDetailPage() {
             progressPercentage: data.data.progressPercentage
           }
         })
-        fetchTasks(true)
+        mutateTasks()
         playNotificationSound(NotificationSoundTypes.WARNING)
         toast.success('Subtask completion rejected and reset', { icon: '↩️' })
       } else {
@@ -1062,7 +905,7 @@ export default function ProjectDetailPage() {
       toast.error('Comment text is required')
       return
     }
-    
+
     try {
       const token = localStorage.getItem('token')
       const response = await fetch(`/api/projects/${projectId}/tasks/${taskId}/subtasks/${subtaskId}/comments`, {
@@ -1091,7 +934,7 @@ export default function ProjectDetailPage() {
           return { ...prev, subtasks: updatedSubtasks }
         })
         // Refresh timeline
-        fetchTimeline()
+        mutateTimeline()
         toast.success('Comment added')
       } else {
         toast.error(data.message || 'Failed to add comment')
@@ -1125,8 +968,8 @@ export default function ProjectDetailPage() {
         }
         toast.success('Task updated')
         setSelectedTask(null)
-        fetchTasks()
-        fetchProject()
+        mutateTasks()
+        mutateProject()
       } else {
         playNotificationSound(NotificationSoundTypes.WARNING)
         toast.error(data.message)
@@ -1143,7 +986,7 @@ export default function ProjectDetailPage() {
     try {
       setSubmitting(true)
       const token = localStorage.getItem('token')
-      
+
       // If project head, delete directly. Otherwise, create a deletion request
       if (isProjectHead) {
         const response = await fetch(`/api/projects/${projectId}/tasks/${taskId}`, {
@@ -1159,9 +1002,9 @@ export default function ProjectDetailPage() {
           setShowDeleteTaskModal(false)
           setTaskToDelete(null)
           setDeleteReason('')
-          fetchTasks()
-          fetchProject()
-          fetchCompletionStatus() // Update completion button state
+          mutateTasks()
+          mutateProject()
+          mutateCompletionStatus() // Update completion button state
         } else {
           playNotificationSound(NotificationSoundTypes.WARNING)
           toast.error(data.message)
@@ -1224,7 +1067,7 @@ export default function ProjectDetailPage() {
         setShowReassignModal(false)
         setReassignTask(null)
         setReassignToId('')
-        fetchTasks()
+        mutateTasks()
       } else {
         playNotificationSound(NotificationSoundTypes.WARNING)
         toast.error(data.message)
@@ -1259,7 +1102,7 @@ export default function ProjectDetailPage() {
         }
         toast.success(data.message)
         setSelectedTask(null)
-        fetchTasks()
+        mutateTasks()
       } else {
         playNotificationSound(NotificationSoundTypes.WARNING)
         toast.error(data.message)
@@ -1292,7 +1135,7 @@ export default function ProjectDetailPage() {
       if (data.success) {
         toast.success('Comment added')
         setNewComment('')
-        fetchTimeline()
+        mutateTimeline()
       } else {
         toast.error(data.message)
       }
@@ -1325,8 +1168,8 @@ export default function ProjectDetailPage() {
       if (data.success) {
         playNotificationSound(NotificationSoundTypes.SUCCESS)
         toast.success('Project marked as complete!')
-        fetchProject()
-        fetchCompletionStatus()
+        mutateProject()
+        mutateCompletionStatus()
       } else {
         toast.error(data.message)
       }
@@ -1360,7 +1203,7 @@ export default function ProjectDetailPage() {
       if (data.success) {
         playNotificationSound(NotificationSoundTypes.SUCCESS)
         toast.success('Completion request sent to project head')
-        fetchProject()
+        mutateProject()
       } else {
         toast.error(data.message)
       }
@@ -1393,7 +1236,7 @@ export default function ProjectDetailPage() {
       const data = await response.json()
       if (data.success) {
         toast.success(data.message)
-        fetchProject()
+        mutateProject()
       } else {
         toast.error(data.message)
       }
@@ -1424,8 +1267,33 @@ export default function ProjectDetailPage() {
   if (loading) {
     return (
       <div className="page-container">
-        <div className="flex items-center justify-center h-64">
-          <Loader size="lg" />
+        <div className="space-y-6">
+          {/* Header skeleton */}
+          <div className="flex items-start justify-between">
+            <div className="flex items-start gap-4">
+              <Skeleton className="w-10 h-10 rounded-lg" />
+              <div className="space-y-2">
+                <Skeleton className="w-64 h-8 rounded-lg" />
+                <Skeleton className="w-96 h-4 rounded-lg" />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Skeleton className="w-20 h-10 rounded-lg" />
+              <Skeleton className="w-32 h-10 rounded-lg" />
+            </div>
+          </div>
+          {/* Tabs skeleton */}
+          <div className="flex gap-4">
+            {[1, 2, 3, 4, 5].map(i => (
+              <Skeleton key={i} className="w-24 h-10 rounded-lg" />
+            ))}
+          </div>
+          {/* Content skeleton */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Skeleton className="w-full h-48 rounded-lg" />
+            <Skeleton className="w-full h-48 rounded-lg" />
+          </div>
+          <Skeleton className="w-full h-64 rounded-lg" />
         </div>
       </div>
     )
@@ -1473,9 +1341,8 @@ export default function ProjectDetailPage() {
                   <FaComments className="w-5 h-5" />
                 </button>
               )}
-              <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                isOverdue ? statusColors.overdue : statusColors[project.status]
-              }`}>
+              <span className={`px-3 py-1 rounded-full text-sm font-medium ${isOverdue ? statusColors.overdue : statusColors[project.status]
+                }`}>
                 {isOverdue ? 'Overdue' : statusLabels[project.status]}
               </span>
               <span className={`px-2 py-1 rounded-full text-xs font-medium ${priorityColors[project.priority]}`}>
@@ -1485,9 +1352,8 @@ export default function ProjectDetailPage() {
             {/* Description Section */}
             {project.description ? (
               <div className="mt-3 bg-gray-50 rounded-lg p-4 border border-gray-100 max-w-4xl">
-                <p className={`text-gray-600 text-sm leading-relaxed whitespace-pre-wrap ${
-                  !isDescriptionExpanded && project.description.length > 200 ? 'line-clamp-3' : ''
-                }`}>
+                <p className={`text-gray-600 text-sm leading-relaxed whitespace-pre-wrap ${!isDescriptionExpanded && project.description.length > 200 ? 'line-clamp-3' : ''
+                  }`}>
                   {project.description}
                 </p>
                 {project.description.length > 200 && (
@@ -1527,19 +1393,18 @@ export default function ProjectDetailPage() {
               Edit
             </button>
           )}
-          
+
           {/* Mark Complete button - ONLY for Project Head (green, permanent) */}
           {isProjectHead && project.status === 'ongoing' && (
             <button
               onClick={handleMarkComplete}
               disabled={submitting || !completionStatus.canComplete}
-              className={`flex items-center px-4 py-2 rounded-lg font-medium transition-all ${
-                completionStatus.canComplete
+              className={`flex items-center px-4 py-2 rounded-lg font-medium transition-all ${completionStatus.canComplete
                   ? 'bg-green-600 hover:bg-green-700 text-white'
                   : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-              }`}
-              title={completionStatus.canComplete 
-                ? 'Mark project as complete' 
+                }`}
+              title={completionStatus.canComplete
+                ? 'Mark project as complete'
                 : `${completionStatus.totalTasks - completionStatus.completedTasks} task(s) not completed`}
             >
               <FaCheckCircle className="mr-2" />
@@ -1551,19 +1416,18 @@ export default function ProjectDetailPage() {
               )}
             </button>
           )}
-          
+
           {/* Request Completion button - for project MEMBERS (not heads), green, permanent */}
           {!isProjectHead && isAcceptedMember && project.status === 'ongoing' && (
             <button
               onClick={handleRequestCompletion}
               disabled={submitting || !completionStatus.allTasksCompleted}
-              className={`flex items-center px-4 py-2 rounded-lg font-medium transition-all ${
-                completionStatus.allTasksCompleted
+              className={`flex items-center px-4 py-2 rounded-lg font-medium transition-all ${completionStatus.allTasksCompleted
                   ? 'bg-green-600 hover:bg-green-700 text-white'
                   : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-              }`}
-              title={completionStatus.allTasksCompleted 
-                ? 'Request project completion approval from project head' 
+                }`}
+              title={completionStatus.allTasksCompleted
+                ? 'Request project completion approval from project head'
                 : `${completionStatus.totalTasks - completionStatus.completedTasks} task(s) not completed`}
             >
               <FaCheckCircle className="mr-2" />
@@ -1709,11 +1573,10 @@ export default function ProjectDetailPage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                  activeTab === tab.id
+                className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.id
                     ? 'border-primary-500 text-primary-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
+                  }`}
               >
                 <tab.icon className="w-5 h-5" />
                 {tab.label}
@@ -1760,9 +1623,8 @@ export default function ProjectDetailPage() {
                 {project.members?.map(member => (
                   <div
                     key={member._id}
-                    className={`flex items-center justify-between p-4 rounded-lg ${
-                      member.isCurrentUser ? 'bg-primary-50 border border-primary-200' : 'bg-gray-50'
-                    }`}
+                    className={`flex items-center justify-between p-4 rounded-lg ${member.isCurrentUser ? 'bg-primary-50 border border-primary-200' : 'bg-gray-50'
+                      }`}
                   >
                     <div className="flex items-center">
                       <div className="w-10 h-10 rounded-full bg-primary-500 flex items-center justify-center text-white text-sm overflow-hidden">
@@ -1792,11 +1654,10 @@ export default function ProjectDetailPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        member.invitationStatus === 'accepted' ? 'bg-green-100 text-green-700' :
-                        member.invitationStatus === 'invited' ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-red-100 text-red-700'
-                      }`}>
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${member.invitationStatus === 'accepted' ? 'bg-green-100 text-green-700' :
+                          member.invitationStatus === 'invited' ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-red-100 text-red-700'
+                        }`}>
                         {member.invitationStatus}
                       </span>
                     </div>
@@ -1822,7 +1683,7 @@ export default function ProjectDetailPage() {
                 <Button
                   isIconOnly
                   variant="flat"
-                  onPress={() => fetchTimeline()}
+                  onPress={() => mutateTimeline()}
                   isDisabled={timelineLoading}
                   className="h-[42px] w-[42px]"
                   title="Refresh activity"
@@ -1856,8 +1717,8 @@ export default function ProjectDetailPage() {
 
               {/* GitHub-style Timeline with Branch Visualization */}
               <div className="relative">
-                {/* Loading State - show when actively loading OR when not fetched yet */}
-                {(timelineLoading || !timelineFetched) && !timelineError && (
+                {/* Loading State */}
+                {timelineLoading && !timelineError && (
                   <div className="flex items-center justify-center py-12">
                     <div className="flex flex-col items-center gap-3">
                       <div className="w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
@@ -1872,7 +1733,7 @@ export default function ProjectDetailPage() {
                     <HiOutlineExclamationTriangle className="w-12 h-12 text-red-300 mx-auto mb-3" />
                     <p className="text-red-500 mb-3">{timelineError}</p>
                     <Button
-                      onPress={() => fetchTimeline()}
+                      onPress={() => mutateTimeline()}
                       color="primary"
                       size="sm"
                       startContent={<HiOutlineArrowPath className="w-4 h-4" />}
@@ -1883,153 +1744,147 @@ export default function ProjectDetailPage() {
                 )}
 
                 {/* Main vertical line - only show when we have timeline data */}
-                {timelineFetched && !timelineLoading && !timelineError && timeline.length > 0 && (
+                {!timelineLoading && !timelineError && timeline.length > 0 && (
                   <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-gradient-to-b from-indigo-200 via-gray-200 to-gray-100" />
                 )}
-                
-                {timelineFetched && !timelineLoading && !timelineError && (
+
+                {!timelineLoading && !timelineError && (
                   <div className="space-y-0">
                     {timeline.map((event, index) => {
-                    // Get event type icon and color
-                    const getEventStyle = (type) => {
-                      switch (type) {
-                        case 'task_created':
-                          return { icon: HiOutlinePlus, bg: 'bg-blue-500', color: 'text-white', branch: 'blue' }
-                        case 'task_completed':
-                          return { icon: HiOutlineCheckCircle, bg: 'bg-green-500', color: 'text-white', branch: 'green' }
-                        case 'task_rejected':
-                        case 'task_review_rejected':
-                          return { icon: HiOutlineXMark, bg: 'bg-red-500', color: 'text-white', branch: 'red' }
-                        case 'task_assigned':
-                          return { icon: HiOutlineUserPlus, bg: 'bg-purple-500', color: 'text-white', branch: 'purple' }
-                        case 'subtask_completed':
-                        case 'subtask_updated':
-                          return { icon: HiOutlineCheck, bg: 'bg-teal-400', color: 'text-white', branch: 'teal', isSubLevel: true }
-                        case 'comment_added':
-                          return { icon: HiOutlineChatBubbleOvalLeftEllipsis, bg: 'bg-gray-400', color: 'text-white', branch: 'gray' }
-                        case 'project_approved':
-                          return { icon: HiOutlineCheckCircle, bg: 'bg-emerald-500', color: 'text-white', branch: 'emerald' }
-                        case 'project_rejected':
-                          return { icon: HiOutlineXMark, bg: 'bg-red-500', color: 'text-white', branch: 'red' }
-                        case 'member_joined':
-                          return { icon: HiOutlineUsers, bg: 'bg-indigo-500', color: 'text-white', branch: 'indigo' }
-                        case 'status_changed':
-                          return { icon: HiOutlineArrowPath, bg: 'bg-amber-500', color: 'text-white', branch: 'amber' }
-                        default:
-                          return { icon: HiOutlineHistory, bg: 'bg-gray-400', color: 'text-white', branch: 'gray' }
+                      // Get event type icon and color
+                      const getEventStyle = (type) => {
+                        switch (type) {
+                          case 'task_created':
+                            return { icon: HiOutlinePlus, bg: 'bg-blue-500', color: 'text-white', branch: 'blue' }
+                          case 'task_completed':
+                            return { icon: HiOutlineCheckCircle, bg: 'bg-green-500', color: 'text-white', branch: 'green' }
+                          case 'task_rejected':
+                          case 'task_review_rejected':
+                            return { icon: HiOutlineXMark, bg: 'bg-red-500', color: 'text-white', branch: 'red' }
+                          case 'task_assigned':
+                            return { icon: HiOutlineUserPlus, bg: 'bg-purple-500', color: 'text-white', branch: 'purple' }
+                          case 'subtask_completed':
+                          case 'subtask_updated':
+                            return { icon: HiOutlineCheck, bg: 'bg-teal-400', color: 'text-white', branch: 'teal', isSubLevel: true }
+                          case 'comment_added':
+                            return { icon: HiOutlineChatBubbleOvalLeftEllipsis, bg: 'bg-gray-400', color: 'text-white', branch: 'gray' }
+                          case 'project_approved':
+                            return { icon: HiOutlineCheckCircle, bg: 'bg-emerald-500', color: 'text-white', branch: 'emerald' }
+                          case 'project_rejected':
+                            return { icon: HiOutlineXMark, bg: 'bg-red-500', color: 'text-white', branch: 'red' }
+                          case 'member_joined':
+                            return { icon: HiOutlineUsers, bg: 'bg-indigo-500', color: 'text-white', branch: 'indigo' }
+                          case 'status_changed':
+                            return { icon: HiOutlineArrowPath, bg: 'bg-amber-500', color: 'text-white', branch: 'amber' }
+                          default:
+                            return { icon: HiOutlineHistory, bg: 'bg-gray-400', color: 'text-white', branch: 'gray' }
+                        }
                       }
-                    }
-                    const style = getEventStyle(event.type)
-                    const EventIcon = style.icon
-                    const isSubLevel = style.isSubLevel || event.type.includes('subtask') || event.metadata?.isSubtask
-                    const isLast = index === timeline.length - 1
+                      const style = getEventStyle(event.type)
+                      const EventIcon = style.icon
+                      const isSubLevel = style.isSubLevel || event.type.includes('subtask') || event.metadata?.isSubtask
+                      const isLast = index === timeline.length - 1
 
-                    return (
-                      <div key={event._id} className="relative flex items-start group">
-                        {/* Branch connector for sub-level items */}
-                        {isSubLevel && (
-                          <div className="absolute left-5 top-5 w-6 h-0.5 bg-gray-300" />
-                        )}
-                        
-                        {/* Node/Dot on the timeline */}
-                        <div className={`relative z-10 flex-shrink-0 ${isSubLevel ? 'ml-6' : ''}`}>
-                          <div className={`w-10 h-10 rounded-full ${style.bg} flex items-center justify-center shadow-md ring-4 ring-white`}>
-                            <EventIcon className={`w-5 h-5 ${style.color}`} />
-                          </div>
-                          {/* Connector line to next item */}
-                          {!isLast && (
-                            <div className={`absolute top-10 left-1/2 -translate-x-1/2 w-0.5 h-6 ${
-                              isSubLevel ? 'bg-gray-200' : 'bg-transparent'
-                            }`} />
+                      return (
+                        <div key={event._id} className="relative flex items-start group">
+                          {/* Branch connector for sub-level items */}
+                          {isSubLevel && (
+                            <div className="absolute left-5 top-5 w-6 h-0.5 bg-gray-300" />
                           )}
-                        </div>
-                        
-                        {/* Event Content */}
-                        <div className={`flex-1 ml-4 pb-6 ${isSubLevel ? 'ml-4' : 'ml-4'}`}>
-                          <div className={`p-4 rounded-xl border transition-all hover:shadow-md ${
-                            isSubLevel 
-                              ? 'bg-gray-50 border-gray-200 ml-2' 
-                              : 'bg-white border-gray-100 hover:border-gray-200'
-                          }`}>
-                            <div className="flex items-center gap-2 mb-1 flex-wrap">
-                              <div className="flex items-center gap-2">
-                                {event.createdBy?.profilePicture ? (
-                                  <img src={event.createdBy.profilePicture} alt="" className="w-6 h-6 rounded-full object-cover" />
-                                ) : (
-                                  <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center text-xs font-medium text-primary-700">
-                                    {event.createdBy?.firstName?.[0]}{event.createdBy?.lastName?.[0]}
-                                  </div>
-                                )}
-                                <span className="font-medium text-gray-800 text-sm">
-                                  {event.createdBy?.firstName} {event.createdBy?.lastName}
-                                </span>
-                              </div>
-                              <span className={`text-xs px-2 py-0.5 rounded-full ${
-                                style.bg.replace('500', '100').replace('400', '100')
-                              } ${style.bg.replace('bg-', 'text-').replace('500', '700').replace('400', '700')}`}>
-                                {event.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                              </span>
-                              <span className="text-xs text-gray-400 ml-auto">{formatDateTime(event.createdAt)}</span>
+
+                          {/* Node/Dot on the timeline */}
+                          <div className={`relative z-10 flex-shrink-0 ${isSubLevel ? 'ml-6' : ''}`}>
+                            <div className={`w-10 h-10 rounded-full ${style.bg} flex items-center justify-center shadow-md ring-4 ring-white`}>
+                              <EventIcon className={`w-5 h-5 ${style.color}`} />
                             </div>
-                            <p className="text-gray-600 text-sm mt-1">{event.description}</p>
-                            
-                            {/* Task link if present */}
-                            {event.relatedTask && (
-                              <div className="mt-2 inline-flex items-center gap-1 text-xs text-primary-600 bg-primary-50 px-2 py-1 rounded-md">
-                                <HiOutlineClipboardDocumentList className="w-3 h-3" />
-                                {event.relatedTask.title || 'Related Task'}
-                              </div>
-                            )}
-                            
-                            {/* Show rejection details */}
-                            {(event.metadata?.rejectionReason || event.metadata?.rejectionComment) && (
-                              <div className="mt-3 p-3 bg-red-50 border border-red-100 rounded-lg">
-                                <p className="text-sm font-medium text-red-700 mb-1 flex items-center gap-1">
-                                  <HiOutlineXMark className="w-4 h-4" />
-                                  Rejection Details
-                                </p>
-                                <p className="text-sm text-red-600">{event.metadata.rejectionReason || event.metadata.rejectionComment}</p>
-                                {event.metadata.subtasksUnmarked && event.metadata.subtasksUnmarked.length > 0 && (
-                                  <div className="mt-2 pt-2 border-t border-red-100">
-                                    <p className="text-xs font-medium text-red-700 mb-1">Subtasks marked incomplete:</p>
-                                    <ul className="text-xs text-red-600 list-disc list-inside">
-                                      {event.metadata.subtasksUnmarked.map((st, idx) => (
-                                        <li key={idx}>{st}</li>
-                                      ))}
-                                    </ul>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                            
-                            {/* Show remark if present */}
-                            {event.metadata?.remark && !event.metadata?.rejectionReason && !event.metadata?.rejectionComment && (
-                              <div className={`mt-3 p-3 rounded-lg ${
-                                event.type === 'project_rejected' ? 'bg-red-50 border border-red-100' : 'bg-blue-50 border border-blue-100'
-                              }`}>
-                                <p className={`text-sm font-medium mb-1 ${
-                                  event.type === 'project_rejected' ? 'text-red-700' : 'text-blue-700'
-                                }`}>Remark:</p>
-                                <p className={`text-sm ${
-                                  event.type === 'project_rejected' ? 'text-red-600' : 'text-blue-600'
-                                }`}>{event.metadata.remark}</p>
-                              </div>
-                            )}
-                            
-                            {event.commentContent && (
-                              <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
-                                <p className="text-gray-700 text-sm">{event.commentContent}</p>
-                              </div>
+                            {/* Connector line to next item */}
+                            {!isLast && (
+                              <div className={`absolute top-10 left-1/2 -translate-x-1/2 w-0.5 h-6 ${isSubLevel ? 'bg-gray-200' : 'bg-transparent'
+                                }`} />
                             )}
                           </div>
+
+                          {/* Event Content */}
+                          <div className={`flex-1 ml-4 pb-6 ${isSubLevel ? 'ml-4' : 'ml-4'}`}>
+                            <div className={`p-4 rounded-xl border transition-all hover:shadow-md ${isSubLevel
+                                ? 'bg-gray-50 border-gray-200 ml-2'
+                                : 'bg-white border-gray-100 hover:border-gray-200'
+                              }`}>
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                <div className="flex items-center gap-2">
+                                  {event.createdBy?.profilePicture ? (
+                                    <img src={event.createdBy.profilePicture} alt="" className="w-6 h-6 rounded-full object-cover" />
+                                  ) : (
+                                    <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center text-xs font-medium text-primary-700">
+                                      {event.createdBy?.firstName?.[0]}{event.createdBy?.lastName?.[0]}
+                                    </div>
+                                  )}
+                                  <span className="font-medium text-gray-800 text-sm">
+                                    {event.createdBy?.firstName} {event.createdBy?.lastName}
+                                  </span>
+                                </div>
+                                <span className={`text-xs px-2 py-0.5 rounded-full ${style.bg.replace('500', '100').replace('400', '100')
+                                  } ${style.bg.replace('bg-', 'text-').replace('500', '700').replace('400', '700')}`}>
+                                  {event.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                </span>
+                                <span className="text-xs text-gray-400 ml-auto">{formatDateTime(event.createdAt)}</span>
+                              </div>
+                              <p className="text-gray-600 text-sm mt-1">{event.description}</p>
+
+                              {/* Task link if present */}
+                              {event.relatedTask && (
+                                <div className="mt-2 inline-flex items-center gap-1 text-xs text-primary-600 bg-primary-50 px-2 py-1 rounded-md">
+                                  <HiOutlineClipboardDocumentList className="w-3 h-3" />
+                                  {event.relatedTask.title || 'Related Task'}
+                                </div>
+                              )}
+
+                              {/* Show rejection details */}
+                              {(event.metadata?.rejectionReason || event.metadata?.rejectionComment) && (
+                                <div className="mt-3 p-3 bg-red-50 border border-red-100 rounded-lg">
+                                  <p className="text-sm font-medium text-red-700 mb-1 flex items-center gap-1">
+                                    <HiOutlineXMark className="w-4 h-4" />
+                                    Rejection Details
+                                  </p>
+                                  <p className="text-sm text-red-600">{event.metadata.rejectionReason || event.metadata.rejectionComment}</p>
+                                  {event.metadata.subtasksUnmarked && event.metadata.subtasksUnmarked.length > 0 && (
+                                    <div className="mt-2 pt-2 border-t border-red-100">
+                                      <p className="text-xs font-medium text-red-700 mb-1">Subtasks marked incomplete:</p>
+                                      <ul className="text-xs text-red-600 list-disc list-inside">
+                                        {event.metadata.subtasksUnmarked.map((st, idx) => (
+                                          <li key={idx}>{st}</li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* Show remark if present */}
+                              {event.metadata?.remark && !event.metadata?.rejectionReason && !event.metadata?.rejectionComment && (
+                                <div className={`mt-3 p-3 rounded-lg ${event.type === 'project_rejected' ? 'bg-red-50 border border-red-100' : 'bg-blue-50 border border-blue-100'
+                                  }`}>
+                                  <p className={`text-sm font-medium mb-1 ${event.type === 'project_rejected' ? 'text-red-700' : 'text-blue-700'
+                                    }`}>Remark:</p>
+                                  <p className={`text-sm ${event.type === 'project_rejected' ? 'text-red-600' : 'text-blue-600'
+                                    }`}>{event.metadata.remark}</p>
+                                </div>
+                              )}
+
+                              {event.commentContent && (
+                                <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
+                                  <p className="text-gray-700 text-sm">{event.commentContent}</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    )
-                  })}
+                      )
+                    })}
                   </div>
                 )}
-                
-                {timelineFetched && !timelineLoading && !timelineError && timeline.length === 0 && (
+
+                {!timelineLoading && !timelineError && timeline.length === 0 && (
                   <div className="text-center py-12">
                     <HiOutlineHistory className="w-12 h-12 text-gray-300 mx-auto mb-3" />
                     <p className="text-gray-500">No activity yet</p>
@@ -2093,9 +1948,8 @@ export default function ProjectDetailPage() {
                               key={color}
                               type="button"
                               onClick={() => setNoteForm(prev => ({ ...prev, color }))}
-                              className={`w-8 h-8 rounded-lg border-2 ${noteColors[color]} ${
-                                noteForm.color === color ? 'ring-2 ring-primary-500 ring-offset-2' : ''
-                              }`}
+                              className={`w-8 h-8 rounded-lg border-2 ${noteColors[color]} ${noteForm.color === color ? 'ring-2 ring-primary-500 ring-offset-2' : ''
+                                }`}
                               title={color}
                             />
                           ))}
@@ -2172,9 +2026,8 @@ export default function ProjectDetailPage() {
                                   key={color}
                                   type="button"
                                   onClick={() => setNoteForm(prev => ({ ...prev, color }))}
-                                  className={`w-6 h-6 rounded border ${noteColors[color]} ${
-                                    noteForm.color === color ? 'ring-2 ring-primary-500' : ''
-                                  }`}
+                                  className={`w-6 h-6 rounded border ${noteColors[color]} ${noteForm.color === color ? 'ring-2 ring-primary-500' : ''
+                                    }`}
                                 />
                               ))}
                             </div>
@@ -2278,9 +2131,8 @@ export default function ProjectDetailPage() {
                                 key={color}
                                 type="button"
                                 onClick={() => setNoteForm(prev => ({ ...prev, color }))}
-                                className={`w-6 h-6 rounded border ${noteColors[color]} ${
-                                  noteForm.color === color ? 'ring-2 ring-primary-500' : ''
-                                }`}
+                                className={`w-6 h-6 rounded border ${noteColors[color]} ${noteForm.color === color ? 'ring-2 ring-primary-500' : ''
+                                  }`}
                               />
                             ))}
                           </div>
@@ -2380,7 +2232,7 @@ export default function ProjectDetailPage() {
                 <FaTimes />
               </button>
             </div>
-            
+
             <form onSubmit={handleCreateTask} className="p-4 space-y-4 overflow-y-auto flex-1">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -2456,30 +2308,31 @@ export default function ProjectDetailPage() {
                       seenIds.add(memberId)
                       return true
                     }).map(member => (
-                    <label key={member.user._id} className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={taskForm.assigneeIds.includes(member.user._id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setTaskForm(prev => ({
-                              ...prev,
-                              assigneeIds: [...prev.assigneeIds, member.user._id]
-                            }))
-                          } else {
-                            setTaskForm(prev => ({
-                              ...prev,
-                              assigneeIds: prev.assigneeIds.filter(id => id !== member.user._id)
-                            }))
-                          }
-                        }}
-                        className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
-                      />
-                      <span className="text-sm text-gray-700">
-                        {member.user.firstName} {member.user.lastName}
-                      </span>
-                    </label>
-                  ))})()}
+                      <label key={member.user._id} className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={taskForm.assigneeIds.includes(member.user._id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setTaskForm(prev => ({
+                                ...prev,
+                                assigneeIds: [...prev.assigneeIds, member.user._id]
+                              }))
+                            } else {
+                              setTaskForm(prev => ({
+                                ...prev,
+                                assigneeIds: prev.assigneeIds.filter(id => id !== member.user._id)
+                              }))
+                            }
+                          }}
+                          className="rounded border-gray-300 text-primary-500 focus:ring-primary-500"
+                        />
+                        <span className="text-sm text-gray-700">
+                          {member.user.firstName} {member.user.lastName}
+                        </span>
+                      </label>
+                    ))
+                  })()}
                 </div>
               </div>
 
@@ -2634,7 +2487,7 @@ export default function ProjectDetailPage() {
             </div>
             <div className="p-6 overflow-y-auto flex-1">
               <p className="text-gray-600 mb-4">
-                You're assigning this task to yourself. {pendingTaskData.subtasks?.length > 0 
+                You're assigning this task to yourself. {pendingTaskData.subtasks?.length > 0
                   ? 'Please provide an ETA for each subtask:'
                   : 'How long do you estimate it will take?'}
               </p>
@@ -2644,7 +2497,7 @@ export default function ProjectDetailPage() {
                   <p className="text-sm text-gray-500">{pendingTaskData.description}</p>
                 )}
               </div>
-              
+
               {/* Subtask-wise ETAs */}
               {pendingTaskData.subtasks?.length > 0 ? (
                 <div className="space-y-4">
@@ -2784,7 +2637,7 @@ export default function ProjectDetailPage() {
                 <FaTimes />
               </button>
             </div>
-            
+
             <form onSubmit={handleEditTask} className="flex-1 overflow-y-auto">
               <div className="p-6 space-y-4">
                 {/* Title and Description Row */}
@@ -2843,7 +2696,7 @@ export default function ProjectDetailPage() {
                   <label className="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
                     Subtasks {editTaskForm.subtasks?.length > 0 && `(${editTaskForm.subtasks.length})`}
                   </label>
-                  
+
                   {editTaskForm.subtasks && editTaskForm.subtasks.length > 0 ? (
                     <div className="space-y-2 mb-3">
                       {editTaskForm.subtasks.map((subtask, index) => (
@@ -2922,7 +2775,7 @@ export default function ProjectDetailPage() {
                   ) : (
                     <p className="text-sm text-gray-500 mb-3">No subtasks added yet</p>
                   )}
-                  
+
                   {/* Add new subtask */}
                   <div className="flex gap-2">
                     <input
@@ -3068,7 +2921,7 @@ export default function ProjectDetailPage() {
                     a => (a.user?._id?.toString() || a.user?.toString()) === currentEmployeeId?.toString() && a.assignmentStatus === 'accepted'
                   )
                   const canEdit = isProjectHead || (user && ['admin'].includes(user.role)) || isAssignedAndAccepted || selectedTask.createdBy?._id?.toString() === currentEmployeeId?.toString()
-                  
+
                   return canEdit && (
                     <Button
                       onPress={() => {
@@ -3100,17 +2953,16 @@ export default function ProjectDetailPage() {
                 </button>
               </div>
             </div>
-            
+
             <div className="p-6 overflow-y-auto flex-1">
               {/* Task Title & Status */}
               <div className="flex items-start justify-between mb-4">
                 <h2 className="text-xl font-semibold text-gray-800">{selectedTask.title}</h2>
-                <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                  selectedTask.status === 'completed' ? 'bg-green-100 text-green-700' :
-                  selectedTask.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
-                  selectedTask.status === 'review' ? 'bg-purple-100 text-purple-700' :
-                  'bg-gray-100 text-gray-700'
-                }`}>
+                <span className={`px-3 py-1 rounded-full text-sm font-medium ${selectedTask.status === 'completed' ? 'bg-green-100 text-green-700' :
+                    selectedTask.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
+                      selectedTask.status === 'review' ? 'bg-purple-100 text-purple-700' :
+                        'bg-gray-100 text-gray-700'
+                  }`}>
                   {selectedTask.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                 </span>
               </div>
@@ -3157,10 +3009,9 @@ export default function ProjectDetailPage() {
                 </div>
                 <div className="bg-gray-50 p-3 rounded-lg">
                   <p className="text-xs text-gray-500 mb-1">Due Date</p>
-                  <p className={`font-medium text-gray-800 ${
-                    selectedTask.dueDate && new Date(selectedTask.dueDate) < new Date() && selectedTask.status !== 'completed' 
+                  <p className={`font-medium text-gray-800 ${selectedTask.dueDate && new Date(selectedTask.dueDate) < new Date() && selectedTask.status !== 'completed'
                       ? 'text-red-600' : ''
-                  }`}>
+                    }`}>
                     {selectedTask.dueDate ? formatDate(selectedTask.dueDate) : 'Not set'}
                   </p>
                 </div>
@@ -3178,8 +3029,8 @@ export default function ProjectDetailPage() {
                   <div className="bg-blue-50 p-3 rounded-lg">
                     <p className="text-xs text-gray-500 mb-1">Estimated Time</p>
                     <p className="font-medium text-blue-700">
-                      {selectedTask.estimatedHours >= 8 
-                        ? `${Math.floor(selectedTask.estimatedHours / 8)}d ${selectedTask.estimatedHours % 8}h` 
+                      {selectedTask.estimatedHours >= 8
+                        ? `${Math.floor(selectedTask.estimatedHours / 8)}d ${selectedTask.estimatedHours % 8}h`
                         : `${selectedTask.estimatedHours}h`}
                     </p>
                   </div>
@@ -3225,24 +3076,22 @@ export default function ProjectDetailPage() {
                   <h4 className="text-sm font-medium text-gray-500 mb-3">Assigned To</h4>
                   <div className="space-y-2">
                     {selectedTask.assignees.map(a => {
-                      const canReassign = a.assignmentStatus === 'rejected' && 
+                      const canReassign = a.assignmentStatus === 'rejected' &&
                         (selectedTask.createdBy?._id?.toString() === currentEmployeeId?.toString() || isProjectHead || (user && ['admin'].includes(user.role)))
                       const isCurrentUserPending = (a.user?._id?.toString() || a.user?.toString()) === currentEmployeeId?.toString() && a.assignmentStatus === 'pending'
                       const isUpdating = updatingTaskId === selectedTask._id
-                      
+
                       return (
-                        <div key={a._id} className={`flex items-center justify-between p-3 rounded-lg ${
-                          a.assignmentStatus === 'rejected' ? 'bg-orange-50 border border-orange-200' : 
-                          isCurrentUserPending ? 'bg-yellow-50 border border-yellow-200' : 'bg-gray-50'
-                        }`}>
+                        <div key={a._id} className={`flex items-center justify-between p-3 rounded-lg ${a.assignmentStatus === 'rejected' ? 'bg-orange-50 border border-orange-200' :
+                            isCurrentUserPending ? 'bg-yellow-50 border border-yellow-200' : 'bg-gray-50'
+                          }`}>
                           <div className="flex items-center gap-3">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${
-                              a.assignmentStatus === 'pending' 
-                                ? 'bg-yellow-400 text-yellow-900' 
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm ${a.assignmentStatus === 'pending'
+                                ? 'bg-yellow-400 text-yellow-900'
                                 : a.assignmentStatus === 'rejected'
-                                ? 'bg-orange-500 text-white'
-                                : 'bg-primary-500 text-white'
-                            }`}>
+                                  ? 'bg-orange-500 text-white'
+                                  : 'bg-primary-500 text-white'
+                              }`}>
                               {a.user.profilePicture ? (
                                 <img src={a.user.profilePicture} alt="" className="w-full h-full rounded-full object-cover" />
                               ) : (
@@ -3287,11 +3136,10 @@ export default function ProjectDetailPage() {
                               </>
                             ) : (
                               <>
-                                <span className={`text-sm px-3 py-1 rounded-full ${
-                                  a.assignmentStatus === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                                  a.assignmentStatus === 'rejected' ? 'bg-orange-100 text-orange-700' :
-                                  'bg-green-100 text-green-700'
-                                }`}>
+                                <span className={`text-sm px-3 py-1 rounded-full ${a.assignmentStatus === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                                    a.assignmentStatus === 'rejected' ? 'bg-orange-100 text-orange-700' :
+                                      'bg-green-100 text-green-700'
+                                  }`}>
                                   {a.assignmentStatus}
                                 </span>
                                 {canReassign && (
@@ -3329,22 +3177,21 @@ export default function ProjectDetailPage() {
                       </span>
                     )}
                   </div>
-                  
+
                   {selectedTask.progressPercentage !== undefined && (
                     <div className="mb-4">
                       <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
-                          className={`h-2 rounded-full transition-all ${
-                            selectedTask.progressPercentage === 100 ? 'bg-green-500' :
-                            selectedTask.progressPercentage >= 50 ? 'bg-blue-500' :
-                            'bg-orange-500'
-                          }`}
+                          className={`h-2 rounded-full transition-all ${selectedTask.progressPercentage === 100 ? 'bg-green-500' :
+                              selectedTask.progressPercentage >= 50 ? 'bg-blue-500' :
+                                'bg-orange-500'
+                            }`}
                           style={{ width: `${selectedTask.progressPercentage}%` }}
                         />
                       </div>
                     </div>
                   )}
-                  
+
                   <div className="space-y-3 bg-gray-50 rounded-lg p-3">
                     {selectedTask.subtasks.sort((a, b) => a.order - b.order).map((subtask) => {
                       // Use string comparison for ObjectIds - check multiple ways to match
@@ -3353,19 +3200,19 @@ export default function ProjectDetailPage() {
                         const assigneeId = a.user?._id?.toString() || a.user?._id || a.user?.toString()
                         return assigneeId === currentEmpId && a.assignmentStatus === 'accepted'
                       })
-                      
+
                       // Also check if user is the task creator
-                      const isTaskCreator = selectedTask.createdBy?._id?.toString() === currentEmpId || 
-                                           selectedTask.createdBy?.toString() === currentEmpId
-                      
+                      const isTaskCreator = selectedTask.createdBy?._id?.toString() === currentEmpId ||
+                        selectedTask.createdBy?.toString() === currentEmpId
+
                       // Check if user is task assignor
                       const isTaskAssignor = selectedTask.assignedBy?._id?.toString() === currentEmpId ||
-                                            selectedTask.assignedBy?.toString() === currentEmpId
-                      
+                        selectedTask.assignedBy?.toString() === currentEmpId
+
                       // Allow toggle if: assigned & accepted, project head, admin, task creator, task assignor, or accepted project member
                       const canToggle = isAssignedAndAccepted || isProjectHead || (user && ['admin'].includes(user.role)) || isTaskCreator || isTaskAssignor || isAcceptedMember
                       const canComment = canToggle // Same permissions for commenting
-                      
+
                       // Color coding for comment author roles
                       const getCommentColor = (authorRole) => {
                         switch (authorRole) {
@@ -3381,7 +3228,7 @@ export default function ProjectDetailPage() {
                             return 'bg-gray-100 border-l-4 border-gray-400 text-gray-700'
                         }
                       }
-                      
+
                       const getRoleBadge = (authorRole) => {
                         switch (authorRole) {
                           case 'project_head':
@@ -3396,13 +3243,12 @@ export default function ProjectDetailPage() {
                             return null
                         }
                       }
-                      
+
                       return (
-                        <div key={subtask._id || subtask.title} className={`rounded-lg p-3 border ${
-                          subtask.pendingAcceptance 
-                            ? 'bg-yellow-50 border-yellow-300' 
+                        <div key={subtask._id || subtask.title} className={`rounded-lg p-3 border ${subtask.pendingAcceptance
+                            ? 'bg-yellow-50 border-yellow-300'
                             : 'bg-white border-gray-200'
-                        }`}>
+                          }`}>
                           {/* Pending Acceptance Banner */}
                           {subtask.pendingAcceptance && (
                             <div className="mb-2 pb-2 border-b border-yellow-200">
@@ -3419,28 +3265,26 @@ export default function ProjectDetailPage() {
                               )}
                             </div>
                           )}
-                          
-                          <div 
+
+                          <div
                             className={`flex items-center gap-3 ${canToggle && !subtask.pendingAcceptance ? 'cursor-pointer' : ''}`}
                             onClick={() => canToggle && !subtask.pendingAcceptance && handleToggleSubtask(selectedTask._id, subtask._id, subtask.completed)}
                           >
-                            <span className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                              subtask.completed 
-                                ? 'bg-green-500 border-green-500' 
+                            <span className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${subtask.completed
+                                ? 'bg-green-500 border-green-500'
                                 : subtask.pendingAcceptance
                                   ? 'bg-yellow-400 border-yellow-400'
                                   : 'border-gray-300 bg-white'
-                            }`}>
+                              }`}>
                               {subtask.completed && <FaCheck className="text-white text-xs" />}
                               {subtask.pendingAcceptance && !subtask.completed && <HiOutlineClock className="text-white text-xs" />}
                             </span>
-                            <span className={`flex-1 text-sm font-medium ${
-                              subtask.completed 
-                                ? 'line-through text-gray-400' 
+                            <span className={`flex-1 text-sm font-medium ${subtask.completed
+                                ? 'line-through text-gray-400'
                                 : subtask.pendingAcceptance
                                   ? 'text-yellow-700'
                                   : 'text-gray-700'
-                            }`}>
+                              }`}>
                               {subtask.title}
                             </span>
                             {subtask.completed && subtask.completedAt && (
@@ -3449,7 +3293,7 @@ export default function ProjectDetailPage() {
                               </span>
                             )}
                           </div>
-                          
+
                           {/* Accept/Reject buttons for pending acceptance (only show to other assignees who haven't accepted) */}
                           {subtask.pendingAcceptance && isAssignedAndAccepted && (
                             (() => {
@@ -3490,7 +3334,7 @@ export default function ProjectDetailPage() {
                               )
                             })()
                           )}
-                          
+
                           {/* Subtask Comments */}
                           {subtask.comments && subtask.comments.length > 0 && (
                             <div className="mt-3 space-y-2 pl-8">
@@ -3510,7 +3354,7 @@ export default function ProjectDetailPage() {
                               ))}
                             </div>
                           )}
-                          
+
                           {/* Add Comment Button */}
                           {canComment && (
                             <div className="mt-2 pl-8">
@@ -3646,7 +3490,7 @@ export default function ProjectDetailPage() {
                 {isProjectHead ? 'Delete Task' : 'Request Task Deletion'}
               </h3>
               <p className="text-gray-600 text-sm mb-4">
-                {isProjectHead 
+                {isProjectHead
                   ? 'Are you sure you want to delete this task? This action cannot be undone.'
                   : 'Please provide a reason for requesting task deletion. The project head will review your request.'
                 }
@@ -3712,7 +3556,7 @@ export default function ProjectDetailPage() {
               <p className="font-medium text-gray-800 mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
                 "{reassignTask.title}"
               </p>
-              
+
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Reassign To
@@ -3762,56 +3606,56 @@ export default function ProjectDetailPage() {
 
       {/* Reason Modal for Status Changes */}
       <ModalPortal isOpen={showReasonModal && !!pendingStatusChange}>
-          {pendingStatusChange && <div className="modal-overlay">
-            <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-md transform transition-all">
-              <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-amber-500 to-orange-500 rounded-t-xl">
-                <h3 className="text-lg font-semibold text-white">Reason Required</h3>
-                <p className="text-amber-100 text-sm">Please provide a reason for this status change</p>
+        {pendingStatusChange && <div className="modal-overlay">
+          <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-md transform transition-all">
+            <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-amber-500 to-orange-500 rounded-t-xl">
+              <h3 className="text-lg font-semibold text-white">Reason Required</h3>
+              <p className="text-amber-100 text-sm">Please provide a reason for this status change</p>
+            </div>
+            <div className="p-6">
+              <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                <p className="text-sm text-gray-600 mb-1">Task: <span className="font-medium text-gray-800">{pendingStatusChange.task?.title}</span></p>
+                <p className="text-sm text-gray-600">
+                  Status: <span className="font-medium text-gray-500">{pendingStatusChange.task?.status}</span>
+                  <span className="mx-2">→</span>
+                  <span className="font-medium text-primary-600">{pendingStatusChange.newStatus}</span>
+                </p>
               </div>
-              <div className="p-6">
-                <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-600 mb-1">Task: <span className="font-medium text-gray-800">{pendingStatusChange.task?.title}</span></p>
-                  <p className="text-sm text-gray-600">
-                    Status: <span className="font-medium text-gray-500">{pendingStatusChange.task?.status}</span> 
-                    <span className="mx-2">→</span> 
-                    <span className="font-medium text-primary-600">{pendingStatusChange.newStatus}</span>
-                  </p>
-                </div>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Reason for change <span className="text-red-500">*</span>
-                  </label>
-                  <textarea
-                    value={statusChangeReason}
-                    onChange={(e) => setStatusChangeReason(e.target.value)}
-                    placeholder="Enter the reason for this status change..."
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none"
-                    rows={3}
-                    autoFocus
-                  />
-                </div>
-                <div className="flex justify-end gap-3">
-                  <button
-                    onClick={() => {
-                      setShowReasonModal(false)
-                      setPendingStatusChange(null)
-                      setStatusChangeReason('')
-                    }}
-                    className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={executeStatusChange}
-                    disabled={!statusChangeReason.trim()}
-                    className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  >
-                    Confirm Change
-                  </button>
-                </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Reason for change <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={statusChangeReason}
+                  onChange={(e) => setStatusChangeReason(e.target.value)}
+                  placeholder="Enter the reason for this status change..."
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none"
+                  rows={3}
+                  autoFocus
+                />
+              </div>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowReasonModal(false)
+                    setPendingStatusChange(null)
+                    setStatusChangeReason('')
+                  }}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={executeStatusChange}
+                  disabled={!statusChangeReason.trim()}
+                  className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Confirm Change
+                </button>
               </div>
             </div>
-          </div>}
+          </div>
+        </div>}
       </ModalPortal>
     </div>
   )

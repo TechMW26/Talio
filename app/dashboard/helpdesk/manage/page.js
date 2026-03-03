@@ -1,82 +1,59 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
-import { 
-  FaTicketAlt, FaCheckCircle, FaClock, FaExclamationCircle, 
+import {
+  FaTicketAlt, FaCheckCircle, FaClock, FaExclamationCircle,
   FaUser, FaArrowRight, FaComment, FaTimes, FaChevronDown
 } from 'react-icons/fa'
-import { getCurrentUser } from '@/utils/userHelper'
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Select, SelectItem, Input } from '@heroui/react'
-import Loader from '@/components/ui/Loader'
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Select, SelectItem, Input, Skeleton } from '@heroui/react'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton from '@/components/ui/LoadingButton'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 
 export default function HelpdeskManagePage() {
   const router = useRouter()
-  const [tickets, setTickets] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState(null)
+  const user = useMemo(() => { try { return JSON.parse(localStorage.getItem('user')) } catch { return null } }, [])
+  const hasAccess = user && ['admin', 'hr', 'manager', 'department_head', 'super_admin'].includes(user.role)
+
   const [selectedTicket, setSelectedTicket] = useState(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
   const [newComment, setNewComment] = useState('')
   const [newStatus, setNewStatus] = useState('')
-  const [employees, setEmployees] = useState([])
   const [assignTo, setAssignTo] = useState('')
   const [filter, setFilter] = useState('all') // all, open, in-progress, resolved
 
-  useEffect(() => {
-    const parsedUser = getCurrentUser()
-    if (parsedUser) {
-      setUser(parsedUser)
-      // Check if user has permission to view this page
-      if (!['admin', 'hr', 'manager', 'department_head', 'super_admin'].includes(parsedUser.role)) {
-        toast.error('You do not have permission to access this page')
-        router.push('/dashboard/helpdesk')
-        return
-      }
-      fetchAllTickets()
-      fetchEmployees()
-    } else {
-      toast.error('Please login to access this page')
-      router.push('/login')
-    }
-  }, [])
+  // SWR data fetching - only fetch when user has access
+  const { data: ticketsRes, error, isLoading, isValidating, mutate: refreshTickets } = useAuthedSWR(hasAccess ? '/api/helpdesk' : null)
+  const tickets = ticketsRes?.data || []
 
-  const fetchAllTickets = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      // Fetch all tickets (no employeeId filter for admins)
-      const response = await fetch('/api/helpdesk', {
-        headers: { 'Authorization': `Bearer ${token}` },
+  const { data: employeesRes } = useAuthedSWR(hasAccess ? '/api/employees?limit=1000' : null)
+  const employeesRaw = employeesRes?.data
+  const employees = Array.isArray(employeesRaw) ? employeesRaw : (employeesRaw?.employees || [])
+
+  // Mutations
+  const updateMutation = useApiMutation({
+    invalidateKeys: ['/api/helpdesk'],
+    onSuccess: () => { toast.success('Ticket updated successfully'); setShowDetailModal(false); setSelectedTicket(null) },
+    onError: (msg) => toast.error(msg || 'Failed to update ticket'),
+  })
+
+  const commentMutation = useApiMutation({
+    invalidateKeys: ['/api/helpdesk'],
+    onSuccess: () => {
+      toast.success('Comment added')
+      setNewComment('')
+      // Refresh ticket details from SWR cache + revalidate
+      refreshTickets().then((res) => {
+        const updated = (res?.data || []).find(t => t._id === selectedTicket?._id)
+        if (updated) setSelectedTicket(updated)
       })
-
-      const data = await response.json()
-      if (data.success) {
-        setTickets(data.data || [])
-      }
-    } catch (error) {
-      console.error('Fetch tickets error:', error)
-      toast.error('Failed to fetch tickets')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchEmployees = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/employees?limit=1000', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-      const data = await response.json()
-      if (data.success) {
-        const empList = Array.isArray(data.data) ? data.data : (data.data.employees || [])
-        setEmployees(empList)
-      }
-    } catch (error) {
-      console.error('Fetch employees error:', error)
-    }
-  }
+    },
+    onError: (msg) => toast.error(msg || 'Failed to add comment'),
+  })
 
   const handleViewTicket = (ticket) => {
     setSelectedTicket(ticket)
@@ -85,90 +62,18 @@ export default function HelpdeskManagePage() {
     setShowDetailModal(true)
   }
 
-  const handleUpdateTicket = async () => {
+  const handleUpdateTicket = () => {
     if (!selectedTicket) return
-
-    try {
-      const token = localStorage.getItem('token')
-      const updateData = {
-        status: newStatus
-      }
-
-      // Add date fields based on status
-      if (newStatus === 'resolved' && selectedTicket.status !== 'resolved') {
-        updateData.resolvedDate = new Date()
-      }
-      if (newStatus === 'closed' && selectedTicket.status !== 'closed') {
-        updateData.closedDate = new Date()
-      }
-      if (assignTo) {
-        updateData.assignedTo = assignTo
-        if (!selectedTicket.assignedTo) {
-          updateData.assignedDate = new Date()
-        }
-      }
-
-      const response = await fetch(`/api/helpdesk/${selectedTicket._id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(updateData)
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        toast.success('Ticket updated successfully')
-        fetchAllTickets()
-        setShowDetailModal(false)
-        setSelectedTicket(null)
-      } else {
-        toast.error(data.message || 'Failed to update ticket')
-      }
-    } catch (error) {
-      console.error('Update ticket error:', error)
-      toast.error('Failed to update ticket')
-    }
+    const updateData = { status: newStatus }
+    if (newStatus === 'resolved' && selectedTicket.status !== 'resolved') updateData.resolvedDate = new Date()
+    if (newStatus === 'closed' && selectedTicket.status !== 'closed') updateData.closedDate = new Date()
+    if (assignTo) { updateData.assignedTo = assignTo; if (!selectedTicket.assignedTo) updateData.assignedDate = new Date() }
+    updateMutation.execute(`/api/helpdesk/${selectedTicket._id}`, updateData, { method: 'PATCH' })
   }
 
-  const handleAddComment = async () => {
+  const handleAddComment = () => {
     if (!selectedTicket || !newComment.trim()) return
-
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/helpdesk/${selectedTicket._id}/comment`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          comment: newComment,
-          isInternal: false
-        })
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        toast.success('Comment added')
-        setNewComment('')
-        // Refresh ticket details
-        const ticketRes = await fetch(`/api/helpdesk/${selectedTicket._id}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-        const ticketData = await ticketRes.json()
-        if (ticketData.success) {
-          setSelectedTicket(ticketData.data)
-        }
-        fetchAllTickets()
-      } else {
-        toast.error(data.message || 'Failed to add comment')
-      }
-    } catch (error) {
-      console.error('Add comment error:', error)
-      toast.error('Failed to add comment')
-    }
+    commentMutation.execute(`/api/helpdesk/${selectedTicket._id}/comment`, { comment: newComment, isInternal: false }, { method: 'POST' })
   }
 
   const filteredTickets = tickets.filter(t => {
@@ -231,13 +136,23 @@ export default function HelpdeskManagePage() {
     }
   }
 
+  // Role guard
+  if (!user) return null
+  if (!hasAccess) {
+    toast.error('You do not have permission to access this page')
+    router.push('/dashboard/helpdesk')
+    return null
+  }
+
+  if (error) return <DataErrorState message="Failed to load tickets" onRetry={() => refreshTickets()} />
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Helpdesk Management</h1>
-          <p className="text-sm text-gray-600 mt-1">Manage and respond to support tickets</p>
+          <p className="text-sm text-gray-600 mt-1">Manage and respond to support tickets <BackgroundRefreshIndicator isValidating={isValidating} position="inline" /></p>
         </div>
         <button
           onClick={() => router.push('/dashboard/helpdesk')}
@@ -251,8 +166,8 @@ export default function HelpdeskManagePage() {
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat, index) => (
-          <div 
-            key={index} 
+          <div
+            key={index}
             className={`bg-white rounded-xl p-4 shadow-sm border border-gray-100 cursor-pointer transition-all hover:shadow-md ${filter === stat.filter ? 'ring-2 ring-blue-500' : ''}`}
             onClick={() => setFilter(stat.filter || 'all')}
           >
@@ -275,11 +190,10 @@ export default function HelpdeskManagePage() {
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-colors ${
-              filter === f 
-                ? 'bg-blue-600 text-white' 
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
+            className={`px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap transition-colors ${filter === f
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
           >
             {f === 'all' ? 'All Tickets' : f.charAt(0).toUpperCase() + f.slice(1).replace('-', ' ')}
           </button>
@@ -295,10 +209,21 @@ export default function HelpdeskManagePage() {
           </h2>
         </div>
 
-        {loading ? (
-          <div className="p-8 text-center">
-            <Loader size="lg" className="mx-auto" />
-            <p className="mt-4 text-gray-600">Loading tickets...</p>
+        {isLoading ? (
+          <div className="p-4 space-y-3">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="flex items-center gap-4 px-6 py-4">
+                <Skeleton className="h-4 w-20 rounded" />
+                <Skeleton className="h-4 w-40 rounded" />
+                <Skeleton className="h-8 w-8 rounded-full" />
+                <Skeleton className="h-4 w-24 rounded" />
+                <Skeleton className="h-5 w-16 rounded-full" />
+                <Skeleton className="h-5 w-16 rounded-full" />
+                <Skeleton className="h-4 w-28 rounded" />
+                <Skeleton className="h-4 w-20 rounded" />
+                <Skeleton className="h-8 w-20 rounded-lg" />
+              </div>
+            ))}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -507,13 +432,14 @@ export default function HelpdeskManagePage() {
                         className="flex-1"
                         onKeyPress={(e) => e.key === 'Enter' && handleAddComment()}
                       />
-                      <Button
+                      <LoadingButton
                         onPress={handleAddComment}
                         isDisabled={!newComment.trim()}
+                        isLoading={commentMutation.isLoading}
                         variant="flat"
                       >
                         Add
-                      </Button>
+                      </LoadingButton>
                     </div>
                   </div>
                 </ModalBody>
@@ -523,9 +449,9 @@ export default function HelpdeskManagePage() {
                 <Button variant="light" onPress={onClose}>
                   Cancel
                 </Button>
-                <Button color="primary" onPress={handleUpdateTicket}>
+                <LoadingButton color="primary" onPress={handleUpdateTicket} isLoading={updateMutation.isLoading}>
                   Update Ticket
-                </Button>
+                </LoadingButton>
               </ModalFooter>
             </>
           )}

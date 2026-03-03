@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button } from '@heroui/react'
+import { Button, Skeleton } from '@heroui/react'
 import toast from '@/utils/toast'
 import {
   FaChartLine, FaStar, FaTrophy, FaBullseye, FaCalendarAlt,
@@ -10,110 +10,65 @@ import {
   FaArrowDown, FaMinus, FaChevronRight, FaPlus,
   FaEdit, FaEye, FaAward, FaLightbulb, FaUserTie
 } from 'react-icons/fa'
-import Loader from '@/components/ui/Loader'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 
 export default function MyPerformancePage() {
   const router = useRouter()
-  const [user, setUser] = useState(null)
-  const [employee, setEmployee] = useState(null)
-  const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('overview')
-  
-  // Performance Data
-  const [reviews, setReviews] = useState([])
-  const [goals, setGoals] = useState([])
-  const [performanceReviews, setPerformanceReviews] = useState([])
-  
-  // Stats
-  const [stats, setStats] = useState({
-    averageRating: 0,
-    totalReviews: 0,
-    totalGoals: 0,
-    completedGoals: 0,
-    inProgressGoals: 0,
-    overdueGoals: 0,
-    goalsProgress: 0
-  })
 
+  const user = useMemo(() => getCurrentUser(), [])
+
+  // Redirect if not logged in
   useEffect(() => {
-    const parsedUser = getCurrentUser()
-    if (parsedUser) {
-      setUser(parsedUser)
-      fetchMyPerformanceData()
-    } else {
+    if (!user) {
       toast.error('Please login to view your performance')
       router.push('/login')
     }
-  }, [])
+  }, [user])
 
-  const fetchMyPerformanceData = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const headers = { 'Authorization': `Bearer ${token}` }
+  // SWR: fetch all performance data in parallel
+  const { data: reviewsRes, error: reviewsErr, isLoading: reviewsLoading, isValidating: reviewsValidating } = useAuthedSWR('/api/performance/ratings')
+  const { data: goalsRes, error: goalsErr, isLoading: goalsLoading, isValidating: goalsValidating } = useAuthedSWR('/api/performance/goals')
+  const { data: perfReviewsRes, error: perfErr, isLoading: perfLoading, isValidating: perfValidating } = useAuthedSWR('/api/performance')
+  const { data: profileRes, error: profileErr, isLoading: profileLoading, isValidating: profileValidating } = useAuthedSWR('/api/profile')
 
-      // Fetch reviews/ratings for current user
-      const reviewsRes = await fetch('/api/performance/ratings', { headers })
-      const reviewsData = await reviewsRes.json()
+  const isLoading = reviewsLoading || goalsLoading || perfLoading || profileLoading
+  const isValidating = reviewsValidating || goalsValidating || perfValidating || profileValidating
+  const error = reviewsErr || goalsErr || perfErr || profileErr
 
-      // Fetch goals for current user
-      const goalsRes = await fetch('/api/performance/goals', { headers })
-      const goalsData = await goalsRes.json()
+  // Derive data
+  const employee = profileRes?.data?.employee || null
+  const reviews = reviewsRes?.data || []
+  const goals = goalsRes?.data || []
+  const performanceReviews = perfReviewsRes?.data || []
 
-      // Fetch performance reviews (formal reviews)
-      const perfReviewsRes = await fetch('/api/performance', { headers })
-      const perfReviewsData = await perfReviewsRes.json()
+  // Calculate stats
+  const stats = useMemo(() => {
+    const completedGoals = goals.filter(g => g.status === 'completed').length
+    const inProgressGoals = goals.filter(g => g.status === 'in-progress').length
+    const overdueGoals = goals.filter(g =>
+      g.status !== 'completed' && g.status !== 'cancelled' && new Date(g.dueDate) < new Date()
+    ).length
 
-      // Fetch employee profile for additional context
-      const profileRes = await fetch('/api/profile', { headers })
-      const profileData = await profileRes.json()
+    const totalProgress = goals.reduce((sum, g) => sum + (g.progress || 0), 0)
+    const avgProgress = goals.length > 0 ? Math.round(totalProgress / goals.length) : 0
 
-      if (profileData.success && profileData.data?.employee) {
-        setEmployee(profileData.data.employee)
-      }
+    const totalRating = reviews.reduce((sum, r) => sum + (r.rating || 0), 0)
+    const avgRating = reviews.length > 0 ? (totalRating / reviews.length).toFixed(1) : 0
 
-      // Process reviews
-      const myReviews = reviewsData.success ? reviewsData.data : []
-      setReviews(myReviews)
-
-      // Process goals
-      const myGoals = goalsData.success ? goalsData.data : []
-      setGoals(myGoals)
-
-      // Process formal performance reviews
-      const myPerfReviews = perfReviewsData.success ? perfReviewsData.data : []
-      setPerformanceReviews(myPerfReviews)
-
-      // Calculate stats
-      const completedGoals = myGoals.filter(g => g.status === 'completed').length
-      const inProgressGoals = myGoals.filter(g => g.status === 'in-progress').length
-      const overdueGoals = myGoals.filter(g => 
-        g.status !== 'completed' && g.status !== 'cancelled' && new Date(g.dueDate) < new Date()
-      ).length
-
-      const totalProgress = myGoals.reduce((sum, g) => sum + (g.progress || 0), 0)
-      const avgProgress = myGoals.length > 0 ? Math.round(totalProgress / myGoals.length) : 0
-
-      const totalRating = myReviews.reduce((sum, r) => sum + (r.rating || 0), 0)
-      const avgRating = myReviews.length > 0 ? (totalRating / myReviews.length).toFixed(1) : 0
-
-      setStats({
-        averageRating: avgRating,
-        totalReviews: myReviews.length,
-        totalGoals: myGoals.length,
-        completedGoals,
-        inProgressGoals,
-        overdueGoals,
-        goalsProgress: avgProgress
-      })
-
-    } catch (error) {
-      console.error('Fetch my performance error:', error)
-      toast.error('Failed to fetch performance data')
-    } finally {
-      setLoading(false)
+    return {
+      averageRating: avgRating,
+      totalReviews: reviews.length,
+      totalGoals: goals.length,
+      completedGoals,
+      inProgressGoals,
+      overdueGoals,
+      goalsProgress: avgProgress
     }
-  }
+  }, [reviews, goals])
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -174,19 +129,42 @@ export default function MyPerformancePage() {
     return diffDays
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="p-4 sm:p-6 flex justify-center items-center min-h-[400px]">
-        <div className="text-center">
-          <Loader size="lg" />
-          <p className="mt-4 text-gray-600">Loading your performance data...</p>
+      <div className="p-4 sm:p-6 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+          <div>
+            <Skeleton className="h-8 w-56 rounded-lg mb-2" />
+            <Skeleton className="h-4 w-72 rounded-lg" />
+          </div>
+          <Skeleton className="h-10 w-36 rounded-lg" />
+        </div>
+        <Skeleton className="h-48 w-full rounded-xl" />
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <Skeleton className="h-12 w-full" />
+          <div className="p-6 space-y-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {[1, 2, 3, 4].map(i => (
+                <Skeleton key={i} className="h-24 w-full rounded-lg" />
+              ))}
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Skeleton className="h-64 w-full rounded-xl" />
+              <Skeleton className="h-64 w-full rounded-xl" />
+            </div>
+          </div>
         </div>
       </div>
     )
   }
 
+  if (error) {
+    return <DataErrorState error={error} title="Failed to load performance data" />
+  }
+
   return (
     <div className="p-4 sm:p-6 space-y-6">
+      <BackgroundRefreshIndicator isValidating={isValidating} />
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
@@ -229,7 +207,7 @@ export default function MyPerformancePage() {
               )}
             </div>
           </div>
-          
+
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
             <div className="bg-blue-500/50 rounded-xl p-4 text-center border border-blue-400/30">
               <p className="text-2xl sm:text-3xl font-bold">{stats.totalReviews}</p>
@@ -253,8 +231,8 @@ export default function MyPerformancePage() {
 
       {/* Tabs */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="border-b border-gray-200 overflow-x-auto overflow-y-hidden relative" 
-             style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+        <div className="border-b border-gray-200 overflow-x-auto overflow-y-hidden relative"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
           <style jsx>{`
             div::-webkit-scrollbar {
               display: none;
@@ -270,11 +248,10 @@ export default function MyPerformancePage() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center justify-center gap-1.5 px-3 sm:px-5 py-3 text-xs sm:text-sm font-medium whitespace-nowrap border-b-2 transition-colors flex-shrink-0 ${
-                  activeTab === tab.id
+                className={`flex items-center justify-center gap-1.5 px-3 sm:px-5 py-3 text-xs sm:text-sm font-medium whitespace-nowrap border-b-2 transition-colors flex-shrink-0 ${activeTab === tab.id
                     ? 'border-blue-500 text-blue-600 bg-blue-50'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                  }`}
               >
                 <tab.icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
                 <span className="hidden sm:inline">{tab.fullLabel || tab.label}</span>
@@ -297,7 +274,7 @@ export default function MyPerformancePage() {
                   </div>
                   <p className="text-sm text-green-600 mt-2">Completed Goals</p>
                 </div>
-                
+
                 <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
                   <div className="flex items-center justify-between">
                     <FaClock className="w-8 h-8 text-blue-500" />
@@ -305,7 +282,7 @@ export default function MyPerformancePage() {
                   </div>
                   <p className="text-sm text-blue-600 mt-2">In Progress</p>
                 </div>
-                
+
                 <div className="bg-red-50 rounded-lg p-4 border border-red-200">
                   <div className="flex items-center justify-between">
                     <FaExclamationTriangle className="w-8 h-8 text-red-500" />
@@ -313,7 +290,7 @@ export default function MyPerformancePage() {
                   </div>
                   <p className="text-sm text-red-600 mt-2">Overdue</p>
                 </div>
-                
+
                 <div className="bg-yellow-50 rounded-lg p-4 border border-yellow-200">
                   <div className="flex items-center justify-between">
                     <FaStar className="w-8 h-8 text-yellow-500" />
@@ -334,7 +311,7 @@ export default function MyPerformancePage() {
                       </div>
                       <h3 className="text-lg font-semibold text-gray-800">Recent Goals</h3>
                     </div>
-                    <button 
+                    <button
                       onClick={() => setActiveTab('goals')}
                       className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center hover:bg-blue-50 px-2 py-1 rounded-lg transition-colors"
                     >
@@ -359,7 +336,7 @@ export default function MyPerformancePage() {
                             <span>{goal.progress || 0}%</span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
+                            <div
                               className="bg-primary-500 h-2 rounded-full transition-all duration-300"
                               style={{ width: `${goal.progress || 0}%` }}
                             />
@@ -374,7 +351,7 @@ export default function MyPerformancePage() {
                         </div>
                         <h4 className="text-gray-700 font-medium mb-1">No goals set yet</h4>
                         <p className="text-gray-500 text-sm mb-4">Start tracking your progress by setting goals</p>
-                        <Button 
+                        <Button
                           onPress={() => router.push('/dashboard/performance/goals')}
                           color="primary"
                           size="sm"
@@ -395,7 +372,7 @@ export default function MyPerformancePage() {
                       </div>
                       <h3 className="text-lg font-semibold text-gray-800">Recent Feedback</h3>
                     </div>
-                    <button 
+                    <button
                       onClick={() => setActiveTab('reviews')}
                       className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center hover:bg-blue-50 px-2 py-1 rounded-lg transition-colors"
                     >
@@ -472,13 +449,12 @@ export default function MyPerformancePage() {
                   {goals.map((goal) => {
                     const daysRemaining = getDaysRemaining(goal.dueDate)
                     const isOverdue = daysRemaining < 0 && goal.status !== 'completed' && goal.status !== 'cancelled'
-                    
+
                     return (
-                      <div 
-                        key={goal._id} 
-                        className={`bg-white border rounded-lg p-4 sm:p-5 hover:shadow-md transition-shadow ${
-                          isOverdue ? 'border-red-300 bg-red-50' : 'border-gray-200'
-                        }`}
+                      <div
+                        key={goal._id}
+                        className={`bg-white border rounded-lg p-4 sm:p-5 hover:shadow-md transition-shadow ${isOverdue ? 'border-red-300 bg-red-50' : 'border-gray-200'
+                          }`}
                       >
                         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
                           <div className="flex-1 min-w-0">
@@ -527,7 +503,7 @@ export default function MyPerformancePage() {
                             </button>
                           </div>
                         </div>
-                        
+
                         {/* Progress Bar */}
                         <div className="mt-4">
                           <div className="flex items-center justify-between text-sm mb-1">
@@ -535,11 +511,10 @@ export default function MyPerformancePage() {
                             <span className="font-medium text-gray-800">{goal.progress || 0}%</span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-2.5">
-                            <div 
-                              className={`h-2.5 rounded-full transition-all duration-300 ${
-                                goal.status === 'completed' ? 'bg-green-500' :
-                                isOverdue ? 'bg-red-500' : 'bg-primary-500'
-                              }`}
+                            <div
+                              className={`h-2.5 rounded-full transition-all duration-300 ${goal.status === 'completed' ? 'bg-green-500' :
+                                  isOverdue ? 'bg-red-500' : 'bg-primary-500'
+                                }`}
                               style={{ width: `${goal.progress || 0}%` }}
                             />
                           </div>
@@ -553,13 +528,12 @@ export default function MyPerformancePage() {
                             </p>
                             <div className="flex flex-wrap gap-2">
                               {goal.milestones.slice(0, 3).map((milestone, idx) => (
-                                <span 
+                                <span
                                   key={idx}
-                                  className={`text-xs px-2 py-1 rounded ${
-                                    milestone.completed 
-                                      ? 'bg-green-100 text-green-700 line-through' 
+                                  className={`text-xs px-2 py-1 rounded ${milestone.completed
+                                      ? 'bg-green-100 text-green-700 line-through'
                                       : 'bg-gray-100 text-gray-600'
-                                  }`}
+                                    }`}
                                 >
                                   {milestone.title}
                                 </span>
@@ -603,12 +577,11 @@ export default function MyPerformancePage() {
                             <span className="font-medium text-gray-800">
                               {review.rater?.firstName} {review.rater?.lastName}
                             </span>
-                            <span className={`px-2 py-0.5 text-xs rounded capitalize ${
-                              review.type === 'appreciation' ? 'bg-green-100 text-green-700' :
-                              review.type === 'warning' ? 'bg-red-100 text-red-700' :
-                              review.type === 'feedback' ? 'bg-blue-100 text-blue-700' :
-                              'bg-gray-100 text-gray-700'
-                            }`}>
+                            <span className={`px-2 py-0.5 text-xs rounded capitalize ${review.type === 'appreciation' ? 'bg-green-100 text-green-700' :
+                                review.type === 'warning' ? 'bg-red-100 text-red-700' :
+                                  review.type === 'feedback' ? 'bg-blue-100 text-blue-700' :
+                                    'bg-gray-100 text-gray-700'
+                              }`}>
                               {review.type || 'Review'}
                             </span>
                             {review.category && (
@@ -675,14 +648,14 @@ export default function MyPerformancePage() {
                               {review.reviewer?.firstName} {review.reviewer?.lastName}
                             </p>
                           </div>
-                          
+
                           {review.strengths && (
                             <div className="mt-3">
                               <p className="text-sm font-medium text-green-700">Strengths:</p>
                               <p className="text-sm text-gray-600">{review.strengths}</p>
                             </div>
                           )}
-                          
+
                           {review.areasOfImprovement && (
                             <div className="mt-2">
                               <p className="text-sm font-medium text-orange-700">Areas for Improvement:</p>
@@ -690,7 +663,7 @@ export default function MyPerformancePage() {
                             </div>
                           )}
                         </div>
-                        
+
                         <div className="flex flex-col items-end">
                           {review.overallRating && (
                             <div className="text-center bg-primary-50 px-4 py-2 rounded-lg">
@@ -701,7 +674,7 @@ export default function MyPerformancePage() {
                           )}
                         </div>
                       </div>
-                      
+
                       {/* KRAs/KPIs Summary */}
                       {((review.kras && review.kras.length > 0) || (review.kpis && review.kpis.length > 0)) && (
                         <div className="mt-4 pt-4 border-t border-gray-100">

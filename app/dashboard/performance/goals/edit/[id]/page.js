@@ -4,15 +4,14 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import toast from '@/utils/toast'
 import { FaArrowLeft, FaSave, FaTimes, FaPlus } from 'react-icons/fa'
-import Loader from '@/components/ui/Loader'
-import { Select, SelectItem, Input, Textarea, Button } from '@heroui/react'
+import { Select, SelectItem, Input, Textarea, Button, Skeleton } from '@heroui/react'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton from '@/components/ui/LoadingButton'
 
 export default function EditGoalPage() {
   const router = useRouter()
   const params = useParams()
-  const [loading, setLoading] = useState(false)
-  const [initialLoading, setInitialLoading] = useState(true)
-  const [employees, setEmployees] = useState([])
   const [formData, setFormData] = useState({
     employeeId: '',
     title: '',
@@ -26,65 +25,43 @@ export default function EditGoalPage() {
     milestones: [{ title: '', description: '', dueDate: '', completed: false }]
   })
 
+  // Fetch employees
+  const { data: empRes } = useAuthedSWR('/api/employees?limit=1000')
+  const employees = empRes?.data || []
+
+  // Fetch the goal
+  const { data: goalRes, isLoading: initialLoading } = useAuthedSWR(
+    params.id ? `/api/performance/goals?goalId=${params.id}` : null
+  )
+
+  // Populate form when goal data loads
   useEffect(() => {
-    fetchEmployees()
-    fetchGoal()
-  }, [params.id])
-
-  const fetchEmployees = async () => {
-    try {
-      const response = await fetch('/api/employees?limit=1000')
-      const data = await response.json()
-      if (data.success) {
-        setEmployees(data.data)
-      }
-    } catch (error) {
-      console.error('Fetch employees error:', error)
-      toast.error('Failed to fetch employees')
-    }
-  }
-
-  const fetchGoal = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/performance/goals?goalId=' + params.id, {
-        headers: { 'Authorization': 'Bearer ' + token }
+    if (goalRes?.success && goalRes.data) {
+      const goal = goalRes.data
+      setFormData({
+        employeeId: goal.employee?._id || goal.employee || '',
+        title: goal.title || '',
+        description: goal.description || '',
+        category: goal.category || '',
+        priority: goal.priority || 'medium',
+        status: goal.status || 'not-started',
+        progress: goal.progress || 0,
+        startDate: goal.startDate ? new Date(goal.startDate).toISOString().split('T')[0] : '',
+        dueDate: goal.dueDate ? new Date(goal.dueDate).toISOString().split('T')[0] : '',
+        milestones: goal.milestones && goal.milestones.length > 0
+          ? goal.milestones.map(m => ({
+            title: m.title || '',
+            description: m.description || '',
+            dueDate: m.dueDate ? new Date(m.dueDate).toISOString().split('T')[0] : '',
+            completed: m.completed || false
+          }))
+          : [{ title: '', description: '', dueDate: '', completed: false }]
       })
-
-      const data = await response.json()
-      
-      if (data.success && data.data) {
-        const goal = data.data
-        setFormData({
-          employeeId: goal.employee?._id || goal.employee || '',
-          title: goal.title || '',
-          description: goal.description || '',
-          category: goal.category || '',
-          priority: goal.priority || 'medium',
-          status: goal.status || 'not-started',
-          progress: goal.progress || 0,
-          startDate: goal.startDate ? new Date(goal.startDate).toISOString().split('T')[0] : '',
-          dueDate: goal.dueDate ? new Date(goal.dueDate).toISOString().split('T')[0] : '',
-          milestones: goal.milestones && goal.milestones.length > 0 
-            ? goal.milestones.map(m => ({
-                title: m.title || '',
-                description: m.description || '',
-                dueDate: m.dueDate ? new Date(m.dueDate).toISOString().split('T')[0] : '',
-                completed: m.completed || false
-              }))
-            : [{ title: '', description: '', dueDate: '', completed: false }]
-        })
-      } else {
-        toast.error(data.message || 'Goal not found')
-        router.push('/dashboard/performance/goals')
-      }
-    } catch (error) {
-      console.error('Fetch goal error:', error)
-      toast.error('Failed to fetch goal details')
-    } finally {
-      setInitialLoading(false)
+    } else if (goalRes && !goalRes.success) {
+      toast.error(goalRes.message || 'Goal not found')
+      router.push('/dashboard/performance/goals')
     }
-  }
+  }, [goalRes, router])
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
@@ -97,7 +74,7 @@ export default function EditGoalPage() {
   const handleMilestoneChange = (index, field, value) => {
     setFormData(prev => ({
       ...prev,
-      milestones: prev.milestones.map((milestone, i) => 
+      milestones: prev.milestones.map((milestone, i) =>
         i === index ? { ...milestone, [field]: value } : milestone
       )
     }))
@@ -117,14 +94,23 @@ export default function EditGoalPage() {
     }))
   }
 
+  const submitMutation = useApiMutation({
+    method: 'PUT',
+    onSuccess: () => {
+      toast.success('Goal updated successfully')
+      router.push('/dashboard/performance/goals/' + params.id)
+    },
+    onError: (msg) => toast.error(msg || 'Failed to update goal'),
+  })
+
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
+
     if (!formData.employeeId) {
       toast.error('Please select an employee')
       return
     }
-    
+
     if (!formData.title) {
       toast.error('Please enter goal title')
       return
@@ -135,37 +121,11 @@ export default function EditGoalPage() {
       return
     }
 
-    setLoading(true)
-    
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/performance/goals', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + token
-        },
-        body: JSON.stringify({
-          goalId: params.id,
-          ...formData,
-          milestones: formData.milestones.filter(m => m.title.trim())
-        })
-      })
-
-      const data = await response.json()
-      
-      if (data.success) {
-        toast.success('Goal updated successfully')
-        router.push('/dashboard/performance/goals/' + params.id)
-      } else {
-        toast.error(data.message || 'Failed to update goal')
-      }
-    } catch (error) {
-      console.error('Update goal error:', error)
-      toast.error('Failed to update goal')
-    } finally {
-      setLoading(false)
-    }
+    submitMutation.execute('/api/performance/goals', {
+      goalId: params.id,
+      ...formData,
+      milestones: formData.milestones.filter(m => m.title.trim())
+    })
   }
 
   const categories = [
@@ -183,8 +143,11 @@ export default function EditGoalPage() {
 
   if (initialLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader size="lg" />
+      <div className="p-6 max-w-4xl mx-auto space-y-6">
+        <Skeleton className="h-10 w-64 rounded-lg" />
+        <Skeleton className="h-64 rounded-xl" />
+        <Skeleton className="h-48 rounded-xl" />
+        <Skeleton className="h-40 rounded-xl" />
       </div>
     )
   }
@@ -216,7 +179,7 @@ export default function EditGoalPage() {
               <Select
                 label="Employee *"
                 selectedKeys={formData.employeeId ? [formData.employeeId] : []}
-                onSelectionChange={(keys) => handleInputChange({ target: { name: 'employeeId', value: Array.from(keys)[0] || '' }})}
+                onSelectionChange={(keys) => handleInputChange({ target: { name: 'employeeId', value: Array.from(keys)[0] || '' } })}
                 isRequired
                 placeholder="Select Employee"
               >
@@ -231,7 +194,7 @@ export default function EditGoalPage() {
               <Select
                 label="Category"
                 selectedKeys={formData.category ? [formData.category] : []}
-                onSelectionChange={(keys) => handleInputChange({ target: { name: 'category', value: Array.from(keys)[0] || '' }})}
+                onSelectionChange={(keys) => handleInputChange({ target: { name: 'category', value: Array.from(keys)[0] || '' } })}
                 placeholder="Select Category"
               >
                 {categories.map((category) => (
@@ -245,7 +208,7 @@ export default function EditGoalPage() {
               <Select
                 label="Priority"
                 selectedKeys={[formData.priority]}
-                onSelectionChange={(keys) => handleInputChange({ target: { name: 'priority', value: Array.from(keys)[0] || 'medium' }})}
+                onSelectionChange={(keys) => handleInputChange({ target: { name: 'priority', value: Array.from(keys)[0] || 'medium' } })}
               >
                 <SelectItem key="low">Low</SelectItem>
                 <SelectItem key="medium">Medium</SelectItem>
@@ -256,7 +219,7 @@ export default function EditGoalPage() {
               <Select
                 label="Status"
                 selectedKeys={[formData.status]}
-                onSelectionChange={(keys) => handleInputChange({ target: { name: 'status', value: Array.from(keys)[0] || 'not-started' }})}
+                onSelectionChange={(keys) => handleInputChange({ target: { name: 'status', value: Array.from(keys)[0] || 'not-started' } })}
               >
                 <SelectItem key="not-started">Not Started</SelectItem>
                 <SelectItem key="in-progress">In Progress</SelectItem>
@@ -433,14 +396,14 @@ export default function EditGoalPage() {
             <FaTimes className="w-4 h-4" />
             <span>Cancel</span>
           </button>
-          <button
+          <LoadingButton
             type="submit"
-            disabled={loading}
-            className="px-6 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors flex items-center space-x-2 disabled:opacity-50"
+            isLoading={submitMutation.isLoading}
+            loadingText="Updating..."
+            startContent={<FaSave className="w-4 h-4" />}
           >
-            <FaSave className="w-4 h-4" />
-            <span>{loading ? 'Updating...' : 'Update Goal'}</span>
-          </button>
+            Update Goal
+          </LoadingButton>
         </div>
       </form>
     </div>

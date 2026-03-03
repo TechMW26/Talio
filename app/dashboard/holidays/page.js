@@ -7,8 +7,12 @@ import {
   FaPlus, FaEdit, FaTrash, FaCalendarAlt,
   FaList, FaTh, FaChevronLeft, FaChevronRight
 } from 'react-icons/fa'
-import Loader from '@/components/ui/Loader'
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Select, SelectItem, Input, Textarea, Checkbox } from '@heroui/react'
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Select, SelectItem, Input, Textarea, Checkbox, Skeleton } from '@heroui/react'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton from '@/components/ui/LoadingButton'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 import {
   format, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths,
@@ -16,8 +20,6 @@ import {
 } from 'date-fns'
 
 export default function HolidaysPage() {
-  const [holidays, setHolidays] = useState([])
-  const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingHoliday, setEditingHoliday] = useState(null)
 
@@ -38,20 +40,19 @@ export default function HolidaysPage() {
     'India', 'USA', 'UK', 'Canada', 'Australia', 'UAE', 'Singapore', 'Germany', 'France', 'Japan'
   ]
 
+  // --- SWR Data Fetching ---
+  const { data: holidaysRes, error, isLoading, isValidating, mutate: refreshHolidays } = useAuthedSWR('/api/holidays')
+  const holidays = holidaysRes?.data || []
+
   // Real-time updates
   const { socket, isConnected, subscribe, onHolidayUpdate } = useSocket()
 
-  useEffect(() => {
-    fetchHolidays()
-  }, [])
-
-  // Subscribe to real-time holiday updates
   useEffect(() => {
     if (!socket || !isConnected) return
 
     const handleHolidayUpdate = (data) => {
       console.log('🔄 [Holidays] Real-time update received:', data)
-      fetchHolidays()
+      refreshHolidays()
     }
 
     const unsub1 = onHolidayUpdate?.(handleHolidayUpdate)
@@ -70,63 +71,30 @@ export default function HolidaysPage() {
     }
   }, [])
 
-  const fetchHolidays = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/holidays', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
+  // --- Submit mutation (create/edit) ---
+  const submitMutation = useApiMutation({
+    invalidateKeys: ['/api/holidays'],
+    onSuccess: (data) => {
+      toast.success(data.message || 'Holiday saved')
+      handleCloseModal()
+    },
+    onError: (msg) => toast.error(msg || 'Failed to save holiday'),
+  })
 
-      const data = await response.json()
-      if (data.success) {
-        setHolidays(data.data)
-      }
-    } catch (error) {
-      console.error('Fetch holidays error:', error)
-      toast.error('Failed to fetch holidays')
-    } finally {
-      setLoading(false)
-    }
-  }
+  // --- Delete mutation ---
+  const deleteMutation = useApiMutation({
+    method: 'DELETE',
+    invalidateKeys: ['/api/holidays'],
+    onSuccess: (data) => toast.success(data.message || 'Holiday deleted'),
+    onError: (msg) => toast.error(msg || 'Failed to delete holiday'),
+  })
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault()
-
-    try {
-      const token = localStorage.getItem('token')
-      const url = editingHoliday
-        ? `/api/holidays/${editingHoliday._id}`
-        : '/api/holidays'
-      const method = editingHoliday ? 'PUT' : 'POST'
-
-      // Add year automatically
-      const dataToSend = {
-        ...formData,
-        year: new Date(formData.date).getFullYear()
-      }
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(dataToSend),
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        toast.success(data.message)
-        handleCloseModal()
-        fetchHolidays()
-      } else {
-        toast.error(data.message)
-      }
-    } catch (error) {
-      console.error('Submit error:', error)
-      toast.error('Failed to save holiday')
-    }
+    const url = editingHoliday ? `/api/holidays/${editingHoliday._id}` : '/api/holidays'
+    const method = editingHoliday ? 'PUT' : 'POST'
+    const dataToSend = { ...formData, year: new Date(formData.date).getFullYear() }
+    submitMutation.execute(url, dataToSend, { method })
   }
 
   const handleEdit = (holiday) => {
@@ -142,28 +110,9 @@ export default function HolidaysPage() {
     setShowModal(true)
   }
 
-  const handleDelete = async (id) => {
+  const handleDelete = (id) => {
     if (!confirm('Are you sure you want to delete this holiday?')) return
-
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/holidays/${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        toast.success(data.message)
-        fetchHolidays()
-      } else {
-        toast.error(data.message)
-      }
-    } catch (error) {
-      console.error('Delete error:', error)
-      toast.error('Failed to delete holiday')
-    }
+    deleteMutation.execute(`/api/holidays/${id}`)
   }
 
   const handleCloseModal = () => {
@@ -381,10 +330,15 @@ export default function HolidaysPage() {
       </div>
 
       {/* Main Content */}
-      {loading ? (
-        <div className="bg-white rounded-lg shadow-md p-8 text-center">
-          <Loader size="lg" />
-          <p className="mt-4 text-gray-600">Loading holidays...</p>
+      {error ? (
+        <DataErrorState message="Failed to load holidays" onRetry={() => refreshHolidays()} />
+      ) : isLoading ? (
+        <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 space-y-4">
+          <div className="grid grid-cols-7 gap-2">
+            {[...Array(35)].map((_, i) => (
+              <Skeleton key={i} className="h-16 rounded-lg" />
+            ))}
+          </div>
         </div>
       ) : (
         <>
@@ -555,9 +509,14 @@ export default function HolidaysPage() {
                   <Button variant="light" onPress={handleCloseModal}>
                     Cancel
                   </Button>
-                  <Button color="primary" type="submit">
+                  <LoadingButton
+                    color="primary"
+                    type="submit"
+                    isLoading={submitMutation.isLoading}
+                    loadingText={editingHoliday ? 'Updating...' : 'Creating...'}
+                  >
                     {editingHoliday ? 'Update' : 'Create'}
-                  </Button>
+                  </LoadingButton>
                 </ModalFooter>
               </form>
             </>

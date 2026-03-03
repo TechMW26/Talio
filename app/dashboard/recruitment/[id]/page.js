@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import {
   Button, Chip, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter,
@@ -9,6 +9,11 @@ import {
 } from '@heroui/react';
 import toast from '@/utils/toast';
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext';
+import useAuthedSWR from '@/hooks/useAuthedSWR';
+import useApiMutation from '@/hooks/useApiMutation';
+import LoadingButton from '@/components/ui/LoadingButton';
+import { DataErrorState } from '@/components/ui/ErrorBoundary';
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator';
 import {
   FaArrowLeft, FaEdit, FaTrash, FaBriefcase, FaMapMarkerAlt, FaClock,
   FaDollarSign, FaUsers, FaUserPlus, FaGraduationCap, FaCalendarAlt,
@@ -35,10 +40,6 @@ const EMPLOYMENT_TYPE_LABELS = {
 export default function JobDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const [job, setJob] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null);
-  const [deleting, setDeleting] = useState(false);
 
   const { isOpen: isAddOpen, onOpen: onAddOpen, onClose: onAddClose } = useDisclosure();
   const [candidateForm, setCandidateForm] = useState({
@@ -46,125 +47,73 @@ export default function JobDetailPage() {
     source: 'direct', experience: '', currentCompany: '',
     expectedSalary: '', skills: '',
   });
-  const [submitting, setSubmitting] = useState(false);
 
   const { socket, isConnected, subscribe } = useSocket();
 
-  const fetchJob = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/recruitment/${params.id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
-      if (data.success) {
-        setJob(data.data);
-      } else {
-        toast.error(data.message || 'Job not found');
-        router.push('/dashboard/recruitment');
-      }
-    } catch (error) {
-      console.error('Fetch job error:', error);
-      toast.error('Failed to load job details');
-    } finally {
-      setLoading(false);
-    }
-  }, [params.id]);
+  const user = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem('user')); } catch { return null; }
+  }, []);
 
-  useEffect(() => {
-    const userData = localStorage.getItem('user');
-    if (userData) setUser(JSON.parse(userData));
-    fetchJob();
-  }, [params.id]);
+  const { data: res, error, isLoading, isValidating, mutate: refresh } = useAuthedSWR(params.id ? `/api/recruitment/${params.id}` : null);
+  const job = res?.data || null;
 
   useEffect(() => {
     if (!socket || !isConnected) return;
-    const unsub = subscribe ? subscribe(REALTIME_EVENTS.RECRUITMENT_UPDATE, fetchJob) : undefined;
+    const unsub = subscribe ? subscribe(REALTIME_EVENTS.RECRUITMENT_UPDATE, () => refresh()) : undefined;
     return () => { if (unsub) unsub(); };
   }, [socket, isConnected]);
 
   const canManage = user && ['admin', 'hr', 'manager'].includes(user.role);
 
+  const deleteMutation = useApiMutation({
+    method: 'DELETE',
+    onSuccess: () => { toast.success('Job posting deleted'); router.push('/dashboard/recruitment'); },
+    onError: (msg) => toast.error(msg || 'Failed to delete job posting'),
+  });
+
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this job posting? This will also remove all associated candidates and interviews.')) return;
-    setDeleting(true);
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/recruitment/${params.id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
-      if (data.success) {
-        toast.success('Job posting deleted');
-        router.push('/dashboard/recruitment');
-      } else {
-        toast.error(data.message || 'Failed to delete');
-      }
-    } catch (error) {
-      toast.error('Failed to delete job posting');
-    } finally {
-      setDeleting(false);
-    }
+    await deleteMutation.execute(`/api/recruitment/${params.id}`);
   };
 
+  const statusMutation = useApiMutation({
+    method: 'PUT',
+    invalidateKeys: [`/api/recruitment/${params.id}`],
+    onSuccess: () => toast.success('Status updated'),
+    onError: (msg) => toast.error(msg || 'Failed to update status'),
+  });
+
   const handleStatusChange = async (newStatus) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/recruitment/${params.id}`, {
-        method: 'PUT',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
-      });
-      const data = await response.json();
-      if (data.success) {
-        toast.success(`Status updated to ${newStatus}`);
-        setJob(data.data);
-      } else {
-        toast.error(data.message || 'Failed to update status');
-      }
-    } catch (error) {
-      toast.error('Failed to update status');
-    }
+    await statusMutation.execute(`/api/recruitment/${params.id}`, { status: newStatus });
   };
+
+  const addCandidateMutation = useApiMutation({
+    method: 'POST',
+    invalidateKeys: [`/api/recruitment/${params.id}`],
+    onSuccess: () => {
+      toast.success('Candidate added successfully');
+      onAddClose();
+      setCandidateForm({ firstName: '', lastName: '', email: '', phone: '', source: 'direct', experience: '', currentCompany: '', expectedSalary: '', skills: '' });
+    },
+    onError: (msg) => toast.error(msg || 'Failed to add candidate'),
+  });
 
   const handleAddCandidate = async () => {
     if (!candidateForm.firstName || !candidateForm.lastName || !candidateForm.email) {
       toast.error('First name, last name, and email are required');
       return;
     }
-    setSubmitting(true);
-    try {
-      const token = localStorage.getItem('token');
-      const payload = {
-        ...candidateForm,
-        jobPosting: params.id,
-        experience: candidateForm.experience ? parseFloat(candidateForm.experience) : undefined,
-        expectedSalary: candidateForm.expectedSalary ? parseFloat(candidateForm.expectedSalary) : undefined,
-        skills: candidateForm.skills ? candidateForm.skills.split(',').map((s) => s.trim()).filter(Boolean) : [],
-      };
-      const response = await fetch('/api/recruitment/candidates', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const data = await response.json();
-      if (data.success) {
-        toast.success('Candidate added successfully');
-        onAddClose();
-        setCandidateForm({ firstName: '', lastName: '', email: '', phone: '', source: 'direct', experience: '', currentCompany: '', expectedSalary: '', skills: '' });
-        fetchJob();
-      } else {
-        toast.error(data.message || 'Failed to add candidate');
-      }
-    } catch (error) {
-      toast.error('Failed to add candidate');
-    } finally {
-      setSubmitting(false);
-    }
+    const payload = {
+      ...candidateForm,
+      jobPosting: params.id,
+      experience: candidateForm.experience ? parseFloat(candidateForm.experience) : undefined,
+      expectedSalary: candidateForm.expectedSalary ? parseFloat(candidateForm.expectedSalary) : undefined,
+      skills: candidateForm.skills ? candidateForm.skills.split(',').map((s) => s.trim()).filter(Boolean) : [],
+    };
+    await addCandidateMutation.execute('/api/recruitment/candidates', payload);
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="page-container">
         <div className="space-y-4 sm:space-y-6">
@@ -183,6 +132,14 @@ export default function JobDetailPage() {
             </div>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="page-container">
+        <DataErrorState message="Failed to load job details" onRetry={() => refresh()} />
       </div>
     );
   }
@@ -242,13 +199,14 @@ export default function JobDetailPage() {
                 </Button>
               </Tooltip>
               <Tooltip content="Delete">
-                <Button size="sm" isIconOnly variant="flat" color="danger" onPress={handleDelete} isLoading={deleting}>
+                <Button size="sm" isIconOnly variant="flat" color="danger" onPress={handleDelete} isLoading={deleteMutation.isLoading}>
                   <FaTrash className="w-3.5 h-3.5" />
                 </Button>
               </Tooltip>
             </div>
           )}
         </div>
+        <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" />
 
         {/* Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
@@ -539,7 +497,7 @@ export default function JobDetailPage() {
             </ModalBody>
             <ModalFooter>
               <Button variant="flat" onPress={onAddClose}>Cancel</Button>
-              <Button color="primary" onPress={handleAddCandidate} isLoading={submitting}>Add Candidate</Button>
+              <Button color="primary" onPress={handleAddCandidate} isLoading={addCandidateMutation.isLoading}>Add Candidate</Button>
             </ModalFooter>
           </ModalContent>
         </Modal>

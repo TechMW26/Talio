@@ -4,8 +4,8 @@ import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
-import { 
-  FaDownload, FaEye, FaMoneyBillWave, FaPlus, FaFilter, 
+import {
+  FaDownload, FaEye, FaMoneyBillWave, FaPlus, FaFilter,
   FaCheckCircle, FaClock, FaExclamationTriangle, FaUsers,
   FaFileInvoiceDollar, FaChartLine, FaCalendarAlt, FaFileExcel,
   FaEnvelope, FaCheckSquare, FaSquare, FaCog, FaTrash, FaEdit, FaTimes,
@@ -13,6 +13,9 @@ import {
 } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
 import * as XLSX from 'xlsx'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton from '@/components/ui/LoadingButton'
 
 // Hero UI Components
 import {
@@ -58,21 +61,15 @@ const ADMIN_ROLES = ['admin', 'hr', 'super_admin']
 
 export default function PayrollPage() {
   const router = useRouter()
-  const [payrolls, setPayrolls] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState(null)
-  const [isAdmin, setIsAdmin] = useState(false)
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [statusFilter, setStatusFilter] = useState('all')
   const [selectedVenture, setSelectedVenture] = useState('all')
-  const [ventures, setVentures] = useState([])
   const [selectedPayrolls, setSelectedPayrolls] = useState([])
   const [bulkProcessing, setBulkProcessing] = useState(false)
   const [sendEmailsOnProcess, setSendEmailsOnProcess] = useState(true)
   const [editingPayroll, setEditingPayroll] = useState(null)
   const [editFormData, setEditFormData] = useState({})
-  const [deleting, setDeleting] = useState(false)
   const [selectedBank, setSelectedBank] = useState('')
 
   // Hero UI Modal disclosures
@@ -82,47 +79,32 @@ export default function PayrollPage() {
   // Real-time updates
   const { socket, isConnected, subscribe, onPayrollUpdate } = useSocket()
 
-  // Fetch ventures/companies
-  const fetchVentures = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/companies', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-      const data = await response.json()
-      if (data.success) {
-        setVentures(data.data)
-      }
-    } catch (error) {
-      console.error('Fetch ventures error:', error)
-    }
-  }
+  // User from localStorage (memoized)
+  const user = useMemo(() => getCurrentUser(), [])
+  const isAdmin = useMemo(() => user ? ADMIN_ROLES.includes(user.role) : false, [user])
 
-  useEffect(() => {
-    const parsedUser = getCurrentUser()
-    if (parsedUser) {
-      setUser(parsedUser)
-      const adminCheck = ADMIN_ROLES.includes(parsedUser.role)
-      setIsAdmin(adminCheck)
-      
-      if (adminCheck) {
-        // Admin/HR - fetch all payrolls and ventures
-        fetchAllPayrolls()
-        fetchVentures()
-      } else {
-        // Employee - fetch personal payrolls
-        const empId = getEmployeeId(parsedUser)
-        if (empId) {
-          fetchPayrolls(empId)
-        } else {
-          toast.error('Employee information not found. Please logout and login again.')
-          setLoading(false)
-        }
-      }
+  // --- SWR Data Fetching ---
+
+  // Payroll data (depends on user role + month/year)
+  const payrollParams = useMemo(() => {
+    if (!user) return null
+    if (isAdmin) {
+      const params = new URLSearchParams()
+      if (selectedMonth) params.append('month', selectedMonth)
+      if (selectedYear) params.append('year', selectedYear)
+      return `/api/payroll?${params.toString()}`
     } else {
-      setLoading(false)
+      const empId = getEmployeeId(user)
+      return empId ? `/api/payroll?employeeId=${empId}` : null
     }
-  }, [selectedMonth, selectedYear])
+  }, [user, isAdmin, selectedMonth, selectedYear])
+
+  const { data: payrollsRes, isLoading: loading, mutate: refreshPayrolls } = useAuthedSWR(payrollParams)
+  const payrolls = payrollsRes?.data || []
+
+  // Ventures (admin only)
+  const { data: venturesRes } = useAuthedSWR(isAdmin ? '/api/companies' : null)
+  const ventures = venturesRes?.data || []
 
   // Subscribe to real-time payroll updates
   useEffect(() => {
@@ -130,12 +112,7 @@ export default function PayrollPage() {
 
     const handlePayrollUpdate = (data) => {
       console.log('🔄 [Payroll] Real-time update received:', data)
-      if (isAdmin) {
-        fetchAllPayrolls()
-      } else {
-        const empId = getEmployeeId(user)
-        if (empId) fetchPayrolls(empId)
-      }
+      refreshPayrolls()
     }
 
     const unsub1 = onPayrollUpdate?.(handlePayrollUpdate)
@@ -147,91 +124,41 @@ export default function PayrollPage() {
     }
   }, [socket, isConnected, user, isAdmin, selectedMonth, selectedYear])
 
-  const fetchAllPayrolls = async () => {
-    try {
-      setLoading(true)
-      const token = localStorage.getItem('token')
-      const params = new URLSearchParams()
-      if (selectedMonth) params.append('month', selectedMonth)
-      if (selectedYear) params.append('year', selectedYear)
-      
-      const response = await fetch(
-        `/api/payroll?${params.toString()}`,
-        {
-          headers: { 'Authorization': `Bearer ${token}` },
-        }
-      )
-
-      const data = await response.json()
-      if (data.success) {
-        setPayrolls(data.data)
-      }
-    } catch (error) {
-      console.error('Fetch payroll error:', error)
-      toast.error('Failed to fetch payroll records')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchPayrolls = async (employeeId) => {
-    try {
-      setLoading(true)
-      const token = localStorage.getItem('token')
-      const response = await fetch(
-        `/api/payroll?employeeId=${employeeId}`,
-        {
-          headers: { 'Authorization': `Bearer ${token}` },
-        }
-      )
-
-      const data = await response.json()
-      if (data.success) {
-        setPayrolls(data.data)
-      }
-    } catch (error) {
-      console.error('Fetch payroll error:', error)
-      toast.error('Failed to fetch payroll records')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const filteredPayrolls = useMemo(() => {
     let filtered = payrolls
-    
+
     // Filter by status
     if (statusFilter !== 'all') {
       filtered = filtered.filter(p => p.status === statusFilter)
     }
-    
+
     // Filter by venture/company
     if (selectedVenture !== 'all') {
       filtered = filtered.filter(p => p.employee?.company?._id === selectedVenture)
     }
-    
+
     // Sort by hierarchy (higher designationLevel = higher hierarchy = comes first)
     // Then by designation title to group same designations together
     filtered = [...filtered].sort((a, b) => {
       const levelA = a.employee?.designationLevel || a.employee?.designation?.level || 0
       const levelB = b.employee?.designationLevel || b.employee?.designation?.level || 0
-      
+
       // First sort by level (higher = higher hierarchy, so descending)
       if (levelA !== levelB) {
         return levelB - levelA
       }
-      
+
       // Within same level, group by designation title
       const titleA = a.employee?.designation?.title || ''
       const titleB = b.employee?.designation?.title || ''
       return titleA.localeCompare(titleB)
     })
-    
+
     return filtered
   }, [payrolls, statusFilter, selectedVenture])
 
   const stats = useMemo(() => {
-    const monthPayrolls = payrolls.filter(p => 
+    const monthPayrolls = payrolls.filter(p =>
       p.month === selectedMonth && p.year === selectedYear
     )
     return {
@@ -278,42 +205,25 @@ export default function PayrollPage() {
       'pending': 'Pending',
     }
     return (
-      <StatusBadge 
-        status={statusMap[status] || 'default'} 
-        label={labelMap[status] || 'Unknown'} 
+      <StatusBadge
+        status={statusMap[status] || 'default'}
+        label={labelMap[status] || 'Unknown'}
       />
     )
   }
 
-  const handleUpdateStatus = async (payrollId, newStatus) => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/payroll/${payrollId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ status: newStatus }),
-      })
+  // --- Status update mutation ---
+  const statusMutation = useApiMutation({
+    method: 'PATCH',
+    onSuccess: (data) => {
+      toast.success(`Payroll status updated`)
+      refreshPayrolls()
+    },
+    onError: (msg) => toast.error(msg || 'Failed to update status'),
+  })
 
-      const data = await response.json()
-      if (data.success) {
-        toast.success(`Payroll marked as ${newStatus}`)
-        // Refresh payrolls
-        if (isAdmin) {
-          fetchAllPayrolls()
-        } else {
-          const empId = getEmployeeId(user)
-          if (empId) fetchPayrolls(empId)
-        }
-      } else {
-        toast.error(data.message || 'Failed to update status')
-      }
-    } catch (error) {
-      console.error('Update status error:', error)
-      toast.error('Failed to update status')
-    }
+  const handleUpdateStatus = async (payrollId, newStatus) => {
+    await statusMutation.execute(`/api/payroll/${payrollId}`, { status: newStatus })
   }
 
   // Bulk selection handlers
@@ -369,7 +279,7 @@ export default function PayrollPage() {
         }
         toast.success(message)
         setSelectedPayrolls([])
-        fetchAllPayrolls()
+        refreshPayrolls()
       } else {
         toast.error(data.message || 'Failed to process payrolls')
       }
@@ -597,30 +507,19 @@ export default function PayrollPage() {
   }
 
   // Delete single payroll
+  // Delete single payroll
+  const deleteMutation = useApiMutation({
+    method: 'DELETE',
+    onSuccess: () => {
+      toast.success('Payroll deleted successfully')
+      refreshPayrolls()
+    },
+    onError: (msg) => toast.error(msg || 'Failed to delete payroll'),
+  })
+
   const handleDeletePayroll = async (payrollId) => {
     if (!confirm('Are you sure you want to delete this payroll record? This action cannot be undone.')) return
-
-    setDeleting(true)
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/payroll/${payrollId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        toast.success('Payroll deleted successfully')
-        fetchAllPayrolls()
-      } else {
-        toast.error(data.message || 'Failed to delete payroll')
-      }
-    } catch (error) {
-      console.error('Delete payroll error:', error)
-      toast.error('Failed to delete payroll')
-    } finally {
-      setDeleting(false)
-    }
+    await deleteMutation.execute(`/api/payroll/${payrollId}`)
   }
 
   // Bulk delete payrolls
@@ -648,7 +547,7 @@ export default function PayrollPage() {
       if (data.success) {
         toast.success(`${data.data.deleted} payroll(s) deleted successfully`)
         setSelectedPayrolls([])
-        fetchAllPayrolls()
+        refreshPayrolls()
       } else {
         toast.error(data.message || 'Failed to delete payrolls')
       }
@@ -703,11 +602,11 @@ export default function PayrollPage() {
   const recalculateTotals = (data) => {
     const earnings = data.earnings || editFormData.earnings
     const deductions = data.deductions || editFormData.deductions
-    
+
     const grossSalary = Object.values(earnings).reduce((sum, val) => sum + (parseFloat(val) || 0), 0)
     const totalDeductions = Object.values(deductions).reduce((sum, val) => sum + (parseFloat(val) || 0), 0)
     const netSalary = grossSalary - totalDeductions
-    
+
     return { grossSalary, totalDeductions, netSalary }
   }
 
@@ -739,36 +638,21 @@ export default function PayrollPage() {
     })
   }
 
+  // --- Save edit mutation ---
+  const saveEditMutation = useApiMutation({
+    method: 'PUT',
+    onSuccess: () => {
+      toast.success('Payroll updated successfully')
+      closeEditModal()
+      refreshPayrolls()
+    },
+    onError: (msg) => toast.error(msg || 'Failed to update payroll'),
+  })
+
   // Save edited payroll
   const handleSaveEdit = async () => {
     if (!editingPayroll) return
-
-    setBulkProcessing(true)
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/payroll/${editingPayroll._id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(editFormData),
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        toast.success('Payroll updated successfully')
-        closeEditModal()
-        fetchAllPayrolls()
-      } else {
-        toast.error(data.message || 'Failed to update payroll')
-      }
-    } catch (error) {
-      console.error('Update payroll error:', error)
-      toast.error('Failed to update payroll')
-    } finally {
-      setBulkProcessing(false)
-    }
+    await saveEditMutation.execute(`/api/payroll/${editingPayroll._id}`, editFormData)
   }
 
   const months = Array.from({ length: 12 }, (_, i) => ({
@@ -790,8 +674,8 @@ export default function PayrollPage() {
             {isAdmin ? 'Process Payroll' : 'My Payroll'}
           </h1>
           <p className="text-sm sm:text-base text-default-500 mt-1">
-            {isAdmin 
-              ? 'Manage and process employee payrolls' 
+            {isAdmin
+              ? 'Manage and process employee payrolls'
               : 'View your salary slips and payment history'}
           </p>
         </div>
@@ -855,7 +739,7 @@ export default function PayrollPage() {
                     <SelectItem key="paid">Paid</SelectItem>
                     <SelectItem key="on-hold">On Hold</SelectItem>
                   </Select>
-                  
+
                   {ventures.length > 0 && (
                     <Select
                       selectedKeys={[selectedVenture]}
@@ -878,7 +762,7 @@ export default function PayrollPage() {
             </div>
 
             <SecondaryButton
-              onPress={() => isAdmin ? fetchAllPayrolls() : fetchPayrolls(getEmployeeId(user))}
+              onPress={() => refreshPayrolls()}
               size="sm"
               startContent={<FaSync />}
               className="w-full sm:w-auto"
@@ -1040,11 +924,11 @@ export default function PayrollPage() {
             <EmptyState
               icon={<FaFileInvoiceDollar className="w-12 h-12" />}
               title="No payroll records found"
-              description={isAdmin 
-                ? 'Generate payroll for employees to see records here' 
+              description={isAdmin
+                ? 'Generate payroll for employees to see records here'
                 : 'Your payroll records will appear here once processed'}
               action={isAdmin && (
-                <PrimaryButton 
+                <PrimaryButton
                   onPress={() => router.push('/dashboard/payroll/generate')}
                   startContent={<FaPlus />}
                 >
@@ -1054,7 +938,7 @@ export default function PayrollPage() {
             />
           ) : (
             <div className="overflow-x-auto">
-              <Table 
+              <Table
                 aria-label="Payroll records table"
                 selectionMode={isAdmin ? "multiple" : "none"}
                 selectedKeys={new Set(selectedPayrolls)}
@@ -1144,7 +1028,7 @@ export default function PayrollPage() {
                               </IconButton>
                               <IconButton
                                 onPress={() => handleDeletePayroll(payroll._id)}
-                                isDisabled={deleting}
+                                isDisabled={deleteMutation.isLoading}
                                 color="danger"
                                 variant="light"
                                 size="sm"
@@ -1184,8 +1068,8 @@ export default function PayrollPage() {
       </HRMSCard>
 
       {/* Edit Payroll Modal */}
-      <HRMSModal 
-        isOpen={editModal.isOpen} 
+      <HRMSModal
+        isOpen={editModal.isOpen}
         onOpenChange={editModal.onOpenChange}
         size="3xl"
         scrollBehavior="inside"
@@ -1350,9 +1234,9 @@ export default function PayrollPage() {
                 </SecondaryButton>
                 <PrimaryButton
                   onPress={handleSaveEdit}
-                  isLoading={bulkProcessing}
+                  isLoading={saveEditMutation.isLoading}
                 >
-                  {bulkProcessing ? 'Saving...' : 'Save Changes'}
+                  {saveEditMutation.isLoading ? 'Saving...' : 'Save Changes'}
                 </PrimaryButton>
               </HRMSModalFooter>
             </>
@@ -1361,8 +1245,8 @@ export default function PayrollPage() {
       </HRMSModal>
 
       {/* Bank Sheet Export Modal */}
-      <HRMSModal 
-        isOpen={bankSheetModal.isOpen} 
+      <HRMSModal
+        isOpen={bankSheetModal.isOpen}
         onOpenChange={bankSheetModal.onOpenChange}
         size="lg"
       >
@@ -1379,7 +1263,7 @@ export default function PayrollPage() {
                     Select your bank to download the salary sheet in the correct format for bulk salary transfers.
                     Only <span className="font-medium text-primary">processed</span> or <span className="font-medium text-success">paid</span> payrolls will be included.
                   </p>
-                  
+
                   <HRMSCard className="bg-primary-50 border border-primary-200">
                     <HRMSCardBody className="py-3">
                       <p className="text-sm text-primary-800">
@@ -1433,7 +1317,7 @@ export default function PayrollPage() {
                 )}
               </HRMSModalBody>
               <HRMSModalFooter>
-                <SecondaryButton 
+                <SecondaryButton
                   onPress={() => {
                     onClose()
                     setSelectedBank('')

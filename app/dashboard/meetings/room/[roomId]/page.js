@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, use } from 'react'
+import { useState, useEffect, useRef, useCallback, use, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   HiOutlineMicrophone,
@@ -19,7 +19,8 @@ import {
   HiMiniMicrophone,
   HiMiniVideoCamera
 } from 'react-icons/hi2'
-import Loader from '@/components/ui/Loader'
+import { Skeleton } from '@heroui/react'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
 // Slash icons for muted/off states
 import { HiMicrophone as HiOutlineMicrophoneSlash, HiVideoCamera as HiOutlineVideoCameraSlash } from 'react-icons/hi'
 import { BsPin, BsPinFill, BsEmojiSmile } from 'react-icons/bs'
@@ -38,11 +39,22 @@ const REACTIONS = [
 export default function MeetingRoomPage({ params }) {
   const router = useRouter()
   const { roomId } = use(params)
-  
+
+  // --- SWR: Fetch meeting data ---
+  const { data: meetingsRes, isLoading: meetingLoading, error: meetingError } = useAuthedSWR(
+    `/api/meetings?roomId=${roomId}`,
+    { revalidateOnFocus: false, revalidateIfStale: false }
+  )
+
+  // Derive user from localStorage
+  const user = useMemo(() => {
+    if (typeof window === 'undefined') return null
+    const storedUser = localStorage.getItem('user')
+    return storedUser ? JSON.parse(storedUser) : null
+  }, [])
+
   // State
   const [meeting, setMeeting] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState(null)
   const [isJoined, setIsJoined] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
   const [isVideoOff, setIsVideoOff] = useState(false)
@@ -61,7 +73,7 @@ export default function MeetingRoomPage({ params }) {
   const [hasScreenStream, setHasScreenStream] = useState(false) // Track screen stream
   const [previewReady, setPreviewReady] = useState(false) // Track preview camera state
   const [previewError, setPreviewError] = useState(null) // Track preview errors
-  
+
   // Refs
   const localVideoRef = useRef(null)
   const screenVideoRef = useRef(null)
@@ -72,6 +84,7 @@ export default function MeetingRoomPage({ params }) {
   const socketRef = useRef(null)
   const peerConnectionsRef = useRef({})
   const remoteStreamsRef = useRef({})
+  const cameraPreviewStartedRef = useRef(false)
 
   const upsertParticipant = useCallback((participantLike) => {
     if (!participantLike?.id) return
@@ -93,7 +106,7 @@ export default function MeetingRoomPage({ params }) {
     if (hasLocalStream && localVideoRef.current && localStreamRef.current) {
       if (localVideoRef.current.srcObject !== localStreamRef.current) {
         localVideoRef.current.srcObject = localStreamRef.current
-        localVideoRef.current.play().catch(() => {})
+        localVideoRef.current.play().catch(() => { })
       }
     }
   }, [hasLocalStream])
@@ -103,62 +116,47 @@ export default function MeetingRoomPage({ params }) {
     if (hasScreenStream && screenVideoRef.current && screenStreamRef.current) {
       if (screenVideoRef.current.srcObject !== screenStreamRef.current) {
         screenVideoRef.current.srcObject = screenStreamRef.current
-        screenVideoRef.current.play().catch(() => {})
+        screenVideoRef.current.play().catch(() => { })
       }
     }
   }, [hasScreenStream])
 
-  // Fetch meeting details
+  // Handle meeting data from SWR (side effects: redirect, camera preview)
   useEffect(() => {
-    const storedUser = localStorage.getItem('user')
-    if (storedUser) {
-      setUser(JSON.parse(storedUser))
-    }
-    fetchMeetingByRoom()
-  }, [roomId])
+    if (!meetingsRes) return
 
-  const fetchMeetingByRoom = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      // First get meeting ID from roomId
-      const response = await fetch(`/api/meetings?roomId=${roomId}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success && data.data.length > 0) {
-        const meetingData = data.data[0]
-        
-        // Check if meeting link is still active
-        if (meetingData.isLinkActive === false) {
-          toast.error('This meeting has ended and the link is no longer active')
-          router.push('/dashboard/meetings')
-          return
-        }
-        
-        // Check if meeting has passed its end time
-        const now = new Date()
-        const endTime = new Date(meetingData.scheduledEnd)
-        if (now > endTime && meetingData.status !== 'in-progress') {
-          toast.error('This meeting has ended')
-          router.push('/dashboard/meetings')
-          return
-        }
-        
-        setMeeting(meetingData)
-        
-        // Start camera preview after meeting data is loaded
-        startCameraPreview()
-      } else {
-        toast.error('Meeting not found')
+    if (meetingsRes.success && meetingsRes.data?.length > 0) {
+      const meetingData = meetingsRes.data[0]
+
+      // Check if meeting link is still active
+      if (meetingData.isLinkActive === false) {
+        toast.error('This meeting has ended and the link is no longer active')
         router.push('/dashboard/meetings')
+        return
       }
-    } catch (error) {
-      console.error('Error fetching meeting:', error)
-      toast.error('Failed to load meeting')
-    } finally {
-      setLoading(false)
+
+      // Check if meeting has passed its end time
+      const now = new Date()
+      const endTime = new Date(meetingData.scheduledEnd)
+      if (now > endTime && meetingData.status !== 'in-progress') {
+        toast.error('This meeting has ended')
+        router.push('/dashboard/meetings')
+        return
+      }
+
+      setMeeting(meetingData)
+
+      // Start camera preview only once
+      if (!cameraPreviewStartedRef.current) {
+        cameraPreviewStartedRef.current = true
+        startCameraPreview()
+      }
+    } else {
+      toast.error('Meeting not found')
+      router.push('/dashboard/meetings')
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meetingsRes])
 
   // Start camera preview before joining
   const startCameraPreview = async () => {
@@ -167,14 +165,14 @@ export default function MeetingRoomPage({ params }) {
         video: true,
         audio: true
       })
-      
+
       localStreamRef.current = stream
       setHasLocalStream(true)
       setPreviewReady(true)
-      
+
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream
-        localVideoRef.current.play().catch(() => {})
+        localVideoRef.current.play().catch(() => { })
       }
     } catch (error) {
       console.error('Error starting camera preview:', error)
@@ -222,10 +220,10 @@ export default function MeetingRoomPage({ params }) {
         localStreamRef.current = stream
         setHasLocalStream(true)
       }
-      
+
       if (localVideoRef.current && localStreamRef.current) {
         localVideoRef.current.srcObject = localStreamRef.current
-        localVideoRef.current.play().catch(() => {})
+        localVideoRef.current.play().catch(() => { })
       }
 
       // Connect to socket for signaling
@@ -407,7 +405,7 @@ export default function MeetingRoomPage({ params }) {
   // Create peer connection and send offer (for initiating connection)
   const createPeerConnectionAndOffer = async (peerId, peerName) => {
     const pc = createPeerConnection(peerId, peerName, true)
-    
+
     try {
       const offer = await pc.createOffer()
       await pc.setLocalDescription(offer)
@@ -416,7 +414,7 @@ export default function MeetingRoomPage({ params }) {
     } catch (err) {
       console.error('Error creating offer:', err)
     }
-    
+
     return pc
   }
 
@@ -471,11 +469,11 @@ export default function MeetingRoomPage({ params }) {
     } else {
       try {
         let screenStream = null
-        
+
         // Check if running in Electron desktop app
         const isElectronApp = typeof window !== 'undefined' && window.isElectron
         const isWindows = isElectronApp && window.platform === 'win32'
-        
+
         if (isElectronApp && isWindows && window.electronAPI) {
           // Windows Electron: Use desktopCapturer for proper screen share with multi-display support
           try {
@@ -502,7 +500,7 @@ export default function MeetingRoomPage({ params }) {
                 types: ['screen'],
                 thumbnailSize: { width: 320, height: 180 }
               })
-              
+
               if (sources && sources.length > 0) {
                 // Use the first screen source
                 const sourceId = sources[0].id
@@ -546,11 +544,11 @@ export default function MeetingRoomPage({ params }) {
         }
         screenStreamRef.current = screenStream
         setHasScreenStream(true) // Trigger re-render and useEffect to attach stream
-        
+
         // Set screen stream to screen video element
         if (screenVideoRef.current) {
           screenVideoRef.current.srcObject = screenStream
-          screenVideoRef.current.play().catch(() => {}) // Ensure video plays
+          screenVideoRef.current.play().catch(() => { }) // Ensure video plays
         }
 
         // Replace video track in peer connections with screen share
@@ -653,10 +651,10 @@ export default function MeetingRoomPage({ params }) {
       emoji,
       sender: `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'You',
     }
-    
+
     // Emit to others
     socketRef.current?.emit('meeting-reaction', { roomId, reaction })
-    
+
     // Show locally
     showFloatingReaction(reaction)
     setShowReactions(false)
@@ -667,7 +665,7 @@ export default function MeetingRoomPage({ params }) {
     const id = Date.now() + Math.random()
     const newReaction = { ...reaction, animId: id, left: Math.random() * 80 + 10 }
     setFloatingReactions(prev => [...prev, newReaction])
-    
+
     // Remove after animation
     setTimeout(() => {
       setFloatingReactions(prev => prev.filter(r => r.animId !== id))
@@ -731,12 +729,24 @@ export default function MeetingRoomPage({ params }) {
     }
   }, [])
 
-  if (loading) {
+  if (meetingLoading) {
     return (
       <div className="h-screen w-screen bg-gray-100 flex items-center justify-center overflow-hidden">
-        <div className="text-center">
-          <Loader size="lg" className="mb-4" />
-          <p className="text-gray-700">Loading meeting...</p>
+        <div className="max-w-lg w-full px-6">
+          <div className="bg-white rounded-2xl p-6 shadow-xl border border-gray-200">
+            <div className="flex flex-col items-center">
+              <Skeleton className="w-16 h-16 rounded-2xl mb-4" />
+              <Skeleton className="h-7 w-48 rounded-lg mb-2" />
+              <Skeleton className="h-4 w-36 rounded-lg mb-4" />
+              <Skeleton className="w-full aspect-video rounded-xl mb-4" />
+              <div className="flex gap-2 mb-4">
+                <Skeleton className="w-12 h-12 rounded-full" />
+                <Skeleton className="w-12 h-12 rounded-full" />
+              </div>
+              <Skeleton className="w-full h-12 rounded-xl mb-3" />
+              <Skeleton className="w-full h-10 rounded-xl" />
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -755,7 +765,7 @@ export default function MeetingRoomPage({ params }) {
           <p className="text-gray-500 mb-4">
             Ready to join the meeting?
           </p>
-          
+
           {/* Camera Preview */}
           <div className="relative bg-gray-900 rounded-xl aspect-video mb-4 overflow-hidden">
             {previewReady && !isVideoOff ? (
@@ -764,7 +774,7 @@ export default function MeetingRoomPage({ params }) {
                   localVideoRef.current = el
                   if (el && localStreamRef.current && el.srcObject !== localStreamRef.current) {
                     el.srcObject = localStreamRef.current
-                    el.play().catch(() => {})
+                    el.play().catch(() => { })
                   }
                 }}
                 autoPlay
@@ -788,32 +798,30 @@ export default function MeetingRoomPage({ params }) {
               </div>
             ) : (
               <div className="absolute inset-0 flex flex-col items-center justify-center z-0">
-                <Loader size="md" className="mb-3" />
+                <svg className="animate-spin w-8 h-8 text-gray-400 mb-3" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
                 <p className="text-gray-400 text-sm">Starting camera...</p>
               </div>
             )}
-            
+
             {/* Preview Controls Overlay */}
             {previewReady && (
               <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2 z-20">
                 <button
                   onClick={togglePreviewMute}
-                  className={`p-3 rounded-full transition-colors ${
-                    isMuted 
-                      ? 'bg-red-500 hover:bg-red-600 text-white' 
+                  className={`p-3 rounded-full transition-colors ${isMuted
+                      ? 'bg-red-500 hover:bg-red-600 text-white'
                       : 'bg-gray-800/80 hover:bg-gray-700 text-white'
-                  }`}
+                    }`}
                   title={isMuted ? 'Unmute' : 'Mute'}
                 >
                   {isMuted ? <HiOutlineMicrophoneSlash className="w-5 h-5" /> : <HiMiniMicrophone className="w-5 h-5" />}
                 </button>
                 <button
                   onClick={togglePreviewVideo}
-                  className={`p-3 rounded-full transition-colors ${
-                    isVideoOff 
-                      ? 'bg-red-500 hover:bg-red-600 text-white' 
+                  className={`p-3 rounded-full transition-colors ${isVideoOff
+                      ? 'bg-red-500 hover:bg-red-600 text-white'
                       : 'bg-gray-800/80 hover:bg-gray-700 text-white'
-                  }`}
+                    }`}
                   title={isVideoOff ? 'Turn on camera' : 'Turn off camera'}
                 >
                   {isVideoOff ? <HiOutlineVideoCameraSlash className="w-5 h-5" /> : <HiMiniVideoCamera className="w-5 h-5" />}
@@ -839,15 +847,14 @@ export default function MeetingRoomPage({ params }) {
           <button
             onClick={joinMeeting}
             disabled={!previewReady && !previewError}
-            className={`w-full py-3 font-medium rounded-xl transition-colors ${
-              previewReady || previewError
+            className={`w-full py-3 font-medium rounded-xl transition-colors ${previewReady || previewError
                 ? 'bg-indigo-600 text-white hover:bg-indigo-700'
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            }`}
+              }`}
           >
             {previewReady || previewError ? 'Join Meeting' : 'Preparing...'}
           </button>
-          
+
           <button
             onClick={() => {
               // Stop preview stream when canceling
@@ -868,14 +875,14 @@ export default function MeetingRoomPage({ params }) {
 
   // Calculate total tiles (local + participants + screen share if active)
   const totalTiles = 1 + participants.length + (isScreenSharing ? 1 : 0)
-  
+
   // Get grid layout based on tile count and pinned state
   const getGridClass = () => {
     if (pinnedTile) {
       // Pinned layout - one large tile, others in strip
       return 'grid-cols-1'
     }
-    
+
     // Responsive grid based on participant count
     if (totalTiles === 1) return 'grid-cols-1'
     if (totalTiles === 2) return 'grid-cols-1 sm:grid-cols-2'
@@ -893,16 +900,16 @@ export default function MeetingRoomPage({ params }) {
   const renderTile = (type, data = null, isPinned = false, isInStrip = false) => {
     const tileId = type === 'local' ? 'local' : type === 'screen' ? 'screen' : data?.id
     const isThisPinned = pinnedTile === tileId
-    
+
     // Different styling for strip tiles vs grid tiles
     const getTileClasses = () => {
       if (isPinned) return 'col-span-full row-span-full h-full'
       if (isInStrip) return 'h-full w-full' // Strip tiles use parent's height
       return 'aspect-video min-h-[120px]' // Grid tiles maintain aspect ratio
     }
-    
+
     return (
-      <div 
+      <div
         key={tileId}
         className={`relative bg-gray-900 rounded-xl overflow-hidden shadow-lg group ${getTileClasses()} ${isThisPinned && !isPinned ? 'ring-2 ring-indigo-500' : ''}`}
       >
@@ -915,7 +922,7 @@ export default function MeetingRoomPage({ params }) {
                 // Re-attach stream when video element is mounted/updated
                 if (el && localStreamRef.current && el.srcObject !== localStreamRef.current) {
                   el.srcObject = localStreamRef.current
-                  el.play().catch(() => {}) // Ignore autoplay errors
+                  el.play().catch(() => { }) // Ignore autoplay errors
                 }
               }}
               autoPlay
@@ -944,7 +951,7 @@ export default function MeetingRoomPage({ params }) {
                 // Re-attach stream when video element is mounted/updated
                 if (el && screenStreamRef.current && el.srcObject !== screenStreamRef.current) {
                   el.srcObject = screenStreamRef.current
-                  el.play().catch(() => {}) // Ignore autoplay errors
+                  el.play().catch(() => { }) // Ignore autoplay errors
                 }
               }}
               autoPlay
@@ -959,29 +966,29 @@ export default function MeetingRoomPage({ params }) {
         ) : (
           <>
             {data?.stream ? (
-                  <>
-                    <video
-                      autoPlay
-                      playsInline
-                      ref={el => {
-                        if (el && data.stream && el.srcObject !== data.stream) {
-                          el.srcObject = data.stream
-                          el.play().catch(() => {}) // Ignore autoplay errors
-                        }
-                      }}
-                      className="absolute inset-0 w-full h-full object-contain"
-                    />
-                    <audio
-                      autoPlay
-                      playsInline
-                      ref={el => {
-                        if (el && data.stream && el.srcObject !== data.stream) {
-                          el.srcObject = data.stream
-                          el.play().catch(() => {})
-                        }
-                      }}
-                    />
-                  </>
+              <>
+                <video
+                  autoPlay
+                  playsInline
+                  ref={el => {
+                    if (el && data.stream && el.srcObject !== data.stream) {
+                      el.srcObject = data.stream
+                      el.play().catch(() => { }) // Ignore autoplay errors
+                    }
+                  }}
+                  className="absolute inset-0 w-full h-full object-contain"
+                />
+                <audio
+                  autoPlay
+                  playsInline
+                  ref={el => {
+                    if (el && data.stream && el.srcObject !== data.stream) {
+                      el.srcObject = data.stream
+                      el.play().catch(() => { })
+                    }
+                  }}
+                />
+              </>
             ) : (
               <div className="absolute inset-0 flex items-center justify-center bg-gray-800">
                 <div className="w-12 h-12 sm:w-20 sm:h-20 bg-indigo-600 rounded-full flex items-center justify-center">
@@ -996,7 +1003,7 @@ export default function MeetingRoomPage({ params }) {
             </div>
           </>
         )}
-        
+
         {/* Pin Button */}
         <button
           onClick={() => togglePin(tileId)}
@@ -1059,11 +1066,11 @@ export default function MeetingRoomPage({ params }) {
               <div className="flex-1 min-h-0">
                 {pinnedTile === 'local' && renderTile('local', null, true)}
                 {pinnedTile === 'screen' && isScreenSharing && renderTile('screen', null, true)}
-                {participants.find(p => p.id === pinnedTile) && 
+                {participants.find(p => p.id === pinnedTile) &&
                   renderTile('participant', participants.find(p => p.id === pinnedTile), true)
                 }
               </div>
-              
+
               {/* Other Tiles Strip */}
               <div className="h-24 sm:h-32 flex gap-2 overflow-x-auto overflow-y-hidden flex-shrink-0">
                 {pinnedTile !== 'local' && (
@@ -1192,9 +1199,8 @@ export default function MeetingRoomPage({ params }) {
         {/* Mute */}
         <button
           onClick={toggleMute}
-          className={`p-2.5 sm:p-4 rounded-full transition-colors ${
-            isMuted ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-700 hover:bg-gray-600'
-          }`}
+          className={`p-2.5 sm:p-4 rounded-full transition-colors ${isMuted ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-700 hover:bg-gray-600'
+            }`}
           title={isMuted ? 'Unmute' : 'Mute'}
         >
           <HiOutlineMicrophone className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
@@ -1203,9 +1209,8 @@ export default function MeetingRoomPage({ params }) {
         {/* Video */}
         <button
           onClick={toggleVideo}
-          className={`p-2.5 sm:p-4 rounded-full transition-colors ${
-            isVideoOff ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-700 hover:bg-gray-600'
-          }`}
+          className={`p-2.5 sm:p-4 rounded-full transition-colors ${isVideoOff ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-700 hover:bg-gray-600'
+            }`}
           title={isVideoOff ? 'Turn on camera' : 'Turn off camera'}
         >
           <HiOutlineVideoCamera className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
@@ -1214,9 +1219,8 @@ export default function MeetingRoomPage({ params }) {
         {/* Screen Share - Hidden on mobile */}
         <button
           onClick={toggleScreenShare}
-          className={`hidden sm:block p-2.5 sm:p-4 rounded-full transition-colors ${
-            isScreenSharing ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-700 hover:bg-gray-600'
-          }`}
+          className={`hidden sm:block p-2.5 sm:p-4 rounded-full transition-colors ${isScreenSharing ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-700 hover:bg-gray-600'
+            }`}
           title={isScreenSharing ? 'Stop sharing' : 'Share screen'}
         >
           <HiOutlineComputerDesktop className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
@@ -1225,9 +1229,8 @@ export default function MeetingRoomPage({ params }) {
         {/* Record - Hidden on mobile */}
         <button
           onClick={toggleRecording}
-          className={`hidden sm:block p-2.5 sm:p-4 rounded-full transition-colors ${
-            isRecording ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-700 hover:bg-gray-600'
-          }`}
+          className={`hidden sm:block p-2.5 sm:p-4 rounded-full transition-colors ${isRecording ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-700 hover:bg-gray-600'
+            }`}
           title={isRecording ? 'Stop recording' : 'Start recording'}
         >
           <HiOutlineStopCircle className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
@@ -1236,9 +1239,8 @@ export default function MeetingRoomPage({ params }) {
         {/* Raise Hand */}
         <button
           onClick={raiseHand}
-          className={`p-2.5 sm:p-4 rounded-full transition-colors ${
-            handRaised ? 'bg-amber-600 hover:bg-amber-700' : 'bg-gray-700 hover:bg-gray-600'
-          }`}
+          className={`p-2.5 sm:p-4 rounded-full transition-colors ${handRaised ? 'bg-amber-600 hover:bg-amber-700' : 'bg-gray-700 hover:bg-gray-600'
+            }`}
           title={handRaised ? 'Lower hand' : 'Raise hand'}
         >
           <HiOutlineHandRaised className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
@@ -1248,14 +1250,13 @@ export default function MeetingRoomPage({ params }) {
         <div className="relative">
           <button
             onClick={() => setShowReactions(!showReactions)}
-            className={`p-2.5 sm:p-4 rounded-full transition-colors ${
-              showReactions ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-700 hover:bg-gray-600'
-            }`}
+            className={`p-2.5 sm:p-4 rounded-full transition-colors ${showReactions ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-700 hover:bg-gray-600'
+              }`}
             title="Reactions"
           >
             <BsEmojiSmile className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
           </button>
-          
+
           {/* Reactions Popup */}
           {showReactions && (
             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-white rounded-xl shadow-xl border border-gray-200 p-2 flex gap-1">
@@ -1279,9 +1280,8 @@ export default function MeetingRoomPage({ params }) {
             setShowChat(!showChat)
             setShowParticipants(false)
           }}
-          className={`p-2.5 sm:p-4 rounded-full transition-colors ${
-            showChat ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-700 hover:bg-gray-600'
-          }`}
+          className={`p-2.5 sm:p-4 rounded-full transition-colors ${showChat ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-700 hover:bg-gray-600'
+            }`}
           title="Chat"
         >
           <HiOutlineChatBubbleLeftRight className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
@@ -1293,9 +1293,8 @@ export default function MeetingRoomPage({ params }) {
             setShowParticipants(!showParticipants)
             setShowChat(false)
           }}
-          className={`p-2.5 sm:p-4 rounded-full transition-colors ${
-            showParticipants ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-700 hover:bg-gray-600'
-          }`}
+          className={`p-2.5 sm:p-4 rounded-full transition-colors ${showParticipants ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-700 hover:bg-gray-600'
+            }`}
           title="Participants"
         >
           <HiOutlineUserGroup className="w-5 h-5 sm:w-6 sm:h-6 text-white" />

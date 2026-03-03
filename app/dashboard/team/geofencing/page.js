@@ -1,81 +1,53 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
+import { Skeleton } from '@heroui/react'
 import { FaMapMarkerAlt, FaCheck, FaTimes, FaClock, FaUser, FaFilter } from 'react-icons/fa'
 import { toast } from '@/utils/toast'
-import Loader from '@/components/ui/Loader'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton from '@/components/ui/LoadingButton'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 
 export default function GeofencingPage() {
-  const [logs, setLogs] = useState([])
-  const [pendingRequests, setPendingRequests] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState('all') // all, pending, approved, rejected
-  const [userRole, setUserRole] = useState('')
+  const [filter, setFilter] = useState('all')
+  const [processingId, setProcessingId] = useState(null)
 
-  useEffect(() => {
-    const userData = localStorage.getItem('user')
-    if (userData) {
-      const user = JSON.parse(userData)
-      setUserRole(user.role)
-    }
-    fetchLogs()
-    // Poll for updates every 30 seconds
-    const interval = setInterval(fetchLogs, 30000)
-    return () => clearInterval(interval)
-  }, [filter])
+  const userRole = useMemo(() => {
+    if (typeof window === 'undefined') return ''
+    try { return JSON.parse(localStorage.getItem('user'))?.role || '' } catch { return '' }
+  }, [])
 
-  const fetchLogs = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const params = new URLSearchParams()
-      if (filter !== 'all') {
-        params.append('status', filter)
-      }
-      
-      const response = await fetch(`/api/geofence/log?${params.toString()}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setLogs(data.data)
-        // Filter pending requests
-        const pending = data.data.filter(log => 
-          log.outOfPremisesRequest && log.outOfPremisesRequest.status === 'pending'
-        )
-        setPendingRequests(pending)
-      }
-    } catch (error) {
-      console.error('Error fetching logs:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  // --- SWR data fetching (replaces manual fetch + 30s interval) ---
+  const params = filter !== 'all' ? `?status=${filter}` : ''
+  const { data: logsRes, error, isLoading, isValidating, mutate: refreshLogs } = useAuthedSWR(
+    `/api/geofence/log${params}`,
+    { refreshInterval: 30000 }
+  )
+  const logs = logsRes?.data || []
+  const pendingRequests = useMemo(() =>
+    logs.filter(log => log.outOfPremisesRequest?.status === 'pending'),
+    [logs]
+  )
 
-  const handleApproval = async (logId, action, comments = '') => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/geofence/approve', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ logId, action, comments })
-      })
+  // --- Approval mutation ---
+  const approvalMutation = useApiMutation({
+    method: 'POST',
+    invalidateKeys: ['/api/geofence/log'],
+    onSuccess: (data) => {
+      toast.success('Request processed successfully!')
+      setProcessingId(null)
+    },
+    onError: (msg) => {
+      toast.error(msg || 'Failed to process request')
+      setProcessingId(null)
+    },
+  })
 
-      const data = await response.json()
-      if (data.success) {
-        toast.success(`Request ${action} successfully!`)
-        fetchLogs() // Refresh the list
-      } else {
-        toast.error(data.message || 'Failed to process request')
-      }
-    } catch (error) {
-      console.error('Error processing approval:', error)
-      toast.error('Failed to process request')
-    }
+  const handleApproval = (logId, action, comments = '') => {
+    setProcessingId(logId)
+    approvalMutation.execute('/api/geofence/approve', { logId, action, comments })
   }
 
   const formatDate = (date) => {
@@ -90,12 +62,24 @@ export default function GeofencingPage() {
     return `${(meters / 1000).toFixed(2)}km`
   }
 
-  if (loading) {
+  if (error) {
     return (
       <div className="p-6">
-        <div className="text-center py-12">
-          <Loader size="lg" className="mx-auto" />
-          <p className="mt-4 text-gray-600">Loading geofencing data...</p>
+        <DataErrorState message="Failed to load geofencing data" onRetry={() => refreshLogs()} />
+      </div>
+    )
+  }
+
+  if (isLoading) {
+    return (
+      <div className="p-6 space-y-4">
+        <Skeleton className="h-8 w-64 rounded-lg" />
+        <Skeleton className="h-4 w-96 rounded-lg" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+          {[...Array(3)].map((_, i) => <Skeleton key={i} className="h-24 rounded-lg" />)}
+        </div>
+        <div className="space-y-3 mt-6">
+          {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-20 rounded-lg" />)}
         </div>
       </div>
     )
@@ -140,11 +124,10 @@ export default function GeofencingPage() {
             <button
               key={status}
               onClick={() => setFilter(status)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                filter === status
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${filter === status
                   ? 'bg-primary-500 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
+                }`}
             >
               {status.charAt(0).toUpperCase() + status.slice(1)}
             </button>
@@ -228,7 +211,7 @@ export default function GeofencingPage() {
                       <div className="flex-1">
                         <p className="text-sm font-medium text-gray-900 mb-2">Reason for being outside:</p>
                         <p className="text-sm text-gray-700">{log.outOfPremisesRequest.reason}</p>
-                        
+
                         {/* Status */}
                         <div className="mt-3 flex items-center gap-2">
                           <span className="text-xs text-gray-500">Status:</span>

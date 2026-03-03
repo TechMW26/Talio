@@ -7,15 +7,15 @@ import { emitDashboardRefresh, REALTIME_EVENTS } from '@/lib/realtimeEvents'
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-  const auth = await getAuthAndModels(request, ['Announcement', 'User', 'Employee', 'Notification'])
+    const auth = await getAuthAndModels(request, ['Announcement', 'User', 'Employee', 'Notification'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { models } = auth
-  const { Announcement, User, Employee, Notification } = models
+    const { Announcement, User, Employee, Notification } = models
 
     const { searchParams } = new URL(request.url)
-    const limit = parseInt(searchParams.get('limit')) || 10
+    const limit = parseInt(searchParams.get('limit')) || 50
     const status = searchParams.get('status') || 'published'
 
     // Get user info from auth to filter department announcements
@@ -29,7 +29,7 @@ export async function GET(request) {
       }
       const userDoc = await User.findById(userId).select('role')
       const employee = await Employee.findOne({ userId }).select('department')
-      
+
       if (userDoc) {
         userRole = userDoc.role
       }
@@ -43,20 +43,35 @@ export async function GET(request) {
       console.error('[Announcements GET] Error getting user info:', err)
     }
 
-    const query = { status }
-
-    // Only show non-expired announcements
+    // Build query - support both old schema (isActive) and new schema (status)
     const now = new Date()
-    query.$or = [
-      { expiryDate: { $exists: false } },
-      { expiryDate: null },
-      { expiryDate: { $gte: now } }
-    ]
+    const query = {
+      $and: [
+        // Match status OR legacy isActive field
+        {
+          $or: [
+            { status: status },
+            { status: { $exists: false }, isActive: true },
+            { status: null, isActive: true },
+          ]
+        },
+        // Only show non-expired announcements (support both expiryDate and expiresAt)
+        {
+          $or: [
+            { expiryDate: { $exists: false }, expiresAt: { $exists: false } },
+            { expiryDate: null, expiresAt: null },
+            { expiryDate: { $gte: now } },
+            { expiresAt: { $gte: now } },
+          ]
+        }
+      ]
+    }
 
     const announcements = await Announcement.find(query)
       .populate('createdBy', 'firstName lastName')
       .populate('departments', 'name')
-      .sort({ publishDate: -1 })
+      .populate('targetDepartments', 'name')
+      .sort({ createdAt: -1 })
       .limit(limit)
 
     console.log('[Announcements GET] Total announcements found:', announcements.length)
@@ -64,7 +79,7 @@ export async function GET(request) {
     // Filter announcements based on user's department and role
     const filteredAnnouncements = announcements.filter(announcement => {
       // Admins and HR can see all announcements
-      if (userRole === 'admin' || userRole === 'hr' || userRole === 'admin') {
+      if (userRole === 'admin' || userRole === 'hr' || userRole === 'super_admin') {
         return true
       }
 
@@ -73,9 +88,14 @@ export async function GET(request) {
         return true
       }
 
+      // Get departments from either field (backward compat)
+      const depts = (announcement.departments && announcement.departments.length > 0)
+        ? announcement.departments
+        : (announcement.targetDepartments || [])
+
       // Show department announcements only to users in that department
-      if (announcement.isDepartmentAnnouncement && userDepartment && announcement.departments && announcement.departments.length > 0) {
-        return announcement.departments.some(dept => dept && dept._id && dept._id.toString() === userDepartment.toString())
+      if (announcement.isDepartmentAnnouncement && userDepartment && depts.length > 0) {
+        return depts.some(dept => dept && (dept._id || dept).toString() === userDepartment.toString())
       }
 
       // If department announcement but user has no department, don't show
@@ -106,12 +126,12 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     // Get authenticated user and tenant-specific models
-  const auth = await getAuthAndModels(request, ['Announcement', 'User', 'Employee', 'Notification'])
+    const auth = await getAuthAndModels(request, ['Announcement', 'User', 'Employee', 'Notification'])
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-  const { Announcement, User, Employee, Notification } = models
+    const { Announcement, User, Employee, Notification } = models
 
     const data = await request.json()
 
@@ -148,10 +168,10 @@ export async function POST(request) {
 
     // Set createdBy field (required by Announcement model)
     data.createdBy = employee._id
-    
+
     console.log('[Announcement] Setting createdBy to:', employee._id.toString())
-    console.log('[Announcement] Data before create:', { 
-      title: data.title, 
+    console.log('[Announcement] Data before create:', {
+      title: data.title,
       createdBy: data.createdBy?.toString(),
       createdByRole: user.role,
       department: employee.department?.toString()
@@ -194,6 +214,7 @@ export async function POST(request) {
     const populatedAnnouncement = await Announcement.findById(announcement._id)
       .populate('createdBy', 'firstName lastName')
       .populate('departments', 'name')
+      .populate('targetDepartments', 'name')
 
     // Send push notification to targeted users and emit Socket.IO event
     try {
@@ -264,7 +285,7 @@ export async function POST(request) {
               })
             })
             console.log(`Socket.IO announcement event emitted to ${userIds.length} user(s)`)
-            
+
             // Also emit dashboard refresh for all users
             emitDashboardRefresh({ reason: 'announcement-created' })
           }

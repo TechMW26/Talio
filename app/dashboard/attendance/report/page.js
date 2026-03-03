@@ -1,9 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 import toast from '@/utils/toast'
 import * as XLSX from 'xlsx'
-import { 
+import {
   FaUsers, FaChartLine, FaClock, FaCalendarAlt, FaExclamationTriangle,
   FaCheckCircle, FaTimesCircle, FaChartPie, FaDownload, FaFileExcel,
   FaSearch, FaBuilding, FaUserTie, FaChevronDown, FaChevronUp
@@ -11,14 +14,10 @@ import {
 import { Card, CardBody, CardHeader, Button, Chip, Skeleton, Input, Select, SelectItem } from '@heroui/react'
 
 export default function AttendanceReportPage() {
-  const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState(null)
-  const [dateRange, setDateRange] = useState('month') // Default to month-to-date
+  const [dateRange, setDateRange] = useState('month')
   const [customStartDate, setCustomStartDate] = useState('')
   const [customEndDate, setCustomEndDate] = useState('')
   const [selectedDepartment, setSelectedDepartment] = useState('all')
-  const [departments, setDepartments] = useState([])
-  const [reportData, setReportData] = useState(null)
   const [expandedSections, setExpandedSections] = useState({
     overview: true,
     shrinkage: true,
@@ -27,143 +26,89 @@ export default function AttendanceReportPage() {
   })
   const [searchTerm, setSearchTerm] = useState('')
 
-  useEffect(() => {
-    const userData = localStorage.getItem('user')
-    if (userData) {
-      const parsedUser = JSON.parse(userData)
-      setUser(parsedUser)
-      
-      if (!['admin', 'hr'].includes(parsedUser.role)) {
-        toast.error('Access denied. This page is for admins and HR only.')
-        setLoading(false)
-        return
+  const user = useMemo(() => { try { return JSON.parse(localStorage.getItem('user')) } catch { return null } }, [])
+  const isAuthorized = user && ['admin', 'hr'].includes(user.role)
+
+  // Compute date range params (auto-updates SWR keys when filters change)
+  const dateParams = useMemo(() => {
+    const today = new Date()
+    let startDate, endDate
+    switch (dateRange) {
+      case 'today':
+        startDate = endDate = today.toISOString().split('T')[0]
+        break
+      case 'yesterday': {
+        const yesterday = new Date(today)
+        yesterday.setDate(yesterday.getDate() - 1)
+        startDate = endDate = yesterday.toISOString().split('T')[0]
+        break
       }
-      
-      fetchDepartments()
-      fetchReportData()
+      case 'week': {
+        const weekStart = new Date(today)
+        weekStart.setDate(weekStart.getDate() - 7)
+        startDate = weekStart.toISOString().split('T')[0]
+        endDate = today.toISOString().split('T')[0]
+        break
+      }
+      case 'month': {
+        const monthStart = new Date(today.getFullYear(), today.getMonth(), 1)
+        startDate = monthStart.toISOString().split('T')[0]
+        endDate = today.toISOString().split('T')[0]
+        break
+      }
+      case 'custom':
+        startDate = customStartDate
+        endDate = customEndDate
+        break
+      default:
+        startDate = endDate = today.toISOString().split('T')[0]
     }
-  }, [])
+    if (!startDate || !endDate) return null
+    return { startDate, endDate }
+  }, [dateRange, customStartDate, customEndDate])
 
-  useEffect(() => {
-    if (user && ['admin', 'hr'].includes(user.role)) {
-      fetchReportData()
-    }
-  }, [dateRange, customStartDate, customEndDate, selectedDepartment])
+  // SWR hooks — keys auto-change when filters change, triggering refetches
+  const deptParam = selectedDepartment !== 'all' ? `&department=${selectedDepartment}` : ''
 
-  const fetchDepartments = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/departments', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setDepartments(data.data || [])
-      }
-    } catch (error) {
-      console.error('Error fetching departments:', error)
-    }
-  }
+  const { data: deptsRes } = useAuthedSWR(isAuthorized ? '/api/departments' : null)
+  const departments = deptsRes?.data || []
 
-  const fetchReportData = async () => {
-    try {
-      setLoading(true)
-      const token = localStorage.getItem('token')
-      
-      let startDate, endDate
-      const today = new Date()
-      
-      switch (dateRange) {
-        case 'today':
-          startDate = endDate = today.toISOString().split('T')[0]
-          break
-        case 'yesterday':
-          const yesterday = new Date(today)
-          yesterday.setDate(yesterday.getDate() - 1)
-          startDate = endDate = yesterday.toISOString().split('T')[0]
-          break
-        case 'week':
-          const weekStart = new Date(today)
-          weekStart.setDate(weekStart.getDate() - 7)
-          startDate = weekStart.toISOString().split('T')[0]
-          endDate = today.toISOString().split('T')[0]
-          break
-        case 'month':
-          const monthStart = new Date(today.getFullYear(), today.getMonth(), 1)
-          startDate = monthStart.toISOString().split('T')[0]
-          endDate = today.toISOString().split('T')[0]
-          break
-        case 'custom':
-          startDate = customStartDate
-          endDate = customEndDate
-          break
-        default:
-          startDate = endDate = today.toISOString().split('T')[0]
-      }
+  const { data: attendanceRes, error: attError, isLoading: attLoading, isValidating: attValidating, mutate: refreshReport } = useAuthedSWR(
+    isAuthorized && dateParams ? `/api/attendance?startDate=${dateParams.startDate}&endDate=${dateParams.endDate}${deptParam}&populate=true` : null
+  )
+  const { data: employeesRes, error: empError, isLoading: empLoading, isValidating: empValidating } = useAuthedSWR(
+    isAuthorized && dateParams ? `/api/employees?limit=1000&status=active&populate=true${deptParam}` : null
+  )
+  const { data: companyRes, isLoading: compLoading } = useAuthedSWR(
+    isAuthorized ? '/api/settings/company' : null
+  )
+  const { data: holidaysRes, isLoading: holLoading } = useAuthedSWR(
+    isAuthorized && dateParams ? `/api/holidays?startDate=${dateParams.startDate}&endDate=${dateParams.endDate}` : null
+  )
 
-      if (!startDate || !endDate) {
-        setLoading(false)
-        return
-      }
-
-      // Fetch all necessary data including company settings and holidays
-      const [attendanceRes, employeesRes, companyRes, holidaysRes] = await Promise.all([
-        fetch(`/api/attendance?startDate=${startDate}&endDate=${endDate}${selectedDepartment !== 'all' ? `&department=${selectedDepartment}` : ''}&populate=true`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch(`/api/employees?limit=1000&status=active&populate=true${selectedDepartment !== 'all' ? `&department=${selectedDepartment}` : ''}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch(`/api/settings/company`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch(`/api/holidays?startDate=${startDate}&endDate=${endDate}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-      ])
-
-      const attendanceData = await attendanceRes.json()
-      const employeesData = await employeesRes.json()
-      const companyData = await companyRes.json()
-      const holidaysData = await holidaysRes.json()
-
-      if (attendanceData.success && employeesData.success) {
-        const attendance = attendanceData.data || []
-        const employees = employeesData.data || []
-        const companySettings = companyData.success ? companyData.data : null
-        const holidays = holidaysData.success ? (holidaysData.data || []) : []
-        
-        // Calculate comprehensive KPIs with proper working day calculations
-        const kpis = calculateKPIs(attendance, employees, startDate, endDate, companySettings, holidays)
-        setReportData(kpis)
-      }
-    } catch (error) {
-      console.error('Error fetching report data:', error)
-      toast.error('Failed to fetch attendance report')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const isLoading = attLoading || empLoading || compLoading || holLoading
+  const error = attError || empError
+  const isValidating = attValidating || empValidating
 
   // Helper function to count working days between two dates
   const countWorkingDays = (startDate, endDate, workingDays, holidays) => {
     const dayNameMap = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
     const holidayDates = new Set(holidays.map(h => new Date(h.date).toISOString().split('T')[0]))
-    
+
     let count = 0
     const current = new Date(startDate)
     const end = new Date(endDate)
-    
+
     while (current <= end) {
       const dayName = dayNameMap[current.getDay()]
       const dateStr = current.toISOString().split('T')[0]
-      
+
       if (workingDays.includes(dayName) && !holidayDates.has(dateStr)) {
         count++
       }
       current.setDate(current.getDate() + 1)
     }
-    
+
     return count
   }
 
@@ -172,15 +117,15 @@ export default function AttendanceReportPage() {
     const joiningDate = employee.dateOfJoining ? new Date(employee.dateOfJoining) : null
     const start = new Date(startDate)
     const end = new Date(endDate)
-    
+
     // If employee hasn't joined yet, they have 0 expected days
     if (joiningDate && joiningDate > end) {
       return 0
     }
-    
+
     // Effective start date is the later of period start or joining date
     const effectiveStart = joiningDate && joiningDate > start ? joiningDate : start
-    
+
     return countWorkingDays(effectiveStart, end, workingDays, holidays)
   }
 
@@ -189,21 +134,21 @@ export default function AttendanceReportPage() {
     const start = new Date(startDate)
     const end = new Date(endDate)
     const daysDiff = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1
-    
+
     // Get working days from company settings (workingDays is at root level, not under workingHours)
-    const workingDays = companySettings?.workingDays || 
-                        ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
+    const workingDays = companySettings?.workingDays ||
+      ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
     const fullDayHours = companySettings?.fullDayHours || 8
-    
+
     // Calculate total working days in the period (for overview)
     const totalWorkingDaysInPeriod = countWorkingDays(start, end, workingDays, holidays)
-    
+
     // Calculate expected attendance per employee (respecting their joining dates)
     let totalExpectedAttendance = 0
     employees.forEach(emp => {
       totalExpectedAttendance += countEmployeeWorkingDays(emp, startDate, endDate, workingDays, holidays)
     })
-    
+
     // Group attendance by employee
     const employeeAttendance = {}
     attendance.forEach(record => {
@@ -228,7 +173,7 @@ export default function AttendanceReportPage() {
     let lateArrivals = 0
     let earlyDepartures = 0
     let totalAccountedRecords = 0
-    
+
     attendance.forEach(record => {
       if (statusCounts[record.status] !== undefined) {
         statusCounts[record.status]++
@@ -243,8 +188,8 @@ export default function AttendanceReportPage() {
         lateArrivals++
       }
       // Check for early departure (less than 81.25% of full day hours OR checkOutStatus is 'early')
-      if ((record.status === 'present' || record.status === 'in-progress') && 
-          (record.checkOutStatus === 'early' || (record.workHours && record.workHours < (fullDayHours * 0.8125)))) {
+      if ((record.status === 'present' || record.status === 'in-progress') &&
+        (record.checkOutStatus === 'early' || (record.workHours && record.workHours < (fullDayHours * 0.8125)))) {
         earlyDepartures++
       }
     })
@@ -256,26 +201,26 @@ export default function AttendanceReportPage() {
 
     // Calculate scheduled hours based on actual expected attendance
     const totalScheduledHours = totalExpectedAttendance * fullDayHours
-    
+
     // Calculate shrinkage metrics
     const shrinkageHours = Math.max(0, totalScheduledHours - totalWorkHours)
-    const shrinkagePercentage = totalScheduledHours > 0 
-      ? ((shrinkageHours / totalScheduledHours) * 100).toFixed(2) 
+    const shrinkagePercentage = totalScheduledHours > 0
+      ? ((shrinkageHours / totalScheduledHours) * 100).toFixed(2)
       : '0.00'
-    
+
     // Attendance rate: (present + half-day*0.5 + in-progress) / expected attendance
     // Note: statusCounts.present already includes late arrivals since late is a checkInStatus, not status
     // statusCounts.late will always be 0 since status field never has 'late' value
     const actualAttendanceValue = statusCounts.present + (statusCounts['half-day'] * 0.5) + statusCounts['in-progress']
-    const attendanceRate = totalExpectedAttendance > 0 
-      ? ((actualAttendanceValue / totalExpectedAttendance) * 100).toFixed(2) 
+    const attendanceRate = totalExpectedAttendance > 0
+      ? ((actualAttendanceValue / totalExpectedAttendance) * 100).toFixed(2)
       : '0.00'
-    
+
     // Absenteeism rate: effective absent (including missing records) / expected attendance
-    const absenteeismRate = totalExpectedAttendance > 0 
-      ? ((effectiveAbsent / totalExpectedAttendance) * 100).toFixed(2) 
+    const absenteeismRate = totalExpectedAttendance > 0
+      ? ((effectiveAbsent / totalExpectedAttendance) * 100).toFixed(2)
       : '0.00'
-    
+
     // Punctuality rate calculation:
     // - Punctuality considers both on-time arrival AND completing full work hours
     // - Late arrival = checkInStatus === 'late' (counted in lateArrivals variable)
@@ -284,14 +229,14 @@ export default function AttendanceReportPage() {
     const totalWorkInstances = statusCounts.present + statusCounts['half-day'] + statusCounts['in-progress']
     const punctualityDeductions = lateArrivals + earlyDepartures
     const punctualInstances = Math.max(0, totalWorkInstances - punctualityDeductions)
-    const punctualityRate = totalWorkInstances > 0 
-      ? ((punctualInstances / totalWorkInstances) * 100).toFixed(2) 
+    const punctualityRate = totalWorkInstances > 0
+      ? ((punctualInstances / totalWorkInstances) * 100).toFixed(2)
       : '0.00' // If no one worked, punctuality should be 0%, not 100%
-    
+
     // Average work hours per actual worked days (not expected days)
     const totalWorkedDays = statusCounts.present + statusCounts['half-day'] + statusCounts['in-progress']
-    const avgWorkHours = totalWorkedDays > 0 
-      ? (totalWorkHours / totalWorkedDays).toFixed(2) 
+    const avgWorkHours = totalWorkedDays > 0
+      ? (totalWorkHours / totalWorkedDays).toFixed(2)
       : '0.00'
 
     // Department breakdown - calculate expected days per department too
@@ -300,7 +245,7 @@ export default function AttendanceReportPage() {
       const deptId = emp.department?._id || emp.department
       const deptName = emp.department?.name || 'Unknown'
       const empExpectedDays = countEmployeeWorkingDays(emp, startDate, endDate, workingDays, holidays)
-      
+
       if (!departmentStats[deptId]) {
         departmentStats[deptId] = {
           name: deptName,
@@ -317,7 +262,7 @@ export default function AttendanceReportPage() {
       }
       departmentStats[deptId].totalEmployees++
       departmentStats[deptId].expectedDays += empExpectedDays
-      
+
       const empRecords = employeeAttendance[emp._id] || []
       empRecords.forEach(record => {
         // Count status-based metrics
@@ -334,7 +279,7 @@ export default function AttendanceReportPage() {
         }
       })
     })
-    
+
     // Calculate effective absent for each department (including missing records)
     Object.keys(departmentStats).forEach(deptId => {
       const dept = departmentStats[deptId]
@@ -351,10 +296,10 @@ export default function AttendanceReportPage() {
       const empHalfDay = empRecords.filter(r => r.status === 'half-day').length
       const empOnLeave = empRecords.filter(r => r.status === 'on-leave').length
       const empWorkHours = empRecords.reduce((sum, r) => sum + (r.workHours || 0), 0)
-      
+
       // Calculate expected days for this employee
       const empExpectedDays = countEmployeeWorkingDays(emp, startDate, endDate, workingDays, holidays)
-      
+
       // Calculate effective absences: days with no record or explicit absent status
       // Note: empLate is count of late arrivals, not separate from empPresent
       // People who arrived late are still in empPresent (status = 'present' or 'in-progress')
@@ -362,18 +307,18 @@ export default function AttendanceReportPage() {
       const empAccountedDays = empPresent + empHalfDay + empOnLeave + empExplicitAbsent
       const empMissingDays = Math.max(0, empExpectedDays - empAccountedDays)
       const empAbsent = empExplicitAbsent + empMissingDays // Total absent = explicit + missing records
-      
+
       // Attendance rate: (present + half-day*0.5) / expected days
       // empPresent already includes people who arrived late (late is a checkInStatus, not status)
-      const empAttendanceRate = empExpectedDays > 0 
-        ? (((empPresent + empHalfDay * 0.5) / empExpectedDays) * 100).toFixed(1) 
+      const empAttendanceRate = empExpectedDays > 0
+        ? (((empPresent + empHalfDay * 0.5) / empExpectedDays) * 100).toFixed(1)
         : '0.0'
-      
+
       // Average hours per ACTUAL worked days (not expected days)
       // empPresent includes late arrivals since status is 'present' not 'late'
       const empWorkedDays = empPresent + empHalfDay
       const empAvgHours = empWorkedDays > 0 ? (empWorkHours / empWorkedDays).toFixed(2) : '0.00'
-      
+
       return {
         id: emp._id,
         name: `${emp.firstName} ${emp.lastName}`,
@@ -404,16 +349,16 @@ export default function AttendanceReportPage() {
     // Shrinkage from complete absences (days with no work at all)
     const absentDays = effectiveAbsent
     const shrinkageFromAbsent = absentDays * fullDayHours
-    
+
     // Shrinkage from half days (lost half the day's hours)
     const shrinkageFromHalfDay = statusCounts['half-day'] * (fullDayHours * 0.5)
-    
+
     // Shrinkage from underwork on present days
     // Expected hours from worked days = (present + in-progress) * fullDayHours + half-day * fullDayHours
     // Note: statusCounts.late is always 0 since late is stored in checkInStatus, not status
     const expectedHoursFromWorkedDays = (statusCounts.present + statusCounts['in-progress']) * fullDayHours + statusCounts['half-day'] * fullDayHours
     const shrinkageFromUnderwork = Math.max(0, expectedHoursFromWorkedDays - totalWorkHours)
-    
+
     // Recalculate total shrinkage to ensure consistency
     const calculatedShrinkage = shrinkageFromAbsent + shrinkageFromHalfDay + shrinkageFromUnderwork
     const finalShrinkageHours = Math.max(shrinkageHours, calculatedShrinkage) // Use max to ensure we capture all lost time
@@ -459,13 +404,23 @@ export default function AttendanceReportPage() {
     }
   }
 
+  // Compute report data from SWR responses
+  const reportData = useMemo(() => {
+    if (!attendanceRes?.success || !employeesRes?.success || !dateParams) return null
+    const attendance = attendanceRes.data || []
+    const employees = employeesRes.data || []
+    const companySettings = companyRes?.success ? companyRes.data : null
+    const holidays = holidaysRes?.success ? (holidaysRes.data || []) : []
+    return calculateKPIs(attendance, employees, dateParams.startDate, dateParams.endDate, companySettings, holidays)
+  }, [attendanceRes, employeesRes, companyRes, holidaysRes, dateParams])
+
   const toggleSection = (section) => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }))
   }
 
   const exportToCSV = () => {
     if (!reportData) return
-    
+
     const csvData = [
       ['Attendance Report'],
       ['Period', `${reportData.period.startDate} to ${reportData.period.endDate}`],
@@ -484,7 +439,7 @@ export default function AttendanceReportPage() {
         emp.attendanceRate + '%'
       ])
     ]
-    
+
     const csv = csvData.map(row => row.join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = window.URL.createObjectURL(blob)
@@ -615,7 +570,9 @@ export default function AttendanceReportPage() {
     )
   }) || []
 
-  if (loading) {
+  if (error) return <DataErrorState message="Failed to load attendance report" onRetry={() => refreshReport()} />
+
+  if (isLoading) {
     return (
       <div className="page-container space-y-6">
         <div className="flex flex-col gap-3">
@@ -624,7 +581,7 @@ export default function AttendanceReportPage() {
         </div>
         <Skeleton className="h-20 rounded-lg" />
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {[1,2,3,4].map(i => <Skeleton key={i} className="h-28 rounded-lg" />)}
+          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-28 rounded-lg" />)}
         </div>
         <Skeleton className="h-64 rounded-lg" />
       </div>
@@ -650,7 +607,10 @@ export default function AttendanceReportPage() {
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-default-800">Attendance Report & Analytics</h1>
-            <p className="text-default-500 mt-1">Comprehensive attendance KPIs, shrinkage analysis, and employee metrics</p>
+            <p className="text-default-500 mt-1">
+              Comprehensive attendance KPIs, shrinkage analysis, and employee metrics
+              <BackgroundRefreshIndicator isValidating={isValidating} />
+            </p>
           </div>
           <div className="flex items-center space-x-3">
             <Button
@@ -739,7 +699,7 @@ export default function AttendanceReportPage() {
           {/* Overview KPIs */}
           <Card className="shadow-md mb-6">
             <CardBody className="p-6">
-              <div 
+              <div
                 className="flex items-center justify-between cursor-pointer mb-4"
                 onClick={() => toggleSection('overview')}
               >
@@ -754,7 +714,7 @@ export default function AttendanceReportPage() {
                 </div>
                 {expandedSections.overview ? <FaChevronUp /> : <FaChevronDown />}
               </div>
-              
+
               {expandedSections.overview && (
                 <>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -821,7 +781,7 @@ export default function AttendanceReportPage() {
           {/* Shrinkage Analysis */}
           <Card className="shadow-md mb-6">
             <CardBody className="p-6">
-              <div 
+              <div
                 className="flex items-center justify-between cursor-pointer mb-4"
                 onClick={() => toggleSection('shrinkage')}
               >
@@ -836,7 +796,7 @@ export default function AttendanceReportPage() {
                 </div>
                 {expandedSections.shrinkage ? <FaChevronUp /> : <FaChevronDown />}
               </div>
-              
+
               {expandedSections.shrinkage && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
@@ -847,8 +807,8 @@ export default function AttendanceReportPage() {
                       </div>
                       <p className="text-sm text-danger">{reportData.shrinkage.totalHours} hours lost</p>
                       <div className="mt-2 bg-danger-200 rounded-full h-3">
-                        <div 
-                          className="bg-danger h-3 rounded-full" 
+                        <div
+                          className="bg-danger h-3 rounded-full"
                           style={{ width: `${Math.min(reportData.shrinkage.percentage, 100)}%` }}
                         ></div>
                       </div>
@@ -907,7 +867,7 @@ export default function AttendanceReportPage() {
           {reportData.departments.length > 0 && (
             <Card className="shadow-md mb-6">
               <CardBody className="p-6">
-                <div 
+                <div
                   className="flex items-center justify-between cursor-pointer mb-4"
                   onClick={() => toggleSection('departmentBreakdown')}
                 >
@@ -917,7 +877,7 @@ export default function AttendanceReportPage() {
                   </h2>
                   {expandedSections.departmentBreakdown ? <FaChevronUp /> : <FaChevronDown />}
                 </div>
-                
+
                 {expandedSections.departmentBreakdown && (
                   <div className="overflow-x-auto">
                     <table className="w-full">
@@ -955,7 +915,7 @@ export default function AttendanceReportPage() {
           {/* Employee Details */}
           <Card className="shadow-md">
             <CardBody className="p-6">
-              <div 
+              <div
                 className="flex items-center justify-between cursor-pointer mb-4"
                 onClick={() => toggleSection('employeeDetails')}
               >
@@ -965,7 +925,7 @@ export default function AttendanceReportPage() {
                 </h2>
                 {expandedSections.employeeDetails ? <FaChevronUp /> : <FaChevronDown />}
               </div>
-              
+
               {expandedSections.employeeDetails && (
                 <>
                   <div className="mb-4">
@@ -1027,7 +987,7 @@ export default function AttendanceReportPage() {
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-primary font-semibold">{emp.totalHours}h</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-default-600">{emp.avgHours}h</td>
                             <td className="px-6 py-4 whitespace-nowrap">
-                              <Chip 
+                              <Chip
                                 color={parseFloat(emp.attendanceRate) >= 95 ? 'success' : parseFloat(emp.attendanceRate) >= 80 ? 'warning' : 'danger'}
                                 variant="flat"
                                 size="sm"

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
@@ -11,6 +11,11 @@ import {
 } from 'react-icons/fa'
 import { formatDesignation, formatDepartments, getLevelNameFromNumber } from '@/lib/formatters'
 import { Card, CardBody, CardHeader, Button, Chip, Skeleton, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Select, SelectItem, Input, Checkbox } from '@heroui/react'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton from '@/components/ui/LoadingButton'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 
 // Status options with Hero UI colors
 const STATUS_OPTIONS = [
@@ -38,14 +43,9 @@ const LEVEL_OPTIONS = [
 
 export default function EmployeesPage() {
   const router = useRouter()
-  const [employees, setEmployees] = useState([])
-  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [page, setPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
-  const [totalEmployees, setTotalEmployees] = useState(0)
-  const [user, setUser] = useState(null)
-  const [accessDenied, setAccessDenied] = useState(false)
   const [sortBy, setSortBy] = useState('createdAt')
   const [sortOrder, setSortOrder] = useState('desc')
   const [showFilters, setShowFilters] = useState(false)
@@ -53,8 +53,6 @@ export default function EmployeesPage() {
   const [statusUpdating, setStatusUpdating] = useState(null)
 
   // Filter states
-  const [departments, setDepartments] = useState([])
-  const [designations, setDesignations] = useState([])
   const [selectedDepartment, setSelectedDepartment] = useState('')
   const [selectedDesignation, setSelectedDesignation] = useState('')
   const [selectedLevel, setSelectedLevel] = useState('')
@@ -71,13 +69,54 @@ export default function EmployeesPage() {
     reportingManager: '',
   })
   const [bulkUpdating, setBulkUpdating] = useState(false)
-  const [managers, setManagers] = useState([])
+
+  // Auth
+  const user = useMemo(() => { try { return JSON.parse(localStorage.getItem('user')) } catch { return null } }, [])
+  const accessDenied = user ? !['admin', 'hr'].includes(user.role) : false
 
   // Real-time updates
   const { socket, isConnected, onEmployeeCreated, onEmployeeUpdated, subscribe } = useSocket()
 
   const getLevelName = getLevelNameFromNumber
-  const isFirstRender = useRef(true)
+
+  // Search debounce
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  // SWR data fetching
+  const employeeParams = useMemo(() => {
+    const params = new URLSearchParams({ page, limit: 20 })
+    if (debouncedSearch) params.set('search', debouncedSearch)
+    if (sortBy) params.set('sortBy', sortBy)
+    if (sortOrder) params.set('sortOrder', sortOrder)
+    if (selectedDepartment) params.set('department', selectedDepartment)
+    if (selectedDesignation) params.set('designation', selectedDesignation)
+    if (selectedLevel) params.set('level', selectedLevel)
+    if (selectedStatus) params.set('status', selectedStatus)
+    return params.toString()
+  }, [page, debouncedSearch, sortBy, sortOrder, selectedDepartment, selectedDesignation, selectedLevel, selectedStatus])
+
+  const { data: employeesRes, error, isLoading, isValidating, mutate: refreshEmployees } = useAuthedSWR(
+    accessDenied ? null : `/api/employees?${employeeParams}`
+  )
+  const employees = employeesRes?.data || []
+  const totalPages = employeesRes?.pagination?.pages || 1
+  const totalEmployees = employeesRes?.pagination?.total || employees.length
+
+  const { data: deptsRes } = useAuthedSWR(accessDenied ? null : '/api/departments')
+  const departments = deptsRes?.data || []
+
+  const { data: desigsRes } = useAuthedSWR(accessDenied ? null : '/api/designations')
+  const designations = desigsRes?.data || []
+
+  const { data: managersRes } = useAuthedSWR(showBulkEditModal ? '/api/employees/managers' : null)
+  const managers = managersRes?.data || []
+
+  // Mutations
+  const deleteMutation = useApiMutation({ method: 'DELETE' })
+  const statusMutation = useApiMutation({ method: 'PATCH' })
 
   // Subscribe to real-time employee updates
   useEffect(() => {
@@ -85,7 +124,7 @@ export default function EmployeesPage() {
 
     const handleEmployeeUpdate = (data) => {
       console.log('🔄 [Employees] Real-time update received:', data)
-      fetchEmployees()
+      refreshEmployees()
     }
 
     const unsub1 = onEmployeeCreated?.(handleEmployeeUpdate)
@@ -97,113 +136,7 @@ export default function EmployeesPage() {
       unsub2?.()
       unsub3?.()
     }
-  }, [socket, isConnected])
-
-  useEffect(() => {
-    const userData = localStorage.getItem('user')
-    if (userData) {
-      const parsedUser = JSON.parse(userData)
-      setUser(parsedUser)
-
-      // Check if user has access (admin or hr only)
-      const allowedRoles = ['admin', 'hr']
-      if (!allowedRoles.includes(parsedUser.role)) {
-        setAccessDenied(true)
-        setLoading(false)
-        return
-      }
-    }
-    fetchDepartments()
-    fetchDesignations()
-  }, [])
-
-  useEffect(() => {
-    fetchEmployees()
-  }, [page, sortBy, sortOrder, selectedDepartment, selectedDesignation, selectedLevel, selectedStatus])
-
-  const fetchDepartments = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/departments', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-      const data = await response.json()
-      if (data.success) {
-        setDepartments(data.data || [])
-      }
-    } catch (error) {
-      console.error('Fetch departments error:', error)
-    }
-  }
-
-  const fetchDesignations = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/designations', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-      const data = await response.json()
-      if (data.success) {
-        setDesignations(data.data || [])
-      }
-    } catch (error) {
-      console.error('Fetch designations error:', error)
-    }
-  }
-
-  const fetchManagers = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/employees/managers', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-      const data = await response.json()
-      if (data.success) {
-        setManagers(data.data || [])
-      }
-    } catch (error) {
-      console.error('Fetch managers error:', error)
-    }
-  }
-
-  const fetchEmployees = async () => {
-    try {
-      setLoading(true)
-      const token = localStorage.getItem('token')
-
-      const params = new URLSearchParams({
-        page: page.toString(),
-        limit: '20',
-        search,
-        sortBy,
-        sortOrder,
-      })
-
-      if (selectedDepartment) params.append('department', selectedDepartment)
-      if (selectedDesignation) params.append('designation', selectedDesignation)
-      if (selectedLevel) params.append('level', selectedLevel)
-      if (selectedStatus) params.append('status', selectedStatus)
-
-      const response = await fetch(`/api/employees?${params.toString()}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        setEmployees(data.data)
-        setTotalPages(data.pagination?.pages || 1)
-        setTotalEmployees(data.pagination?.total || data.data.length)
-      } else {
-        toast.error(data.message || 'Failed to fetch employees')
-      }
-    } catch (error) {
-      console.error('Fetch employees error:', error)
-      toast.error('An error occurred while fetching employees')
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [socket, isConnected, refreshEmployees])
 
   const handleDelete = async (employee) => {
     if (!canManageEmployees()) {
@@ -217,28 +150,16 @@ export default function EmployeesPage() {
     const employee = deleteModal.employee
     if (!employee) return
 
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/employees/${employee._id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        toast.success(`${employee.firstName} ${employee.lastName} has been permanently deleted`)
-        fetchEmployees()
-        setSelectedEmployees(prev => prev.filter(id => id !== employee._id))
-      } else {
-        toast.error(data.message || 'Failed to delete employee')
-      }
-    } catch (error) {
-      console.error('Delete employee error:', error)
-      toast.error('An error occurred while deleting employee')
-    } finally {
-      setDeleteModal({ show: false, employee: null })
+    const result = await deleteMutation.execute(`/api/employees/${employee._id}`, null, {
+      invalidateKeys: [/^\/api\/employees/],
+    })
+    if (result) {
+      toast.success(`${employee.firstName} ${employee.lastName} has been permanently deleted`)
+      setSelectedEmployees(prev => prev.filter(id => id !== employee._id))
+    } else {
+      toast.error(deleteMutation.error || 'Failed to delete employee')
     }
+    setDeleteModal({ show: false, employee: null })
   }
 
   const handleStatusChange = async (employeeId, newStatus) => {
@@ -249,33 +170,15 @@ export default function EmployeesPage() {
 
     setStatusUpdating(employeeId)
 
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/employees/${employeeId}`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ status: newStatus }),
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        toast.success(data.message || 'Status updated successfully')
-        setEmployees(prev => prev.map(emp =>
-          emp._id === employeeId ? { ...emp, status: newStatus } : emp
-        ))
-      } else {
-        toast.error(data.message || 'Failed to update status')
-      }
-    } catch (error) {
-      console.error('Update status error:', error)
-      toast.error('An error occurred while updating status')
-    } finally {
-      setStatusUpdating(null)
+    const result = await statusMutation.execute(`/api/employees/${employeeId}`, { status: newStatus }, {
+      invalidateKeys: [/^\/api\/employees/],
+    })
+    if (result) {
+      toast.success(result.message || 'Status updated successfully')
+    } else {
+      toast.error('Failed to update status')
     }
+    setStatusUpdating(null)
   }
 
   const canManageEmployees = () => {
@@ -366,7 +269,7 @@ export default function EmployeesPage() {
 
       if (successCount > 0) {
         toast.success(`Successfully updated ${successCount} employee(s)`)
-        fetchEmployees()
+        refreshEmployees()
         setSelectedEmployees([])
         setShowBulkEditModal(false)
         setBulkEditData({
@@ -388,25 +291,6 @@ export default function EmployeesPage() {
       setBulkUpdating(false)
     }
   }
-
-  // Lazy-load managers only when Bulk Edit modal opens
-  useEffect(() => {
-    if (showBulkEditModal && managers.length === 0) {
-      fetchManagers()
-    }
-  }, [showBulkEditModal])
-
-  useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false
-      return
-    }
-    const timer = setTimeout(() => {
-      setPage(1)
-      fetchEmployees()
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [search])
 
   // Access denied screen for non-admin/non-hr users
   if (accessDenied) {
@@ -441,6 +325,7 @@ export default function EmployeesPage() {
           <p className="text-default-500 mt-1">
             {canManageEmployees() ? "Manage your organization's employees" : 'View organization employees'}
             {totalEmployees > 0 && <span className="ml-2 text-primary font-medium">({totalEmployees} total)</span>}
+            <BackgroundRefreshIndicator isValidating={isValidating} />
           </p>
         </div>
         <div className="flex items-center space-x-3 mt-4 md:mt-0">
@@ -626,9 +511,13 @@ export default function EmployeesPage() {
         </Card>
       )}
 
+      {error && !isLoading && (
+        <DataErrorState message={error.message || 'Failed to load employees'} onRetry={() => refreshEmployees()} className="mb-6" />
+      )}
+
       <Card shadow="sm">
         <CardBody className="p-0">
-          {loading ? (
+          {isLoading ? (
             <div className="p-8 text-center">
               <div className="space-y-4">
                 <Skeleton className="h-12 w-full rounded-lg" />
@@ -813,9 +702,9 @@ export default function EmployeesPage() {
           </ModalBody>
           <ModalFooter className="bg-default-50">
             <Button variant="bordered" onPress={() => setDeleteModal({ show: false, employee: null })}>Cancel</Button>
-            <Button color="danger" onPress={confirmDelete} startContent={<FaTrash className="text-sm" />}>
+            <LoadingButton color="danger" onPress={confirmDelete} isLoading={deleteMutation.isLoading} loadingText="Deleting..." startContent={<FaTrash className="text-sm" />}>
               Delete Permanently
-            </Button>
+            </LoadingButton>
           </ModalFooter>
         </ModalContent>
       </Modal>

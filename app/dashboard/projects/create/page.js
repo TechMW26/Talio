@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { Card, CardBody, CardHeader, Button, Input, Select, SelectItem, Textarea, Skeleton, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Spinner } from '@heroui/react'
@@ -18,20 +18,38 @@ import { formatDepartments } from '@/lib/formatters'
 import Portal from '@/components/ui/Portal'
 import ModalPortal from '@/components/ui/ModalPortal'
 import { useAILoading } from '@/contexts/AILoadingContext'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton from '@/components/ui/LoadingButton'
 
 export default function CreateProjectPage() {
   const router = useRouter()
-  const [loading, setLoading] = useState(false)
   const [generatingDescription, setGeneratingDescription] = useState(false)
-  const [employees, setEmployees] = useState([])
-  const [departments, setDepartments] = useState([])
   const [searchEmployee, setSearchEmployee] = useState('')
   const [showEmployeeSearch, setShowEmployeeSearch] = useState(false)
-  const [user, setUser] = useState(null)
   const [expandedMemberDepts, setExpandedMemberDepts] = useState({})
   const [expandedHeadDepts, setExpandedHeadDepts] = useState({})
-  
+
   const { startAILoading, stopAILoading } = useAILoading()
+
+  // --- useMemo: user ---
+  const user = useMemo(() => { try { return JSON.parse(localStorage.getItem('user')) } catch { return null } }, [])
+
+  // --- SWR: Dropdown data ---
+  const { data: empRes } = useAuthedSWR('/api/employees?limit=500&status=active')
+  const employees = empRes?.data || []
+
+  const { data: deptRes } = useAuthedSWR('/api/departments')
+  const departments = deptRes?.data || []
+
+  // --- Submit mutation ---
+  const submitMutation = useApiMutation({
+    onSuccess: (data) => {
+      toast.success('Project created successfully!')
+      router.push(`/dashboard/projects/${data.data._id}`)
+    },
+    onError: (msg) => toast.error(msg || 'Failed to create project'),
+  })
 
   const [formData, setFormData] = useState({
     name: '',
@@ -47,45 +65,6 @@ export default function CreateProjectPage() {
   })
   const [showHeadSearch, setShowHeadSearch] = useState(false)
   const [searchHead, setSearchHead] = useState('')
-
-  useEffect(() => {
-    const userData = localStorage.getItem('user')
-    if (userData) {
-      setUser(JSON.parse(userData))
-    }
-    fetchEmployees()
-    fetchDepartments()
-  }, [])
-
-  const fetchEmployees = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/employees?limit=500&status=active', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setEmployees(data.data || [])
-      }
-    } catch (error) {
-      console.error('Fetch employees error:', error)
-    }
-  }
-
-  const fetchDepartments = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/departments', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setDepartments(data.data || [])
-      }
-    } catch (error) {
-      console.error('Fetch departments error:', error)
-    }
-  }
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -172,47 +151,21 @@ export default function CreateProjectPage() {
       return
     }
 
-    setLoading(true)
-
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/projects', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          name: formData.name.trim(),
-          description: formData.description.trim(),
-          startDate: formData.startDate,
-          endDate: formData.endDate,
-          projectHeadIds: formData.projectHeadIds,
-          priority: formData.priority,
-          department: formData.department || undefined,
-          tags: formData.tags.split(',').map(t => t.trim()).filter(t => t),
-          status: formData.status,
-          members: formData.members.map(m => ({
-            userId: m.userId,
-            role: m.role
-          }))
-        })
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        toast.success('Project created successfully!')
-        router.push(`/dashboard/projects/${data.data._id}`)
-      } else {
-        toast.error(data.message || 'Failed to create project')
-      }
-    } catch (error) {
-      console.error('Create project error:', error)
-      toast.error('An error occurred while creating the project')
-    } finally {
-      setLoading(false)
-    }
+    await submitMutation.execute('/api/projects', {
+      name: formData.name.trim(),
+      description: formData.description.trim(),
+      startDate: formData.startDate,
+      endDate: formData.endDate,
+      projectHeadIds: formData.projectHeadIds,
+      priority: formData.priority,
+      department: formData.department || undefined,
+      tags: formData.tags.split(',').map(t => t.trim()).filter(t => t),
+      status: formData.status,
+      members: formData.members.map(m => ({
+        userId: m.userId,
+        role: m.role
+      }))
+    })
   }
 
   // AI generate description
@@ -310,273 +263,273 @@ export default function CreateProjectPage() {
       <form onSubmit={handleSubmit}>
         <Card shadow="sm" className="mb-6">
           <CardBody className="p-6">
-          <h2 className="text-lg font-semibold text-default-800 mb-4">Project Details</h2>
+            <h2 className="text-lg font-semibold text-default-800 mb-4">Project Details</h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Project Name */}
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-default-700 mb-2">
-                Project Name <span className="text-danger">*</span>
-              </label>
-              <input
-                type="text"
-                name="name"
-                value={formData.name}
-                onChange={handleChange}
-                placeholder="Enter project name"
-                className="w-full px-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                required
-              />
-            </div>
-
-            {/* Description */}
-            <div className="md:col-span-2">
-              <div className="flex items-center justify-start mb-2">
-                <label className="block text-sm font-medium text-default-700">
-                  Description
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Project Name */}
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-default-700 mb-2">
+                  Project Name <span className="text-danger">*</span>
                 </label>
-                <Button
-                  size="sm"
-                  color="secondary"
-                  variant="flat"
-                  onPress={generateDescription}
-                  isDisabled={generatingDescription || !formData.name.trim()}
-                  isLoading={generatingDescription}
-                  startContent={!generatingDescription && <HiOutlineSparkles className="w-3.5 h-3.5" />}
-                  className="ml-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white"
+                <input
+                  type="text"
+                  name="name"
+                  value={formData.name}
+                  onChange={handleChange}
+                  placeholder="Enter project name"
+                  className="w-full px-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  required
+                />
+              </div>
+
+              {/* Description */}
+              <div className="md:col-span-2">
+                <div className="flex items-center justify-start mb-2">
+                  <label className="block text-sm font-medium text-default-700">
+                    Description
+                  </label>
+                  <Button
+                    size="sm"
+                    color="secondary"
+                    variant="flat"
+                    onPress={generateDescription}
+                    isDisabled={generatingDescription || !formData.name.trim()}
+                    isLoading={generatingDescription}
+                    startContent={!generatingDescription && <HiOutlineSparkles className="w-3.5 h-3.5" />}
+                    className="ml-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white"
+                  >
+                    {generatingDescription ? 'Writing...' : 'AI Write'}
+                  </Button>
+                </div>
+                <textarea
+                  name="description"
+                  value={formData.description}
+                  onChange={handleChange}
+                  placeholder="Describe the project objectives and scope..."
+                  rows={4}
+                  className="w-full px-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+                />
+              </div>
+
+              {/* Start Date */}
+              <div>
+                <label className="block text-sm font-medium text-default-700 mb-2">
+                  Start Date <span className="text-danger">*</span>
+                </label>
+                <div className="relative">
+                  <FaCalendarAlt className="absolute left-3 top-1/2 -translate-y-1/2 text-default-400" />
+                  <input
+                    type="date"
+                    name="startDate"
+                    value={formData.startDate}
+                    onChange={handleChange}
+                    className="w-full pl-10 pr-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* End Date */}
+              <div>
+                <label className="block text-sm font-medium text-default-700 mb-2">
+                  End Date / Deadline <span className="text-danger">*</span>
+                </label>
+                <div className="relative">
+                  <FaCalendarAlt className="absolute left-3 top-1/2 -translate-y-1/2 text-default-400" />
+                  <input
+                    type="date"
+                    name="endDate"
+                    value={formData.endDate}
+                    onChange={handleChange}
+                    className="w-full pl-10 pr-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Priority */}
+              <div>
+                <label className="block text-sm font-medium text-default-700 mb-2">
+                  Priority
+                </label>
+                <Select
+                  name="priority"
+                  selectedKeys={[formData.priority]}
+                  onChange={handleChange}
+                  aria-label="Priority"
+                  classNames={{ trigger: "bg-white" }}
                 >
-                  {generatingDescription ? 'Writing...' : 'AI Write'}
-                </Button>
+                  <SelectItem key="low">Low</SelectItem>
+                  <SelectItem key="medium">Medium</SelectItem>
+                  <SelectItem key="high">High</SelectItem>
+                  <SelectItem key="critical">Critical</SelectItem>
+                </Select>
               </div>
-              <textarea
-                name="description"
-                value={formData.description}
-                onChange={handleChange}
-                placeholder="Describe the project objectives and scope..."
-                rows={4}
-                className="w-full px-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
-              />
-            </div>
 
-            {/* Start Date */}
-            <div>
-              <label className="block text-sm font-medium text-default-700 mb-2">
-                Start Date <span className="text-danger">*</span>
-              </label>
-              <div className="relative">
-                <FaCalendarAlt className="absolute left-3 top-1/2 -translate-y-1/2 text-default-400" />
-                <input
-                  type="date"
-                  name="startDate"
-                  value={formData.startDate}
+              {/* Status */}
+              <div>
+                <label className="block text-sm font-medium text-default-700 mb-2">
+                  Initial Status
+                </label>
+                <Select
+                  name="status"
+                  selectedKeys={[formData.status]}
                   onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  required
+                  aria-label="Initial Status"
+                  classNames={{ trigger: "bg-white" }}
+                >
+                  <SelectItem key="planned">Planned</SelectItem>
+                  <SelectItem key="ongoing">Ongoing</SelectItem>
+                </Select>
+              </div>
+
+              {/* Department */}
+              <div>
+                <label className="block text-sm font-medium text-default-700 mb-2">
+                  Department (Optional)
+                </label>
+                <Select
+                  name="department"
+                  selectedKeys={formData.department ? [formData.department] : []}
+                  onChange={handleChange}
+                  aria-label="Department"
+                  placeholder="Select Department"
+                  classNames={{ trigger: "bg-white" }}
+                >
+                  {departments.map(dept => (
+                    <SelectItem key={dept._id}>{dept.name}</SelectItem>
+                  ))}
+                </Select>
+              </div>
+
+              {/* Tags */}
+              <div>
+                <label className="block text-sm font-medium text-default-700 mb-2">
+                  Tags (comma-separated)
+                </label>
+                <input
+                  type="text"
+                  name="tags"
+                  value={formData.tags}
+                  onChange={handleChange}
+                  placeholder="e.g., frontend, urgent, Q1"
+                  className="w-full px-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
               </div>
             </div>
-
-            {/* End Date */}
-            <div>
-              <label className="block text-sm font-medium text-default-700 mb-2">
-                End Date / Deadline <span className="text-danger">*</span>
-              </label>
-              <div className="relative">
-                <FaCalendarAlt className="absolute left-3 top-1/2 -translate-y-1/2 text-default-400" />
-                <input
-                  type="date"
-                  name="endDate"
-                  value={formData.endDate}
-                  onChange={handleChange}
-                  className="w-full pl-10 pr-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Priority */}
-            <div>
-              <label className="block text-sm font-medium text-default-700 mb-2">
-                Priority
-              </label>
-              <Select
-                name="priority"
-                selectedKeys={[formData.priority]}
-                onChange={handleChange}
-                aria-label="Priority"
-                classNames={{ trigger: "bg-white" }}
-              >
-                <SelectItem key="low">Low</SelectItem>
-                <SelectItem key="medium">Medium</SelectItem>
-                <SelectItem key="high">High</SelectItem>
-                <SelectItem key="critical">Critical</SelectItem>
-              </Select>
-            </div>
-
-            {/* Status */}
-            <div>
-              <label className="block text-sm font-medium text-default-700 mb-2">
-                Initial Status
-              </label>
-              <Select
-                name="status"
-                selectedKeys={[formData.status]}
-                onChange={handleChange}
-                aria-label="Initial Status"
-                classNames={{ trigger: "bg-white" }}
-              >
-                <SelectItem key="planned">Planned</SelectItem>
-                <SelectItem key="ongoing">Ongoing</SelectItem>
-              </Select>
-            </div>
-
-            {/* Department */}
-            <div>
-              <label className="block text-sm font-medium text-default-700 mb-2">
-                Department (Optional)
-              </label>
-              <Select
-                name="department"
-                selectedKeys={formData.department ? [formData.department] : []}
-                onChange={handleChange}
-                aria-label="Department"
-                placeholder="Select Department"
-                classNames={{ trigger: "bg-white" }}
-              >
-                {departments.map(dept => (
-                  <SelectItem key={dept._id}>{dept.name}</SelectItem>
-                ))}
-              </Select>
-            </div>
-
-            {/* Tags */}
-            <div>
-              <label className="block text-sm font-medium text-default-700 mb-2">
-                Tags (comma-separated)
-              </label>
-              <input
-                type="text"
-                name="tags"
-                value={formData.tags}
-                onChange={handleChange}
-                placeholder="e.g., frontend, urgent, Q1"
-                className="w-full px-4 py-2 border border-default-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
-            </div>
-          </div>
           </CardBody>
         </Card>
 
         {/* Project Heads Section */}
         <Card shadow="sm" className="mb-6">
           <CardBody className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-default-800">
-              Project Heads <span className="text-danger">*</span>
-            </h2>
-            <Button
-              variant="bordered"
-              size="sm"
-              onPress={() => setShowHeadSearch(true)}
-              startContent={<FaPlus />}
-            >
-              Add Head
-            </Button>
-          </div>
-
-          {selectedProjectHeads.length === 0 ? (
-            <p className="text-default-500 text-center py-8">
-              No project heads added yet. Click "Add Head" to assign project heads.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {selectedProjectHeads.map((head) => (
-                <div key={head._id} className="flex items-center justify-between p-3 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
-                  <div className="flex items-center">
-                    <div className="w-12 h-12 rounded-full bg-primary-500 flex items-center justify-center text-white font-medium overflow-hidden">
-                      {head.profilePicture ? (
-                        <img
-                          src={head.profilePicture}
-                          alt=""
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <span>{head.firstName?.[0]}{head.lastName?.[0]}</span>
-                      )}
-                    </div>
-                    <div className="ml-4">
-                      <p className="font-medium text-default-800">
-                        {head.firstName} {head.lastName}
-                      </p>
-                      <p className="text-sm text-default-500">{head.email}</p>
-                    </div>
-                  </div>
-                  <Button
-                    isIconOnly
-                    variant="light"
-                    color="danger"
-                    onPress={() => handleRemoveProjectHead(head._id)}
-                  >
-                    <FaTimes />
-                  </Button>
-                </div>
-              ))}
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-default-800">
+                Project Heads <span className="text-danger">*</span>
+              </h2>
+              <Button
+                variant="bordered"
+                size="sm"
+                onPress={() => setShowHeadSearch(true)}
+                startContent={<FaPlus />}
+              >
+                Add Head
+              </Button>
             </div>
-          )}
+
+            {selectedProjectHeads.length === 0 ? (
+              <p className="text-default-500 text-center py-8">
+                No project heads added yet. Click "Add Head" to assign project heads.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {selectedProjectHeads.map((head) => (
+                  <div key={head._id} className="flex items-center justify-between p-3 bg-primary-50 dark:bg-primary-900/20 rounded-lg">
+                    <div className="flex items-center">
+                      <div className="w-12 h-12 rounded-full bg-primary-500 flex items-center justify-center text-white font-medium overflow-hidden">
+                        {head.profilePicture ? (
+                          <img
+                            src={head.profilePicture}
+                            alt=""
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <span>{head.firstName?.[0]}{head.lastName?.[0]}</span>
+                        )}
+                      </div>
+                      <div className="ml-4">
+                        <p className="font-medium text-default-800">
+                          {head.firstName} {head.lastName}
+                        </p>
+                        <p className="text-sm text-default-500">{head.email}</p>
+                      </div>
+                    </div>
+                    <Button
+                      isIconOnly
+                      variant="light"
+                      color="danger"
+                      onPress={() => handleRemoveProjectHead(head._id)}
+                    >
+                      <FaTimes />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardBody>
         </Card>
 
         {/* Team Members Section */}
         <Card shadow="sm" className="mb-6">
           <CardBody className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-default-800">
-              <FaUsers className="inline mr-2" />
-              Team Members
-            </h2>
-            <Button
-              variant="bordered"
-              size="sm"
-              onPress={() => setShowEmployeeSearch(true)}
-              startContent={<FaPlus />}
-            >
-              Add Member
-            </Button>
-          </div>
-
-          {formData.members.length === 0 ? (
-            <p className="text-default-500 text-center py-8">
-              No team members added yet. Click "Add Member" to invite team members.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {formData.members.map((member) => (
-                <div key={member.userId} className="flex items-center justify-between p-3 bg-default-50 rounded-lg">
-                  <div className="flex items-center">
-                    <div className="w-10 h-10 rounded-full bg-primary-500 flex items-center justify-center text-white text-sm overflow-hidden">
-                      {member.profilePicture ? (
-                        <img src={member.profilePicture} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <span>{member.name.split(' ').map(n => n[0]).join('')}</span>
-                      )}
-                    </div>
-                    <div className="ml-3">
-                      <p className="font-medium text-default-800">{member.name}</p>
-                      <p className="text-sm text-default-500">{member.department || 'No Department'}</p>
-                    </div>
-                  </div>
-                  <Button
-                    isIconOnly
-                    variant="light"
-                    color="danger"
-                    onPress={() => handleRemoveMember(member.userId)}
-                  >
-                    <FaTimes />
-                  </Button>
-                </div>
-              ))}
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-default-800">
+                <FaUsers className="inline mr-2" />
+                Team Members
+              </h2>
+              <Button
+                variant="bordered"
+                size="sm"
+                onPress={() => setShowEmployeeSearch(true)}
+                startContent={<FaPlus />}
+              >
+                Add Member
+              </Button>
             </div>
-          )}
+
+            {formData.members.length === 0 ? (
+              <p className="text-default-500 text-center py-8">
+                No team members added yet. Click "Add Member" to invite team members.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {formData.members.map((member) => (
+                  <div key={member.userId} className="flex items-center justify-between p-3 bg-default-50 rounded-lg">
+                    <div className="flex items-center">
+                      <div className="w-10 h-10 rounded-full bg-primary-500 flex items-center justify-center text-white text-sm overflow-hidden">
+                        {member.profilePicture ? (
+                          <img src={member.profilePicture} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <span>{member.name.split(' ').map(n => n[0]).join('')}</span>
+                        )}
+                      </div>
+                      <div className="ml-3">
+                        <p className="font-medium text-default-800">{member.name}</p>
+                        <p className="text-sm text-default-500">{member.department || 'No Department'}</p>
+                      </div>
+                    </div>
+                    <Button
+                      isIconOnly
+                      variant="light"
+                      color="danger"
+                      onPress={() => handleRemoveMember(member.userId)}
+                    >
+                      <FaTimes />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardBody>
         </Card>
 
@@ -585,19 +538,19 @@ export default function CreateProjectPage() {
           <Button
             variant="bordered"
             onPress={() => router.back()}
-            isDisabled={loading}
+            isDisabled={submitMutation.isLoading}
           >
             Cancel
           </Button>
-          <Button
+          <LoadingButton
             type="submit"
             color="primary"
-            isLoading={loading}
-            isDisabled={loading}
-            startContent={!loading && <FaSave />}
+            isLoading={submitMutation.isLoading}
+            loadingText="Creating..."
+            startContent={<FaSave />}
           >
-            {loading ? 'Creating...' : 'Create Project'}
-          </Button>
+            Create Project
+          </LoadingButton>
         </div>
       </form>
 
@@ -648,10 +601,10 @@ export default function CreateProjectPage() {
                     }, {})
                   ).sort(([a], [b]) => a.localeCompare(b)).map(([deptName, deptEmployees]) => {
                     const isExpanded = expandedMemberDepts[deptName]
-                    const allSelected = deptEmployees.every(emp => 
+                    const allSelected = deptEmployees.every(emp =>
                       formData.members.some(m => m.userId === emp._id)
                     )
-                    
+
                     return (
                       <div key={deptName} className="border border-default-200 rounded-lg overflow-hidden">
                         {/* Department Header - Clickable */}
@@ -676,14 +629,14 @@ export default function CreateProjectPage() {
                                 // Remove all from this department
                                 setFormData(prev => ({
                                   ...prev,
-                                  members: prev.members.filter(m => 
+                                  members: prev.members.filter(m =>
                                     !deptEmployees.some(emp => emp._id === m.userId)
                                   )
                                 }))
                               } else {
                                 // Add all from this department
                                 const newMembers = deptEmployees
-                                  .filter(emp => 
+                                  .filter(emp =>
                                     !formData.members.some(m => m.userId === emp._id) &&
                                     !formData.projectHeadIds.includes(emp._id)
                                   )
@@ -700,17 +653,16 @@ export default function CreateProjectPage() {
                                 }))
                               }
                             }}
-                            className={`text-xs px-2 py-1 rounded flex items-center gap-1 ${
-                              allSelected 
-                                ? 'bg-primary-100 text-primary-700' 
+                            className={`text-xs px-2 py-1 rounded flex items-center gap-1 ${allSelected
+                                ? 'bg-primary-100 text-primary-700'
                                 : 'bg-default-200 text-default-600 hover:bg-default-300'
-                            }`}
+                              }`}
                           >
                             <FaCheckSquare className="w-3 h-3" />
                             {allSelected ? 'Deselect All' : 'Select All'}
                           </button>
                         </div>
-                        
+
                         {/* Employees List - Collapsible */}
                         {isExpanded && (
                           <div className="divide-y divide-default-100">
@@ -730,13 +682,11 @@ export default function CreateProjectPage() {
                                       handleAddMember(emp)
                                     }
                                   }}
-                                  className={`w-full flex items-center p-2 pl-8 transition-colors text-left ${
-                                    isSelected ? 'bg-primary-50' : 'hover:bg-default-50'
-                                  }`}
+                                  className={`w-full flex items-center p-2 pl-8 transition-colors text-left ${isSelected ? 'bg-primary-50' : 'hover:bg-default-50'
+                                    }`}
                                 >
-                                  <div className={`w-5 h-5 rounded border flex items-center justify-center mr-3 ${
-                                    isSelected ? 'bg-primary-500 border-primary-500' : 'border-default-300'
-                                  }`}>
+                                  <div className={`w-5 h-5 rounded border flex items-center justify-center mr-3 ${isSelected ? 'bg-primary-500 border-primary-500' : 'border-default-300'
+                                    }`}>
                                     {isSelected && <FaTimes className="w-3 h-3 text-white" style={{ transform: 'rotate(45deg)' }} />}
                                   </div>
                                   <div className="w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center text-white text-xs overflow-hidden">
@@ -814,10 +764,10 @@ export default function CreateProjectPage() {
                     }, {})
                   ).sort(([a], [b]) => a.localeCompare(b)).map(([deptName, deptEmployees]) => {
                     const isExpanded = expandedHeadDepts[deptName]
-                    const allSelected = deptEmployees.every(emp => 
+                    const allSelected = deptEmployees.every(emp =>
                       formData.projectHeadIds.includes(emp._id)
                     )
-                    
+
                     return (
                       <div key={deptName} className="border border-default-200 rounded-lg overflow-hidden">
                         {/* Department Header - Clickable */}
@@ -842,7 +792,7 @@ export default function CreateProjectPage() {
                                 // Remove all from this department
                                 setFormData(prev => ({
                                   ...prev,
-                                  projectHeadIds: prev.projectHeadIds.filter(id => 
+                                  projectHeadIds: prev.projectHeadIds.filter(id =>
                                     !deptEmployees.some(emp => emp._id === id)
                                   )
                                 }))
@@ -859,17 +809,16 @@ export default function CreateProjectPage() {
                                 }))
                               }
                             }}
-                            className={`text-xs px-2 py-1 rounded flex items-center gap-1 ${
-                              allSelected 
-                                ? 'bg-primary-100 text-primary-700' 
+                            className={`text-xs px-2 py-1 rounded flex items-center gap-1 ${allSelected
+                                ? 'bg-primary-100 text-primary-700'
                                 : 'bg-default-200 text-default-600 hover:bg-default-300'
-                            }`}
+                              }`}
                           >
                             <FaCheckSquare className="w-3 h-3" />
                             {allSelected ? 'Deselect All' : 'Select All'}
                           </button>
                         </div>
-                        
+
                         {/* Employees List - Collapsible */}
                         {isExpanded && (
                           <div className="divide-y divide-default-100">
@@ -889,13 +838,11 @@ export default function CreateProjectPage() {
                                       handleAddProjectHead(emp)
                                     }
                                   }}
-                                  className={`w-full flex items-center p-2 pl-8 transition-colors text-left ${
-                                    isSelected ? 'bg-primary-50' : 'hover:bg-default-50'
-                                  }`}
+                                  className={`w-full flex items-center p-2 pl-8 transition-colors text-left ${isSelected ? 'bg-primary-50' : 'hover:bg-default-50'
+                                    }`}
                                 >
-                                  <div className={`w-5 h-5 rounded border flex items-center justify-center mr-3 ${
-                                    isSelected ? 'bg-primary-500 border-primary-500' : 'border-default-300'
-                                  }`}>
+                                  <div className={`w-5 h-5 rounded border flex items-center justify-center mr-3 ${isSelected ? 'bg-primary-500 border-primary-500' : 'border-default-300'
+                                    }`}>
                                     {isSelected && <FaTimes className="w-3 h-3 text-white" style={{ transform: 'rotate(45deg)' }} />}
                                   </div>
                                   <div className="w-8 h-8 rounded-full bg-primary-500 flex items-center justify-center text-white text-xs overflow-hidden">

@@ -1,21 +1,66 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaFileAlt, FaEdit, FaTrash, FaCheckCircle, FaExclamationCircle } from 'react-icons/fa'
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Select, SelectItem, Textarea, Checkbox } from '@heroui/react'
-import Loader from '@/components/ui/Loader'
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Select, SelectItem, Textarea, Checkbox, Skeleton } from '@heroui/react'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton from '@/components/ui/LoadingButton'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
+
+// --- Skeleton Loader for Policies page ---
+function PoliciesSkeleton() {
+  return (
+    <div className="p-6 animate-in fade-in duration-300">
+      {/* Header skeleton */}
+      <div className="flex md:justify-between md:items-center md:flex-row flex-col mb-6">
+        <div>
+          <Skeleton className="h-8 w-48 rounded-lg mb-2" />
+          <Skeleton className="h-4 w-64 rounded-lg" />
+        </div>
+        <Skeleton className="h-10 w-32 rounded-lg" />
+      </div>
+
+      {/* Stats skeleton */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        {[1, 2, 3, 4].map(i => (
+          <div key={i} className="bg-white rounded-lg shadow-md p-6">
+            <Skeleton className="h-3 w-24 rounded mb-3" />
+            <Skeleton className="h-8 w-12 rounded" />
+          </div>
+        ))}
+      </div>
+
+      {/* Policy cards skeleton */}
+      <div className="space-y-4">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex items-center space-x-3 mb-3">
+              <Skeleton className="h-5 w-5 rounded" />
+              <Skeleton className="h-6 w-48 rounded-lg" />
+              <Skeleton className="h-5 w-16 rounded-full" />
+            </div>
+            <Skeleton className="h-4 w-full rounded mb-2" />
+            <Skeleton className="h-4 w-3/4 rounded mb-4" />
+            <div className="flex space-x-4">
+              <Skeleton className="h-3 w-32 rounded" />
+              <Skeleton className="h-3 w-24 rounded" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export default function PoliciesPage() {
-  const [policies, setPolicies] = useState([])
-  const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingPolicy, setEditingPolicy] = useState(null)
-  const [currentUser, setCurrentUser] = useState(null)
-  const [pendingPolicies, setPendingPolicies] = useState([])
   const [showAckModal, setShowAckModal] = useState(false)
-  
+
   const [formData, setFormData] = useState({
     title: '',
     code: '',
@@ -27,17 +72,53 @@ export default function PoliciesPage() {
     applicableTo: 'all'
   })
 
+  const resetForm = () => {
+    setFormData({ title: '', code: '', category: '', content: '', description: '', effectiveDate: '', requiresAcknowledgment: true, applicableTo: 'all' })
+  }
+
   // Real-time updates
   const { socket, isConnected, subscribe } = useSocket()
 
-  useEffect(() => {
-    const userData = localStorage.getItem('user')
-    if (userData) {
-      const user = JSON.parse(userData)
-      setCurrentUser(user)
-    }
-    fetchPolicies()
-  }, [])
+  // --- Memoized current user ---
+  const currentUser = useMemo(() => { try { return JSON.parse(localStorage.getItem('user')) } catch { return null } }, [])
+
+  // --- SWR Data Fetching (replaces raw useEffect+fetch) ---
+  const { data: policiesRes, error, isLoading, isValidating, mutate: refreshPolicies } = useAuthedSWR('/api/policies')
+  const policies = policiesRes?.data || []
+
+  // --- Pending acknowledgments (replaces checkPendingAcknowledgments + useEffect) ---
+  const pendingPolicies = useMemo(() => {
+    if (!currentUser || !policies.length) return []
+    const employeeId = currentUser.employeeId || currentUser._id
+    return policies.filter(policy => {
+      if (!policy.requiresAcknowledgment) return false
+      if (policy.status !== 'active' && policy.status !== 'draft') return false
+      return !policy.acknowledgments?.some(ack => ack.employee === employeeId || ack.employee?._id === employeeId)
+    })
+  }, [currentUser, policies])
+
+  // Auto-show ack modal when pending policies exist
+  const showAckModalAuto = useMemo(() => pendingPolicies.length > 0, [pendingPolicies])
+
+  // --- Mutations with loading states ---
+  const submitMutation = useApiMutation({
+    invalidateKeys: ['/api/policies'],
+    onSuccess: () => { toast.success(editingPolicy ? 'Policy updated' : 'Policy created'); setShowModal(false); setEditingPolicy(null); resetForm() },
+    onError: (msg) => toast.error(msg || 'Failed to save policy'),
+  })
+
+  const deleteMutation = useApiMutation({
+    method: 'DELETE',
+    invalidateKeys: ['/api/policies'],
+    onSuccess: (data) => toast.success(data.message || 'Policy deleted'),
+    onError: (msg) => toast.error(msg || 'Failed to delete policy'),
+  })
+
+  const acknowledgeMutation = useApiMutation({
+    invalidateKeys: ['/api/policies'],
+    onSuccess: () => toast.success('Policy acknowledged'),
+    onError: (msg) => toast.error(msg || 'Failed to acknowledge policy'),
+  })
 
   // Subscribe to real-time policy updates
   useEffect(() => {
@@ -45,7 +126,7 @@ export default function PoliciesPage() {
 
     const handlePolicyUpdate = (data) => {
       console.log('🔄 [Policies] Real-time update received:', data)
-      fetchPolicies()
+      refreshPolicies()
     }
 
     const unsub = subscribe?.(REALTIME_EVENTS.POLICY_UPDATE, handlePolicyUpdate)
@@ -55,106 +136,24 @@ export default function PoliciesPage() {
     }
   }, [socket, isConnected])
 
-  useEffect(() => {
-    if (currentUser && policies.length > 0) {
-      checkPendingAcknowledgments()
-    }
-  }, [currentUser, policies])
-
-  const checkPendingAcknowledgments = () => {
-    // If user is admin, they might not need to acknowledge, but let's assume everyone does if applicable
-    // We need the employeeId. If the user object has it, great.
-    const employeeId = currentUser.employeeId || currentUser._id // Fallback, might need adjustment based on User model
-
-    const pending = policies.filter(policy => {
-      if (!policy.requiresAcknowledgment) return false
-      if (policy.status !== 'active' && policy.status !== 'draft') return false // Only active policies usually
-      
-      // Check if already acknowledged
-      const hasAcknowledged = policy.acknowledgments?.some(
-        ack => ack.employee === employeeId || ack.employee?._id === employeeId
-      )
-      
-      return !hasAcknowledged
-    })
-
-    setPendingPolicies(pending)
-    if (pending.length > 0) {
-      setShowAckModal(true)
-    }
-  }
-
-  const fetchPolicies = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/policies', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        setPolicies(data.data)
-      }
-    } catch (error) {
-      console.error('Fetch policies error:', error)
-      toast.error('Failed to fetch policies')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const handleSubmit = async (e) => {
     e.preventDefault()
 
-    try {
-      const token = localStorage.getItem('token')
-      const url = editingPolicy ? `/api/policies/${editingPolicy._id}` : '/api/policies'
-      const method = editingPolicy ? 'PUT' : 'POST'
+    const url = editingPolicy ? `/api/policies/${editingPolicy._id}` : '/api/policies'
+    const method = editingPolicy ? 'PUT' : 'POST'
 
-      // Auto-generate code if missing
-      const dataToSend = { ...formData }
-      if (!dataToSend.code) {
-        dataToSend.code = `POL-${Date.now().toString().slice(-6)}`
-      }
-      
-      // Add createdBy if new
-      if (!editingPolicy && currentUser) {
-        dataToSend.createdBy = currentUser.employeeId || currentUser._id
-      }
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(dataToSend),
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        toast.success(data.message)
-        setShowModal(false)
-        setEditingPolicy(null)
-        setFormData({ 
-          title: '', 
-          code: '', 
-          category: '', 
-          content: '', 
-          description: '', 
-          effectiveDate: '',
-          requiresAcknowledgment: true,
-          applicableTo: 'all'
-        })
-        fetchPolicies()
-      } else {
-        toast.error(data.message)
-      }
-    } catch (error) {
-      console.error('Submit error:', error)
-      toast.error('Failed to save policy')
+    // Auto-generate code if missing
+    const dataToSend = { ...formData }
+    if (!dataToSend.code) {
+      dataToSend.code = `POL-${Date.now().toString().slice(-6)}`
     }
+
+    // Add createdBy if new
+    if (!editingPolicy && currentUser) {
+      dataToSend.createdBy = currentUser.employeeId || currentUser._id
+    }
+
+    await submitMutation.execute(url, dataToSend, { method })
   }
 
   const handleEdit = (policy) => {
@@ -176,64 +175,23 @@ export default function PoliciesPage() {
 
   const handleDelete = async (id) => {
     if (!confirm('Are you sure you want to delete this policy?')) return
-
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/policies/${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        toast.success(data.message)
-        fetchPolicies()
-      } else {
-        toast.error(data.message)
-      }
-    } catch (error) {
-      console.error('Delete error:', error)
-      toast.error('Failed to delete policy')
-    }
+    await deleteMutation.execute(`/api/policies/${id}`, null, { method: 'DELETE' })
   }
 
   const handleAcknowledge = async (policyId) => {
-    try {
-      const token = localStorage.getItem('token')
-      const employeeId = currentUser.employeeId || currentUser._id
-
-      const response = await fetch(`/api/policies/${policyId}/acknowledge`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ employeeId }),
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        toast.success('Policy acknowledged')
-        // Remove from pending list
-        const updatedPending = pendingPolicies.filter(p => p._id !== policyId)
-        setPendingPolicies(updatedPending)
-        if (updatedPending.length === 0) {
-          setShowAckModal(false)
-        }
-        fetchPolicies() // Refresh list to show updated status
-      } else {
-        toast.error(data.message)
-      }
-    } catch (error) {
-      console.error('Acknowledge error:', error)
-      toast.error('Failed to acknowledge policy')
-    }
+    const employeeId = currentUser.employeeId || currentUser._id
+    await acknowledgeMutation.execute(`/api/policies/${policyId}/acknowledge`, { employeeId })
   }
+
+  // --- Loading & Error states ---
+  if (isLoading) return <PoliciesSkeleton />
+  if (error) return <DataErrorState error={error} onRetry={() => refreshPolicies()} title="Failed to load policies" />
 
   return (
     <div className="p-6">
+      {/* Background refresh indicator */}
+      <BackgroundRefreshIndicator isValidating={isValidating} />
+
       {/* Header */}
       <div className="flex md:justify-between md:items-center md:flex-row flex-col mb-6">
         <div>
@@ -276,12 +234,7 @@ export default function PoliciesPage() {
 
       {/* Policies List */}
       <div className="space-y-4">
-        {loading ? (
-          <div className="bg-white rounded-lg shadow-md p-8 text-center">
-            <Loader size="lg" className="mx-auto" />
-            <p className="mt-4 text-gray-600">Loading policies...</p>
-          </div>
-        ) : policies.length === 0 ? (
+        {policies.length === 0 ? (
           <div className="bg-white rounded-lg shadow-md p-8 text-center text-gray-500">
             No policies found
           </div>
@@ -433,23 +386,19 @@ export default function PoliciesPage() {
                     onPress={() => {
                       onClose()
                       setEditingPolicy(null)
-                      setFormData({ 
-                        title: '', 
-                        code: '', 
-                        category: '', 
-                        content: '', 
-                        description: '', 
-                        effectiveDate: '',
-                        requiresAcknowledgment: true,
-                        applicableTo: 'all'
-                      })
+                      resetForm()
                     }}
                   >
                     Cancel
                   </Button>
-                  <Button color="primary" type="submit">
+                  <LoadingButton
+                    color="primary"
+                    type="submit"
+                    isLoading={submitMutation.isLoading}
+                    loadingText={editingPolicy ? 'Updating...' : 'Creating...'}
+                  >
                     {editingPolicy ? 'Update' : 'Create'}
-                  </Button>
+                  </LoadingButton>
                 </ModalFooter>
               </form>
             </>
@@ -458,7 +407,7 @@ export default function PoliciesPage() {
       </Modal>
 
       {/* Acknowledgment Modal */}
-      <Modal isOpen={showAckModal} onOpenChange={setShowAckModal} size="2xl" isDismissable={pendingPolicies.length === 0}>
+      <Modal isOpen={showAckModal || showAckModalAuto} onOpenChange={setShowAckModal} size="2xl" isDismissable={pendingPolicies.length === 0}>
         <ModalContent>
           {(onClose) => (
             <>
@@ -480,13 +429,15 @@ export default function PoliciesPage() {
                         {policy.content}
                       </div>
                       <div className="flex justify-end">
-                        <Button
+                        <LoadingButton
                           color="primary"
                           onPress={() => handleAcknowledge(policy._id)}
                           startContent={<FaCheckCircle />}
+                          isLoading={acknowledgeMutation.isLoading}
+                          loadingText="Acknowledging..."
                         >
                           I Acknowledge & Accept
-                        </Button>
+                        </LoadingButton>
                       </div>
                     </div>
                   ))}
@@ -495,7 +446,7 @@ export default function PoliciesPage() {
                 {pendingPolicies.length === 0 && (
                   <div className="text-center py-4">
                     <p className="text-success font-medium">All policies acknowledged!</p>
-                    <Button 
+                    <Button
                       onPress={onClose}
                       className="mt-4"
                       variant="light"

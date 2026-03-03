@@ -1,9 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button, Chip, Card, CardBody, CardHeader, Skeleton } from '@heroui/react';
 import toast from '@/utils/toast';
+import useAuthedSWR from '@/hooks/useAuthedSWR';
+import { DataErrorState } from '@/components/ui/ErrorBoundary';
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator';
 import {
   FaArrowLeft, FaBriefcase, FaUsers, FaCheckCircle, FaChartBar,
   FaClock, FaPercentage, FaTrophy, FaCalendarAlt
@@ -17,32 +19,10 @@ const STAGE_COLOR = {
 
 export default function RecruitmentAnalyticsPage() {
   const router = useRouter();
-  const [analytics, setAnalytics] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { data: res, error, isLoading, isValidating, mutate: refresh } = useAuthedSWR('/api/recruitment/analytics');
+  const analytics = res?.data || null;
 
-  useEffect(() => { fetchAnalytics(); }, []);
-
-  const fetchAnalytics = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/recruitment/analytics', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
-      if (data.success) {
-        setAnalytics(data.data);
-      } else {
-        toast.error(data.message || 'Failed to load analytics');
-      }
-    } catch (error) {
-      console.error('Analytics error:', error);
-      toast.error('Failed to load analytics');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="page-container">
         <div className="space-y-4 sm:space-y-6">
@@ -55,6 +35,14 @@ export default function RecruitmentAnalyticsPage() {
           </div>
           <Skeleton className="h-32 rounded-xl" />
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="page-container">
+        <DataErrorState message="Failed to load analytics data" onRetry={() => refresh()} />
       </div>
     );
   }
@@ -91,6 +79,7 @@ export default function RecruitmentAnalyticsPage() {
             <h1 className="text-2xl sm:text-3xl font-bold text-default-800">Recruitment Analytics</h1>
             <p className="text-sm text-default-500">Overview of your hiring metrics</p>
           </div>
+          <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" />
         </div>
 
         {/* Key Metrics */}

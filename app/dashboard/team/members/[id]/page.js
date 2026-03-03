@@ -1,10 +1,14 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import toast from '@/utils/toast'
-import { Select, SelectItem, Button } from '@heroui/react'
-import Loader from '@/components/ui/Loader'
+import { Select, SelectItem, Button, Skeleton, Card, CardBody } from '@heroui/react'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton from '@/components/ui/LoadingButton'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 import {
   FaArrowLeft, FaUser, FaEnvelope, FaPhone, FaCalendarAlt,
   FaBriefcase, FaStar, FaTasks, FaChartLine, FaComments,
@@ -15,8 +19,6 @@ import { formatDesignation } from '@/lib/formatters'
 export default function TeamMemberDetailsPage() {
   const router = useRouter()
   const params = useParams()
-  const [loading, setLoading] = useState(true)
-  const [memberData, setMemberData] = useState(null)
   const [showReviewForm, setShowReviewForm] = useState(false)
   const [reviewForm, setReviewForm] = useState({
     type: 'review',
@@ -25,36 +27,24 @@ export default function TeamMemberDetailsPage() {
     category: 'general'
   })
 
-  useEffect(() => {
-    if (params.id) {
-      fetchMemberDetails()
-    }
-  }, [params.id])
+  const { data: res, error, isLoading, isValidating, mutate: refresh } = useAuthedSWR(params.id ? `/api/team/members/${params.id}` : null)
+  const memberData = res?.data || null
 
-  const fetchMemberDetails = async () => {
-    try {
-      setLoading(true)
-      const token = localStorage.getItem('token')
-
-      const response = await fetch(`/api/team/members/${params.id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+  const reviewMutation = useApiMutation({
+    method: 'POST',
+    invalidateKeys: [`/api/team/members/${params.id}`],
+    onSuccess: (data) => {
+      toast.success(data?.message || 'Review added')
+      setShowReviewForm(false)
+      setReviewForm({
+        type: 'review',
+        content: '',
+        rating: 0,
+        category: 'general'
       })
-
-      const data = await response.json()
-      if (data.success) {
-        setMemberData(data.data)
-      } else {
-        toast.error(data.message || 'Failed to fetch member details')
-      }
-    } catch (error) {
-      console.error('Error fetching member details:', error)
-      toast.error('Failed to fetch member details')
-    } finally {
-      setLoading(false)
-    }
-  }
+    },
+    onError: (msg) => toast.error(msg || 'Failed to add review'),
+  })
 
   const handleSubmitReview = async () => {
     if (!reviewForm.content.trim()) {
@@ -67,35 +57,7 @@ export default function TeamMemberDetailsPage() {
       return
     }
 
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/team/members/${params.id}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(reviewForm)
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        toast.success(data.message)
-        setShowReviewForm(false)
-        setReviewForm({
-          type: 'review',
-          content: '',
-          rating: 0,
-          category: 'general'
-        })
-        fetchMemberDetails()
-      } else {
-        toast.error(data.message || 'Failed to add review')
-      }
-    } catch (error) {
-      console.error('Error adding review:', error)
-      toast.error('Failed to add review')
-    }
+    await reviewMutation.execute(`/api/team/members/${params.id}`, reviewForm)
   }
 
   const getStatusColor = (status) => {
@@ -123,10 +85,37 @@ export default function TeamMemberDetailsPage() {
     return colors[type] || 'bg-gray-100 text-gray-800'
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <Loader size="lg" />
+      <div className="px-4 py-4 sm:p-6 lg:p-8 pb-14 md:pb-6">
+        <div className="space-y-6">
+          <div className="flex items-center">
+            <Skeleton className="w-20 h-20 rounded-full mr-4" />
+            <div className="space-y-2">
+              <Skeleton className="h-8 w-48 rounded-lg" />
+              <Skeleton className="h-5 w-32 rounded-lg" />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
+              <Skeleton className="h-48 rounded-xl" />
+              <Skeleton className="h-32 rounded-xl" />
+              <Skeleton className="h-64 rounded-xl" />
+            </div>
+            <div className="space-y-6">
+              <Skeleton className="h-12 rounded-xl" />
+              <Skeleton className="h-64 rounded-xl" />
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="px-4 py-4 sm:p-6 lg:p-8 pb-14 md:pb-6">
+        <DataErrorState message="Failed to load member details" onRetry={() => refresh()} />
       </div>
     )
   }
@@ -197,8 +186,9 @@ export default function TeamMemberDetailsPage() {
           </div>
         </div>
       </div>
+      <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" />
 
-      {/* Employee Details */}
+      {/* Employee Details */}}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <div className="lg:col-span-2 space-y-6">
           {/* Basic Info */}
@@ -401,13 +391,15 @@ export default function TeamMemberDetailsPage() {
               </div>
 
               {/* Submit Button */}
-              <button
+              <LoadingButton
                 onClick={handleSubmitReview}
+                isLoading={reviewMutation.isLoading}
+                loadingText="Submitting..."
                 className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center"
               >
                 <FaPaperPlane className="mr-2" />
                 Submit
-              </button>
+              </LoadingButton>
             </div>
           )}
 

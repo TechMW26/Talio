@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import {
   Button, Chip, Divider, Modal, ModalContent, ModalHeader,
@@ -9,6 +9,11 @@ import {
 } from '@heroui/react';
 import toast from '@/utils/toast';
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext';
+import useAuthedSWR from '@/hooks/useAuthedSWR';
+import useApiMutation from '@/hooks/useApiMutation';
+import LoadingButton from '@/components/ui/LoadingButton';
+import { DataErrorState } from '@/components/ui/ErrorBoundary';
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator';
 import {
   FaArrowLeft, FaEdit, FaTrash, FaUser, FaEnvelope, FaPhone,
   FaBriefcase, FaStar, FaCalendarAlt, FaDollarSign, FaClock,
@@ -30,11 +35,6 @@ const STAGES = [
 export default function CandidateDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const [candidate, setCandidate] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
 
   // Stage change modal
   const { isOpen: isStageOpen, onOpen: onStageOpen, onClose: onStageClose } = useDisclosure();
@@ -52,174 +52,88 @@ export default function CandidateDetailPage() {
   // Convert modal
   const { isOpen: isConvertOpen, onOpen: onConvertOpen, onClose: onConvertClose } = useDisclosure();
   const [convertData, setConvertData] = useState({ employeeCode: '', joiningDate: '' });
-  const [converting, setConverting] = useState(false);
 
   const { socket, isConnected, subscribe } = useSocket();
 
-  const fetchCandidate = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/recruitment/candidates/${params.id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
-      if (data.success) {
-        setCandidate(data.data);
-      } else {
-        toast.error(data.message || 'Candidate not found');
-      }
-    } catch (error) {
-      console.error('Fetch candidate error:', error);
-      toast.error('Failed to load candidate');
-    } finally {
-      setLoading(false);
-    }
-  }, [params.id]);
+  const user = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem('user')); } catch { return null; }
+  }, []);
 
-  useEffect(() => {
-    const userData = localStorage.getItem('user');
-    if (userData) setUser(JSON.parse(userData));
-    fetchCandidate();
-  }, [params.id]);
+  const { data: res, error, isLoading, isValidating, mutate: refresh } = useAuthedSWR(params.id ? `/api/recruitment/candidates/${params.id}` : null);
+  const candidate = res?.data || null;
 
   useEffect(() => {
     if (!socket || !isConnected) return;
-    const unsub = subscribe?.(REALTIME_EVENTS.RECRUITMENT_CANDIDATE_STAGE_CHANGED, fetchCandidate);
+    const unsub = subscribe?.(REALTIME_EVENTS.RECRUITMENT_CANDIDATE_STAGE_CHANGED, () => refresh());
     return () => unsub?.();
   }, [socket, isConnected]);
 
   const canManage = user && ['admin', 'hr', 'manager'].includes(user.role);
 
+  const stageMutation = useApiMutation({
+    method: 'PUT',
+    invalidateKeys: [`/api/recruitment/candidates/${params.id}`],
+    onSuccess: () => { toast.success('Stage updated'); onStageClose(); setStageNotes(''); },
+    onError: (msg) => toast.error(msg || 'Failed to update stage'),
+  });
+
   const handleStageChange = async () => {
     if (!newStage) return;
-    setSaving(true);
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/recruitment/candidates/${params.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ stage: newStage, stageNotes }),
-      });
-      const data = await response.json();
-      if (data.success) {
-        toast.success(`Stage updated to ${newStage}`);
-        setCandidate(data.data);
-        onStageClose();
-        setStageNotes('');
-      } else {
-        toast.error(data.message || 'Failed to update stage');
-      }
-    } catch (error) {
-      toast.error('Failed to update stage');
-    } finally {
-      setSaving(false);
-    }
+    await stageMutation.execute(`/api/recruitment/candidates/${params.id}`, { stage: newStage, stageNotes });
   };
+
+  const noteMutation = useApiMutation({
+    method: 'PUT',
+    invalidateKeys: [`/api/recruitment/candidates/${params.id}`],
+    onSuccess: () => { toast.success('Note added'); onNoteClose(); setNoteText(''); },
+    onError: (msg) => toast.error(msg || 'Failed to add note'),
+  });
 
   const handleAddNote = async () => {
     if (!noteText.trim()) return;
-    setSaving(true);
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/recruitment/candidates/${params.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ addNote: noteText }),
-      });
-      const data = await response.json();
-      if (data.success) {
-        toast.success('Note added');
-        setCandidate(data.data);
-        onNoteClose();
-        setNoteText('');
-      } else {
-        toast.error(data.message || 'Failed to add note');
-      }
-    } catch (error) {
-      toast.error('Failed to add note');
-    } finally {
-      setSaving(false);
-    }
+    await noteMutation.execute(`/api/recruitment/candidates/${params.id}`, { addNote: noteText });
   };
+
+  const ratingMutation = useApiMutation({
+    method: 'PUT',
+    invalidateKeys: [`/api/recruitment/candidates/${params.id}`],
+    onSuccess: () => { toast.success('Rating updated'); onRatingClose(); },
+    onError: (msg) => toast.error(msg || 'Failed to update rating'),
+  });
 
   const handleUpdateRating = async () => {
     const rating = Number(ratingValue);
     if (!rating || rating < 1 || rating > 5) { toast.error('Rating must be 1-5'); return; }
-    setSaving(true);
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/recruitment/candidates/${params.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ rating }),
-      });
-      const data = await response.json();
-      if (data.success) {
-        toast.success('Rating updated');
-        setCandidate(data.data);
-        onRatingClose();
-      } else {
-        toast.error(data.message || 'Failed to update rating');
-      }
-    } catch (error) {
-      toast.error('Failed to update rating');
-    } finally {
-      setSaving(false);
-    }
+    await ratingMutation.execute(`/api/recruitment/candidates/${params.id}`, { rating });
   };
+
+  const convertMutation = useApiMutation({
+    method: 'POST',
+    invalidateKeys: [`/api/recruitment/candidates/${params.id}`],
+    onSuccess: () => { toast.success('Candidate converted to employee!'); onConvertClose(); },
+    onError: (msg) => toast.error(msg || 'Failed to convert candidate'),
+  });
 
   const handleConvert = async () => {
     if (!convertData.employeeCode || !convertData.joiningDate) {
       toast.error('Employee code and joining date are required');
       return;
     }
-    setConverting(true);
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/recruitment/candidates/convert', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ candidateId: params.id, ...convertData }),
-      });
-      const data = await response.json();
-      if (data.success) {
-        toast.success('Candidate converted to employee!');
-        fetchCandidate();
-        onConvertClose();
-      } else {
-        toast.error(data.message || 'Conversion failed');
-      }
-    } catch (error) {
-      toast.error('Failed to convert candidate');
-    } finally {
-      setConverting(false);
-    }
+    await convertMutation.execute('/api/recruitment/candidates/convert', { candidateId: params.id, ...convertData });
   };
+
+  const deleteMutation = useApiMutation({
+    method: 'DELETE',
+    onSuccess: () => { toast.success('Candidate deleted'); router.push('/dashboard/recruitment/candidates'); },
+    onError: (msg) => toast.error(msg || 'Failed to delete candidate'),
+  });
 
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this candidate?')) return;
-    setDeleting(true);
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/recruitment/candidates/${params.id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
-      if (data.success) {
-        toast.success('Candidate deleted');
-        router.push('/dashboard/recruitment/candidates');
-      } else {
-        toast.error(data.message || 'Failed to delete');
-      }
-    } catch (error) {
-      toast.error('Failed to delete candidate');
-    } finally {
-      setDeleting(false);
-    }
+    await deleteMutation.execute(`/api/recruitment/candidates/${params.id}`);
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="page-container">
         <div className="space-y-4 sm:space-y-6">
@@ -238,6 +152,14 @@ export default function CandidateDetailPage() {
             </div>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="page-container">
+        <DataErrorState message="Failed to load candidate details" onRetry={() => refresh()} />
       </div>
     );
   }
@@ -307,12 +229,13 @@ export default function CandidateDetailPage() {
                   Convert to Employee
                 </Button>
               )}
-              <Button size="sm" color="danger" variant="light" isLoading={deleting} onPress={handleDelete}>
+              <Button size="sm" color="danger" variant="light" isLoading={deleteMutation.isLoading} onPress={handleDelete}>
                 Delete
               </Button>
             </div>
           )}
         </div>
+        <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Main content — 2/3 */}
@@ -605,7 +528,7 @@ export default function CandidateDetailPage() {
             </ModalBody>
             <ModalFooter>
               <Button variant="flat" onPress={onStageClose}>Cancel</Button>
-              <Button color="primary" isLoading={saving} onPress={handleStageChange}>Update Stage</Button>
+              <Button color="primary" isLoading={stageMutation.isLoading} onPress={handleStageChange}>Update Stage</Button>
             </ModalFooter>
           </ModalContent>
         </Modal>
@@ -625,7 +548,7 @@ export default function CandidateDetailPage() {
             </ModalBody>
             <ModalFooter>
               <Button variant="flat" onPress={onNoteClose}>Cancel</Button>
-              <Button color="primary" isLoading={saving} onPress={handleAddNote}>Add Note</Button>
+              <Button color="primary" isLoading={noteMutation.isLoading} onPress={handleAddNote}>Add Note</Button>
             </ModalFooter>
           </ModalContent>
         </Modal>
@@ -646,7 +569,7 @@ export default function CandidateDetailPage() {
             </ModalBody>
             <ModalFooter>
               <Button variant="flat" onPress={onRatingClose}>Cancel</Button>
-              <Button color="primary" isLoading={saving} onPress={handleUpdateRating}>Update Rating</Button>
+              <Button color="primary" isLoading={ratingMutation.isLoading} onPress={handleUpdateRating}>Update Rating</Button>
             </ModalFooter>
           </ModalContent>
         </Modal>
@@ -677,7 +600,7 @@ export default function CandidateDetailPage() {
             </ModalBody>
             <ModalFooter>
               <Button variant="flat" onPress={onConvertClose}>Cancel</Button>
-              <Button color="success" isLoading={converting} onPress={handleConvert}>
+              <Button color="success" isLoading={convertMutation.isLoading} onPress={handleConvert}>
                 Convert to Employee
               </Button>
             </ModalFooter>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Button, Chip, Input, Select, SelectItem, Pagination,
@@ -9,6 +9,11 @@ import {
 } from '@heroui/react';
 import toast from '@/utils/toast';
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext';
+import useAuthedSWR from '@/hooks/useAuthedSWR';
+import useApiMutation from '@/hooks/useApiMutation';
+import LoadingButton from '@/components/ui/LoadingButton';
+import { DataErrorState } from '@/components/ui/ErrorBoundary';
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator';
 import {
   FaSearch, FaCalendarAlt, FaPlus, FaClock, FaUser, FaVideo,
   FaPhone, FaMapMarkerAlt, FaLink, FaFilter, FaStar, FaArrowLeft
@@ -26,23 +31,22 @@ const TYPE_ICON = {
 
 export default function InterviewsPage() {
   const router = useRouter();
-  const [interviews, setInterviews] = useState([]);
-  const [jobs, setJobs] = useState([]);
-  const [employees, setEmployees] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [pagination, setPagination] = useState({ total: 0, pages: 1 });
   const [filters, setFilters] = useState({ status: '', jobPosting: '', page: 1 });
-  const [user, setUser] = useState(null);
+
+  const user = useMemo(() => { try { return JSON.parse(localStorage.getItem('user')) } catch { return null } }, []);
 
   // Schedule modal
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const [scheduling, setScheduling] = useState(false);
   const [scheduleData, setScheduleData] = useState({
     candidate: '', jobPosting: '', type: 'video', title: '',
     scheduledDate: '', duration: 60, location: '', meetingLink: '',
     interviewers: [], notes: '',
   });
-  const [candidates, setCandidates] = useState([]);
+  // --- SWR: Candidates for selected job (conditional) ---
+  const { data: candidatesRes } = useAuthedSWR(
+    scheduleData.jobPosting ? `/api/recruitment/candidates?jobPosting=${scheduleData.jobPosting}&limit=100` : null
+  );
+  const candidates = candidatesRes?.data || [];
 
   // Feedback modal
   const { isOpen: isFeedbackOpen, onOpen: onFeedbackOpen, onClose: onFeedbackClose } = useDisclosure();
@@ -50,87 +54,58 @@ export default function InterviewsPage() {
   const [feedback, setFeedback] = useState({
     rating: '', strengths: '', weaknesses: '', comments: '', recommendation: 'maybe',
   });
-  const [submittingFeedback, setSubmittingFeedback] = useState(false);
 
   const { socket, isConnected, subscribe } = useSocket();
 
-  const fetchInterviews = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const params = new URLSearchParams({ page: filters.page, limit: 20 });
-      if (filters.status) params.set('status', filters.status);
-      if (filters.jobPosting) params.set('jobPosting', filters.jobPosting);
-
-      const response = await fetch(`/api/recruitment/interviews?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
-      if (data.success) {
-        setInterviews(data.data);
-        setPagination(data.pagination || { total: data.data.length, pages: 1 });
-      }
-    } catch (error) {
-      console.error('Fetch interviews error:', error);
-      toast.error('Failed to load interviews');
-    } finally {
-      setLoading(false);
-    }
+  // --- SWR: Dynamic key for interviews based on filters ---
+  const interviewsKey = useMemo(() => {
+    const params = new URLSearchParams({ page: filters.page, limit: 20 });
+    if (filters.status) params.set('status', filters.status);
+    if (filters.jobPosting) params.set('jobPosting', filters.jobPosting);
+    return `/api/recruitment/interviews?${params}`;
   }, [filters]);
 
-  const fetchJobs = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/recruitment?limit=100', {
-        headers: { Authorization: `Bearer ${token}` },
+  const { data: interviewsResponse, error: interviewsError, isLoading, isValidating, mutate: refreshInterviews } = useAuthedSWR(interviewsKey);
+  const interviews = interviewsResponse?.data || [];
+  const pagination = interviewsResponse?.pagination || { total: interviews.length, pages: 1 };
+
+  // --- SWR: Jobs (static) ---
+  const { data: jobsResponse } = useAuthedSWR('/api/recruitment?limit=100');
+  const jobs = jobsResponse?.data || [];
+
+  // --- SWR: Employees (static) ---
+  const { data: employeesResponse } = useAuthedSWR('/api/employees?limit=1000');
+  const employees = employeesResponse?.data || [];
+
+  // --- Mutations ---
+  const scheduleMutation = useApiMutation({
+    invalidateKeys: [/^\/api\/recruitment\/interviews/],
+    onSuccess: (data) => {
+      toast.success('Interview scheduled successfully');
+      onClose();
+      setScheduleData({
+        candidate: '', jobPosting: '', type: 'video', title: '',
+        scheduledDate: '', duration: 60, location: '', meetingLink: '',
+        interviewers: [], notes: '',
       });
-      const data = await response.json();
-      if (data.success) setJobs(data.data);
-    } catch (error) {
-      console.error('Fetch jobs error:', error);
-    }
-  }, []);
+    },
+    onError: (msg) => toast.error(msg || 'Failed to schedule interview'),
+  });
 
-  const fetchEmployees = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/employees?limit=1000', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
-      if (data.success) setEmployees(data.data);
-    } catch (error) {
-      console.error('Fetch employees error:', error);
-    }
-  }, []);
+  const feedbackMutation = useApiMutation({
+    method: 'PUT',
+    invalidateKeys: [/^\/api\/recruitment\/interviews/],
+    onSuccess: (data) => {
+      toast.success('Feedback submitted');
+      onFeedbackClose();
+    },
+    onError: (msg) => toast.error(msg || 'Failed to submit feedback'),
+  });
 
-  const fetchCandidatesForJob = async (jobId) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/recruitment/candidates?jobPosting=${jobId}&limit=100`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
-      if (data.success) setCandidates(data.data);
-    } catch (error) {
-      console.error('Fetch candidates error:', error);
-    }
-  };
-
-  useEffect(() => {
-    const userData = localStorage.getItem('user');
-    if (userData) setUser(JSON.parse(userData));
-    fetchJobs();
-    fetchEmployees();
-  }, []);
-
-  useEffect(() => {
-    setLoading(true);
-    fetchInterviews();
-  }, [filters]);
-
+  // --- Socket: auto-refresh on real-time events ---
   useEffect(() => {
     if (!socket || !isConnected) return;
-    const unsub = subscribe?.(REALTIME_EVENTS.RECRUITMENT_INTERVIEW_UPDATED, fetchInterviews);
+    const unsub = subscribe?.(REALTIME_EVENTS.RECRUITMENT_INTERVIEW_UPDATED, () => refreshInterviews());
     return () => unsub?.();
   }, [socket, isConnected]);
 
@@ -149,32 +124,9 @@ export default function InterviewsPage() {
       toast.error('At least one interviewer is required');
       return;
     }
-    setScheduling(true);
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/recruitment/interviews', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ ...scheduleData, duration: Number(scheduleData.duration) }),
-      });
-      const data = await response.json();
-      if (data.success) {
-        toast.success('Interview scheduled successfully');
-        onClose();
-        setScheduleData({
-          candidate: '', jobPosting: '', type: 'video', title: '',
-          scheduledDate: '', duration: 60, location: '', meetingLink: '',
-          interviewers: [], notes: '',
-        });
-        fetchInterviews();
-      } else {
-        toast.error(data.message || 'Failed to schedule');
-      }
-    } catch (error) {
-      toast.error('Failed to schedule interview');
-    } finally {
-      setScheduling(false);
-    }
+    await scheduleMutation.execute('/api/recruitment/interviews', {
+      ...scheduleData, duration: Number(scheduleData.duration),
+    });
   };
 
   const handleFeedbackSubmit = async () => {
@@ -182,35 +134,15 @@ export default function InterviewsPage() {
       toast.error('Rating (1-5) is required');
       return;
     }
-    setSubmittingFeedback(true);
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch(`/api/recruitment/interviews/${selectedInterview._id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          feedback: {
-            rating: Number(feedback.rating),
-            strengths: feedback.strengths,
-            weaknesses: feedback.weaknesses,
-            comments: feedback.comments,
-            recommendation: feedback.recommendation,
-          },
-        }),
-      });
-      const data = await response.json();
-      if (data.success) {
-        toast.success('Feedback submitted');
-        onFeedbackClose();
-        fetchInterviews();
-      } else {
-        toast.error(data.message || 'Failed to submit feedback');
-      }
-    } catch (error) {
-      toast.error('Failed to submit feedback');
-    } finally {
-      setSubmittingFeedback(false);
-    }
+    await feedbackMutation.execute(`/api/recruitment/interviews/${selectedInterview._id}`, {
+      feedback: {
+        rating: Number(feedback.rating),
+        strengths: feedback.strengths,
+        weaknesses: feedback.weaknesses,
+        comments: feedback.comments,
+        recommendation: feedback.recommendation,
+      },
+    });
   };
 
   const openFeedback = (interview) => {
@@ -229,7 +161,20 @@ export default function InterviewsPage() {
     return acc;
   }, {});
 
-  if (loading && interviews.length === 0) {
+  // --- Error state ---
+  if (interviewsError) {
+    return (
+      <div className="page-container">
+        <DataErrorState
+          title="Failed to load interviews"
+          message={interviewsError.message}
+          onRetry={() => refreshInterviews()}
+        />
+      </div>
+    );
+  }
+
+  if (isLoading && interviews.length === 0) {
     return (
       <div className="page-container">
         <div className="space-y-4 sm:space-y-6">
@@ -257,7 +202,10 @@ export default function InterviewsPage() {
             </Button>
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-default-800">Interviews</h1>
-              <p className="text-sm text-default-500 mt-0.5">Schedule and manage candidate interviews</p>
+              <p className="text-sm text-default-500 mt-0.5">
+                Schedule and manage candidate interviews
+                <BackgroundRefreshIndicator isValidating={isValidating} />
+              </p>
             </div>
           </div>
           {canManage && (
@@ -411,7 +359,6 @@ export default function InterviewsPage() {
                   onSelectionChange={(keys) => {
                     const val = Array.from(keys)[0] || '';
                     setScheduleData((prev) => ({ ...prev, jobPosting: val, candidate: '' }));
-                    if (val) fetchCandidatesForJob(val);
                   }}
                 >
                   {jobs.map((j) => <SelectItem key={j._id}>{j.jobTitle}</SelectItem>)}
@@ -474,7 +421,7 @@ export default function InterviewsPage() {
             </ModalBody>
             <ModalFooter>
               <Button variant="flat" onPress={onClose}>Cancel</Button>
-              <Button color="primary" isLoading={scheduling} onPress={handleSchedule}>Schedule Interview</Button>
+              <LoadingButton color="primary" isLoading={scheduleMutation.isLoading} loadingText="Scheduling..." onPress={handleSchedule}>Schedule Interview</LoadingButton>
             </ModalFooter>
           </ModalContent>
         </Modal>
@@ -518,7 +465,7 @@ export default function InterviewsPage() {
             </ModalBody>
             <ModalFooter>
               <Button variant="flat" onPress={onFeedbackClose}>Cancel</Button>
-              <Button color="primary" isLoading={submittingFeedback} onPress={handleFeedbackSubmit}>Submit Feedback</Button>
+              <LoadingButton color="primary" isLoading={feedbackMutation.isLoading} loadingText="Submitting..." onPress={handleFeedbackSubmit}>Submit Feedback</LoadingButton>
             </ModalFooter>
           </ModalContent>
         </Modal>

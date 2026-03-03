@@ -1,58 +1,32 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import toast from '@/utils/toast'
 import { FaMoneyBillWave, FaDownload, FaEye, FaCalendarAlt, FaFilter, FaTimes } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
-import { useDisclosure, Divider, Chip } from '@heroui/react'
-import { PageLoader } from '@/components/ui/heroui/Loading'
+import { useDisclosure, Divider, Chip, Skeleton } from '@heroui/react'
 import { HRMSCard, HRMSCardHeader, HRMSCardBody, KPICard } from '@/components/ui/heroui/Card'
 import { HRMSSelect, HRMSSelectItem } from '@/components/ui/heroui/Input'
 import { PrimaryButton, SecondaryButton, GhostButton } from '@/components/ui/heroui/Button'
 import { HRMSTable, HRMSTableHeader, HRMSTableColumn, HRMSTableBody, HRMSTableRow, HRMSTableCell, StatusBadge } from '@/components/ui/heroui/Table'
 import { HRMSModal, HRMSModalContent, HRMSModalHeader, HRMSModalBody, HRMSModalFooter } from '@/components/ui/heroui/Modal'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 
 export default function PayslipsPage() {
-  const [payslips, setPayslips] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState(null)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [selectedPayslip, setSelectedPayslip] = useState(null)
   const { isOpen: showModal, onOpen: openModal, onClose: closeModal } = useDisclosure()
 
-  useEffect(() => {
-    const parsedUser = getCurrentUser()
-    if (parsedUser) {
-      setUser(parsedUser)
-      const empId = getEmployeeId(parsedUser)
-      if (empId) {
-        fetchPayslips(empId)
-      } else {
-        toast.error('Employee information not found. Please logout and login again.')
-        setLoading(false)
-      }
-    } else {
-      setLoading(false)
-    }
-  }, [selectedYear])
+  const user = useMemo(() => getCurrentUser(), [])
+  const empId = useMemo(() => user ? getEmployeeId(user) : null, [user])
 
-  const fetchPayslips = async (employeeId) => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/payroll/payslips?employeeId=${employeeId}&year=${selectedYear}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-      const data = await response.json()
-      if (data.success) {
-        setPayslips(data.data)
-      }
-    } catch (error) {
-      console.error('Fetch payslips error:', error)
-      toast.error('Failed to fetch payslips')
-    } finally {
-      setLoading(false)
-    }
-  }
+  // SWR: fetch payslips (re-fetches when selectedYear changes via the key)
+  const { data: res, error, isLoading, isValidating, mutate: refresh } = useAuthedSWR(
+    empId ? `/api/payroll/payslips?employeeId=${empId}&year=${selectedYear}` : null
+  )
+  const payslips = res?.data || []
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-IN', {
@@ -117,8 +91,52 @@ Generated on: ${new Date().toLocaleDateString()}
     window.URL.revokeObjectURL(url)
   }
 
-  if (loading) {
-    return <PageLoader message="Loading payslips..." />
+  if (isLoading) {
+    return (
+      <div className="p-3 sm:p-6 pb-20 md:pb-6 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+          <div>
+            <Skeleton className="h-8 w-40 rounded-lg mb-2" />
+            <Skeleton className="h-4 w-64 rounded-lg" />
+          </div>
+          <Skeleton className="h-10 w-32 rounded-lg" />
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="bg-white rounded-xl shadow-sm p-4">
+              <Skeleton className="h-4 w-24 rounded mb-3" />
+              <Skeleton className="h-7 w-20 rounded" />
+            </div>
+          ))}
+        </div>
+        <HRMSCard>
+          <HRMSCardHeader>
+            <Skeleton className="h-6 w-48 rounded" />
+          </HRMSCardHeader>
+          <Divider />
+          <HRMSCardBody className="p-4">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="flex items-center gap-4 py-3">
+                <Skeleton className="h-5 w-32 rounded" />
+                <Skeleton className="h-5 w-24 rounded" />
+                <Skeleton className="h-5 w-24 rounded" />
+                <Skeleton className="h-5 w-24 rounded" />
+                <Skeleton className="h-6 w-16 rounded-full" />
+                <Skeleton className="h-8 w-24 rounded" />
+              </div>
+            ))}
+          </HRMSCardBody>
+        </HRMSCard>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="p-3 sm:p-6 pb-20 md:pb-6">
+        <DataErrorState message="Failed to load payslips" onRetry={() => refresh()} />
+      </div>
+    )
   }
 
   return (
@@ -127,7 +145,7 @@ Generated on: ${new Date().toLocaleDateString()}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground">My Payslips</h1>
-          <p className="text-default-500 mt-1">View and download your salary statements</p>
+          <p className="text-default-500 mt-1">View and download your salary statements <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" /></p>
         </div>
         <div className="flex items-center gap-4">
           <HRMSSelect

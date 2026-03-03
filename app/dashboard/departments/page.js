@@ -1,21 +1,20 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { Button } from '@heroui/react'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { Button, Skeleton } from '@heroui/react'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaEdit, FaTrash, FaBuilding, FaUsers, FaTimes, FaUserTie, FaSearch } from 'react-icons/fa'
-import Loader from '@/components/ui/Loader'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton from '@/components/ui/LoadingButton'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 import ModalPortal from '@/components/ui/ModalPortal'
 
 export default function DepartmentsPage() {
-  const [departments, setDepartments] = useState([])
-  const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingDept, setEditingDept] = useState(null)
-  const [user, setUser] = useState(null)
-  const [employees, setEmployees] = useState([])
-  const [users, setUsers] = useState([]) // Fallback users list
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -26,27 +25,22 @@ export default function DepartmentsPage() {
   const [showHeadDropdown, setShowHeadDropdown] = useState(false)
   const dropdownRef = useRef(null)
 
+  // User from localStorage
+  const user = useMemo(() => { try { return JSON.parse(localStorage.getItem('user')) } catch { return null } }, [])
+  const isAdmin = user && ['admin', 'hr'].includes(user.role)
+
+  // SWR data fetching
+  const { data: deptsRes, error, isLoading, isValidating, mutate: refreshDepartments } = useAuthedSWR('/api/departments')
+  const departments = deptsRes?.data || []
+
+  const { data: employeesRes } = useAuthedSWR(isAdmin ? '/api/employees?limit=1000' : null)
+  const employees = employeesRes?.data || []
+
+  const { data: usersRes } = useAuthedSWR(isAdmin ? '/api/users?limit=1000' : null)
+  const users = usersRes?.data || usersRes?.users || []
+
   // Real-time updates
   const { socket, isConnected, subscribe } = useSocket()
-
-  useEffect(() => {
-    const userData = localStorage.getItem('user')
-    if (userData) {
-      const parsedUser = JSON.parse(userData)
-      setUser(parsedUser)
-
-      // Check role-based access
-      if (!['admin', 'hr'].includes(parsedUser.role)) {
-        // For employees and managers, show read-only view
-        fetchDepartments()
-      } else {
-        // For admin, admin and HR, show full management interface
-        fetchDepartments()
-        fetchEmployees()
-        fetchUsers() // Also fetch users as fallback
-      }
-    }
-  }, [])
 
   // Subscribe to real-time department updates
   useEffect(() => {
@@ -54,7 +48,7 @@ export default function DepartmentsPage() {
 
     const handleDepartmentUpdate = (data) => {
       console.log('🔄 [Departments] Real-time update received:', data)
-      fetchDepartments()
+      refreshDepartments()
     }
 
     const unsub = subscribe?.(REALTIME_EVENTS.DEPARTMENT_UPDATED, handleDepartmentUpdate)
@@ -75,93 +69,29 @@ export default function DepartmentsPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const fetchDepartments = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/departments', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
+  // Mutations
+  const submitMutation = useApiMutation({
+    invalidateKeys: ['/api/departments'],
+    onSuccess: (data) => {
+      toast.success(data.message || 'Department saved')
+      setShowModal(false)
+      setEditingDept(null)
+      setFormData({ name: '', description: '', code: '', heads: [] })
+    },
+    onError: (msg) => toast.error(msg || 'Failed to save department'),
+  })
 
-      const data = await response.json()
-      if (data.success) {
-        setDepartments(data.data)
-      } else {
-        toast.error(data.message || 'Failed to fetch departments')
-      }
-    } catch (error) {
-      console.error('Fetch departments error:', error)
-      toast.error('Failed to fetch departments')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const deleteMutation = useApiMutation({
+    method: 'DELETE',
+    invalidateKeys: ['/api/departments'],
+    onSuccess: (data) => toast.success(data.message || 'Department deleted'),
+    onError: (msg) => toast.error(msg || 'Failed to delete department'),
+  })
 
-  const fetchEmployees = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/employees?limit=1000', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        setEmployees(data.data || [])
-      }
-    } catch (error) {
-      console.error('Fetch employees error:', error)
-    }
-  }
-
-  const fetchUsers = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/users?limit=1000', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        setUsers(data.data || data.users || [])
-      }
-    } catch (error) {
-      console.error('Fetch users error:', error)
-    }
-  }
-
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault()
-
-    try {
-      const token = localStorage.getItem('token')
-      const url = editingDept
-        ? `/api/departments/${editingDept._id}`
-        : '/api/departments'
-      const method = editingDept ? 'PUT' : 'POST'
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(formData),
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        toast.success(data.message)
-        setShowModal(false)
-        setEditingDept(null)
-        setFormData({ name: '', description: '', code: '', heads: [] })
-        fetchDepartments()
-      } else {
-        toast.error(data.message)
-      }
-    } catch (error) {
-      console.error('Submit error:', error)
-      toast.error('Failed to save department')
-    }
+    const url = editingDept ? `/api/departments/${editingDept._id}` : '/api/departments'
+    submitMutation.execute(url, formData, { method: editingDept ? 'PUT' : 'POST' })
   }
 
   const handleEdit = (dept) => {
@@ -182,28 +112,9 @@ export default function DepartmentsPage() {
     setShowModal(true)
   }
 
-  const handleDelete = async (id) => {
+  const handleDelete = (id) => {
     if (!confirm('Are you sure you want to delete this department?')) return
-
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/departments/${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        toast.success(data.message)
-        fetchDepartments()
-      } else {
-        toast.error(data.message)
-      }
-    } catch (error) {
-      console.error('Delete error:', error)
-      toast.error('Failed to delete department')
-    }
+    deleteMutation.execute(`/api/departments/${id}`)
   }
 
   const handleCloseModal = () => {
@@ -232,8 +143,8 @@ export default function DepartmentsPage() {
     if (emp) return emp
     // Fallback to users
     const usr = users.find(u => u._id === headId || u.employeeId === headId)
-    if (usr) return { 
-      _id: usr._id, 
+    if (usr) return {
+      _id: usr._id,
       firstName: usr.firstName || usr.email?.split('@')[0] || 'User',
       lastName: usr.lastName || '',
       employeeCode: usr.employeeId?.employeeCode || usr.email
@@ -255,17 +166,19 @@ export default function DepartmentsPage() {
   const unselectedPeople = availablePeople.filter(person => !heads.includes(person._id))
 
   // When searching, filter by search term; otherwise just show first 10
-  const filteredEmployees = headSearch.trim() 
-    ? unselectedPeople.filter(person => 
-        `${person.firstName} ${person.lastName}`.toLowerCase().includes(headSearch.toLowerCase()) ||
-        person.employeeCode?.toLowerCase().includes(headSearch.toLowerCase()) ||
-        person.email?.toLowerCase().includes(headSearch.toLowerCase())
-      )
+  const filteredEmployees = headSearch.trim()
+    ? unselectedPeople.filter(person =>
+      `${person.firstName} ${person.lastName}`.toLowerCase().includes(headSearch.toLowerCase()) ||
+      person.employeeCode?.toLowerCase().includes(headSearch.toLowerCase()) ||
+      person.email?.toLowerCase().includes(headSearch.toLowerCase())
+    )
     : unselectedPeople.slice(0, 10)
 
   const canManageDepartments = () => {
-    return user && ['admin', 'hr'].includes(user.role)
+    return isAdmin
   }
+
+  if (error) return <DataErrorState message="Failed to load departments" onRetry={() => refreshDepartments()} />
 
   return (
     <div className="p-6">
@@ -275,6 +188,7 @@ export default function DepartmentsPage() {
           <h1 className="text-3xl font-bold text-gray-800">Departments</h1>
           <p className="text-gray-600 mt-1">
             {canManageDepartments() ? 'Manage company departments' : 'View company departments'}
+            <BackgroundRefreshIndicator isValidating={isValidating} />
           </p>
         </div>
         {canManageDepartments() && (
@@ -321,11 +235,27 @@ export default function DepartmentsPage() {
 
       {/* Departments Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-        {loading ? (
-          <div className="col-span-full bg-white rounded-lg shadow-md p-6 sm:p-8 text-center">
-            <Loader size="lg" />
-            <p className="mt-4 text-gray-600 text-sm sm:text-base">Loading departments...</p>
-          </div>
+        {isLoading ? (
+          <>
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="bg-white rounded-lg shadow-md p-3 sm:p-6">
+                <div className="flex items-start justify-between mb-3 sm:mb-4">
+                  <div className="flex items-center space-x-2 sm:space-x-3 flex-1">
+                    <Skeleton className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-5 w-3/4 rounded" />
+                      <Skeleton className="h-3 w-1/2 rounded" />
+                    </div>
+                  </div>
+                </div>
+                <Skeleton className="h-4 w-full rounded mb-3" />
+                <div className="flex items-center justify-between pt-3 border-t border-gray-200">
+                  <Skeleton className="h-4 w-24 rounded" />
+                  <Skeleton className="h-4 w-20 rounded" />
+                </div>
+              </div>
+            ))}
+          </>
         ) : departments.length === 0 ? (
           <div className="col-span-full bg-white rounded-lg shadow-md p-6 sm:p-8 text-center text-gray-500">
             No departments found
@@ -359,7 +289,8 @@ export default function DepartmentsPage() {
                     </button>
                     <button
                       onClick={() => handleDelete(dept._id)}
-                      className="text-red-600 hover:text-red-800 p-1.5 sm:p-2 rounded-lg hover:bg-red-50 transition-colors"
+                      disabled={deleteMutation.isLoading}
+                      className="text-red-600 hover:text-red-800 p-1.5 sm:p-2 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50"
                       title="Delete Department"
                     >
                       <FaTrash className="w-3 h-3 sm:w-4 sm:h-4" />
@@ -382,7 +313,7 @@ export default function DepartmentsPage() {
                     <div className="flex items-center space-x-1">
                       <FaUserTie className="text-primary-500" />
                       <span className="truncate max-w-[100px]">
-                        {dept.heads.length === 1 
+                        {dept.heads.length === 1
                           ? `${dept.heads[0].firstName} ${dept.heads[0].lastName}`
                           : `${dept.heads.length} Heads`
                         }
@@ -396,7 +327,7 @@ export default function DepartmentsPage() {
                   ) : null}
                 </div>
               </div>
-              
+
               {/* Show all heads if multiple */}
               {dept.heads && dept.heads.length > 1 && (
                 <div className="mt-2 pt-2 border-t border-gray-100">
@@ -468,19 +399,19 @@ export default function DepartmentsPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Department Heads <span className="text-gray-400 font-normal">(Optional - Multiple allowed)</span>
                   </label>
-                  
+
                   {/* Selected heads */}
                   {formData.heads.length > 0 && (
                     <div className="flex flex-wrap gap-2 mb-2">
                       {formData.heads.map(headId => {
                         const head = getHeadDetails(headId)
                         return head ? (
-                          <span 
-                            key={headId} 
+                          <span
+                            key={headId}
                             className="inline-flex items-center space-x-1 bg-primary-100 text-primary-800 px-3 py-1 rounded-full text-sm"
                           >
                             <span>{head.firstName} {head.lastName}</span>
-                            <button 
+                            <button
                               type="button"
                               onClick={() => removeHead(headId)}
                               className="text-primary-600 hover:text-primary-800"
@@ -492,7 +423,7 @@ export default function DepartmentsPage() {
                       })}
                     </div>
                   )}
-                  
+
                   {/* Search and add heads */}
                   <div className="relative" ref={dropdownRef}>
                     <div className="relative">
@@ -509,7 +440,7 @@ export default function DepartmentsPage() {
                         className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                       />
                     </div>
-                    
+
                     {showHeadDropdown && filteredEmployees.length > 0 && (
                       <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                         {filteredEmployees.slice(0, 10).map(employee => (
@@ -530,13 +461,13 @@ export default function DepartmentsPage() {
                         )}
                       </div>
                     )}
-                    
+
                     {showHeadDropdown && filteredEmployees.length === 0 && headSearch.trim() && (
                       <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-gray-500 text-sm">
                         No matches found for "{headSearch}"
                       </div>
                     )}
-                    
+
                     {showHeadDropdown && filteredEmployees.length === 0 && !headSearch.trim() && availablePeople.length === 0 && (
                       <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg p-4 text-center text-gray-500 text-sm">
                         No employees or users found. You can create the department without heads and add them later.
@@ -557,9 +488,9 @@ export default function DepartmentsPage() {
                 >
                   Cancel
                 </Button>
-                <Button type="submit" color="primary">
+                <LoadingButton type="submit" color="primary" isLoading={submitMutation.isLoading}>
                   {editingDept ? 'Update' : 'Create'}
-                </Button>
+                </LoadingButton>
               </div>
             </form>
           </div>

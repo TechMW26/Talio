@@ -1,127 +1,93 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
-import { 
-  FaPlus, FaEye, FaEdit, FaTrash, FaBullseye, FaSearch, FaFilter, 
+import {
+  FaPlus, FaEye, FaEdit, FaTrash, FaBullseye, FaSearch, FaFilter,
   FaCalendarAlt, FaClock, FaChartLine, FaCheckCircle, FaExclamationTriangle,
   FaFlag, FaTasks, FaUserClock, FaSync
 } from 'react-icons/fa'
-import Loader from '@/components/ui/Loader'
-import { Select, SelectItem, Input, Button } from '@heroui/react'
+import { Select, SelectItem, Input, Button, Skeleton } from '@heroui/react'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 
 export default function PerformanceGoalsPage() {
   const router = useRouter()
-  const [goals, setGoals] = useState([])
-  const [projects, setProjects] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterPriority, setFilterPriority] = useState('all')
   const [viewMode, setViewMode] = useState('all')
 
-  useEffect(() => {
-    const userData = localStorage.getItem('user')
-    if (userData) {
-      const parsedUser = JSON.parse(userData)
-      setUser(parsedUser)
-      fetchGoals()
-      fetchProjects()
-    }
+  const user = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem('user')) } catch { return null }
   }, [])
 
-  const fetchGoals = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/performance/goals', {
-        headers: { 'Authorization': 'Bearer ' + token }
-      })
+  const empId = useMemo(() => {
+    if (!user) return null
+    return typeof user.employeeId === 'object'
+      ? user.employeeId._id || user.employeeId
+      : user.employeeId
+  }, [user])
 
-      const data = await response.json()
-      if (data.success) {
-        setGoals(data.data || [])
-      } else {
-        toast.error(data.message || 'Failed to fetch goals')
-      }
-    } catch (error) {
-      console.error('Fetch goals error:', error)
-      toast.error('Failed to fetch performance goals')
-    } finally {
-      setLoading(false)
-    }
-  }
+  // SWR: fetch goals
+  const { data: goalsRes, error: goalsError, isLoading: goalsLoading, isValidating: goalsValidating, mutate: refreshGoals } = useAuthedSWR('/api/performance/goals')
+  const goals = goalsRes?.data || []
 
-  const fetchProjects = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const userData = JSON.parse(localStorage.getItem('user'))
-      const empId = typeof userData.employeeId === 'object'
-        ? userData.employeeId._id || userData.employeeId
-        : userData.employeeId
+  // SWR: fetch projects (tasks)
+  const { data: projectsRes, error: projectsError, isLoading: projectsLoading, isValidating: projectsValidating, mutate: refreshProjects } = useAuthedSWR(
+    empId ? `/api/tasks?employee=${empId}&limit=100` : null
+  )
+  const projects = useMemo(() => {
+    if (!projectsRes?.data || !user) return []
+    return (projectsRes.data || []).map(task => ({
+      _id: task._id,
+      title: task.title,
+      description: task.description,
+      type: 'project',
+      status: task.status,
+      progress: task.progress || 0,
+      priority: task.priority,
+      dueDate: task.dueDate,
+      startDate: task.startDate,
+      completedAt: task.completedAt,
+      employee: {
+        _id: empId,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        employeeCode: user.employeeCode
+      },
+      assignedBy: task.assignedBy,
+      createdAt: task.createdAt,
+      createdBy: task.assignedBy || { firstName: 'System', lastName: '' }
+    }))
+  }, [projectsRes, user, empId])
 
-      const response = await fetch('/api/tasks?employee=' + empId + '&limit=100', {
-        headers: { 'Authorization': 'Bearer ' + token }
-      })
+  const isLoading = goalsLoading || projectsLoading
+  const error = goalsError || projectsError
+  const isValidating = goalsValidating || projectsValidating
+  const refresh = () => { refreshGoals(); refreshProjects() }
 
-      const data = await response.json()
-      if (data.success) {
-        const projectGoals = (data.data || []).map(task => ({
-          _id: task._id,
-          title: task.title,
-          description: task.description,
-          type: 'project',
-          status: task.status,
-          progress: task.progress || 0,
-          priority: task.priority,
-          dueDate: task.dueDate,
-          startDate: task.startDate,
-          completedAt: task.completedAt,
-          employee: {
-            _id: empId,
-            firstName: userData.firstName,
-            lastName: userData.lastName,
-            employeeCode: userData.employeeCode
-          },
-          assignedBy: task.assignedBy,
-          createdAt: task.createdAt,
-          createdBy: task.assignedBy || { firstName: 'System', lastName: '' }
-        }))
-        setProjects(projectGoals)
-      }
-    } catch (error) {
-      console.error('Fetch projects error:', error)
-    }
-  }
+  // Mutation: delete goal
+  const deleteMutation = useApiMutation({
+    invalidateKeys: ['/api/performance/goals'],
+    onSuccess: () => toast.success('Goal deleted successfully'),
+    onError: (msg) => toast.error(msg || 'Failed to delete goal'),
+  })
 
   const handleDelete = async (goalId, isProject = false) => {
     if (!confirm('Are you sure you want to delete this goal?')) return
 
     if (isProject) {
-      setProjects(projects.filter(g => g._id !== goalId))
+      // Just refresh projects to reflect changes
+      refreshProjects()
       toast.success('Project removed from view')
       return
     }
 
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/performance/goals?goalId=' + goalId, {
-        method: 'DELETE',
-        headers: { 'Authorization': 'Bearer ' + token }
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        setGoals(goals.filter(g => g._id !== goalId))
-        toast.success('Goal deleted successfully')
-      } else {
-        toast.error(data.message || 'Failed to delete goal')
-      }
-    } catch (error) {
-      console.error('Delete goal error:', error)
-      toast.error('Failed to delete goal')
-    }
+    deleteMutation.execute('/api/performance/goals?goalId=' + goalId, null, { method: 'DELETE' })
   }
 
   const canManageGoals = () => {
@@ -171,8 +137,8 @@ export default function PerformanceGoalsPage() {
   }
 
   const allItems = viewMode === 'goals' ? goals :
-                   viewMode === 'projects' ? projects :
-                   [...goals, ...projects]
+    viewMode === 'projects' ? projects :
+      [...goals, ...projects]
 
   const filteredGoals = allItems.filter(goal => {
     const matchesSearch = searchTerm === '' ||
@@ -195,13 +161,43 @@ export default function PerformanceGoalsPage() {
     avgProgress: allItems.length > 0 ? Math.round(allItems.reduce((acc, g) => acc + (g.progress || 0), 0) / allItems.length) : 0
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <Loader size="lg" />
-          <p className="mt-4 text-gray-600">Loading goals...</p>
+      <div className="p-4 sm:p-6 pb-24 md:pb-6 bg-gray-50 min-h-screen">
+        <div className="mb-6">
+          <Skeleton className="h-8 w-64 rounded-lg mb-2" />
+          <Skeleton className="h-4 w-48 rounded-lg" />
         </div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="bg-white rounded-xl shadow-sm p-4">
+              <Skeleton className="h-4 w-16 rounded mb-2" />
+              <Skeleton className="h-8 w-12 rounded" />
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="bg-white rounded-xl shadow-sm p-4">
+              <div className="flex items-start gap-3">
+                <Skeleton className="w-10 h-10 rounded-full" />
+                <div className="flex-1">
+                  <Skeleton className="h-5 w-40 rounded mb-2" />
+                  <Skeleton className="h-4 w-24 rounded" />
+                </div>
+              </div>
+              <Skeleton className="h-2 w-full rounded-full mt-4" />
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="p-4 sm:p-6 pb-24 md:pb-6 bg-gray-50 min-h-screen">
+        <DataErrorState message="Failed to load performance goals" onRetry={refresh} />
       </div>
     )
   }
@@ -212,11 +208,11 @@ export default function PerformanceGoalsPage() {
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center mb-6 gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Performance Goals</h1>
-          <p className="text-gray-600 mt-1">Track and manage employee objectives</p>
+          <p className="text-gray-600 mt-1">Track and manage employee objectives <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" /></p>
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => { fetchGoals(); fetchProjects(); }}
+            onClick={refresh}
             className="p-2 text-gray-600 hover:text-primary-600 hover:bg-gray-100 rounded-lg transition-colors"
             title="Refresh"
           >
@@ -298,13 +294,13 @@ export default function PerformanceGoalsPage() {
                   key={mode}
                   onClick={() => setViewMode(mode)}
                   className={'px-3 py-1.5 rounded-md text-sm font-medium transition-all ' +
-                    (viewMode === mode 
-                      ? 'bg-white text-primary-600 shadow-sm' 
+                    (viewMode === mode
+                      ? 'bg-white text-primary-600 shadow-sm'
                       : 'text-gray-600 hover:text-gray-900')}
                 >
                   {mode === 'all' ? 'All (' + allItems.length + ')' :
-                   mode === 'goals' ? 'Goals (' + goals.length + ')' :
-                   'Projects (' + projects.length + ')'}
+                    mode === 'goals' ? 'Goals (' + goals.length + ')' :
+                      'Projects (' + projects.length + ')'}
                 </button>
               ))}
             </div>
@@ -366,8 +362,8 @@ export default function PerformanceGoalsPage() {
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">No goals found</h3>
           <p className="text-gray-500 mb-6">
-            {canManageGoals() 
-              ? 'Create your first performance goal to track employee objectives.' 
+            {canManageGoals()
+              ? 'Create your first performance goal to track employee objectives.'
               : 'No performance goals have been assigned yet.'}
           </p>
           {canManageGoals() && (
@@ -390,8 +386,8 @@ export default function PerformanceGoalsPage() {
             const StatusIcon = statusConfig.icon
 
             return (
-              <div 
-                key={goal._id} 
+              <div
+                key={goal._id}
                 className={'bg-white rounded-xl shadow-sm border-l-4 hover:shadow-md transition-all duration-200 overflow-hidden ' + statusConfig.border}
               >
                 {/* Card Header */}
@@ -399,11 +395,11 @@ export default function PerformanceGoalsPage() {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3 flex-1 min-w-0">
                       {/* Avatar */}
-                      <div className={'w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0 ' + 
+                      <div className={'w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0 ' +
                         (goal.type === 'project' ? 'bg-purple-500' : 'bg-primary-500')}>
                         {(goal.employee?.firstName?.charAt(0) || 'U')}{(goal.employee?.lastName?.charAt(0) || '')}
                       </div>
-                      
+
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="font-semibold text-gray-900 truncate">{goal.title}</h3>
@@ -463,7 +459,7 @@ export default function PerformanceGoalsPage() {
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
+                    <div
                       className={'h-2 rounded-full transition-all duration-500 ' + getProgressColor(goal.progress || 0)}
                       style={{ width: (goal.progress || 0) + '%' }}
                     ></div>
@@ -491,10 +487,10 @@ export default function PerformanceGoalsPage() {
                     <FaCalendarAlt className="w-3 h-3" />
                     <span>
                       {overdue ? 'Overdue by ' + Math.abs(daysLeft) + ' days' :
-                       daysLeft === 0 ? 'Due today' :
-                       daysLeft === 1 ? 'Due tomorrow' :
-                       daysLeft < 7 ? daysLeft + ' days left' :
-                       new Date(goal.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        daysLeft === 0 ? 'Due today' :
+                          daysLeft === 1 ? 'Due tomorrow' :
+                            daysLeft < 7 ? daysLeft + ' days left' :
+                              new Date(goal.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </span>
                   </div>
                 </div>

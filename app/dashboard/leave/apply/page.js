@@ -1,21 +1,36 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Card, CardBody, Button, Skeleton, Input, Textarea, Select, SelectItem, Checkbox } from '@heroui/react'
 import toast from '@/utils/toast'
 import { FaCalendarAlt, FaPlus, FaArrowLeft, FaCheck } from 'react-icons/fa'
 import { useRouter } from 'next/navigation'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton from '@/components/ui/LoadingButton'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 
 export default function ApplyLeavePage() {
-  const [leaveTypes, setLeaveTypes] = useState([])
-  const [leaveBalance, setLeaveBalance] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState(false)
-  const [user, setUser] = useState(null)
-  const [employeeId, setEmployeeId] = useState(null)
   const router = useRouter()
-  
+
+  // Derive user/employeeId from localStorage
+  const user = useMemo(() => getCurrentUser(), [])
+  const employeeId = useMemo(() => user ? getEmployeeId(user) : null, [user])
+
+  // SWR data fetching
+  const { data: leaveTypesRes, error: leaveTypesError, isLoading: leaveTypesLoading, isValidating: leaveTypesValidating } = useAuthedSWR('/api/leave/types')
+  const { data: leaveBalanceRes, error: leaveBalanceError, isLoading: leaveBalanceLoading, isValidating: leaveBalanceValidating, mutate: refreshBalance } = useAuthedSWR(
+    employeeId ? `/api/leave/balance?employeeId=${employeeId}&year=${new Date().getFullYear()}` : null
+  )
+
+  const leaveTypes = useMemo(() => (leaveTypesRes?.data || []).filter(type => type.isActive), [leaveTypesRes])
+  const leaveBalance = leaveBalanceRes?.data || []
+  const loading = leaveTypesLoading || leaveBalanceLoading
+  const isValidating = leaveTypesValidating || leaveBalanceValidating
+  const error = leaveTypesError || leaveBalanceError
+
   const [formData, setFormData] = useState({
     leaveType: '',
     startDate: '',
@@ -28,60 +43,42 @@ export default function ApplyLeavePage() {
     handoverNotes: '',
   })
 
+  // Submit mutation
+  const submitLeave = useApiMutation({
+    method: 'POST',
+    invalidateKeys: [
+      employeeId ? `/api/leave/balance?employeeId=${employeeId}&year=${new Date().getFullYear()}` : null,
+      /^\/api\/leave/,
+    ].filter(Boolean),
+    onSuccess: () => {
+      toast.success('Leave application submitted successfully!')
+      setFormData({
+        leaveType: '',
+        startDate: '',
+        endDate: '',
+        reason: '',
+        isHalfDay: false,
+        halfDayPeriod: 'morning',
+        workFromHome: false,
+        emergencyContact: '',
+        handoverNotes: '',
+      })
+      setTimeout(() => {
+        router.push('/dashboard/leave/requests')
+      }, 2000)
+    },
+    onError: (err) => toast.error(err.message || 'Failed to submit leave application'),
+  })
+
   useEffect(() => {
-    const parsedUser = getCurrentUser()
-    if (parsedUser) {
-      setUser(parsedUser)
-      const empId = getEmployeeId(parsedUser)
-      setEmployeeId(empId)
-      fetchLeaveTypes()
-      if (empId) {
-        fetchLeaveBalance(empId)
-      } else {
-        toast.error('Employee information not found. Please logout and login again.')
-        setLoading(false)
-      }
-    } else {
-      setLoading(false)
+    if (!employeeId && user) {
+      toast.error('Employee information not found. Please logout and login again.')
     }
-  }, [])
-
-  const fetchLeaveTypes = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/leave/types', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-      const data = await response.json()
-      if (data.success) {
-        setLeaveTypes(data.data.filter(type => type.isActive))
-      }
-    } catch (error) {
-      console.error('Fetch leave types error:', error)
-      toast.error('Failed to fetch leave types')
-    }
-  }
-
-  const fetchLeaveBalance = async (employeeId) => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/leave/balance?employeeId=${employeeId}&year=${new Date().getFullYear()}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-      const data = await response.json()
-      if (data.success) {
-        setLeaveBalance(data.data)
-      }
-    } catch (error) {
-      console.error('Fetch leave balance error:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [employeeId, user])
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target
-    
+
     // If checking Half Day or Work From Home, clear the leave type
     if (name === 'isHalfDay' && checked) {
       setFormData(prev => ({
@@ -117,15 +114,15 @@ export default function ApplyLeavePage() {
 
   const calculateDays = () => {
     if (!formData.startDate || !formData.endDate) return 0
-    
+
     const start = new Date(formData.startDate)
     const end = new Date(formData.endDate)
-    
+
     if (end < start) return 0
-    
+
     const diffTime = Math.abs(end - start)
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
-    
+
     return formData.isHalfDay ? 0.5 : diffDays
   }
 
@@ -137,7 +134,6 @@ export default function ApplyLeavePage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setSubmitting(true)
 
     const days = calculateDays()
     const availableBalance = getAvailableBalance()
@@ -145,66 +141,24 @@ export default function ApplyLeavePage() {
     // Validation
     if (days === 0) {
       toast.error('Please select valid dates')
-      setSubmitting(false)
       return
     }
 
     if (days > availableBalance) {
       toast.error(`Insufficient leave balance. Available: ${availableBalance} days`)
-      setSubmitting(false)
       return
     }
 
     if (new Date(formData.startDate) < new Date()) {
       toast.error('Start date cannot be in the past')
-      setSubmitting(false)
       return
     }
 
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/leave', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          ...formData,
-          employee: employeeId,
-          numberOfDays: days,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        toast.success('Leave application submitted successfully!')
-        // Reset form
-        setFormData({
-          leaveType: '',
-          startDate: '',
-          endDate: '',
-          reason: '',
-          isHalfDay: false,
-          halfDayPeriod: 'morning',
-          workFromHome: false,
-          emergencyContact: '',
-          handoverNotes: '',
-        })
-        // Redirect to leave requests page
-        setTimeout(() => {
-          router.push('/dashboard/leave/requests')
-        }, 2000)
-      } else {
-        toast.error(data.message || 'Failed to submit leave application')
-      }
-    } catch (error) {
-      console.error('Submit leave error:', error)
-      toast.error('Failed to submit leave application')
-    } finally {
-      setSubmitting(false)
-    }
+    await submitLeave.execute('/api/leave', {
+      ...formData,
+      employee: employeeId,
+      numberOfDays: days,
+    })
   }
 
   const formatDate = (date) => {
@@ -213,6 +167,10 @@ export default function ApplyLeavePage() {
       month: 'short',
       day: 'numeric'
     })
+  }
+
+  if (error && !leaveTypes.length && !leaveBalance.length) {
+    return <DataErrorState error={error} onRetry={() => refreshBalance()} />
   }
 
   if (loading) {
@@ -233,6 +191,7 @@ export default function ApplyLeavePage() {
 
   return (
     <div className="page-container space-y-4 sm:space-y-6 pb-24 md:pb-6">
+      <BackgroundRefreshIndicator isRefreshing={isValidating && !loading} />
       {/* Header */}
       <div className="flex items-center space-x-3 sm:space-x-4">
         <Button
@@ -396,14 +355,14 @@ export default function ApplyLeavePage() {
                     >
                       Cancel
                     </Button>
-                    <Button
+                    <LoadingButton
                       type="submit"
                       color="primary"
-                      isLoading={submitting}
-                      startContent={!submitting && <FaCheck className="w-4 h-4" />}
+                      isLoading={submitLeave.isLoading}
+                      startContent={!submitLeave.isLoading && <FaCheck className="w-4 h-4" />}
                     >
-                      {submitting ? 'Submitting...' : 'Submit Application'}
-                    </Button>
+                      {submitLeave.isLoading ? 'Submitting...' : 'Submit Application'}
+                    </LoadingButton>
                   </div>
                 </div>
               </form>
@@ -442,8 +401,8 @@ export default function ApplyLeavePage() {
                       </div>
                       <div className="mt-2">
                         <div className="w-full bg-default-200 rounded-full h-2">
-                          <div 
-                            className="bg-primary h-2 rounded-full" 
+                          <div
+                            className="bg-primary h-2 rounded-full"
                             style={{ width: `${(balance.usedDays / balance.totalDays) * 100}%` }}
                           ></div>
                         </div>

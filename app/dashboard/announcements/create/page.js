@@ -1,18 +1,21 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
-import { Select, SelectItem } from '@heroui/react'
+import { Select, SelectItem, Skeleton } from '@heroui/react'
 import { FaBullhorn, FaUsers, FaCalendarAlt, FaExclamationTriangle } from 'react-icons/fa'
-import Loader from '@/components/ui/Loader'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton from '@/components/ui/LoadingButton'
 
 export default function CreateAnnouncementPage() {
   const router = useRouter()
-  const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [teamMembers, setTeamMembers] = useState([])
-  const [departments, setDepartments] = useState([])
+  const user = useMemo(() => {
+    if (typeof window === 'undefined') return null
+    const userData = localStorage.getItem('user')
+    return userData ? JSON.parse(userData) : null
+  }, [])
   const [formData, setFormData] = useState({
     title: '',
     content: '',
@@ -23,115 +26,56 @@ export default function CreateAnnouncementPage() {
     isActive: true,
   })
 
-  useEffect(() => {
-    const userData = localStorage.getItem('user')
-    if (userData) {
-      const parsedUser = JSON.parse(userData)
-      setUser(parsedUser)
-
-      // Check if user has permission to create announcements
-      const allowedRoles = ['admin', 'hr', 'department_head', 'manager']
-      if (!allowedRoles.includes(parsedUser.role)) {
-        toast.error('Access denied. You do not have permission to create announcements.')
-        router.push('/dashboard')
-        return
-      }
-
-      // Fetch team members for managers
-      if (parsedUser.role === 'manager') {
-        fetchTeamMembers()
-      }
-
-      // Fetch departments for admin/hr/department_head
-      if (['admin', 'hr', 'department_head'].includes(parsedUser.role)) {
-        fetchDepartments()
-      }
-    }
-  }, [router])
-
-  const fetchTeamMembers = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/team/members', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        setTeamMembers(data.data || [])
-      }
-    } catch (error) {
-      console.error('Fetch team members error:', error)
-    }
+  // Check permissions
+  const allowedRoles = ['admin', 'hr', 'department_head', 'manager']
+  if (user && !allowedRoles.includes(user.role)) {
+    toast.error('Access denied. You do not have permission to create announcements.')
+    router.push('/dashboard')
   }
 
-  const fetchDepartments = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/departments', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
+  // Fetch team members for managers
+  const { data: teamRes } = useAuthedSWR(
+    user?.role === 'manager' ? '/api/team/members' : null
+  )
+  const teamMembers = teamRes?.data || []
 
-      const data = await response.json()
-      if (data.success) {
-        setDepartments(data.data || [])
-      }
-    } catch (error) {
-      console.error('Fetch departments error:', error)
-    }
-  }
+  // Fetch departments for admin/hr/department_head
+  const { data: deptRes } = useAuthedSWR(
+    user && ['admin', 'hr', 'department_head'].includes(user.role) ? '/api/departments' : null
+  )
+  const departments = deptRes?.data || []
+
+  const submitMutation = useApiMutation({
+    method: 'POST',
+    onSuccess: () => {
+      toast.success('Announcement created successfully! 📢')
+      router.push('/dashboard/announcements')
+    },
+    onError: (msg) => toast.error(msg || 'Failed to create announcement'),
+  })
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setLoading(true)
 
-    try {
-      const token = localStorage.getItem('token')
+    // Prepare announcement data
+    const announcementData = {
+      ...formData,
+    }
 
-      // Prepare announcement data
-      const announcementData = {
-        ...formData,
-        // createdBy is handled by the API based on the token
-      }
-
-      // For managers, set as department announcement
-      if (user.role === 'manager') {
-        announcementData.isDepartmentAnnouncement = true
-        announcementData.targetAudience = 'department'
-        // Get manager's department from employeeId if available
-        if (user.employeeId && typeof user.employeeId === 'object' && user.employeeId.department) {
-           // If department is populated as object
-           if (user.employeeId.department._id) {
-             announcementData.departments = [user.employeeId.department._id]
-           } else {
-             // If department is just an ID
-             announcementData.departments = [user.employeeId.department]
-           }
+    // For managers, set as department announcement
+    if (user.role === 'manager') {
+      announcementData.isDepartmentAnnouncement = true
+      announcementData.targetAudience = 'department'
+      if (user.employeeId && typeof user.employeeId === 'object' && user.employeeId.department) {
+        if (user.employeeId.department._id) {
+          announcementData.departments = [user.employeeId.department._id]
+        } else {
+          announcementData.departments = [user.employeeId.department]
         }
       }
-
-      const response = await fetch('/api/announcements', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(announcementData),
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        toast.success('Announcement created successfully! 📢')
-        router.push('/dashboard/announcements')
-      } else {
-        toast.error(data.message || 'Failed to create announcement')
-      }
-    } catch (error) {
-      console.error('Create announcement error:', error)
-      toast.error('Failed to create announcement')
-    } finally {
-      setLoading(false)
     }
+
+    submitMutation.execute('/api/announcements', announcementData)
   }
 
   const getPriorityColor = (priority) => {
@@ -155,7 +99,7 @@ export default function CreateAnnouncementPage() {
   if (!user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Loader size="lg" />
+        <Skeleton className="h-64 w-full max-w-4xl rounded-xl" />
       </div>
     )
   }
@@ -372,11 +316,10 @@ export default function CreateAnnouncementPage() {
           {/* Preview */}
           <div className="border-t pt-4 sm:pt-6">
             <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3 sm:mb-4">Preview</h3>
-            <div className={`rounded-lg p-3 sm:p-4 border-l-4 ${
-              user.role === 'manager' || user.role === 'department_head'
+            <div className={`rounded-lg p-3 sm:p-4 border-l-4 ${user.role === 'manager' || user.role === 'department_head'
                 ? 'bg-purple-50 border-purple-500'
                 : 'bg-gray-50 border-primary-500'
-            }`}>
+              }`}>
               <div className="flex items-start sm:items-center justify-between mb-2 flex-wrap gap-2">
                 <div className="flex items-center space-x-2 flex-wrap">
                   <h4 className="text-base sm:text-lg font-semibold text-gray-900">
@@ -392,11 +335,10 @@ export default function CreateAnnouncementPage() {
                   {React.createElement(getPriorityIcon(formData.priority), {
                     className: `w-3 h-3 sm:w-4 sm:h-4 ${getPriorityColor(formData.priority)}`
                   })}
-                  <span className={`text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full ${
-                    formData.priority === 'high' ? 'bg-red-100 text-red-800' :
-                    formData.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-green-100 text-green-800'
-                  }`}>
+                  <span className={`text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full ${formData.priority === 'high' ? 'bg-red-100 text-red-800' :
+                      formData.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                        'bg-green-100 text-green-800'
+                    }`}>
                     {formData.priority.toUpperCase()}
                   </span>
                 </div>
@@ -434,13 +376,14 @@ export default function CreateAnnouncementPage() {
             >
               Cancel
             </button>
-            <button
+            <LoadingButton
               type="submit"
-              disabled={loading}
-              className="w-full sm:flex-1 px-4 sm:px-6 py-2.5 sm:py-2 text-sm sm:text-base bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              isLoading={submitMutation.isLoading}
+              loadingText="Creating..."
+              className="w-full sm:flex-1"
             >
-              {loading ? 'Creating...' : 'Create Announcement'}
-            </button>
+              Create Announcement
+            </LoadingButton>
           </div>
         </form>
       </div>

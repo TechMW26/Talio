@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { Button, Input, Select, SelectItem } from '@heroui/react'
-import { handleSessionExpired } from '@/utils/userHelper'
+import { useState, useMemo } from 'react'
+import { Button, Input, Select, SelectItem, Skeleton } from '@heroui/react'
+
 import {
   HiOutlineListBullet,
   HiOutlinePlus,
@@ -35,12 +35,10 @@ import CreateTodoModal from './components/CreateTodoModal'
 import TodoDetailPanel from './components/TodoDetailPanel'
 import CategoryModal from './components/CategoryModal'
 import AnalyticsPanel from './components/AnalyticsPanel'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 
 export default function TodoPage() {
-  const [todos, setTodos] = useState([])
-  const [projectTasks, setProjectTasks] = useState([]) // Project tasks in todo status
-  const [categories, setCategories] = useState([])
-  const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('all') // all, today, upcoming, completed, project-tasks, or category id
   const [searchQuery, setSearchQuery] = useState('')
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -50,33 +48,40 @@ export default function TodoPage() {
   const [editingCategory, setEditingCategory] = useState(null)
   const [sortBy, setSortBy] = useState('dueDate') // dueDate, priority, createdAt
   const [showCompleted, setShowCompleted] = useState(false)
-  const [analytics, setAnalytics] = useState(null)
   const [advancingTaskId, setAdvancingTaskId] = useState(null) // Track which task is being advanced
 
-  // Fetch project tasks in todo status
-  const fetchProjectTasks = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/projects/my-todo-tasks', {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      })
-      
-      // Handle 401 - session expired
-      if (response.status === 401) {
-        handleSessionExpired()
-        return
-      }
-      
-      const data = await response.json()
-      if (data.success) {
-        setProjectTasks(data.data)
-      }
-    } catch (error) {
-      console.error('Error fetching project tasks:', error)
-    }
-  }, [])
+  // Build dynamic query string for todos
+  const todosQueryString = useMemo(() => {
+    if (activeTab === 'project-tasks') return null // Skip fetching personal todos
+    const params = new URLSearchParams({ sort: sortBy, limit: '100' })
+    if (activeTab === 'today') params.append('dueDate', 'today')
+    else if (activeTab === 'upcoming') params.append('dueDate', 'upcoming')
+    else if (activeTab === 'overdue') params.append('dueDate', 'overdue')
+    else if (activeTab === 'completed') params.append('status', 'completed')
+    else if (activeTab !== 'all') params.append('category', activeTab)
+    if (activeTab !== 'completed' && !showCompleted) params.append('status', 'pending')
+    if (searchQuery) params.append('search', searchQuery)
+    return params.toString()
+  }, [activeTab, sortBy, showCompleted, searchQuery])
+
+  // SWR: Fetch todos
+  const { data: todosData, isLoading: todosLoading, mutate: mutateTodos } = useAuthedSWR(
+    todosQueryString ? `/api/personal-todos?${todosQueryString}` : null
+  )
+  const todos = todosData?.data || []
+  const loading = todosLoading
+
+  // SWR: Fetch project tasks in todo status
+  const { data: projectTasksData, isValidating: projectTasksValidating, mutate: mutateProjectTasks } = useAuthedSWR('/api/projects/my-todo-tasks')
+  const projectTasks = projectTasksData?.data || []
+
+  // SWR: Fetch categories
+  const { data: categoriesData, mutate: mutateCategories } = useAuthedSWR('/api/personal-todos/categories')
+  const categories = categoriesData?.data || []
+
+  // SWR: Fetch analytics
+  const { data: analyticsData, mutate: mutateAnalytics } = useAuthedSWR('/api/personal-todos/analytics')
+  const analytics = analyticsData?.data || null
 
   // Advance project task status (mark as started)
   const advanceProjectTaskStatus = async (taskId, e) => {
@@ -93,8 +98,7 @@ export default function TodoPage() {
       })
       const data = await response.json()
       if (data.success) {
-        // Remove the task from project tasks list
-        setProjectTasks(prev => prev.filter(t => t._id !== taskId))
+        mutateProjectTasks() // Refresh project tasks list
         toast.success('Task started! Moved to In Progress.')
       } else {
         toast.error(data.message || 'Failed to start task')
@@ -106,132 +110,6 @@ export default function TodoPage() {
       setAdvancingTaskId(null)
     }
   }
-
-  // Fetch todos
-  const fetchTodos = useCallback(async () => {
-    // Skip fetching personal todos when viewing project tasks
-    if (activeTab === 'project-tasks') {
-      setLoading(false)
-      return
-    }
-    
-    try {
-      setLoading(true)
-      const token = localStorage.getItem('token')
-      
-      const params = new URLSearchParams({
-        sort: sortBy,
-        limit: '100'
-      })
-
-      // Filter based on active tab
-      if (activeTab === 'today') {
-        params.append('dueDate', 'today')
-      } else if (activeTab === 'upcoming') {
-        params.append('dueDate', 'upcoming')
-      } else if (activeTab === 'overdue') {
-        params.append('dueDate', 'overdue')
-      } else if (activeTab === 'completed') {
-        params.append('status', 'completed')
-      } else if (activeTab !== 'all') {
-        // Category filter
-        params.append('category', activeTab)
-      }
-
-      // Show pending by default, unless viewing completed
-      if (activeTab !== 'completed' && !showCompleted) {
-        params.append('status', 'pending')
-      }
-
-      if (searchQuery) {
-        params.append('search', searchQuery)
-      }
-
-      const response = await fetch(`/api/personal-todos?${params}`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      })
-
-      // Handle 401 - session expired
-      if (response.status === 401) {
-        handleSessionExpired()
-        return
-      }
-
-      const data = await response.json()
-      if (data.success) {
-        setTodos(data.data)
-      } else {
-        toast.error(data.message || 'Failed to fetch to-dos')
-      }
-    } catch (error) {
-      console.error('Error fetching todos:', error)
-      toast.error('Failed to load to-dos')
-    } finally {
-      setLoading(false)
-    }
-  }, [activeTab, sortBy, showCompleted, searchQuery])
-
-  // Fetch categories
-  const fetchCategories = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/personal-todos/categories', {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      })
-
-      // Handle 401 - session expired
-      if (response.status === 401) {
-        handleSessionExpired()
-        return
-      }
-
-      const data = await response.json()
-      if (data.success) {
-        setCategories(data.data)
-      }
-    } catch (error) {
-      console.error('Error fetching categories:', error)
-    }
-  }, [])
-
-  // Fetch analytics
-  const fetchAnalytics = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/personal-todos/analytics?period=month', {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      })
-
-      // Handle 401 - session expired
-      if (response.status === 401) {
-        handleSessionExpired()
-        return
-      }
-
-      const data = await response.json()
-      if (data.success) {
-        setAnalytics(data.data)
-      }
-    } catch (error) {
-      console.error('Error fetching analytics:', error)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchTodos()
-  }, [fetchTodos])
-
-  useEffect(() => {
-    fetchCategories()
-    fetchAnalytics()
-    fetchProjectTasks() // Fetch project tasks on mount
-  }, [fetchCategories, fetchAnalytics, fetchProjectTasks])
 
   // Toggle todo completion
   const toggleComplete = async (todoId, e) => {
@@ -247,12 +125,12 @@ export default function TodoPage() {
 
       const data = await response.json()
       if (data.success) {
-        setTodos(prev => prev.map(t => t._id === todoId ? data.data : t))
+        mutateTodos() // Refresh todos list
         if (selectedTodo?._id === todoId) {
           setSelectedTodo(data.data)
         }
         toast.success(data.message)
-        fetchAnalytics() // Refresh analytics
+        mutateAnalytics() // Refresh analytics
       } else {
         toast.error(data.message || 'Failed to update to-do')
       }
@@ -275,12 +153,12 @@ export default function TodoPage() {
 
       const data = await response.json()
       if (data.success) {
-        setTodos(prev => prev.filter(t => t._id !== todoId))
+        mutateTodos() // Refresh todos list
         if (selectedTodo?._id === todoId) {
           setSelectedTodo(null)
         }
         toast.success('To-do deleted')
-        fetchAnalytics()
+        mutateAnalytics()
       } else {
         toast.error(data.message || 'Failed to delete to-do')
       }
@@ -292,22 +170,22 @@ export default function TodoPage() {
 
   // Handle todo created from modal
   const handleTodoCreated = (newTodo) => {
-    setTodos(prev => [newTodo, ...prev])
+    mutateTodos() // Refresh todos list
     setShowCreateModal(false)
     toast.success('To-do created!')
-    fetchAnalytics()
+    mutateAnalytics()
   }
 
   // Handle todo updated
   const handleTodoUpdated = (updatedTodo) => {
-    setTodos(prev => prev.map(t => t._id === updatedTodo._id ? updatedTodo : t))
+    mutateTodos() // Refresh todos list
     setSelectedTodo(updatedTodo)
-    fetchAnalytics()
+    mutateAnalytics()
   }
 
   // Handle category created/updated
   const handleCategoryChange = () => {
-    fetchCategories()
+    mutateCategories()
     setShowCategoryModal(false)
     setEditingCategory(null)
   }
@@ -357,11 +235,11 @@ export default function TodoPage() {
   // Combine personal todos with project tasks for display
   const combinedTodos = activeTab === 'all' || activeTab === 'today' || activeTab === 'upcoming' || activeTab === 'overdue'
     ? [...todos, ...projectTasks.map(task => ({
-        ...task,
-        isProjectTask: true,
-        // Map project task fields to todo-like structure
-        status: 'pending', // Project tasks in todo status are pending
-      }))]
+      ...task,
+      isProjectTask: true,
+      // Map project task fields to todo-like structure
+      status: 'pending', // Project tasks in todo status are pending
+    }))]
       .sort((a, b) => {
         // Sort by due date first, then by priority
         if (sortBy === 'dueDate') {
@@ -407,6 +285,7 @@ export default function TodoPage() {
 
   return (
     <div className="page-container">
+      <BackgroundRefreshIndicator isRefreshing={projectTasksValidating && !loading} />
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div>
@@ -516,11 +395,10 @@ export default function TodoPage() {
             <div className="space-y-1 mb-4">
               <button
                 onClick={() => setActiveTab('all')}
-                className={`w-full flex items-center justify-start gap-3 px-3 py-2 rounded-lg transition-colors ${
-                  activeTab === 'all' 
-                    ? 'bg-indigo-50 text-indigo-700' 
-                    : 'text-gray-700 hover:bg-gray-50'
-                }`}
+                className={`w-full flex items-center justify-start gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'all'
+                  ? 'bg-indigo-50 text-indigo-700'
+                  : 'text-gray-700 hover:bg-gray-50'
+                  }`}
               >
                 <HiOutlineListBullet className="w-5 h-5 flex-shrink-0" />
                 <span className="flex-1 text-left font-medium">All To-dos</span>
@@ -529,11 +407,10 @@ export default function TodoPage() {
 
               <button
                 onClick={() => setActiveTab('today')}
-                className={`w-full flex items-center justify-start gap-3 px-3 py-2 rounded-lg transition-colors ${
-                  activeTab === 'today' 
-                    ? 'bg-indigo-50 text-indigo-700' 
-                    : 'text-gray-700 hover:bg-gray-50'
-                }`}
+                className={`w-full flex items-center justify-start gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'today'
+                  ? 'bg-indigo-50 text-indigo-700'
+                  : 'text-gray-700 hover:bg-gray-50'
+                  }`}
               >
                 <HiOutlineStar className="w-5 h-5 text-amber-500 flex-shrink-0" />
                 <span className="flex-1 text-left font-medium">Today</span>
@@ -541,11 +418,10 @@ export default function TodoPage() {
 
               <button
                 onClick={() => setActiveTab('upcoming')}
-                className={`w-full flex items-center justify-start gap-3 px-3 py-2 rounded-lg transition-colors ${
-                  activeTab === 'upcoming' 
-                    ? 'bg-indigo-50 text-indigo-700' 
-                    : 'text-gray-700 hover:bg-gray-50'
-                }`}
+                className={`w-full flex items-center justify-start gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'upcoming'
+                  ? 'bg-indigo-50 text-indigo-700'
+                  : 'text-gray-700 hover:bg-gray-50'
+                  }`}
               >
                 <HiOutlineCalendarDays className="w-5 h-5 text-blue-500 flex-shrink-0" />
                 <span className="flex-1 text-left font-medium">Upcoming</span>
@@ -554,11 +430,10 @@ export default function TodoPage() {
               {analytics?.summary?.overdue > 0 && (
                 <button
                   onClick={() => setActiveTab('overdue')}
-                  className={`w-full flex items-center justify-start gap-3 px-3 py-2 rounded-lg transition-colors ${
-                    activeTab === 'overdue' 
-                      ? 'bg-red-50 text-red-700' 
-                      : 'text-red-600 hover:bg-red-50'
-                  }`}
+                  className={`w-full flex items-center justify-start gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'overdue'
+                    ? 'bg-red-50 text-red-700'
+                    : 'text-red-600 hover:bg-red-50'
+                    }`}
                 >
                   <HiOutlineExclamationTriangle className="w-5 h-5 flex-shrink-0" />
                   <span className="flex-1 text-left font-medium">Overdue</span>
@@ -570,11 +445,10 @@ export default function TodoPage() {
 
               <button
                 onClick={() => setActiveTab('completed')}
-                className={`w-full flex items-center justify-start gap-3 px-3 py-2 rounded-lg transition-colors ${
-                  activeTab === 'completed' 
-                    ? 'bg-green-50 text-green-700' 
-                    : 'text-gray-700 hover:bg-gray-50'
-                }`}
+                className={`w-full flex items-center justify-start gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'completed'
+                  ? 'bg-green-50 text-green-700'
+                  : 'text-gray-700 hover:bg-gray-50'
+                  }`}
               >
                 <HiOutlineCheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
                 <span className="flex-1 text-left font-medium">Completed</span>
@@ -606,14 +480,13 @@ export default function TodoPage() {
                 <button
                   key={category._id}
                   onClick={() => setActiveTab(category._id)}
-                  className={`w-full flex items-center justify-start gap-3 px-3 py-2 rounded-lg transition-colors group ${
-                    activeTab === category._id 
-                      ? 'bg-indigo-50 text-indigo-700' 
-                      : 'text-gray-700 hover:bg-gray-50'
-                  }`}
+                  className={`w-full flex items-center justify-start gap-3 px-3 py-2 rounded-lg transition-colors group ${activeTab === category._id
+                    ? 'bg-indigo-50 text-indigo-700'
+                    : 'text-gray-700 hover:bg-gray-50'
+                    }`}
                 >
-                  <div 
-                    className="w-3 h-3 rounded-full flex-shrink-0" 
+                  <div
+                    className="w-3 h-3 rounded-full flex-shrink-0"
                     style={{ backgroundColor: category.color }}
                   ></div>
                   <span className="flex-1 text-left font-medium truncate">{category.name}</span>
@@ -641,11 +514,10 @@ export default function TodoPage() {
                 <div className="border-t border-gray-200 my-4"></div>
                 <button
                   onClick={() => setActiveTab('project-tasks')}
-                  className={`w-full flex items-center justify-start gap-3 px-3 py-2 rounded-lg transition-colors ${
-                    activeTab === 'project-tasks' 
-                      ? 'bg-purple-50 text-purple-700' 
-                      : 'text-gray-700 hover:bg-gray-50'
-                  }`}
+                  className={`w-full flex items-center justify-start gap-3 px-3 py-2 rounded-lg transition-colors ${activeTab === 'project-tasks'
+                    ? 'bg-purple-50 text-purple-700'
+                    : 'text-gray-700 hover:bg-gray-50'
+                    }`}
                 >
                   <HiOutlineBriefcase className="w-5 h-5 text-purple-500 flex-shrink-0" />
                   <span className="flex-1 text-left font-medium">Project Tasks</span>
@@ -753,11 +625,10 @@ export default function TodoPage() {
                       <button
                         onClick={(e) => advanceProjectTaskStatus(task._id, e)}
                         disabled={advancingTaskId === task._id}
-                        className={`w-8 h-8 rounded-lg flex-shrink-0 mt-0.5 flex items-center justify-center transition-colors ${
-                          advancingTaskId === task._id
-                            ? 'bg-purple-100 text-purple-400 cursor-wait'
-                            : 'bg-purple-50 text-purple-600 hover:bg-purple-100'
-                        }`}
+                        className={`w-8 h-8 rounded-lg flex-shrink-0 mt-0.5 flex items-center justify-center transition-colors ${advancingTaskId === task._id
+                          ? 'bg-purple-100 text-purple-400 cursor-wait'
+                          : 'bg-purple-50 text-purple-600 hover:bg-purple-100'
+                          }`}
                         title="Start task (move to In Progress)"
                       >
                         {advancingTaskId === task._id ? (
@@ -790,11 +661,10 @@ export default function TodoPage() {
 
                           {/* Due date */}
                           {task.dueDate && (
-                            <span className={`flex items-center gap-1 ${
-                              isOverdue(task.dueDate)
-                                ? 'text-red-500'
-                                : 'text-gray-500'
-                            }`}>
+                            <span className={`flex items-center gap-1 ${isOverdue(task.dueDate)
+                              ? 'text-red-500'
+                              : 'text-gray-500'
+                              }`}>
                               <HiOutlineCalendarDays className="w-4 h-4" />
                               {formatDueDate(task.dueDate)}
                             </span>
@@ -828,7 +698,7 @@ export default function TodoPage() {
                 {activeTab === 'completed' ? 'No completed to-dos' : 'No to-dos yet'}
               </h3>
               <p className="text-gray-500 mb-4">
-                {activeTab === 'completed' 
+                {activeTab === 'completed'
                   ? 'Complete some to-dos to see them here'
                   : 'Add your first to-do to get started'
                 }
@@ -849,11 +719,9 @@ export default function TodoPage() {
                 <div
                   key={todo._id}
                   onClick={() => !todo.isProjectTask && setSelectedTodo(todo)}
-                  className={`bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow ${
-                    !todo.isProjectTask ? 'cursor-pointer' : ''
-                  } ${selectedTodo?._id === todo._id ? 'ring-2 ring-indigo-500' : ''} ${
-                    todo.isProjectTask ? 'border-l-4 border-l-purple-400' : ''
-                  }`}
+                  className={`bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow ${!todo.isProjectTask ? 'cursor-pointer' : ''
+                    } ${selectedTodo?._id === todo._id ? 'ring-2 ring-indigo-500' : ''} ${todo.isProjectTask ? 'border-l-4 border-l-purple-400' : ''
+                    }`}
                 >
                   <div className="flex items-start gap-3">
                     {/* Checkbox for personal todo OR Start button for project task */}
@@ -861,11 +729,10 @@ export default function TodoPage() {
                       <button
                         onClick={(e) => advanceProjectTaskStatus(todo._id, e)}
                         disabled={advancingTaskId === todo._id}
-                        className={`w-8 h-8 rounded-lg flex-shrink-0 mt-0.5 flex items-center justify-center transition-colors ${
-                          advancingTaskId === todo._id
-                            ? 'bg-purple-100 text-purple-400 cursor-wait'
-                            : 'bg-purple-50 text-purple-600 hover:bg-purple-100'
-                        }`}
+                        className={`w-8 h-8 rounded-lg flex-shrink-0 mt-0.5 flex items-center justify-center transition-colors ${advancingTaskId === todo._id
+                          ? 'bg-purple-100 text-purple-400 cursor-wait'
+                          : 'bg-purple-50 text-purple-600 hover:bg-purple-100'
+                          }`}
                         title="Start task (move to In Progress)"
                       >
                         {advancingTaskId === todo._id ? (
@@ -877,11 +744,10 @@ export default function TodoPage() {
                     ) : (
                       <button
                         onClick={(e) => toggleComplete(todo._id, e)}
-                        className={`w-5 h-5 rounded-full border-2 flex-shrink-0 mt-0.5 flex items-center justify-center transition-colors ${
-                          todo.status === 'completed'
-                            ? 'bg-green-500 border-green-500 text-white'
-                            : 'border-gray-300 hover:border-green-500'
-                        }`}
+                        className={`w-5 h-5 rounded-full border-2 flex-shrink-0 mt-0.5 flex items-center justify-center transition-colors ${todo.status === 'completed'
+                          ? 'bg-green-500 border-green-500 text-white'
+                          : 'border-gray-300 hover:border-green-500'
+                          }`}
                       >
                         {todo.status === 'completed' && (
                           <HiOutlineCheck className="w-3 h-3" />
@@ -892,11 +758,10 @@ export default function TodoPage() {
                     {/* Todo content */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <h3 className={`font-medium ${
-                          todo.status === 'completed' 
-                            ? 'text-gray-400 line-through' 
-                            : 'text-gray-800'
-                        }`}>
+                        <h3 className={`font-medium ${todo.status === 'completed'
+                          ? 'text-gray-400 line-through'
+                          : 'text-gray-800'
+                          }`}>
                           {todo.title}
                         </h3>
                         {todo.priority && (
@@ -923,11 +788,10 @@ export default function TodoPage() {
 
                         {/* Due date */}
                         {todo.dueDate && (
-                          <span className={`flex items-center gap-1 ${
-                            todo.status !== 'completed' && isOverdue(todo.dueDate)
-                              ? 'text-red-500'
-                              : 'text-gray-500'
-                          }`}>
+                          <span className={`flex items-center gap-1 ${todo.status !== 'completed' && isOverdue(todo.dueDate)
+                            ? 'text-red-500'
+                            : 'text-gray-500'
+                            }`}>
                             <HiOutlineCalendarDays className="w-4 h-4" />
                             {formatDueDate(todo.dueDate, todo.dueTime)}
                           </span>
@@ -936,8 +800,8 @@ export default function TodoPage() {
                         {/* Category (only for personal todos) */}
                         {!todo.isProjectTask && todo.category && (
                           <span className="flex items-center gap-1 text-gray-500">
-                            <div 
-                              className="w-2.5 h-2.5 rounded-full" 
+                            <div
+                              className="w-2.5 h-2.5 rounded-full"
                               style={{ backgroundColor: todo.category.color }}
                             ></div>
                             {todo.category.name}

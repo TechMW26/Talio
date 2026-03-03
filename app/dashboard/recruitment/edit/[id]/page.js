@@ -8,15 +8,12 @@ import {
 } from '@heroui/react';
 import toast from '@/utils/toast';
 import { FaArrowLeft, FaSave, FaPlus, FaTimes } from 'react-icons/fa';
+import useAuthedSWR from '@/hooks/useAuthedSWR';
+import useApiMutation from '@/hooks/useApiMutation';
 
 export default function EditJobPage() {
   const router = useRouter();
   const params = useParams();
-  const [loading, setLoading] = useState(false);
-  const [departments, setDepartments] = useState([]);
-  const [designations, setDesignations] = useState([]);
-  const [employees, setEmployees] = useState([]);
-  const [formLoading, setFormLoading] = useState(true);
   const [formData, setFormData] = useState({
     jobTitle: '',
     jobCode: '',
@@ -39,63 +36,54 @@ export default function EditJobPage() {
     hiringManager: '',
   });
 
-  useEffect(() => { fetchData(); }, []);
+  // Fetch dropdown data
+  const { data: deptRes } = useAuthedSWR('/api/departments');
+  const { data: desigRes } = useAuthedSWR('/api/designations');
+  const { data: empRes } = useAuthedSWR('/api/employees');
+  const departments = deptRes?.data || [];
+  const designations = desigRes?.data || [];
+  const employees = empRes?.data || [];
 
-  const fetchData = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const headers = { Authorization: `Bearer ${token}` };
-      const [jobRes, deptRes, desigRes, empRes] = await Promise.all([
-        fetch(`/api/recruitment/${params.id}`, { headers }),
-        fetch('/api/departments', { headers }),
-        fetch('/api/designations', { headers }).catch(() => ({ json: async () => ({ success: false }) })),
-        fetch('/api/employees', { headers }),
-      ]);
-      const [jobData, deptData, desigData, empData] = await Promise.all([
-        jobRes.json(), deptRes.json(), desigRes.json(), empRes.json(),
-      ]);
-      if (deptData.success) setDepartments(deptData.data || []);
-      if (desigData.success) setDesignations(desigData.data || []);
-      if (empData.success) setEmployees(empData.data || []);
-      if (jobData.success && jobData.data) {
-        const job = jobData.data;
-        setFormData({
-          jobTitle: job.jobTitle || '',
-          jobCode: job.jobCode || '',
-          department: job.department?._id || job.department || '',
-          designation: job.designation?._id || job.designation || '',
-          numberOfPositions: job.numberOfPositions || 1,
-          jobDescription: job.jobDescription || '',
-          requirements: job.requirements?.length > 0 ? job.requirements : [''],
-          responsibilities: job.responsibilities?.length > 0 ? job.responsibilities : [''],
-          benefits: job.benefits?.length > 0 ? job.benefits : [''],
-          skills: job.skills?.length > 0 ? job.skills : [''],
-          educationLevel: job.educationLevel || 'any',
-          experience: { min: job.experience?.min || 0, max: job.experience?.max || 0 },
-          salaryRange: {
-            min: job.salaryRange?.min?.toString() || '',
-            max: job.salaryRange?.max?.toString() || '',
-            currency: job.salaryRange?.currency || 'INR',
-            isConfidential: job.salaryRange?.isConfidential || false,
-          },
-          location: job.location || '',
-          workMode: job.workMode || 'on-site',
-          employmentType: job.employmentType || 'full-time',
-          status: job.status || 'draft',
-          applicationDeadline: job.applicationDeadline ? job.applicationDeadline.split('T')[0] : '',
-          hiringManager: job.hiringManager?._id || job.hiringManager || '',
-        });
-      } else {
-        toast.error('Job posting not found');
-        router.push('/dashboard/recruitment');
-      }
-    } catch (error) {
-      console.error('Fetch data error:', error);
-      toast.error('Failed to load job posting');
-    } finally {
-      setFormLoading(false);
+  // Fetch the job posting
+  const { data: jobRes, isLoading: formLoading } = useAuthedSWR(
+    params.id ? `/api/recruitment/${params.id}` : null
+  );
+
+  // Populate form when job data loads
+  useEffect(() => {
+    if (jobRes?.success && jobRes.data) {
+      const job = jobRes.data;
+      setFormData({
+        jobTitle: job.jobTitle || '',
+        jobCode: job.jobCode || '',
+        department: job.department?._id || job.department || '',
+        designation: job.designation?._id || job.designation || '',
+        numberOfPositions: job.numberOfPositions || 1,
+        jobDescription: job.jobDescription || '',
+        requirements: job.requirements?.length > 0 ? job.requirements : [''],
+        responsibilities: job.responsibilities?.length > 0 ? job.responsibilities : [''],
+        benefits: job.benefits?.length > 0 ? job.benefits : [''],
+        skills: job.skills?.length > 0 ? job.skills : [''],
+        educationLevel: job.educationLevel || 'any',
+        experience: { min: job.experience?.min || 0, max: job.experience?.max || 0 },
+        salaryRange: {
+          min: job.salaryRange?.min?.toString() || '',
+          max: job.salaryRange?.max?.toString() || '',
+          currency: job.salaryRange?.currency || 'INR',
+          isConfidential: job.salaryRange?.isConfidential || false,
+        },
+        location: job.location || '',
+        workMode: job.workMode || 'on-site',
+        employmentType: job.employmentType || 'full-time',
+        status: job.status || 'draft',
+        applicationDeadline: job.applicationDeadline ? job.applicationDeadline.split('T')[0] : '',
+        hiringManager: job.hiringManager?._id || job.hiringManager || '',
+      });
+    } else if (jobRes && !jobRes.success) {
+      toast.error('Job posting not found');
+      router.push('/dashboard/recruitment');
     }
-  };
+  }, [jobRes, router]);
 
   const updateField = (field, value) => {
     if (field.includes('.')) {
@@ -125,51 +113,40 @@ export default function EditJobPage() {
     });
   };
 
+  const submitMutation = useApiMutation({
+    method: 'PUT',
+    onSuccess: (data, { publish } = {}) => {
+      toast.success(publish ? 'Job published successfully' : 'Job updated successfully');
+      router.push(`/dashboard/recruitment/${params.id}`);
+    },
+    onError: (msg) => toast.error(msg || 'Failed to update job posting'),
+  });
+
   const handleSubmit = async (publish = false) => {
     if (!formData.jobTitle.trim()) { toast.error('Job title is required'); return; }
     if (!formData.department) { toast.error('Department is required'); return; }
     if (!formData.jobDescription.trim()) { toast.error('Job description is required'); return; }
 
-    setLoading(true);
-    try {
-      const token = localStorage.getItem('token');
-      const payload = {
-        ...formData,
-        status: publish ? 'open' : formData.status,
-        requirements: formData.requirements.filter((r) => r.trim()),
-        responsibilities: formData.responsibilities.filter((r) => r.trim()),
-        benefits: formData.benefits.filter((b) => b.trim()),
-        skills: formData.skills.filter((s) => s.trim()),
-        salaryRange: {
-          ...formData.salaryRange,
-          min: formData.salaryRange.min ? parseFloat(formData.salaryRange.min) : undefined,
-          max: formData.salaryRange.max ? parseFloat(formData.salaryRange.max) : undefined,
-        },
-        applicationDeadline: formData.applicationDeadline || undefined,
-      };
-      if (!payload.jobCode) delete payload.jobCode;
-      if (!payload.designation) delete payload.designation;
-      if (!payload.hiringManager) delete payload.hiringManager;
-      if (!payload.location) delete payload.location;
+    const payload = {
+      ...formData,
+      status: publish ? 'open' : formData.status,
+      requirements: formData.requirements.filter((r) => r.trim()),
+      responsibilities: formData.responsibilities.filter((r) => r.trim()),
+      benefits: formData.benefits.filter((b) => b.trim()),
+      skills: formData.skills.filter((s) => s.trim()),
+      salaryRange: {
+        ...formData.salaryRange,
+        min: formData.salaryRange.min ? parseFloat(formData.salaryRange.min) : undefined,
+        max: formData.salaryRange.max ? parseFloat(formData.salaryRange.max) : undefined,
+      },
+      applicationDeadline: formData.applicationDeadline || undefined,
+    };
+    if (!payload.jobCode) delete payload.jobCode;
+    if (!payload.designation) delete payload.designation;
+    if (!payload.hiringManager) delete payload.hiringManager;
+    if (!payload.location) delete payload.location;
 
-      const response = await fetch(`/api/recruitment/${params.id}`, {
-        method: 'PUT',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      const data = await response.json();
-      if (data.success) {
-        toast.success(publish ? 'Job published successfully' : 'Job updated successfully');
-        router.push(`/dashboard/recruitment/${params.id}`);
-      } else {
-        toast.error(data.message || 'Failed to update job posting');
-      }
-    } catch (error) {
-      console.error('Update job error:', error);
-      toast.error('Failed to update job posting');
-    } finally {
-      setLoading(false);
-    }
+    submitMutation.execute(`/api/recruitment/${params.id}`, payload);
   };
 
   if (formLoading) {
@@ -197,11 +174,11 @@ export default function EditJobPage() {
             <h1 className="text-2xl sm:text-3xl font-bold text-default-800">Edit Job Posting</h1>
           </div>
           <div className="flex gap-2 ml-10 md:ml-0">
-            <Button variant="flat" onPress={() => handleSubmit(false)} isLoading={loading} startContent={<FaSave className="w-3.5 h-3.5" />}>
+            <Button variant="flat" onPress={() => handleSubmit(false)} isLoading={submitMutation.isLoading} startContent={<FaSave className="w-3.5 h-3.5" />}>
               Save Changes
             </Button>
             {formData.status === 'draft' && (
-              <Button color="primary" onPress={() => handleSubmit(true)} isLoading={loading}>
+              <Button color="primary" onPress={() => handleSubmit(true)} isLoading={submitMutation.isLoading}>
                 Publish Job
               </Button>
             )}
@@ -396,11 +373,11 @@ export default function EditJobPage() {
         {/* Bottom Actions */}
         <div className="flex justify-end gap-3 pb-8">
           <Button variant="flat" onPress={() => router.push(`/dashboard/recruitment/${params.id}`)}>Cancel</Button>
-          <Button variant="flat" onPress={() => handleSubmit(false)} isLoading={loading} startContent={<FaSave className="w-3.5 h-3.5" />}>
+          <Button variant="flat" onPress={() => handleSubmit(false)} isLoading={submitMutation.isLoading} startContent={<FaSave className="w-3.5 h-3.5" />}>
             Save Changes
           </Button>
           {formData.status === 'draft' && (
-            <Button color="primary" onPress={() => handleSubmit(true)} isLoading={loading}>
+            <Button color="primary" onPress={() => handleSubmit(true)} isLoading={submitMutation.isLoading}>
               Publish Job
             </Button>
           )}

@@ -1,10 +1,14 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { FaBell, FaClock, FaRedo, FaPaperPlane, FaUsers, FaBuilding, FaUserTag, FaCalendar, FaTrash, FaEdit, FaPause, FaPlay, FaHistory, FaPlus, FaEye, FaCheck, FaTimes, FaExclamationTriangle } from 'react-icons/fa'
 import toast from '@/utils/toast'
 import Loader from '@/components/ui/Loader'
 import ModalPortal from '@/components/ui/ModalPortal'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton, { SubmitButton } from '@/components/ui/LoadingButton'
+import { Skeleton } from '@heroui/react'
 
 export default function NotificationsPage() {
   const [activeTab, setActiveTab] = useState('send')
@@ -69,8 +73,8 @@ export default function NotificationsPage() {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center space-x-2 px-4 py-3 border-b-2 font-medium text-sm whitespace-nowrap transition-colors ${activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -105,82 +109,36 @@ function SendNotificationTab({ userRole, userDepartment }) {
     targetRoles: [],
     scheduleType: 'now'
   })
-  const [sending, setSending] = useState(false)
-  const [departments, setDepartments] = useState([])
-  const [employees, setEmployees] = useState([])
 
-  useEffect(() => {
-    fetchDepartments()
-    fetchEmployees()
-  }, [])
+  const { data: deptData } = useAuthedSWR('/api/departments')
+  const departments = deptData?.data || []
 
-  const fetchDepartments = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/departments', {
-        headers: { 'Authorization': `Bearer ${token}` }
+  const { data: empData } = useAuthedSWR('/api/employees?limit=1000')
+  const employees = empData?.data || []
+
+  const sendMutation = useApiMutation({
+    method: 'POST',
+    onSuccess: (data) => {
+      toast.success(data.message || 'Notification sent successfully!')
+      setFormData({
+        title: '',
+        message: '',
+        url: '/dashboard',
+        targetType: 'all',
+        targetDepartment: '',
+        targetUsers: [],
+        targetRoles: [],
+        scheduleType: 'now'
       })
-      const data = await response.json()
-      if (data.success) {
-        setDepartments(data.data)
-      }
-    } catch (error) {
-      console.error('Error fetching departments:', error)
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to send notification')
     }
-  }
-
-  const fetchEmployees = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/employees?limit=1000', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setEmployees(data.data)
-      }
-    } catch (error) {
-      console.error('Error fetching employees:', error)
-    }
-  }
+  })
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setSending(true)
-
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/notifications/send', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(formData)
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        toast.success(data.message || 'Notification sent successfully!')
-        setFormData({
-          title: '',
-          message: '',
-          url: '/dashboard',
-          targetType: 'all',
-          targetDepartment: '',
-          targetUsers: [],
-          targetRoles: [],
-          scheduleType: 'now'
-        })
-      } else {
-        toast.error(data.message || 'Failed to send notification')
-      }
-    } catch (error) {
-      console.error('Error sending notification:', error)
-      toast.error('Failed to send notification')
-    } finally {
-      setSending(false)
-    }
+    await sendMutation.execute('/api/notifications/send', formData)
   }
 
   return (
@@ -302,14 +260,15 @@ function SendNotificationTab({ userRole, userDepartment }) {
 
       {/* Submit Button */}
       <div className="flex justify-end">
-        <button
+        <LoadingButton
           type="submit"
-          disabled={sending}
-          className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center space-x-2"
+          isLoading={sendMutation.isLoading}
+          loadingText="Sending..."
+          color="primary"
+          startContent={<FaPaperPlane className="w-4 h-4" />}
         >
-          <FaPaperPlane className="w-4 h-4" />
-          <span>{sending ? 'Sending...' : 'Send Notification'}</span>
-        </button>
+          Send Notification
+        </LoadingButton>
       </div>
     </form>
   )
@@ -317,11 +276,7 @@ function SendNotificationTab({ userRole, userDepartment }) {
 
 // Placeholder tabs - will be implemented
 function ScheduledNotificationsTab({ userRole, userDepartment }) {
-  const [notifications, setNotifications] = useState([])
-  const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [departments, setDepartments] = useState([])
-  const [employees, setEmployees] = useState([])
   const [formData, setFormData] = useState({
     title: '',
     message: '',
@@ -332,62 +287,44 @@ function ScheduledNotificationsTab({ userRole, userDepartment }) {
     targetRoles: [],
     scheduledFor: ''
   })
-  const [creating, setCreating] = useState(false)
 
-  useEffect(() => {
-    fetchScheduledNotifications()
-    fetchDepartments()
-    fetchEmployees()
-  }, [])
+  const { data: scheduledData, isLoading: loading } = useAuthedSWR('/api/notifications/scheduled')
+  const notifications = scheduledData?.data || []
 
-  const fetchScheduledNotifications = async () => {
-    try {
-      setLoading(true)
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/notifications/scheduled', {
-        headers: { 'Authorization': `Bearer ${token}` }
+  const { data: deptData } = useAuthedSWR('/api/departments')
+  const departments = deptData?.data || []
+
+  const { data: empData } = useAuthedSWR('/api/employees?limit=1000')
+  const employees = empData?.data || []
+
+  const createMutation = useApiMutation({
+    method: 'POST',
+    invalidateKeys: ['/api/notifications/scheduled'],
+    onSuccess: () => {
+      toast.success('Scheduled notification created!')
+      setShowCreateModal(false)
+      setFormData({
+        title: '',
+        message: '',
+        url: '/dashboard',
+        targetType: 'all',
+        targetDepartment: '',
+        targetUsers: [],
+        targetRoles: [],
+        scheduledFor: ''
       })
-      const data = await response.json()
-      if (data.success) {
-        setNotifications(data.data || [])
-      }
-    } catch (error) {
-      console.error('Error fetching scheduled notifications:', error)
-      toast.error('Failed to load scheduled notifications')
-    } finally {
-      setLoading(false)
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to create scheduled notification')
     }
-  }
+  })
 
-  const fetchDepartments = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/departments', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setDepartments(data.data)
-      }
-    } catch (error) {
-      console.error('Error fetching departments:', error)
-    }
-  }
-
-  const fetchEmployees = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/employees?limit=1000', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setEmployees(data.data)
-      }
-    } catch (error) {
-      console.error('Error fetching employees:', error)
-    }
-  }
+  const cancelMutation = useApiMutation({
+    method: 'DELETE',
+    invalidateKeys: ['/api/notifications/scheduled'],
+    onSuccess: () => toast.success('Notification cancelled'),
+    onError: (error) => toast.error(error.message || 'Failed to cancel notification')
+  })
 
   const handleCreateScheduled = async (e) => {
     e.preventDefault()
@@ -395,64 +332,12 @@ function ScheduledNotificationsTab({ userRole, userDepartment }) {
       toast.error('Please select a date and time')
       return
     }
-
-    setCreating(true)
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/notifications/scheduled', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(formData)
-      })
-      const data = await response.json()
-      if (data.success) {
-        toast.success('Scheduled notification created!')
-        setShowCreateModal(false)
-        setFormData({
-          title: '',
-          message: '',
-          url: '/dashboard',
-          targetType: 'all',
-          targetDepartment: '',
-          targetUsers: [],
-          targetRoles: [],
-          scheduledFor: ''
-        })
-        fetchScheduledNotifications()
-      } else {
-        toast.error(data.message || 'Failed to create scheduled notification')
-      }
-    } catch (error) {
-      console.error('Error creating scheduled notification:', error)
-      toast.error('Failed to create scheduled notification')
-    } finally {
-      setCreating(false)
-    }
+    await createMutation.execute('/api/notifications/scheduled', formData)
   }
 
   const handleCancelNotification = async (id) => {
     if (!confirm('Are you sure you want to cancel this scheduled notification?')) return
-
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/notifications/scheduled?id=${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success) {
-        toast.success('Notification cancelled')
-        fetchScheduledNotifications()
-      } else {
-        toast.error(data.message || 'Failed to cancel notification')
-      }
-    } catch (error) {
-      console.error('Error cancelling notification:', error)
-      toast.error('Failed to cancel notification')
-    }
+    await cancelMutation.execute(`/api/notifications/scheduled?id=${id}`)
   }
 
   const getStatusBadge = (status) => {
@@ -493,8 +378,17 @@ function ScheduledNotificationsTab({ userRole, userDepartment }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader size="md" />
+      <div className="space-y-4">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <Skeleton className="h-6 w-48 rounded-lg mb-2" />
+            <Skeleton className="h-4 w-72 rounded-lg" />
+          </div>
+          <Skeleton className="h-10 w-32 rounded-lg" />
+        </div>
+        {[1, 2, 3].map(i => (
+          <Skeleton key={i} className="h-24 w-full rounded-lg" />
+        ))}
       </div>
     )
   }
@@ -666,13 +560,14 @@ function ScheduledNotificationsTab({ userRole, userDepartment }) {
                 >
                   Cancel
                 </button>
-                <button
+                <LoadingButton
                   type="submit"
-                  disabled={creating}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
+                  isLoading={createMutation.isLoading}
+                  loadingText="Scheduling..."
+                  color="primary"
                 >
-                  {creating ? 'Scheduling...' : 'Schedule'}
-                </button>
+                  Schedule
+                </LoadingButton>
               </div>
             </form>
           </div>
@@ -683,10 +578,7 @@ function ScheduledNotificationsTab({ userRole, userDepartment }) {
 }
 
 function RecurringNotificationsTab({ userRole, userDepartment }) {
-  const [notifications, setNotifications] = useState([])
-  const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
-  const [departments, setDepartments] = useState([])
   const [formData, setFormData] = useState({
     title: '',
     message: '',
@@ -704,137 +596,68 @@ function RecurringNotificationsTab({ userRole, userDepartment }) {
     startDate: new Date().toISOString().split('T')[0],
     endDate: ''
   })
-  const [creating, setCreating] = useState(false)
 
-  useEffect(() => {
-    fetchRecurringNotifications()
-    fetchDepartments()
-  }, [])
+  const { data: recurringData, isLoading: loading } = useAuthedSWR('/api/notifications/recurring')
+  const notifications = recurringData?.data || []
 
-  const fetchRecurringNotifications = async () => {
-    try {
-      setLoading(true)
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/notifications/recurring', {
-        headers: { 'Authorization': `Bearer ${token}` }
+  const { data: deptData } = useAuthedSWR('/api/departments')
+  const departments = deptData?.data || []
+
+  const createMutation = useApiMutation({
+    method: 'POST',
+    invalidateKeys: ['/api/notifications/recurring'],
+    onSuccess: () => {
+      toast.success('Recurring notification created!')
+      setShowCreateModal(false)
+      setFormData({
+        title: '',
+        message: '',
+        url: '/dashboard',
+        targetType: 'all',
+        targetDepartment: '',
+        targetUsers: [],
+        targetRoles: [],
+        frequency: 'daily',
+        dailyTime: '09:00',
+        weeklyDays: [],
+        weeklyTime: '09:00',
+        monthlyDay: 1,
+        monthlyTime: '09:00',
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: ''
       })
-      const data = await response.json()
-      if (data.success) {
-        setNotifications(data.data || [])
-      }
-    } catch (error) {
-      console.error('Error fetching recurring notifications:', error)
-      toast.error('Failed to load recurring notifications')
-    } finally {
-      setLoading(false)
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to create recurring notification')
     }
-  }
+  })
 
-  const fetchDepartments = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/departments', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setDepartments(data.data)
-      }
-    } catch (error) {
-      console.error('Error fetching departments:', error)
-    }
-  }
+  const toggleMutation = useApiMutation({
+    method: 'PATCH',
+    invalidateKeys: ['/api/notifications/recurring'],
+    onSuccess: (data) => toast.success(data.message || 'Notification updated'),
+    onError: (error) => toast.error(error.message || 'Failed to update notification')
+  })
+
+  const deleteMutation = useApiMutation({
+    method: 'DELETE',
+    invalidateKeys: ['/api/notifications/recurring'],
+    onSuccess: () => toast.success('Notification deleted'),
+    onError: (error) => toast.error(error.message || 'Failed to delete notification')
+  })
 
   const handleCreateRecurring = async (e) => {
     e.preventDefault()
-    setCreating(true)
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/notifications/recurring', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(formData)
-      })
-      const data = await response.json()
-      if (data.success) {
-        toast.success('Recurring notification created!')
-        setShowCreateModal(false)
-        setFormData({
-          title: '',
-          message: '',
-          url: '/dashboard',
-          targetType: 'all',
-          targetDepartment: '',
-          targetUsers: [],
-          targetRoles: [],
-          frequency: 'daily',
-          dailyTime: '09:00',
-          weeklyDays: [],
-          weeklyTime: '09:00',
-          monthlyDay: 1,
-          monthlyTime: '09:00',
-          startDate: new Date().toISOString().split('T')[0],
-          endDate: ''
-        })
-        fetchRecurringNotifications()
-      } else {
-        toast.error(data.message || 'Failed to create recurring notification')
-      }
-    } catch (error) {
-      console.error('Error creating recurring notification:', error)
-      toast.error('Failed to create recurring notification')
-    } finally {
-      setCreating(false)
-    }
+    await createMutation.execute('/api/notifications/recurring', formData)
   }
 
   const handleToggleActive = async (id, isActive) => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/notifications/recurring', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ id, isActive: !isActive })
-      })
-      const data = await response.json()
-      if (data.success) {
-        toast.success(isActive ? 'Notification paused' : 'Notification resumed')
-        fetchRecurringNotifications()
-      } else {
-        toast.error(data.message || 'Failed to update notification')
-      }
-    } catch (error) {
-      console.error('Error updating notification:', error)
-      toast.error('Failed to update notification')
-    }
+    await toggleMutation.execute('/api/notifications/recurring', { id, isActive: !isActive })
   }
 
   const handleDeleteRecurring = async (id) => {
     if (!confirm('Are you sure you want to delete this recurring notification?')) return
-
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/notifications/recurring?id=${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success) {
-        toast.success('Notification deleted')
-        fetchRecurringNotifications()
-      } else {
-        toast.error(data.message || 'Failed to delete notification')
-      }
-    } catch (error) {
-      console.error('Error deleting notification:', error)
-      toast.error('Failed to delete notification')
-    }
+    await deleteMutation.execute(`/api/notifications/recurring?id=${id}`)
   }
 
   const getFrequencyDisplay = (notification) => {
@@ -870,8 +693,17 @@ function RecurringNotificationsTab({ userRole, userDepartment }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader size="md" />
+      <div className="space-y-4">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <Skeleton className="h-6 w-48 rounded-lg mb-2" />
+            <Skeleton className="h-4 w-72 rounded-lg" />
+          </div>
+          <Skeleton className="h-10 w-36 rounded-lg" />
+        </div>
+        {[1, 2, 3].map(i => (
+          <Skeleton key={i} className="h-24 w-full rounded-lg" />
+        ))}
       </div>
     )
   }
@@ -1155,13 +987,14 @@ function RecurringNotificationsTab({ userRole, userDepartment }) {
                 >
                   Cancel
                 </button>
-                <button
+                <LoadingButton
                   type="submit"
-                  disabled={creating}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400"
+                  isLoading={createMutation.isLoading}
+                  loadingText="Creating..."
+                  color="primary"
                 >
-                  {creating ? 'Creating...' : 'Create'}
-                </button>
+                  Create
+                </LoadingButton>
               </div>
             </form>
           </div>
@@ -1172,70 +1005,49 @@ function RecurringNotificationsTab({ userRole, userDepartment }) {
 }
 
 function NotificationHistoryTab({ userRole, userDepartment }) {
-  const [notifications, setNotifications] = useState([])
-  const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all') // 'all', 'scheduled', 'recurring'
   const [selectedNotification, setSelectedNotification] = useState(null)
 
-  useEffect(() => {
-    fetchHistory()
-  }, [filter])
+  // Fetch scheduled sent notifications (when filter is 'all' or 'scheduled')
+  const { data: sentData, isLoading: loadingSent } = useAuthedSWR(
+    filter !== 'recurring' ? '/api/notifications/scheduled?status=sent' : null
+  )
+  // Fetch scheduled failed notifications
+  const { data: failedData, isLoading: loadingFailed } = useAuthedSWR(
+    filter !== 'recurring' ? '/api/notifications/scheduled?status=failed' : null
+  )
+  // Fetch recurring notifications
+  const { data: recurringData, isLoading: loadingRecurring } = useAuthedSWR(
+    filter !== 'scheduled' ? '/api/notifications/recurring' : null
+  )
 
-  const fetchHistory = async () => {
-    try {
-      setLoading(true)
-      const token = localStorage.getItem('token')
+  const loading = loadingSent || loadingFailed || loadingRecurring
 
-      let allNotifications = []
+  const notifications = useMemo(() => {
+    let allNotifications = []
 
-      // Fetch sent scheduled notifications
-      if (filter === 'all' || filter === 'scheduled') {
-        const scheduledRes = await fetch('/api/notifications/scheduled?status=sent', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-        const scheduledData = await scheduledRes.json()
-        if (scheduledData.success) {
-          allNotifications = [...allNotifications, ...(scheduledData.data || []).map(n => ({ ...n, type: 'scheduled' }))]
-        }
-
-        // Also fetch failed
-        const failedRes = await fetch('/api/notifications/scheduled?status=failed', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-        const failedData = await failedRes.json()
-        if (failedData.success) {
-          allNotifications = [...allNotifications, ...(failedData.data || []).map(n => ({ ...n, type: 'scheduled' }))]
-        }
-      }
-
-      // Fetch recurring notifications with sent history
-      if (filter === 'all' || filter === 'recurring') {
-        const recurringRes = await fetch('/api/notifications/recurring', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-        const recurringData = await recurringRes.json()
-        if (recurringData.success) {
-          // Only include recurring notifications that have been sent at least once
-          const sentRecurring = (recurringData.data || []).filter(n => n.lastSentAt || n.totalSent > 0)
-          allNotifications = [...allNotifications, ...sentRecurring.map(n => ({ ...n, type: 'recurring' }))]
-        }
-      }
-
-      // Sort by most recent first
-      allNotifications.sort((a, b) => {
-        const dateA = new Date(a.sentAt || a.lastSentAt || a.createdAt)
-        const dateB = new Date(b.sentAt || b.lastSentAt || b.createdAt)
-        return dateB - dateA
-      })
-
-      setNotifications(allNotifications)
-    } catch (error) {
-      console.error('Error fetching history:', error)
-      toast.error('Failed to load notification history')
-    } finally {
-      setLoading(false)
+    if (filter !== 'recurring') {
+      const sentNotifications = (sentData?.data || []).map(n => ({ ...n, type: 'scheduled' }))
+      const failedNotifications = (failedData?.data || []).map(n => ({ ...n, type: 'scheduled' }))
+      allNotifications = [...sentNotifications, ...failedNotifications]
     }
-  }
+
+    if (filter !== 'scheduled') {
+      const sentRecurring = (recurringData?.data || [])
+        .filter(n => n.lastSentAt || n.totalSent > 0)
+        .map(n => ({ ...n, type: 'recurring' }))
+      allNotifications = [...allNotifications, ...sentRecurring]
+    }
+
+    // Sort by most recent first
+    allNotifications.sort((a, b) => {
+      const dateA = new Date(a.sentAt || a.lastSentAt || a.createdAt)
+      const dateB = new Date(b.sentAt || b.lastSentAt || b.createdAt)
+      return dateB - dateA
+    })
+
+    return allNotifications
+  }, [sentData, failedData, recurringData, filter])
 
   const formatDate = (date) => {
     if (!date) return 'N/A'
@@ -1282,8 +1094,17 @@ function NotificationHistoryTab({ userRole, userDepartment }) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader size="md" />
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+          <div>
+            <Skeleton className="h-6 w-48 rounded-lg mb-2" />
+            <Skeleton className="h-4 w-56 rounded-lg" />
+          </div>
+          <Skeleton className="h-10 w-36 rounded-lg" />
+        </div>
+        {[1, 2, 3, 4].map(i => (
+          <Skeleton key={i} className="h-24 w-full rounded-lg" />
+        ))}
       </div>
     )
   }

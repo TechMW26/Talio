@@ -1,30 +1,26 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { FaArrowLeft, FaUser, FaPaperPlane, FaClock, FaTag, FaExclamationCircle, FaCheckCircle } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
-import Loader from '@/components/ui/Loader'
-import { Select, SelectItem } from '@heroui/react'
+import { Select, SelectItem, Skeleton, Card, CardBody } from '@heroui/react'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 
 export default function TicketDetailPage() {
   const params = useParams()
   const router = useRouter()
-  const [ticket, setTicket] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState(null)
   const [newComment, setNewComment] = useState('')
-  const [sending, setSending] = useState(false)
   const commentsEndRef = useRef(null)
 
-  useEffect(() => {
-    const parsedUser = getCurrentUser()
-    if (parsedUser) {
-      setUser(parsedUser)
-      fetchTicket()
-    }
-  }, [params.id])
+  const user = useMemo(() => getCurrentUser(), [])
+
+  const { data: res, error, isLoading, isValidating, mutate: refresh } = useAuthedSWR(params.id ? `/api/helpdesk/${params.id}` : null)
+  const ticket = res?.data || null
 
   useEffect(() => {
     scrollToBottom()
@@ -34,95 +30,59 @@ export default function TicketDetailPage() {
     commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
 
-  const fetchTicket = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/helpdesk/${params.id}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-
-      const data = await response.json()
-      if (response.ok && data?.success) {
-        setTicket(data.data)
-      } else {
-        toast.error(data?.message || data?.error || 'Failed to fetch ticket')
-        router.push('/dashboard/helpdesk')
-      }
-    } catch (error) {
-      console.error('Fetch ticket error:', error)
-      toast.error('Failed to fetch ticket')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const statusMutation = useApiMutation({
+    method: 'PUT',
+    invalidateKeys: [`/api/helpdesk/${params.id}`],
+    onSuccess: () => toast.success('Status updated'),
+    onError: (msg) => toast.error(msg || 'Failed to update status'),
+  })
 
   const handleStatusChange = async (newStatus) => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/helpdesk/${params.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ status: newStatus })
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        toast.success(`Status updated to ${newStatus}`)
-        setTicket(prev => ({ ...prev, status: newStatus }))
-      } else {
-        toast.error(data.message)
-      }
-    } catch (error) {
-      console.error('Update status error:', error)
-      toast.error('Failed to update status')
-    }
+    await statusMutation.execute(`/api/helpdesk/${params.id}`, { status: newStatus })
   }
+
+  const commentMutation = useApiMutation({
+    method: 'POST',
+    invalidateKeys: [`/api/helpdesk/${params.id}`],
+    onSuccess: () => setNewComment(''),
+    onError: (msg) => toast.error(msg || 'Failed to add comment'),
+  })
 
   const handleAddComment = async (e) => {
     e.preventDefault()
     if (!newComment.trim()) return
-
-    setSending(true)
-    try {
-      const token = localStorage.getItem('token')
-      const empId = getEmployeeId(user)
-      
-      const response = await fetch(`/api/helpdesk/${params.id}/comments`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          comment: newComment,
-          commentedBy: empId
-        })
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        setNewComment('')
-        fetchTicket() // Refresh to get new comment
-      } else {
-        toast.error(data.message)
-      }
-    } catch (error) {
-      console.error('Add comment error:', error)
-      toast.error('Failed to add comment')
-    } finally {
-      setSending(false)
-    }
+    const empId = getEmployeeId(user)
+    await commentMutation.execute(`/api/helpdesk/${params.id}/comments`, {
+      comment: newComment,
+      commentedBy: empId
+    })
   }
 
   const canManageTicket = user && ['admin', 'hr', 'manager', 'department_head'].includes(user.role)
 
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="p-6 flex justify-center">
-        <Loader size="lg" />
+      <div className="p-6 max-w-5xl mx-auto">
+        <div className="space-y-6">
+          <Skeleton className="h-8 w-48 rounded-lg" />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
+              <Skeleton className="h-48 rounded-xl" />
+              <Skeleton className="h-[500px] rounded-xl" />
+            </div>
+            <div className="space-y-6">
+              <Skeleton className="h-64 rounded-xl" />
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 max-w-5xl mx-auto">
+        <DataErrorState message="Failed to load ticket details" onRetry={() => refresh()} />
       </div>
     )
   }
@@ -137,6 +97,7 @@ export default function TicketDetailPage() {
       >
         <FaArrowLeft className="mr-2" /> Back to Tickets
       </button>
+      <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Content - Ticket Info & Comments */}
@@ -153,16 +114,15 @@ export default function TicketDetailPage() {
                   </span>
                 </div>
               </div>
-              <span className={`px-3 py-1 rounded-full text-sm font-semibold capitalize ${
-                ticket.status === 'open' ? 'bg-blue-100 text-blue-800' :
-                ticket.status === 'in-progress' ? 'bg-yellow-100 text-yellow-800' :
-                ticket.status === 'resolved' ? 'bg-green-100 text-green-800' :
-                'bg-gray-100 text-gray-800'
-              }`}>
+              <span className={`px-3 py-1 rounded-full text-sm font-semibold capitalize ${ticket.status === 'open' ? 'bg-blue-100 text-blue-800' :
+                  ticket.status === 'in-progress' ? 'bg-yellow-100 text-yellow-800' :
+                    ticket.status === 'resolved' ? 'bg-green-100 text-green-800' :
+                      'bg-gray-100 text-gray-800'
+                }`}>
                 {ticket.status}
               </span>
             </div>
-            
+
             <div className="prose max-w-none text-gray-700 mb-6">
               <p>{ticket.description}</p>
             </div>
@@ -187,12 +147,12 @@ export default function TicketDetailPage() {
             <div className="p-4 border-b border-gray-200">
               <h3 className="font-semibold text-gray-800">Discussion</h3>
             </div>
-            
+
             <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
               {ticket.comments?.length === 0 && (
                 <p className="text-center text-gray-500 italic my-4">No comments yet.</p>
               )}
-              
+
               {ticket.comments?.map((comment, index) => {
                 const commentBy = comment?.commentedBy || comment?.author
                 const commentText = comment?.comment ?? comment?.content ?? ''
@@ -202,9 +162,8 @@ export default function TicketDetailPage() {
                 const isMe = commenterEmployeeId === currentEmployeeId
                 return (
                   <div key={index} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[80%] rounded-lg p-3 ${
-                      isMe ? 'bg-primary-600 text-white' : 'bg-white border border-gray-200 text-gray-800'
-                    }`}>
+                    <div className={`max-w-[80%] rounded-lg p-3 ${isMe ? 'bg-primary-600 text-white' : 'bg-white border border-gray-200 text-gray-800'
+                      }`}>
                       <div className="flex justify-between items-center gap-4 mb-1">
                         <span className={`text-xs font-bold ${isMe ? 'text-primary-100' : 'text-gray-600'}`}>
                           {commentBy?.firstName} {commentBy?.lastName}
@@ -229,11 +188,11 @@ export default function TicketDetailPage() {
                   onChange={(e) => setNewComment(e.target.value)}
                   placeholder="Type your reply..."
                   className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  disabled={sending}
+                  disabled={commentMutation.isLoading}
                 />
                 <button
                   type="submit"
-                  disabled={sending || !newComment.trim()}
+                  disabled={commentMutation.isLoading || !newComment.trim()}
                   className="bg-primary-600 text-white p-2 rounded-lg hover:bg-primary-700 disabled:opacity-50 transition-colors"
                 >
                   <FaPaperPlane />
@@ -247,7 +206,7 @@ export default function TicketDetailPage() {
         <div className="space-y-6">
           <div className="bg-white rounded-lg shadow-md p-6">
             <h3 className="font-semibold text-gray-800 mb-4">Ticket Details</h3>
-            
+
             <div className="space-y-4">
               <div>
                 <label className="text-xs text-gray-500 uppercase font-bold">Category</label>
@@ -256,12 +215,12 @@ export default function TicketDetailPage() {
                   <span className="capitalize">{ticket.category}</span>
                 </div>
               </div>
-              
+
               <div>
                 <label className="text-xs text-gray-500 uppercase font-bold">Priority</label>
                 <div className="flex items-center gap-2 mt-1">
                   <FaExclamationCircle className={`
-                    ${ticket.priority === 'high' || ticket.priority === 'urgent' ? 'text-red-500' : 
+                    ${ticket.priority === 'high' || ticket.priority === 'urgent' ? 'text-red-500' :
                       ticket.priority === 'medium' ? 'text-yellow-500' : 'text-green-500'}
                   `} />
                   <span className="capitalize">{ticket.priority}</span>

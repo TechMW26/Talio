@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAILoading } from '@/contexts/AILoadingContext';
 import {
   FaInbox, FaPaperPlane, FaFile, FaTrash, FaStar, FaSearch,
@@ -12,7 +12,8 @@ import {
   FaUnderline, FaListUl, FaListOl, FaQuoteRight, FaStrikethrough,
   FaLink, FaSmile, FaChevronDown, FaChevronRight, FaMagic
 } from 'react-icons/fa';
-import Loader from '@/components/ui/Loader';
+import { Skeleton } from '@heroui/react';
+import useAuthedSWR from '@/hooks/useAuthedSWR';
 import {
   MdRefresh, MdMoreVert, MdArchive, MdDelete,
   MdSchedule, MdCheckBoxOutlineBlank, MdKeyboardArrowDown,
@@ -54,9 +55,10 @@ const commonEmojis = [
 ];
 
 export default function MailPage() {
+  // --- SWR: Connection status ---
+  const { data: connectionData, isLoading: connectionLoading, mutate: refreshConnection } = useAuthedSWR('/api/mail');
   const [isConnected, setIsConnected] = useState(false);
   const [connectedEmail, setConnectedEmail] = useState('');
-  const [loading, setLoading] = useState(true);
   const [connectingEmail, setConnectingEmail] = useState(false);
   const [emails, setEmails] = useState([]);
   const [isDesktopApp, setIsDesktopApp] = useState(false);
@@ -81,7 +83,7 @@ export default function MailPage() {
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiTone, setAiTone] = useState('professional');
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
-  
+
   // Global AI loading animation
   const { startAILoading, stopAILoading } = useAILoading();
 
@@ -136,34 +138,41 @@ export default function MailPage() {
   const fileInputRef = useRef(null);
   const bodyEditorRef = useRef(null);
 
+  // --- SWR: Labels/folder counts (only when connected) ---
+  const { data: labelsData, mutate: refreshLabels } = useAuthedSWR(isConnected ? '/api/mail/labels' : null);
+
+  // Seed connection state from SWR data
+  useEffect(() => {
+    if (connectionData) {
+      setIsConnected(connectionData.isConnected || false);
+      setConnectedEmail(connectionData.email || '');
+      setUnreadCount(connectionData.unreadCount || 0);
+      setSpamCount(connectionData.spamCount || 0);
+      setAccounts(connectionData.accounts || []);
+      setActiveAccountId(connectionData.activeAccountId || null);
+    }
+  }, [connectionData]);
+
+  // Seed labels/folder counts from SWR data
+  useEffect(() => {
+    if (labelsData) {
+      if (labelsData.folderCounts) {
+        setFolderCounts(labelsData.folderCounts);
+        setUnreadCount(labelsData.folderCounts.inbox?.unread || 0);
+        setSpamCount(labelsData.folderCounts.spam?.total || 0);
+      }
+      if (labelsData.userLabels) {
+        setUserLabels(labelsData.userLabels);
+      }
+    }
+  }, [labelsData]);
+
   const getToken = () => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('token');
     }
     return null;
   };
-
-  // Check email connection status
-  const checkConnectionStatus = useCallback(async () => {
-    try {
-      const token = getToken();
-      const res = await fetch('/api/mail', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await res.json();
-
-      setIsConnected(data.isConnected || false);
-      setConnectedEmail(data.email || '');
-      setUnreadCount(data.unreadCount || 0);
-      setSpamCount(data.spamCount || 0);
-      setAccounts(data.accounts || []);
-      setActiveAccountId(data.activeAccountId || null);
-    } catch (err) {
-      console.error('Error checking email status:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
 
   // Fetch emails
   const fetchEmails = useCallback(async (folder = 'inbox', reset = false) => {
@@ -292,7 +301,7 @@ export default function MailPage() {
     startAILoading('MIRA is composing your email...');
     try {
       const token = localStorage.getItem('token');
-      
+
       // Determine if this is a reply
       const isReply = composeData.subject?.startsWith('Re:') || (selectedEmail && composeData.subject?.includes(selectedEmail.subject));
       const context = isReply && selectedEmail ? `From: ${selectedEmail.from?.name} <${selectedEmail.from?.email}>\nSubject: ${selectedEmail.subject}\n\n${selectedEmail.body || selectedEmail.snippet}` : '';
@@ -787,33 +796,6 @@ export default function MailPage() {
     }
   };
 
-  // Fetch labels with counts
-  const fetchLabels = useCallback(async () => {
-    try {
-      const token = getToken();
-      const res = await fetch('/api/mail/labels', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (!res.ok) return;
-
-      const data = await res.json();
-
-      if (data.folderCounts) {
-        setFolderCounts(data.folderCounts);
-        // Update unread and spam counts
-        setUnreadCount(data.folderCounts.inbox?.unread || 0);
-        setSpamCount(data.folderCounts.spam?.total || 0);
-      }
-
-      if (data.userLabels) {
-        setUserLabels(data.userLabels);
-      }
-    } catch (err) {
-      console.error('Error fetching labels:', err);
-    }
-  }, []);
-
   // Email selection handlers
   const toggleEmailSelection = (email, e) => {
     e?.stopPropagation();
@@ -1005,14 +987,13 @@ export default function MailPage() {
       setIsDesktopApp(true);
     }
 
-    checkConnectionStatus();
-
     const params = new URLSearchParams(window.location.search);
     const connected = params.get('connected');
     const urlError = params.get('error');
 
     if (connected === 'true') {
       setIsConnected(true);
+      refreshConnection();
       window.history.replaceState({}, '', '/dashboard/mail');
     }
 
@@ -1020,15 +1001,15 @@ export default function MailPage() {
       alert(`Failed to connect email: ${urlError}`);
       window.history.replaceState({}, '', '/dashboard/mail');
     }
-  }, [checkConnectionStatus]);
+  }, [refreshConnection]);
 
   // Fetch emails when connected or when account/view changes
   useEffect(() => {
-    if (isConnected && !loading) {
+    if (isConnected && !connectionLoading) {
       fetchEmails(selectedFolder, true);
-      fetchLabels(); // Fetch label counts
+      refreshLabels(); // Refresh label counts
     }
-  }, [isConnected, loading, selectedFolder, showAllAccounts, activeAccountId, fetchLabels]);
+  }, [isConnected, connectionLoading, selectedFolder, showAllAccounts, activeAccountId, refreshLabels]);
 
   // Close dropdowns on click outside
   useEffect(() => {
@@ -1048,10 +1029,39 @@ export default function MailPage() {
   // Filter emails (using same logic as getFilteredEmails for consistency)
   const filteredEmails = getFilteredEmails();
 
-  if (loading) {
+  if (connectionLoading) {
     return (
-      <div className="flex items-center justify-center h-[calc(100vh-120px)] bg-white">
-        <Loader size="lg" />
+      <div className="h-[calc(100vh-80px)] flex flex-col bg-white -m-4 md:-m-6">
+        {/* Skeleton header */}
+        <div className="flex items-center gap-2 px-4 py-2 bg-[#f6f8fc] border-b border-gray-200">
+          <div className="flex-1 max-w-3xl mx-auto">
+            <Skeleton className="h-10 w-full rounded-full" />
+          </div>
+          <Skeleton className="w-10 h-10 rounded-full" />
+        </div>
+        <div className="flex-1 flex overflow-hidden bg-[#f6f8fc]">
+          {/* Skeleton sidebar */}
+          <div className="w-64 flex-shrink-0 py-3 px-2 hidden md:block bg-[#f6f8fc]">
+            <Skeleton className="h-12 w-36 rounded-2xl mb-4" />
+            <div className="space-y-1">
+              {[...Array(5)].map((_, i) => (
+                <Skeleton key={i} className="h-8 w-full rounded-r-full" />
+              ))}
+            </div>
+          </div>
+          {/* Skeleton email list */}
+          <div className="flex-1 bg-white rounded-l-xl">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
+                <Skeleton className="w-5 h-5 rounded" />
+                <Skeleton className="w-5 h-5 rounded" />
+                <Skeleton className="h-4 w-28 rounded" />
+                <Skeleton className="h-4 flex-1 rounded" />
+                <Skeleton className="h-3 w-16 rounded" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -1101,8 +1111,7 @@ export default function MailPage() {
 
             <button
               onClick={() => {
-                setLoading(true);
-                checkConnectionStatus();
+                refreshConnection();
               }}
               className="mt-4 text-blue-600 hover:text-blue-700 text-sm font-medium hover:underline"
             >
@@ -1139,7 +1148,7 @@ export default function MailPage() {
             className="inline-flex items-center gap-3 bg-white border border-gray-300 text-gray-700 px-8 py-3 rounded-full font-medium hover:bg-gray-50 hover:shadow-md transition-all disabled:opacity-50 text-base"
           >
             {connectingEmail ? (
-              <Loader size="xs" />
+              <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
             ) : (
               <>
                 <svg className="w-5 h-5" viewBox="0 0 24 24">
@@ -1567,7 +1576,7 @@ export default function MailPage() {
                 </div>
               ) : loadingEmails && emails.length === 0 ? (
                 <div className="flex items-center justify-center h-40">
-                  <Loader size="md" />
+                  <svg className="animate-spin w-8 h-8 text-gray-400" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
                 </div>
               ) : filteredEmails.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-64 text-gray-500 dark:text-gray-400">
@@ -1708,7 +1717,7 @@ export default function MailPage() {
 
               {loadingEmails && emails.length > 0 && (
                 <div className="flex items-center justify-center py-4">
-                  <Loader size="xs" />
+                  <svg className="animate-spin w-5 h-5 text-gray-400" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
                 </div>
               )}
             </div>
@@ -2113,7 +2122,7 @@ export default function MailPage() {
                 <FaTimes />
               </button>
             </div>
-            
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">What should this email say?</label>
@@ -2124,7 +2133,7 @@ export default function MailPage() {
                   placeholder="e.g. Write a polite decline to the meeting invitation for next Tuesday..."
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Tone</label>
                 <select
@@ -2139,7 +2148,7 @@ export default function MailPage() {
                   <option value="urgent">Urgent</option>
                 </select>
               </div>
-              
+
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   onClick={() => setShowAiCompose(false)}
@@ -2152,7 +2161,7 @@ export default function MailPage() {
                   disabled={isGeneratingAi || !aiPrompt.trim()}
                   className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 flex items-center gap-2"
                 >
-                  {isGeneratingAi ? <Loader size="xs" /> : <FaMagic />}
+                  {isGeneratingAi ? <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg> : <FaMagic />}
                   Generate
                 </button>
               </div>
@@ -2406,7 +2415,7 @@ export default function MailPage() {
                       disabled={sending || !composeData.to || !composeData.subject}
                       className="flex items-center gap-2 bg-[#1a73e8] hover:bg-[#1557b0] text-white px-6 py-2 rounded font-medium text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      {sending ? <Loader size="xs" /> : 'Send'}
+                      {sending ? <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg> : 'Send'}
                     </button>
                     <button className="p-2 hover:bg-gray-100 rounded hidden sm:block">
                       <MdArrowDropDown className="text-xl text-gray-600" />
@@ -2451,7 +2460,7 @@ export default function MailPage() {
                       disabled={uploadingAttachment}
                     >
                       {uploadingAttachment ? (
-                        <Loader size="xs" />
+                        <svg className="animate-spin w-5 h-5 text-gray-500" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
                       ) : (
                         <MdAttachFile className="text-xl text-gray-500 -rotate-45" />
                       )}

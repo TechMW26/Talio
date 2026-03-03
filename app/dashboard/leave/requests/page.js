@@ -1,58 +1,29 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { Card, CardBody, CardHeader, Button, Chip, Skeleton, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@heroui/react'
 import toast from '@/utils/toast'
 import { FaCalendarAlt, FaClock, FaCheck, FaTimes, FaEye, FaFilter } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 
 export default function LeaveRequestsPage() {
-  const [leaves, setLeaves] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState(null)
   const [filter, setFilter] = useState('all')
   const [selectedLeave, setSelectedLeave] = useState(null)
   const [showModal, setShowModal] = useState(false)
 
-  useEffect(() => {
+  const { user, employeeId } = useMemo(() => {
     const parsedUser = getCurrentUser()
-    if (parsedUser) {
-      setUser(parsedUser)
-      const empId = getEmployeeId(parsedUser)
-      if (empId) {
-        fetchLeaves(empId)
-      } else {
-        console.error('Employee ID not found in user data:', parsedUser)
-        toast.error('Employee information not found. Please logout and login again.')
-        setLoading(false)
-      }
-    } else {
-      console.error('No user data found')
-      toast.error('Please login to view leave requests')
-      setLoading(false)
-    }
+    return { user: parsedUser, employeeId: parsedUser ? getEmployeeId(parsedUser) : null }
   }, [])
 
-  const fetchLeaves = async (employeeId) => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/leave?employeeId=${employeeId}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-      const data = await response.json()
-      if (data.success) {
-        setLeaves(data.data || [])
-      } else {
-        console.error('API Error:', data.message)
-        toast.error(data.message || 'Failed to fetch leave requests')
-      }
-    } catch (error) {
-      console.error('Fetch leaves error:', error)
-      toast.error('Failed to fetch leave requests')
-    } finally {
-      setLoading(false)
-    }
-  }
+  // --- SWR data fetching ---
+  const { data: leavesRes, error, isLoading, isValidating, mutate: refreshLeaves } = useAuthedSWR(
+    employeeId ? `/api/leave?employeeId=${employeeId}` : null
+  )
+  const leaves = leavesRes?.data || []
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -85,7 +56,15 @@ export default function LeaveRequestsPage() {
     return diffDays
   }
 
-  if (loading) {
+  if (error) {
+    return (
+      <div className="p-6">
+        <DataErrorState message="Failed to load leave requests" onRetry={() => refreshLeaves()} />
+      </div>
+    )
+  }
+
+  if (isLoading) {
     return (
       <div className="p-6 pb-24 md:pb-6 space-y-6">
         <Skeleton className="h-10 w-1/3 rounded-lg" />
@@ -103,7 +82,10 @@ export default function LeaveRequestsPage() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold text-default-800">My Leave Requests</h1>
-          <p className="text-default-500 mt-1">Track all your leave applications and their status</p>
+          <p className="text-default-500 mt-1 flex items-center gap-2">
+            Track all your leave applications and their status
+            <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" />
+          </p>
         </div>
       </div>
 
@@ -145,11 +127,10 @@ export default function LeaveRequestsPage() {
                 <button
                   key={tab.key}
                   onClick={() => setFilter(tab.key)}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                    filter === tab.key
+                  className={`py-4 px-1 border-b-2 font-medium text-sm ${filter === tab.key
                       ? 'border-primary text-primary'
                       : 'border-transparent text-default-500 hover:text-default-700 hover:border-default-300'
-                  }`}
+                    }`}
                 >
                   {tab.label} ({tab.count})
                 </button>

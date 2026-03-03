@@ -1,23 +1,31 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaFile, FaDownload, FaEye, FaTrash, FaTimes, FaUpload } from 'react-icons/fa'
-import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Select, SelectItem } from '@heroui/react'
-import Loader from '@/components/ui/Loader'
+import { getEmployeeId } from '@/utils/userHelper'
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Select, SelectItem, Skeleton } from '@heroui/react'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton from '@/components/ui/LoadingButton'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 
 export default function DocumentsPage() {
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
+  const { user, employeeId } = useMemo(() => {
+    try {
+      const parsedUser = JSON.parse(localStorage.getItem('user'))
+      const empId = parsedUser ? getEmployeeId(parsedUser) : null
+      return { user: parsedUser, employeeId: empId }
+    } catch { return { user: null, employeeId: null } }
   }, [])
-  const [documents, setDocuments] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState(null)
-  const [employeeId, setEmployeeId] = useState(null)
+
+  // SWR data fetching
+  const swrKey = employeeId ? `/api/documents?employeeId=${employeeId}` : null
+  const { data: docsRes, error, isLoading, isValidating, mutate: refreshDocuments } = useAuthedSWR(swrKey)
+  const documents = docsRes?.data || []
+
   const [showModal, setShowModal] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadForm, setUploadForm] = useState({
@@ -26,7 +34,7 @@ export default function DocumentsPage() {
   })
   const [selectedFile, setSelectedFile] = useState(null)
   const fileInputRef = useRef(null)
-  
+
   // Preview modal state
   const [previewDoc, setPreviewDoc] = useState(null)
   const [showPreview, setShowPreview] = useState(false)
@@ -34,31 +42,11 @@ export default function DocumentsPage() {
   // Real-time updates
   const { socket, isConnected, subscribe, onDocumentUpdate } = useSocket()
 
-  useEffect(() => {
-    const parsedUser = getCurrentUser()
-    if (parsedUser) {
-      setUser(parsedUser)
-      const empId = getEmployeeId(parsedUser)
-      setEmployeeId(empId)
-      if (empId) {
-        fetchDocuments(empId)
-      } else {
-        toast.error('Employee information not found. Please logout and login again.')
-        setLoading(false)
-      }
-    } else {
-      setLoading(false)
-    }
-  }, [])
-
   // Subscribe to real-time document updates
   useEffect(() => {
     if (!socket || !isConnected || !employeeId) return
 
-    const handleDocumentUpdate = (data) => {
-      console.log('🔄 [Documents] Real-time update received:', data)
-      fetchDocuments(employeeId)
-    }
+    const handleDocumentUpdate = () => refreshDocuments()
 
     const unsub1 = onDocumentUpdate?.(handleDocumentUpdate)
     const unsub2 = subscribe?.(REALTIME_EVENTS.DOCUMENT_UPDATE, handleDocumentUpdate)
@@ -67,26 +55,15 @@ export default function DocumentsPage() {
       unsub1?.()
       unsub2?.()
     }
-  }, [socket, isConnected, employeeId])
+  }, [socket, isConnected, employeeId, refreshDocuments])
 
-  const fetchDocuments = async (employeeId) => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/documents?employeeId=${employeeId}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        setDocuments(data.data)
-      }
-    } catch (error) {
-      console.error('Fetch documents error:', error)
-      toast.error('Failed to fetch documents')
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Delete mutation
+  const deleteMutation = useApiMutation({
+    method: 'DELETE',
+    invalidateKeys: [swrKey],
+    onSuccess: () => toast.success('Document deleted successfully'),
+    onError: (msg) => toast.error(msg || 'Failed to delete document'),
+  })
 
   const handleFileSelect = (e) => {
     const file = e.target.files?.[0]
@@ -175,7 +152,7 @@ export default function DocumentsPage() {
 
       if (docData.success) {
         toast.success('Document uploaded successfully')
-        setDocuments(prev => [docData.data, ...prev])
+        refreshDocuments()
         setShowModal(false)
         resetUploadForm()
       } else {
@@ -189,27 +166,9 @@ export default function DocumentsPage() {
     }
   }
 
-  const handleDelete = async (docId) => {
+  const handleDelete = (docId) => {
     if (!confirm('Are you sure you want to delete this document?')) return
-
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/documents/${docId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        toast.success('Document deleted successfully')
-        setDocuments(prev => prev.filter(doc => doc._id !== docId))
-      } else {
-        toast.error(data.message || 'Failed to delete document')
-      }
-    } catch (error) {
-      console.error('Delete document error:', error)
-      toast.error('Failed to delete document')
-    }
+    deleteMutation.execute(`/api/documents/${docId}`)
   }
 
   const formatFileSize = (bytes) => {
@@ -228,19 +187,8 @@ export default function DocumentsPage() {
     })
   }
 
-  // Prevent hydration mismatch
-  if (!mounted) {
-    return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-10 bg-gray-200 rounded w-1/4"></div>
-          <div className="grid grid-cols-4 gap-4">
-            {[1,2,3,4].map(i => <div key={i} className="h-24 bg-gray-200 rounded"></div>)}
-          </div>
-        </div>
-      </div>
-    )
-  }
+  // Error state
+  if (error) return <DataErrorState message="Failed to load documents" onRetry={() => refreshDocuments()} />
 
   return (
     <div className="p-6">
@@ -248,7 +196,7 @@ export default function DocumentsPage() {
       <div className="flex md:justify-between md:items-center md:flex-row flex-col mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-800">Documents</h1>
-          <p className="text-gray-600 mt-1">Manage your documents and files</p>
+          <p className="text-gray-600 mt-1">Manage your documents and files <BackgroundRefreshIndicator isValidating={isValidating} /></p>
         </div>
         <Button
           onPress={() => setShowModal(true)}
@@ -280,10 +228,20 @@ export default function DocumentsPage() {
           <h2 className="text-xl font-semibold text-gray-800">All Documents</h2>
         </div>
 
-        {loading ? (
-          <div className="p-8 text-center">
-            <Loader size="lg" className="mx-auto" />
-            <p className="mt-4 text-gray-600">Loading documents...</p>
+        {isLoading ? (
+          <div className="p-4">
+            <div className="space-y-3">
+              {[1, 2, 3, 4, 5].map(i => (
+                <div key={i} className="flex items-center gap-4 py-3">
+                  <Skeleton className="w-8 h-8 rounded" />
+                  <Skeleton className="h-4 w-1/4 rounded" />
+                  <Skeleton className="h-4 w-20 rounded" />
+                  <Skeleton className="h-4 w-16 rounded" />
+                  <Skeleton className="h-4 w-24 rounded" />
+                  <Skeleton className="h-4 w-20 rounded" />
+                </div>
+              ))}
+            </div>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -334,9 +292,8 @@ export default function DocumentsPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          doc.category === 'identity' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
-                        }`}>
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${doc.category === 'identity' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
+                          }`}>
                           {doc.category}
                         </span>
                       </td>
@@ -454,15 +411,16 @@ export default function DocumentsPage() {
                   >
                     Cancel
                   </Button>
-                  <Button
+                  <LoadingButton
                     type="submit"
                     color="primary"
                     isLoading={uploading}
-                    isDisabled={uploading || !selectedFile}
-                    startContent={!uploading && <FaUpload />}
+                    loadingText="Uploading..."
+                    isDisabled={!selectedFile}
+                    startContent={<FaUpload />}
                   >
-                    {uploading ? 'Uploading...' : 'Upload'}
-                  </Button>
+                    Upload
+                  </LoadingButton>
                 </ModalFooter>
               </form>
             </>
@@ -471,12 +429,12 @@ export default function DocumentsPage() {
       </Modal>
 
       {/* Document Preview Modal */}
-      <Modal 
-        isOpen={showPreview} 
+      <Modal
+        isOpen={showPreview}
         onOpenChange={(open) => {
           setShowPreview(open)
           if (!open) setPreviewDoc(null)
-        }} 
+        }}
         size="4xl"
         scrollBehavior="inside"
       >
@@ -491,8 +449,8 @@ export default function DocumentsPage() {
                 {previewDoc && (
                   <div className="flex items-center justify-center bg-gray-100 min-h-[400px] max-h-[70vh]">
                     {(previewDoc.fileType?.startsWith('image') || previewDoc.type?.startsWith('image') || previewDoc.isAadhaarDocument) ? (
-                      <img 
-                        src={previewDoc.fileUrl || previewDoc.url} 
+                      <img
+                        src={previewDoc.fileUrl || previewDoc.url}
                         alt={previewDoc.fileName || previewDoc.name}
                         className="max-w-full max-h-[70vh] object-contain"
                       />

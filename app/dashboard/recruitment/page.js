@@ -1,13 +1,15 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Button, Input, Select, SelectItem, Chip, Tooltip, Pagination,
   Card, CardBody, CardHeader, Skeleton
 } from '@heroui/react';
-import toast from '@/utils/toast';
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext';
+import useAuthedSWR from '@/hooks/useAuthedSWR';
+import { DataErrorState } from '@/components/ui/ErrorBoundary';
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator';
 import {
   FaPlus, FaBriefcase, FaMapMarkerAlt, FaClock, FaUsers,
   FaSearch, FaChartBar, FaEye, FaEdit, FaCalendarAlt,
@@ -32,11 +34,6 @@ const EMPLOYMENT_TYPE_LABELS = {
 
 export default function RecruitmentPage() {
   const router = useRouter();
-  const [jobs, setJobs] = useState([]);
-  const [departments, setDepartments] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState(null);
-  const [pagination, setPagination] = useState({ total: 0, pages: 1 });
   const [filters, setFilters] = useState({
     search: '',
     status: '',
@@ -44,78 +41,35 @@ export default function RecruitmentPage() {
     employmentType: '',
     page: 1,
   });
-  const [user, setUser] = useState(null);
 
+  const user = useMemo(() => { try { return JSON.parse(localStorage.getItem('user')) } catch { return null } }, []);
   const { socket, isConnected, subscribe } = useSocket();
 
-  const fetchJobs = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const params = new URLSearchParams({ page: filters.page, limit: 10 });
-      if (filters.search) params.set('search', filters.search);
-      if (filters.status) params.set('status', filters.status);
-      if (filters.department) params.set('department', filters.department);
-      if (filters.employmentType) params.set('employmentType', filters.employmentType);
-
-      const response = await fetch(`/api/recruitment?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
-      if (data.success) {
-        setJobs(data.data);
-        setPagination(data.pagination || { total: data.data.length, pages: 1 });
-      } else {
-        toast.error(data.message || 'Failed to fetch jobs');
-      }
-    } catch (error) {
-      console.error('Fetch jobs error:', error);
-      toast.error('Failed to load job postings');
-    } finally {
-      setLoading(false);
-    }
+  // SWR: Jobs with pagination + filters
+  const jobsParams = useMemo(() => {
+    const params = new URLSearchParams({ page: filters.page, limit: 10 });
+    if (filters.search) params.set('search', filters.search);
+    if (filters.status) params.set('status', filters.status);
+    if (filters.department) params.set('department', filters.department);
+    if (filters.employmentType) params.set('employmentType', filters.employmentType);
+    return params.toString();
   }, [filters]);
+  const { data: jobsRes, error: jobsError, isLoading: jobsLoading, isValidating, mutate: refreshJobs } = useAuthedSWR(`/api/recruitment?${jobsParams}`);
+  const jobs = jobsRes?.data || [];
+  const pagination = jobsRes?.pagination || { total: 0, pages: 1 };
 
-  const fetchDepartments = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/departments', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
-      if (data.success) setDepartments(data.data);
-    } catch (error) {
-      console.error('Fetch departments error:', error);
-    }
-  }, []);
+  // SWR: Departments
+  const { data: deptsRes } = useAuthedSWR('/api/departments');
+  const departments = deptsRes?.data || [];
 
-  const fetchStats = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/recruitment/analytics', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
-      if (data.success) setStats(data.data?.overview);
-    } catch (error) {
-      console.error('Fetch stats error:', error);
-    }
-  }, []);
+  // SWR: Stats
+  const { data: statsRes, mutate: refreshStats } = useAuthedSWR('/api/recruitment/analytics');
+  const stats = statsRes?.data?.overview || null;
 
-  useEffect(() => {
-    const userData = localStorage.getItem('user');
-    if (userData) setUser(JSON.parse(userData));
-    fetchDepartments();
-    fetchStats();
-  }, []);
-
-  useEffect(() => {
-    setLoading(true);
-    fetchJobs();
-  }, [filters]);
-
+  // Socket: real-time updates
   useEffect(() => {
     if (!socket || !isConnected) return;
-    const handleUpdate = () => { fetchJobs(); fetchStats(); };
+    const handleUpdate = () => { refreshJobs(); refreshStats(); };
     const unsub = subscribe ? subscribe(REALTIME_EVENTS.RECRUITMENT_UPDATE, handleUpdate) : undefined;
     return () => { if (unsub) unsub(); };
   }, [socket, isConnected]);
@@ -126,7 +80,11 @@ export default function RecruitmentPage() {
     setFilters((prev) => ({ ...prev, [key]: value, page: key === 'page' ? value : 1 }));
   };
 
-  if (loading && jobs.length === 0) {
+  if (jobsError) {
+    return <DataErrorState message="Failed to load jobs" onRetry={() => refreshJobs()} />;
+  }
+
+  if (jobsLoading && jobs.length === 0) {
     return (
       <div className="page-container">
         <div className="space-y-4 sm:space-y-6">
@@ -153,7 +111,7 @@ export default function RecruitmentPage() {
         <div className="flex md:justify-between md:items-center md:flex-row flex-col">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-default-800">Recruitment</h1>
-            <p className="text-sm sm:text-base text-default-500 mt-1">Manage job postings and candidates</p>
+            <p className="text-sm sm:text-base text-default-500 mt-1">Manage job postings and candidates {' '}<BackgroundRefreshIndicator isValidating={isValidating} /></p>
           </div>
           <div className="flex items-center flex-wrap gap-2 mt-4 md:mt-0">
             <Button size="sm" variant="flat" onPress={() => router.push('/dashboard/recruitment/candidates')} startContent={<FaUsers className="w-3.5 h-3.5" />}>

@@ -1,18 +1,18 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Card, CardBody, CardHeader, Button, Skeleton, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Select, SelectItem } from '@heroui/react'
 import toast from '@/utils/toast'
 import { FaPlus, FaEdit, FaUsers, FaCalendarAlt, FaDownload, FaUpload } from 'react-icons/fa'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton from '@/components/ui/LoadingButton'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 
 export default function LeaveAllocationsPage() {
-  const [employees, setEmployees] = useState([])
-  const [leaveTypes, setLeaveTypes] = useState([])
-  const [leaveBalances, setLeaveBalances] = useState([])
-  const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
-  const [user, setUser] = useState(null)
   const [bulkMode, setBulkMode] = useState(false)
 
   const [formData, setFormData] = useState({
@@ -22,119 +22,69 @@ export default function LeaveAllocationsPage() {
     year: new Date().getFullYear(),
   })
 
-  useEffect(() => {
+  // User from localStorage
+  const user = useMemo(() => {
+    if (typeof window === 'undefined') return null
     const userData = localStorage.getItem('user')
-    if (userData) {
-      const parsedUser = JSON.parse(userData)
-      setUser(parsedUser)
-      
-      // Check if user has permission (HR or Admin only)
-      if (!['hr', 'admin'].includes(parsedUser.role)) {
-        toast.error('Access denied. Only HR and Admin can manage leave allocations.')
-        window.location.href = '/dashboard'
-        return
-      }
-      
-      fetchData()
+    return userData ? JSON.parse(userData) : null
+  }, [])
+
+  // Permission check
+  useEffect(() => {
+    if (user && !['hr', 'admin'].includes(user.role)) {
+      toast.error('Access denied. Only HR and Admin can manage leave allocations.')
+      window.location.href = '/dashboard'
     }
-  }, [selectedYear])
+  }, [user])
 
-  const fetchData = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      
-      // Fetch all data in parallel
-      const [employeesRes, leaveTypesRes, balancesRes] = await Promise.all([
-        fetch('/api/employees?limit=1000', { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch('/api/leave/types', { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch(`/api/leave/balance?year=${selectedYear}`, { headers: { 'Authorization': `Bearer ${token}` } })
-      ])
+  // SWR data fetching
+  const { data: employeesRes, error: employeesError, isLoading: employeesLoading, isValidating: employeesValidating } = useAuthedSWR('/api/employees?limit=1000')
+  const { data: leaveTypesRes, error: leaveTypesError, isLoading: leaveTypesLoading, isValidating: leaveTypesValidating } = useAuthedSWR('/api/leave/types')
+  const { data: balancesRes, error: balancesError, isLoading: balancesLoading, isValidating: balancesValidating, mutate: refreshBalances } = useAuthedSWR(`/api/leave/balance?year=${selectedYear}`)
 
-      const [employeesData, leaveTypesData, balancesData] = await Promise.all([
-        employeesRes.json(),
-        leaveTypesRes.json(),
-        balancesRes.json()
-      ])
+  const employees = employeesRes?.data || []
+  const leaveTypes = useMemo(() => (leaveTypesRes?.data || []).filter(type => type.isActive), [leaveTypesRes])
+  const leaveBalances = balancesRes?.data || []
+  const loading = employeesLoading || leaveTypesLoading || balancesLoading
+  const isValidating = employeesValidating || leaveTypesValidating || balancesValidating
+  const error = employeesError || leaveTypesError || balancesError
 
-      if (employeesData.success) setEmployees(employeesData.data)
-      if (leaveTypesData.success) setLeaveTypes(leaveTypesData.data.filter(type => type.isActive))
-      if (balancesData.success) setLeaveBalances(balancesData.data)
-      
-    } catch (error) {
-      console.error('Fetch data error:', error)
-      toast.error('Failed to fetch data')
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Mutations
+  const createAllocation = useApiMutation({
+    method: 'POST',
+    invalidateKeys: [`/api/leave/balance?year=${selectedYear}`],
+    onSuccess: () => {
+      toast.success('Leave allocation created successfully')
+      setShowModal(false)
+      resetForm()
+    },
+    onError: (err) => toast.error(err.message || 'Failed to create leave allocation'),
+  })
+
+  const bulkAllocation = useApiMutation({
+    method: 'POST',
+    invalidateKeys: [`/api/leave/balance?year=${selectedYear}`],
+    onSuccess: (data) => {
+      toast.success(`Bulk allocation completed for ${data.allocated || 0} employees`)
+    },
+    onError: (err) => toast.error(err.message || 'Failed to perform bulk allocation'),
+  })
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setLoading(true)
-
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/leave/balance', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          ...formData,
-          totalDays: parseInt(formData.totalDays),
-          usedDays: 0,
-          remainingDays: parseInt(formData.totalDays),
-        }),
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        toast.success('Leave allocation created successfully')
-        setShowModal(false)
-        resetForm()
-        fetchData()
-      } else {
-        toast.error(data.message || 'Failed to create leave allocation')
-      }
-    } catch (error) {
-      console.error('Submit allocation error:', error)
-      toast.error('Failed to create leave allocation')
-    } finally {
-      setLoading(false)
-    }
+    await createAllocation.execute('/api/leave/balance', {
+      ...formData,
+      totalDays: parseInt(formData.totalDays),
+      usedDays: 0,
+      remainingDays: parseInt(formData.totalDays),
+    })
   }
 
   const handleBulkAllocation = async () => {
     if (!confirm('This will allocate leave for all employees based on their leave types. Continue?')) {
       return
     }
-
-    setLoading(true)
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/leave/balance/bulk-allocate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ year: selectedYear }),
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        toast.success(`Bulk allocation completed for ${data.allocated} employees`)
-        fetchData()
-      } else {
-        toast.error(data.message || 'Failed to perform bulk allocation')
-      }
-    } catch (error) {
-      console.error('Bulk allocation error:', error)
-      toast.error('Failed to perform bulk allocation')
-    } finally {
-      setLoading(false)
-    }
+    await bulkAllocation.execute('/api/leave/balance/bulk-allocate', { year: selectedYear })
   }
 
   const resetForm = () => {
@@ -163,7 +113,7 @@ export default function LeaveAllocationsPage() {
   const exportBalances = () => {
     const csvData = []
     csvData.push(['Employee Code', 'Employee Name', 'Leave Type', 'Total Days', 'Used Days', 'Remaining Days'])
-    
+
     leaveBalances.forEach(balance => {
       if (balance.employee && balance.leaveType) {
         csvData.push([
@@ -187,6 +137,10 @@ export default function LeaveAllocationsPage() {
     window.URL.revokeObjectURL(url)
   }
 
+  if (error && !leaveBalances.length) {
+    return <DataErrorState error={error} onRetry={() => refreshBalances()} />
+  }
+
   if (loading && leaveBalances.length === 0) {
     return (
       <div className="p-6 pb-24 md:pb-6 space-y-6">
@@ -201,53 +155,54 @@ export default function LeaveAllocationsPage() {
 
   return (
     <div className="p-6 pb-24 md:pb-6">
+      <BackgroundRefreshIndicator isRefreshing={isValidating && !loading} />
       {/* Header */}
       <div className="flex md:justify-between md:items-center md:flex-row flex-col mb-6">
         <div>
           <h1 className="text-3xl font-bold text-default-800">Leave Allocations</h1>
           <p className="text-default-500 mt-1">Manage employee leave balances and allocations</p>
         </div>
-       <div className="grid grid-cols-2 md:flex md:gap-3 md:items-center md:flex-row flex-col gap-2 mt-4 md:mt-0">
-  <Select
-    selectedKeys={[String(selectedYear)]}
-    onSelectionChange={(keys) => setSelectedYear(parseInt(Array.from(keys)[0]))}
-    className="min-w-[120px]"
-    size="sm"
-    aria-label="Select Year"
-  >
-    {[2024, 2025, 2026, 2027].map(year => (
-      <SelectItem key={String(year)}>{String(year)}</SelectItem>
-    ))}
-  </Select>
+        <div className="grid grid-cols-2 md:flex md:gap-3 md:items-center md:flex-row flex-col gap-2 mt-4 md:mt-0">
+          <Select
+            selectedKeys={[String(selectedYear)]}
+            onSelectionChange={(keys) => setSelectedYear(parseInt(Array.from(keys)[0]))}
+            className="min-w-[120px]"
+            size="sm"
+            aria-label="Select Year"
+          >
+            {[2024, 2025, 2026, 2027].map(year => (
+              <SelectItem key={String(year)}>{String(year)}</SelectItem>
+            ))}
+          </Select>
 
-  <Button
-    variant="flat"
-    startContent={<FaDownload className="w-4 h-4" />}
-    onPress={exportBalances}
-  >
-    Export
-  </Button>
+          <Button
+            variant="flat"
+            startContent={<FaDownload className="w-4 h-4" />}
+            onPress={exportBalances}
+          >
+            Export
+          </Button>
 
-  <Button
-    color="primary"
-    variant="flat"
-    startContent={<FaUsers className="w-4 h-4" />}
-    onPress={handleBulkAllocation}
-  >
-    Bulk Allocate
-  </Button>
+          <Button
+            color="primary"
+            variant="flat"
+            startContent={<FaUsers className="w-4 h-4" />}
+            onPress={handleBulkAllocation}
+          >
+            Bulk Allocate
+          </Button>
 
-  <Button
-    color="primary"
-    startContent={<FaPlus className="w-4 h-4" />}
-    onPress={() => {
-      resetForm()
-      setShowModal(true)
-    }}
-  >
-    Add Allocation
-  </Button>
-</div>
+          <Button
+            color="primary"
+            startContent={<FaPlus className="w-4 h-4" />}
+            onPress={() => {
+              resetForm()
+              setShowModal(true)
+            }}
+          >
+            Add Allocation
+          </Button>
+        </div>
 
       </div>
 
@@ -432,9 +387,9 @@ export default function LeaveAllocationsPage() {
                 <Button variant="flat" onPress={onClose}>
                   Cancel
                 </Button>
-                <Button color="primary" type="submit" isLoading={loading}>
-                  {loading ? 'Creating...' : 'Create Allocation'}
-                </Button>
+                <LoadingButton color="primary" type="submit" isLoading={createAllocation.isLoading}>
+                  {createAllocation.isLoading ? 'Creating...' : 'Create Allocation'}
+                </LoadingButton>
               </ModalFooter>
             </form>
           )}

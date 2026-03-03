@@ -1,25 +1,65 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Card, CardBody, CardHeader, Button, Chip, Skeleton, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Textarea, Select, SelectItem, Checkbox } from '@heroui/react'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaCalendarAlt, FaCheckCircle, FaTimesCircle, FaClock } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import { useAuthedSWRStatic } from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton from '@/components/ui/LoadingButton'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
+
+// Skeleton for leave page
+function LeaveSkeleton() {
+  return (
+    <div className="page-container pb-24 md:pb-6">
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <div>
+            <Skeleton className="h-8 w-48 rounded-lg mb-2" />
+            <Skeleton className="h-4 w-64 rounded-lg" />
+          </div>
+          <div className="flex gap-2">
+            <Skeleton className="h-10 w-28 rounded-lg" />
+            <Skeleton className="h-10 w-28 rounded-lg" />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i} shadow="sm">
+              <CardBody className="p-4">
+                <Skeleton className="h-3 w-20 rounded mb-3" />
+                <Skeleton className="h-8 w-12 rounded mb-2" />
+                <Skeleton className="h-3 w-28 rounded" />
+              </CardBody>
+            </Card>
+          ))}
+        </div>
+        <Card shadow="sm">
+          <CardBody className="p-4">
+            <Skeleton className="h-6 w-40 rounded-lg mb-4" />
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="flex gap-4 py-3 border-b border-default-100">
+                <Skeleton className="h-4 flex-1 rounded" />
+                <Skeleton className="h-4 w-24 rounded" />
+                <Skeleton className="h-4 w-24 rounded" />
+                <Skeleton className="h-4 w-16 rounded" />
+                <Skeleton className="h-6 w-20 rounded-full" />
+              </div>
+            ))}
+          </CardBody>
+        </Card>
+      </div>
+    </div>
+  )
+}
 
 export default function LeavePage() {
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-  const [leaves, setLeaves] = useState([])
-  const [leaveBalance, setLeaveBalance] = useState([])
-  const [leaveTypes, setLeaveTypes] = useState([])
-  const [loading, setLoading] = useState(false)
   const [showModal, setShowModal] = useState(false)
-  const [user, setUser] = useState(null)
-  const [employeeId, setEmployeeId] = useState(null)
   const [formData, setFormData] = useState({
     leaveType: '',
     startDate: '',
@@ -28,17 +68,49 @@ export default function LeavePage() {
     isHalfDay: false,
   })
 
+  // Get user info
+  const user = useMemo(() => getCurrentUser(), [])
+  const employeeId = useMemo(() => user ? getEmployeeId(user) : null, [user])
+
+  // --- SWR Data Fetching ---
+  const { data: leavesRes, error: leavesError, isLoading: leavesLoading, isValidating: leavesValidating, mutate: refreshLeaves } = useAuthedSWR(
+    employeeId ? `/api/leave?employeeId=${employeeId}` : null
+  )
+  const leaves = leavesRes?.data || []
+
+  const { data: balanceRes, error: balanceError, isLoading: balanceLoading, mutate: refreshBalance } = useAuthedSWR(
+    employeeId ? `/api/leave/balance?employeeId=${employeeId}` : null
+  )
+  const leaveBalance = balanceRes?.data || []
+
+  const { data: typesRes } = useAuthedSWRStatic('/api/leave/types')
+  const leaveTypes = typesRes?.data || []
+
+  const isLoading = leavesLoading || balanceLoading
+
+  // --- Mutation ---
+  const submitMutation = useApiMutation({
+    invalidateKeys: [
+      employeeId ? `/api/leave?employeeId=${employeeId}` : null,
+      employeeId ? `/api/leave/balance?employeeId=${employeeId}` : null,
+    ].filter(Boolean),
+    onSuccess: () => {
+      toast.success('Leave request submitted successfully')
+      setShowModal(false)
+      setFormData({ leaveType: '', startDate: '', endDate: '', reason: '', isHalfDay: false })
+    },
+    onError: (msg) => toast.error(msg || 'Failed to submit leave request'),
+  })
+
   // Real-time updates
   const { socket, isConnected, onLeaveStatusUpdate, onLeaveRequest, subscribe } = useSocket()
 
-  // Subscribe to real-time leave updates
   useEffect(() => {
     if (!socket || !isConnected || !employeeId) return
 
-    const handleLeaveUpdate = (data) => {
-      console.log('🔄 [Leave] Real-time update received:', data)
-      fetchLeaves(employeeId)
-      fetchLeaveBalance(employeeId)
+    const handleLeaveUpdate = () => {
+      refreshLeaves()
+      refreshBalance()
     }
 
     const unsub1 = onLeaveStatusUpdate?.(handleLeaveUpdate)
@@ -50,71 +122,7 @@ export default function LeavePage() {
       unsub2?.()
       unsub3?.()
     }
-  }, [socket, isConnected, employeeId])
-
-  useEffect(() => {
-    const parsedUser = getCurrentUser()
-    if (parsedUser) {
-      setUser(parsedUser)
-      const empId = getEmployeeId(parsedUser)
-      setEmployeeId(empId)
-      if (empId) {
-        fetchLeaves(empId)
-        fetchLeaveBalance(empId)
-        fetchLeaveTypes()
-      } else {
-        toast.error('Employee information not found. Please logout and login again.')
-      }
-    }
-  }, [])
-
-  const fetchLeaves = async (employeeId) => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/leave?employeeId=${employeeId}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        setLeaves(data.data)
-      }
-    } catch (error) {
-      console.error('Fetch leaves error:', error)
-    }
-  }
-
-  const fetchLeaveBalance = async (employeeId) => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/leave/balance?employeeId=${employeeId}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        setLeaveBalance(data.data)
-      }
-    } catch (error) {
-      console.error('Fetch leave balance error:', error)
-    }
-  }
-
-  const fetchLeaveTypes = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/leave/types', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        setLeaveTypes(data.data)
-      }
-    } catch (error) {
-      console.error('Fetch leave types error:', error)
-    }
-  }
+  }, [socket, isConnected, employeeId, refreshLeaves, refreshBalance])
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target
@@ -128,45 +136,10 @@ export default function LeavePage() {
     e.preventDefault()
     if (!user) return
 
-    setLoading(true)
-
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/leave', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          ...formData,
-          employee: employeeId,
-        }),
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        toast.success('Leave request submitted successfully')
-        setShowModal(false)
-        setFormData({
-          leaveType: '',
-          startDate: '',
-          endDate: '',
-          reason: '',
-          isHalfDay: false,
-        })
-        fetchLeaves(employeeId)
-        fetchLeaveBalance(employeeId)
-      } else {
-        toast.error(data.message || 'Failed to submit leave request')
-      }
-    } catch (error) {
-      console.error('Submit leave error:', error)
-      toast.error('An error occurred while submitting leave request')
-    } finally {
-      setLoading(false)
-    }
+    await submitMutation.execute('/api/leave', {
+      ...formData,
+      employee: employeeId,
+    })
   }
 
   const formatDate = (dateString) => {
@@ -177,17 +150,20 @@ export default function LeavePage() {
     })
   }
 
-  // Prevent hydration mismatch
-  if (!mounted) {
+  // Loading state
+  if (isLoading) {
+    return <LeaveSkeleton />
+  }
+
+  // Error state
+  if (leavesError || balanceError) {
     return (
       <div className="page-container pb-24 md:pb-6">
-        <div className="space-y-4">
-          <Skeleton className="h-10 w-1/4 rounded-lg" />
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {[...Array(4)].map((_, i) => <Skeleton key={i} className="h-28 rounded-lg" />)}
-          </div>
-          <Skeleton className="h-64 rounded-lg" />
-        </div>
+        <DataErrorState
+          title="Failed to load leave data"
+          message={leavesError?.message || balanceError?.message}
+          onRetry={() => { refreshLeaves(); refreshBalance() }}
+        />
       </div>
     )
   }
@@ -198,7 +174,10 @@ export default function LeavePage() {
       <div className="mb-4 sm:mb-6">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-default-800">Leave Management</h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-2xl sm:text-3xl font-bold text-default-800">Leave Management</h1>
+              <BackgroundRefreshIndicator isValidating={leavesValidating} />
+            </div>
             <p className="text-sm sm:text-base text-default-500 mt-1">Apply and manage your leave requests</p>
           </div>
           <div className="flex gap-2 sm:gap-3">
@@ -251,7 +230,7 @@ export default function LeavePage() {
         </CardHeader>
         <CardBody className="p-0">
 
-        {/* Mobile Card View */}
+          {/* Mobile Card View */}
           <div className="block sm:hidden">
             {leaves.length === 0 ? (
               <div className="p-6 text-center text-default-500">
@@ -368,7 +347,7 @@ export default function LeavePage() {
       <Modal isOpen={showModal} onOpenChange={setShowModal} size="lg">
         <ModalContent>
           {(onClose) => (
-            <form onSubmit={(e) => { handleSubmit(e); onClose(); }}>
+            <form onSubmit={handleSubmit}>
               <ModalHeader className="flex flex-col gap-1">
                 <h2 className="text-xl font-bold text-default-800">Apply for Leave</h2>
               </ModalHeader>
@@ -425,12 +404,12 @@ export default function LeavePage() {
                 </div>
               </ModalBody>
               <ModalFooter>
-                <Button variant="flat" onPress={onClose}>
+                <Button variant="flat" onPress={onClose} isDisabled={submitMutation.isLoading}>
                   Cancel
                 </Button>
-                <Button color="primary" type="submit" isLoading={loading}>
+                <LoadingButton type="submit" color="primary" isLoading={submitMutation.isLoading} loadingText="Submitting...">
                   Submit
-                </Button>
+                </LoadingButton>
               </ModalFooter>
             </form>
           )}

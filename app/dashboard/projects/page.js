@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { Card, CardBody, Button, Chip, Skeleton, Progress } from '@heroui/react'
@@ -18,6 +18,11 @@ import {
   FaEye, FaUsers, FaTasks, FaChartLine, FaClipboardCheck, FaTimes, FaCheck
 } from 'react-icons/fa'
 import { playNotificationSound, NotificationSoundTypes } from '@/lib/notificationSounds'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton from '@/components/ui/LoadingButton'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 
 const statusColors = {
   planned: 'primary',
@@ -52,100 +57,47 @@ const priorityColors = {
 
 export default function ProjectsPage() {
   const router = useRouter()
-  const [projects, setProjects] = useState([])
-  const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('active')
-  const [user, setUser] = useState(null)
-  const [respondingTo, setRespondingTo] = useState(null) // Track which project is being responded to
-  const [stats, setStats] = useState({
-    total: 0,
-    active: 0,
-    completed: 0,
-    overdue: 0
-  })
+  const [respondingTo, setRespondingTo] = useState(null)
 
-  // Auto-refresh refs
-  const refreshIntervalRef = useRef(null)
-  const lastFetchRef = useRef(Date.now())
-
-  useEffect(() => {
-    const userData = localStorage.getItem('user')
-    if (userData) {
-      setUser(JSON.parse(userData))
-    }
+  // User from localStorage
+  const user = useMemo(() => {
+    if (typeof window === 'undefined') return null
+    try { return JSON.parse(localStorage.getItem('user')) } catch { return null }
   }, [])
 
-  const fetchProjects = useCallback(async (silent = false) => {
-    try {
-      if (!silent) setLoading(true)
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/projects?status=${statusFilter}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
+  // --- SWR Data Fetching (replaces manual fetch + setInterval) ---
+  const swrKey = `/api/projects?status=${statusFilter}`
+  const { data: projectsRes, error, isLoading, isValidating, mutate: refreshProjects } = useAuthedSWR(swrKey, {
+    refreshInterval: 30000, // Refresh every 30s instead of 10s (reduces load)
+    revalidateOnFocus: true,
+  })
+  const projects = projectsRes?.data || []
 
-      const data = await response.json()
+  // Calculate stats from fetched data
+  const stats = useMemo(() => ({
+    total: projects.length,
+    active: projects.filter(p => ['planned', 'ongoing', 'pending'].includes(p.status)).length,
+    completed: projects.filter(p => ['completed', 'approved'].includes(p.status)).length,
+    overdue: projects.filter(p => p.status === 'overdue' || (new Date(p.endDate) < new Date() && !['completed', 'approved', 'archived'].includes(p.status))).length,
+  }), [projects])
 
-      if (data.success) {
-        setProjects(prev => {
-          // Only update if data changed to prevent layout shifts
-          if (JSON.stringify(prev) !== JSON.stringify(data.data)) {
-            return data.data
-          }
-          return prev
-        })
-
-        // Calculate stats
-        const allProjects = data.data
-        setStats({
-          total: allProjects.length,
-          active: allProjects.filter(p => ['planned', 'ongoing', 'pending'].includes(p.status)).length,
-          completed: allProjects.filter(p => ['completed', 'approved'].includes(p.status)).length,
-          overdue: allProjects.filter(p => p.status === 'overdue' || (new Date(p.endDate) < new Date() && !['completed', 'approved', 'archived'].includes(p.status))).length
-        })
-        lastFetchRef.current = Date.now()
-      } else if (!silent) {
-        toast.error(data.message || 'Failed to fetch projects')
-      }
-    } catch (error) {
-      console.error('Fetch projects error:', error)
-      if (!silent) toast.error('An error occurred while fetching projects')
-    } finally {
-      if (!silent) setLoading(false)
-    }
-  }, [statusFilter])
-
-  // Silent refresh function for background updates
-  const silentRefresh = useCallback(() => {
-    fetchProjects(true)
-  }, [fetchProjects])
-
-  useEffect(() => {
-    fetchProjects()
-  }, [statusFilter, fetchProjects])
-
-  // Auto-refresh every 10 seconds
-  useEffect(() => {
-    refreshIntervalRef.current = setInterval(silentRefresh, 10000)
-
-    // Also refresh when window gains focus
-    const handleFocus = () => {
-      if (Date.now() - lastFetchRef.current > 5000) {
-        silentRefresh()
-      }
-    }
-
-    window.addEventListener('focus', handleFocus)
-
-    return () => {
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current)
-      }
-      window.removeEventListener('focus', handleFocus)
-    }
-  }, [silentRefresh])
+  // --- Invitation mutation ---
+  const invitationMutation = useApiMutation({
+    method: 'POST',
+    invalidateKeys: [swrKey],
+    onSuccess: (data) => {
+      const action = respondingTo?.action
+      toast.success(action === 'accept' ? 'Project invitation accepted!' : 'Project invitation declined')
+      playNotificationSound(NotificationSoundTypes.SUCCESS)
+      setRespondingTo(null)
+    },
+    onError: (msg) => {
+      toast.error(msg || 'Failed to respond to invitation')
+      setRespondingTo(null)
+    },
+  })
 
   const filteredProjects = projects.filter(project => {
     const matchesSearch = search === '' ||
@@ -159,36 +111,10 @@ export default function ProjectsPage() {
     return true
   }
 
-  // Handle accept/reject project invitation
-  const handleRespondToInvitation = async (projectId, action) => {
-    try {
-      setRespondingTo({ projectId, action })
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/projects/${projectId}/respond`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ action })
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        toast.success(action === 'accept' ? 'Project invitation accepted!' : 'Project invitation declined')
-        // Refresh projects list
-        fetchProjects(true)
-        playNotificationSound(NotificationSoundTypes.SUCCESS)
-      } else {
-        toast.error(data.message || 'Failed to respond to invitation')
-      }
-    } catch (error) {
-      console.error('Error responding to invitation:', error)
-      toast.error('Failed to respond to invitation')
-    } finally {
-      setRespondingTo(null)
-    }
+  // Handle accept/reject project invitation (via mutation hook)
+  const handleRespondToInvitation = (projectId, action) => {
+    setRespondingTo({ projectId, action })
+    invitationMutation.execute(`/api/projects/${projectId}/respond`, { action })
   }
 
   const formatDate = (date) => {
@@ -216,8 +142,9 @@ export default function ProjectsPage() {
             <HiOutlineRectangleStack className="w-7 h-7 text-primary" />
             Projects
           </h1>
-          <p className="text-default-500 mt-1">
+          <p className="text-default-500 mt-1 flex items-center gap-2">
             Manage and track your projects
+            <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" />
           </p>
         </div>
         {canCreateProject() && (
@@ -335,7 +262,9 @@ export default function ProjectsPage() {
       </Card>
 
       {/* Projects Grid */}
-      {loading ? (
+      {error ? (
+        <DataErrorState message="Failed to load projects" onRetry={() => refreshProjects()} />
+      ) : isLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {[...Array(6)].map((_, i) => (
             <Card key={i} shadow="sm">

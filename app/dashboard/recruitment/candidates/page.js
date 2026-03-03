@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Button, Chip, Input, Select, SelectItem, Pagination, Tooltip,
@@ -8,6 +8,9 @@ import {
 } from '@heroui/react';
 import toast from '@/utils/toast';
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext';
+import useAuthedSWR from '@/hooks/useAuthedSWR';
+import { DataErrorState } from '@/components/ui/ErrorBoundary';
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator';
 import {
   FaSearch, FaUsers, FaFilter, FaUserPlus, FaChevronRight,
   FaStar, FaEnvelope, FaPhone, FaBriefcase, FaArrowLeft
@@ -30,10 +33,6 @@ const SOURCES = [
 
 export default function CandidatesPage() {
   const router = useRouter();
-  const [candidates, setCandidates] = useState([]);
-  const [jobs, setJobs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [pagination, setPagination] = useState({ total: 0, pages: 1 });
   const [filters, setFilters] = useState({
     search: '', stage: '', source: '', jobPosting: '', page: 1,
   });
@@ -41,54 +40,28 @@ export default function CandidatesPage() {
 
   const { socket, isConnected, subscribe } = useSocket();
 
-  const fetchCandidates = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const params = new URLSearchParams({ page: filters.page, limit: 20 });
-      if (filters.search) params.set('search', filters.search);
-      if (filters.stage) params.set('stage', filters.stage);
-      if (filters.source) params.set('source', filters.source);
-      if (filters.jobPosting) params.set('jobPosting', filters.jobPosting);
-
-      const response = await fetch(`/api/recruitment/candidates?${params}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
-      if (data.success) {
-        setCandidates(data.data);
-        setPagination(data.pagination || { total: data.data.length, pages: 1 });
-      }
-    } catch (error) {
-      console.error('Fetch candidates error:', error);
-      toast.error('Failed to load candidates');
-    } finally {
-      setLoading(false);
-    }
+  // --- SWR: Dynamic key for candidates based on filters ---
+  const candidatesKey = useMemo(() => {
+    const params = new URLSearchParams({ page: filters.page, limit: 20 });
+    if (filters.search) params.set('search', filters.search);
+    if (filters.stage) params.set('stage', filters.stage);
+    if (filters.source) params.set('source', filters.source);
+    if (filters.jobPosting) params.set('jobPosting', filters.jobPosting);
+    return `/api/recruitment/candidates?${params}`;
   }, [filters]);
 
-  const fetchJobs = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/recruitment?limit=100&status=open', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await response.json();
-      if (data.success) setJobs(data.data);
-    } catch (error) {
-      console.error('Fetch jobs error:', error);
-    }
-  }, []);
+  const { data: candidatesResponse, error: candidatesError, isLoading, isValidating, mutate: refreshCandidates } = useAuthedSWR(candidatesKey);
+  const candidates = candidatesResponse?.data || [];
+  const pagination = candidatesResponse?.pagination || { total: candidates.length, pages: 1 };
 
-  useEffect(() => { fetchJobs(); }, []);
+  // --- SWR: Jobs (static) ---
+  const { data: jobsResponse } = useAuthedSWR('/api/recruitment?limit=100&status=open');
+  const jobs = jobsResponse?.data || [];
 
-  useEffect(() => {
-    setLoading(true);
-    fetchCandidates();
-  }, [filters]);
-
+  // --- Socket: auto-refresh on real-time events ---
   useEffect(() => {
     if (!socket || !isConnected) return;
-    const unsub = subscribe?.(REALTIME_EVENTS.RECRUITMENT_CANDIDATE_STAGE_CHANGED, fetchCandidates);
+    const unsub = subscribe?.(REALTIME_EVENTS.RECRUITMENT_CANDIDATE_STAGE_CHANGED, () => refreshCandidates());
     return () => unsub?.();
   }, [socket, isConnected]);
 
@@ -102,7 +75,20 @@ export default function CandidatesPage() {
     return acc;
   }, {});
 
-  if (loading && candidates.length === 0) {
+  // --- Error state ---
+  if (candidatesError) {
+    return (
+      <div className="page-container">
+        <DataErrorState
+          title="Failed to load candidates"
+          message={candidatesError.message}
+          onRetry={() => refreshCandidates()}
+        />
+      </div>
+    );
+  }
+
+  if (isLoading && candidates.length === 0) {
     return (
       <div className="page-container">
         <div className="space-y-4 sm:space-y-6">
@@ -130,7 +116,10 @@ export default function CandidatesPage() {
             </Button>
             <div>
               <h1 className="text-2xl sm:text-3xl font-bold text-default-800">Candidates</h1>
-              <p className="text-sm text-default-500 mt-0.5">Manage all candidates across job postings</p>
+              <p className="text-sm text-default-500 mt-0.5">
+                Manage all candidates across job postings
+                <BackgroundRefreshIndicator isValidating={isValidating} />
+              </p>
             </div>
           </div>
           <div className="flex gap-2 ml-10 md:ml-0">

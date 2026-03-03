@@ -19,11 +19,13 @@ import { InAppNotificationProvider } from '@/contexts/InAppNotificationContext'
 import { ActionableToastProvider } from '@/contexts/ActionableToastContext'
 import { ChatWidgetProvider, useChatWidget } from '@/contexts/ChatWidgetContext'
 import { PageTransitionProvider, usePageTransition } from '@/contexts/PageTransitionContext'
+import RouteProgressBar from '@/components/ui/RouteProgressBar'
+import { ErrorBoundaryWithRetry } from '@/components/ui/ErrorBoundary'
 import { getCurrentUser, getEmployeeId, syncUserData, getToken } from '@/utils/userHelper'
-import { 
-  getOptimisticAuth, 
-  validateAuthBackground, 
-  getCachedProfileStatus, 
+import {
+  getOptimisticAuth,
+  validateAuthBackground,
+  getCachedProfileStatus,
   setCachedProfileStatus,
   getCachedEmployeeData,
   setCachedEmployeeData,
@@ -35,9 +37,9 @@ import CallAlertReceiver from '@/components/CallAlertReceiver'
 // Page transition loading overlay
 function PageTransitionOverlay() {
   const { isNavigating } = usePageTransition()
-  
+
   if (!isNavigating) return null
-  
+
   return (
     <div className="fixed inset-0 bg-background/80 backdrop-blur-[10px] flex items-center justify-center z-[9998]">
       <div className="flex flex-col items-center">
@@ -86,7 +88,7 @@ export default function DashboardLayout({ children }) {
     const checkPasswordChangeRequired = async () => {
       // STEP 1: Check for auth data in localStorage
       const optimisticAuth = getOptimisticAuth()
-      
+
       if (!optimisticAuth) {
         // No auth, redirect to login
         window.location.href = '/login'
@@ -118,7 +120,7 @@ export default function DashboardLayout({ children }) {
 
       try {
         const validationResult = await validateAuthBackground(token, handleInvalidSession)
-        
+
         if (validationResult.forcePasswordChange) {
           console.log('[Dashboard] Password change required (from server), redirecting...')
           const updatedUser = { ...user, forcePasswordChange: true }
@@ -347,83 +349,88 @@ export default function DashboardLayout({ children }) {
       <UnreadMessagesProvider>
         <ChatWidgetProvider>
           <PageTransitionProvider>
-          <InAppNotificationProvider>
-            <ActionableToastProvider>
-            {/* Sync sidebar state to chat widget context */}
-            <SidebarStateSync sidebarCollapsed={sidebarCollapsed} />
-            
-            {/* Page transition loading overlay */}
-            <PageTransitionOverlay />
+            <InAppNotificationProvider>
+              <ActionableToastProvider>
+                {/* Sync sidebar state to chat widget context */}
+                <SidebarStateSync sidebarCollapsed={sidebarCollapsed} />
 
-            {/* Main Layout Container - Flex Row */}
-            <div className="flex h-screen w-full overflow-hidden" style={{ backgroundColor: 'var(--color-bg-main)' }}>
+                {/* Page transition loading overlay */}
+                <PageTransitionOverlay />
 
-              {/* Sidebar - Static on Desktop, Fixed on Mobile */}
-              <Sidebar
-                isOpen={sidebarOpen}
-                setIsOpen={setSidebarOpen}
-                isCollapsed={sidebarCollapsed}
-                setIsCollapsed={setSidebarCollapsed}
-              />
+                {/* Route progress bar - slim top bar during navigation */}
+                <RouteProgressBar />
 
-              {/* Right Side Content - Flex Column */}
-              <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
-                {/* Offline Indicator */}
-                <OfflineIndicator />
+                {/* Main Layout Container - Flex Row */}
+                <div className="flex h-screen w-full overflow-hidden" style={{ backgroundColor: 'var(--color-bg-main)' }}>
 
-                {/* Header - Static at top of right column */}
-                <Header toggleSidebar={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
+                  {/* Sidebar - Static on Desktop, Fixed on Mobile */}
+                  <Sidebar
+                    isOpen={sidebarOpen}
+                    setIsOpen={setSidebarOpen}
+                    isCollapsed={sidebarCollapsed}
+                    setIsCollapsed={setSidebarCollapsed}
+                  />
 
-                {/* Main Content Area - Scrollable */}
-                <main className={`z-0 flex-1 overflow-y-auto ${isChatPage ? 'bg-white dark:bg-slate-800 md:bg-transparent' : ''}`}>
-                  <div className={`min-h-full ${isChatPage ? 'sm:pb-16 px-0 md:px-4 lg:px-8' : 'px-0 sm:px-6 lg:px-8 pt-2 pb-6 sm:py-6'}`}>
-                    {children}
+                  {/* Right Side Content - Flex Column */}
+                  <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
+                    {/* Offline Indicator */}
+                    <OfflineIndicator />
+
+                    {/* Header - Static at top of right column */}
+                    <Header toggleSidebar={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
+
+                    {/* Main Content Area - Scrollable */}
+                    <main className={`z-0 flex-1 overflow-y-auto ${isChatPage ? 'bg-white dark:bg-slate-800 md:bg-transparent' : ''}`}>
+                      <div className={`min-h-full ${isChatPage ? 'sm:pb-16 px-0 md:px-4 lg:px-8' : 'px-0 sm:px-6 lg:px-8 pt-2 pb-6 sm:py-6'}`}>
+                        <ErrorBoundaryWithRetry>
+                          {children}
+                        </ErrorBoundaryWithRetry>
+                      </div>
+
+                      {/* Bottom padding for mobile nav */}
+                      <div className={`w-full flex-shrink-0 md:hidden ${shouldShowFade ? 'h-20' : 'h-16'}`}></div>
+                      {/* Bottom padding for desktop */}
+                      <div className="w-full flex-shrink-0 hidden md:block h-4"></div>
+                    </main>
+
+                    {/* Gradient above bottom nav - Mobile only */}
+                    {shouldShowFade && (
+                      <div
+                        className="md:hidden fixed left-0 right-0 h-[124px] pointer-events-none z-[39]"
+                        style={{
+                          bottom: '68px',
+                          background: `linear-gradient(179.13deg, rgba(249, 250, 251, 0) 0%, var(--color-bg-main) 71.18%)`,
+                          opacity: 1,
+                          transition: 'opacity 0.6s ease-in-out'
+                        }}
+                      />
+                    )}
+
+                    {/* Bottom Navigation for Mobile */}
+                    <BottomNav />
                   </div>
 
-                  {/* Bottom padding for mobile nav */}
-                  <div className={`w-full flex-shrink-0 md:hidden ${shouldShowFade ? 'h-20' : 'h-16'}`}></div>
-                  {/* Bottom padding for desktop */}
-                  <div className="w-full flex-shrink-0 hidden md:block h-4"></div>
-                </main>
+                  {/* Out of Premises Popup */}
+                  <OutOfPremisesPopup />
 
-                {/* Gradient above bottom nav - Mobile only */}
-                {shouldShowFade && (
-                  <div
-                    className="md:hidden fixed left-0 right-0 h-[124px] pointer-events-none z-[39]"
-                    style={{
-                      bottom: '68px',
-                      background: `linear-gradient(179.13deg, rgba(249, 250, 251, 0) 0%, var(--color-bg-main) 71.18%)`,
-                      opacity: 1,
-                      transition: 'opacity 0.6s ease-in-out'
-                    }}
+                  {/* Floating Chat Widget for Desktop */}
+                  <ChatWidgetContainer />
+
+                  {/* Profile Completion Modal */}
+                  <ProfileCompletionModal
+                    isOpen={showProfileCompletionModal}
+                    onClose={handleProfileModalClose}
+                    profileStatus={profileCompletionStatus}
                   />
-                )}
 
-                {/* Bottom Navigation for Mobile */}
-                <BottomNav />
-              </div>
+                  {/* Call Alert Receiver - Global alert listener */}
+                  <CallAlertReceiver />
 
-              {/* Out of Premises Popup */}
-              <OutOfPremisesPopup />
-
-              {/* Floating Chat Widget for Desktop */}
-              <ChatWidgetContainer />
-
-              {/* Profile Completion Modal */}
-              <ProfileCompletionModal
-                isOpen={showProfileCompletionModal}
-                onClose={handleProfileModalClose}
-                profileStatus={profileCompletionStatus}
-              />
-
-              {/* Call Alert Receiver - Global alert listener */}
-              <CallAlertReceiver />
-
-              {/* Web Push Notification Prompt */}
-              <WebPushPrompt />
-            </div>
-            </ActionableToastProvider>
-          </InAppNotificationProvider>
+                  {/* Web Push Notification Prompt */}
+                  <WebPushPrompt />
+                </div>
+              </ActionableToastProvider>
+            </InAppNotificationProvider>
           </PageTransitionProvider>
         </ChatWidgetProvider>
       </UnreadMessagesProvider>

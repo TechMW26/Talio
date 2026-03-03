@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Card, CardBody, Button, Skeleton, Input, Chip } from '@heroui/react'
 import {
   HiOutlineKey,
@@ -15,14 +15,15 @@ import {
 } from 'react-icons/hi2'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 
 export default function UserPasswordsPage() {
   const router = useRouter()
-  const [users, setUsers] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState({ total: 0, withPassword: 0, withoutPassword: 0 })
-  const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, pages: 0 })
-  
+
+  // Filters & pagination
+  const [page, setPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filter, setFilter] = useState('all') // 'all', 'with-password', 'without-password'
@@ -35,43 +36,27 @@ export default function UserPasswordsPage() {
     return () => clearTimeout(timer)
   }, [searchQuery])
 
-  // Fetch users with passwords
-  const fetchUsers = useCallback(async () => {
-    setLoading(true)
-    try {
-      const token = localStorage.getItem('token')
-      const params = new URLSearchParams({
-        page: pagination.page.toString(),
-        limit: pagination.limit.toString(),
-        filter,
-      })
-      
-      if (debouncedSearch) params.set('search', debouncedSearch)
-      
-      const res = await fetch(`/api/employees/user-passwords?${params}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      
-      const data = await res.json()
-      
-      if (data.success) {
-        setUsers(data.data)
-        setPagination(prev => ({ ...prev, ...data.pagination }))
-        setStats(data.stats)
-      } else {
-        toast.error(data.message || 'Failed to fetch data')
-      }
-    } catch (error) {
-      console.error('Fetch error:', error)
-      toast.error('Failed to fetch user passwords')
-    } finally {
-      setLoading(false)
-    }
-  }, [pagination.page, pagination.limit, debouncedSearch, filter])
-
+  // Reset page when filters change
   useEffect(() => {
-    fetchUsers()
-  }, [fetchUsers])
+    setPage(1)
+  }, [debouncedSearch, filter])
+
+  // SWR key for fetching users
+  const swrKey = useMemo(() => {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: '50',
+      filter,
+    })
+    if (debouncedSearch) params.set('search', debouncedSearch)
+    return `/api/employees/user-passwords?${params}`
+  }, [page, debouncedSearch, filter])
+
+  const { data: swrData, error, isLoading, isValidating, mutate: refreshUsers } = useAuthedSWR(swrKey)
+
+  const users = swrData?.data || []
+  const stats = swrData?.stats || { total: 0, withPassword: 0, withoutPassword: 0 }
+  const pagination = swrData?.pagination || { page: 1, limit: 50, total: 0, pages: 0 }
 
   // Copy password to clipboard
   const copyPassword = (password, email) => {
@@ -116,6 +101,7 @@ export default function UserPasswordsPage() {
             <p className="text-theme-text-secondary mt-1">
               View all user credentials from onboarding emails
             </p>
+            <BackgroundRefreshIndicator isValidating={isValidating} />
           </div>
         </div>
       </div>
@@ -167,7 +153,7 @@ export default function UserPasswordsPage() {
             startContent={<HiOutlineMagnifyingGlass className="w-5 h-5 text-default-400" />}
             className="md:max-w-xs"
           />
-          
+
           <div className="flex items-center gap-2">
             <HiOutlineFunnel className="w-5 h-5 text-default-400" />
             <div className="flex gap-2">
@@ -175,7 +161,7 @@ export default function UserPasswordsPage() {
                 size="sm"
                 variant={filter === 'all' ? 'solid' : 'flat'}
                 color={filter === 'all' ? 'primary' : 'default'}
-                onPress={() => { setFilter('all'); setPagination(p => ({ ...p, page: 1 })) }}
+                onPress={() => { setFilter('all'); setPage(1) }}
               >
                 All
               </Button>
@@ -183,7 +169,7 @@ export default function UserPasswordsPage() {
                 size="sm"
                 variant={filter === 'with-password' ? 'solid' : 'flat'}
                 color={filter === 'with-password' ? 'success' : 'default'}
-                onPress={() => { setFilter('with-password'); setPagination(p => ({ ...p, page: 1 })) }}
+                onPress={() => { setFilter('with-password'); setPage(1) }}
               >
                 With Password
               </Button>
@@ -191,7 +177,7 @@ export default function UserPasswordsPage() {
                 size="sm"
                 variant={filter === 'without-password' ? 'solid' : 'flat'}
                 color={filter === 'without-password' ? 'danger' : 'default'}
-                onPress={() => { setFilter('without-password'); setPagination(p => ({ ...p, page: 1 })) }}
+                onPress={() => { setFilter('without-password'); setPage(1) }}
               >
                 Without Password
               </Button>
@@ -228,7 +214,13 @@ export default function UserPasswordsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-default-200 bg-content1">
-                {loading ? (
+                {error && !swrData ? (
+                  <tr>
+                    <td colSpan={6} className="px-4 py-12">
+                      <DataErrorState message={error.message} onRetry={() => refreshUsers()} />
+                    </td>
+                  </tr>
+                ) : isLoading ? (
                   [...Array(10)].map((_, i) => (
                     <tr key={i}>
                       <td colSpan={6} className="px-4 py-4">
@@ -341,27 +333,27 @@ export default function UserPasswordsPage() {
           {pagination.pages > 1 && (
             <div className="flex items-center justify-between px-4 py-3 border-t border-default-200">
               <p className="text-sm text-default-500">
-                Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
+                Showing {((page - 1) * pagination.limit) + 1} to {Math.min(page * pagination.limit, pagination.total)} of {pagination.total}
               </p>
               <div className="flex items-center gap-2">
                 <Button
                   isIconOnly
                   variant="flat"
                   size="sm"
-                  onPress={() => setPagination(p => ({ ...p, page: p.page - 1 }))}
-                  isDisabled={pagination.page === 1}
+                  onPress={() => setPage(p => p - 1)}
+                  isDisabled={page === 1}
                 >
                   <HiOutlineChevronLeft className="w-4 h-4" />
                 </Button>
                 <span className="text-sm text-default-600">
-                  Page {pagination.page} of {pagination.pages}
+                  Page {page} of {pagination.pages}
                 </span>
                 <Button
                   isIconOnly
                   variant="flat"
                   size="sm"
-                  onPress={() => setPagination(p => ({ ...p, page: p.page + 1 }))}
-                  isDisabled={pagination.page === pagination.pages}
+                  onPress={() => setPage(p => p + 1)}
+                  isDisabled={page === pagination.pages}
                 >
                   <HiOutlineChevronRight className="w-4 h-4" />
                 </Button>

@@ -1,11 +1,13 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import WhiteboardCanvas from '@/components/whiteboard/WhiteboardCanvas';
-import Loader from '@/components/ui/Loader';
+import { Skeleton } from '@heroui/react';
 import { FiArrowLeft, FiShare2, FiX, FiUsers, FiMaximize, FiMinimize } from 'react-icons/fi';
 import ModalPortal from '@/components/ui/ModalPortal';
+import useAuthedSWR from '@/hooks/useAuthedSWR';
+import { DataErrorState } from '@/components/ui/ErrorBoundary';
 
 export default function WhiteboardEditorPage() {
   const router = useRouter();
@@ -14,10 +16,15 @@ export default function WhiteboardEditorPage() {
   const containerRef = useRef(null);
   const canvasRef = useRef(null);
 
-  const [board, setBoard] = useState(null);
-  const [permission, setPermission] = useState('view_only');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  // SWR data fetching for board
+  const { data: boardRes, error: boardError, isLoading: boardSWRLoading, mutate: refreshBoard } = useAuthedSWR(
+    boardId ? `/api/whiteboard/${boardId}` : null
+  );
+
+  const board = boardRes?.whiteboard || null;
+  const permission = boardRes?.permission || 'view_only';
+  const loading = boardSWRLoading;
+  const error = boardError?.message || null;
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareEmail, setShareEmail] = useState('');
   const [sharePermission, setSharePermission] = useState('view_only');
@@ -28,6 +35,14 @@ export default function WhiteboardEditorPage() {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [newTitle, setNewTitle] = useState('');
+
+  // Sync sharing and newTitle from SWR data
+  useEffect(() => {
+    if (board) {
+      setSharing(board.sharing || []);
+      setNewTitle(board.title || '');
+    }
+  }, [board]);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [hasEnteredFullscreen, setHasEnteredFullscreen] = useState(false);
   const [isFilePickerOpen, setIsFilePickerOpen] = useState(false);
@@ -129,37 +144,6 @@ export default function WhiteboardEditorPage() {
     };
   };
 
-  // Fetch board
-  const fetchBoard = useCallback(async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem('token');
-      const res = await fetch(`/api/whiteboard/${boardId}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await res.json();
-
-      if (!res.ok) {
-        if (res.status === 404) {
-          router.push('/dashboard/talioboard');
-          return;
-        }
-        throw new Error(data.error || 'Failed to load board');
-      }
-
-      setBoard(data.whiteboard);
-      setPermission(data.permission);
-      setSharing(data.whiteboard.sharing || []);
-      setNewTitle(data.whiteboard.title);
-      setError(null);
-    } catch (err) {
-      console.error('Error loading board:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [boardId, router]);
-
   // Search for users
   const searchUsers = useCallback(async (query = '') => {
     try {
@@ -180,12 +164,6 @@ export default function WhiteboardEditorPage() {
       setLoadingUsers(false);
     }
   }, []);
-
-  useEffect(() => {
-    if (boardId) {
-      fetchBoard();
-    }
-  }, [boardId, fetchBoard]);
 
   // Save handler
   const handleSave = useCallback(async (data) => {
@@ -349,31 +327,22 @@ export default function WhiteboardEditorPage() {
 
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <Loader size="lg" />
+      <div className="h-screen flex flex-col bg-gray-50">
+        <div className="flex items-center gap-4 px-4 py-3 bg-white border-b border-gray-200">
+          <Skeleton className="w-8 h-8 rounded-lg" />
+          <Skeleton className="h-6 w-48 rounded-lg" />
+          <div className="flex-1" />
+          <Skeleton className="w-20 h-8 rounded-lg" />
+        </div>
+        <div className="flex-1">
+          <Skeleton className="w-full h-full" />
         </div>
       </div>
     );
   }
 
   if (error) {
-    return (
-      <div className="h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <span className="text-2xl">⚠️</span>
-          </div>
-          <h2 className="text-lg font-medium text-gray-900 mb-2">{error}</h2>
-          <button
-            onClick={() => router.push('/dashboard/talioboard')}
-            className="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 transition-colors"
-          >
-            Back to Dashboard
-          </button>
-        </div>
-      </div>
-    );
+    return <DataErrorState error={{ message: error }} onRetry={() => refreshBoard()} />;
   }
 
   if (!board) {
@@ -386,7 +355,7 @@ export default function WhiteboardEditorPage() {
       <ModalPortal isOpen={isSaving}>
         <div className="modal-overlay">
           <div className="bg-white rounded-[30px] animate-modal-enter px-6 py-4 flex items-center gap-3 shadow-xl">
-            <Loader size="sm" />
+            <Skeleton className="w-5 h-5 rounded-full" />
             <span className="text-gray-700 font-medium">Saving...</span>
           </div>
         </div>
@@ -491,7 +460,7 @@ export default function WhiteboardEditorPage() {
                     <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-xl border border-gray-200 max-h-64 overflow-y-auto z-10">
                       {loadingUsers ? (
                         <div className="p-4 text-center text-gray-500">
-                          <Loader size="sm" className="mx-auto mb-2" />
+                          <Skeleton className="w-5 h-5 rounded-full mx-auto mb-2" />
                           Searching...
                         </div>
                       ) : safeArrayLength(userResults) === 0 ? (

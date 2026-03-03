@@ -1,14 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { FaMapMarkerAlt, FaPlus, FaEdit, FaTrash, FaStar, FaRegStar, FaClock } from 'react-icons/fa'
+import { Skeleton } from '@heroui/react'
 import GeofenceMap from '@/components/GeofenceMap'
-import Loader from '@/components/ui/Loader'
 import ModalPortal from '@/components/ui/ModalPortal'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 
 export default function GeofenceLocationsPage() {
-  const [locations, setLocations] = useState([])
-  const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingLocation, setEditingLocation] = useState(null)
   const [formData, setFormData] = useState({
@@ -23,26 +25,23 @@ export default function GeofenceLocationsPage() {
     breakTimings: []
   })
 
-  useEffect(() => {
-    fetchLocations()
-  }, [])
+  // SWR: fetch locations
+  const { data: res, error, isLoading, isValidating, mutate: refresh } = useAuthedSWR('/api/geofence/locations')
+  const locations = res?.data || []
 
-  const fetchLocations = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/geofence/locations', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setLocations(data.data)
-      }
-    } catch (error) {
-      console.error('Error fetching locations:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Mutation: save location (create/update)
+  const saveMutation = useApiMutation({
+    invalidateKeys: ['/api/geofence/locations'],
+    onSuccess: () => setShowModal(false),
+    onError: (msg) => alert(msg || 'Failed to save location'),
+  })
+
+  // Mutation: delete location
+  const deleteMutation = useApiMutation({
+    method: 'DELETE',
+    invalidateKeys: ['/api/geofence/locations'],
+    onError: (msg) => alert(msg || 'Failed to delete location'),
+  })
 
   const handleOpenModal = (location = null) => {
     if (location) {
@@ -120,58 +119,17 @@ export default function GeofenceLocationsPage() {
   const handleSave = async (e) => {
     e.preventDefault()
 
-    try {
-      const token = localStorage.getItem('token')
-      const url = editingLocation
-        ? `/api/geofence/locations/${editingLocation._id}`
-        : '/api/geofence/locations'
+    const url = editingLocation
+      ? `/api/geofence/locations/${editingLocation._id}`
+      : '/api/geofence/locations'
+    const method = editingLocation ? 'PUT' : 'POST'
 
-      const method = editingLocation ? 'PUT' : 'POST'
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(formData)
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        setShowModal(false)
-        fetchLocations()
-      } else {
-        alert(data.message || 'Failed to save location')
-      }
-    } catch (error) {
-      console.error('Error saving location:', error)
-      alert('Failed to save location')
-    }
+    saveMutation.execute(url, formData, { method })
   }
 
   const handleDelete = async (locationId) => {
     if (!confirm('Are you sure you want to delete this location?')) return
-
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/geofence/locations/${locationId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        fetchLocations()
-      } else {
-        alert(data.message || 'Failed to delete location')
-      }
-    } catch (error) {
-      console.error('Error deleting location:', error)
-      alert('Failed to delete location')
-    }
+    deleteMutation.execute(`/api/geofence/locations/${locationId}`, null, { method: 'DELETE' })
   }
 
   const handleMapUpdate = (center, radius) => {
@@ -214,16 +172,37 @@ export default function GeofenceLocationsPage() {
     }))
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader size="lg" />
+      <div className="p-6">
+        <div className="flex justify-between items-center mb-6">
+          <div>
+            <Skeleton className="h-8 w-56 rounded-lg mb-2" />
+            <Skeleton className="h-4 w-80 rounded-lg" />
+          </div>
+          <Skeleton className="h-10 w-36 rounded-lg" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="bg-white rounded-lg border-2 border-gray-200 p-4 space-y-3">
+              <Skeleton className="h-6 w-40 rounded-lg" />
+              <Skeleton className="h-4 w-full rounded-lg" />
+              <Skeleton className="h-4 w-3/4 rounded-lg" />
+              <Skeleton className="h-4 w-1/2 rounded-lg" />
+            </div>
+          ))}
+        </div>
       </div>
     )
   }
 
+  if (error) {
+    return <DataErrorState error={error} onRetry={refresh} title="Failed to load geofence locations" />
+  }
+
   return (
     <div className="p-6">
+      <BackgroundRefreshIndicator isValidating={isValidating} />
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">

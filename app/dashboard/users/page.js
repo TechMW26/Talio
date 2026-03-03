@@ -1,37 +1,19 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
+import { Skeleton } from '@heroui/react'
 import { FaUser, FaEye, FaEyeSlash, FaCopy } from 'react-icons/fa'
 import toast from '@/utils/toast'
-import Loader from '@/components/ui/Loader'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 
 export default function UsersPage() {
-  const [users, setUsers] = useState([])
-  const [loading, setLoading] = useState(true)
   const [showPasswords, setShowPasswords] = useState({})
 
-  useEffect(() => {
-    fetchUsers()
-  }, [])
-
-  const fetchUsers = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/users', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        setUsers(data.data)
-      }
-    } catch (error) {
-      console.error('Error fetching users:', error)
-      toast.error('Failed to fetch users')
-    } finally {
-      setLoading(false)
-    }
-  }
+  // --- SWR data fetching ---
+  const { data: usersRes, error, isLoading, isValidating, mutate: refreshUsers } = useAuthedSWR('/api/users')
+  const users = usersRes?.data || []
 
   const togglePasswordVisibility = (userId) => {
     setShowPasswords(prev => ({
@@ -45,10 +27,32 @@ export default function UsersPage() {
     toast.success('Password copied to clipboard!')
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="p-6">
-        <Loader size="lg" className="mx-auto" />
+        <div className="mb-6">
+          <Skeleton className="h-8 w-48 rounded-lg mb-2" />
+          <Skeleton className="h-4 w-72 rounded-lg" />
+        </div>
+        <div className="bg-white rounded-lg shadow-md p-4 space-y-4">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="flex items-center gap-4 py-2">
+              <Skeleton className="w-10 h-10 rounded-full" />
+              <Skeleton className="h-4 w-1/5 rounded-lg" />
+              <Skeleton className="h-4 w-1/4 rounded-lg" />
+              <Skeleton className="h-4 w-20 rounded-lg" />
+              <Skeleton className="h-5 w-16 rounded-full" />
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <DataErrorState message="Failed to load users" onRetry={() => refreshUsers()} />
       </div>
     )
   }
@@ -58,7 +62,10 @@ export default function UsersPage() {
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-800">Users Management</h1>
-        <p className="text-gray-600 mt-1">View all users and their login credentials</p>
+        <p className="text-gray-600 mt-1 flex items-center gap-2">
+          View all users and their login credentials
+          <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" />
+        </p>
       </div>
 
       {/* Users Table */}
@@ -103,8 +110,8 @@ export default function UsersPage() {
                       </div>
                       <div className="ml-4">
                         <div className="text-sm font-medium text-gray-900">
-                          {user.employeeId ? 
-                            `${user.employeeId.firstName} ${user.employeeId.lastName}` : 
+                          {user.employeeId ?
+                            `${user.employeeId.firstName} ${user.employeeId.lastName}` :
                             'No Employee Data'
                           }
                         </div>
@@ -139,25 +146,23 @@ export default function UsersPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      user.role === 'admin' ? 'bg-purple-100 text-purple-800' :
-                      user.role === 'hr' ? 'bg-blue-100 text-blue-800' :
-                      user.role === 'manager' ? 'bg-green-100 text-green-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
+                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.role === 'admin' ? 'bg-purple-100 text-purple-800' :
+                        user.role === 'hr' ? 'bg-blue-100 text-blue-800' :
+                          user.role === 'manager' ? 'bg-green-100 text-green-800' :
+                            'bg-gray-100 text-gray-800'
+                      }`}>
                       {user.role.toUpperCase()}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      user.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                    }`}>
+                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${user.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      }`}>
                       {user.isActive ? 'Active' : 'Inactive'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {user.lastLogin ? 
-                      new Date(user.lastLogin).toLocaleDateString() : 
+                    {user.lastLogin ?
+                      new Date(user.lastLogin).toLocaleDateString() :
                       'Never'
                     }
                   </td>

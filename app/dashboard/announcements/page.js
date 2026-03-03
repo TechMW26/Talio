@@ -1,28 +1,38 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
+import { Skeleton } from '@heroui/react'
 import { FaPlus, FaBullhorn, FaCalendarAlt, FaExclamationTriangle, FaUsers, FaEdit, FaTrash } from 'react-icons/fa'
-import Loader from '@/components/ui/Loader'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 
 export default function AnnouncementsPage() {
   const router = useRouter()
-  const [announcements, setAnnouncements] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState(null)
+
+  const user = useMemo(() => {
+    if (typeof window === 'undefined') return null
+    try { return JSON.parse(localStorage.getItem('user')) } catch { return null }
+  }, [])
+
+  // --- SWR data fetching ---
+  const { data: announcementsRes, error, isLoading, isValidating, mutate: refreshAnnouncements } = useAuthedSWR('/api/announcements')
+  const announcements = announcementsRes?.data || []
 
   // Real-time updates
   const { socket, isConnected, onAnnouncementUpdate, subscribe } = useSocket()
 
   // Subscribe to real-time announcement updates
-  useEffect(() => {
+  useState(() => {
     if (!socket || !isConnected) return
 
     const handleAnnouncementUpdate = (data) => {
       console.log('🔄 [Announcements] Real-time update received:', data)
-      fetchAnnouncements()
+      refreshAnnouncements()
     }
 
     const unsub1 = onAnnouncementUpdate?.(handleAnnouncementUpdate)
@@ -34,57 +44,19 @@ export default function AnnouncementsPage() {
       unsub2?.()
       unsub3?.()
     }
-  }, [socket, isConnected])
+  })
 
-  useEffect(() => {
-    const userData = localStorage.getItem('user')
-    if (userData) {
-      const parsedUser = JSON.parse(userData)
-      setUser(parsedUser)
-    }
-    fetchAnnouncements()
-  }, [])
+  // --- Delete mutation ---
+  const deleteMutation = useApiMutation({
+    method: 'DELETE',
+    invalidateKeys: ['/api/announcements'],
+    onSuccess: () => toast.success('Announcement deleted successfully'),
+    onError: (msg) => toast.error(msg || 'Failed to delete announcement'),
+  })
 
-  const fetchAnnouncements = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/announcements', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        setAnnouncements(data.data)
-      }
-    } catch (error) {
-      console.error('Fetch announcements error:', error)
-      toast.error('Failed to fetch announcements')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleDelete = async (announcementId) => {
+  const handleDelete = (announcementId) => {
     if (!confirm('Are you sure you want to delete this announcement?')) return
-
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/announcements/${announcementId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        toast.success('Announcement deleted successfully')
-        fetchAnnouncements()
-      } else {
-        toast.error(data.message || 'Failed to delete announcement')
-      }
-    } catch (error) {
-      console.error('Delete announcement error:', error)
-      toast.error('Failed to delete announcement')
-    }
+    deleteMutation.execute(`/api/announcements/${announcementId}`)
   }
 
   const getPriorityColor = (priority) => {
@@ -115,7 +87,10 @@ export default function AnnouncementsPage() {
       <div className="flex md:justify-between md:items-center md:flex-row flex-col gap-                3 sm:gap-4 mb-4 sm:mb-6">
         <div>
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800">Announcements</h1>
-          <p className="text-sm sm:text-base text-gray-600 mt-1">Company-wide announcements and updates</p>
+          <p className="text-sm sm:text-base text-gray-600 mt-1">
+            Company-wide announcements and updates
+            <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" />
+          </p>
         </div>
         {canManageAnnouncements() && (
           <button
@@ -130,10 +105,25 @@ export default function AnnouncementsPage() {
 
       {/* Announcements List */}
       <div className="space-y-3 sm:space-y-4">
-        {loading ? (
-          <div className="bg-white rounded-lg shadow-md p-6 sm:p-8 text-center">
-            <Loader size="lg" className="mx-auto" />
-            <p className="mt-3 sm:mt-4 text-sm sm:text-base text-gray-600">Loading announcements...</p>
+        {error ? (
+          <DataErrorState message="Failed to load announcements" onRetry={() => refreshAnnouncements()} />
+        ) : isLoading ? (
+          <div className="space-y-3 sm:space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="bg-white rounded-lg shadow-md p-4 sm:p-6 space-y-3">
+                <div className="flex items-center gap-3">
+                  <Skeleton className="w-6 h-6 rounded" />
+                  <Skeleton className="h-5 w-1/3 rounded-lg" />
+                  <Skeleton className="w-16 h-5 rounded-full" />
+                </div>
+                <Skeleton className="h-4 w-full rounded-lg" />
+                <Skeleton className="h-4 w-2/3 rounded-lg" />
+                <div className="flex gap-3">
+                  <Skeleton className="h-3 w-24 rounded-lg" />
+                  <Skeleton className="h-3 w-32 rounded-lg" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : announcements.length === 0 ? (
           <div className="bg-white rounded-lg shadow-md p-6 sm:p-8 text-center text-sm sm:text-base text-gray-500">
@@ -143,26 +133,23 @@ export default function AnnouncementsPage() {
           announcements.map((announcement) => (
             <div
               key={announcement._id}
-              className={`rounded-lg shadow-md p-4 sm:p-6 hover:shadow-lg transition-shadow ${
-                announcement.isDepartmentAnnouncement
+              className={`rounded-lg shadow-md p-4 sm:p-6 hover:shadow-lg transition-shadow ${announcement.isDepartmentAnnouncement
                   ? 'bg-purple-50 border-l-4 border-purple-500'
                   : 'bg-white'
-              }`}
+                }`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center space-x-2 sm:space-x-3 mb-2 flex-wrap">
-                    <FaBullhorn className={`text-base sm:text-xl flex-shrink-0 ${
-                      announcement.isDepartmentAnnouncement ? 'text-purple-600' : 'text-primary-500'
-                    }`} />
+                    <FaBullhorn className={`text-base sm:text-xl flex-shrink-0 ${announcement.isDepartmentAnnouncement ? 'text-purple-600' : 'text-primary-500'
+                      }`} />
                     <h3 className="text-base sm:text-xl font-bold text-gray-800 break-words">
                       {announcement.title}
                     </h3>
-                    <span className={`px-2 sm:px-3 py-0.5 sm:py-1 text-xs font-semibold rounded-full ${
-                      announcement.priority === 'high' ? 'bg-red-100 text-red-800' :
-                      announcement.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-blue-100 text-blue-800'
-                    }`}>
+                    <span className={`px-2 sm:px-3 py-0.5 sm:py-1 text-xs font-semibold rounded-full ${announcement.priority === 'high' ? 'bg-red-100 text-red-800' :
+                        announcement.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-blue-100 text-blue-800'
+                      }`}>
                       {announcement.priority}
                     </span>
                     {announcement.isDepartmentAnnouncement && (

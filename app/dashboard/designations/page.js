@@ -1,17 +1,18 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Button } from '@heroui/react'
+import { useState } from 'react'
+import { Button, Skeleton } from '@heroui/react'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaEdit, FaTrash, FaBriefcase } from 'react-icons/fa'
-import Loader from '@/components/ui/Loader'
 import ModalPortal from '@/components/ui/ModalPortal'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton from '@/components/ui/LoadingButton'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 
 export default function DesignationsPage() {
-  const [designations, setDesignations] = useState([])
-
-  const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingDesig, setEditingDesig] = useState(null)
   const [formData, setFormData] = useState({
@@ -19,85 +20,43 @@ export default function DesignationsPage() {
     description: '',
   })
 
+  // --- SWR data fetching ---
+  const { data: desigRes, error, isLoading, isValidating, mutate: refreshDesignations } = useAuthedSWR('/api/designations')
+  const designations = desigRes?.data || []
+
   // Real-time updates
   const { socket, isConnected, subscribe } = useSocket()
 
-  useEffect(() => {
-    fetchDesignations()
-  }, [])
-
-  // Subscribe to real-time designation updates
-  useEffect(() => {
+  useState(() => {
     if (!socket || !isConnected) return
-
-    const handleDesignationUpdate = (data) => {
-      console.log('🔄 [Designations] Real-time update received:', data)
-      fetchDesignations()
-    }
-
-    // Listen for generic dashboard refresh or designation-specific events
+    const handleDesignationUpdate = () => refreshDesignations()
     const unsub = subscribe?.('designation-updated', handleDesignationUpdate)
+    return () => unsub?.()
+  })
 
-    return () => {
-      unsub?.()
-    }
-  }, [socket, isConnected])
+  // --- Submit mutation (create/edit) ---
+  const submitMutation = useApiMutation({
+    invalidateKeys: ['/api/designations'],
+    onSuccess: (data) => {
+      toast.success(data.message || 'Designation saved successfully')
+      handleCloseModal()
+    },
+    onError: (msg) => toast.error(msg || 'Failed to save designation'),
+  })
 
-  const fetchDesignations = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/designations', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
+  // --- Delete mutation ---
+  const deleteMutation = useApiMutation({
+    method: 'DELETE',
+    invalidateKeys: ['/api/designations'],
+    onSuccess: (data) => toast.success(data.message || 'Designation deleted'),
+    onError: (msg) => toast.error(msg || 'Failed to delete designation'),
+  })
 
-      const data = await response.json()
-      if (data.success) {
-        setDesignations(data.data)
-      }
-    } catch (error) {
-      console.error('Fetch designations error:', error)
-      toast.error('Failed to fetch designations')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-
-
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault()
-
-    try {
-      const token = localStorage.getItem('token')
-      const url = editingDesig
-        ? `/api/designations/${editingDesig._id}`
-        : '/api/designations'
-      const method = editingDesig ? 'PUT' : 'POST'
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(formData),
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        toast.success(data.message)
-        setShowModal(false)
-        setEditingDesig(null)
-        setFormData({ title: '', description: '' })
-        fetchDesignations()
-      } else {
-        toast.error(data.message)
-      }
-    } catch (error) {
-      console.error('Submit error:', error)
-      toast.error('Failed to save designation')
-    }
+    const url = editingDesig ? `/api/designations/${editingDesig._id}` : '/api/designations'
+    const method = editingDesig ? 'PUT' : 'POST'
+    submitMutation.execute(url, formData, { method })
   }
 
   const handleEdit = (desig) => {
@@ -109,28 +68,9 @@ export default function DesignationsPage() {
     setShowModal(true)
   }
 
-  const handleDelete = async (id) => {
+  const handleDelete = (id) => {
     if (!confirm('Are you sure you want to delete this designation?')) return
-
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/designations/${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        toast.success(data.message)
-        fetchDesignations()
-      } else {
-        toast.error(data.message)
-      }
-    } catch (error) {
-      console.error('Delete error:', error)
-      toast.error('Failed to delete designation')
-    }
+    deleteMutation.execute(`/api/designations/${id}`)
   }
 
   const handleCloseModal = () => {
@@ -145,7 +85,10 @@ export default function DesignationsPage() {
       <div className="flex md:justify-between md:items-center md:flex-row flex-col mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-800">Designations</h1>
-          <p className="text-gray-600 mt-1">Manage job designations and roles</p>
+          <p className="text-gray-600 mt-1 flex items-center gap-2">
+            Manage job designations and roles
+            <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" />
+          </p>
         </div>
         <Button
           onPress={() => setShowModal(true)}
@@ -185,10 +128,19 @@ export default function DesignationsPage() {
           <h2 className="text-xl font-semibold text-gray-800">All Designations</h2>
         </div>
 
-        {loading ? (
-          <div className="p-8 text-center">
-            <Loader size="lg" />
-            <p className="mt-4 text-gray-600">Loading designations...</p>
+        {error ? (
+          <div className="p-8">
+            <DataErrorState message="Failed to load designations" onRetry={() => refreshDesignations()} />
+          </div>
+        ) : isLoading ? (
+          <div className="p-4 space-y-3">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="flex items-center gap-4 py-3 px-6">
+                <Skeleton className="w-10 h-10 rounded-lg" />
+                <Skeleton className="h-4 w-1/4 rounded-lg" />
+                <Skeleton className="h-4 w-1/3 rounded-lg" />
+              </div>
+            ))}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -297,9 +249,14 @@ export default function DesignationsPage() {
                 >
                   Cancel
                 </Button>
-                <Button type="submit" color="primary">
+                <LoadingButton
+                  type="submit"
+                  color="primary"
+                  isLoading={submitMutation.isLoading}
+                  loadingText={editingDesig ? 'Updating...' : 'Creating...'}
+                >
                   {editingDesig ? 'Update' : 'Create'}
-                </Button>
+                </LoadingButton>
               </div>
             </form>
           </div>

@@ -1,87 +1,95 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
+import { Skeleton } from '@heroui/react'
 import toast from '@/utils/toast'
 import { FaCheck, FaTimes, FaEye, FaFileInvoiceDollar, FaUser } from 'react-icons/fa'
 import { getCurrentUser } from '@/utils/userHelper'
 import { useRouter } from 'next/navigation'
-import Loader from '@/components/ui/Loader'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton from '@/components/ui/LoadingButton'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 
 export default function ExpenseApprovalsPage() {
-  const [expenses, setExpenses] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState(null)
   const router = useRouter()
+  const [processingId, setProcessingId] = useState(null)
 
-  useEffect(() => {
+  const user = useMemo(() => {
     const parsedUser = getCurrentUser()
-    if (parsedUser) {
-      setUser(parsedUser)
-      if (['admin', 'hr', 'manager', 'department_head'].includes(parsedUser.role)) {
-        fetchPendingExpenses()
-      } else {
-        toast.error('Unauthorized access')
-        router.push('/dashboard/expenses')
-      }
+    if (parsedUser && !['admin', 'hr', 'manager', 'department_head'].includes(parsedUser.role)) {
+      toast.error('Unauthorized access')
+      router.push('/dashboard/expenses')
+      return null
     }
+    return parsedUser
   }, [])
 
-  const fetchPendingExpenses = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      // Fetch all pending expenses awaiting approval
-      const response = await fetch('/api/expenses?status=pending', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
+  // --- SWR data fetching ---
+  const { data: expensesRes, error, isLoading, isValidating, mutate: refreshExpenses } = useAuthedSWR(
+    user ? '/api/expenses?status=pending' : null
+  )
+  const expenses = expensesRes?.data || []
 
-      const data = await response.json()
-      if (data.success) {
-        setExpenses(data.data || [])
-      } else {
-        toast.error(data.message || 'Failed to fetch expenses')
-      }
-    } catch (error) {
-      console.error('Fetch expenses error:', error)
-      toast.error('Failed to fetch expenses')
-    } finally {
-      setLoading(false)
-    }
+  // --- Action mutation (approve/reject) ---
+  const actionMutation = useApiMutation({
+    method: 'PUT',
+    invalidateKeys: ['/api/expenses'],
+    onSuccess: (data, { action }) => {
+      toast.success(`Expense ${action} successfully`)
+      setProcessingId(null)
+    },
+    onError: (msg) => {
+      toast.error(msg || 'Failed to process expense')
+      setProcessingId(null)
+    },
+  })
+
+  const handleAction = (expenseId, action, reason = '') => {
+    setProcessingId(expenseId)
+    actionMutation.execute(`/api/expenses/${expenseId}`, {
+      status: action,
+      approvedBy: user?.employeeId?._id || user?.employeeId,
+      approvedDate: new Date(),
+      rejectionReason: reason
+    })
   }
 
-  const handleAction = async (expenseId, action, reason = '') => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/expenses/${expenseId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          status: action, // 'approved' or 'rejected'
-          approvedBy: user.employeeId?._id || user.employeeId, // Assuming user object structure
-          approvedDate: new Date(),
-          rejectionReason: reason
-        })
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        toast.success(`Expense ${action} successfully`)
-        fetchPendingExpenses() // Refresh list
-      } else {
-        toast.error(data.message || `Failed to ${action} expense`)
-      }
-    } catch (error) {
-      console.error('Action error:', error)
-      toast.error(`Failed to ${action} expense`)
-    }
-  }
-
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="p-6 flex justify-center">
-        <Loader size="lg" />
+      <div className="p-6">
+        <div className="mb-6">
+          <Skeleton className="h-7 w-48 rounded-lg mb-2" />
+          <Skeleton className="h-4 w-64 rounded-lg" />
+        </div>
+        <div className="grid gap-4">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="bg-white rounded-lg shadow-md p-6 border-l-4 border-gray-200 space-y-3">
+              <div className="flex gap-3">
+                <Skeleton className="w-16 h-5 rounded" />
+                <Skeleton className="w-24 h-5 rounded" />
+              </div>
+              <div className="flex items-center gap-3">
+                <Skeleton className="w-10 h-10 rounded-full" />
+                <div>
+                  <Skeleton className="h-4 w-32 rounded-lg mb-1" />
+                  <Skeleton className="h-3 w-20 rounded-lg" />
+                </div>
+              </div>
+              <Skeleton className="h-5 w-40 rounded-lg" />
+              <Skeleton className="h-8 w-24 rounded-lg" />
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <DataErrorState message="Failed to load pending expenses" onRetry={() => refreshExpenses()} />
       </div>
     )
   }
@@ -90,7 +98,10 @@ export default function ExpenseApprovalsPage() {
     <div className="p-6">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-800">Expense Approvals</h1>
-        <p className="text-gray-600">Review and approve employee expense claims</p>
+        <p className="text-gray-600 flex items-center gap-2">
+          Review and approve employee expense claims
+          <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" />
+        </p>
       </div>
 
       {expenses.length === 0 ? (
@@ -112,7 +123,7 @@ export default function ExpenseApprovalsPage() {
                       {new Date(expense.expenseDate).toLocaleDateString()}
                     </span>
                   </div>
-                  
+
                   <div className="flex items-center gap-3 mb-2">
                     <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600">
                       <FaUser />
@@ -134,21 +145,30 @@ export default function ExpenseApprovalsPage() {
                 </div>
 
                 <div className="flex gap-3">
-                  <button
-                    onClick={() => {
+                  <LoadingButton
+                    onPress={() => {
                       const reason = prompt('Enter rejection reason:')
                       if (reason) handleAction(expense._id, 'rejected', reason)
                     }}
-                    className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+                    color="danger"
+                    variant="flat"
+                    isLoading={processingId === expense._id && actionMutation.isLoading}
+                    isDisabled={processingId !== null && processingId !== expense._id}
+                    startContent={<FaTimes />}
+                    loadingText="Rejecting..."
                   >
-                    <FaTimes /> Reject
-                  </button>
-                  <button
-                    onClick={() => handleAction(expense._id, 'approved')}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors shadow-sm"
+                    Reject
+                  </LoadingButton>
+                  <LoadingButton
+                    onPress={() => handleAction(expense._id, 'approved')}
+                    color="success"
+                    isLoading={processingId === expense._id && actionMutation.isLoading}
+                    isDisabled={processingId !== null && processingId !== expense._id}
+                    startContent={<FaCheck />}
+                    loadingText="Approving..."
                   >
-                    <FaCheck /> Approve
-                  </button>
+                    Approve
+                  </LoadingButton>
                 </div>
               </div>
             </div>

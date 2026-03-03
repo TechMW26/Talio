@@ -1,156 +1,91 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { FaCheck, FaTimes, FaCalendarCheck, FaExclamationCircle, FaChevronDown, FaChevronUp, FaFilter, FaBuilding } from 'react-icons/fa'
-import { Card, CardBody, Button, Chip, Skeleton, Select, SelectItem, Avatar, Accordion, AccordionItem } from '@heroui/react'
+import { Card, CardBody, Chip, Skeleton, Select, SelectItem, Avatar, Accordion, AccordionItem } from '@heroui/react'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton from '@/components/ui/LoadingButton'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 
 export default function TeamRegularisationPage() {
   const router = useRouter()
-  const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState(null)
-  const [hasAccess, setHasAccess] = useState(false)
-  const [pendingCorrections, setPendingCorrections] = useState([])
-  const [allCorrections, setAllCorrections] = useState([])
-  const [processingCorrection, setProcessingCorrection] = useState(null)
   const [expandedCards, setExpandedCards] = useState({})
   const [statusFilter, setStatusFilter] = useState('pending')
-  const [departments, setDepartments] = useState([])
   const [selectedDepartment, setSelectedDepartment] = useState('all')
+  const [processingCorrection, setProcessingCorrection] = useState(null)
 
-  useEffect(() => {
-    const userData = localStorage.getItem('user')
-    if (userData) {
-      const parsedUser = JSON.parse(userData)
-      setUser(parsedUser)
-      checkAccess(parsedUser)
-    }
+  const user = useMemo(() => {
+    if (typeof window === 'undefined') return null
+    try { return JSON.parse(localStorage.getItem('user')) } catch { return null }
   }, [])
 
-  const checkAccess = async (currentUser) => {
-    try {
-      // Admin and HR have full access
-      if (['admin', 'hr'].includes(currentUser?.role)) {
-        setHasAccess(true)
-        fetchDepartments()
-        fetchCorrections()
-        return
-      }
+  const isAdminOrHR = ['admin', 'hr'].includes(user?.role)
 
-      // Check for department head status
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/team/check-head', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
+  // Check department head access for non-admin/HR users
+  const { data: accessRes, isLoading: accessLoading } = useAuthedSWR(
+    user && !isAdminOrHR ? '/api/team/check-head' : null
+  )
+  const hasAccess = isAdminOrHR || (accessRes?.success && accessRes?.isDepartmentHead)
+  const accessResolved = isAdminOrHR || (!accessLoading && accessRes !== undefined)
 
-      const data = await response.json()
-      
-      if (data.success && data.isDepartmentHead) {
-        setHasAccess(true)
-        fetchCorrections()
-      } else {
-        setHasAccess(false)
-        setLoading(false)
-      }
-    } catch (error) {
-      console.error('Error checking access:', error)
-      setLoading(false)
-    }
-  }
+  // Fetch departments (admin/HR only)
+  const { data: deptsRes } = useAuthedSWR(isAdminOrHR ? '/api/departments' : null)
+  const departments = deptsRes?.data || []
 
-  const fetchDepartments = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/departments', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setDepartments(data.data || [])
-      }
-    } catch (error) {
-      console.error('Error fetching departments:', error)
-    }
-  }
+  // Build query params for corrections
+  const deptParam = selectedDepartment && selectedDepartment !== 'all' ? `&department=${selectedDepartment}` : ''
 
-  const fetchCorrections = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      
-      // Build query params
-      let queryParams = 'type=pending'
-      if (selectedDepartment && selectedDepartment !== 'all') {
-        queryParams += `&department=${selectedDepartment}`
-      }
-      
-      // Fetch pending corrections
-      const pendingResponse = await fetch(`/api/attendance/corrections?${queryParams}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const pendingData = await pendingResponse.json()
-      
-      // Fetch all corrections for history
-      let allQueryParams = 'type=all'
-      if (selectedDepartment && selectedDepartment !== 'all') {
-        allQueryParams += `&department=${selectedDepartment}`
-      }
-      const allResponse = await fetch(`/api/attendance/corrections?${allQueryParams}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const allData = await allResponse.json()
-      
-      if (pendingData.success) {
-        setPendingCorrections(pendingData.data)
-      }
-      if (allData.success) {
-        setAllCorrections(allData.data)
-      }
-    } catch (error) {
-      console.error('Fetch corrections error:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  // Fetch pending corrections
+  const {
+    data: pendingRes,
+    error: pendingError,
+    isLoading: pendingLoading,
+    isValidating: pendingValidating,
+    mutate: refreshPending,
+  } = useAuthedSWR(hasAccess ? `/api/attendance/corrections?type=pending${deptParam}` : null)
+  const pendingCorrections = pendingRes?.data || []
 
-  // Refetch when department filter changes
-  useEffect(() => {
-    if (hasAccess) {
-      setLoading(true)
-      fetchCorrections()
-    }
-  }, [selectedDepartment])
+  // Fetch all corrections (history)
+  const {
+    data: allRes,
+    error: allError,
+    isLoading: allLoading,
+    isValidating: allValidating,
+    mutate: refreshAll,
+  } = useAuthedSWR(hasAccess ? `/api/attendance/corrections?type=all${deptParam}` : null)
+  const allCorrections = allRes?.data || []
+
+  const isLoading = !accessResolved || (hasAccess && (pendingLoading || allLoading))
+  const error = pendingError || allError
+  const isValidating = pendingValidating || allValidating
+
+  const refresh = () => { refreshPending(); refreshAll() }
+
+  // Mutation for approve/reject
+  const { execute: executeAction } = useApiMutation({
+    method: 'PATCH',
+    onSuccess: (data) => {
+      toast.success(data.message || 'Correction updated successfully')
+      setProcessingCorrection(null)
+      refresh()
+    },
+    onError: (err) => {
+      toast.error(err.message || 'Failed to update correction')
+      setProcessingCorrection(null)
+    },
+  })
 
   const handleApproveReject = async (correctionId, action, comments = '') => {
     setProcessingCorrection(correctionId)
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/attendance/corrections', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          correctionId,
-          action,
-          reviewerComments: comments
-        })
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        toast.success(`Correction ${action}d successfully`)
-        fetchCorrections()
-      } else {
-        toast.error(data.message || `Failed to ${action} correction`)
-      }
-    } catch (error) {
-      console.error(`${action} correction error:`, error)
-      toast.error(`Failed to ${action} correction`)
-    } finally {
-      setProcessingCorrection(null)
-    }
+    await executeAction('/api/attendance/corrections', {
+      correctionId,
+      action,
+      reviewerComments: comments,
+    })
   }
 
   const formatTime = (dateString, { timeZone } = {}) => {
@@ -200,9 +135,7 @@ export default function TeamRegularisationPage() {
     }
   }
 
-  const isAdminOrHR = ['admin', 'hr'].includes(user?.role)
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen px-4 py-4 sm:p-6 lg:p-8 pb-14 md:pb-6">
         <div className="mb-6">
@@ -219,6 +152,18 @@ export default function TeamRegularisationPage() {
             <Skeleton key={i} className="h-24 rounded-lg" />
           ))}
         </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen px-4 py-4 sm:p-6 lg:p-8 pb-14 md:pb-6">
+        <DataErrorState
+          title="Error loading regularisation data"
+          message={error.message || 'Failed to load attendance corrections'}
+          onRetry={refresh}
+        />
       </div>
     )
   }
@@ -249,9 +194,10 @@ export default function TeamRegularisationPage() {
           <h1 className="text-2xl sm:text-3xl font-bold text-default-900">Attendance Regularisation</h1>
           <p className="text-default-500 mt-1">
             Review and approve attendance correction requests {isAdminOrHR ? 'across all departments' : 'from your team'}
+            <BackgroundRefreshIndicator isValidating={isValidating} className="ml-2" />
           </p>
         </div>
-        
+
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-3">
           {/* Department filter - only for admin/HR */}
@@ -271,7 +217,7 @@ export default function TeamRegularisationPage() {
               ))}
             </Select>
           )}
-          
+
           {/* Status filter */}
           <Select
             label="Status"
@@ -344,7 +290,7 @@ export default function TeamRegularisationPage() {
             </div>
             <h3 className="text-xl font-semibold text-default-700 mb-2">No Requests Found</h3>
             <p className="text-default-500">
-              {statusFilter === 'pending' 
+              {statusFilter === 'pending'
                 ? 'There are no pending attendance correction requests at the moment.'
                 : `No ${statusFilter} requests found.`
               }
@@ -354,18 +300,17 @@ export default function TeamRegularisationPage() {
       ) : (
         <div className="space-y-4">
           {filteredCorrections.map((correction) => (
-            <Card 
-              key={correction._id} 
+            <Card
+              key={correction._id}
               shadow="sm"
-              className={`border-l-4 overflow-visible ${
-                correction.status === 'pending' ? 'border-l-warning-500' :
-                correction.status === 'approved' ? 'border-l-success-500' :
-                'border-l-danger-500'
-              }`}
+              className={`border-l-4 overflow-visible ${correction.status === 'pending' ? 'border-l-warning-500' :
+                  correction.status === 'approved' ? 'border-l-success-500' :
+                    'border-l-danger-500'
+                }`}
             >
               <CardBody className="p-0">
                 {/* Header - Always visible */}
-                <div 
+                <div
                   className="p-4 cursor-pointer hover:bg-default-50 transition-colors"
                   onClick={() => toggleCard(correction._id)}
                 >
@@ -385,7 +330,7 @@ export default function TeamRegularisationPage() {
                         </p>
                       </div>
                     </div>
-                    
+
                     <div className="flex items-center space-x-3">
                       <Chip color={getStatusColor(correction.status)} variant="flat" size="sm">
                         {correction.status.charAt(0).toUpperCase() + correction.status.slice(1)}
@@ -482,7 +427,7 @@ export default function TeamRegularisationPage() {
                     {/* Action Buttons - Only for pending */}
                     {correction.status === 'pending' && (
                       <div className="flex justify-end space-x-3">
-                        <Button
+                        <LoadingButton
                           color="danger"
                           variant="flat"
                           startContent={<FaTimes />}
@@ -490,20 +435,20 @@ export default function TeamRegularisationPage() {
                             const comment = prompt('Reason for rejection (optional):')
                             handleApproveReject(correction._id, 'reject', comment || '')
                           }}
-                          isDisabled={processingCorrection === correction._id}
                           isLoading={processingCorrection === correction._id}
+                          loadingText="Rejecting..."
                         >
                           Reject
-                        </Button>
-                        <Button
+                        </LoadingButton>
+                        <LoadingButton
                           color="success"
                           startContent={<FaCheck />}
                           onPress={() => handleApproveReject(correction._id, 'approve')}
-                          isDisabled={processingCorrection === correction._id}
                           isLoading={processingCorrection === correction._id}
+                          loadingText="Approving..."
                         >
                           Approve
-                        </Button>
+                        </LoadingButton>
                       </div>
                     )}
                   </div>

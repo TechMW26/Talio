@@ -26,21 +26,18 @@ import {
 } from '@/components/ui/heroui'
 import { Input, Checkbox, Button, Divider, Chip, Progress, Tooltip } from '@heroui/react'
 import AttendanceCorrectionModal from '@/components/payroll/AttendanceCorrectionModal'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import LoadingButton from '@/components/ui/LoadingButton'
 
 export default function GeneratePayrollPage() {
   const router = useRouter()
   const [employees, setEmployees] = useState([])
   const [departments, setDepartments] = useState([])
-  const [existingPayrollEmployeeIds, setExistingPayrollEmployeeIds] = useState([])
-  const [attendanceData, setAttendanceData] = useState({})
-  const [leaveData, setLeaveData] = useState({}) // Leave data per employee
-  const [holidayData, setHolidayData] = useState([]) // Holidays for the month
   const [companySettings, setCompanySettings] = useState(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const [selectedEmployees, setSelectedEmployees] = useState([])
-  const [pendingLeavesWarning, setPendingLeavesWarning] = useState([]) // Employees with pending leaves
 
   // Filter states
   const [searchQuery, setSearchQuery] = useState('')
@@ -82,34 +79,33 @@ export default function GeneratePayrollPage() {
     fetchInitialData()
   }, [])
 
-  useEffect(() => {
-    if (employees.length > 0 && companySettings) {
-      fetchAttendanceData()
-      fetchLeaveData() // Fetch leave data for accurate payroll calculation
-      fetchHolidayData() // Fetch holidays for the month
-      fetchExistingPayrolls()
-    }
-  }, [formData.month, formData.year, employees, companySettings])
+  // --- SWR: Existing payrolls for this month (to filter out already-generated) ---
+  const { data: existingPayrollRes, mutate: refreshExistingPayrolls } = useAuthedSWR(
+    employees.length > 0 ? `/api/payroll?month=${formData.month}&year=${formData.year}` : null
+  )
+  const existingPayrollEmployeeIds = useMemo(() => {
+    if (!existingPayrollRes?.data) return []
+    return existingPayrollRes.data.map(p => p.employee?._id || p.employee).filter(Boolean)
+  }, [existingPayrollRes])
 
-  const fetchExistingPayrolls = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(
-        `/api/payroll?month=${formData.month}&year=${formData.year}`,
-        { headers: { 'Authorization': `Bearer ${token}` } }
-      )
-      const data = await response.json()
-      if (data.success && data.data) {
-        // Get employee IDs that already have payroll for this month/year
-        const existingIds = data.data.map(p => p.employee?._id || p.employee).filter(Boolean)
-        setExistingPayrollEmployeeIds(existingIds)
-        // Clear selections for employees that already have payroll
-        setSelectedEmployees(prev => prev.filter(id => !existingIds.includes(id)))
-      }
-    } catch (error) {
-      console.error('Fetch existing payrolls error:', error)
+  // Clear selections for employees that already have payroll  
+  useEffect(() => {
+    if (existingPayrollEmployeeIds.length > 0) {
+      setSelectedEmployees(prev => prev.filter(id => !existingPayrollEmployeeIds.includes(id)))
     }
-  }
+  }, [existingPayrollEmployeeIds])
+
+  // --- SWR: Holidays for selected month ---
+  const { data: holidayRes } = useAuthedSWR(`/api/holidays?year=${formData.year}`)
+  const holidayData = useMemo(() => {
+    if (!holidayRes?.data) return []
+    return holidayRes.data.filter(holiday => {
+      const holidayDate = new Date(holiday.date)
+      return holidayDate.getMonth() + 1 === formData.month &&
+        holidayDate.getFullYear() === formData.year &&
+        holiday.isActive
+    })
+  }, [holidayRes, formData.month, formData.year])
 
   // Filter employees to only show those without existing payroll
   const availableEmployees = useMemo(() => {
@@ -187,189 +183,123 @@ export default function GeneratePayrollPage() {
     },
   })
 
-  // Fetch holidays for the selected month
-  const fetchHolidayData = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(
-        `/api/holidays?year=${formData.year}`,
-        { headers: { 'Authorization': `Bearer ${token}` } }
-      )
-      const data = await response.json()
+  // --- SWR: Raw attendance data for the month ---
+  const { data: rawAttendanceRes, mutate: refreshAttendance } = useAuthedSWR(
+    employees.length > 0 && companySettings
+      ? `/api/attendance?month=${formData.month}&year=${formData.year}&limit=5000`
+      : null
+  )
 
-      if (data.success && data.data) {
-        // Filter holidays for the selected month
-        const monthHolidays = data.data.filter(holiday => {
-          const holidayDate = new Date(holiday.date)
-          return holidayDate.getMonth() + 1 === formData.month &&
-            holidayDate.getFullYear() === formData.year &&
-            holiday.isActive
-        })
-        setHolidayData(monthHolidays)
-      }
-    } catch (error) {
-      console.error('Fetch holiday data error:', error)
-      setHolidayData([])
-    }
-  }
+  // Process raw attendance into per-employee map
+  const attendanceData = useMemo(() => {
+    if (!rawAttendanceRes?.data) return {}
+    const attendanceMap = {}
+    const settings = companySettings || getDefaultSettings()
+    const fullDayThreshold = settings.fullDayThreshold || 7.5
 
-  const fetchAttendanceData = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const attendanceMap = {}
+    rawAttendanceRes.data.forEach(record => {
+      const empId = record.employee?._id || record.employee
+      if (!empId) return
 
-      // Fetch attendance for the selected month
-      const response = await fetch(
-        '/api/attendance?month=' + formData.month + '&year=' + formData.year + '&limit=5000',
-        { headers: { 'Authorization': 'Bearer ' + token } }
-      )
-
-      const data = await response.json()
-
-      // Get hour thresholds from company settings
-      const settings = companySettings || getDefaultSettings()
-      const fullDayThreshold = settings.fullDayThreshold || 7.5 // Default: 7.5 hours = full day
-
-      if (data.success && data.data) {
-        // Process attendance data per employee - SIMPLIFIED for addition-based calculation
-        // Only count PRESENT days (full days with sufficient hours)
-        data.data.forEach(record => {
-          const empId = record.employee?._id || record.employee
-          if (!empId) return
-
-          if (!attendanceMap[empId]) {
-            attendanceMap[empId] = {
-              presentDays: 0,      // Full present days (paid)
-              halfDays: 0,         // Half days (not paid in new system)
-              absentDays: 0,       // Absent days (not paid)
-              wfhDays: 0,          // WFH days (not paid unless configured)
-              totalWorkHours: 0,
-              records: [],
-            }
-          }
-
-          attendanceMap[empId].records.push(record)
-
-          const status = record.status?.toLowerCase() || ''
-          const workHours = record.workHours || 0
-
-          // SIMPLIFIED: Only count full present days
-          // Present = status is 'present' AND workHours >= fullDayThreshold
-          if (status === 'present' || status === 'approved') {
-            if (workHours >= fullDayThreshold) {
-              attendanceMap[empId].presentDays++
-            } else if (workHours > 0) {
-              // Less than full day threshold = half day (NOT paid in new system)
-              attendanceMap[empId].halfDays++
-            }
-            attendanceMap[empId].totalWorkHours += workHours
-          } else if (status === 'half-day' || status === 'halfday') {
-            attendanceMap[empId].halfDays++
-            attendanceMap[empId].totalWorkHours += workHours
-          } else if (status === 'absent') {
-            attendanceMap[empId].absentDays++
-          } else if (status === 'wfh' || status === 'work-from-home') {
-            attendanceMap[empId].wfhDays++
-          }
-          // Note: 'leave', 'on-leave' status is handled separately in leave data
-          // 'holiday', 'weekend' are not working days
-        })
+      if (!attendanceMap[empId]) {
+        attendanceMap[empId] = {
+          presentDays: 0,
+          halfDays: 0,
+          absentDays: 0,
+          wfhDays: 0,
+          totalWorkHours: 0,
+          records: [],
+        }
       }
 
-      setAttendanceData(attendanceMap)
-    } catch (error) {
-      console.error('Fetch attendance error:', error)
-    }
-  }
+      attendanceMap[empId].records.push(record)
+      const status = record.status?.toLowerCase() || ''
+      const workHours = record.workHours || 0
 
-  // Fetch leave data for the selected month
-  const fetchLeaveData = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const leaveMap = {}
-      const pendingWarnings = []
+      if (status === 'present' || status === 'approved') {
+        if (workHours >= fullDayThreshold) {
+          attendanceMap[empId].presentDays++
+        } else if (workHours > 0) {
+          attendanceMap[empId].halfDays++
+        }
+        attendanceMap[empId].totalWorkHours += workHours
+      } else if (status === 'half-day' || status === 'halfday') {
+        attendanceMap[empId].halfDays++
+        attendanceMap[empId].totalWorkHours += workHours
+      } else if (status === 'absent') {
+        attendanceMap[empId].absentDays++
+      } else if (status === 'wfh' || status === 'work-from-home') {
+        attendanceMap[empId].wfhDays++
+      }
+    })
 
-      // Calculate start and end of the month
-      const startOfMonth = new Date(formData.year, formData.month - 1, 1)
-      const endOfMonth = new Date(formData.year, formData.month, 0)
+    return attendanceMap
+  }, [rawAttendanceRes, companySettings])
 
-      // Fetch all leaves
-      const response = await fetch('/api/leave', {
-        headers: { 'Authorization': 'Bearer ' + token }
-      })
+  // --- SWR: Raw leave data ---
+  const { data: rawLeaveRes, mutate: refreshLeave } = useAuthedSWR(
+    employees.length > 0 && companySettings ? '/api/leave' : null
+  )
 
-      const data = await response.json()
+  // Process raw leave data into per-employee map
+  const { leaveData, pendingLeavesWarning } = useMemo(() => {
+    if (!rawLeaveRes?.data) return { leaveData: {}, pendingLeavesWarning: [] }
+    const leaveMap = {}
+    const pendingWarnings = []
 
-      if (data.success && data.data) {
-        data.data.forEach(leave => {
-          const empId = leave.employee?._id || leave.employee
-          if (!empId) return
+    const startOfMonth = new Date(formData.year, formData.month - 1, 1)
+    const endOfMonth = new Date(formData.year, formData.month, 0)
 
-          // Check if leave overlaps with selected month
-          const leaveStart = new Date(leave.startDate)
-          const leaveEnd = new Date(leave.endDate)
+    rawLeaveRes.data.forEach(leave => {
+      const empId = leave.employee?._id || leave.employee
+      if (!empId) return
 
-          // Only consider leaves that overlap with the payroll month
-          if (leaveEnd < startOfMonth || leaveStart > endOfMonth) return
+      const leaveStart = new Date(leave.startDate)
+      const leaveEnd = new Date(leave.endDate)
+      if (leaveEnd < startOfMonth || leaveStart > endOfMonth) return
 
-          if (!leaveMap[empId]) {
-            leaveMap[empId] = {
-              approvedDays: 0,
-              deniedDays: 0,
-              pendingDays: 0,
-              approvedLeaves: [],
-              deniedLeaves: [],
-              pendingLeaves: [],
-            }
-          }
-
-          // Calculate days within this month
-          const effectiveStart = leaveStart < startOfMonth ? startOfMonth : leaveStart
-          const effectiveEnd = leaveEnd > endOfMonth ? endOfMonth : leaveEnd
-          const daysInMonth = Math.ceil((effectiveEnd - effectiveStart) / (1000 * 60 * 60 * 24)) + 1
-
-          if (leave.status === 'approved') {
-            leaveMap[empId].approvedDays += leave.isHalfDay ? 0.5 : daysInMonth
-            leaveMap[empId].approvedLeaves.push({
-              ...leave,
-              daysInMonth: leave.isHalfDay ? 0.5 : daysInMonth
-            })
-          } else if (leave.status === 'rejected') {
-            leaveMap[empId].deniedDays += leave.isHalfDay ? 0.5 : daysInMonth
-            leaveMap[empId].deniedLeaves.push({
-              ...leave,
-              daysInMonth: leave.isHalfDay ? 0.5 : daysInMonth
-            })
-          } else if (leave.status === 'pending') {
-            leaveMap[empId].pendingDays += leave.isHalfDay ? 0.5 : daysInMonth
-            leaveMap[empId].pendingLeaves.push({
-              ...leave,
-              daysInMonth: leave.isHalfDay ? 0.5 : daysInMonth
-            })
-
-            // Add to pending warnings
-            const employee = employees.find(e => e._id === empId)
-            if (employee) {
-              pendingWarnings.push({
-                employeeId: empId,
-                employeeName: `${employee.firstName} ${employee.lastName}`,
-                employeeCode: employee.employeeCode,
-                pendingDays: leave.isHalfDay ? 0.5 : daysInMonth,
-                leaveId: leave._id,
-                startDate: leave.startDate,
-                endDate: leave.endDate,
-              })
-            }
-          }
-        })
+      if (!leaveMap[empId]) {
+        leaveMap[empId] = {
+          approvedDays: 0,
+          deniedDays: 0,
+          pendingDays: 0,
+          approvedLeaves: [],
+          deniedLeaves: [],
+          pendingLeaves: [],
+        }
       }
 
-      setLeaveData(leaveMap)
-      setPendingLeavesWarning(pendingWarnings)
-    } catch (error) {
-      console.error('Fetch leave data error:', error)
-    }
-  }
+      const effectiveStart = leaveStart < startOfMonth ? startOfMonth : leaveStart
+      const effectiveEnd = leaveEnd > endOfMonth ? endOfMonth : leaveEnd
+      const daysInMonth = Math.ceil((effectiveEnd - effectiveStart) / (1000 * 60 * 60 * 24)) + 1
+
+      if (leave.status === 'approved') {
+        leaveMap[empId].approvedDays += leave.isHalfDay ? 0.5 : daysInMonth
+        leaveMap[empId].approvedLeaves.push({ ...leave, daysInMonth: leave.isHalfDay ? 0.5 : daysInMonth })
+      } else if (leave.status === 'rejected') {
+        leaveMap[empId].deniedDays += leave.isHalfDay ? 0.5 : daysInMonth
+        leaveMap[empId].deniedLeaves.push({ ...leave, daysInMonth: leave.isHalfDay ? 0.5 : daysInMonth })
+      } else if (leave.status === 'pending') {
+        leaveMap[empId].pendingDays += leave.isHalfDay ? 0.5 : daysInMonth
+        leaveMap[empId].pendingLeaves.push({ ...leave, daysInMonth: leave.isHalfDay ? 0.5 : daysInMonth })
+
+        const employee = employees.find(e => e._id === empId)
+        if (employee) {
+          pendingWarnings.push({
+            employeeId: empId,
+            employeeName: `${employee.firstName} ${employee.lastName}`,
+            employeeCode: employee.employeeCode,
+            pendingDays: leave.isHalfDay ? 0.5 : daysInMonth,
+            leaveId: leave._id,
+            startDate: leave.startDate,
+            endDate: leave.endDate,
+          })
+        }
+      }
+    })
+
+    return { leaveData: leaveMap, pendingLeavesWarning: pendingWarnings }
+  }, [rawLeaveRes, formData.month, formData.year, employees])
 
   const calculateEmployeePayroll = (employee) => {
     const settings = companySettings || getDefaultSettings()
@@ -667,10 +597,10 @@ export default function GeneratePayrollPage() {
 
   const handleCorrectionSaved = useCallback((employeeId) => {
     setCorrectedEmployees(prev => ({ ...prev, [employeeId]: true }))
-    // Refresh attendance data to reflect corrections
-    fetchAttendanceData()
-    fetchLeaveData()
-  }, [fetchAttendanceData, fetchLeaveData])
+    // Refresh attendance and leave data to reflect corrections
+    refreshAttendance()
+    refreshLeave()
+  }, [refreshAttendance, refreshLeave])
 
   const handlePreviewPayroll = () => {
     if (selectedEmployees.length === 0) {
@@ -1026,7 +956,7 @@ export default function GeneratePayrollPage() {
                 size="sm"
                 variant="flat"
                 color="primary"
-                onPress={() => { fetchAttendanceData(); fetchLeaveData(); fetchHolidayData(); }}
+                onPress={() => { refreshAttendance(); refreshLeave(); }}
                 startContent={<FaSync className="w-3 h-3" />}
               >
                 Refresh

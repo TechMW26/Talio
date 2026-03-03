@@ -1,142 +1,87 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useMemo } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import toast from '@/utils/toast'
-import { 
-  FaArrowLeft, FaEdit, FaTrash, FaBullseye, FaCalendar, FaUser, 
+import {
+  FaArrowLeft, FaEdit, FaTrash, FaBullseye, FaCalendar, FaUser,
   FaCheckCircle, FaClock, FaChartLine, FaFlag, FaTasks, FaSync,
   FaExclamationTriangle, FaBuilding
 } from 'react-icons/fa'
-import Loader from '@/components/ui/Loader'
+import { Skeleton } from '@heroui/react'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
 
 export default function GoalDetailsPage() {
   const router = useRouter()
   const params = useParams()
-  const [goal, setGoal] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [updating, setUpdating] = useState(false)
-  const [user, setUser] = useState(null)
 
-  useEffect(() => {
+  const user = useMemo(() => {
+    if (typeof window === 'undefined') return null
     const userData = localStorage.getItem('user')
-    if (userData) {
-      setUser(JSON.parse(userData))
-    }
-    fetchGoal()
-  }, [params.id])
+    return userData ? JSON.parse(userData) : null
+  }, [])
 
-  const fetchGoal = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/performance/goals?goalId=' + params.id, {
-        headers: { 'Authorization': 'Bearer ' + token }
-      })
+  // Fetch goal data
+  const { data: goalRes, isLoading: loading, mutate: mutateGoal } = useAuthedSWR(
+    params.id ? `/api/performance/goals?goalId=${params.id}` : null
+  )
+  const goal = goalRes?.data || null
 
-      const data = await response.json()
-      
-      if (data.success && data.data) {
-        setGoal(data.data)
-      } else {
-        toast.error(data.message || 'Goal not found')
-      }
-    } catch (error) {
-      console.error('Fetch goal error:', error)
-      toast.error('Failed to fetch goal details')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const deleteMutation = useApiMutation({
+    method: 'DELETE',
+    onSuccess: () => {
+      toast.success('Goal deleted successfully')
+      router.push('/dashboard/performance/goals')
+    },
+    onError: (msg) => toast.error(msg || 'Failed to delete goal'),
+  })
 
   const handleDelete = async () => {
     if (!confirm('Are you sure you want to delete this goal?')) return
-
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/performance/goals?goalId=' + params.id, {
-        method: 'DELETE',
-        headers: { 'Authorization': 'Bearer ' + token }
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        toast.success('Goal deleted successfully')
-        router.push('/dashboard/performance/goals')
-      } else {
-        toast.error(data.message || 'Failed to delete goal')
-      }
-    } catch (error) {
-      console.error('Delete goal error:', error)
-      toast.error('Failed to delete goal')
-    }
+    deleteMutation.execute('/api/performance/goals?goalId=' + params.id)
   }
 
-  const handleProgressUpdate = async (newProgress) => {
-    setUpdating(true)
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/performance/goals', {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + token 
-        },
-        body: JSON.stringify({ goalId: params.id, progress: newProgress })
-      })
+  const progressMutation = useApiMutation({
+    method: 'PUT',
+    onSuccess: () => {
+      mutateGoal()
+      toast.success('Progress updated')
+    },
+    onError: (msg) => toast.error(msg || 'Failed to update progress'),
+  })
 
-      const data = await response.json()
-      if (data.success) {
-        setGoal(prev => ({ ...prev, progress: newProgress }))
-        toast.success('Progress updated')
-      } else {
-        toast.error(data.message || 'Failed to update progress')
-      }
-    } catch (error) {
-      console.error('Update progress error:', error)
-      toast.error('Failed to update progress')
-    } finally {
-      setUpdating(false)
-    }
+  const milestoneMutation = useApiMutation({
+    method: 'PUT',
+    onSuccess: (data, _, opts) => {
+      mutateGoal()
+      toast.success(opts?._completed ? 'Milestone completed!' : 'Milestone uncompleted')
+    },
+    onError: (msg) => toast.error(msg || 'Failed to update milestone'),
+  })
+
+  const updating = progressMutation.isLoading || milestoneMutation.isLoading
+
+  const handleProgressUpdate = async (newProgress) => {
+    progressMutation.execute('/api/performance/goals', { goalId: params.id, progress: newProgress })
   }
 
   const handleMilestoneToggle = async (milestoneIndex, completed) => {
-    setUpdating(true)
-    try {
-      const token = localStorage.getItem('token')
-      
-      const updatedMilestones = goal.milestones.map((m, i) => {
-        if (i === milestoneIndex) {
-          return { 
-            ...m, 
-            completed, 
-            completedDate: completed ? new Date().toISOString() : null 
-          }
+    const updatedMilestones = goal.milestones.map((m, i) => {
+      if (i === milestoneIndex) {
+        return {
+          ...m,
+          completed,
+          completedDate: completed ? new Date().toISOString() : null
         }
-        return m
-      })
-
-      const response = await fetch('/api/performance/goals', {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer ' + token 
-        },
-        body: JSON.stringify({ goalId: params.id, milestones: updatedMilestones })
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        setGoal(data.data)
-        toast.success(completed ? 'Milestone completed!' : 'Milestone uncompleted')
-      } else {
-        toast.error(data.message || 'Failed to update milestone')
       }
-    } catch (error) {
-      console.error('Update milestone error:', error)
-      toast.error('Failed to update milestone')
-    } finally {
-      setUpdating(false)
-    }
+      return m
+    })
+
+    milestoneMutation.execute('/api/performance/goals',
+      { goalId: params.id, milestones: updatedMilestones },
+      { _completed: completed }
+    )
   }
 
   const canManageGoals = () => {
@@ -182,10 +127,23 @@ export default function GoalDetailsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <Loader size="lg" />
-          <p className="mt-4 text-gray-600">Loading goal details...</p>
+      <div className="p-4 sm:p-6 bg-gray-50 min-h-screen">
+        <div className="flex items-center gap-4 mb-6">
+          <Skeleton className="h-10 w-10 rounded-lg" />
+          <div>
+            <Skeleton className="h-8 w-48 rounded-lg mb-2" />
+            <Skeleton className="h-4 w-64 rounded-lg" />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            <Skeleton className="h-64 rounded-xl" />
+            <Skeleton className="h-48 rounded-xl" />
+          </div>
+          <div className="space-y-6">
+            <Skeleton className="h-40 rounded-xl" />
+            <Skeleton className="h-40 rounded-xl" />
+          </div>
         </div>
       </div>
     )
@@ -237,7 +195,7 @@ export default function GoalDetailsPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={fetchGoal}
+            onClick={() => mutateGoal()}
             className="p-2 text-gray-600 hover:text-primary-600 hover:bg-white rounded-lg transition-colors"
             title="Refresh"
           >
@@ -304,13 +262,13 @@ export default function GoalDetailsPage() {
                   </span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-3 mb-3">
-                  <div 
-                    className={'h-3 rounded-full transition-all duration-500 ' + 
+                  <div
+                    className={'h-3 rounded-full transition-all duration-500 ' +
                       (goal.progress >= 80 ? 'bg-emerald-500' : goal.progress >= 50 ? 'bg-blue-500' : goal.progress >= 25 ? 'bg-yellow-500' : 'bg-gray-400')}
                     style={{ width: (goal.progress || 0) + '%' }}
                   ></div>
                 </div>
-                
+
                 {canUpdateProgress() && (
                   <div className="pt-2 border-t border-gray-200">
                     <label className="block text-xs font-medium text-gray-500 mb-2">Update Progress</label>
@@ -360,8 +318,8 @@ export default function GoalDetailsPage() {
                         onClick={() => handleMilestoneToggle(index, !milestone.completed)}
                         disabled={updating}
                         className={'w-6 h-6 rounded-full flex items-center justify-center transition-colors flex-shrink-0 mt-0.5 ' +
-                          (milestone.completed 
-                            ? 'bg-emerald-500 text-white hover:bg-emerald-600' 
+                          (milestone.completed
+                            ? 'bg-emerald-500 text-white hover:bg-emerald-600'
                             : 'border-2 border-gray-300 hover:border-primary-500')}
                       >
                         {milestone.completed && <FaCheckCircle className="w-4 h-4" />}
@@ -409,7 +367,7 @@ export default function GoalDetailsPage() {
                       <span className="text-sm text-gray-500">{kr.current} / {kr.target} {kr.unit}</span>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
+                      <div
                         className="h-2 rounded-full bg-blue-500"
                         style={{ width: Math.min(100, (kr.current / kr.target) * 100) + '%' }}
                       ></div>

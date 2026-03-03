@@ -1,10 +1,13 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { Card, CardBody, Button, Chip, Skeleton, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Textarea, Progress, Spinner, Select, SelectItem } from '@heroui/react'
-import { 
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton from '@/components/ui/LoadingButton'
+import {
   FaTasks, FaCalendarAlt, FaFilter, FaSearch, FaProjectDiagram,
   FaCheck, FaPlay, FaEye, FaClock, FaExclamationTriangle,
   FaChevronDown, FaCheckCircle, FaTimes, FaPlus,
@@ -58,20 +61,42 @@ const getProjectColor = (projectId) => {
   return projectColors[Math.abs(hash) % projectColors.length]
 }
 
+// Skeleton for loading state
+function AssignedTasksSkeleton() {
+  return (
+    <div className="page-container">
+      <div className="flex items-center gap-4 mb-6">
+        <Skeleton className="h-10 w-10 rounded-lg" />
+        <div>
+          <Skeleton className="h-8 w-48 rounded-lg mb-2" />
+          <Skeleton className="h-4 w-64 rounded-lg" />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4 mb-6">
+        {[...Array(6)].map((_, i) => (
+          <Card key={i} shadow="sm"><CardBody className="p-4"><Skeleton className="h-12 rounded-lg" /></CardBody></Card>
+        ))}
+      </div>
+      <Card shadow="sm" className="mb-6"><CardBody className="p-4"><Skeleton className="h-10 rounded-lg" /></CardBody></Card>
+      <div className="grid gap-4">
+        {[...Array(4)].map((_, i) => (
+          <Card key={i} shadow="sm"><CardBody className="p-4"><Skeleton className="h-24 rounded-lg" /></CardBody></Card>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function AssignedTasksPage() {
   const router = useRouter()
-  const [tasks, setTasks] = useState([])
-  const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState({
     status: 'all',
     project: 'all'
   })
   const [searchQuery, setSearchQuery] = useState('')
   const [showFilters, setShowFilters] = useState(false)
-  const [projects, setProjects] = useState([])
-  const [stats, setStats] = useState({})
   const [selectedTask, setSelectedTask] = useState(null)
-  
+
   // Modal states
   const [showEditModal, setShowEditModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -90,12 +115,12 @@ export default function AssignedTasksPage() {
     const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), sizes.length - 1)
     return `${(bytes / Math.pow(1024, i)).toFixed(i === 0 ? 0 : 1)} ${sizes[i]}`
   }, [])
-  
+
   // Reason modal for status changes
   const [showReasonModal, setShowReasonModal] = useState(false)
   const [pendingStatusChange, setPendingStatusChange] = useState(null) // { task, newStatus, source: 'kanban' | 'modal' }
   const [statusChangeReason, setStatusChangeReason] = useState('')
-  
+
   // Form states
   const [editForm, setEditForm] = useState({ title: '', description: '', priority: 'medium', dueDate: '' })
   const [deleteReason, setDeleteReason] = useState('')
@@ -103,64 +128,26 @@ export default function AssignedTasksPage() {
   const [reassignToId, setReassignToId] = useState('')
   const [addUserIds, setAddUserIds] = useState([])
   const [deletionResponse, setDeletionResponse] = useState({ action: '', reason: '' })
-  
+
   const [submitting, setSubmitting] = useState(false)
   const [projectMembers, setProjectMembers] = useState([])
-  
-  // Auto-refresh
-  const refreshIntervalRef = useRef(null)
-  const lastFetchRef = useRef(Date.now())
 
-  const fetchTasks = useCallback(async (silent = false) => {
-    try {
-      if (!silent) setLoading(true)
-      const token = localStorage.getItem('token')
-      const params = new URLSearchParams()
-      
-      if (filters.status !== 'all') params.append('status', filters.status)
-      if (filters.project !== 'all') params.append('projectId', filters.project)
-
-      const response = await fetch(`/api/projects/assigned-tasks?${params.toString()}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        setTasks(data.data)
-        setProjects(data.projects || [])
-        setStats(data.stats || {})
-      } else if (!silent) {
-        toast.error(data.message || 'Failed to load tasks')
-      }
-    } catch (error) {
-      console.error('Fetch tasks error:', error)
-      if (!silent) toast.error('An error occurred')
-    } finally {
-      if (!silent) setLoading(false)
-      lastFetchRef.current = Date.now()
-    }
+  // --- SWR Data Fetching ---
+  const tasksQueryString = useMemo(() => {
+    const params = new URLSearchParams()
+    if (filters.status !== 'all') params.append('status', filters.status)
+    if (filters.project !== 'all') params.append('projectId', filters.project)
+    return params.toString()
   }, [filters])
 
-  useEffect(() => {
-    fetchTasks()
-  }, [fetchTasks])
+  const { data: tasksData, error: tasksError, isLoading: loading, mutate: mutateTasks } = useAuthedSWR(
+    `/api/projects/assigned-tasks?${tasksQueryString}`,
+    { refreshInterval: 10000 }
+  )
 
-  // Auto-refresh every 10 seconds
-  useEffect(() => {
-    refreshIntervalRef.current = setInterval(() => fetchTasks(true), 10000)
-    
-    const handleFocus = () => {
-      if (Date.now() - lastFetchRef.current > 5000) {
-        fetchTasks(true)
-      }
-    }
-    window.addEventListener('focus', handleFocus)
-    
-    return () => {
-      if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current)
-      window.removeEventListener('focus', handleFocus)
-    }
-  }, [fetchTasks])
+  const tasks = tasksData?.data || []
+  const projects = tasksData?.projects || []
+  const stats = tasksData?.stats || {}
 
   // Fetch project members when a task is selected
   const fetchProjectMembers = async (projectId) => {
@@ -182,7 +169,7 @@ export default function AssignedTasksPage() {
   const handleEditTask = async (e) => {
     e.preventDefault()
     if (!selectedTask || !editForm.title.trim()) return
-    
+
     try {
       setSubmitting(true)
       const token = localStorage.getItem('token')
@@ -201,7 +188,7 @@ export default function AssignedTasksPage() {
         toast.success('Task updated successfully')
         setShowEditModal(false)
         setSelectedTask(null)
-        fetchTasks()
+        mutateTasks()
       } else {
         toast.error(data.message)
       }
@@ -215,12 +202,12 @@ export default function AssignedTasksPage() {
   // Delete task (request deletion)
   const handleDeleteTask = async () => {
     if (!selectedTask) return
-    
+
     try {
       setSubmitting(true)
       const token = localStorage.getItem('token')
       const response = await fetch(
-        `/api/projects/${selectedTask.project._id}/tasks/${selectedTask._id}?reason=${encodeURIComponent(deleteReason)}`, 
+        `/api/projects/${selectedTask.project._id}/tasks/${selectedTask._id}?reason=${encodeURIComponent(deleteReason)}`,
         {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` }
@@ -234,7 +221,7 @@ export default function AssignedTasksPage() {
         setShowDeleteModal(false)
         setSelectedTask(null)
         setDeleteReason('')
-        fetchTasks()
+        mutateTasks()
       } else {
         toast.error(data.message)
       }
@@ -248,14 +235,14 @@ export default function AssignedTasksPage() {
   // Add subtask
   const handleAddSubtask = async () => {
     if (!selectedTask || !newSubtaskTitle.trim()) return
-    
+
     // Handle both populated and unpopulated project field
     const projectId = selectedTask.project?._id || selectedTask.project
     if (!projectId) {
       toast.error('Project not found')
       return
     }
-    
+
     try {
       setSubmitting(true)
       const token = localStorage.getItem('token')
@@ -274,7 +261,7 @@ export default function AssignedTasksPage() {
         toast.success('Subtask added successfully')
         setNewSubtaskTitle('')
         setShowAddSubtaskModal(false)
-        fetchTasks()
+        mutateTasks()
       } else {
         toast.error(data.message || 'Failed to add subtask')
       }
@@ -288,7 +275,7 @@ export default function AssignedTasksPage() {
   // Reassign task
   const handleReassignTask = async () => {
     if (!selectedTask || !reassignToId) return
-    
+
     try {
       setSubmitting(true)
       const token = localStorage.getItem('token')
@@ -308,7 +295,7 @@ export default function AssignedTasksPage() {
         setShowReassignModal(false)
         setSelectedTask(null)
         setReassignToId('')
-        fetchTasks()
+        mutateTasks()
       } else {
         toast.error(data.message)
       }
@@ -322,11 +309,11 @@ export default function AssignedTasksPage() {
   // Add user to task
   const handleAddUserToTask = async () => {
     if (!selectedTask || addUserIds.length === 0) return
-    
+
     try {
       setSubmitting(true)
       const token = localStorage.getItem('token')
-      
+
       for (const userId of addUserIds) {
         await fetch(`/api/projects/${selectedTask.project._id}/tasks/${selectedTask._id}/assign`, {
           method: 'POST',
@@ -342,7 +329,7 @@ export default function AssignedTasksPage() {
       toast.success('Users added to task')
       setShowAddUserModal(false)
       setAddUserIds([])
-      fetchTasks()
+      mutateTasks()
     } catch (error) {
       toast.error('Failed to add users')
     } finally {
@@ -353,7 +340,7 @@ export default function AssignedTasksPage() {
   // Handle deletion approval response
   const handleDeletionApproval = async () => {
     if (!selectedTask || !deletionResponse.action) return
-    
+
     try {
       setSubmitting(true)
       const token = localStorage.getItem('token')
@@ -373,7 +360,7 @@ export default function AssignedTasksPage() {
         setShowDeletionApprovalModal(false)
         setSelectedTask(null)
         setDeletionResponse({ action: '', reason: '' })
-        fetchTasks()
+        mutateTasks()
       } else {
         toast.error(data.message)
       }
@@ -403,43 +390,44 @@ export default function AssignedTasksPage() {
       toast.error('Tasks with subtasks are auto-managed. Update subtasks to change status.')
       return
     }
-    
+
     // Don't allow status change for tasks pending acceptance
-    const isPendingAcceptance = task.assignmentStatus === 'pending' || 
+    const isPendingAcceptance = task.assignmentStatus === 'pending' ||
       task.assignees?.some(a => a.assignmentStatus === 'pending')
     const hasAcceptedAssignee = task.assignees?.some(a => a.assignmentStatus === 'accepted')
     if (isPendingAcceptance && !hasAcceptedAssignee) {
       toast.error('Task must be accepted before changing status.')
       return
     }
-    
+
     // Show reason modal instead of changing directly
     setPendingStatusChange({ task, newStatus, source: 'kanban' })
     setStatusChangeReason('')
     setShowReasonModal(true)
   }
-  
+
   // Execute the actual status change after reason is provided
   const executeStatusChange = async (reason) => {
     if (!pendingStatusChange) return
-    
+
     const { task, newStatus, source } = pendingStatusChange
-    
-    // Immediately update local state for instant UI feedback
-    setTasks(prevTasks => prevTasks.map(t => 
-      t._id === task._id ? { ...t, status: newStatus } : t
-    ))
-    
+
+    // Optimistic update via SWR
+    mutateTasks(
+      prev => prev ? { ...prev, data: prev.data.map(t => t._id === task._id ? { ...t, status: newStatus } : t) } : prev,
+      { revalidate: false }
+    )
+
     // Update selectedTask if it's the same task (for modal source)
     if (source === 'modal' && selectedTask?._id === task._id) {
       setSelectedTask(prev => ({ ...prev, status: newStatus }))
     }
-    
+
     // Close modals
     setShowReasonModal(false)
     setPendingStatusChange(null)
     setStatusChangeReason('')
-    
+
     try {
       const token = localStorage.getItem('token')
       const response = await fetch(`/api/projects/${task.project._id || task.project}/tasks/${task._id}`, {
@@ -448,9 +436,9 @@ export default function AssignedTasksPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           status: newStatus,
-          statusChangeReason: reason 
+          statusChangeReason: reason
         })
       })
 
@@ -462,19 +450,19 @@ export default function AssignedTasksPage() {
           playNotificationSound(NotificationSoundTypes.UPDATE)
         }
         toast.success('Task updated')
-        // Silent refresh to sync with server
-        fetchTasks(true)
+        // Revalidate to sync with server
+        mutateTasks()
       } else {
         playNotificationSound(NotificationSoundTypes.WARNING)
         toast.error(data.message)
         // Revert local state on error
-        fetchTasks(true)
+        mutateTasks()
       }
     } catch (error) {
       playNotificationSound(NotificationSoundTypes.WARNING)
       toast.error('Failed to update task')
       // Revert local state on error
-      fetchTasks(true)
+      mutateTasks()
     }
   }
 
@@ -492,27 +480,19 @@ export default function AssignedTasksPage() {
 
   // Separate tasks
   const pendingDeletion = filteredTasks.filter(t => t.deletionRequest?.status === 'pending')
-  const pendingAcceptance = filteredTasks.filter(t => 
+  const pendingAcceptance = filteredTasks.filter(t =>
     t.deletionRequest?.status !== 'pending' && t.assignees?.some(a => a.assignmentStatus === 'pending')
   )
-  const activeTasks = filteredTasks.filter(t => 
-    t.deletionRequest?.status !== 'pending' && 
+  const activeTasks = filteredTasks.filter(t =>
+    t.deletionRequest?.status !== 'pending' &&
     !t.assignees?.some(a => a.assignmentStatus === 'pending') &&
     t.status !== 'completed'
   )
-  const completedTasks = filteredTasks.filter(t => 
+  const completedTasks = filteredTasks.filter(t =>
     t.deletionRequest?.status !== 'pending' && t.status === 'completed'
   )
 
-  if (loading) {
-    return (
-      <div className="page-container">
-        <div className="flex items-center justify-center h-64">
-          <Spinner size="lg" />
-        </div>
-      </div>
-    )
-  }
+  if (loading) return <AssignedTasksSkeleton />
 
   return (
     <div className="page-container">
@@ -637,27 +617,25 @@ export default function AssignedTasksPage() {
             >
               Filters
             </Button>
-            
+
             {/* View Toggle */}
             <div className="flex border border-default-300 rounded-lg overflow-hidden">
               <button
                 onClick={() => setViewMode('list')}
-                className={`px-3 py-2 flex items-center gap-1.5 transition-colors ${
-                  viewMode === 'list'
+                className={`px-3 py-2 flex items-center gap-1.5 transition-colors ${viewMode === 'list'
                     ? 'bg-primary-500 text-white'
                     : 'bg-content1 text-default-600 hover:bg-default-50'
-                }`}
+                  }`}
                 title="List View"
               >
                 <FaList className="w-4 h-4" />
               </button>
               <button
                 onClick={() => setViewMode('kanban')}
-                className={`px-3 py-2 flex items-center gap-1.5 transition-colors border-l border-default-300 ${
-                  viewMode === 'kanban'
+                className={`px-3 py-2 flex items-center gap-1.5 transition-colors border-l border-default-300 ${viewMode === 'kanban'
                     ? 'bg-primary-500 text-white'
                     : 'bg-content1 text-default-600 hover:bg-default-50'
-                }`}
+                  }`}
                 title="Kanban View"
               >
                 <FaTh className="w-4 h-4" />
@@ -714,7 +692,7 @@ export default function AssignedTasksPage() {
             enableDragDrop={true}
             onProjectClick={(projectId) => router.push(`/dashboard/projects/${projectId}`)}
           />
-          
+
           {/* Show pending deletion in kanban mode */}
           {pendingDeletion.length > 0 && (
             <div className="mt-6 p-4 bg-danger-50 border border-danger-200 rounded-lg">
@@ -738,204 +716,204 @@ export default function AssignedTasksPage() {
         <>
           {/* Pending Deletion Requests */}
           {pendingDeletion.length > 0 && (
-        <div className="mb-6">
-          <div className="flex items-center gap-2 mb-4">
-            <FaTrash className="text-danger" />
-            <h2 className="text-lg font-semibold text-default-800">Pending Deletion Approval</h2>
-            <Chip color="danger" variant="flat" size="sm">
-              {pendingDeletion.length}
-            </Chip>
-          </div>
-          <div className="grid gap-4">
-            {pendingDeletion.map(task => (
-              <TaskCard
-                key={task._id}
-                task={task}
-                onEdit={() => {
-                  setSelectedTask(task)
-                  setEditForm({
-                    title: task.title,
-                    description: task.description || '',
-                    priority: task.priority,
-                    dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : ''
-                  })
-                  setShowEditModal(true)
-                }}
-                onDelete={() => {
-                  setSelectedTask(task)
-                  setShowDeleteModal(true)
-                }}
-                onAddUser={() => {
-                  setSelectedTask(task)
-                  fetchProjectMembers(task.project._id)
-                  setShowAddUserModal(true)
-                }}
-                onReassign={() => {
-                  setSelectedTask(task)
-                  fetchProjectMembers(task.project._id)
-                  setShowReassignModal(true)
-                }}
-                onAddSubtask={() => {
-                  setSelectedTask(task)
-                  setShowAddSubtaskModal(true)
-                }}
-                onViewProject={() => router.push(`/dashboard/projects/${task.project._id}`)}
-                onRespondToDeletion={() => {
-                  setSelectedTask(task)
-                  setShowDeletionApprovalModal(true)
-                }}
-                hasPendingDeletion
-              />
-            ))}
-          </div>
-        </div>
-      )}
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-4">
+                <FaTrash className="text-danger" />
+                <h2 className="text-lg font-semibold text-default-800">Pending Deletion Approval</h2>
+                <Chip color="danger" variant="flat" size="sm">
+                  {pendingDeletion.length}
+                </Chip>
+              </div>
+              <div className="grid gap-4">
+                {pendingDeletion.map(task => (
+                  <TaskCard
+                    key={task._id}
+                    task={task}
+                    onEdit={() => {
+                      setSelectedTask(task)
+                      setEditForm({
+                        title: task.title,
+                        description: task.description || '',
+                        priority: task.priority,
+                        dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : ''
+                      })
+                      setShowEditModal(true)
+                    }}
+                    onDelete={() => {
+                      setSelectedTask(task)
+                      setShowDeleteModal(true)
+                    }}
+                    onAddUser={() => {
+                      setSelectedTask(task)
+                      fetchProjectMembers(task.project._id)
+                      setShowAddUserModal(true)
+                    }}
+                    onReassign={() => {
+                      setSelectedTask(task)
+                      fetchProjectMembers(task.project._id)
+                      setShowReassignModal(true)
+                    }}
+                    onAddSubtask={() => {
+                      setSelectedTask(task)
+                      setShowAddSubtaskModal(true)
+                    }}
+                    onViewProject={() => router.push(`/dashboard/projects/${task.project._id}`)}
+                    onRespondToDeletion={() => {
+                      setSelectedTask(task)
+                      setShowDeletionApprovalModal(true)
+                    }}
+                    hasPendingDeletion
+                  />
+                ))}
+              </div>
+            </div>
+          )}
 
-      {/* Pending Acceptance */}
-      {pendingAcceptance.length > 0 && (
-        <div className="mb-6">
-          <div className="flex items-center gap-2 mb-4">
-            <FaClock className="text-warning" />
-            <h2 className="text-lg font-semibold text-default-800">Awaiting Acceptance</h2>
-            <Chip color="warning" variant="flat" size="sm">
-              {pendingAcceptance.length}
-            </Chip>
-          </div>
-          <div className="grid gap-4">
-            {pendingAcceptance.map(task => (
-              <TaskCard
-                key={task._id}
-                task={task}
-                onEdit={() => {
-                  setSelectedTask(task)
-                  setEditForm({
-                    title: task.title,
-                    description: task.description || '',
-                    priority: task.priority,
-                    dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : ''
-                  })
-                  setShowEditModal(true)
-                }}
-                onDelete={() => {
-                  setSelectedTask(task)
-                  setShowDeleteModal(true)
-                }}
-                onAddUser={() => {
-                  setSelectedTask(task)
-                  fetchProjectMembers(task.project._id)
-                  setShowAddUserModal(true)
-                }}
-                onReassign={() => {
-                  setSelectedTask(task)
-                  fetchProjectMembers(task.project._id)
-                  setShowReassignModal(true)
-                }}
-                onAddSubtask={() => {
-                  setSelectedTask(task)
-                  setShowAddSubtaskModal(true)
-                }}
-                onViewProject={() => router.push(`/dashboard/projects/${task.project._id}`)}
-              />
-            ))}
-          </div>
-        </div>
-      )}
+          {/* Pending Acceptance */}
+          {pendingAcceptance.length > 0 && (
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-4">
+                <FaClock className="text-warning" />
+                <h2 className="text-lg font-semibold text-default-800">Awaiting Acceptance</h2>
+                <Chip color="warning" variant="flat" size="sm">
+                  {pendingAcceptance.length}
+                </Chip>
+              </div>
+              <div className="grid gap-4">
+                {pendingAcceptance.map(task => (
+                  <TaskCard
+                    key={task._id}
+                    task={task}
+                    onEdit={() => {
+                      setSelectedTask(task)
+                      setEditForm({
+                        title: task.title,
+                        description: task.description || '',
+                        priority: task.priority,
+                        dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : ''
+                      })
+                      setShowEditModal(true)
+                    }}
+                    onDelete={() => {
+                      setSelectedTask(task)
+                      setShowDeleteModal(true)
+                    }}
+                    onAddUser={() => {
+                      setSelectedTask(task)
+                      fetchProjectMembers(task.project._id)
+                      setShowAddUserModal(true)
+                    }}
+                    onReassign={() => {
+                      setSelectedTask(task)
+                      fetchProjectMembers(task.project._id)
+                      setShowReassignModal(true)
+                    }}
+                    onAddSubtask={() => {
+                      setSelectedTask(task)
+                      setShowAddSubtaskModal(true)
+                    }}
+                    onViewProject={() => router.push(`/dashboard/projects/${task.project._id}`)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
 
-      {/* Active Tasks */}
-      {activeTasks.length > 0 && (
-        <div className="mb-6">
-          <div className="flex items-center gap-2 mb-4">
-            <FaTasks className="text-primary" />
-            <h2 className="text-lg font-semibold text-default-800">Active Tasks</h2>
-            <Chip color="primary" variant="flat" size="sm">
-              {activeTasks.length}
-            </Chip>
-          </div>
-          <div className="grid gap-4">
-            {activeTasks.map(task => (
-              <TaskCard
-                key={task._id}
-                task={task}
-                onEdit={() => {
-                  setSelectedTask(task)
-                  setEditForm({
-                    title: task.title,
-                    description: task.description || '',
-                    priority: task.priority,
-                    dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : ''
-                  })
-                  setShowEditModal(true)
-                }}
-                onDelete={() => {
-                  setSelectedTask(task)
-                  setShowDeleteModal(true)
-                }}
-                onAddUser={() => {
-                  setSelectedTask(task)
-                  fetchProjectMembers(task.project._id)
-                  setShowAddUserModal(true)
-                }}
-                onReassign={() => {
-                  setSelectedTask(task)
-                  fetchProjectMembers(task.project._id)
-                  setShowReassignModal(true)
-                }}
-                onAddSubtask={() => {
-                  setSelectedTask(task)
-                  setShowAddSubtaskModal(true)
-                }}
-                onViewProject={() => router.push(`/dashboard/projects/${task.project._id}`)}
-                isOverdue={isOverdue(task)}
-              />
-            ))}
-          </div>
-        </div>
-      )}
+          {/* Active Tasks */}
+          {activeTasks.length > 0 && (
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-4">
+                <FaTasks className="text-primary" />
+                <h2 className="text-lg font-semibold text-default-800">Active Tasks</h2>
+                <Chip color="primary" variant="flat" size="sm">
+                  {activeTasks.length}
+                </Chip>
+              </div>
+              <div className="grid gap-4">
+                {activeTasks.map(task => (
+                  <TaskCard
+                    key={task._id}
+                    task={task}
+                    onEdit={() => {
+                      setSelectedTask(task)
+                      setEditForm({
+                        title: task.title,
+                        description: task.description || '',
+                        priority: task.priority,
+                        dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : ''
+                      })
+                      setShowEditModal(true)
+                    }}
+                    onDelete={() => {
+                      setSelectedTask(task)
+                      setShowDeleteModal(true)
+                    }}
+                    onAddUser={() => {
+                      setSelectedTask(task)
+                      fetchProjectMembers(task.project._id)
+                      setShowAddUserModal(true)
+                    }}
+                    onReassign={() => {
+                      setSelectedTask(task)
+                      fetchProjectMembers(task.project._id)
+                      setShowReassignModal(true)
+                    }}
+                    onAddSubtask={() => {
+                      setSelectedTask(task)
+                      setShowAddSubtaskModal(true)
+                    }}
+                    onViewProject={() => router.push(`/dashboard/projects/${task.project._id}`)}
+                    isOverdue={isOverdue(task)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
 
-      {/* Completed Tasks */}
-      {completedTasks.length > 0 && (
-        <div className="mb-6">
-          <div className="flex items-center gap-2 mb-4">
-            <FaCheckCircle className="text-success" />
-            <h2 className="text-lg font-semibold text-default-800">Completed</h2>
-            <Chip color="success" variant="flat" size="sm">
-              {completedTasks.length}
-            </Chip>
-          </div>
-          <div className="grid gap-4">
-            {completedTasks.map(task => (
-              <TaskCard
-                key={task._id}
-                task={task}
-                onEdit={() => {
-                  setSelectedTask(task)
-                  setEditForm({
-                    title: task.title,
-                    description: task.description || '',
-                    priority: task.priority,
-                    dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : ''
-                  })
-                  setShowEditModal(true)
-                }}
-                onDelete={() => {
-                  setSelectedTask(task)
-                  setShowDeleteModal(true)
-                }}
-                onViewProject={() => router.push(`/dashboard/projects/${task.project._id}`)}
-                isCompleted
-              />
-            ))}
-          </div>
-        </div>
-      )}
+          {/* Completed Tasks */}
+          {completedTasks.length > 0 && (
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-4">
+                <FaCheckCircle className="text-success" />
+                <h2 className="text-lg font-semibold text-default-800">Completed</h2>
+                <Chip color="success" variant="flat" size="sm">
+                  {completedTasks.length}
+                </Chip>
+              </div>
+              <div className="grid gap-4">
+                {completedTasks.map(task => (
+                  <TaskCard
+                    key={task._id}
+                    task={task}
+                    onEdit={() => {
+                      setSelectedTask(task)
+                      setEditForm({
+                        title: task.title,
+                        description: task.description || '',
+                        priority: task.priority,
+                        dueDate: task.dueDate ? new Date(task.dueDate).toISOString().split('T')[0] : ''
+                      })
+                      setShowEditModal(true)
+                    }}
+                    onDelete={() => {
+                      setSelectedTask(task)
+                      setShowDeleteModal(true)
+                    }}
+                    onViewProject={() => router.push(`/dashboard/projects/${task.project._id}`)}
+                    isCompleted
+                  />
+                ))}
+              </div>
+            </div>
+          )}
 
-      {filteredTasks.length === 0 && (
-        <div className="bg-white rounded-xl shadow-sm p-12 text-center">
-          <FaTasks className="mx-auto text-4xl text-gray-300 mb-4" />
-          <h3 className="text-lg font-medium text-gray-600">No assigned tasks found</h3>
-          <p className="text-gray-500">Tasks you assign to others will appear here</p>
-        </div>
-      )}
+          {filteredTasks.length === 0 && (
+            <div className="bg-white rounded-xl shadow-sm p-12 text-center">
+              <FaTasks className="mx-auto text-4xl text-gray-300 mb-4" />
+              <h3 className="text-lg font-medium text-gray-600">No assigned tasks found</h3>
+              <p className="text-gray-500">Tasks you assign to others will appear here</p>
+            </div>
+          )}
         </>
       )}
 
@@ -1054,13 +1032,13 @@ export default function AssignedTasksPage() {
               </div>
             </div>
             <div className="p-4 border-t border-gray-200 flex justify-end gap-3">
-              <button 
-                onClick={() => { setShowReasonModal(false); setPendingStatusChange(null); setStatusChangeReason('') }} 
+              <button
+                onClick={() => { setShowReasonModal(false); setPendingStatusChange(null); setStatusChangeReason('') }}
                 className="btn-secondary"
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={() => executeStatusChange(statusChangeReason)}
                 disabled={!statusChangeReason.trim() || modalUpdatingStatus}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
@@ -1184,7 +1162,7 @@ export default function AssignedTasksPage() {
                   placeholder="Select a team member..."
                   classNames={{ trigger: "bg-white" }}
                 >
-                  {projectMembers.filter(m => 
+                  {projectMembers.filter(m =>
                     !selectedTask.assignees?.some(a => a.user._id === m.user._id)
                   ).map(member => (
                     <SelectItem key={member.user._id}>
@@ -1229,7 +1207,7 @@ export default function AssignedTasksPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Select Team Members</label>
                 <div className="space-y-2 max-h-60 overflow-y-auto border border-gray-200 rounded-lg p-2">
-                  {projectMembers.filter(m => 
+                  {projectMembers.filter(m =>
                     !selectedTask.assignees?.some(a => a.user._id === m.user._id)
                   ).map(member => (
                     <label key={member.user._id} className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded cursor-pointer">
@@ -1294,7 +1272,7 @@ export default function AssignedTasksPage() {
                 </p>
               </div>
               <p className="text-gray-600 mb-4">Task: <strong>{selectedTask.title}</strong></p>
-              
+
               <div className="space-y-3">
                 <label className="flex items-center gap-3 p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
                   <input
@@ -1343,14 +1321,13 @@ export default function AssignedTasksPage() {
               <button onClick={() => { setShowDeletionApprovalModal(false); setDeletionResponse({ action: '', reason: '' }) }} className="btn-secondary">
                 Cancel
               </button>
-              <button 
-                onClick={handleDeletionApproval} 
-                disabled={submitting || !deletionResponse.action} 
-                className={`px-4 py-2 rounded-lg disabled:opacity-50 flex items-center gap-2 ${
-                  deletionResponse.action === 'approve' 
-                    ? 'bg-red-600 text-white hover:bg-red-700' 
+              <button
+                onClick={handleDeletionApproval}
+                disabled={submitting || !deletionResponse.action}
+                className={`px-4 py-2 rounded-lg disabled:opacity-50 flex items-center gap-2 ${deletionResponse.action === 'approve'
+                    ? 'bg-red-600 text-white hover:bg-red-700'
                     : 'bg-green-600 text-white hover:bg-green-700'
-                }`}
+                  }`}
               >
                 {submitting ? <Loader size="xs" /> : deletionResponse.action === 'approve' ? <FaTrash /> : <FaCheck />}
                 {deletionResponse.action === 'approve' ? 'Approve Deletion' : 'Reject Deletion'}
@@ -1362,169 +1339,166 @@ export default function AssignedTasksPage() {
 
       {/* Task Detail Modal - Opens when clicking task in Kanban view */}
       <ModalPortal isOpen={!!selectedTask && !showEditModal && !showDeleteModal && !showAddUserModal && !showReassignModal && !showAddSubtaskModal && !showDeletionApprovalModal}>
-          {selectedTask && <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setSelectedTask(null)}>
-            <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
-              <div className="px-6 py-4 bg-gray-50 flex items-center justify-between flex-shrink-0">
-                <h3 className="text-lg font-semibold text-gray-800">Task Details</h3>
-                <div className="flex items-center gap-2">
-                  <Button
-                    onPress={() => {
-                      setEditForm({
-                        title: selectedTask.title,
-                        description: selectedTask.description || '',
-                        priority: selectedTask.priority,
-                        dueDate: selectedTask.dueDate ? new Date(selectedTask.dueDate).toISOString().split('T')[0] : ''
-                      })
-                      setShowEditModal(true)
-                    }}
-                    color="primary"
-                    size="sm"
-                    startContent={<FaEdit className="w-3 h-3" />}
-                  >
-                    Edit Task
-                  </Button>
-                  <Button
-                    onPress={() => router.push(`/dashboard/projects/${selectedTask.project?._id || selectedTask.project}`)}
-                    variant="flat"
-                    size="sm"
-                    startContent={<FaProjectDiagram className="w-3 h-3" />}
-                  >
-                    View Project
-                  </Button>
-                  <button
-                    onClick={() => setSelectedTask(null)}
-                    className="p-2 hover:bg-gray-100 rounded-lg text-gray-500"
-                  >
-                    <FaTimes />
-                  </button>
-                </div>
+        {selectedTask && <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && setSelectedTask(null)}>
+          <div className="bg-white rounded-[30px] shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col animate-modal-enter">
+            <div className="px-6 py-4 bg-gray-50 flex items-center justify-between flex-shrink-0">
+              <h3 className="text-lg font-semibold text-gray-800">Task Details</h3>
+              <div className="flex items-center gap-2">
+                <Button
+                  onPress={() => {
+                    setEditForm({
+                      title: selectedTask.title,
+                      description: selectedTask.description || '',
+                      priority: selectedTask.priority,
+                      dueDate: selectedTask.dueDate ? new Date(selectedTask.dueDate).toISOString().split('T')[0] : ''
+                    })
+                    setShowEditModal(true)
+                  }}
+                  color="primary"
+                  size="sm"
+                  startContent={<FaEdit className="w-3 h-3" />}
+                >
+                  Edit Task
+                </Button>
+                <Button
+                  onPress={() => router.push(`/dashboard/projects/${selectedTask.project?._id || selectedTask.project}`)}
+                  variant="flat"
+                  size="sm"
+                  startContent={<FaProjectDiagram className="w-3 h-3" />}
+                >
+                  View Project
+                </Button>
+                <button
+                  onClick={() => setSelectedTask(null)}
+                  className="p-2 hover:bg-gray-100 rounded-lg text-gray-500"
+                >
+                  <FaTimes />
+                </button>
               </div>
-              
-              <div className="p-6 overflow-y-auto flex-1">
-                {/* Task Title & Status */}
-                <div className="flex items-start justify-between mb-4">
-                  <h2 className="text-xl font-semibold text-gray-800">{selectedTask.title}</h2>
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[selectedTask.status]}`}>
-                    {selectedTask.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+            </div>
+
+            <div className="p-6 overflow-y-auto flex-1">
+              {/* Task Title & Status */}
+              <div className="flex items-start justify-between mb-4">
+                <h2 className="text-xl font-semibold text-gray-800">{selectedTask.title}</h2>
+                <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[selectedTask.status]}`}>
+                  {selectedTask.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                </span>
+              </div>
+
+              {/* Project Badge */}
+              {selectedTask.project && (
+                <div className="mb-4">
+                  <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${getProjectColor(selectedTask.project?._id).badge} ${getProjectColor(selectedTask.project?._id).text}`}>
+                    <FaProjectDiagram className="w-3 h-3" />
+                    {selectedTask.project.name || 'Project'}
                   </span>
                 </div>
+              )}
 
-                {/* Project Badge */}
-                {selectedTask.project && (
-                  <div className="mb-4">
-                    <span className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${getProjectColor(selectedTask.project?._id).badge} ${getProjectColor(selectedTask.project?._id).text}`}>
-                      <FaProjectDiagram className="w-3 h-3" />
-                      {selectedTask.project.name || 'Project'}
-                    </span>
-                  </div>
-                )}
+              {/* Description */}
+              {selectedTask.description && (
+                <div className="mb-6">
+                  <h4 className="text-sm font-medium text-gray-500 mb-2">Description</h4>
+                  <p className="text-gray-700 whitespace-pre-wrap">{selectedTask.description}</p>
+                </div>
+              )}
 
-                {/* Description */}
-                {selectedTask.description && (
-                  <div className="mb-6">
-                    <h4 className="text-sm font-medium text-gray-500 mb-2">Description</h4>
-                    <p className="text-gray-700 whitespace-pre-wrap">{selectedTask.description}</p>
-                  </div>
-                )}
-
-                {/* Attachments */}
-                {selectedTask.attachments && selectedTask.attachments.length > 0 && (
-                  <div className="mb-6">
-                    <h4 className="text-sm font-medium text-gray-500 mb-2">Attachments</h4>
-                    <div className="space-y-2">
-                      {selectedTask.attachments.map((file, index) => (
-                        <a
-                          key={`${file.url}-${index}`}
-                          href={file.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100"
-                        >
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-gray-800 truncate">{file.name || 'Attachment'}</p>
-                            <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
-                          </div>
-                          <span className="text-xs text-blue-600">Open</span>
-                        </a>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Details Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-xs text-gray-500 mb-1">Priority</p>
-                    <span className={`px-2 py-1 rounded text-sm font-medium ${priorityColors[selectedTask.priority]}`}>
-                      {selectedTask.priority.charAt(0).toUpperCase() + selectedTask.priority.slice(1)}
-                    </span>
-                  </div>
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-xs text-gray-500 mb-1">Due Date</p>
-                    <p className={`font-medium ${
-                      selectedTask.dueDate && new Date(selectedTask.dueDate) < new Date() && selectedTask.status !== 'completed'
-                        ? 'text-red-600' : 'text-gray-800'
-                    }`}>
-                      {selectedTask.dueDate ? new Date(selectedTask.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set'}
-                    </p>
-                  </div>
-                  {selectedTask.estimatedHours && (
-                    <div className="bg-gray-50 p-3 rounded-lg">
-                      <p className="text-xs text-gray-500 mb-1">Estimated Time</p>
-                      <p className="font-medium text-gray-800">
-                        {selectedTask.estimatedHours >= 8 
-                          ? `${Math.floor(selectedTask.estimatedHours / 8)}d ${selectedTask.estimatedHours % 8}h`
-                          : `${selectedTask.estimatedHours}h`}
-                      </p>
-                    </div>
-                  )}
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-xs text-gray-500 mb-1">Progress</p>
-                    <p className="font-medium text-gray-800">{selectedTask.progressPercentage || 0}%</p>
+              {/* Attachments */}
+              {selectedTask.attachments && selectedTask.attachments.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="text-sm font-medium text-gray-500 mb-2">Attachments</h4>
+                  <div className="space-y-2">
+                    {selectedTask.attachments.map((file, index) => (
+                      <a
+                        key={`${file.url}-${index}`}
+                        href={file.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gray-800 truncate">{file.name || 'Attachment'}</p>
+                          <p className="text-xs text-gray-500">{formatFileSize(file.size)}</p>
+                        </div>
+                        <span className="text-xs text-blue-600">Open</span>
+                      </a>
+                    ))}
                   </div>
                 </div>
+              )}
 
-                {/* Progress Bar */}
-                {selectedTask.subtasks && selectedTask.subtasks.length > 0 && (
-                  <div className="mb-6">
-                    <div className="flex items-center justify-start mb-2">
-                      <h4 className="text-sm font-medium text-gray-500">Progress</h4>
-                      <span className="text-sm text-gray-600">{selectedTask.progressPercentage || 0}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className={`h-2 rounded-full transition-all ${
-                          selectedTask.progressPercentage === 100 ? 'bg-green-500' :
-                          selectedTask.progressPercentage >= 50 ? 'bg-blue-500' :
-                          'bg-orange-500'
-                        }`}
-                        style={{ width: `${selectedTask.progressPercentage || 0}%` }}
-                      />
-                    </div>
+              {/* Details Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <p className="text-xs text-gray-500 mb-1">Priority</p>
+                  <span className={`px-2 py-1 rounded text-sm font-medium ${priorityColors[selectedTask.priority]}`}>
+                    {selectedTask.priority.charAt(0).toUpperCase() + selectedTask.priority.slice(1)}
+                  </span>
+                </div>
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <p className="text-xs text-gray-500 mb-1">Due Date</p>
+                  <p className={`font-medium ${selectedTask.dueDate && new Date(selectedTask.dueDate) < new Date() && selectedTask.status !== 'completed'
+                      ? 'text-red-600' : 'text-gray-800'
+                    }`}>
+                    {selectedTask.dueDate ? new Date(selectedTask.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not set'}
+                  </p>
+                </div>
+                {selectedTask.estimatedHours && (
+                  <div className="bg-gray-50 p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 mb-1">Estimated Time</p>
+                    <p className="font-medium text-gray-800">
+                      {selectedTask.estimatedHours >= 8
+                        ? `${Math.floor(selectedTask.estimatedHours / 8)}d ${selectedTask.estimatedHours % 8}h`
+                        : `${selectedTask.estimatedHours}h`}
+                    </p>
                   </div>
                 )}
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <p className="text-xs text-gray-500 mb-1">Progress</p>
+                  <p className="font-medium text-gray-800">{selectedTask.progressPercentage || 0}%</p>
+                </div>
+              </div>
 
-                {/* Subtasks - Interactive for managers */}
-                {selectedTask.subtasks && selectedTask.subtasks.length > 0 && (
-                  <div className="mb-6">
-                    <h4 className="text-sm font-medium text-gray-500 mb-3">
-                      Subtasks ({selectedTask.subtasks.filter(st => st.completed).length}/{selectedTask.subtasks.length})
-                    </h4>
-                    <div className="space-y-2 max-h-60 overflow-y-auto">
-                      {selectedTask.subtasks.map((subtask, idx) => {
-                        // Allow toggle if: subtask is completed (can unmark) OR not pending acceptance (can mark)
-                        const canToggle = subtask.completed || !subtask.pendingAcceptance
-                        
-                        return (
-                          <div key={subtask._id || idx} className={`flex items-center gap-3 p-3 rounded-lg transition-all ${
-                            subtask.completed ? 'bg-green-50' : 
+              {/* Progress Bar */}
+              {selectedTask.subtasks && selectedTask.subtasks.length > 0 && (
+                <div className="mb-6">
+                  <div className="flex items-center justify-start mb-2">
+                    <h4 className="text-sm font-medium text-gray-500">Progress</h4>
+                    <span className="text-sm text-gray-600">{selectedTask.progressPercentage || 0}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full transition-all ${selectedTask.progressPercentage === 100 ? 'bg-green-500' :
+                          selectedTask.progressPercentage >= 50 ? 'bg-blue-500' :
+                            'bg-orange-500'
+                        }`}
+                      style={{ width: `${selectedTask.progressPercentage || 0}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Subtasks - Interactive for managers */}
+              {selectedTask.subtasks && selectedTask.subtasks.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="text-sm font-medium text-gray-500 mb-3">
+                    Subtasks ({selectedTask.subtasks.filter(st => st.completed).length}/{selectedTask.subtasks.length})
+                  </h4>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {selectedTask.subtasks.map((subtask, idx) => {
+                      // Allow toggle if: subtask is completed (can unmark) OR not pending acceptance (can mark)
+                      const canToggle = subtask.completed || !subtask.pendingAcceptance
+
+                      return (
+                        <div key={subtask._id || idx} className={`flex items-center gap-3 p-3 rounded-lg transition-all ${subtask.completed ? 'bg-green-50' :
                             subtask.pendingAcceptance ? 'bg-yellow-50' : 'bg-gray-50'
                           } ${canToggle ? 'hover:bg-gray-100 cursor-pointer' : ''}`}
                           onClick={async () => {
                             if (!canToggle || modalUpdatingSubtask) return
                             const subtaskId = subtask._id
                             const projectId = selectedTask.project?._id || selectedTask.project
-                            
+
                             try {
                               setModalUpdatingSubtask(subtaskId)
                               const token = localStorage.getItem('token')
@@ -1544,8 +1518,8 @@ export default function AssignedTasksPage() {
                                 // Update selectedTask subtasks
                                 setSelectedTask(prev => ({
                                   ...prev,
-                                  subtasks: prev.subtasks.map(st => 
-                                    st._id === subtaskId 
+                                  subtasks: prev.subtasks.map(st =>
+                                    st._id === subtaskId
                                       ? { ...st, completed: data.data?.subtask?.completed ?? !subtask.completed, pendingAcceptance: data.data?.subtask?.pendingAcceptance || false }
                                       : st
                                   ),
@@ -1553,7 +1527,7 @@ export default function AssignedTasksPage() {
                                   status: data.data?.taskStatus || prev.status
                                 }))
                                 // Also refresh main task list
-                                fetchTasks(true)
+                                mutateTasks()
                                 toast.success(data.message || 'Subtask updated')
                               } else {
                                 toast.error(data.message || 'Failed to update subtask')
@@ -1564,169 +1538,165 @@ export default function AssignedTasksPage() {
                               setModalUpdatingSubtask(null)
                             }
                           }}
-                          >
-                            <div className={`w-5 h-5 rounded-full flex items-center justify-center transition-all ${
-                              modalUpdatingSubtask === subtask._id ? 'bg-blue-500 animate-pulse' :
-                              subtask.completed ? 'bg-green-500 text-white' : 
-                              subtask.pendingAcceptance ? 'bg-yellow-500 text-white' : 
-                              canToggle ? 'bg-gray-300 hover:bg-gray-400' : 'bg-gray-200'
+                        >
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center transition-all ${modalUpdatingSubtask === subtask._id ? 'bg-blue-500 animate-pulse' :
+                              subtask.completed ? 'bg-green-500 text-white' :
+                                subtask.pendingAcceptance ? 'bg-yellow-500 text-white' :
+                                  canToggle ? 'bg-gray-300 hover:bg-gray-400' : 'bg-gray-200'
                             }`}>
-                              {modalUpdatingSubtask === subtask._id ? (
-                                <Loader size="xs" color="#ffffff" />
-                              ) : subtask.completed ? (
-                                <FaCheck className="w-3 h-3" />
-                              ) : subtask.pendingAcceptance ? (
-                                <FaClock className="w-3 h-3" />
-                              ) : null}
-                            </div>
-                            <div className="flex-1">
-                              <p className={`text-sm ${subtask.completed ? 'text-gray-500 line-through' : 'text-gray-800'}`}>
-                                {subtask.title}
+                            {modalUpdatingSubtask === subtask._id ? (
+                              <Loader size="xs" color="#ffffff" />
+                            ) : subtask.completed ? (
+                              <FaCheck className="w-3 h-3" />
+                            ) : subtask.pendingAcceptance ? (
+                              <FaClock className="w-3 h-3" />
+                            ) : null}
+                          </div>
+                          <div className="flex-1">
+                            <p className={`text-sm ${subtask.completed ? 'text-gray-500 line-through' : 'text-gray-800'}`}>
+                              {subtask.title}
+                            </p>
+                            {subtask.estimatedHours && (
+                              <p className="text-xs text-gray-400 mt-0.5">
+                                Est: {subtask.estimatedHours >= 8 ? `${Math.floor(subtask.estimatedHours / 8)}d ${subtask.estimatedHours % 8}h` : `${subtask.estimatedHours}h`}
                               </p>
-                              {subtask.estimatedHours && (
-                                <p className="text-xs text-gray-400 mt-0.5">
-                                  Est: {subtask.estimatedHours >= 8 ? `${Math.floor(subtask.estimatedHours / 8)}d ${subtask.estimatedHours % 8}h` : `${subtask.estimatedHours}h`}
-                                </p>
-                              )}
-                            </div>
-                            {subtask.pendingAcceptance && (
-                              <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded">Pending Review</span>
                             )}
                           </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Assignees */}
-                {selectedTask.assignees && selectedTask.assignees.length > 0 && (
-                  <div className="mb-6">
-                    <h4 className="text-sm font-medium text-gray-500 mb-3">Assignees</h4>
-                    <div className="flex flex-wrap gap-2">
-                      {selectedTask.assignees.map((assignee, idx) => (
-                        <div key={assignee._id || idx} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${
-                          assignee.assignmentStatus === 'accepted' ? 'bg-green-50 text-green-700' :
-                          assignee.assignmentStatus === 'rejected' ? 'bg-red-50 text-red-700' :
-                          'bg-yellow-50 text-yellow-700'
-                        }`}>
-                          <div className="w-6 h-6 rounded-full bg-primary-500 text-white flex items-center justify-center text-xs">
-                            {assignee.user?.profilePicture ? (
-                              <img src={assignee.user.profilePicture} alt="" className="w-full h-full rounded-full object-cover" />
-                            ) : (
-                              assignee.user?.firstName?.[0] || '?'
-                            )}
-                          </div>
-                          <span className="text-sm">{assignee.user?.firstName} {assignee.user?.lastName}</span>
-                          <span className="text-xs opacity-75">({assignee.assignmentStatus})</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Status Update - For tasks WITHOUT subtasks */}
-                {(!selectedTask.subtasks || selectedTask.subtasks.length === 0) && (
-                  <div className="mb-6">
-                    <h4 className="text-sm font-medium text-gray-500 mb-3">Update Status</h4>
-                    <div className="relative">
-                      <button
-                        onClick={() => setShowModalStatusDropdown(!showModalStatusDropdown)}
-                        disabled={modalUpdatingStatus}
-                        className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-all ${
-                          modalUpdatingStatus ? 'bg-gray-100 cursor-not-allowed' : 'bg-white hover:bg-gray-50 cursor-pointer'
-                        }`}
-                      >
-                        <span className={`flex items-center gap-2 font-medium ${statusColors[selectedTask.status]?.split(' ')[1] || 'text-gray-700'}`}>
-                          {modalUpdatingStatus ? (
-                            <Loader size="xs" />
-                          ) : (
-                            selectedTask.status === 'completed' ? <FaCheckCircle /> :
-                            selectedTask.status === 'in-progress' ? <FaPlay /> :
-                            selectedTask.status === 'review' ? <FaEye /> :
-                            selectedTask.status === 'blocked' ? <FaExclamationTriangle /> :
-                            <FaClock />
+                          {subtask.pendingAcceptance && (
+                            <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded">Pending Review</span>
                           )}
-                          {selectedTask.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                        </span>
-                        <FaChevronDown className={`transition-transform ${showModalStatusDropdown ? 'rotate-180' : ''}`} />
-                      </button>
-                      
-                      {showModalStatusDropdown && (
-                        <div className="absolute top-full left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-10 overflow-hidden">
-                          {['todo', 'in-progress', 'review', 'completed', 'blocked'].map(status => (
-                            <button
-                              key={status}
-                              onClick={() => {
-                                if (status === selectedTask.status) {
-                                  setShowModalStatusDropdown(false)
-                                  return
-                                }
-                                // Show reason modal instead of changing directly
-                                setShowModalStatusDropdown(false)
-                                setPendingStatusChange({ task: selectedTask, newStatus: status, source: 'modal' })
-                                setStatusChangeReason('')
-                                setShowReasonModal(true)
-                              }}
-                              className={`w-full flex items-center gap-2 px-4 py-2.5 text-left hover:bg-gray-50 transition-colors ${
-                                status === selectedTask.status ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
-                              }`}
-                            >
-                              {status === 'completed' ? <FaCheckCircle className="text-green-500" /> :
-                               status === 'in-progress' ? <FaPlay className="text-blue-500" /> :
-                               status === 'review' ? <FaEye className="text-purple-500" /> :
-                               status === 'blocked' ? <FaExclamationTriangle className="text-red-500" /> :
-                               <FaClock className="text-gray-400" />}
-                              {status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                              {status === selectedTask.status && <FaCheck className="ml-auto text-blue-500" />}
-                            </button>
-                          ))}
                         </div>
-                      )}
-                    </div>
+                      )
+                    })}
                   </div>
-                )}
-
-                {/* Action Buttons */}
-                <div className="flex flex-wrap gap-3 pt-4 border-t">
-                  <button
-                    onClick={() => {
-                      fetchProjectMembers(selectedTask.project._id)
-                      setShowAddUserModal(true)
-                    }}
-                    className="btn-secondary flex items-center gap-2"
-                  >
-                    <FaUserPlus className="w-4 h-4" />
-                    Add User
-                  </button>
-                  <button
-                    onClick={() => {
-                      fetchProjectMembers(selectedTask.project._id)
-                      setShowReassignModal(true)
-                    }}
-                    className="btn-secondary flex items-center gap-2"
-                  >
-                    <FaExchangeAlt className="w-4 h-4" />
-                    Reassign
-                  </button>
-                  <button
-                    onClick={() => setShowAddSubtaskModal(true)}
-                    className="btn-secondary flex items-center gap-2"
-                  >
-                    <FaPlus className="w-4 h-4" />
-                    Add Subtask
-                  </button>
-                  <button
-                    onClick={() => setShowDeleteModal(true)}
-                    className="btn-secondary text-red-600 hover:bg-red-50 flex items-center gap-2"
-                  >
-                    <FaTrash className="w-4 h-4" />
-                    Delete
-                  </button>
                 </div>
+              )}
+
+              {/* Assignees */}
+              {selectedTask.assignees && selectedTask.assignees.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="text-sm font-medium text-gray-500 mb-3">Assignees</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedTask.assignees.map((assignee, idx) => (
+                      <div key={assignee._id || idx} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${assignee.assignmentStatus === 'accepted' ? 'bg-green-50 text-green-700' :
+                          assignee.assignmentStatus === 'rejected' ? 'bg-red-50 text-red-700' :
+                            'bg-yellow-50 text-yellow-700'
+                        }`}>
+                        <div className="w-6 h-6 rounded-full bg-primary-500 text-white flex items-center justify-center text-xs">
+                          {assignee.user?.profilePicture ? (
+                            <img src={assignee.user.profilePicture} alt="" className="w-full h-full rounded-full object-cover" />
+                          ) : (
+                            assignee.user?.firstName?.[0] || '?'
+                          )}
+                        </div>
+                        <span className="text-sm">{assignee.user?.firstName} {assignee.user?.lastName}</span>
+                        <span className="text-xs opacity-75">({assignee.assignmentStatus})</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Status Update - For tasks WITHOUT subtasks */}
+              {(!selectedTask.subtasks || selectedTask.subtasks.length === 0) && (
+                <div className="mb-6">
+                  <h4 className="text-sm font-medium text-gray-500 mb-3">Update Status</h4>
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowModalStatusDropdown(!showModalStatusDropdown)}
+                      disabled={modalUpdatingStatus}
+                      className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-all ${modalUpdatingStatus ? 'bg-gray-100 cursor-not-allowed' : 'bg-white hover:bg-gray-50 cursor-pointer'
+                        }`}
+                    >
+                      <span className={`flex items-center gap-2 font-medium ${statusColors[selectedTask.status]?.split(' ')[1] || 'text-gray-700'}`}>
+                        {modalUpdatingStatus ? (
+                          <Loader size="xs" />
+                        ) : (
+                          selectedTask.status === 'completed' ? <FaCheckCircle /> :
+                            selectedTask.status === 'in-progress' ? <FaPlay /> :
+                              selectedTask.status === 'review' ? <FaEye /> :
+                                selectedTask.status === 'blocked' ? <FaExclamationTriangle /> :
+                                  <FaClock />
+                        )}
+                        {selectedTask.status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      </span>
+                      <FaChevronDown className={`transition-transform ${showModalStatusDropdown ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {showModalStatusDropdown && (
+                      <div className="absolute top-full left-0 right-0 mt-1 bg-white border rounded-lg shadow-lg z-10 overflow-hidden">
+                        {['todo', 'in-progress', 'review', 'completed', 'blocked'].map(status => (
+                          <button
+                            key={status}
+                            onClick={() => {
+                              if (status === selectedTask.status) {
+                                setShowModalStatusDropdown(false)
+                                return
+                              }
+                              // Show reason modal instead of changing directly
+                              setShowModalStatusDropdown(false)
+                              setPendingStatusChange({ task: selectedTask, newStatus: status, source: 'modal' })
+                              setStatusChangeReason('')
+                              setShowReasonModal(true)
+                            }}
+                            className={`w-full flex items-center gap-2 px-4 py-2.5 text-left hover:bg-gray-50 transition-colors ${status === selectedTask.status ? 'bg-blue-50 text-blue-700' : 'text-gray-700'
+                              }`}
+                          >
+                            {status === 'completed' ? <FaCheckCircle className="text-green-500" /> :
+                              status === 'in-progress' ? <FaPlay className="text-blue-500" /> :
+                                status === 'review' ? <FaEye className="text-purple-500" /> :
+                                  status === 'blocked' ? <FaExclamationTriangle className="text-red-500" /> :
+                                    <FaClock className="text-gray-400" />}
+                            {status.replace('-', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                            {status === selectedTask.status && <FaCheck className="ml-auto text-blue-500" />}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap gap-3 pt-4 border-t">
+                <button
+                  onClick={() => {
+                    fetchProjectMembers(selectedTask.project._id)
+                    setShowAddUserModal(true)
+                  }}
+                  className="btn-secondary flex items-center gap-2"
+                >
+                  <FaUserPlus className="w-4 h-4" />
+                  Add User
+                </button>
+                <button
+                  onClick={() => {
+                    fetchProjectMembers(selectedTask.project._id)
+                    setShowReassignModal(true)
+                  }}
+                  className="btn-secondary flex items-center gap-2"
+                >
+                  <FaExchangeAlt className="w-4 h-4" />
+                  Reassign
+                </button>
+                <button
+                  onClick={() => setShowAddSubtaskModal(true)}
+                  className="btn-secondary flex items-center gap-2"
+                >
+                  <FaPlus className="w-4 h-4" />
+                  Add Subtask
+                </button>
+                <button
+                  onClick={() => setShowDeleteModal(true)}
+                  className="btn-secondary text-red-600 hover:bg-red-50 flex items-center gap-2"
+                >
+                  <FaTrash className="w-4 h-4" />
+                  Delete
+                </button>
               </div>
             </div>
-          </div>}
+          </div>
+        </div>}
       </ModalPortal>
     </div>
   )
@@ -1739,12 +1709,11 @@ function TaskCard({ task, onEdit, onDelete, onAddUser, onReassign, onAddSubtask,
   const progressPercentage = task.progressPercentage || 0
 
   return (
-    <div className={`rounded-xl shadow-sm border-2 border-l-4 p-4 transition-all bg-white ${projectColor.border} ${
-      hasPendingDeletion ? 'border-red-300 bg-red-50/30' :
-      isOverdue ? 'border-red-300 bg-red-50/30' :
-      isCompleted ? 'border-green-300 bg-green-50/30' :
-      'border-gray-200'
-    }`}>
+    <div className={`rounded-xl shadow-sm border-2 border-l-4 p-4 transition-all bg-white ${projectColor.border} ${hasPendingDeletion ? 'border-red-300 bg-red-50/30' :
+        isOverdue ? 'border-red-300 bg-red-50/30' :
+          isCompleted ? 'border-green-300 bg-green-50/30' :
+            'border-gray-200'
+      }`}>
       <div className="flex items-start justify-between">
         <div className="flex-1">
           {hasPendingDeletion && (
@@ -1759,7 +1728,7 @@ function TaskCard({ task, onEdit, onDelete, onAddUser, onReassign, onAddSubtask,
               </button>
             </div>
           )}
-          
+
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <h3 className="font-medium text-gray-800">{task.title}</h3>
             <span className={`px-2 py-0.5 rounded text-xs border ${statusColors[task.status]}`}>
@@ -1769,11 +1738,11 @@ function TaskCard({ task, onEdit, onDelete, onAddUser, onReassign, onAddSubtask,
               {task.priority}
             </span>
           </div>
-          
+
           {task.description && (
             <p className="text-sm text-gray-600 mb-2">{task.description}</p>
           )}
-          
+
           <div className="flex items-center gap-4 text-sm text-gray-500 flex-wrap">
             <button
               onClick={onViewProject}
@@ -1807,11 +1776,10 @@ function TaskCard({ task, onEdit, onDelete, onAddUser, onReassign, onAddSubtask,
               </div>
               <div className="w-full bg-gray-200 rounded-full h-1.5">
                 <div
-                  className={`h-1.5 rounded-full transition-all ${
-                    progressPercentage === 100 ? 'bg-green-500' :
-                    progressPercentage >= 50 ? 'bg-blue-500' :
-                    'bg-orange-500'
-                  }`}
+                  className={`h-1.5 rounded-full transition-all ${progressPercentage === 100 ? 'bg-green-500' :
+                      progressPercentage >= 50 ? 'bg-blue-500' :
+                        'bg-orange-500'
+                    }`}
                   style={{ width: `${progressPercentage}%` }}
                 />
               </div>
@@ -1826,13 +1794,12 @@ function TaskCard({ task, onEdit, onDelete, onAddUser, onReassign, onAddSubtask,
                 {task.assignees.map(a => (
                   <div
                     key={a._id}
-                    className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
-                      a.assignmentStatus === 'pending' 
-                        ? 'bg-yellow-100 text-yellow-700' 
+                    className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${a.assignmentStatus === 'pending'
+                        ? 'bg-yellow-100 text-yellow-700'
                         : a.assignmentStatus === 'rejected'
-                        ? 'bg-red-100 text-red-700'
-                        : 'bg-green-100 text-green-700'
-                    }`}
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-green-100 text-green-700'
+                      }`}
                     title={a.assignmentStatus}
                   >
                     {a.user.firstName} {a.user.lastName}
@@ -1853,7 +1820,7 @@ function TaskCard({ task, onEdit, onDelete, onAddUser, onReassign, onAddSubtask,
           >
             <FaChevronDown className={`transition-transform ${showActions ? 'rotate-180' : ''}`} />
           </button>
-          
+
           {showActions && (
             <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
               <button

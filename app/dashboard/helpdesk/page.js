@@ -1,26 +1,21 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaTicketAlt, FaCheckCircle, FaClock, FaExclamationCircle, FaTimes, FaCog } from 'react-icons/fa'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Select, SelectItem, Input, Textarea } from '@heroui/react'
-import Loader from '@/components/ui/Loader'
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Select, SelectItem, Input, Textarea, Skeleton } from '@heroui/react'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton from '@/components/ui/LoadingButton'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 
 export default function HelpdeskPage() {
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
   const router = useRouter()
-  const [tickets, setTickets] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState(null)
   const [showModal, setShowModal] = useState(false)
-  const [isManager, setIsManager] = useState(false)
   const [formData, setFormData] = useState({
     subject: '',
     category: '',
@@ -28,128 +23,52 @@ export default function HelpdeskPage() {
     description: ''
   })
 
+  const { user, employeeId, isManager } = useMemo(() => {
+    const parsedUser = getCurrentUser()
+    const empId = parsedUser ? getEmployeeId(parsedUser) : null
+    const mgr = parsedUser && ['admin', 'hr', 'manager', 'department_head', 'super_admin'].includes(parsedUser.role)
+    return { user: parsedUser, employeeId: empId, isManager: mgr }
+  }, [])
+
+  // --- SWR data fetching ---
+  const isAdminHr = user && ['admin', 'hr'].includes(user.role)
+  const swrKey = isAdminHr ? '/api/helpdesk' : (employeeId ? `/api/helpdesk?employeeId=${employeeId}` : null)
+  const { data: ticketsRes, error, isLoading, isValidating, mutate: refreshTickets } = useAuthedSWR(swrKey)
+  const tickets = ticketsRes?.data || []
+
   // Real-time updates
   const { socket, isConnected, onHelpdeskTicket, subscribe } = useSocket()
 
-  // Subscribe to real-time helpdesk updates
-  useEffect(() => {
-    if (!socket || !isConnected || !user) return
-
-    const empId = getEmployeeId(user)
-    if (!empId) return
-
-    const handleHelpdeskUpdate = (data) => {
-      console.log('🔄 [Helpdesk] Real-time update received:', data)
-      fetchTickets(empId)
-    }
-
+  useState(() => {
+    if (!socket || !isConnected || !employeeId) return
+    const handleHelpdeskUpdate = () => refreshTickets()
     const unsub1 = onHelpdeskTicket?.(handleHelpdeskUpdate)
     const unsub2 = subscribe?.(REALTIME_EVENTS.HELPDESK_TICKET, handleHelpdeskUpdate)
     const unsub3 = subscribe?.(REALTIME_EVENTS.HELPDESK_TICKET_UPDATED, handleHelpdeskUpdate)
+    return () => { unsub1?.(); unsub2?.(); unsub3?.() }
+  })
 
-    return () => {
-      unsub1?.()
-      unsub2?.()
-      unsub3?.()
-    }
-  }, [socket, isConnected, user])
-
-  useEffect(() => {
-    const parsedUser = getCurrentUser()
-    if (parsedUser) {
-      setUser(parsedUser)
-      // Check if user can manage tickets
-      setIsManager(['admin', 'hr', 'manager', 'department_head', 'super_admin'].includes(parsedUser.role))
-      const empId = getEmployeeId(parsedUser)
-      if (empId) {
-        fetchTickets(empId)
-      } else {
-        console.error('Employee ID not found in user data:', parsedUser)
-        toast.error('Employee information not found. Please logout and login again.')
-        setLoading(false)
-      }
-    } else {
-      console.error('No user data found')
-      toast.error('Please login to view tickets')
-      setLoading(false)
-    }
-  }, [])
+  // --- Submit mutation ---
+  const submitMutation = useApiMutation({
+    method: 'POST',
+    invalidateKeys: [swrKey],
+    onSuccess: () => {
+      toast.success('Ticket created successfully')
+      setShowModal(false)
+      setFormData({ subject: '', category: '', priority: 'medium', description: '' })
+    },
+    onError: (msg) => toast.error(msg || 'Failed to create ticket'),
+  })
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault()
-    const empId = getEmployeeId(user)
-    if (!empId) {
-      toast.error('Employee ID not found')
-      return
-    }
-
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/helpdesk', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          ...formData,
-          createdBy: empId
-        })
-      })
-      const data = await response.json()
-      if (data.success) {
-        toast.success('Ticket created successfully')
-        setShowModal(false)
-        fetchTickets(empId)
-        setFormData({
-          subject: '',
-          category: '',
-          priority: 'medium',
-          description: ''
-        })
-      } else {
-        toast.error(data.message || 'Failed to create ticket')
-      }
-    } catch (error) {
-      console.error('Create ticket error:', error)
-      toast.error('Failed to create ticket')
-    }
-  }
-
-  const fetchTickets = async (employeeId) => {
-    try {
-      const token = localStorage.getItem('token')
-      const parsedUser = getCurrentUser()
-      const userRole = parsedUser?.role
-      
-      // Admin/HR see all tickets, others see only their own
-      const isManagerRole = ['admin', 'hr'].includes(userRole)
-      const url = isManagerRole 
-        ? '/api/helpdesk'  // All tickets for admin/HR
-        : `/api/helpdesk?employeeId=${employeeId}`  // Only user's tickets
-        
-      const response = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        setTickets(data.data || [])
-      } else {
-        console.error('API Error:', data.message)
-        toast.error(data.message || 'Failed to fetch tickets')
-      }
-    } catch (error) {
-      console.error('Fetch tickets error:', error)
-      toast.error('Failed to fetch tickets')
-    } finally {
-      setLoading(false)
-    }
+    if (!employeeId) { toast.error('Employee ID not found'); return }
+    submitMutation.execute('/api/helpdesk', { ...formData, createdBy: employeeId })
   }
 
   const stats = [
@@ -183,16 +102,8 @@ export default function HelpdeskPage() {
     }
   ]
 
-  // Prevent hydration mismatch
-  if (!mounted) {
-    return (
-      <div className="space-y-6">
-        <div className="space-y-4 animate-pulse">
-          <div className="w-1/4 h-10 bg-gray-200 rounded"></div>
-          <div className="h-32 bg-gray-200 rounded"></div>
-        </div>
-      </div>
-    )
+  if (error) {
+    return <DataErrorState message="Failed to load tickets" onRetry={() => refreshTickets()} />
   }
 
   return (
@@ -201,7 +112,7 @@ export default function HelpdeskPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl">Helpdesk</h1>
-          <p className="mt-1 text-sm text-gray-600">Submit and track support tickets</p>
+          <p className="mt-1 text-sm text-gray-600">Submit and track support tickets <BackgroundRefreshIndicator isValidating={isValidating} position="inline" /></p>
         </div>
         <div className="flex gap-3">
           {isManager && (
@@ -225,19 +136,30 @@ export default function HelpdeskPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {stats.map((stat, index) => (
-          <div key={index} className="p-4 bg-white border border-gray-100 shadow-sm rounded-xl">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="mb-1 text-sm text-gray-600">{stat.label}</p>
-                <p className="text-2xl font-bold text-gray-900 sm:text-3xl">{stat.value}</p>
-              </div>
-              <div className={`p-3 rounded-xl ${stat.bgColor}`}>
-                <stat.icon className={`w-5 h-5 sm:w-6 sm:h-6 ${stat.iconColor}`} />
+        {isLoading ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="p-4 bg-white border border-gray-100 shadow-sm rounded-xl">
+              <div className="flex items-center justify-between">
+                <div className="space-y-2"><Skeleton className="w-20 h-4 rounded" /><Skeleton className="w-12 h-8 rounded" /></div>
+                <Skeleton className="w-12 h-12 rounded-xl" />
               </div>
             </div>
-          </div>
-        ))}
+          ))
+        ) : (
+          stats.map((stat, index) => (
+            <div key={index} className="p-4 bg-white border border-gray-100 shadow-sm rounded-xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="mb-1 text-sm text-gray-600">{stat.label}</p>
+                  <p className="text-2xl font-bold text-gray-900 sm:text-3xl">{stat.value}</p>
+                </div>
+                <div className={`p-3 rounded-xl ${stat.bgColor}`}>
+                  <stat.icon className={`w-5 h-5 sm:w-6 sm:h-6 ${stat.iconColor}`} />
+                </div>
+              </div>
+            </div>
+          ))
+        )}
       </div>
 
       {/* Tickets Table */}
@@ -246,10 +168,11 @@ export default function HelpdeskPage() {
           <h2 className="text-xl font-semibold text-gray-800">My Tickets</h2>
         </div>
 
-        {loading ? (
-          <div className="p-8 text-center">
-            <Loader size="lg" className="mx-auto" />
-            <p className="mt-4 text-gray-600">Loading tickets...</p>
+        {isLoading ? (
+          <div className="p-4 space-y-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="flex gap-4"><Skeleton className="w-20 h-5 rounded" /><Skeleton className="flex-1 h-5 rounded" /><Skeleton className="w-16 h-5 rounded" /><Skeleton className="w-16 h-5 rounded" /><Skeleton className="w-16 h-5 rounded" /><Skeleton className="w-24 h-5 rounded" /></div>
+            ))}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -285,8 +208,8 @@ export default function HelpdeskPage() {
                   </tr>
                 ) : (
                   tickets.map((ticket) => (
-                    <tr 
-                      key={ticket._id} 
+                    <tr
+                      key={ticket._id}
                       className="transition-colors cursor-pointer hover:bg-gray-50"
                       onClick={() => router.push(`/dashboard/helpdesk/${ticket._id}`)}
                     >
@@ -300,19 +223,18 @@ export default function HelpdeskPage() {
                         {ticket?.category || 'N/A'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            ticket?.priority === 'urgent' || ticket?.priority === 'low' ? 'bg-red-200 text-red-900' :
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${ticket?.priority === 'urgent' || ticket?.priority === 'low' ? 'bg-red-200 text-red-900' :
                             ticket?.priority === 'high' ? 'bg-red-100 text-red-800' :
-                            ticket?.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-green-100 text-green-800'
+                              ticket?.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-green-100 text-green-800'
                           }`}>
                           {ticket?.priority || 'low'}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${ticket?.status === 'resolved' ? 'bg-green-100 text-green-800' :
-                            ticket?.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
-                              'bg-yellow-100 text-yellow-800'
+                          ticket?.status === 'in-progress' ? 'bg-blue-100 text-blue-800' :
+                            'bg-yellow-100 text-yellow-800'
                           }`}>
                           {ticket?.status || 'open'}
                         </span>
@@ -391,9 +313,9 @@ export default function HelpdeskPage() {
                 <Button variant="light" onPress={onClose}>
                   Cancel
                 </Button>
-                <Button color="primary" type="submit" form="ticket-form">
+                <LoadingButton color="primary" type="submit" form="ticket-form" isLoading={submitMutation.isLoading} loadingText="Creating...">
                   Create Ticket
-                </Button>
+                </LoadingButton>
               </ModalFooter>
             </>
           )}

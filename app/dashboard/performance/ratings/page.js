@@ -1,74 +1,38 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { FaPlus, FaEye, FaEdit, FaTrash, FaStar, FaSearch, FaFilter, FaUser } from 'react-icons/fa'
-import Loader from '@/components/ui/Loader'
-import { Select, SelectItem, Input } from '@heroui/react'
+import { Select, SelectItem, Input, Skeleton } from '@heroui/react'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 
 export default function EmployeeRatingsPage() {
   const router = useRouter()
-  const [ratings, setRatings] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterCategory, setFilterCategory] = useState('all')
 
-  useEffect(() => {
-    const userData = localStorage.getItem('user')
-    if (userData) {
-      const parsedUser = JSON.parse(userData)
-      setUser(parsedUser)
-      fetchRatings()
-    }
+  const user = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem('user')) } catch { return null }
   }, [])
 
-  const fetchRatings = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/performance/ratings', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await response.json()
-      
-      if (data.success) {
-        setRatings(data.data)
-      } else {
-        toast.error(data.message || 'Failed to fetch ratings')
-      }
-    } catch (error) {
-      console.error('Fetch ratings error:', error)
-      toast.error('Failed to fetch employee ratings')
-    } finally {
-      setLoading(false)
-    }
-  }
+  // SWR: fetch ratings
+  const { data: res, error, isLoading, isValidating, mutate: refresh } = useAuthedSWR('/api/performance/ratings')
+  const ratings = res?.data || []
+
+  // Mutation: delete rating
+  const deleteMutation = useApiMutation({
+    invalidateKeys: ['/api/performance/ratings'],
+    onSuccess: () => toast.success('Rating deleted successfully'),
+    onError: (msg) => toast.error(msg || 'Failed to delete rating'),
+  })
 
   const handleDelete = async (ratingId) => {
     if (!confirm('Are you sure you want to delete this rating?')) return
-
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/performance/ratings?id=${ratingId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        setRatings(ratings.filter(r => r._id !== ratingId))
-        toast.success('Rating deleted successfully')
-      } else {
-        toast.error(data.message || 'Failed to delete rating')
-      }
-    } catch (error) {
-      console.error('Delete rating error:', error)
-      toast.error('Failed to delete rating')
-    }
+    deleteMutation.execute(`/api/performance/ratings?id=${ratingId}`, null, { method: 'DELETE' })
   }
 
   const canManageRatings = () => {
@@ -96,20 +60,54 @@ export default function EmployeeRatingsPage() {
   }
 
   const filteredRatings = ratings.filter(rating => {
-    const matchesSearch = searchTerm === '' || 
+    const matchesSearch = searchTerm === '' ||
       `${rating.employee.firstName} ${rating.employee.lastName}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
       rating.employee.employeeCode.toLowerCase().includes(searchTerm.toLowerCase()) ||
       rating.employee.department.toLowerCase().includes(searchTerm.toLowerCase())
-    
+
     const matchesFilter = filterCategory === 'all' || rating.category === filterCategory
-    
+
     return matchesSearch && matchesFilter
   })
 
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader size="lg" />
+      <div className="p-6 pb-24 md:pb-6">
+        <div className="mb-6">
+          <Skeleton className="h-8 w-56 rounded-lg mb-2" />
+          <Skeleton className="h-4 w-72 rounded-lg" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="bg-white rounded-lg shadow-md p-6">
+              <Skeleton className="h-4 w-24 rounded mb-3" />
+              <Skeleton className="h-8 w-16 rounded" />
+            </div>
+          ))}
+        </div>
+        <div className="space-y-4">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="bg-white rounded-lg shadow-md p-6">
+              <div className="flex items-start space-x-4">
+                <Skeleton className="w-12 h-12 rounded-full" />
+                <div className="flex-1">
+                  <Skeleton className="h-5 w-40 rounded mb-2" />
+                  <Skeleton className="h-4 w-24 rounded mb-1" />
+                  <Skeleton className="h-4 w-32 rounded" />
+                </div>
+              </div>
+              <Skeleton className="h-16 w-full rounded-lg mt-4" />
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 pb-24 md:pb-6">
+        <DataErrorState message="Failed to load employee ratings" onRetry={() => refresh()} />
       </div>
     )
   }
@@ -120,7 +118,7 @@ export default function EmployeeRatingsPage() {
       <div className="flex md:justify-between md:items-center md:flex-row flex-col mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-800">Employee Ratings</h1>
-          <p className="text-gray-600 mt-1">Manage employee performance ratings and reviews</p>
+          <p className="text-gray-600 mt-1">Manage employee performance ratings and reviews <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" /></p>
         </div>
 
       </div>
@@ -128,33 +126,33 @@ export default function EmployeeRatingsPage() {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
         {[
-          { 
-            title: 'Total Reviews', 
-            value: ratings.length, 
+          {
+            title: 'Total Reviews',
+            value: ratings.length,
             color: 'bg-blue-500',
             icon: FaUser
           },
-          { 
-            title: 'Average Rating', 
-            value: ratings.filter(r => r.rating > 0).length > 0 
-              ? (ratings.filter(r => r.rating > 0).reduce((sum, r) => sum + r.rating, 0) / ratings.filter(r => r.rating > 0).length).toFixed(1) 
-              : '0.0', 
+          {
+            title: 'Average Rating',
+            value: ratings.filter(r => r.rating > 0).length > 0
+              ? (ratings.filter(r => r.rating > 0).reduce((sum, r) => sum + r.rating, 0) / ratings.filter(r => r.rating > 0).length).toFixed(1)
+              : '0.0',
             color: 'bg-green-500',
             icon: FaStar
           },
-          { 
-            title: 'High Performers', 
-            value: ratings.filter(r => r.rating >= 4.5).length, 
+          {
+            title: 'High Performers',
+            value: ratings.filter(r => r.rating >= 4.5).length,
             color: 'bg-yellow-500',
             icon: FaStar
           },
-          { 
-            title: 'This Month', 
+          {
+            title: 'This Month',
             value: ratings.filter(r => {
               const date = new Date(r.createdAt)
               const now = new Date()
               return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()
-            }).length, 
+            }).length,
             color: 'bg-purple-500',
             icon: FaUser
           },

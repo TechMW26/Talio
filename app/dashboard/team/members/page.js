@@ -1,63 +1,31 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
-import { Select, SelectItem } from '@heroui/react'
-import Loader from '@/components/ui/Loader'
+import { Select, SelectItem, Skeleton } from '@heroui/react'
 import {
   FaUsers, FaSearch, FaUser, FaEnvelope, FaPhone, FaCalendarAlt,
   FaBriefcase, FaStar, FaChartLine, FaFilter, FaCrown
 } from 'react-icons/fa'
 import { formatDesignation } from '@/lib/formatters'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 
 export default function TeamMembersPage() {
   const router = useRouter()
-  const [loading, setLoading] = useState(true)
-  const [teamMembers, setTeamMembers] = useState([])
-  const [department, setDepartment] = useState(null)
-  const [departments, setDepartments] = useState([])
   const [selectedDepartment, setSelectedDepartment] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
 
-  useEffect(() => {
-    fetchTeamMembers()
-  }, [selectedDepartment])
-
-  const fetchTeamMembers = async () => {
-    try {
-      setLoading(true)
-      const token = localStorage.getItem('token')
-
-      const url = selectedDepartment && selectedDepartment !== 'all' 
-        ? `/api/team/members?department=${selectedDepartment}`
-        : '/api/team/members'
-
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        setTeamMembers(data.data)
-        setDepartment(data.meta.department)
-        // Set departments list for filter (only on first load)
-        if (data.meta.departments && data.meta.departments.length > 0) {
-          setDepartments(data.meta.departments)
-        }
-      } else {
-        toast.error(data.message || 'Failed to fetch team members')
-      }
-    } catch (error) {
-      console.error('Error fetching team members:', error)
-      toast.error('Failed to fetch team members')
-    } finally {
-      setLoading(false)
-    }
-  }
-
+  // --- SWR data fetching ---
+  const swrKey = selectedDepartment && selectedDepartment !== 'all'
+    ? `/api/team/members?department=${selectedDepartment}`
+    : '/api/team/members'
+  const { data: teamRes, error, isLoading, isValidating, mutate: refreshTeam } = useAuthedSWR(swrKey)
+  const teamMembers = teamRes?.data || []
+  const department = teamRes?.meta?.department || null
+  const departments = teamRes?.meta?.departments || []
   const filteredMembers = teamMembers.filter(member => {
     if (!searchTerm) return true
     const searchLower = searchTerm.toLowerCase()
@@ -78,7 +46,7 @@ export default function TeamMembersPage() {
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Team Members</h1>
             <p className="text-gray-600 text-sm sm:text-base">
-              {selectedDepartment === 'all' 
+              {selectedDepartment === 'all'
                 ? (departments.length > 1 ? 'All Departments' : department?.name + ' Department')
                 : departments.find(d => d._id === selectedDepartment)?.name + ' Department'}
             </p>
@@ -111,7 +79,7 @@ export default function TeamMembersPage() {
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
-          
+
           {/* Department Filter - show only if multiple departments */}
           {departments.length > 1 && (
             <div className="sm:w-64">
@@ -135,10 +103,23 @@ export default function TeamMembersPage() {
       </div>
 
       {/* Team Members List */}
-      {loading ? (
-        <div className="bg-white rounded-lg shadow-md p-8 text-center">
-          <Loader size="lg" className="mx-auto" />
-          <p className="mt-4 text-gray-600">Loading team members...</p>
+      {error ? (
+        <DataErrorState message="Failed to load team members" onRetry={() => refreshTeam()} />
+      ) : isLoading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="bg-white rounded-lg shadow-md p-6 space-y-3">
+              <div className="flex items-center gap-3">
+                <Skeleton className="w-12 h-12 rounded-full" />
+                <div>
+                  <Skeleton className="h-4 w-28 rounded-lg mb-1" />
+                  <Skeleton className="h-3 w-20 rounded-lg" />
+                </div>
+              </div>
+              <Skeleton className="h-3 w-3/4 rounded-lg" />
+              <Skeleton className="h-3 w-1/2 rounded-lg" />
+            </div>
+          ))}
         </div>
       ) : filteredMembers.length === 0 ? (
         <div className="bg-white rounded-lg shadow-md p-8 text-center">

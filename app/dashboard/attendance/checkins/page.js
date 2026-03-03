@@ -1,54 +1,32 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 import toast from '@/utils/toast'
 import { FaClock, FaUsers, FaCalendarAlt, FaSearch, FaDownload, FaMapMarkerAlt } from 'react-icons/fa'
 import { Card, CardBody, CardHeader, Button, Chip, Skeleton, Input } from '@heroui/react'
 
 export default function EmployeeCheckinsPage() {
-  const [checkins, setCheckins] = useState([])
-  const [loading, setLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [searchTerm, setSearchTerm] = useState('')
-  const [user, setUser] = useState(null)
 
+  const user = useMemo(() => { try { return JSON.parse(localStorage.getItem('user')) } catch { return null } }, [])
+
+  // Redirect non-authorized users
   useEffect(() => {
-    const userData = localStorage.getItem('user')
-    if (userData) {
-      const parsedUser = JSON.parse(userData)
-      setUser(parsedUser)
-
-      // Check if user is admin or HR
-      if (parsedUser.role !== 'admin' && parsedUser.role !== 'hr') {
-        toast.error('Access denied. Only Admin or HR can view employee check-ins.')
-        window.location.href = '/dashboard'
-        return
-      }
-
-      fetchCheckins()
+    if (user && user.role !== 'admin' && user.role !== 'hr') {
+      toast.error('Access denied. Only Admin or HR can view employee check-ins.')
+      window.location.href = '/dashboard'
     }
-  }, [selectedDate])
+  }, [user])
 
-  const fetchCheckins = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/attendance/checkins?date=${selectedDate}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        setCheckins(data.data)
-      } else {
-        toast.error(data.message || 'Failed to fetch check-ins')
-      }
-    } catch (error) {
-      console.error('Fetch check-ins error:', error)
-      toast.error('Failed to fetch check-ins')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const isAuthorized = user?.role === 'admin' || user?.role === 'hr'
+  const { data: checkinsRes, error, isLoading, isValidating, mutate: refreshCheckins } = useAuthedSWR(
+    isAuthorized ? `/api/attendance/checkins?date=${selectedDate}` : null
+  )
+  const checkins = checkinsRes?.data || []
 
   const formatTime = (timeString, timezone) => {
     if (!timeString) return 'Not checked in'
@@ -130,7 +108,9 @@ export default function EmployeeCheckinsPage() {
     absent: checkins.filter(c => c.status === 'absent').length,
   }
 
-  if (loading) {
+  if (error) return <DataErrorState message="Failed to load check-ins" onRetry={() => refreshCheckins()} />
+
+  if (isLoading) {
     return (
       <div className="page-container space-y-6">
         <div className="flex flex-col gap-3">
@@ -138,7 +118,7 @@ export default function EmployeeCheckinsPage() {
           <Skeleton className="h-4 w-64 rounded-lg" />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1,2,3,4].map(i => <Skeleton key={i} className="h-24 rounded-lg" />)}
+          {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-24 rounded-lg" />)}
         </div>
         <Skeleton className="h-96 rounded-lg" />
       </div>
@@ -151,7 +131,10 @@ export default function EmployeeCheckinsPage() {
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-3 sm:space-y-0">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-default-800">Employee Check-ins</h1>
-          <p className="text-default-500 mt-1 text-sm sm:text-base">Monitor real-time employee attendance</p>
+          <p className="text-default-500 mt-1 text-sm sm:text-base">
+            Monitor real-time employee attendance
+            <BackgroundRefreshIndicator isValidating={isValidating} />
+          </p>
         </div>
         <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
           <input

@@ -1,14 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { createPortal } from 'react-dom'
-import { Select, SelectItem, Button } from '@heroui/react'
+import { Select, SelectItem, Button, Skeleton } from '@heroui/react'
 import { FaBuilding, FaBriefcase, FaCalendarAlt, FaUmbrellaBeach, FaCog, FaMapMarkerAlt, FaClock, FaImage, FaPalette, FaCheck, FaBell, FaMoneyBillWave, FaArrowLeft, FaSun, FaMoon, FaDesktop } from 'react-icons/fa'
 import { HiOutlineOfficeBuilding, HiOutlineCog, HiOutlineArrowLeft } from 'react-icons/hi2'
 import { toast } from '@/utils/toast'
 import dynamic from 'next/dynamic'
 import { useTheme } from '@/contexts/ThemeContext'
-import Loader from '@/components/ui/Loader'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton, { SubmitButton } from '@/components/ui/LoadingButton'
 
 // Dynamically import map component (client-side only)
 const GeofenceMap = dynamic(() => import('@/components/GeofenceMap'), { ssr: false })
@@ -17,8 +19,10 @@ const GeofenceMap = dynamic(() => import('@/components/GeofenceMap'), { ssr: fal
 function CompanySelector({ companies, selectedCompany, onSelect, onBack, loading }) {
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader size="md" />
+      <div className="py-6 space-y-4">
+        {[1, 2, 3].map(i => (
+          <Skeleton key={i} className="h-16 w-full rounded-xl" />
+        ))}
       </div>
     )
   }
@@ -99,40 +103,16 @@ export default function SettingsPage() {
   useEffect(() => {
     setMounted(true)
   }, [])
-  const [userRole, setUserRole] = useState('')
-  const [isDepartmentHead, setIsDepartmentHead] = useState(false)
-  const [user, setUser] = useState(null)
 
-  useEffect(() => {
+  const user = useMemo(() => {
+    if (typeof window === 'undefined') return null
     const userData = localStorage.getItem('user')
-    if (userData) {
-      const parsedUser = JSON.parse(userData)
-      setUserRole(parsedUser.role)
-      setUser(parsedUser)
-    }
-    checkDepartmentHead()
+    return userData ? JSON.parse(userData) : null
   }, [])
+  const userRole = user?.role || ''
 
-  // Check if user is a department head
-  const checkDepartmentHead = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      if (!token) return
-
-      const response = await fetch('/api/team/check-head', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-
-      const data = await response.json()
-      if (data.success && data.isDepartmentHead) {
-        setIsDepartmentHead(true)
-      }
-    } catch (error) {
-      console.error('Error checking department head:', error)
-    }
-  }
+  const { data: deptHeadData } = useAuthedSWR('/api/team/check-head')
+  const isDepartmentHead = deptHeadData?.success && deptHeadData?.isDepartmentHead
 
   // Define tabs based on user role
   const getTabs = () => {
@@ -178,8 +158,15 @@ export default function SettingsPage() {
   // Show loading state while detecting device
   if (!mounted) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader size="md" />
+      <div className="page-container">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+          <div>
+            <Skeleton className="h-8 w-40 rounded-lg mb-2" />
+            <Skeleton className="h-4 w-56 rounded-lg" />
+          </div>
+        </div>
+        <Skeleton className="h-12 w-full rounded-xl mb-6" />
+        <Skeleton className="h-96 w-full rounded-xl" />
       </div>
     )
   }
@@ -208,8 +195,8 @@ export default function SettingsPage() {
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
                   className={`flex items-center space-x-2 px-4 py-2.5 rounded-lg font-medium text-sm whitespace-nowrap transition-all ${activeTab === tab.id
-                      ? 'bg-indigo-600 text-white shadow-sm'
-                      : 'text-gray-600 hover:bg-gray-100'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-gray-600 hover:bg-gray-100'
                     }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -235,8 +222,6 @@ export default function SettingsPage() {
 
 // Company Settings Tab (Admin/HR only)
 function CompanySettingsTab() {
-  const [companies, setCompanies] = useState([])
-  const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingCompany, setEditingCompany] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -269,30 +254,19 @@ function CompanySettingsTab() {
     }
   })
 
+  const { data: companiesData, isLoading: loading, mutate: mutateCompanies } = useAuthedSWR('/api/companies')
+  const companies = companiesData?.data || []
+
+  const deleteMutation = useApiMutation({
+    method: 'DELETE',
+    invalidateKeys: ['/api/companies'],
+    onSuccess: () => toast.success('Company deleted successfully!'),
+    onError: (error) => toast.error(error.message || 'Failed to delete company')
+  })
+
   useEffect(() => {
     setIsMounted(true)
-    fetchCompanies()
   }, [])
-
-  const fetchCompanies = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/companies', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setCompanies(data.data || [])
-      }
-    } catch (error) {
-      console.error('Error fetching companies:', error)
-      toast.error('Failed to load companies')
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const handleOpenModal = (company = null) => {
     if (company) {
@@ -446,7 +420,7 @@ function CompanySettingsTab() {
       const data = await response.json()
       if (data.success) {
         toast.success(editingCompany ? 'Company updated successfully!' : 'Company created successfully!')
-        fetchCompanies()
+        mutateCompanies()
         handleCloseModal()
       } else {
         toast.error(data.message || 'Failed to save company')
@@ -461,27 +435,7 @@ function CompanySettingsTab() {
 
   const handleDeleteCompany = async (companyId) => {
     if (!confirm('Are you sure you want to delete this company?')) return
-
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/companies/${companyId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        toast.success('Company deleted successfully!')
-        fetchCompanies()
-      } else {
-        toast.error(data.message || 'Failed to delete company')
-      }
-    } catch (error) {
-      console.error('Error deleting company:', error)
-      toast.error('Failed to delete company')
-    }
+    await deleteMutation.execute(`/api/companies/${companyId}`)
   }
 
   const handleInputChange = (field, value) => {
@@ -517,8 +471,19 @@ function CompanySettingsTab() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader size="md" />
+      <div className="space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
+          <div>
+            <Skeleton className="h-7 w-48 rounded-lg mb-2" />
+            <Skeleton className="h-4 w-72 rounded-lg" />
+          </div>
+          <Skeleton className="h-10 w-36 rounded-lg" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3].map(i => (
+            <Skeleton key={i} className="h-48 w-full rounded-xl" />
+          ))}
+        </div>
       </div>
     )
   }
@@ -953,18 +918,14 @@ function CompanySettingsTab() {
                 >
                   Cancel
                 </button>
-                <Button
+                <LoadingButton
                   type="submit"
-                  isDisabled={saving}
+                  isLoading={saving}
+                  loadingText="Saving..."
                   color="primary"
                 >
-                  {saving ? (
-                    <span className="flex items-center gap-2">
-                      <Loader size="xs" />
-                      Saving...
-                    </span>
-                  ) : (editingCompany ? 'Update Company' : 'Create Company')}
-                </Button>
+                  {editingCompany ? 'Update Company' : 'Create Company'}
+                </LoadingButton>
               </div>
             </form>
           </div>
@@ -978,8 +939,6 @@ function CompanySettingsTab() {
 
 // Geofence Locations Manager Component (must be defined before GeofencingTab)
 function GeofenceLocationsManager() {
-  const [locations, setLocations] = useState([])
-  const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [editingLocation, setEditingLocation] = useState(null)
   const [isMounted, setIsMounted] = useState(false)
@@ -994,35 +953,24 @@ function GeofenceLocationsManager() {
     strictMode: false,
   })
 
+  const { data: locationsData, isLoading: loading, mutate: mutateLocations } = useAuthedSWR('/api/geofence/locations?activeOnly=true')
+  const locations = locationsData?.data || []
+
+  const deleteLocationMutation = useApiMutation({
+    method: 'DELETE',
+    invalidateKeys: ['/api/geofence/locations?activeOnly=true'],
+    onSuccess: () => toast.success('Location deleted successfully'),
+    onError: (error) => toast.error(error.message || 'Failed to delete location')
+  })
+
   // Check if component is mounted (client-side)
   useEffect(() => {
     setIsMounted(true)
   }, [])
 
   useEffect(() => {
-    fetchLocations()
-  }, [])
-
-  useEffect(() => {
     console.log('🟢 showModal state changed to:', showModal)
   }, [showModal])
-
-  const fetchLocations = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/geofence/locations?activeOnly=true', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setLocations(data.data || [])
-      }
-    } catch (error) {
-      console.error('Error fetching locations:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const handleOpenModal = (location = null) => {
     if (location) {
@@ -1117,7 +1065,7 @@ function GeofenceLocationsManager() {
       const data = await response.json()
       if (data.success) {
         toast.success(editingLocation ? 'Location updated successfully' : 'Location added successfully')
-        fetchLocations()
+        mutateLocations()
         setShowModal(false)
         // Reset form data
         setFormData({
@@ -1142,25 +1090,7 @@ function GeofenceLocationsManager() {
 
   const handleDelete = async (locationId) => {
     if (!confirm('Are you sure you want to delete this location?')) return
-
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/geofence/locations/${locationId}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        toast.success('Location deleted successfully')
-        fetchLocations()
-      } else {
-        toast.error(data.message || 'Failed to delete location')
-      }
-    } catch (error) {
-      console.error('Error deleting location:', error)
-      toast.error('Failed to delete location')
-    }
+    await deleteLocationMutation.execute(`/api/geofence/locations/${locationId}`)
   }
 
   const handleMapUpdate = async (newPos, newRadius) => {
@@ -1529,56 +1459,28 @@ function GeofenceLocationsManager() {
 
 // Geofencing Tab (Admin/HR only)
 function GeofencingTab() {
-  const [companies, setCompanies] = useState([])
   const [selectedCompany, setSelectedCompany] = useState(null)
-  const [settings, setSettings] = useState(null)
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [breakTimings, setBreakTimings] = useState([])
 
+  const { data: companiesData, isLoading: companiesLoading } = useAuthedSWR('/api/companies')
+  const companies = companiesData?.data || []
+
+  const { data: companyDetailData, isLoading: detailLoading, mutate: mutateCompanyDetail } = useAuthedSWR(
+    selectedCompany ? `/api/companies/${selectedCompany._id}` : null
+  )
+  const settings = companyDetailData?.data || null
+  const loading = companiesLoading || detailLoading
+
+  // Sync breakTimings when settings data arrives
   useEffect(() => {
-    fetchCompanies()
-  }, [])
-
-  const fetchCompanies = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/companies', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setCompanies(data.data || [])
-      }
-    } catch (error) {
-      console.error('Error fetching companies:', error)
-    } finally {
-      setLoading(false)
+    if (settings) {
+      setBreakTimings(Array.isArray(settings.breakTimings) ? settings.breakTimings : [])
     }
-  }
+  }, [settings])
 
-  const handleSelectCompany = async (company) => {
+  const handleSelectCompany = (company) => {
     setSelectedCompany(company)
-    setLoading(true)
-    try {
-      const token = localStorage.getItem('token')
-      // Fetch the specific company settings
-      const response = await fetch(`/api/companies/${company._id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setSettings(data.data)
-        setBreakTimings(Array.isArray(data.data.breakTimings) ? data.data.breakTimings : [])
-      }
-    } catch (error) {
-      console.error('Error fetching settings:', error)
-      toast.error('Failed to load settings')
-    } finally {
-      setLoading(false)
-    }
   }
 
   const addBreakTiming = () => {
@@ -1650,7 +1552,7 @@ function GeofencingTab() {
       const data = await response.json()
       if (data.success) {
         toast.success('Geofencing settings saved successfully!')
-        setSettings(data.data)
+        mutateCompanyDetail()
         setSelectedCompany(data.data)
       } else {
         toast.error(data.message || 'Failed to save settings')
@@ -1665,8 +1567,14 @@ function GeofencingTab() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader size="md" />
+      <div className="space-y-4">
+        <Skeleton className="h-7 w-48 rounded-lg mb-2" />
+        <Skeleton className="h-4 w-72 rounded-lg mb-6" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3].map(i => (
+            <Skeleton key={i} className="h-32 w-full rounded-xl" />
+          ))}
+        </div>
       </div>
     )
   }
@@ -1861,8 +1769,8 @@ function GeofencingTab() {
                           type="button"
                           onClick={() => toggleBreakDay(index, day)}
                           className={`px-3 py-1 text-xs rounded-lg transition-colors ${breakTiming.days?.includes(day)
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
                             }`}
                         >
                           {day.charAt(0).toUpperCase() + day.slice(1, 3)}
@@ -1877,23 +1785,15 @@ function GeofencingTab() {
         </div>
 
         <div className="flex justify-end pt-4 border-t border-gray-200">
-          <button
+          <LoadingButton
             type="submit"
-            disabled={saving}
-            className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-primary-600 focus:ring-4 focus:ring-primary-200 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm hover:shadow-md"
+            isLoading={saving}
+            loadingText="Saving..."
+            color="primary"
+            startContent={!saving ? <FaCheck /> : undefined}
           >
-            {saving ? (
-              <span className="flex items-center gap-2">
-                <Loader size="xs" />
-                Saving...
-              </span>
-            ) : (
-              <>
-                <FaCheck />
-                Save Geofencing Settings
-              </>
-            )}
-          </button>
+            Save Geofencing Settings
+          </LoadingButton>
         </div>
       </form>
     </div>
@@ -2147,9 +2047,9 @@ function PersonalizationTab() {
       <p className="text-gray-600 mb-6">Customize the look and feel of your dashboard</p>
 
       {/* Appearance Mode Selector */}
-      <div className="rounded-xl border p-5 mb-6" style={{ 
-        backgroundColor: 'var(--color-bg-card)', 
-        borderColor: isDarkMode ? '#334155' : '#E5E7EB' 
+      <div className="rounded-xl border p-5 mb-6" style={{
+        backgroundColor: 'var(--color-bg-card)',
+        borderColor: isDarkMode ? '#334155' : '#E5E7EB'
       }}>
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-4">
@@ -2324,54 +2224,20 @@ function PersonalizationTab() {
 
 // Payroll Settings Tab (Admin/HR only)
 function PayrollSettingsTab() {
-  const [companies, setCompanies] = useState([])
   const [selectedCompany, setSelectedCompany] = useState(null)
-  const [settings, setSettings] = useState(null)
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => {
-    fetchCompanies()
-  }, [])
+  const { data: companiesData, isLoading: companiesLoading } = useAuthedSWR('/api/companies')
+  const companies = companiesData?.data || []
 
-  const fetchCompanies = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/companies', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setCompanies(data.data || [])
-      }
-    } catch (error) {
-      console.error('Error fetching companies:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const { data: companyDetailData, isLoading: detailLoading, mutate: mutateCompanyDetail } = useAuthedSWR(
+    selectedCompany ? `/api/companies/${selectedCompany._id}` : null
+  )
+  const settings = companyDetailData?.data || null
+  const loading = companiesLoading || detailLoading
 
-  const handleSelectCompany = async (company) => {
+  const handleSelectCompany = (company) => {
     setSelectedCompany(company)
-    setLoading(true)
-    try {
-      const token = localStorage.getItem('token')
-      // Fetch the specific company settings
-      const response = await fetch(`/api/companies/${company._id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setSettings(data.data)
-      }
-    } catch (error) {
-      console.error('Error fetching payroll settings:', error)
-      toast.error('Failed to load payroll settings')
-    } finally {
-      setLoading(false)
-    }
   }
 
   const handleSave = async (e) => {
@@ -2441,7 +2307,7 @@ function PayrollSettingsTab() {
       const data = await response.json()
       if (data.success) {
         toast.success('Payroll settings saved successfully!')
-        setSettings(data.data)
+        mutateCompanyDetail()
         setSelectedCompany(data.data)
       } else {
         toast.error(data.message || 'Failed to save payroll settings')
@@ -2464,8 +2330,14 @@ function PayrollSettingsTab() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader size="md" />
+      <div className="space-y-4">
+        <Skeleton className="h-7 w-48 rounded-lg mb-2" />
+        <Skeleton className="h-4 w-72 rounded-lg mb-6" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3].map(i => (
+            <Skeleton key={i} className="h-32 w-full rounded-xl" />
+          ))}
+        </div>
       </div>
     )
   }
@@ -2884,23 +2756,15 @@ function PayrollSettingsTab() {
 
         {/* Save Button */}
         <div className="flex justify-end">
-          <button
+          <LoadingButton
             type="submit"
-            disabled={saving}
-            className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 flex items-center gap-2 font-semibold"
+            isLoading={saving}
+            loadingText="Saving..."
+            color="success"
+            startContent={!saving ? <FaCheck /> : undefined}
           >
-            {saving ? (
-              <>
-                <Loader size="xs" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <FaCheck />
-                Save Payroll Settings
-              </>
-            )}
-          </button>
+            Save Payroll Settings
+          </LoadingButton>
         </div>
       </form>
     </div>
@@ -2909,59 +2773,32 @@ function PayrollSettingsTab() {
 
 // Notifications Tab (Admin/HR/Department Head only)
 function NotificationsTab() {
-  const [companies, setCompanies] = useState([])
   const [selectedCompany, setSelectedCompany] = useState(null)
   const [settings, setSettings] = useState(null)
   const [originalSettings, setOriginalSettings] = useState(null)
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
 
   const NotificationManagement = dynamic(() => import('@/components/NotificationManagement'), { ssr: false })
 
+  const { data: companiesData, isLoading: companiesLoading } = useAuthedSWR('/api/companies')
+  const companies = companiesData?.data || []
+
+  const { data: companyDetailData, isLoading: detailLoading, mutate: mutateCompanyDetail } = useAuthedSWR(
+    selectedCompany ? `/api/companies/${selectedCompany._id}` : null
+  )
+  const loading = companiesLoading || detailLoading
+
+  // Sync settings when company detail data arrives
   useEffect(() => {
-    fetchCompanies()
-  }, [])
-
-  const fetchCompanies = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/companies', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setCompanies(data.data || [])
-      }
-    } catch (error) {
-      console.error('Error fetching companies:', error)
-    } finally {
-      setLoading(false)
+    if (companyDetailData?.data) {
+      setSettings(companyDetailData.data)
+      setOriginalSettings(JSON.parse(JSON.stringify(companyDetailData.data)))
     }
-  }
+  }, [companyDetailData])
 
-  const handleSelectCompany = async (company) => {
+  const handleSelectCompany = (company) => {
     setSelectedCompany(company)
-    setLoading(true)
-    try {
-      const token = localStorage.getItem('token')
-      // Fetch the specific company settings
-      const response = await fetch(`/api/companies/${company._id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setSettings(data.data)
-        setOriginalSettings(JSON.parse(JSON.stringify(data.data)))
-      }
-    } catch (error) {
-      console.error('Error fetching notification settings:', error)
-      toast.error('Failed to load notification settings')
-    } finally {
-      setLoading(false)
-    }
   }
 
   useEffect(() => {
@@ -3063,6 +2900,7 @@ function NotificationsTab() {
         setOriginalSettings(updatedSettings)
         setSelectedCompany(data.data)
         setHasChanges(false)
+        mutateCompanyDetail()
         toast.success('Email notification settings saved successfully!')
       } else {
         toast.error(data.message || 'Failed to save notification settings')
@@ -3085,8 +2923,14 @@ function NotificationsTab() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <Loader size="md" />
+      <div className="space-y-4">
+        <Skeleton className="h-7 w-56 rounded-lg mb-2" />
+        <Skeleton className="h-4 w-80 rounded-lg mb-6" />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3].map(i => (
+            <Skeleton key={i} className="h-32 w-full rounded-xl" />
+          ))}
+        </div>
       </div>
     )
   }
@@ -3201,12 +3045,12 @@ function NotificationsTab() {
                   onChange={handleGlobalEmailToggleChange}
                 />
                 <div className={`relative w-11 h-6 rounded-full transition-all duration-500 ease-in-out ${emailNotificationsEnabled
-                    ? 'bg-blue-600'
-                    : 'bg-gray-300'
+                  ? 'bg-blue-600'
+                  : 'bg-gray-300'
                   }`}>
                   <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-500 ease-in-out ${emailNotificationsEnabled
-                      ? 'translate-x-5'
-                      : 'translate-x-0.5'
+                    ? 'translate-x-5'
+                    : 'translate-x-0.5'
                     }`} />
                 </div>
               </label>
@@ -3240,14 +3084,14 @@ function NotificationsTab() {
                         disabled={!canToggle}
                       />
                       <div className={`relative w-11 h-6 rounded-full transition-all duration-500 ease-in-out ${!canToggle
-                          ? 'bg-gray-200 opacity-50'
-                          : isEnabled
-                            ? 'bg-blue-600'
-                            : 'bg-gray-300'
+                        ? 'bg-gray-200 opacity-50'
+                        : isEnabled
+                          ? 'bg-blue-600'
+                          : 'bg-gray-300'
                         }`}>
                         <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-500 ease-in-out ${isEnabled
-                            ? 'translate-x-5'
-                            : 'translate-x-0.5'
+                          ? 'translate-x-5'
+                          : 'translate-x-0.5'
                           }`} />
                       </div>
                     </label>
@@ -3283,14 +3127,14 @@ function NotificationsTab() {
                         disabled={!canToggle}
                       />
                       <div className={`relative w-11 h-6 rounded-full transition-all duration-500 ease-in-out ${!canToggle
-                          ? 'bg-gray-200 opacity-50'
-                          : isEnabled
-                            ? 'bg-blue-600'
-                            : 'bg-gray-300'
+                        ? 'bg-gray-200 opacity-50'
+                        : isEnabled
+                          ? 'bg-blue-600'
+                          : 'bg-gray-300'
                         }`}>
                         <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-500 ease-in-out ${isEnabled
-                            ? 'translate-x-5'
-                            : 'translate-x-0.5'
+                          ? 'translate-x-5'
+                          : 'translate-x-0.5'
                           }`} />
                       </div>
                     </label>
@@ -3320,14 +3164,14 @@ function NotificationsTab() {
                         disabled={!canToggle}
                       />
                       <div className={`relative w-11 h-6 rounded-full transition-all duration-500 ease-in-out ${!canToggle
-                          ? 'bg-gray-200 opacity-50'
-                          : isEnabled
-                            ? 'bg-blue-600'
-                            : 'bg-gray-300'
+                        ? 'bg-gray-200 opacity-50'
+                        : isEnabled
+                          ? 'bg-blue-600'
+                          : 'bg-gray-300'
                         }`}>
                         <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-md transition-all duration-500 ease-in-out ${isEnabled
-                            ? 'translate-x-5'
-                            : 'translate-x-0.5'
+                          ? 'translate-x-5'
+                          : 'translate-x-0.5'
                           }`} />
                       </div>
                     </label>
@@ -3348,20 +3192,15 @@ function NotificationsTab() {
           >
             Reset
           </button>
-          <button
+          <LoadingButton
             type="submit"
-            disabled={!hasChanges || saving}
-            className="px-6 py-2.5 rounded-lg text-sm font-semibold text-white bg-blue-600 hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm"
+            isLoading={saving}
+            loadingText="Saving..."
+            color="primary"
+            isDisabled={!hasChanges}
           >
-            {saving ? (
-              <span className="flex items-center gap-2">
-                <Loader size="xs" />
-                Saving...
-              </span>
-            ) : (
-              'Save Changes'
-            )}
-          </button>
+            Save Changes
+          </LoadingButton>
         </div>
       </form>
 

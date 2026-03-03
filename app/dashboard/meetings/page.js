@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { Button } from '@heroui/react'
-import { 
-  HiOutlineCalendarDays, 
-  HiOutlinePlus, 
-  HiOutlineVideoCamera, 
+import { useState, useEffect, useMemo } from 'react'
+import { Button, Skeleton } from '@heroui/react'
+import {
+  HiOutlineCalendarDays,
+  HiOutlinePlus,
+  HiOutlineVideoCamera,
   HiOutlineMapPin,
   HiOutlineClock,
   HiOutlineUserGroup,
@@ -20,12 +20,14 @@ import {
 } from 'react-icons/hi2'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 import CreateMeetingModal from './components/CreateMeetingModal'
 import MeetingCard from './components/MeetingCard'
 
 export default function MeetingsPage() {
-  const [meetings, setMeetings] = useState([])
-  const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [filter, setFilter] = useState({
     type: 'all',
@@ -37,52 +39,36 @@ export default function MeetingsPage() {
   const [viewMode, setViewMode] = useState('list') // list, calendar
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 20,
-    total: 0,
-    pages: 1
+    limit: 20
   })
 
   // Real-time updates
   const { socket, isConnected, onMeetingUpdate, subscribe } = useSocket()
 
-  const fetchMeetings = useCallback(async () => {
-    try {
-      setLoading(true)
-      const token = localStorage.getItem('token')
-      
-      const params = new URLSearchParams({
-        page: pagination.page.toString(),
-        limit: pagination.limit.toString()
-      })
-
-      if (filter.type !== 'all') params.append('type', filter.type)
-      if (filter.status) params.append('status', filter.status)
-      if (filter.view !== 'all') params.append('view', filter.view)
-
-      const response = await fetch(`/api/meetings?${params}`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        setMeetings(data.data)
-        setPagination(prev => ({
-          ...prev,
-          total: data.pagination.total,
-          pages: data.pagination.pages
-        }))
-      } else {
-        toast.error(data.message || 'Failed to fetch meetings')
-      }
-    } catch (error) {
-      console.error('Error fetching meetings:', error)
-      toast.error('Failed to load meetings')
-    } finally {
-      setLoading(false)
-    }
+  // SWR-based data fetching
+  const meetingsParams = useMemo(() => {
+    const params = new URLSearchParams({ page: pagination.page.toString(), limit: pagination.limit.toString() })
+    if (filter.type !== 'all') params.append('type', filter.type)
+    if (filter.status) params.append('status', filter.status)
+    if (filter.view !== 'all') params.append('view', filter.view)
+    return params.toString()
   }, [filter, pagination.page, pagination.limit])
+
+  const { data: meetingsRes, error, isLoading, isValidating, mutate: refreshMeetings } = useAuthedSWR(`/api/meetings?${meetingsParams}`)
+  const meetings = meetingsRes?.data || []
+  const paginationInfo = meetingsRes?.pagination || { total: 0, pages: 1 }
+
+  // RSVP mutation
+  const respondMutation = useApiMutation({
+    method: 'POST',
+    onSuccess: (data) => {
+      refreshMeetings()
+      toast.success(`Meeting invitation ${data?.data?.status || 'updated'}`)
+    },
+    onError: (err) => {
+      toast.error(err || 'Failed to respond to invitation')
+    }
+  })
 
   // Subscribe to real-time meeting updates
   useEffect(() => {
@@ -90,7 +76,7 @@ export default function MeetingsPage() {
 
     const handleMeetingUpdate = (data) => {
       console.log('🔄 [Meetings] Real-time update received:', data)
-      fetchMeetings()
+      refreshMeetings()
     }
 
     const unsub1 = onMeetingUpdate?.(handleMeetingUpdate)
@@ -109,12 +95,10 @@ export default function MeetingsPage() {
       unsub5?.()
       unsub6?.()
     }
-  }, [socket, isConnected, fetchMeetings, onMeetingUpdate, subscribe])
+  }, [socket, isConnected, refreshMeetings, onMeetingUpdate, subscribe])
 
+  // Trigger meeting expiry check on page load (handles meetings that have passed)
   useEffect(() => {
-    fetchMeetings()
-    
-    // Trigger meeting expiry check on page load (handles meetings that have passed)
     const expirePassedMeetings = async () => {
       try {
         const token = localStorage.getItem('token')
@@ -128,42 +112,16 @@ export default function MeetingsPage() {
       }
     }
     expirePassedMeetings()
-  }, [fetchMeetings])
+  }, [])
 
   const handleMeetingCreated = (newMeeting) => {
-    setMeetings(prev => [newMeeting, ...prev])
+    refreshMeetings()
     setShowCreateModal(false)
     toast.success('Meeting scheduled successfully!')
   }
 
   const handleRespondToInvite = async (meetingId, response, reason = '') => {
-    try {
-      const token = localStorage.getItem('token')
-      const res = await fetch(`/api/meetings/${meetingId}/respond`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ response, reason })
-      })
-
-      const data = await res.json()
-      if (data.success) {
-        // Update local state
-        setMeetings(prev => prev.map(m => 
-          m._id === meetingId 
-            ? { ...m, myInviteStatus: response }
-            : m
-        ))
-        toast.success(`Meeting invitation ${response}`)
-      } else {
-        toast.error(data.message || 'Failed to respond')
-      }
-    } catch (error) {
-      console.error('Error responding to invite:', error)
-      toast.error('Failed to respond to invitation')
-    }
+    await respondMutation.execute(`/api/meetings/${meetingId}/respond`, { response, reason })
   }
 
   const filteredMeetings = meetings.filter(meeting => {
@@ -177,17 +135,17 @@ export default function MeetingsPage() {
     )
   })
 
-  const upcomingMeetings = filteredMeetings.filter(m => 
+  const upcomingMeetings = filteredMeetings.filter(m =>
     new Date(m.scheduledStart) > new Date() && m.status !== 'cancelled'
   )
-  
+
   const todayMeetings = filteredMeetings.filter(m => {
     const today = new Date()
     const meetingDate = new Date(m.scheduledStart)
     return meetingDate.toDateString() === today.toDateString() && m.status !== 'cancelled'
   })
 
-  const pendingInvites = filteredMeetings.filter(m => 
+  const pendingInvites = filteredMeetings.filter(m =>
     m.myInviteStatus === 'pending' && m.status !== 'cancelled'
   )
 
@@ -213,6 +171,19 @@ export default function MeetingsPage() {
           Schedule Meeting
         </Button>
       </div>
+
+      {/* Background Refresh Indicator */}
+      <BackgroundRefreshIndicator isValidating={isValidating} position="bar" />
+
+      {/* Error State */}
+      {error && !isLoading && (
+        <DataErrorState
+          message={error.message || 'Failed to load meetings'}
+          onRetry={() => refreshMeetings()}
+          title="Error loading meetings"
+          className="mb-6"
+        />
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -326,8 +297,8 @@ export default function MeetingsPage() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {pendingInvites.slice(0, 3).map(meeting => (
-              <MeetingCard 
-                key={meeting._id} 
+              <MeetingCard
+                key={meeting._id}
                 meeting={meeting}
                 onRespond={handleRespondToInvite}
                 showResponseActions
@@ -346,8 +317,8 @@ export default function MeetingsPage() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {todayMeetings.map(meeting => (
-              <MeetingCard 
-                key={meeting._id} 
+              <MeetingCard
+                key={meeting._id}
                 meeting={meeting}
                 onRespond={handleRespondToInvite}
               />
@@ -361,14 +332,14 @@ export default function MeetingsPage() {
         <h2 className="text-lg font-semibold text-gray-800 mb-3">
           All Meetings
         </h2>
-        
-        {loading ? (
+
+        {isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[...Array(6)].map((_, i) => (
-              <div key={i} className="bg-white rounded-xl p-4 animate-pulse shadow-sm border border-gray-100">
-                <div className="h-4 bg-gray-200 rounded w-3/4 mb-3"></div>
-                <div className="h-3 bg-gray-200 rounded w-1/2 mb-2"></div>
-                <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+              <div key={i} className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-3">
+                <Skeleton className="h-4 w-3/4 rounded" />
+                <Skeleton className="h-3 w-1/2 rounded" />
+                <Skeleton className="h-3 w-2/3 rounded" />
               </div>
             ))}
           </div>
@@ -392,8 +363,8 @@ export default function MeetingsPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredMeetings.map(meeting => (
-              <MeetingCard 
-                key={meeting._id} 
+              <MeetingCard
+                key={meeting._id}
                 meeting={meeting}
                 onRespond={handleRespondToInvite}
               />
@@ -402,7 +373,7 @@ export default function MeetingsPage() {
         )}
 
         {/* Pagination */}
-        {pagination.pages > 1 && (
+        {paginationInfo.pages > 1 && (
           <div className="flex justify-center items-center gap-2 mt-6">
             <button
               onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
@@ -412,11 +383,11 @@ export default function MeetingsPage() {
               <HiOutlineChevronLeft className="w-5 h-5 text-gray-600" />
             </button>
             <span className="text-sm text-gray-600">
-              Page {pagination.page} of {pagination.pages}
+              Page {pagination.page} of {paginationInfo.pages}
             </span>
             <button
               onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-              disabled={pagination.page === pagination.pages}
+              disabled={pagination.page === paginationInfo.pages}
               className="p-2 rounded-lg border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
             >
               <HiOutlineChevronRight className="w-5 h-5 text-gray-600" />

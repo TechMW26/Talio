@@ -1,34 +1,39 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { FaUserPlus, FaUsers, FaTimes, FaFile, FaImage, FaFilePdf, FaUser, FaComments, FaArrowDown, FaArrowLeft } from 'react-icons/fa'
-import Loader from '@/components/ui/Loader'
 import { useSocket } from '@/contexts/SocketContext'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
 import UnreadBadge from '@/components/UnreadBadge'
 import { playNotificationSound } from '@/utils/audio'
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Checkbox } from '@heroui/react'
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Checkbox, Skeleton } from '@heroui/react'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import { useAuthedSWRStatic } from '@/hooks/useAuthedSWR'
 
 export default function ChatPage() {
   const router = useRouter()
   const { openWidget } = useChatWidget()
+  // --- SWR: Initial data loads ---
+  const { data: chatsRes, isLoading: chatsLoading, mutate: refreshChats } = useAuthedSWR('/api/chat')
+  const { data: employeesRes, isLoading: employeesLoading } = useAuthedSWRStatic('/api/employees/list?includeAdmins=true')
+
+  const currentUserId = useMemo(() => chatsRes?.currentUserId || null, [chatsRes])
+  const employees = useMemo(() => employeesRes?.data || [], [employeesRes])
+
   const [chats, setChats] = useState([])
   const [selectedChat, setSelectedChat] = useState(null)
   const [messages, setMessages] = useState([])
   const [message, setMessage] = useState('')
   const [chatSearchQuery] = useState('')
   const [employeeSearchQuery, setEmployeeSearchQuery] = useState('')
-  const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [showNewChatModal, setShowNewChatModal] = useState(false)
   const [showGroupModal, setShowGroupModal] = useState(false)
-  const [employees, setEmployees] = useState([])
   const [selectedEmployees, setSelectedEmployees] = useState([])
   const [groupName, setGroupName] = useState('')
-  const [currentUserId, setCurrentUserId] = useState(null)
   const [presenceByEmployee, setPresenceByEmployee] = useState({})
   const [uploadingFile, setUploadingFile] = useState(false)
   const [lightboxImage, setLightboxImage] = useState(null)
@@ -67,10 +72,12 @@ export default function ChatPage() {
   // Get unread messages context
   const { markChatAsRead, unreadChats } = useUnreadMessages()
 
+  // Seed local chats state from SWR data
   useEffect(() => {
-    fetchChats()
-    fetchEmployees()
-  }, [])
+    if (chatsRes?.data) {
+      setChats(chatsRes.data)
+    }
+  }, [chatsRes])
 
   // WebSocket: Join/leave chat rooms
   useEffect(() => {
@@ -366,47 +373,7 @@ export default function ChatPage() {
     }
   }
 
-  const fetchChats = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/chat', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const result = await response.json()
-      console.log('Chats API response:', result)
-      if (result.success) {
-        setChats(result.data)
-        setCurrentUserId(result.currentUserId)
-        console.log('Chats loaded:', result.data.length)
-      } else {
-        console.error('Failed to load chats:', result.message)
-      }
-    } catch (error) {
-      console.error('Error fetching chats:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
 
-  const fetchEmployees = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      // Include admins for chat - all users should be searchable for conversations
-      const response = await fetch('/api/employees/list?includeAdmins=true', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const result = await response.json()
-      console.log('Employees API response:', result)
-      if (result.success) {
-        setEmployees(result.data)
-        console.log('Employees loaded:', result.data.length)
-      } else {
-        console.error('Failed to load employees:', result.message)
-      }
-    } catch (error) {
-      console.error('Error fetching employees:', error)
-    }
-  }
 
   const fetchMessages = async (chatId) => {
     try {
@@ -545,7 +512,7 @@ export default function ChatPage() {
         const result = await response.json()
         if (result.success) {
           setMessages([...messages, result.data])
-          fetchChats()
+          refreshChats()
         }
       }
     } catch (error) {
@@ -580,7 +547,7 @@ export default function ChatPage() {
       })
       const result = await response.json()
       if (result.success) {
-        fetchChats()
+        refreshChats()
         setSelectedChat(result.data)
         setShowNewChatModal(false)
       }
@@ -600,7 +567,7 @@ export default function ChatPage() {
       })
       const result = await response.json()
       if (result.success) {
-        fetchChats()
+        refreshChats()
         setSelectedChat(result.data)
         setShowGroupModal(false)
         setGroupName('')
@@ -710,10 +677,33 @@ export default function ChatPage() {
     )
     : employees.slice(0, 10) // Show first 10 employees by default
 
-  if (loading) {
+  if (chatsLoading) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center bg-gray-50">
-        <Loader size="lg" />
+      <div className="fixed inset-0 bg-gray-50 pt-20 px-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <Skeleton className="h-7 w-32 rounded-lg mb-2" />
+              <Skeleton className="h-4 w-48 rounded-lg" />
+            </div>
+            <div className="flex gap-2">
+              <Skeleton className="w-14 h-14 rounded-full" />
+              <Skeleton className="w-14 h-14 rounded-full" />
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl shadow-md overflow-hidden">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="flex items-center gap-3 px-4 py-4 border-b border-gray-100">
+                <Skeleton className="w-12 h-12 rounded-full flex-shrink-0" />
+                <div className="flex-1">
+                  <Skeleton className="h-4 w-32 rounded mb-2" />
+                  <Skeleton className="h-3 w-48 rounded" />
+                </div>
+                <Skeleton className="h-3 w-10 rounded" />
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     )
   }
@@ -746,8 +736,8 @@ export default function ChatPage() {
 
       {/* Chat Container - Full screen edge-to-edge on mobile */}
       <div className={`${selectedChat
-          ? 'fixed top-[60px] left-0 right-0 bottom-[72px] z-[60] md:relative md:top-auto md:left-auto md:right-auto md:bottom-auto md:rounded-2xl md:h-100%'
-          : 'fixed top-[140px] left-0 right-0 bottom-[72px] z-[40] bg-white md:relative md:top-auto md:left-auto md:right-auto md:bottom-auto md:rounded-2xl md:shadow-md md:h-auto md:mt-0 px-4'
+        ? 'fixed top-[60px] left-0 right-0 bottom-[72px] z-[60] md:relative md:top-auto md:left-auto md:right-auto md:bottom-auto md:rounded-2xl md:h-100%'
+        : 'fixed top-[140px] left-0 right-0 bottom-[72px] z-[40] bg-white md:relative md:top-auto md:left-auto md:right-auto md:bottom-auto md:rounded-2xl md:shadow-md md:h-auto md:mt-0 px-4'
         }`} style={{
           height: 'auto',
           maxHeight: 'none'
@@ -1155,7 +1145,7 @@ export default function ChatPage() {
                       title="Send message"
                     >
                       {sending ? (
-                        <Loader size="sm" />
+                        <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
                       ) : (
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" className="w-6 h-6" fill="currentColor">
                           <path d="M498.1 5.6c10.1 7 15.4 19.1 13.5 31.2l-64 416c-1.5 9.7-7.4 18.2-16 23s-18.9 5.4-28 1.6L284 427.7l-68.5 74.1c-8.9 9.7-22.9 12.9-35.2 8.1S160 493.3 160 480V392c0-8.5 3.4-16.6 9.4-22.6l208-208c6.2-6.2 6.2-16.4 0-22.6s-16.4-6.2-22.6 0L121.4 340.4l-96.4-40.2c-9.6-4-16.1-12.9-16.9-23.1s4.9-19.8 14.1-24.8l464-256c9.6-5.3 21.5-5.2 31 .5z" />

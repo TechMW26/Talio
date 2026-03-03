@@ -1,8 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Button } from '@heroui/react'
-import Loader from '@/components/ui/Loader'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 import {
   HiOutlineLightBulb,
   HiOutlinePlus,
@@ -27,13 +30,6 @@ import CreateIdeaModal from './components/CreateIdeaModal'
 import IdeaCard from './components/IdeaCard'
 
 export default function SandboxPage() {
-  const [mounted, setMounted] = useState(false)
-  const [ideas, setIdeas] = useState([])
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-  const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [filter, setFilter] = useState({
     tab: 'all',
@@ -41,154 +37,91 @@ export default function SandboxPage() {
     pinned: false
   })
   const [searchQuery, setSearchQuery] = useState('')
-  const [departments, setDepartments] = useState([])
-  const [pagination, setPagination] = useState({
-    page: 1,
-    limit: 20,
-    total: 0,
-    pages: 1
-  })
-  const [user, setUser] = useState(null)
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const limit = 20
 
-  // Load user
+  // Debounce search query
   useEffect(() => {
-    const userData = localStorage.getItem('user')
-    if (userData) {
-      setUser(JSON.parse(userData))
-    }
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300)
+    return () => clearTimeout(timer)
+  }, [searchQuery])
+
+  // User from localStorage
+  const user = useMemo(() => {
+    if (typeof window === 'undefined') return null
+    try { return JSON.parse(localStorage.getItem('user')) } catch { return null }
   }, [])
 
-  const fetchIdeas = useCallback(async () => {
-    try {
-      setLoading(true)
-      const token = localStorage.getItem('token')
+  // Build SWR key with query params
+  const swrKey = useMemo(() => {
+    const params = new URLSearchParams({
+      page: page.toString(),
+      limit: limit.toString()
+    })
+    if (filter.tab !== 'all') params.append('tab', filter.tab)
+    if (filter.department) params.append('department', filter.department)
+    if (filter.pinned) params.append('pinned', 'true')
+    if (debouncedSearch) params.append('search', debouncedSearch)
+    return `/api/ideas?${params}`
+  }, [page, limit, filter, debouncedSearch])
 
-      const params = new URLSearchParams({
-        page: pagination.page.toString(),
-        limit: pagination.limit.toString()
-      })
+  // Fetch ideas with SWR
+  const { data: res, error, isLoading, isValidating, mutate: refresh } = useAuthedSWR(swrKey)
+  const ideas = Array.isArray(res?.data) ? res.data : []
+  const departments = res?.departments || []
+  const paginationData = res?.pagination || { total: 0, pages: 1 }
 
-      if (filter.tab !== 'all') params.append('tab', filter.tab)
-      if (filter.department) params.append('department', filter.department)
-      if (filter.pinned) params.append('pinned', 'true')
-      if (searchQuery) params.append('search', searchQuery)
+  // Mutations
+  const voteMutation = useApiMutation({
+    method: 'POST',
+    onError: (msg) => toast.error(msg || 'Failed to vote'),
+  })
 
-      const response = await fetch(`/api/ideas?${params}`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      })
+  const pinMutation = useApiMutation({
+    method: 'PUT',
+    onError: (msg) => toast.error(msg || 'Failed to pin idea'),
+  })
 
-      const data = await response.json()
-      if (data.success) {
-        setIdeas(Array.isArray(data.data) ? data.data : [])
-        if (data.departments) {
-          setDepartments(data.departments)
-        }
-        if (data.pagination) {
-          setPagination(prev => ({
-            ...prev,
-            total: data.pagination.total,
-            pages: data.pagination.pages
-          }))
-        }
-      } else {
-        toast.error(data.message || 'Failed to fetch ideas')
-        setIdeas([])
-      }
-    } catch (error) {
-      console.error('Error fetching ideas:', error)
-      toast.error('Failed to load ideas')
-      setIdeas([])
-    } finally {
-      setLoading(false)
-    }
-  }, [filter, pagination.page, pagination.limit, searchQuery])
+  const deleteMutation = useApiMutation({
+    method: 'DELETE',
+    onError: (msg) => toast.error(msg || 'Failed to delete idea'),
+  })
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchIdeas()
-    }, 300)
-    return () => clearTimeout(timer)
-  }, [fetchIdeas])
-
-  const handleIdeaCreated = (newIdea) => {
+  const handleIdeaCreated = () => {
     setShowCreateModal(false)
     toast.success('Idea submitted successfully!')
-    fetchIdeas()
+    refresh()
   }
 
   const handleVote = async (ideaId, type) => {
-    try {
-      const token = localStorage.getItem('token')
-      const res = await fetch(`/api/ideas/${ideaId}/vote`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ type })
-      })
-
-      const data = await res.json()
-      if (data.success) {
-        setIdeas(prev => prev.map(idea =>
+    const result = await voteMutation.execute(`/api/ideas/${ideaId}/vote`, { type })
+    if (result?.success) {
+      refresh(prev => ({
+        ...prev,
+        data: prev?.data?.map(idea =>
           idea._id === ideaId
-            ? { ...idea, likes: data.data.likes, dislikes: data.data.dislikes, userVote: data.data.userVote }
+            ? { ...idea, likes: result.data.likes, dislikes: result.data.dislikes, userVote: result.data.userVote }
             : idea
-        ))
-      } else {
-        toast.error(data.message || 'Failed to vote')
-      }
-    } catch (error) {
-      console.error('Error voting:', error)
-      toast.error('Failed to vote')
+        )
+      }), false)
     }
   }
 
   const handlePin = async (ideaId) => {
-    try {
-      const token = localStorage.getItem('token')
-      const res = await fetch(`/api/ideas/${ideaId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ action: 'pin' })
-      })
-
-      const data = await res.json()
-      if (data.success) {
-        toast.success(data.data.isPinned ? 'Idea pinned!' : 'Idea unpinned')
-        fetchIdeas()
-      }
-    } catch (error) {
-      console.error('Error pinning:', error)
-      toast.error('Failed to pin idea')
+    const result = await pinMutation.execute(`/api/ideas/${ideaId}`, { action: 'pin' })
+    if (result?.success) {
+      toast.success(result.data.isPinned ? 'Idea pinned!' : 'Idea unpinned')
+      refresh()
     }
   }
 
   const handleDelete = async (ideaId) => {
     if (!confirm('Are you sure you want to delete this idea?')) return
-
-    try {
-      const token = localStorage.getItem('token')
-      const res = await fetch(`/api/ideas/${ideaId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
-      })
-
-      const data = await res.json()
-      if (data.success) {
-        toast.success('Idea deleted')
-        fetchIdeas()
-      } else {
-        toast.error(data.message || 'Failed to delete')
-      }
-    } catch (error) {
-      console.error('Error deleting:', error)
-      toast.error('Failed to delete idea')
+    const result = await deleteMutation.execute(`/api/ideas/${ideaId}`, null, { method: 'DELETE' })
+    if (result?.success) {
+      toast.success('Idea deleted')
+      refresh()
     }
   }
 
@@ -199,17 +132,6 @@ export default function SandboxPage() {
 
   const isAdmin = user?.role === 'admin' || user?.role === 'hr' || user?.role === 'department_head'
 
-  // Prevent hydration mismatch
-  if (!mounted) {
-    return (
-      <div className="page-container">
-        <div className="flex items-center justify-center h-64">
-          <Loader size="lg" />
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="page-container">
       {/* Header */}
@@ -219,8 +141,9 @@ export default function SandboxPage() {
             <HiOutlineLightBulb className="w-7 h-7 text-yellow-500" />
             Ideas Sandbox
           </h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-gray-600 mt-1 flex items-center gap-2">
             Share your innovative ideas with the team
+            <BackgroundRefreshIndicator isValidating={isValidating} />
           </p>
         </div>
 
@@ -342,7 +265,9 @@ export default function SandboxPage() {
           {filter.tab === 'my' ? 'My Ideas' : 'All Ideas'}
         </h2>
 
-        {loading ? (
+        {error ? (
+          <DataErrorState message="Failed to load ideas" onRetry={() => refresh()} />
+        ) : isLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[...Array(6)].map((_, i) => (
               <div key={i} className="bg-white rounded-xl p-4 animate-pulse shadow-sm border border-gray-100">
@@ -380,9 +305,12 @@ export default function SandboxPage() {
                 onDelete={handleDelete}
                 isAdmin={isAdmin}
                 onCommentAdded={(ideaId, newCount) => {
-                  setIdeas(prev => prev.map(i =>
-                    i._id === ideaId ? { ...i, commentsCount: newCount } : i
-                  ))
+                  refresh(prev => ({
+                    ...prev,
+                    data: prev?.data?.map(i =>
+                      i._id === ideaId ? { ...i, commentsCount: newCount } : i
+                    )
+                  }), false)
                 }}
               />
             ))}
@@ -390,21 +318,21 @@ export default function SandboxPage() {
         )}
 
         {/* Pagination */}
-        {pagination.pages > 1 && (
+        {paginationData.pages > 1 && (
           <div className="flex justify-center items-center gap-2 mt-6">
             <button
-              onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-              disabled={pagination.page === 1}
+              onClick={() => setPage(p => p - 1)}
+              disabled={page === 1}
               className="p-2 rounded-lg border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
             >
               <HiOutlineChevronLeft className="w-5 h-5 text-gray-600" />
             </button>
             <span className="text-sm text-gray-600">
-              Page {pagination.page} of {pagination.pages}
+              Page {page} of {paginationData.pages}
             </span>
             <button
-              onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-              disabled={pagination.page === pagination.pages}
+              onClick={() => setPage(p => p + 1)}
+              disabled={page === paginationData.pages}
               className="p-2 rounded-lg border border-gray-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
             >
               <HiOutlineChevronRight className="w-5 h-5 text-gray-600" />

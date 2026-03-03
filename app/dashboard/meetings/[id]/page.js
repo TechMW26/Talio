@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, use, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -25,92 +25,67 @@ import {
   HiOutlineGlobeAlt
 } from 'react-icons/hi2'
 import toast from '@/utils/toast'
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Textarea } from '@heroui/react'
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Textarea, Skeleton } from '@heroui/react'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton from '@/components/ui/LoadingButton'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 
 export default function MeetingDetailPage({ params }) {
   const router = useRouter()
   const { id } = use(params)
-  const [meeting, setMeeting] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [responding, setResponding] = useState(false)
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
-  const [guestAccess, setGuestAccess] = useState(null)
-  const [togglingGuest, setTogglingGuest] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [deleting, setDeleting] = useState(false)
 
-  useEffect(() => {
-    fetchMeeting()
-    fetchGuestAccess()
-  }, [id])
+  // SWR data fetching
+  const { data: meetingRes, error: meetingError, isLoading: meetingLoading, isValidating: meetingValidating, mutate: refreshMeeting } = useAuthedSWR(
+    id ? `/api/meetings/${id}` : null
+  )
+  const { data: guestAccessRes, isValidating: guestValidating, mutate: refreshGuestAccess } = useAuthedSWR(
+    id ? `/api/meetings/${id}/guest-access` : null
+  )
 
-  const fetchMeeting = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/meetings/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setMeeting(data.data)
-      } else {
-        toast.error(data.message || 'Failed to load meeting')
-        router.push('/dashboard/meetings')
-      }
-    } catch (error) {
-      console.error('Error fetching meeting:', error)
-      toast.error('Failed to load meeting')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const meeting = meetingRes?.data || null
+  const guestAccess = guestAccessRes?.data || null
+  const loading = meetingLoading
+  const isValidating = meetingValidating || guestValidating
 
-  const fetchGuestAccess = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/meetings/${id}/guest-access`, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setGuestAccess(data.data)
-      }
-    } catch (error) {
-      console.error('Error fetching guest access:', error)
-    }
-  }
+  // Mutations
+  const respondMutation = useApiMutation({
+    method: 'POST',
+    invalidateKeys: [id ? `/api/meetings/${id}` : null].filter(Boolean),
+    onSuccess: (data) => {
+      setShowRejectModal(false)
+      setRejectReason('')
+    },
+    onError: (err) => toast.error(err.message || 'Failed to respond to invitation'),
+  })
+
+  const toggleGuestMutation = useApiMutation({
+    method: 'POST',
+    invalidateKeys: [id ? `/api/meetings/${id}/guest-access` : null].filter(Boolean),
+    onSuccess: (data) => {
+      refreshGuestAccess()
+      toast.success(data.message)
+    },
+    onError: (err) => toast.error(err.message || 'Failed to update guest access'),
+  })
+
+  const deleteMutation = useApiMutation({
+    method: 'DELETE',
+    onSuccess: () => {
+      toast.success('Meeting permanently deleted')
+      router.push('/dashboard/meetings')
+    },
+    onError: (err) => toast.error(err.message || 'Failed to delete meeting'),
+  })
 
   const toggleGuestAccess = async () => {
-    setTogglingGuest(true)
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/meetings/${id}/guest-access`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ enabled: !guestAccess?.guestAccessEnabled })
-      })
-      const data = await response.json()
-      if (data.success) {
-        setGuestAccess(prev => ({
-          ...prev,
-          guestAccessEnabled: data.data.guestAccessEnabled,
-          guestLink: data.data.guestLink,
-          guestUrl: data.data.guestUrl
-        }))
-        toast.success(data.message)
-      } else {
-        toast.error(data.message || 'Failed to update guest access')
-      }
-    } catch (error) {
-      console.error('Error toggling guest access:', error)
-      toast.error('Failed to update guest access')
-    } finally {
-      setTogglingGuest(false)
-    }
+    await toggleGuestMutation.execute(`/api/meetings/${id}/guest-access`, {
+      enabled: !guestAccess?.guestAccessEnabled
+    })
   }
 
   const copyGuestLink = () => {
@@ -121,79 +96,25 @@ export default function MeetingDetailPage({ params }) {
   }
 
   const handleRespond = async (response, reason = '') => {
-    setResponding(true)
-    try {
-      const token = localStorage.getItem('token')
-      const res = await fetch(`/api/meetings/${id}/respond`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ response, reason })
-      })
-
-      const data = await res.json()
-      if (data.success) {
-        setMeeting(prev => ({ ...prev, myInviteStatus: response }))
-        setShowRejectModal(false)
-        setRejectReason('')
-        toast.success(`Meeting invitation ${response}`)
-      } else {
-        toast.error(data.message || 'Failed to respond')
-      }
-    } catch (error) {
-      console.error('Error responding:', error)
-      toast.error('Failed to respond to invitation')
-    } finally {
-      setResponding(false)
+    const data = await respondMutation.execute(`/api/meetings/${id}/respond`, { response, reason })
+    if (data) {
+      toast.success(`Meeting invitation ${response}`)
     }
   }
 
   const handleCancelMeeting = async () => {
     if (!confirm('Are you sure you want to cancel this meeting? All invitees will be notified.')) return
 
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/meetings/${id}?reason=Cancelled by organizer`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        toast.success('Meeting cancelled')
-        router.push('/dashboard/meetings')
-      } else {
-        toast.error(data.message || 'Failed to cancel meeting')
-      }
-    } catch (error) {
-      console.error('Error cancelling meeting:', error)
-      toast.error('Failed to cancel meeting')
+    const data = await deleteMutation.execute(`/api/meetings/${id}?reason=Cancelled by organizer`, null, { method: 'DELETE' })
+    if (data) {
+      toast.success('Meeting cancelled')
+      router.push('/dashboard/meetings')
     }
   }
 
   const handleDeleteMeeting = async () => {
-    setDeleting(true)
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/meetings/${id}?permanent=true`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        toast.success('Meeting permanently deleted')
-        router.push('/dashboard/meetings')
-      } else {
-        toast.error(data.message || 'Failed to delete meeting')
-      }
-    } catch (error) {
-      console.error('Error deleting meeting:', error)
-      toast.error('Failed to delete meeting')
-    } finally {
-      setDeleting(false)
+    const data = await deleteMutation.execute(`/api/meetings/${id}?permanent=true`, null, { method: 'DELETE' })
+    if (data) {
       setShowDeleteModal(false)
     }
   }
@@ -234,14 +155,18 @@ export default function MeetingDetailPage({ params }) {
     }
   }
 
+  if (meetingError) {
+    return <DataErrorState error={meetingError} onRetry={() => refreshMeeting()} />
+  }
+
   if (loading) {
     return (
       <div className="page-container">
         <div className="max-w-4xl mx-auto">
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-            <div className="h-64 bg-gray-200 rounded-xl"></div>
-            <div className="h-48 bg-gray-200 rounded-xl"></div>
+          <div className="space-y-4">
+            <Skeleton className="h-8 w-1/4 rounded-lg" />
+            <Skeleton className="h-64 rounded-xl" />
+            <Skeleton className="h-48 rounded-xl" />
           </div>
         </div>
       </div>
@@ -269,6 +194,7 @@ export default function MeetingDetailPage({ params }) {
 
   return (
     <div className="page-container">
+      <BackgroundRefreshIndicator isRefreshing={isValidating && !loading} />
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
@@ -353,7 +279,7 @@ export default function MeetingDetailPage({ params }) {
                   <>
                     <button
                       onClick={() => handleRespond('accepted')}
-                      disabled={responding}
+                      disabled={respondMutation.isLoading}
                       className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white font-medium rounded-xl hover:bg-green-700 transition-colors disabled:opacity-50"
                     >
                       <HiOutlineCheck className="w-5 h-5" />
@@ -361,7 +287,7 @@ export default function MeetingDetailPage({ params }) {
                     </button>
                     <button
                       onClick={() => setShowRejectModal(true)}
-                      disabled={responding}
+                      disabled={respondMutation.isLoading}
                       className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white font-medium rounded-xl hover:bg-red-700 transition-colors disabled:opacity-50"
                     >
                       <HiOutlineXMark className="w-5 h-5" />
@@ -369,7 +295,7 @@ export default function MeetingDetailPage({ params }) {
                     </button>
                     <button
                       onClick={() => handleRespond('maybe')}
-                      disabled={responding}
+                      disabled={respondMutation.isLoading}
                       className="flex items-center gap-2 px-6 py-3 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-100 transition-colors disabled:opacity-50"
                     >
                       <HiOutlineQuestionMarkCircle className="w-5 h-5" />
@@ -452,19 +378,17 @@ export default function MeetingDetailPage({ params }) {
                     </div>
                     <button
                       onClick={toggleGuestAccess}
-                      disabled={togglingGuest}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        guestAccess.guestAccessEnabled ? 'bg-indigo-600' : 'bg-gray-300'
-                      } ${togglingGuest ? 'opacity-50' : ''}`}
+                      disabled={toggleGuestMutation.isLoading}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${guestAccess.guestAccessEnabled ? 'bg-indigo-600' : 'bg-gray-300'
+                        } ${toggleGuestMutation.isLoading ? 'opacity-50' : ''}`}>
                     >
                       <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          guestAccess.guestAccessEnabled ? 'translate-x-6' : 'translate-x-1'
-                        }`}
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${guestAccess.guestAccessEnabled ? 'translate-x-6' : 'translate-x-1'
+                          }`}
                       />
                     </button>
                   </div>
-                  
+
                   <p className="text-sm text-gray-600 mb-3">
                     Allow anyone with the link to join without signing in
                   </p>
@@ -637,7 +561,7 @@ export default function MeetingDetailPage({ params }) {
               </h3>
               <div className="prose max-w-none">
                 <p className="text-gray-600">{meeting.aiSummary.summary}</p>
-                
+
                 {meeting.aiSummary.keyPoints?.length > 0 && (
                   <div className="mt-4">
                     <h4 className="text-sm font-medium text-gray-800 mb-2">Key Points</h4>
@@ -648,7 +572,7 @@ export default function MeetingDetailPage({ params }) {
                     </ul>
                   </div>
                 )}
-                
+
                 {meeting.aiSummary.actionItems?.length > 0 && (
                   <div className="mt-4">
                     <h4 className="text-sm font-medium text-gray-800 mb-2">Action Items</h4>
@@ -701,7 +625,7 @@ export default function MeetingDetailPage({ params }) {
                   <div>
                     <p className="font-medium text-default-900 mb-1">Are you sure you want to delete this meeting?</p>
                     <p className="text-sm text-default-600">
-                      This will permanently delete <strong>"{meeting?.title}"</strong> from the database. 
+                      This will permanently delete <strong>"{meeting?.title}"</strong> from the database.
                       All associated data including invitees, transcripts, and AI summaries will be removed.
                     </p>
                     <p className="text-sm text-red-600 mt-2 font-medium">
@@ -718,13 +642,13 @@ export default function MeetingDetailPage({ params }) {
                 >
                   Cancel
                 </Button>
-                <Button
+                <LoadingButton
                   color="danger"
                   onPress={handleDeleteMeeting}
-                  isLoading={deleting}
+                  isLoading={deleteMutation.isLoading}
                 >
-                  {deleting ? 'Deleting...' : 'Delete Permanently'}
-                </Button>
+                  {deleteMutation.isLoading ? 'Deleting...' : 'Delete Permanently'}
+                </LoadingButton>
               </ModalFooter>
             </>
           )}
@@ -755,13 +679,13 @@ export default function MeetingDetailPage({ params }) {
                 >
                   Cancel
                 </Button>
-                <Button
+                <LoadingButton
                   color="danger"
                   onPress={() => handleRespond('rejected', rejectReason)}
-                  isLoading={responding}
+                  isLoading={respondMutation.isLoading}
                 >
-                  {responding ? 'Declining...' : 'Decline'}
-                </Button>
+                  {respondMutation.isLoading ? 'Declining...' : 'Decline'}
+                </LoadingButton>
               </ModalFooter>
             </>
           )}

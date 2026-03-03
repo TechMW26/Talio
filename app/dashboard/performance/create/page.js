@@ -1,16 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { FaStar, FaArrowLeft, FaSave } from 'react-icons/fa'
-import { Select, SelectItem, Input, Button } from '@heroui/react'
+import { Select, SelectItem, Input, Button, Skeleton } from '@heroui/react'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton from '@/components/ui/LoadingButton'
 
 export default function CreatePerformanceReviewPage() {
   const router = useRouter()
-  const [employees, setEmployees] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [submitting, setSubmitting] = useState(false)
   const [formData, setFormData] = useState({
     employee: '',
     reviewPeriod: {
@@ -30,28 +30,24 @@ export default function CreatePerformanceReviewPage() {
     comments: '',
   })
 
-  useEffect(() => {
-    fetchEmployees()
+  // Fetch employees
+  const { data: empRes, isLoading: loading } = useAuthedSWR('/api/employees?limit=1000&status=active')
+  const employees = (empRes?.data || []).filter(emp => emp.status === 'active')
+
+  const user = useMemo(() => {
+    if (typeof window === 'undefined') return null
+    const userData = localStorage.getItem('user')
+    return userData ? JSON.parse(userData) : null
   }, [])
 
-  const fetchEmployees = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/employees?limit=1000&status=active', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        setEmployees(data.data.filter(emp => emp.status === 'active'))
-      }
-    } catch (error) {
-      console.error('Fetch employees error:', error)
-      toast.error('Failed to fetch employees')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const submitMutation = useApiMutation({
+    method: 'POST',
+    onSuccess: () => {
+      toast.success('Performance review created successfully!')
+      router.push('/dashboard/performance')
+    },
+    onError: (msg) => toast.error(msg || 'Failed to create review'),
+  })
 
   const handleRatingChange = (category, value) => {
     setFormData({
@@ -65,41 +61,14 @@ export default function CreatePerformanceReviewPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setSubmitting(true)
 
-    try {
-      const token = localStorage.getItem('token')
-      const user = JSON.parse(localStorage.getItem('user'))
-
-      const reviewData = {
-        ...formData,
-        reviewedBy: user.employeeId._id,
-        reviewDate: new Date(),
-      }
-
-      const response = await fetch('/api/performance', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(reviewData),
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        toast.success('Performance review created successfully!')
-        router.push('/dashboard/performance')
-      } else {
-        toast.error(data.message || 'Failed to create review')
-      }
-    } catch (error) {
-      console.error('Create review error:', error)
-      toast.error('Failed to create review')
-    } finally {
-      setSubmitting(false)
+    const reviewData = {
+      ...formData,
+      reviewedBy: user?.employeeId?._id,
+      reviewDate: new Date(),
     }
+
+    submitMutation.execute('/api/performance', reviewData)
   }
 
   const RatingStars = ({ category, value }) => {
@@ -113,9 +82,8 @@ export default function CreatePerformanceReviewPage() {
             className="focus:outline-none"
           >
             <FaStar
-              className={`text-2xl ${
-                star <= value ? 'text-yellow-400' : 'text-gray-300'
-              }`}
+              className={`text-2xl ${star <= value ? 'text-yellow-400' : 'text-gray-300'
+                }`}
             />
           </button>
         ))}
@@ -314,18 +282,18 @@ export default function CreatePerformanceReviewPage() {
               type="button"
               onPress={() => router.push('/dashboard/performance')}
               variant="flat"
-              isDisabled={submitting}
+              isDisabled={submitMutation.isLoading}
             >
               Cancel
             </Button>
-            <Button
+            <LoadingButton
               type="submit"
-              color="primary"
+              isLoading={submitMutation.isLoading}
+              loadingText="Creating..."
               startContent={<FaSave />}
-              isDisabled={submitting}
             >
-              {submitting ? 'Creating...' : 'Create Review'}
-            </Button>
+              Create Review
+            </LoadingButton>
           </div>
         </form>
       </div>

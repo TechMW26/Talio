@@ -1,11 +1,13 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useRef, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { Button } from '@heroui/react'
+import { Button, Skeleton } from '@heroui/react'
 import toast from '@/utils/toast'
 import { FaDownload, FaArrowLeft, FaPrint, FaEnvelope } from 'react-icons/fa'
-import Loader from '@/components/ui/Loader'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 
@@ -13,50 +15,18 @@ export default function PayslipDetailPage() {
   const params = useParams()
   const router = useRouter()
   const payslipRef = useRef(null)
-  const [payroll, setPayroll] = useState(null)
-  const [companySettings, setCompanySettings] = useState(null)
-  const [loading, setLoading] = useState(true)
   const [downloading, setDownloading] = useState(false)
 
-  useEffect(() => {
-    if (params.id) {
-      fetchPayrollAndSettings()
-    }
-  }, [params.id])
+  // SWR data fetching
+  const { data: payrollRes, error: payrollError, isLoading: payrollLoading, isValidating: payrollValidating, mutate: refreshPayroll } = useAuthedSWR(
+    params.id ? `/api/payroll/${params.id}` : null
+  )
+  const { data: settingsRes, error: settingsError, isLoading: settingsLoading, isValidating: settingsValidating } = useAuthedSWR('/api/settings/company')
 
-  const fetchPayrollAndSettings = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      
-      const [payrollRes, settingsRes] = await Promise.all([
-        fetch(`/api/payroll/${params.id}`, {
-          headers: { 'Authorization': `Bearer ${token}` },
-        }),
-        fetch('/api/settings/company', {
-          headers: { 'Authorization': `Bearer ${token}` },
-        })
-      ])
-
-      const payrollData = await payrollRes.json()
-      const settingsData = await settingsRes.json()
-
-      if (payrollData.success) {
-        setPayroll(payrollData.data)
-      } else {
-        toast.error('Failed to load payslip')
-        router.back()
-      }
-
-      if (settingsData.success) {
-        setCompanySettings(settingsData.data)
-      }
-    } catch (error) {
-      console.error('Fetch error:', error)
-      toast.error('Failed to load payslip')
-    } finally {
-      setLoading(false)
-    }
-  }
+  const payroll = payrollRes?.data || null
+  const companySettings = settingsRes?.data || null
+  const loading = payrollLoading || settingsLoading
+  const isValidating = payrollValidating || settingsValidating
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-IN', {
@@ -74,15 +44,15 @@ export default function PayslipDetailPage() {
 
   const getMonthName = (month) => {
     const months = ['January', 'February', 'March', 'April', 'May', 'June',
-                    'July', 'August', 'September', 'October', 'November', 'December']
+      'July', 'August', 'September', 'October', 'November', 'December']
     return months[month - 1]
   }
 
   const downloadPDF = async () => {
     if (!payroll) return
-    
+
     setDownloading(true)
-    
+
     try {
       const doc = new jsPDF('p', 'mm', 'a4')
       const pageWidth = doc.internal.pageSize.getWidth()
@@ -102,13 +72,13 @@ export default function PayslipDetailPage() {
           // Create image element to load the logo
           const img = new Image()
           img.crossOrigin = 'anonymous'
-          
+
           await new Promise((resolve, reject) => {
             img.onload = resolve
             img.onerror = reject
             img.src = companyLogo
           })
-          
+
           // Add logo to PDF
           const logoHeight = 15
           const logoWidth = (img.width / img.height) * logoHeight
@@ -149,7 +119,7 @@ export default function PayslipDetailPage() {
       doc.setFont('helvetica', 'bold')
       doc.setTextColor(59, 130, 246)
       doc.text('SALARY SLIP', pageWidth / 2, yPos, { align: 'center' })
-      
+
       yPos += 6
       doc.setFontSize(11)
       doc.setFont('helvetica', 'normal')
@@ -170,7 +140,7 @@ export default function PayslipDetailPage() {
       doc.setFontSize(10)
       doc.setFont('helvetica', 'bold')
       doc.setTextColor(31, 41, 55)
-      
+
       const employee = payroll.employee || {}
       const col1 = margin + 5
       const col2 = pageWidth / 2 + 5
@@ -230,7 +200,7 @@ export default function PayslipDetailPage() {
           0: { cellWidth: tableWidth * 0.6 },
           1: { cellWidth: tableWidth * 0.4, halign: 'right' },
         },
-        didParseCell: function(data) {
+        didParseCell: function (data) {
           if (data.row.index === earningsData.length - 1) {
             data.cell.styles.fillColor = [220, 252, 231]
             data.cell.styles.fontStyle = 'bold'
@@ -271,7 +241,7 @@ export default function PayslipDetailPage() {
           0: { cellWidth: tableWidth * 0.6 },
           1: { cellWidth: tableWidth * 0.4, halign: 'right' },
         },
-        didParseCell: function(data) {
+        didParseCell: function (data) {
           if (data.row.index === deductionsData.length - 1) {
             data.cell.styles.fillColor = [254, 226, 226]
             data.cell.styles.fontStyle = 'bold'
@@ -285,12 +255,12 @@ export default function PayslipDetailPage() {
       // Net Salary box
       doc.setFillColor(59, 130, 246)
       doc.roundedRect(margin, yPos, pageWidth - 2 * margin, 25, 3, 3, 'F')
-      
+
       doc.setTextColor(255, 255, 255)
       doc.setFontSize(11)
       doc.setFont('helvetica', 'normal')
       doc.text('NET SALARY', pageWidth / 2, yPos + 8, { align: 'center' })
-      
+
       doc.setFontSize(18)
       doc.setFont('helvetica', 'bold')
       doc.text(formatCurrency(payroll.netSalary), pageWidth / 2, yPos + 18, { align: 'center' })
@@ -310,7 +280,7 @@ export default function PayslipDetailPage() {
         doc.setFont('helvetica', 'normal')
         const attendanceText = `Working Days: ${payroll.workingDays || 26}  |  Present: ${payroll.presentDays || 0}  |  Absent: ${payroll.absentDays || 0}  |  Leave: ${payroll.leaveDays || 0}`
         doc.text(attendanceText, margin + 5, yPos + 15)
-        
+
         yPos += 25
       }
 
@@ -318,19 +288,19 @@ export default function PayslipDetailPage() {
       yPos = pageHeight - 25
       doc.setDrawColor(229, 231, 235)
       doc.line(margin, yPos, pageWidth - margin, yPos)
-      
+
       yPos += 8
       doc.setFontSize(8)
       doc.setTextColor(156, 163, 175)
       doc.text('This is a system-generated salary slip. For any queries, please contact HR.', pageWidth / 2, yPos, { align: 'center' })
-      
+
       yPos += 5
       doc.text(`Generated on: ${new Date().toLocaleDateString('en-IN')}`, pageWidth / 2, yPos, { align: 'center' })
 
       // Save PDF
       const fileName = `Payslip_${employee.employeeCode || 'EMP'}_${getMonthName(payroll.month)}_${payroll.year}.pdf`
       doc.save(fileName)
-      
+
       toast.success('Payslip downloaded successfully!')
     } catch (error) {
       console.error('PDF generation error:', error)
@@ -342,10 +312,21 @@ export default function PayslipDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader size="lg" />
+      <div className="p-6 space-y-6">
+        <div className="flex items-center space-x-4">
+          <Skeleton className="w-10 h-10 rounded-lg" />
+          <div className="space-y-2">
+            <Skeleton className="h-6 w-64 rounded-lg" />
+            <Skeleton className="h-4 w-48 rounded-lg" />
+          </div>
+        </div>
+        <Skeleton className="h-[600px] max-w-4xl mx-auto rounded-lg" />
       </div>
     )
+  }
+
+  if (payrollError) {
+    return <DataErrorState error={payrollError} onRetry={() => refreshPayroll()} />
   }
 
   if (!payroll) {
@@ -365,6 +346,7 @@ export default function PayslipDetailPage() {
 
   return (
     <div className="p-6">
+      <BackgroundRefreshIndicator isRefreshing={isValidating && !loading} />
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center space-x-4">
@@ -388,7 +370,7 @@ export default function PayslipDetailPage() {
             onPress={downloadPDF}
             isDisabled={downloading}
             color="primary"
-            startContent={downloading ? <Loader size="xs" /> : <FaDownload />}
+            startContent={downloading ? null : <FaDownload />}
           >
             {downloading ? 'Generating...' : 'Download PDF'}
           </Button>
@@ -423,11 +405,10 @@ export default function PayslipDetailPage() {
         </div>
 
         {/* Status Banner */}
-        <div className={`px-6 py-2 text-center text-sm font-medium ${
-          payroll.status === 'paid' ? 'bg-green-100 text-green-800' :
-          payroll.status === 'processed' ? 'bg-blue-100 text-blue-800' :
-          'bg-gray-100 text-gray-800'
-        }`}>
+        <div className={`px-6 py-2 text-center text-sm font-medium ${payroll.status === 'paid' ? 'bg-green-100 text-green-800' :
+            payroll.status === 'processed' ? 'bg-blue-100 text-blue-800' :
+              'bg-gray-100 text-gray-800'
+          }`}>
           Status: {payroll.status?.toUpperCase()}
         </div>
 

@@ -7,13 +7,13 @@ import OvertimePrompt, { useOvertimeCheck } from '@/components/OvertimePrompt'
 import useLocationCapture from '@/hooks/useLocationCapture'
 import { useSocket } from '@/contexts/SocketContext'
 import { Card, CardBody, CardHeader, CardFooter, Button, Chip, Skeleton, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Textarea, Select, SelectItem } from '@heroui/react'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton from '@/components/ui/LoadingButton'
 
 export default function AttendancePage() {
   const [mounted, setMounted] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [attendance, setAttendance] = useState([])
-  const [todayAttendance, setTodayAttendance] = useState(null)
-  const [user, setUser] = useState(null)
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [viewMode, setViewMode] = useState('calendar') // 'calendar' or 'list'
 
@@ -38,16 +38,11 @@ export default function AttendancePage() {
     requestedStatus: '',
     reason: ''
   })
-  const [submittingCorrection, setSubmittingCorrection] = useState(false)
-
-  // My correction requests
-  const [myCorrections, setMyCorrections] = useState([])
-  const [showMyCorrections, setShowMyCorrections] = useState(false)
+  const [submittingCorrection] = useState(false) // kept for backward compat but unused now
 
   // Pending approvals (for admins/HRs/dept heads)
-  const [pendingCorrections, setPendingCorrections] = useState([])
+  const [showMyCorrections, setShowMyCorrections] = useState(false)
   const [showPendingApprovals, setShowPendingApprovals] = useState(false)
-  const [canApprove, setCanApprove] = useState(false)
 
   // Missing entry modal
   const [showMissingEntryModal, setShowMissingEntryModal] = useState(false)
@@ -59,15 +54,8 @@ export default function AttendancePage() {
   })
 
   // Holidays state
-  const [holidays, setHolidays] = useState([])
   const [selectedHoliday, setSelectedHoliday] = useState(null)
   const [showHolidayModal, setShowHolidayModal] = useState(false)
-
-  // Company working days (0=Sunday, 1=Monday, etc.)
-  const [workingDays, setWorkingDays] = useState([1, 2, 3, 4, 5]) // Default Mon-Fri
-
-  // Employee joining date (to not mark absent before joining)
-  const [employeeJoiningDate, setEmployeeJoiningDate] = useState(null)
 
   // Details modal state (for viewing attendance record details)
   const [showDetailsModal, setShowDetailsModal] = useState(false)
@@ -94,71 +82,69 @@ export default function AttendancePage() {
     return null
   }
 
+  // User from localStorage (memoized)
+  const user = useMemo(() => {
+    if (typeof window === 'undefined') return null
+    const userData = localStorage.getItem('user')
+    return userData ? JSON.parse(userData) : null
+  }, [])
+
+  const employeeId = useMemo(() => user ? getEmployeeId(user) : null, [user])
+
+  const canApprove = useMemo(() => {
+    if (!user) return false
+    return ['admin', 'hr', 'department_head', 'manager'].includes(user.role)
+  }, [user])
+
   // Set mounted state for hydration
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  // Fetch company settings (working days)
-  useEffect(() => {
-    const fetchCompanySettings = async () => {
-      try {
-        const token = localStorage.getItem('token')
-        const response = await fetch('/api/company/settings', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-        const data = await response.json()
-        if (data.success && data.data?.workingHours?.workingDays) {
-          setWorkingDays(data.data.workingHours.workingDays)
-        }
-      } catch (error) {
-        console.error('Error fetching company settings:', error)
-      }
-    }
-    fetchCompanySettings()
+  // --- SWR Data Fetching ---
+
+  // Company settings (independent)
+  const { data: companySettingsRes } = useAuthedSWR('/api/company/settings')
+  const workingDays = companySettingsRes?.data?.workingHours?.workingDays || [1, 2, 3, 4, 5]
+
+  // Employee details (depends on user)
+  const { data: employeeDetailsRes } = useAuthedSWR(employeeId ? `/api/employees/${employeeId}` : null)
+  const employeeJoiningDate = useMemo(() => {
+    const jd = employeeDetailsRes?.data?.joiningDate
+    return jd ? new Date(jd) : null
+  }, [employeeDetailsRes])
+
+  // Holidays (independent)
+  const { data: holidaysRes } = useAuthedSWR('/api/holidays?limit=100')
+  const holidays = holidaysRes?.data || []
+
+  // Today's attendance (depends on employeeId)
+  const todayDateStr = useMemo(() => {
+    const now = new Date()
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   }, [])
+  const { data: todayAttendanceRes, mutate: mutateTodayAttendance } = useAuthedSWR(
+    employeeId ? `/api/attendance?employeeId=${employeeId}&date=${todayDateStr}` : null
+  )
+  const todayAttendance = todayAttendanceRes?.data?.[0] || null
 
-  // Fetch employee details (joining date)
-  useEffect(() => {
-    const fetchEmployeeDetails = async () => {
-      if (!user) return
-      const empId = getEmployeeId(user)
-      if (!empId) return
+  // Monthly attendance (depends on employeeId + currentMonth)
+  const monthNum = currentMonth.getMonth() + 1
+  const yearNum = currentMonth.getFullYear()
+  const { data: attendanceRes, mutate: mutateAttendance } = useAuthedSWR(
+    employeeId ? `/api/attendance?employeeId=${employeeId}&month=${monthNum}&year=${yearNum}` : null
+  )
+  const attendance = attendanceRes?.data || []
 
-      try {
-        const token = localStorage.getItem('token')
-        const response = await fetch(`/api/employees/${empId}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-        const data = await response.json()
-        if (data.success && data.data?.joiningDate) {
-          setEmployeeJoiningDate(new Date(data.data.joiningDate))
-        }
-      } catch (error) {
-        console.error('Error fetching employee details:', error)
-      }
-    }
-    fetchEmployeeDetails()
-  }, [user])
+  // My corrections
+  const { data: myCorrectionsRes, mutate: mutateMyCorrections } = useAuthedSWR('/api/attendance/corrections?type=my')
+  const myCorrections = myCorrectionsRes?.data || []
 
-  // Fetch holidays
-  useEffect(() => {
-    const fetchHolidays = async () => {
-      try {
-        const token = localStorage.getItem('token')
-        const response = await fetch('/api/holidays?limit=100', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-        const data = await response.json()
-        if (data.success) {
-          setHolidays(data.data)
-        }
-      } catch (error) {
-        console.error('Error fetching holidays:', error)
-      }
-    }
-    fetchHolidays()
-  }, [])
+  // Pending corrections (admin only)
+  const { data: pendingCorrectionsRes, mutate: mutatePendingCorrections } = useAuthedSWR(
+    canApprove ? '/api/attendance/corrections?type=pending' : null
+  )
+  const pendingCorrections = pendingCorrectionsRes?.data || []
 
   // Show overtime prompt when there's a pending request
   useEffect(() => {
@@ -171,37 +157,6 @@ export default function AttendancePage() {
   useEffect(() => {
     if (typeof window !== 'undefined' && window.innerWidth < 768) {
       setViewMode('list')
-    }
-  }, [])
-
-  useEffect(() => {
-    const userData = localStorage.getItem('user')
-    if (userData) {
-      const parsedUser = JSON.parse(userData)
-      console.log('📊 User object:', parsedUser)
-      console.log('📊 employeeId field:', parsedUser.employeeId)
-      console.log('📊 _id field:', parsedUser._id)
-
-      setUser(parsedUser)
-      // Handle both object and string formats for employeeId
-      const empId = parsedUser.employeeId?._id || parsedUser.employeeId || parsedUser._id
-      console.log('📊 Extracted empId:', empId)
-
-      // Check if user can approve corrections
-      const role = parsedUser.role
-      if (['admin', 'hr', 'department_head', 'manager'].includes(role)) {
-        setCanApprove(true)
-        fetchPendingCorrections()
-      }
-
-      if (empId) {
-        fetchTodayAttendance(empId)
-        fetchAttendance(empId)
-        fetchMyCorrections()
-      } else {
-        console.error('❌ No valid employee ID found in user object')
-        toast.error('Employee ID not found. Please log in again.')
-      }
     }
   }, [])
 
@@ -218,10 +173,10 @@ export default function AttendancePage() {
 
         // Check if this update is for the current user
         if (data.employeeId === empId) {
-          // Refresh attendance data
-          fetchTodayAttendance(empId)
-          fetchAttendance(empId)
-          fetchMyCorrections()
+          // Refresh attendance data via SWR
+          mutateTodayAttendance()
+          mutateAttendance()
+          mutateMyCorrections()
 
           // Show toast notification
           if (data.type === 'correction-approved') {
@@ -249,35 +204,18 @@ export default function AttendancePage() {
     }
   }, [socket, isConnected, user])
 
-  const fetchMyCorrections = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/attendance/corrections?type=my', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setMyCorrections(data.data)
-      }
-    } catch (error) {
-      console.error('Fetch my corrections error:', error)
-    }
-  }
-
-  const fetchPendingCorrections = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/attendance/corrections?type=pending', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setPendingCorrections(data.data)
-      }
-    } catch (error) {
-      console.error('Fetch pending corrections error:', error)
-    }
-  }
+  // --- Correction mutation ---
+  const correctionMutation = useApiMutation({
+    invalidateKeys: ['/api/attendance/corrections?type=my'],
+    onSuccess: (data) => {
+      toast.success('Correction request submitted successfully')
+      setShowCorrectionModal(false)
+      setSelectedRecord(null)
+      setSelectedDayForEdit(null)
+      setCorrectionForm({ correctionType: 'both', requestedCheckIn: '', requestedCheckOut: '', requestedStatus: '', reason: '' })
+    },
+    onError: (msg) => toast.error(msg || 'Failed to submit correction request'),
+  })
 
   const handleCorrectionRequest = async () => {
     if (!selectedRecord || !correctionForm.reason) {
@@ -285,68 +223,51 @@ export default function AttendancePage() {
       return
     }
 
-    setSubmittingCorrection(true)
-    try {
-      const token = localStorage.getItem('token')
+    // Get the date from the selected record (use selectedDayForEdit or record date)
+    const recordDate = selectedDayForEdit || selectedRecord.date
 
-      // Get the date from the selected record (use selectedDayForEdit or record date)
-      const recordDate = selectedDayForEdit || selectedRecord.date
-      
-      // Format date in local timezone (avoid UTC conversion issues)
-      const dateObj = new Date(recordDate)
-      const year = dateObj.getFullYear()
-      const month = String(dateObj.getMonth() + 1).padStart(2, '0')
-      const day = String(dateObj.getDate()).padStart(2, '0')
-      const dateOnly = `${year}-${month}-${day}`
+    // Format date in local timezone (avoid UTC conversion issues)
+    const dateObj = new Date(recordDate)
+    const year = dateObj.getFullYear()
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0')
+    const day = String(dateObj.getDate()).padStart(2, '0')
+    const dateOnly = `${year}-${month}-${day}`
 
-      // Build the full datetime strings using the record's date and user's time input
-      let requestedCheckIn = undefined
-      let requestedCheckOut = undefined
+    // Build the full datetime strings using the record's date and user's time input
+    let requestedCheckIn = undefined
+    let requestedCheckOut = undefined
 
-      if (correctionForm.requestedCheckIn && ['check-in', 'both'].includes(correctionForm.correctionType)) {
-        // Combine the record date with the time input
-        requestedCheckIn = `${dateOnly}T${correctionForm.requestedCheckIn}:00`
-      }
-
-      if (correctionForm.requestedCheckOut && ['check-out', 'both'].includes(correctionForm.correctionType)) {
-        // Combine the record date with the time input
-        requestedCheckOut = `${dateOnly}T${correctionForm.requestedCheckOut}:00`
-      }
-
-      const response = await fetch('/api/attendance/corrections', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          attendanceId: selectedRecord._id,
-          correctionType: correctionForm.correctionType,
-          requestedCheckIn,
-          requestedCheckOut,
-          requestedStatus: correctionForm.requestedStatus || undefined,
-          reason: correctionForm.reason
-        })
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        toast.success('Correction request submitted successfully')
-        setShowCorrectionModal(false)
-        setSelectedRecord(null)
-        setSelectedDayForEdit(null)
-        setCorrectionForm({ correctionType: 'both', requestedCheckIn: '', requestedCheckOut: '', requestedStatus: '', reason: '' })
-        fetchMyCorrections()
-      } else {
-        toast.error(data.message || 'Failed to submit correction request')
-      }
-    } catch (error) {
-      console.error('Correction request error:', error)
-      toast.error('Failed to submit correction request')
-    } finally {
-      setSubmittingCorrection(false)
+    if (correctionForm.requestedCheckIn && ['check-in', 'both'].includes(correctionForm.correctionType)) {
+      // Combine the record date with the time input
+      requestedCheckIn = `${dateOnly}T${correctionForm.requestedCheckIn}:00`
     }
+
+    if (correctionForm.requestedCheckOut && ['check-out', 'both'].includes(correctionForm.correctionType)) {
+      // Combine the record date with the time input
+      requestedCheckOut = `${dateOnly}T${correctionForm.requestedCheckOut}:00`
+    }
+
+    const response = await correctionMutation.execute('/api/attendance/corrections', {
+      attendanceId: selectedRecord._id,
+      correctionType: correctionForm.correctionType,
+      requestedCheckIn,
+      requestedCheckOut,
+      requestedStatus: correctionForm.requestedStatus || undefined,
+      reason: correctionForm.reason
+    })
   }
+
+  // --- Missing entry mutation ---
+  const missingEntryMutation = useApiMutation({
+    invalidateKeys: ['/api/attendance/corrections?type=my'],
+    onSuccess: (data) => {
+      toast.success('Missing entry request submitted successfully')
+      setShowMissingEntryModal(false)
+      setSelectedDayForMissingEntry(null)
+      setMissingEntryForm({ date: '', checkIn: '', checkOut: '', reason: '' })
+    },
+    onError: (msg) => toast.error(msg || 'Failed to submit request'),
+  })
 
   const handleMissingEntryRequest = async () => {
     // Use selectedDayForMissingEntry if available, otherwise use form date
@@ -365,88 +286,34 @@ export default function AttendancePage() {
       dateToUse = rawDate
     }
 
-    setSubmittingCorrection(true)
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/attendance/corrections', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          date: dateToUse,
-          correctionType: 'missing-entry',
-          requestedCheckIn: missingEntryForm.checkIn ? `${dateToUse}T${missingEntryForm.checkIn}:00` : undefined,
-          requestedCheckOut: missingEntryForm.checkOut ? `${dateToUse}T${missingEntryForm.checkOut}:00` : undefined,
-          reason: missingEntryForm.reason
-        })
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        toast.success('Missing entry request submitted successfully')
-        setShowMissingEntryModal(false)
-        setSelectedDayForMissingEntry(null)
-        setMissingEntryForm({ date: '', checkIn: '', checkOut: '', reason: '' })
-        fetchMyCorrections()
-      } else {
-        toast.error(data.message || 'Failed to submit request')
-      }
-    } catch (error) {
-      console.error('Missing entry request error:', error)
-      toast.error('Failed to submit request')
-    } finally {
-      setSubmittingCorrection(false)
-    }
+    await missingEntryMutation.execute('/api/attendance/corrections', {
+      date: dateToUse,
+      correctionType: 'missing-entry',
+      requestedCheckIn: missingEntryForm.checkIn ? `${dateToUse}T${missingEntryForm.checkIn}:00` : undefined,
+      requestedCheckOut: missingEntryForm.checkOut ? `${dateToUse}T${missingEntryForm.checkOut}:00` : undefined,
+      reason: missingEntryForm.reason
+    })
   }
 
+  // --- Approve/Reject mutation ---
+  const approveRejectMutation = useApiMutation({
+    method: 'PATCH',
+    invalidateKeys: ['/api/attendance/corrections?type=pending', '/api/attendance/corrections?type=my'],
+    onSuccess: (data) => {
+      toast.success(`Correction processed successfully`)
+      // Also refresh attendance data
+      mutateTodayAttendance()
+      mutateAttendance()
+    },
+    onError: (msg) => toast.error(msg || 'Failed to process correction'),
+  })
+
   const handleApproveReject = async (correctionId, action, comments = '') => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/attendance/corrections', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          correctionId,
-          action,
-          reviewerComments: comments
-        })
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        toast.success(`Correction ${action}d successfully`)
-        fetchPendingCorrections()
-        fetchMyCorrections()
-
-        // Refresh attendance data for the EMPLOYEE whose correction was processed
-        // Use employeeId from response (the employee whose correction was approved/rejected)
-        // NOT the current user (who may be the approver)
-        if (action === 'approve') {
-          const employeeId = data.data?.employeeId
-          const currentUserEmployeeId = user ? getEmployeeId(user) : null
-
-          // Always refresh current user's view
-          if (currentUserEmployeeId) {
-            fetchAttendance(currentUserEmployeeId)
-            fetchTodayAttendance(currentUserEmployeeId)
-          }
-
-          // If the approved correction was for a different employee, 
-          // the socket event will handle their refresh
-          console.log(`✅ Correction approved for employee: ${employeeId}`)
-        }
-      } else {
-        toast.error(data.message || `Failed to ${action} correction`)
-      }
-    } catch (error) {
-      console.error(`${action} correction error:`, error)
-      toast.error(`Failed to ${action} correction`)
-    }
+    await approveRejectMutation.execute('/api/attendance/corrections', {
+      correctionId,
+      action,
+      reviewerComments: comments
+    })
   }
 
   // Helper function to format datetime for input (preserves local time)
@@ -498,65 +365,13 @@ export default function AttendancePage() {
     setShowCorrectionModal(true)
   }
 
-  const fetchTodayAttendance = async (employeeId) => {
-    try {
-      const token = localStorage.getItem('token')
-      // Use local timezone date, not UTC (toISOString gives UTC which can be a day off)
-      const now = new Date()
-      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-      const response = await fetch(
-        `/api/attendance?employeeId=${employeeId}&date=${today}`,
-        {
-          headers: { 'Authorization': `Bearer ${token}` },
-        }
-      )
-
-      const data = await response.json()
-      if (data.success && data.data.length > 0) {
-        setTodayAttendance(data.data[0])
-      }
-    } catch (error) {
-      console.error('Fetch today attendance error:', error)
-    }
-  }
-
-  const fetchAttendance = async (employeeId, monthDate = currentMonth) => {
-    try {
-      const token = localStorage.getItem('token')
-      const month = monthDate.getMonth() + 1
-      const year = monthDate.getFullYear()
-
-      const response = await fetch(
-        `/api/attendance?employeeId=${employeeId}&month=${month}&year=${year}`,
-        {
-          headers: { 'Authorization': `Bearer ${token}` },
-        }
-      )
-
-      const data = await response.json()
-      if (data.success) {
-        setAttendance(data.data)
-      }
-    } catch (error) {
-      console.error('Fetch attendance error:', error)
-    }
-  }
-
   // Calendar navigation
   const goToPreviousMonth = () => {
-    const newMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1)
-    setCurrentMonth(newMonth)
-    if (user) {
-      fetchAttendance(getEmployeeId(user), newMonth)
-    }
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))
   }
 
   const goToNextMonth = () => {
-    const newMonth = new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1)
-    setCurrentMonth(newMonth)
-    if (user) {
-      fetchAttendance(getEmployeeId(user), newMonth)
-    }
+    setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))
   }
 
   // Helper to format date as YYYY-MM-DD in local timezone (for use outside useMemo)
@@ -782,8 +597,8 @@ export default function AttendancePage() {
       if (data.success) {
         const address = data.data?.location?.checkIn?.address || 'Location captured'
         toast.success(`Clocked in successfully\n📍 ${address}`, { duration: 4000 })
-        setTodayAttendance(data.data)
-        fetchAttendance(getEmployeeId(user))
+        mutateTodayAttendance()
+        mutateAttendance()
       } else {
         if (data.requiresLocation) {
           toast.error('Location is required for attendance. Please enable location services.')
@@ -837,8 +652,8 @@ export default function AttendancePage() {
       if (data.success) {
         const address = data.data?.location?.checkOut?.address || 'Location captured'
         toast.success(`Clocked out successfully\n📍 ${address}`, { duration: 4000 })
-        setTodayAttendance(data.data)
-        fetchAttendance(getEmployeeId(user))
+        mutateTodayAttendance()
+        mutateAttendance()
       } else {
         if (data.requiresLocation) {
           toast.error('Location is required for attendance. Please enable location services.')
@@ -1065,11 +880,11 @@ export default function AttendancePage() {
                           {correction.status}
                         </Chip>
                       </div>
-                  {correction.reviewerComments && (
-                    <p className="text-xs sm:text-sm text-default-500 mt-2">
-                      <strong>Reviewer:</strong> {correction.reviewerComments}
-                    </p>
-                  )}
+                      {correction.reviewerComments && (
+                        <p className="text-xs sm:text-sm text-default-500 mt-2">
+                          <strong>Reviewer:</strong> {correction.reviewerComments}
+                        </p>
+                      )}
                     </CardBody>
                   </Card>
                 ))}
@@ -1211,176 +1026,108 @@ export default function AttendancePage() {
             </div>
           </div>
 
-        {/* Status Legend */}
-        <div className="flex flex-wrap gap-2 sm:gap-3 mb-4 sm:mb-6 p-2 sm:p-3 bg-default-50 rounded-lg">
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-success-100 border border-success-400"></div>
-            <span className="text-[10px] sm:text-xs text-default-600">Present</span>
+          {/* Status Legend */}
+          <div className="flex flex-wrap gap-2 sm:gap-3 mb-4 sm:mb-6 p-2 sm:p-3 bg-default-50 rounded-lg">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-success-100 border border-success-400"></div>
+              <span className="text-[10px] sm:text-xs text-default-600">Present</span>
+            </div>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-warning-100 border border-warning-400"></div>
+              <span className="text-[10px] sm:text-xs text-default-600">In Progress</span>
+            </div>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-warning-100 border border-warning-400"></div>
+              <span className="text-[10px] sm:text-xs text-default-600">Half Day</span>
+            </div>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-warning-100 border border-warning-400"></div>
+              <span className="text-[10px] sm:text-xs text-default-600">Late</span>
+            </div>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-danger-100 border border-danger-400"></div>
+              <span className="text-[10px] sm:text-xs text-default-600">Absent</span>
+            </div>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-primary-100 border border-primary-400"></div>
+              <span className="text-[10px] sm:text-xs text-default-600">On Leave</span>
+            </div>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-secondary-100 border border-secondary-400"></div>
+              <span className="text-[10px] sm:text-xs text-default-600">Holiday</span>
+            </div>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-default-100 border border-default-300"></div>
+              <span className="text-[10px] sm:text-xs text-default-600">No Record</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-warning-100 border border-warning-400"></div>
-            <span className="text-[10px] sm:text-xs text-default-600">In Progress</span>
-          </div>
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-warning-100 border border-warning-400"></div>
-            <span className="text-[10px] sm:text-xs text-default-600">Half Day</span>
-          </div>
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-warning-100 border border-warning-400"></div>
-            <span className="text-[10px] sm:text-xs text-default-600">Late</span>
-          </div>
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-danger-100 border border-danger-400"></div>
-            <span className="text-[10px] sm:text-xs text-default-600">Absent</span>
-          </div>
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-primary-100 border border-primary-400"></div>
-            <span className="text-[10px] sm:text-xs text-default-600">On Leave</span>
-          </div>
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-secondary-100 border border-secondary-400"></div>
-            <span className="text-[10px] sm:text-xs text-default-600">Holiday</span>
-          </div>
-          <div className="flex items-center gap-1.5 sm:gap-2">
-            <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-default-100 border border-default-300"></div>
-            <span className="text-[10px] sm:text-xs text-default-600">No Record</span>
-          </div>
-        </div>
 
-        {viewMode === 'calendar' ? (
-          /* Calendar View */
-          <div className="overflow-x-auto overflow-y-visible">
-            <div className="min-w-[700px] p-2">
-              {/* Day Headers */}
-              <div className="grid grid-cols-7 gap-1 mb-2">
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                  <div key={day} className="text-center text-xs sm:text-sm font-semibold text-default-500 py-2">
-                    {day}
-                  </div>
-                ))}
-              </div>
+          {viewMode === 'calendar' ? (
+            /* Calendar View */
+            <div className="overflow-x-auto overflow-y-visible">
+              <div className="min-w-[700px] p-2">
+                {/* Day Headers */}
+                <div className="grid grid-cols-7 gap-1 mb-2">
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                    <div key={day} className="text-center text-xs sm:text-sm font-semibold text-default-500 py-2">
+                      {day}
+                    </div>
+                  ))}
+                </div>
 
-              {/* Calendar Grid */}
-              <div className="grid grid-cols-7 gap-1">
-                {calendarData.map((dayData, index) => {
-                  const pendingCorrection = dayData.day ? getPendingCorrectionForDay(dayData) : null
-                  const hasPending = !!pendingCorrection
-                  // Use company working days setting (0=Sunday, 6=Saturday)
-                  const dayOfWeek = dayData.date ? dayData.date.getDay() : null
-                  const isWorkingDay = dayOfWeek !== null ? workingDays.includes(dayOfWeek) : false
-                  const isWeekend = !isWorkingDay
-                  const isHoliday = dayData.record?.status === 'holiday' || dayData.holiday
-                  const holidayName = dayData.holiday?.name || (dayData.record?.status === 'holiday' ? 'Holiday' : '')
+                {/* Calendar Grid */}
+                <div className="grid grid-cols-7 gap-1">
+                  {calendarData.map((dayData, index) => {
+                    const pendingCorrection = dayData.day ? getPendingCorrectionForDay(dayData) : null
+                    const hasPending = !!pendingCorrection
+                    // Use company working days setting (0=Sunday, 6=Saturday)
+                    const dayOfWeek = dayData.date ? dayData.date.getDay() : null
+                    const isWorkingDay = dayOfWeek !== null ? workingDays.includes(dayOfWeek) : false
+                    const isWeekend = !isWorkingDay
+                    const isHoliday = dayData.record?.status === 'holiday' || dayData.holiday
+                    const holidayName = dayData.holiday?.name || (dayData.record?.status === 'holiday' ? 'Holiday' : '')
 
-                  // Check if this is a past working day without a record (should show as absent)
-                  const today = new Date()
-                  today.setHours(0, 0, 0, 0)
-                  const dayDate = dayData.date ? new Date(dayData.date) : null
-                  if (dayDate) dayDate.setHours(0, 0, 0, 0)
-                  const isPastDay = dayDate && dayDate < today
-                  const isAfterJoining = !employeeJoiningDate || (dayDate && dayDate >= employeeJoiningDate)
-                  const shouldShowAsAbsent = dayData.isCurrentMonth && isPastDay && isWorkingDay && !isHoliday && !dayData.record && isAfterJoining
+                    // Check if this is a past working day without a record (should show as absent)
+                    const today = new Date()
+                    today.setHours(0, 0, 0, 0)
+                    const dayDate = dayData.date ? new Date(dayData.date) : null
+                    if (dayDate) dayDate.setHours(0, 0, 0, 0)
+                    const isPastDay = dayDate && dayDate < today
+                    const isAfterJoining = !employeeJoiningDate || (dayDate && dayDate >= employeeJoiningDate)
+                    const shouldShowAsAbsent = dayData.isCurrentMonth && isPastDay && isWorkingDay && !isHoliday && !dayData.record && isAfterJoining
 
-                  // Determine status color
-                  let statusColor = 'bg-default-50'
-                  let displayStatus = dayData.record?.status
+                    // Determine status color
+                    let statusColor = 'bg-default-50'
+                    let displayStatus = dayData.record?.status
 
-                  if (dayData.record) {
-                    if (dayData.record.status === 'present') statusColor = 'bg-success-50 border-success-100'
-                    else if (dayData.record.status === 'absent') statusColor = 'bg-danger-50 border-danger-100'
-                    else if (dayData.record.status === 'late') statusColor = 'bg-warning-50 border-warning-100'
-                    else if (dayData.record.status === 'half-day') statusColor = 'bg-warning-50 border-warning-100'
-                    else if (dayData.record.status === 'leave') statusColor = 'bg-primary-50 border-primary-100'
-                    else if (dayData.record.status === 'holiday') statusColor = 'bg-secondary-50 border-secondary-100'
-                  } else if (isHoliday) {
-                    statusColor = 'bg-secondary-50 border-secondary-100'
-                  } else if (shouldShowAsAbsent) {
-                    // Past working day without record = show as absent
-                    statusColor = 'bg-danger-50 border-danger-200'
-                    displayStatus = 'absent'
-                  }
+                    if (dayData.record) {
+                      if (dayData.record.status === 'present') statusColor = 'bg-success-50 border-success-100'
+                      else if (dayData.record.status === 'absent') statusColor = 'bg-danger-50 border-danger-100'
+                      else if (dayData.record.status === 'late') statusColor = 'bg-warning-50 border-warning-100'
+                      else if (dayData.record.status === 'half-day') statusColor = 'bg-warning-50 border-warning-100'
+                      else if (dayData.record.status === 'leave') statusColor = 'bg-primary-50 border-primary-100'
+                      else if (dayData.record.status === 'holiday') statusColor = 'bg-secondary-50 border-secondary-100'
+                    } else if (isHoliday) {
+                      statusColor = 'bg-secondary-50 border-secondary-100'
+                    } else if (shouldShowAsAbsent) {
+                      // Past working day without record = show as absent
+                      statusColor = 'bg-danger-50 border-danger-200'
+                      displayStatus = 'absent'
+                    }
 
-                  return (
-                    <div
-                      key={index}
-                      onClick={() => {
-                        if (dayData.holiday) {
-                          setSelectedHoliday(dayData.holiday)
-                          setShowHolidayModal(true)
-                        } else if (dayData.record) {
-                          // Open correction modal to view/edit the attendance record
-                          // Pass dayData.date for accurate timezone handling
-                          openCorrectionModal(dayData.record, dayData.date)
-                        } else if (dayData.isCurrentMonth && !isWeekend && !isHoliday && new Date(dayData.date) < new Date()) {
-                          // Handle missing entry click - use local date to avoid UTC offset issues
-                          const d = dayData.date
-                          const localDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-                          setSelectedDayForMissingEntry(d)
-                          setMissingEntryForm({
-                            date: localDateStr,
-                            checkIn: '',
-                            checkOut: '',
-                            reason: ''
-                          })
-                          setShowMissingEntryModal(true)
-                        }
-                      }}
-                      className={`
-                      min-h-[80px] sm:min-h-[120px] p-1.5 sm:p-2 border rounded transition-all cursor-pointer relative group
-                      ${statusColor}
-                      ${dayData.isToday ? 'ring-2 ring-primary' : ''}
-                      ${!dayData.isCurrentMonth ? 'opacity-40 bg-default-50 border-transparent' : 'bg-content1 hover:shadow'}
-                    `}
-                    >
-                      {/* Day number */}
-                      <div className="font-bold text-xs sm:text-sm mb-1">
-                        <span className={dayData.isToday ? 'text-primary' : 'text-default-700'}>
-                          {dayData.day}
-                        </span>
-                      </div>
-
-                      {/* Status badge - show for records OR for computed absent status */}
-                      {(dayData.record?.status || displayStatus) && (
-                        <div className="mb-1">
-                          <span className={`
-                          inline-block text-[9px] sm:text-[10px] px-1 py-0.5 rounded border font-medium uppercase tracking-tight leading-tight
-                          ${getStatusBadgeColor(displayStatus || dayData.record?.status)}
-                          break-words max-w-full
-                        `} style={{ wordBreak: 'break-word', hyphens: 'auto' }}>
-                            {displayStatus || dayData.record?.status}
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Edit button for regularisation - show on hover */}
-                      {dayData.isCurrentMonth && dayData.record && !isHoliday && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
+                    return (
+                      <div
+                        key={index}
+                        onClick={() => {
+                          if (dayData.holiday) {
+                            setSelectedHoliday(dayData.holiday)
+                            setShowHolidayModal(true)
+                          } else if (dayData.record) {
+                            // Open correction modal to view/edit the attendance record
                             // Pass dayData.date for accurate timezone handling
                             openCorrectionModal(dayData.record, dayData.date)
-                          }}
-                          className="absolute top-0.5 sm:top-1 right-0.5 sm:right-1 p-0.5 sm:p-1 rounded-full bg-content1 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-primary-50 z-10"
-                          title="Request Regularisation"
-                        >
-                          <FaEdit className="w-2 h-2 sm:w-3 sm:h-3 text-primary" />
-                        </button>
-                      )}
-
-                      {/* Pending correction indicator */}
-                      {hasPending && (
-                        <div className="absolute bottom-0.5 sm:bottom-1 right-0.5 sm:right-1">
-                          <span className="text-[7px] sm:text-[8px] px-0.5 sm:px-1 py-0.5 bg-warning text-warning-foreground rounded font-medium">
-                            Pending
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Add button for missing entry - show on hover for past working dates without records */}
-                      {shouldShowAsAbsent && (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
+                          } else if (dayData.isCurrentMonth && !isWeekend && !isHoliday && new Date(dayData.date) < new Date()) {
+                            // Handle missing entry click - use local date to avoid UTC offset issues
                             const d = dayData.date
                             const localDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
                             setSelectedDayForMissingEntry(d)
@@ -1391,192 +1138,260 @@ export default function AttendancePage() {
                               reason: ''
                             })
                             setShowMissingEntryModal(true)
-                          }}
-                          className="absolute top-0.5 sm:top-1 right-0.5 sm:right-1 p-0.5 sm:p-1 rounded-full bg-content1 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-success-50 z-10"
-                          title="Add Missing Entry"
-                        >
-                          <FaPlus className="w-2 h-2 sm:w-3 sm:h-3 text-success" />
-                        </button>
-                      )}
-
-                      {/* Holiday Name */}
-                      {isHoliday && (
-                        <div className="text-[9px] sm:text-[10px] leading-tight text-secondary-700 mt-1 font-medium bg-secondary-100/50 px-1 py-0.5 rounded break-words" style={{ wordBreak: 'break-word', hyphens: 'auto' }}>
-                          {holidayName}
+                          }
+                        }}
+                        className={`
+                      min-h-[80px] sm:min-h-[120px] p-1.5 sm:p-2 border rounded transition-all cursor-pointer relative group
+                      ${statusColor}
+                      ${dayData.isToday ? 'ring-2 ring-primary' : ''}
+                      ${!dayData.isCurrentMonth ? 'opacity-40 bg-default-50 border-transparent' : 'bg-content1 hover:shadow'}
+                    `}
+                      >
+                        {/* Day number */}
+                        <div className="font-bold text-xs sm:text-sm mb-1">
+                          <span className={dayData.isToday ? 'text-primary' : 'text-default-700'}>
+                            {dayData.day}
+                          </span>
                         </div>
-                      )}
 
-                      {/* Time details for present/late/half-day */}
-                      {dayData.record && ['present', 'late', 'half-day'].includes(dayData.record.status) && (
-                        <div className="text-[9px] sm:text-[10px] text-default-600 mt-1 space-y-0.5 max-h-[50px] sm:max-h-[70px] overflow-y-auto overflow-x-hidden">
-                          {dayData.record.checkIn && (
-                            <div className="truncate" title={`In: ${formatTime(dayData.record.checkIn)}`}>In: {formatTime(dayData.record.checkIn)}</div>
-                          )}
-                          {dayData.record.checkOut && (
-                            <div className="truncate" title={`Out: ${formatTime(dayData.record.checkOut)}`}>Out: {formatTime(dayData.record.checkOut)}</div>
-                          )}
-                          {dayData.record.workHours && (
-                            <div className="font-medium truncate">{dayData.record.workHours}h</div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
+                        {/* Status badge - show for records OR for computed absent status */}
+                        {(dayData.record?.status || displayStatus) && (
+                          <div className="mb-1">
+                            <span className={`
+                          inline-block text-[9px] sm:text-[10px] px-1 py-0.5 rounded border font-medium uppercase tracking-tight leading-tight
+                          ${getStatusBadgeColor(displayStatus || dayData.record?.status)}
+                          break-words max-w-full
+                        `} style={{ wordBreak: 'break-word', hyphens: 'auto' }}>
+                              {displayStatus || dayData.record?.status}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Edit button for regularisation - show on hover */}
+                        {dayData.isCurrentMonth && dayData.record && !isHoliday && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              // Pass dayData.date for accurate timezone handling
+                              openCorrectionModal(dayData.record, dayData.date)
+                            }}
+                            className="absolute top-0.5 sm:top-1 right-0.5 sm:right-1 p-0.5 sm:p-1 rounded-full bg-content1 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-primary-50 z-10"
+                            title="Request Regularisation"
+                          >
+                            <FaEdit className="w-2 h-2 sm:w-3 sm:h-3 text-primary" />
+                          </button>
+                        )}
+
+                        {/* Pending correction indicator */}
+                        {hasPending && (
+                          <div className="absolute bottom-0.5 sm:bottom-1 right-0.5 sm:right-1">
+                            <span className="text-[7px] sm:text-[8px] px-0.5 sm:px-1 py-0.5 bg-warning text-warning-foreground rounded font-medium">
+                              Pending
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Add button for missing entry - show on hover for past working dates without records */}
+                        {shouldShowAsAbsent && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              const d = dayData.date
+                              const localDateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+                              setSelectedDayForMissingEntry(d)
+                              setMissingEntryForm({
+                                date: localDateStr,
+                                checkIn: '',
+                                checkOut: '',
+                                reason: ''
+                              })
+                              setShowMissingEntryModal(true)
+                            }}
+                            className="absolute top-0.5 sm:top-1 right-0.5 sm:right-1 p-0.5 sm:p-1 rounded-full bg-content1 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity hover:bg-success-50 z-10"
+                            title="Add Missing Entry"
+                          >
+                            <FaPlus className="w-2 h-2 sm:w-3 sm:h-3 text-success" />
+                          </button>
+                        )}
+
+                        {/* Holiday Name */}
+                        {isHoliday && (
+                          <div className="text-[9px] sm:text-[10px] leading-tight text-secondary-700 mt-1 font-medium bg-secondary-100/50 px-1 py-0.5 rounded break-words" style={{ wordBreak: 'break-word', hyphens: 'auto' }}>
+                            {holidayName}
+                          </div>
+                        )}
+
+                        {/* Time details for present/late/half-day */}
+                        {dayData.record && ['present', 'late', 'half-day'].includes(dayData.record.status) && (
+                          <div className="text-[9px] sm:text-[10px] text-default-600 mt-1 space-y-0.5 max-h-[50px] sm:max-h-[70px] overflow-y-auto overflow-x-hidden">
+                            {dayData.record.checkIn && (
+                              <div className="truncate" title={`In: ${formatTime(dayData.record.checkIn)}`}>In: {formatTime(dayData.record.checkIn)}</div>
+                            )}
+                            {dayData.record.checkOut && (
+                              <div className="truncate" title={`Out: ${formatTime(dayData.record.checkOut)}`}>Out: {formatTime(dayData.record.checkOut)}</div>
+                            )}
+                            {dayData.record.workHours && (
+                              <div className="font-medium truncate">{dayData.record.workHours}h</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             </div>
-          </div>
-        ) : (
-          /* List View */
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-default-50 border-b border-divider">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Date</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Check In</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Check Out</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider hidden md:table-cell">Locations</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Hours</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Status</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-content1 divide-y divide-divider">
-                {attendance.length === 0 ? (
+          ) : (
+            /* List View */
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-default-50 border-b border-divider">
                   <tr>
-                    <td colSpan="7" className="px-4 py-4 text-center text-default-500">
-                      No attendance records found for this month
-                    </td>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Date</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Check In</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Check Out</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider hidden md:table-cell">Locations</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Hours</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-default-500 uppercase tracking-wider">Actions</th>
                   </tr>
-                ) : (
-                  attendance.map((record) => {
-                    const pendingCorrection = getPendingCorrectionForRecord(record)
-                    const hasPending = !!pendingCorrection
+                </thead>
+                <tbody className="bg-content1 divide-y divide-divider">
+                  {attendance.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" className="px-4 py-4 text-center text-default-500">
+                        No attendance records found for this month
+                      </td>
+                    </tr>
+                  ) : (
+                    attendance.map((record) => {
+                      const pendingCorrection = getPendingCorrectionForRecord(record)
+                      const hasPending = !!pendingCorrection
 
-                    return (
-                      <tr key={record._id} className={`hover:bg-default-50 ${hasPending ? 'bg-warning-50' : ''}`}>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-default-900">{formatDate(record.date)}</td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-default-900">{formatTime(record.checkIn)}</td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-default-900">{formatTime(record.checkOut)}</td>
-                        <td className="px-4 py-4 text-xs text-default-600 hidden md:table-cell max-w-xs">
-                          {record.location?.checkIn?.address || record.location?.checkOut?.address ? (
-                            <div className="space-y-1">
-                              {record.location?.checkIn?.address && (
-                                <div className="flex items-start gap-1">
-                                  <FaMapMarkerAlt className="text-success mt-0.5 flex-shrink-0 w-3 h-3" />
-                                  <span className="truncate" title={record.location.checkIn.address}>
-                                    {record.location.checkIn.address.length > 40
-                                      ? record.location.checkIn.address.substring(0, 40) + '...'
-                                      : record.location.checkIn.address}
-                                  </span>
-                                </div>
-                              )}
-                              {record.location?.checkOut?.address && (
-                                <div className="flex items-start gap-1">
-                                  <FaMapMarkerAlt className="text-danger mt-0.5 flex-shrink-0 w-3 h-3" />
-                                  <span className="truncate" title={record.location.checkOut.address}>
-                                    {record.location.checkOut.address.length > 40
-                                      ? record.location.checkOut.address.substring(0, 40) + '...'
-                                      : record.location.checkOut.address}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="text-default-400 italic">Not captured</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap text-sm text-default-900">{record.workHours ? `${record.workHours}h` : 'N/A'}</td>
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <Chip
-                            size="sm"
-                            color={record.status === 'present' ? 'success' :
-                              record.status === 'absent' ? 'danger' :
-                                record.status === 'half-day' ? 'warning' :
-                                  record.status === 'in-progress' ? 'warning' :
-                                    record.status === 'late' ? 'warning' :
-                                      record.status === 'on-leave' ? 'primary' :
-                                        'default'}
-                            variant="flat"
-                          >
-                            {record.status === 'in-progress' ? 'In Progress' : record.status}
-                          </Chip>
-                        </td>
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          {hasPending ? (
-                            <Chip size="sm" color="warning" variant="bordered" startContent={<FaClock className="w-3 h-3" />}>
-                              Pending
-                            </Chip>
-                          ) : (
-                            <Button
+                      return (
+                        <tr key={record._id} className={`hover:bg-default-50 ${hasPending ? 'bg-warning-50' : ''}`}>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-default-900">{formatDate(record.date)}</td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-default-900">{formatTime(record.checkIn)}</td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-default-900">{formatTime(record.checkOut)}</td>
+                          <td className="px-4 py-4 text-xs text-default-600 hidden md:table-cell max-w-xs">
+                            {record.location?.checkIn?.address || record.location?.checkOut?.address ? (
+                              <div className="space-y-1">
+                                {record.location?.checkIn?.address && (
+                                  <div className="flex items-start gap-1">
+                                    <FaMapMarkerAlt className="text-success mt-0.5 flex-shrink-0 w-3 h-3" />
+                                    <span className="truncate" title={record.location.checkIn.address}>
+                                      {record.location.checkIn.address.length > 40
+                                        ? record.location.checkIn.address.substring(0, 40) + '...'
+                                        : record.location.checkIn.address}
+                                    </span>
+                                  </div>
+                                )}
+                                {record.location?.checkOut?.address && (
+                                  <div className="flex items-start gap-1">
+                                    <FaMapMarkerAlt className="text-danger mt-0.5 flex-shrink-0 w-3 h-3" />
+                                    <span className="truncate" title={record.location.checkOut.address}>
+                                      {record.location.checkOut.address.length > 40
+                                        ? record.location.checkOut.address.substring(0, 40) + '...'
+                                        : record.location.checkOut.address}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-default-400 italic">Not captured</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-sm text-default-900">{record.workHours ? `${record.workHours}h` : 'N/A'}</td>
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <Chip
                               size="sm"
-                              variant="light"
-                              color="primary"
-                              onPress={() => {
-                                // Extract date in local timezone from the record
-                                const recordDate = new Date(record.date)
-                                const localDate = new Date(recordDate.getFullYear(), recordDate.getMonth(), recordDate.getDate())
-                                openCorrectionModal(record, localDate)
-                              }}
-                              startContent={<FaEdit />}
+                              color={record.status === 'present' ? 'success' :
+                                record.status === 'absent' ? 'danger' :
+                                  record.status === 'half-day' ? 'warning' :
+                                    record.status === 'in-progress' ? 'warning' :
+                                      record.status === 'late' ? 'warning' :
+                                        record.status === 'on-leave' ? 'primary' :
+                                          'default'}
+                              variant="flat"
                             >
-                              Correct
-                            </Button>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+                              {record.status === 'in-progress' ? 'In Progress' : record.status}
+                            </Chip>
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            {hasPending ? (
+                              <Chip size="sm" color="warning" variant="bordered" startContent={<FaClock className="w-3 h-3" />}>
+                                Pending
+                              </Chip>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="light"
+                                color="primary"
+                                onPress={() => {
+                                  // Extract date in local timezone from the record
+                                  const recordDate = new Date(record.date)
+                                  const localDate = new Date(recordDate.getFullYear(), recordDate.getMonth(), recordDate.getDate())
+                                  openCorrectionModal(record, localDate)
+                                }}
+                                startContent={<FaEdit />}
+                              >
+                                Correct
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
 
-        {/* Monthly Summary */}
-        <div className="mt-6 pt-6 border-t border-divider">
-          <h3 className="text-lg font-semibold text-default-800 mb-4">Monthly Summary</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <Card className="bg-success-50">
-              <CardBody className="text-center py-4">
-                <p className="text-2xl font-bold text-success">
-                  {attendance.filter(r => r.status === 'present').length}
-                </p>
-                <p className="text-sm text-success-700">Present Days</p>
-              </CardBody>
-            </Card>
-            <Card className="bg-danger-50">
-              <CardBody className="text-center py-4">
-                <p className="text-2xl font-bold text-danger">
-                  {attendance.filter(r => r.status === 'absent').length}
-                </p>
-                <p className="text-sm text-danger-700">Absent Days</p>
-              </CardBody>
-            </Card>
-            <Card className="bg-warning-50">
-              <CardBody className="text-center py-4">
-                <p className="text-2xl font-bold text-warning">
-                  {attendance.filter(r => r.status === 'late').length}
-                </p>
-                <p className="text-sm text-warning-700">Late Days</p>
-              </CardBody>
-            </Card>
-            <Card className="bg-warning-50">
-              <CardBody className="text-center py-4">
-                <p className="text-2xl font-bold text-warning">
-                  {attendance.filter(r => r.status === 'half-day').length}
-                </p>
-                <p className="text-sm text-warning-700">Half Days</p>
-              </CardBody>
-            </Card>
+          {/* Monthly Summary */}
+          <div className="mt-6 pt-6 border-t border-divider">
+            <h3 className="text-lg font-semibold text-default-800 mb-4">Monthly Summary</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Card className="bg-success-50">
+                <CardBody className="text-center py-4">
+                  <p className="text-2xl font-bold text-success">
+                    {attendance.filter(r => r.status === 'present').length}
+                  </p>
+                  <p className="text-sm text-success-700">Present Days</p>
+                </CardBody>
+              </Card>
+              <Card className="bg-danger-50">
+                <CardBody className="text-center py-4">
+                  <p className="text-2xl font-bold text-danger">
+                    {attendance.filter(r => r.status === 'absent').length}
+                  </p>
+                  <p className="text-sm text-danger-700">Absent Days</p>
+                </CardBody>
+              </Card>
+              <Card className="bg-warning-50">
+                <CardBody className="text-center py-4">
+                  <p className="text-2xl font-bold text-warning">
+                    {attendance.filter(r => r.status === 'late').length}
+                  </p>
+                  <p className="text-sm text-warning-700">Late Days</p>
+                </CardBody>
+              </Card>
+              <Card className="bg-warning-50">
+                <CardBody className="text-center py-4">
+                  <p className="text-2xl font-bold text-warning">
+                    {attendance.filter(r => r.status === 'half-day').length}
+                  </p>
+                  <p className="text-sm text-warning-700">Half Days</p>
+                </CardBody>
+              </Card>
+            </div>
           </div>
-        </div>
         </CardBody>
       </Card>
 
       {/* Correction Request Modal */}
-      <Modal 
-        isOpen={showCorrectionModal && selectedRecord} 
+      <Modal
+        isOpen={showCorrectionModal && selectedRecord}
         onClose={() => { setShowCorrectionModal(false); setSelectedRecord(null); setSelectedDayForEdit(null); }}
         size="lg"
       >
@@ -1590,7 +1405,7 @@ export default function AttendancePage() {
               <CardBody className="py-3">
                 <p className="text-sm font-medium text-primary-800">
                   <FaCalendarAlt className="inline mr-2" />
-                  Date: {selectedDayForEdit 
+                  Date: {selectedDayForEdit
                     ? selectedDayForEdit.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
                     : selectedRecord && formatDate(selectedRecord.date)}
                 </p>
@@ -1667,57 +1482,57 @@ export default function AttendancePage() {
                 </Select>
               </div>
 
-                {['check-in', 'both'].includes(correctionForm.correctionType) && (
-                  <div>
-                    <label className="block text-sm font-medium text-default-700 mb-1">Correct Check-In Time</label>
-                    <input
-                      type="time"
-                      value={correctionForm.requestedCheckIn}
-                      onChange={(e) => setCorrectionForm({ ...correctionForm, requestedCheckIn: e.target.value })}
-                      className="w-full px-3 py-2 border border-default-300 rounded-lg bg-white dark:bg-slate-900 dark:text-slate-100 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                  </div>
-                )}
-
-                {['check-out', 'both'].includes(correctionForm.correctionType) && (
-                  <div>
-                    <label className="block text-sm font-medium text-default-700 mb-1">Correct Check-Out Time</label>
-                    <input
-                      type="time"
-                      value={correctionForm.requestedCheckOut}
-                      onChange={(e) => setCorrectionForm({ ...correctionForm, requestedCheckOut: e.target.value })}
-                      className="w-full px-3 py-2 border border-default-300 rounded-lg bg-white dark:bg-slate-900 dark:text-slate-100 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                  </div>
-                )}
-
-                {correctionForm.correctionType === 'status' && (
-                  <div>
-                    <label className="block text-sm font-medium text-default-700 mb-1">Requested Status</label>
-                    <Select
-                      selectedKeys={correctionForm.requestedStatus ? [correctionForm.requestedStatus] : []}
-                      onChange={(e) => setCorrectionForm({ ...correctionForm, requestedStatus: e.target.value })}
-                      aria-label="Requested Status"
-                      classNames={{ trigger: "bg-white dark:bg-slate-900" }}
-                    >
-                      <SelectItem key="present">Present</SelectItem>
-                      <SelectItem key="half-day">Half Day</SelectItem>
-                      <SelectItem key="on-leave">On Leave</SelectItem>
-                    </Select>
-                  </div>
-                )}
-
+              {['check-in', 'both'].includes(correctionForm.correctionType) && (
                 <div>
-                  <label className="block text-sm font-medium text-default-700 mb-1">Reason for Correction *</label>
-                  <textarea
-                    value={correctionForm.reason}
-                    onChange={(e) => setCorrectionForm({ ...correctionForm, reason: e.target.value })}
-                    placeholder="Please explain why this correction is needed..."
-                    rows={3}
-                    className="w-full px-3 py-2 border border-default-300 rounded-lg bg-white dark:bg-slate-900 dark:text-slate-100 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                  <label className="block text-sm font-medium text-default-700 mb-1">Correct Check-In Time</label>
+                  <input
+                    type="time"
+                    value={correctionForm.requestedCheckIn}
+                    onChange={(e) => setCorrectionForm({ ...correctionForm, requestedCheckIn: e.target.value })}
+                    className="w-full px-3 py-2 border border-default-300 rounded-lg bg-white dark:bg-slate-900 dark:text-slate-100 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
+              )}
+
+              {['check-out', 'both'].includes(correctionForm.correctionType) && (
+                <div>
+                  <label className="block text-sm font-medium text-default-700 mb-1">Correct Check-Out Time</label>
+                  <input
+                    type="time"
+                    value={correctionForm.requestedCheckOut}
+                    onChange={(e) => setCorrectionForm({ ...correctionForm, requestedCheckOut: e.target.value })}
+                    className="w-full px-3 py-2 border border-default-300 rounded-lg bg-white dark:bg-slate-900 dark:text-slate-100 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+              )}
+
+              {correctionForm.correctionType === 'status' && (
+                <div>
+                  <label className="block text-sm font-medium text-default-700 mb-1">Requested Status</label>
+                  <Select
+                    selectedKeys={correctionForm.requestedStatus ? [correctionForm.requestedStatus] : []}
+                    onChange={(e) => setCorrectionForm({ ...correctionForm, requestedStatus: e.target.value })}
+                    aria-label="Requested Status"
+                    classNames={{ trigger: "bg-white dark:bg-slate-900" }}
+                  >
+                    <SelectItem key="present">Present</SelectItem>
+                    <SelectItem key="half-day">Half Day</SelectItem>
+                    <SelectItem key="on-leave">On Leave</SelectItem>
+                  </Select>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-default-700 mb-1">Reason for Correction *</label>
+                <textarea
+                  value={correctionForm.reason}
+                  onChange={(e) => setCorrectionForm({ ...correctionForm, reason: e.target.value })}
+                  placeholder="Please explain why this correction is needed..."
+                  rows={3}
+                  className="w-full px-3 py-2 border border-default-300 rounded-lg bg-white dark:bg-slate-900 dark:text-slate-100 dark:border-slate-600 focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                />
               </div>
+            </div>
           </ModalBody>
           <ModalFooter>
             <Button
@@ -1734,18 +1549,18 @@ export default function AttendancePage() {
             <Button
               color="primary"
               onPress={handleCorrectionRequest}
-              isDisabled={submittingCorrection || !correctionForm.reason}
-              isLoading={submittingCorrection}
+              isDisabled={correctionMutation.isLoading || !correctionForm.reason}
+              isLoading={correctionMutation.isLoading}
             >
-              {submittingCorrection ? 'Submitting...' : 'Submit Request'}
+              {correctionMutation.isLoading ? 'Submitting...' : 'Submit Request'}
             </Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
 
       {/* Missing Entry Modal */}
-      <Modal 
-        isOpen={showMissingEntryModal} 
+      <Modal
+        isOpen={showMissingEntryModal}
         onClose={() => {
           setShowMissingEntryModal(false)
           setSelectedDayForMissingEntry(null)
@@ -1831,10 +1646,10 @@ export default function AttendancePage() {
             <Button
               color="warning"
               onPress={handleMissingEntryRequest}
-              isDisabled={submittingCorrection || (!selectedDayForMissingEntry && !missingEntryForm.date) || !missingEntryForm.reason}
-              isLoading={submittingCorrection}
+              isDisabled={missingEntryMutation.isLoading || (!selectedDayForMissingEntry && !missingEntryForm.date) || !missingEntryForm.reason}
+              isLoading={missingEntryMutation.isLoading}
             >
-              {submittingCorrection ? 'Submitting...' : 'Submit Request'}
+              {missingEntryMutation.isLoading ? 'Submitting...' : 'Submit Request'}
             </Button>
           </ModalFooter>
         </ModalContent>
@@ -1851,18 +1666,16 @@ export default function AttendancePage() {
           onResponse={(isOvertime, data) => {
             if (!isOvertime && data?.checkOutTime) {
               // Refresh attendance data if user was clocked out
-              if (user) {
-                fetchAttendance(getEmployeeId(user))
-                fetchTodayAttendance(getEmployeeId(user))
-              }
+              mutateAttendance()
+              mutateTodayAttendance()
             }
           }}
         />
       )}
 
       {/* Holiday Details Modal */}
-      <Modal 
-        isOpen={showHolidayModal && selectedHoliday} 
+      <Modal
+        isOpen={showHolidayModal && selectedHoliday}
         onClose={() => setShowHolidayModal(false)}
         size="md"
       >

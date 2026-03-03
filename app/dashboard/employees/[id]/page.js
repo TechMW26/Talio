@@ -1,8 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 import { FaUser, FaEnvelope, FaPhone, FaMapMarkerAlt, FaEdit, FaArrowLeft, FaBriefcase, FaCalendarAlt } from 'react-icons/fa'
 import { formatDesignation, formatDepartments } from '@/lib/formatters'
 import { Card, CardBody, CardHeader, Button, Chip, Skeleton } from '@heroui/react'
@@ -10,39 +12,10 @@ import { Card, CardBody, CardHeader, Button, Chip, Skeleton } from '@heroui/reac
 export default function EmployeeDetailPage() {
   const params = useParams()
   const router = useRouter()
-  const [employee, setEmployee] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const { data: res, error, isLoading, isValidating, mutate: refresh } = useAuthedSWR(params.id ? `/api/employees/${params.id}` : null)
+  const employee = res?.data || null
 
-  useEffect(() => {
-    if (params.id) {
-      fetchEmployee()
-    }
-  }, [params.id])
-
-  const fetchEmployee = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/employees/${params.id}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        setEmployee(data.data)
-      } else {
-        toast.error(data.message)
-        router.push('/dashboard/employees')
-      }
-    } catch (error) {
-      console.error('Fetch employee error:', error)
-      toast.error('Failed to fetch employee details')
-      router.push('/dashboard/employees')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="p-6">
         <Card shadow="sm">
@@ -60,6 +33,14 @@ export default function EmployeeDetailPage() {
             <p className="mt-4 text-default-500">Loading employee details...</p>
           </CardBody>
         </Card>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <DataErrorState message="Failed to load employee details" onRetry={() => refresh()} />
       </div>
     )
   }
@@ -87,6 +68,7 @@ export default function EmployeeDetailPage() {
           Edit Employee
         </Button>
       </div>
+      <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" />
 
       {/* Profile Card */}
       <Card shadow="sm" className="mb-6">
@@ -113,7 +95,7 @@ export default function EmployeeDetailPage() {
                 {formatDesignation(employee.designation, employee)} • {formatDepartments(employee)}
               </p>
               <div className="flex items-center space-x-4 mt-4">
-                <Chip 
+                <Chip
                   color={employee.status === 'active' ? 'success' : employee.status === 'inactive' ? 'default' : 'danger'}
                   variant="flat"
                 >

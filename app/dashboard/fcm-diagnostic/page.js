@@ -1,6 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton from '@/components/ui/LoadingButton'
 
 export default function FCMDiagnosticPage() {
     const [diagnostics, setDiagnostics] = useState({
@@ -9,6 +11,40 @@ export default function FCMDiagnosticPage() {
         permissions: null,
         userId: null,
         registrationStatus: null
+    })
+
+    // Mutation: register token
+    const registerMutation = useApiMutation({
+        method: 'POST',
+        onSuccess: (data) => {
+            setDiagnostics(prev => ({
+                ...prev,
+                registrationStatus: 'Registered \u2705'
+            }))
+        },
+        onError: (msg) => {
+            setDiagnostics(prev => ({
+                ...prev,
+                registrationStatus: `Failed: ${msg}`
+            }))
+        }
+    })
+
+    // Mutation: send test notification
+    const testMutation = useApiMutation({
+        method: 'POST',
+        onSuccess: (data) => alert(JSON.stringify(data, null, 2)),
+        onError: (msg) => alert('Error: ' + msg),
+    })
+
+    // Mutation: clear tokens
+    const clearMutation = useApiMutation({
+        method: 'DELETE',
+        onSuccess: (data) => {
+            alert(data?.message || 'Tokens cleared')
+            checkFCMStatus()
+        },
+        onError: (msg) => alert('Error: ' + msg),
     })
 
     useEffect(() => {
@@ -43,25 +79,7 @@ export default function FCMDiagnosticPage() {
 
             // Try to register token if we have both
             if (token && user) {
-                await registerToken(token)
-            }
-
-        } catch (error) {
-            console.error('Diagnostic error:', error)
-        }
-    }
-
-    const registerToken = async (token) => {
-        try {
-            const authToken = localStorage.getItem('token')
-
-            const response = await fetch('/api/fcm/token', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${authToken}`
-                },
-                body: JSON.stringify({
+                registerMutation.execute('/api/fcm/token', {
                     token,
                     platform: 'android',
                     deviceInfo: {
@@ -69,50 +87,23 @@ export default function FCMDiagnosticPage() {
                         osVersion: 'Unknown'
                     }
                 })
-            })
-
-            const data = await response.json()
-
-            setDiagnostics(prev => ({
-                ...prev,
-                registrationStatus: data.success ? 'Registered ✅' : `Failed: ${data.message}`
-            }))
+            }
 
         } catch (error) {
-            setDiagnostics(prev => ({
-                ...prev,
-                registrationStatus: `Error: ${error.message}`
-            }))
+            console.error('Diagnostic error:', error)
         }
     }
 
-    const sendTestNotification = async () => {
-        try {
-            const authToken = localStorage.getItem('token')
-
-            const response = await fetch('/api/test-notification', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${authToken}`
-                },
-                body: JSON.stringify({
-                    userId: diagnostics.userId,
-                    type: 'message',
-                    customTitle: '🧪 Test Notification',
-                    customMessage: 'If you see this as a pop-up bubble, notifications are working!'
-                })
-            })
-
-            const data = await response.json()
-            alert(JSON.stringify(data, null, 2))
-
-        } catch (error) {
-            alert('Error: ' + error.message)
-        }
+    const sendTestNotification = () => {
+        testMutation.execute('/api/test-notification', {
+            userId: diagnostics.userId,
+            type: 'message',
+            customTitle: '🧪 Test Notification',
+            customMessage: 'If you see this as a pop-up bubble, notifications are working!'
+        })
     }
 
-    const forceRegisterToken = async () => {
+    const forceRegisterToken = () => {
         if (!window.AndroidFCM) {
             alert('Android FCM not available')
             return
@@ -120,8 +111,14 @@ export default function FCMDiagnosticPage() {
 
         try {
             const token = window.AndroidFCM.getToken()
-            await registerToken(token)
-            alert('Token registration attempted. Check status above.')
+            registerMutation.execute('/api/fcm/token', {
+                token,
+                platform: 'android',
+                deviceInfo: {
+                    model: 'Android Device',
+                    osVersion: 'Unknown'
+                }
+            })
         } catch (error) {
             alert('Error: ' + error.message)
         }
@@ -165,9 +162,10 @@ export default function FCMDiagnosticPage() {
                 <h2>Actions</h2>
                 <button
                     onClick={forceRegisterToken}
+                    disabled={registerMutation.isLoading}
                     style={{
                         padding: '12px 24px',
-                        background: '#4CAF50',
+                        background: registerMutation.isLoading ? '#9E9E9E' : '#4CAF50',
                         color: 'white',
                         border: 'none',
                         borderRadius: '4px',
@@ -176,14 +174,15 @@ export default function FCMDiagnosticPage() {
                         marginBottom: '10px'
                     }}
                 >
-                    📝 Register FCM Token
+                    {registerMutation.isLoading ? '\u23f3 Registering...' : '\ud83d\udcdd Register FCM Token'}
                 </button>
 
                 <button
                     onClick={sendTestNotification}
+                    disabled={testMutation.isLoading}
                     style={{
                         padding: '12px 24px',
-                        background: '#2196F3',
+                        background: testMutation.isLoading ? '#9E9E9E' : '#2196F3',
                         color: 'white',
                         border: 'none',
                         borderRadius: '4px',
@@ -192,7 +191,7 @@ export default function FCMDiagnosticPage() {
                         marginBottom: '10px'
                     }}
                 >
-                    🧪 Send Test Notification
+                    {testMutation.isLoading ? '\u23f3 Sending...' : '\ud83e\uddea Send Test Notification'}
                 </button>
 
                 <button
@@ -228,22 +227,9 @@ export default function FCMDiagnosticPage() {
                 <button
                     onClick={async () => {
                         if (!confirm('Are you sure you want to clear all FCM tokens? You will need to re-register.')) return
-
-                        try {
-                            const authToken = localStorage.getItem('token')
-                            const response = await fetch('/api/fcm/token', {
-                                method: 'DELETE',
-                                headers: {
-                                    'Authorization': `Bearer ${authToken}`
-                                }
-                            })
-                            const data = await response.json()
-                            alert(data.message)
-                            checkFCMStatus()
-                        } catch (error) {
-                            alert('Error: ' + error.message)
-                        }
+                        clearMutation.execute('/api/fcm/token', null, { method: 'DELETE' })
                     }}
+                    disabled={clearMutation.isLoading}
                     style={{
                         padding: '12px 24px',
                         background: '#dc3545',

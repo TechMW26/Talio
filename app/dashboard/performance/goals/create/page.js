@@ -1,15 +1,16 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { FaArrowLeft, FaSave, FaTimes, FaPlus } from 'react-icons/fa'
 import { Select, SelectItem, Input, Textarea, Button } from '@heroui/react'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton from '@/components/ui/LoadingButton'
 
 export default function CreateGoalPage() {
   const router = useRouter()
-  const [loading, setLoading] = useState(false)
-  const [employees, setEmployees] = useState([])
   const [formData, setFormData] = useState({
     employeeId: '',
     title: '',
@@ -23,22 +24,9 @@ export default function CreateGoalPage() {
     milestones: [{ title: '', description: '', dueDate: '', completed: false }]
   })
 
-  useEffect(() => {
-    fetchEmployees()
-  }, [])
-
-  const fetchEmployees = async () => {
-    try {
-      const response = await fetch('/api/employees?limit=1000')
-      const data = await response.json()
-      if (data.success) {
-        setEmployees(data.data)
-      }
-    } catch (error) {
-      console.error('Fetch employees error:', error)
-      toast.error('Failed to fetch employees')
-    }
-  }
+  // Fetch employees
+  const { data: empRes } = useAuthedSWR('/api/employees?limit=1000')
+  const employees = empRes?.data || []
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
@@ -51,7 +39,7 @@ export default function CreateGoalPage() {
   const handleMilestoneChange = (index, field, value) => {
     setFormData(prev => ({
       ...prev,
-      milestones: prev.milestones.map((milestone, i) => 
+      milestones: prev.milestones.map((milestone, i) =>
         i === index ? { ...milestone, [field]: value } : milestone
       )
     }))
@@ -71,14 +59,23 @@ export default function CreateGoalPage() {
     }))
   }
 
+  const submitMutation = useApiMutation({
+    method: 'POST',
+    onSuccess: () => {
+      toast.success('Goal created successfully')
+      router.push('/dashboard/performance/goals')
+    },
+    onError: (msg) => toast.error(msg || 'Failed to create goal'),
+  })
+
   const handleSubmit = async (e) => {
     e.preventDefault()
-    
+
     if (!formData.employeeId) {
       toast.error('Please select an employee')
       return
     }
-    
+
     if (!formData.title) {
       toast.error('Please enter goal title')
       return
@@ -89,35 +86,10 @@ export default function CreateGoalPage() {
       return
     }
 
-    setLoading(true)
-    
-    try {
-      const response = await fetch('/api/performance/goals', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          ...formData,
-          milestones: formData.milestones.filter(m => m.title.trim())
-        })
-      })
-
-      const data = await response.json()
-      
-      if (data.success) {
-        toast.success('Goal created successfully')
-        router.push('/dashboard/performance/goals')
-      } else {
-        toast.error(data.message || 'Failed to create goal')
-      }
-    } catch (error) {
-      console.error('Create goal error:', error)
-      toast.error('Failed to create goal')
-    } finally {
-      setLoading(false)
-    }
+    submitMutation.execute('/api/performance/goals', {
+      ...formData,
+      milestones: formData.milestones.filter(m => m.title.trim())
+    })
   }
 
   const categories = [
@@ -160,7 +132,7 @@ export default function CreateGoalPage() {
               <Select
                 label="Employee *"
                 selectedKeys={formData.employeeId ? [formData.employeeId] : []}
-                onSelectionChange={(keys) => handleInputChange({ target: { name: 'employeeId', value: Array.from(keys)[0] || '' }})}
+                onSelectionChange={(keys) => handleInputChange({ target: { name: 'employeeId', value: Array.from(keys)[0] || '' } })}
                 isRequired
                 placeholder="Select Employee"
               >
@@ -175,7 +147,7 @@ export default function CreateGoalPage() {
               <Select
                 label="Category"
                 selectedKeys={formData.category ? [formData.category] : []}
-                onSelectionChange={(keys) => handleInputChange({ target: { name: 'category', value: Array.from(keys)[0] || '' }})}
+                onSelectionChange={(keys) => handleInputChange({ target: { name: 'category', value: Array.from(keys)[0] || '' } })}
                 placeholder="Select Category"
               >
                 {categories.map((category) => (
@@ -189,7 +161,7 @@ export default function CreateGoalPage() {
               <Select
                 label="Priority"
                 selectedKeys={[formData.priority]}
-                onSelectionChange={(keys) => handleInputChange({ target: { name: 'priority', value: Array.from(keys)[0] || 'medium' }})}
+                onSelectionChange={(keys) => handleInputChange({ target: { name: 'priority', value: Array.from(keys)[0] || 'medium' } })}
               >
                 <SelectItem key="low">Low</SelectItem>
                 <SelectItem key="medium">Medium</SelectItem>
@@ -200,7 +172,7 @@ export default function CreateGoalPage() {
               <Select
                 label="Status"
                 selectedKeys={[formData.status]}
-                onSelectionChange={(keys) => handleInputChange({ target: { name: 'status', value: Array.from(keys)[0] || 'not-started' }})}
+                onSelectionChange={(keys) => handleInputChange({ target: { name: 'status', value: Array.from(keys)[0] || 'not-started' } })}
               >
                 <SelectItem key="not-started">Not Started</SelectItem>
                 <SelectItem key="in-progress">In Progress</SelectItem>
@@ -366,14 +338,14 @@ export default function CreateGoalPage() {
             <FaTimes className="w-4 h-4" />
             <span>Cancel</span>
           </button>
-          <button
+          <LoadingButton
             type="submit"
-            disabled={loading}
-            className="px-6 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors flex items-center space-x-2 disabled:opacity-50"
+            isLoading={submitMutation.isLoading}
+            loadingText="Creating..."
+            startContent={<FaSave className="w-4 h-4" />}
           >
-            <FaSave className="w-4 h-4" />
-            <span>{loading ? 'Creating...' : 'Create Goal'}</span>
-          </button>
+            Create Goal
+          </LoadingButton>
         </div>
       </form>
     </div>

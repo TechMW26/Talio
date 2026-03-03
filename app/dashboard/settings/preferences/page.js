@@ -1,129 +1,116 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import toast from '@/utils/toast'
 import { FaCog, FaMoneyBillWave, FaClock, FaCalendarAlt, FaSave } from 'react-icons/fa'
-import Loader from '@/components/ui/Loader'
-import { Card, CardBody, CardHeader, Button, Select, SelectItem, Input, Textarea, Checkbox } from '@heroui/react'
+import { Card, CardBody, CardHeader, Button, Select, SelectItem, Input, Textarea, Checkbox, Skeleton } from '@heroui/react'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
+
+const defaultPreferences = {
+  // Currency Settings
+  currency: 'INR',
+  currencySymbol: '₹',
+  // Time Settings
+  timeFormat: '12',
+  timezone: 'Asia/Kolkata',
+  // Work Settings
+  workingDaysPerWeek: 5,
+  workingHoursPerDay: 8,
+  weekStartsOn: 'monday',
+  // Leave Settings
+  defaultLeaveYear: new Date().getFullYear(),
+  leaveCarryForward: true,
+  maxCarryForwardDays: 10,
+  // Attendance Settings
+  lateThresholdMinutes: 15,
+  halfDayThresholdHours: 4,
+  autoMarkAbsent: true,
+  // Notification Settings
+  emailNotifications: true,
+  leaveApprovalNotifications: true,
+  attendanceReminders: true,
+  // System Settings
+  dateFormat: 'DD/MM/YYYY',
+  companyName: 'Your Company',
+  companyAddress: '',
+  companyPhone: '',
+  companyEmail: '',
+}
 
 export default function PreferencesPage() {
-  const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [preferences, setPreferences] = useState({
-    // Currency Settings
-    currency: 'INR',
-    currencySymbol: '₹',
-    
-    // Time Settings
-    timeFormat: '12', // 12 or 24 hour
-    timezone: 'Asia/Kolkata',
-    
-    // Work Settings
-    workingDaysPerWeek: 5,
-    workingHoursPerDay: 8,
-    weekStartsOn: 'monday', // monday or sunday
-    
-    // Leave Settings
-    defaultLeaveYear: new Date().getFullYear(),
-    leaveCarryForward: true,
-    maxCarryForwardDays: 10,
-    
-    // Attendance Settings
-    lateThresholdMinutes: 15,
-    halfDayThresholdHours: 4,
-    autoMarkAbsent: true,
-    
-    // Notification Settings
-    emailNotifications: true,
-    leaveApprovalNotifications: true,
-    attendanceReminders: true,
-    
-    // System Settings
-    dateFormat: 'DD/MM/YYYY',
-    companyName: 'Your Company',
-    companyAddress: '',
-    companyPhone: '',
-    companyEmail: '',
-  })
+  const [preferences, setPreferences] = useState(defaultPreferences)
 
-  useEffect(() => {
-    const userData = localStorage.getItem('user')
-    if (userData) {
-      const parsedUser = JSON.parse(userData)
-      setUser(parsedUser)
-      
-      // Check if user is admin
-      if (parsedUser.role !== 'admin') {
-        toast.error('Access denied. Only Admin can manage preferences.')
-        window.location.href = '/dashboard'
-        return
-      }
-      
-      fetchPreferences()
-    }
+  const user = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem('user')) } catch { return null }
   }, [])
 
-  const fetchPreferences = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/settings/preferences', {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        setPreferences({ ...preferences, ...data.data })
-      }
-    } catch (error) {
-      console.error('Fetch preferences error:', error)
-      toast.error('Failed to fetch preferences')
-    } finally {
-      setLoading(false)
+  // Access check
+  useEffect(() => {
+    if (user && user.role !== 'admin') {
+      toast.error('Access denied. Only Admin can manage preferences.')
+      window.location.href = '/dashboard'
     }
-  }
+  }, [user])
 
-  const handleSave = async () => {
-    setSaving(true)
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/settings/preferences', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify(preferences),
-      })
+  // SWR: fetch preferences
+  const { data: res, error, isLoading, isValidating, mutate: refresh } = useAuthedSWR('/api/settings/preferences')
 
-      const data = await response.json()
-      if (data.success) {
-        toast.success('Preferences saved successfully')
-      } else {
-        toast.error(data.message || 'Failed to save preferences')
-      }
-    } catch (error) {
-      console.error('Save preferences error:', error)
-      toast.error('Failed to save preferences')
-    } finally {
-      setSaving(false)
+  // Sync fetched data into local state for editing
+  useEffect(() => {
+    if (res?.data) {
+      setPreferences(prev => ({ ...prev, ...res.data }))
     }
+  }, [res])
+
+  // Mutation: save preferences
+  const saveMutation = useApiMutation({
+    method: 'PUT',
+    invalidateKeys: ['/api/settings/preferences'],
+    onSuccess: () => toast.success('Preferences saved successfully'),
+    onError: (msg) => toast.error(msg || 'Failed to save preferences'),
+  })
+
+  const handleSave = () => {
+    saveMutation.execute('/api/settings/preferences', preferences, { method: 'PUT' })
   }
 
   const handleChange = (key, value) => {
     setPreferences(prev => ({ ...prev, [key]: value }))
   }
 
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader size="lg" />
+      <div className="p-6 max-w-4xl mx-auto space-y-6">
+        <div className="flex md:justify-between md:items-center md:flex-row flex-col mb-6">
+          <div>
+            <Skeleton className="h-8 w-64 rounded-lg mb-2" />
+            <Skeleton className="h-4 w-80 rounded-lg" />
+          </div>
+          <Skeleton className="h-10 w-36 rounded-lg" />
+        </div>
+        {[1, 2, 3, 4].map(i => (
+          <div key={i} className="bg-white rounded-lg shadow-md p-6 space-y-4">
+            <Skeleton className="h-6 w-48 rounded-lg" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Skeleton className="h-12 w-full rounded-lg" />
+              <Skeleton className="h-12 w-full rounded-lg" />
+            </div>
+          </div>
+        ))}
       </div>
     )
   }
 
+  if (error) {
+    return <DataErrorState error={error} onRetry={refresh} title="Failed to load preferences" />
+  }
+
   return (
     <div className="p-6 max-w-4xl mx-auto">
+      <BackgroundRefreshIndicator isValidating={isValidating} />
       {/* Header */}
       <div className="flex md:justify-between md:items-center md:flex-row flex-col mb-6">
         <div>
@@ -132,11 +119,11 @@ export default function PreferencesPage() {
         </div>
         <Button
           onPress={handleSave}
-          isLoading={saving}
+          isLoading={saveMutation.isLoading}
           color="primary"
-          startContent={!saving && <FaSave className="w-4 h-4" />}
+          startContent={!saveMutation.isLoading && <FaSave className="w-4 h-4" />}
         >
-          {saving ? 'Saving...' : 'Save Changes'}
+          {saveMutation.isLoading ? 'Saving...' : 'Save Changes'}
         </Button>
       </div>
 

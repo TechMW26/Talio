@@ -1,14 +1,17 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import toast from '@/utils/toast'
 import * as XLSX from 'xlsx'
 import { FaDownload, FaChartBar, FaUsers, FaTrophy, FaCalendarAlt, FaFilter, FaRobot, FaFileExcel, FaChevronDown, FaChevronUp, FaBrain, FaStar, FaAward, FaTasks, FaBullseye, FaSearch, FaClock, FaCheckCircle, FaExclamationTriangle, FaArrowUp, FaArrowDown, FaMinus, FaUserCheck, FaClipboardCheck, FaFire, FaLightbulb, FaExclamationCircle, FaRocket } from 'react-icons/fa'
-import Loader from '@/components/ui/Loader'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Area, AreaChart, ComposedChart } from 'recharts'
 import CustomTooltip from '@/components/charts/CustomTooltip'
 import { useAILoading } from '@/contexts/AILoadingContext'
-import { Select, SelectItem, Input } from '@heroui/react'
+import { Select, SelectItem, Input, Skeleton } from '@heroui/react'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 
 // Color palette for charts
 const CHART_COLORS = {
@@ -28,25 +31,25 @@ const GaugeChart = ({ value, maxValue = 100, label, color = CHART_COLORS.primary
   const strokeWidth = 10
   const radius = (size - strokeWidth) / 2
   const circumference = 2 * Math.PI * radius
-  
+
   // For a 270-degree gauge (from bottom-left to bottom-right, going over top)
   const gaugeArc = circumference * 0.75 // 270 degrees
   const filledArc = (percentage / 100) * gaugeArc
   const emptyArc = gaugeArc - filledArc
-  
+
   // Determine color based on value
   const getColor = () => {
     if (percentage >= 80) return CHART_COLORS.success
     if (percentage >= 60) return CHART_COLORS.warning
     return CHART_COLORS.danger
   }
-  
+
   const gaugeColor = color === 'auto' ? getColor() : color
-  
+
   // Center of the SVG
   const cx = size / 2
   const cy = size / 2
-  
+
   return (
     <div className="flex flex-col items-center">
       <svg width={size} height={size * 0.7} viewBox={`0 0 ${size} ${size * 0.7}`}>
@@ -96,13 +99,13 @@ const GaugeChart = ({ value, maxValue = 100, label, color = CHART_COLORS.primary
 // Trend Indicator Component
 const TrendIndicator = ({ current, previous, suffix = '%', higherIsBetter = true }) => {
   if (previous === null || previous === undefined) return null
-  
+
   const diff = current - previous
   const percentChange = previous !== 0 ? ((diff / previous) * 100).toFixed(1) : 0
-  
+
   const isPositive = higherIsBetter ? diff > 0 : diff < 0
   const isNeutral = Math.abs(diff) < 0.5
-  
+
   if (isNeutral) {
     return (
       <span className="flex items-center text-gray-500 text-xs">
@@ -110,7 +113,7 @@ const TrendIndicator = ({ current, previous, suffix = '%', higherIsBetter = true
       </span>
     )
   }
-  
+
   return (
     <span className={`flex items-center text-xs ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
       {isPositive ? <FaArrowUp className="mr-1" /> : <FaArrowDown className="mr-1" />}
@@ -136,16 +139,12 @@ const getDefaultDateRange = () => {
 
 export default function PerformanceReportsPage() {
   const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState(null)
   const [reportData, setReportData] = useState(null)
   const [attendanceStats, setAttendanceStats] = useState(null)
   const [taskStats, setTaskStats] = useState(null)
   const [dateRange, setDateRange] = useState(getDefaultDateRange())
   const [selectedDepartment, setSelectedDepartment] = useState('all')
-  const [departments, setDepartments] = useState([])
-  const [headedDepartments, setHeadedDepartments] = useState([]) // Departments user heads
   const [aiInsights, setAiInsights] = useState(null)
-  const [generatingInsights, setGeneratingInsights] = useState(false)
   const [expandedSections, setExpandedSections] = useState({
     executive: true,
     attendance: true,
@@ -160,47 +159,36 @@ export default function PerformanceReportsPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [isDepartmentHead, setIsDepartmentHead] = useState(false)
   const [userDepartmentId, setUserDepartmentId] = useState(null)
-  
+  const [headedDepartments, setHeadedDepartments] = useState([])
+
   // Global AI loading animation
   const { startAILoading, stopAILoading } = useAILoading()
 
-  const [headCheckComplete, setHeadCheckComplete] = useState(false)
-  
-  useEffect(() => {
-    const userData = localStorage.getItem('user')
-    if (userData) {
-      const parsedUser = JSON.parse(userData)
-      setUser(parsedUser)
-      checkDepartmentHead()
-      fetchDepartments()
-    }
+  const user = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem('user')) } catch { return null }
   }, [])
 
-  const checkDepartmentHead = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/team/check-head', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setIsDepartmentHead(data.isDepartmentHead)
-        // Support multiple departments
-        const depts = data.departments || []
-        setHeadedDepartments(depts)
-        // Backward compatibility - set first department ID
-        setUserDepartmentId(data.departmentId)
-        if (data.isDepartmentHead && depts.length > 0) {
-          // Default to 'all' if multiple departments, else the single department
-          setSelectedDepartment(depts.length > 1 ? 'all' : depts[0]._id)
-        }
+  // SWR: fetch department head status
+  const { data: headCheckRes, isLoading: headCheckLoading } = useAuthedSWR('/api/team/check-head')
+
+  // SWR: fetch departments list
+  const { data: deptsRes } = useAuthedSWR('/api/departments')
+  const departments = deptsRes?.data || []
+
+  // Process head check result
+  const headCheckComplete = !headCheckLoading && !!headCheckRes
+
+  useEffect(() => {
+    if (headCheckRes?.success) {
+      setIsDepartmentHead(headCheckRes.isDepartmentHead)
+      const depts = headCheckRes.departments || []
+      setHeadedDepartments(depts)
+      setUserDepartmentId(headCheckRes.departmentId)
+      if (headCheckRes.isDepartmentHead && depts.length > 0) {
+        setSelectedDepartment(depts.length > 1 ? 'all' : depts[0]._id)
       }
-    } catch (error) {
-      console.error('Error checking department head:', error)
-    } finally {
-      setHeadCheckComplete(true)
     }
-  }
+  }, [headCheckRes])
 
   // Only fetch report data after head check is complete
   useEffect(() => {
@@ -208,21 +196,6 @@ export default function PerformanceReportsPage() {
       fetchReportData()
     }
   }, [user, headCheckComplete, dateRange.startDate, dateRange.endDate, selectedDepartment])
-
-  const fetchDepartments = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/departments', {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setDepartments(data.data || [])
-      }
-    } catch (error) {
-      console.error('Error fetching departments:', error)
-    }
-  }
 
   const fetchReportData = async () => {
     try {
@@ -302,7 +275,7 @@ export default function PerformanceReportsPage() {
       const companySettings = companyData.success ? companyData.data : null
       const holidays = holidaysData.success ? (holidaysData.data || []) : []
       const productivityScores = productivityData.success ? productivityData.data : []
-      
+
       // Set new stats data
       if (attendanceStatsData.success && attendanceStatsData.data) {
         setAttendanceStats(attendanceStatsData.data)
@@ -321,25 +294,25 @@ export default function PerformanceReportsPage() {
       if (isDepartmentHead && headedDepartments.length > 0) {
         // Get all department IDs this user heads
         const headedDeptIds = new Set(headedDepartments.map(d => String(d._id)))
-        
+
         // Filter by selected department or all headed departments
-        const deptIdsToFilter = selectedDepartment !== 'all' 
-          ? new Set([selectedDepartment]) 
+        const deptIdsToFilter = selectedDepartment !== 'all'
+          ? new Set([selectedDepartment])
           : headedDeptIds
-        
+
         filteredEmployees = employees.filter(emp => {
           const empDeptId = String(emp.department?._id || emp.department)
           return deptIdsToFilter.has(empDeptId)
         })
         const employeeIds = new Set(filteredEmployees.map(e => String(e._id)))
-        
-        filteredPerformanceMetrics = performanceMetrics.filter(metric => 
+
+        filteredPerformanceMetrics = performanceMetrics.filter(metric =>
           employeeIds.has(String(metric.employee?._id || metric.employee))
         )
-        filteredReviews = reviews.filter(review => 
+        filteredReviews = reviews.filter(review =>
           employeeIds.has(String(review.employee?._id || review.employee))
         )
-        filteredGoals = goals.filter(goal => 
+        filteredGoals = goals.filter(goal =>
           employeeIds.has(String(goal.employee?._id || goal.employee))
         )
         filteredProjects = projects.filter(project => {
@@ -363,21 +336,21 @@ export default function PerformanceReportsPage() {
   const countWorkingDays = (startDate, endDate, workingDays, holidays) => {
     const dayNameMap = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
     const holidayDates = new Set(holidays.map(h => new Date(h.date).toISOString().split('T')[0]))
-    
+
     let count = 0
     const current = new Date(startDate)
     const end = new Date(endDate)
-    
+
     while (current <= end) {
       const dayName = dayNameMap[current.getDay()]
       const dateStr = current.toISOString().split('T')[0]
-      
+
       if (workingDays.includes(dayName) && !holidayDates.has(dateStr)) {
         count++
       }
       current.setDate(current.getDate() + 1)
     }
-    
+
     return count
   }
 
@@ -386,35 +359,35 @@ export default function PerformanceReportsPage() {
     const joiningDate = employee.dateOfJoining ? new Date(employee.dateOfJoining) : null
     const start = new Date(periodStart)
     const end = new Date(periodEnd)
-    
+
     // If employee hasn't joined yet, return 0
     if (joiningDate && joiningDate > end) {
       return 0
     }
-    
+
     // Effective start is the later of period start or joining date
     const effectiveStart = joiningDate && joiningDate > start ? joiningDate : start
-    
+
     return countWorkingDays(effectiveStart, end, workingDays, holidays)
   }
 
   const calculateComprehensiveKPIs = (performanceMetrics, reviews, goals, projects, employees, companySettings = null, holidays = [], productivityScores = []) => {
     // Get working days from company settings (default to Mon-Fri)
     const workingDays = companySettings?.workingDays || ['monday', 'tuesday', 'wednesday', 'thursday', 'friday']
-    
+
     // Create productivity scores map for quick lookup
     const productivityMap = {}
     productivityScores.forEach(ps => {
       productivityMap[ps.employeeId] = ps
     })
-    
+
     // Department Performance Analysis
     const deptMap = {}
-    
+
     employees.forEach(emp => {
       const dept = emp.department?.name || 'Unknown'
       const deptId = emp.department?._id || 'unknown'
-      
+
       if (!deptMap[deptId]) {
         deptMap[deptId] = {
           name: dept,
@@ -435,9 +408,9 @@ export default function PerformanceReportsPage() {
           sessionProductivityCount: 0
         }
       }
-      
+
       deptMap[deptId].employees.add(emp._id)
-      
+
       // Add session productivity to department totals
       const empProductivity = productivityMap[emp._id.toString()]
       if (empProductivity?.averageProductivityScore != null) {
@@ -501,8 +474,8 @@ export default function PerformanceReportsPage() {
         quality: (dept.qualitySum / empCount).toFixed(1),
         innovation: (dept.innovationSum / empCount).toFixed(1),
         // New: Session-based productivity (AI-analyzed screenshots)
-        sessionProductivity: dept.sessionProductivityCount > 0 
-          ? Math.round(dept.sessionProductivitySum / dept.sessionProductivityCount) 
+        sessionProductivity: dept.sessionProductivityCount > 0
+          ? Math.round(dept.sessionProductivitySum / dept.sessionProductivityCount)
           : null
       }
     }).sort((a, b) => parseFloat(b.avgScore) - parseFloat(a.avgScore))
@@ -513,11 +486,11 @@ export default function PerformanceReportsPage() {
       const empGoals = goals.filter(g => String(g.employee?._id || g.employee) === String(emp._id))
       const empMetric = performanceMetrics.find(p => String(p.employee?._id || p.employee) === String(emp._id))
       const empProductivity = productivityMap[emp._id.toString()]
-      
+
       const completedGoals = empGoals.filter(g => g.status === 'completed').length
-      const avgRating = empReviews.length > 0 ? 
+      const avgRating = empReviews.length > 0 ?
         (empReviews.reduce((sum, r) => sum + (r.overallRating || 0), 0) / empReviews.length) : 0
-      
+
       return {
         id: emp._id,
         name: `${emp.firstName} ${emp.lastName}`,
@@ -546,7 +519,7 @@ export default function PerformanceReportsPage() {
     // Performance Trends (last 12 months)
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
     const trendsMap = {}
-    
+
     reviews.forEach(review => {
       const date = new Date(review.reviewDate || review.createdAt)
       const monthKey = `${monthNames[date.getMonth()]} ${date.getFullYear()}`
@@ -636,7 +609,7 @@ export default function PerformanceReportsPage() {
       : 0
     const projectCompletionRate = totalProjects > 0 ? Math.round((completedProjects / totalProjects) * 100) : 0
     const topPerformers = employeePerformance.filter(e => e.performanceScore >= 85).length
-    
+
     const avgProductivity = employeePerformance.length > 0 ?
       (employeePerformance.reduce((sum, e) => sum + parseFloat(e.productivity), 0) / employeePerformance.length).toFixed(1) : 0
     const avgQuality = employeePerformance.length > 0 ?
@@ -645,7 +618,7 @@ export default function PerformanceReportsPage() {
       (employeePerformance.reduce((sum, e) => sum + parseFloat(e.innovation), 0) / employeePerformance.length).toFixed(1) : 0
     const avgEngagement = employeePerformance.length > 0 ?
       (employeePerformance.reduce((sum, e) => sum + parseFloat(e.engagement), 0) / employeePerformance.length).toFixed(1) : 0
-    
+
     // Calculate average session productivity (AI-analyzed)
     const employeesWithSessionData = employeePerformance.filter(e => e.sessionProductivity != null)
     const avgSessionProductivity = employeesWithSessionData.length > 0
@@ -678,39 +651,26 @@ export default function PerformanceReportsPage() {
     }
   }
 
-  const generateAIInsights = async () => {
+  const aiInsightsMutation = useApiMutation({
+    method: 'POST',
+    onSuccess: (data) => {
+      setAiInsights(data.insights)
+      toast.success('AI insights generated successfully')
+      stopAILoading()
+    },
+    onError: (err) => {
+      toast.error(err?.message || 'Failed to generate AI insights')
+      stopAILoading()
+    }
+  })
+
+  const generateAIInsights = () => {
     if (!reportData) {
       toast.error('No report data available')
       return
     }
-
-    setGeneratingInsights(true)
     startAILoading('MIRA is generating performance insights...')
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/performance/ai-insights', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ reportData })
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        setAiInsights(data.insights)
-        toast.success('AI insights generated successfully')
-      } else {
-        toast.error(data.message || 'Failed to generate AI insights')
-      }
-    } catch (error) {
-      console.error('AI insights error:', error)
-      toast.error('Failed to generate AI insights')
-    } finally {
-      setGeneratingInsights(false)
-      stopAILoading()
-    }
+    aiInsightsMutation.execute('/api/performance/ai-insights', { reportData })
   }
 
   const toggleSection = (section) => {
@@ -756,7 +716,7 @@ export default function PerformanceReportsPage() {
       [],
       ['Department', 'Employees', 'Avg Score', 'Avg Rating', 'Goal Completion %', 'Project Completion %', 'Productivity', 'AI Session Score', 'Quality', 'Innovation'],
       ...reportData.departmentPerformance.map(d => [
-        d.department, d.employees, d.avgScore, d.avgRating, d.goalCompletion, 
+        d.department, d.employees, d.avgScore, d.avgRating, d.goalCompletion,
         d.projectCompletion, d.productivity, d.sessionProductivity != null ? d.sessionProductivity + '%' : 'N/A', d.quality, d.innovation
       ])
     ]
@@ -797,7 +757,7 @@ export default function PerformanceReportsPage() {
         ['Employee Attendance Breakdown'],
         ['Employee', 'Attendance Rate', 'Punctuality', 'Avg Hours', 'Late Arrivals', 'Present Days', 'Absent Days'],
         ...(attendanceStats.employeeBreakdown || []).map(e => [
-          e.name, e.attendanceRate + '%', e.punctualityRate + '%', e.avgWorkingHours + 'h', 
+          e.name, e.attendanceRate + '%', e.punctualityRate + '%', e.avgWorkingHours + 'h',
           e.lateArrivals, e.presentDays, e.absentDays
         ])
       ]
@@ -847,8 +807,24 @@ export default function PerformanceReportsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader size="lg" />
+      <div className="p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <Skeleton className="h-8 w-80 rounded-lg mb-2" />
+            <Skeleton className="h-4 w-60 rounded-lg" />
+          </div>
+          <div className="flex space-x-3">
+            <Skeleton className="h-10 w-32 rounded-lg" />
+            <Skeleton className="h-10 w-32 rounded-lg" />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Skeleton key={i} className="h-28 rounded-lg" />
+          ))}
+        </div>
+        <Skeleton className="h-64 rounded-lg" />
+        <Skeleton className="h-64 rounded-lg" />
       </div>
     )
   }
@@ -866,6 +842,7 @@ export default function PerformanceReportsPage() {
 
   return (
     <div className="page-container">
+      <BackgroundRefreshIndicator isValidating={headCheckLoading} />
       {/* Header */}
       <div className="mb-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -876,11 +853,11 @@ export default function PerformanceReportsPage() {
           <div className="flex items-center space-x-3">
             <button
               onClick={generateAIInsights}
-              disabled={generatingInsights}
+              disabled={aiInsightsMutation.isLoading}
               className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {generatingInsights ? <Loader size="xs" /> : <FaRobot />}
-              <span>{generatingInsights ? 'Generating...' : 'AI Insights'}</span>
+              {aiInsightsMutation.isLoading ? <Skeleton className="h-4 w-4 rounded-full" /> : <FaRobot />}
+              <span>{aiInsightsMutation.isLoading ? 'Generating...' : 'AI Insights'}</span>
             </button>
             <button
               onClick={exportToExcel}
@@ -936,13 +913,13 @@ export default function PerformanceReportsPage() {
                 <SelectItem key="all">{isDepartmentHead ? 'All My Departments' : 'All Departments'}</SelectItem>
               )}
               {/* Show departments based on role */}
-              {isDepartmentHead 
+              {isDepartmentHead
                 ? headedDepartments.map(dept => (
-                    <SelectItem key={dept._id}>{dept.name}</SelectItem>
-                  ))
+                  <SelectItem key={dept._id}>{dept.name}</SelectItem>
+                ))
                 : departments.map(dept => (
-                    <SelectItem key={dept._id}>{dept.name}</SelectItem>
-                  ))
+                  <SelectItem key={dept._id}>{dept.name}</SelectItem>
+                ))
               }
             </Select>
             {isDepartmentHead && headedDepartments.length === 1 && (
@@ -955,7 +932,7 @@ export default function PerformanceReportsPage() {
       {/* ==================== AI INSIGHTS (TOP) ==================== */}
       {aiInsights && (
         <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg shadow-md p-6 mb-6 border border-purple-200">
-          <div 
+          <div
             className="flex items-center justify-between cursor-pointer mb-4"
             onClick={() => toggleSection('aiInsights')}
           >
@@ -965,7 +942,7 @@ export default function PerformanceReportsPage() {
             </h2>
             {expandedSections.aiInsights ? <FaChevronUp /> : <FaChevronDown />}
           </div>
-          
+
           {expandedSections.aiInsights && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {/* Key Strengths */}
@@ -1076,7 +1053,7 @@ export default function PerformanceReportsPage() {
 
       {/* ==================== EXECUTIVE SUMMARY ==================== */}
       <div className="bg-gradient-to-r from-blue-50 via-white to-purple-50 rounded-lg shadow-lg p-6 mb-6 border border-blue-200">
-        <div 
+        <div
           className="flex items-center justify-between cursor-pointer mb-6"
           onClick={() => toggleSection('executive')}
         >
@@ -1088,51 +1065,51 @@ export default function PerformanceReportsPage() {
           </h2>
           {expandedSections.executive ? <FaChevronUp className="text-gray-500" /> : <FaChevronDown className="text-gray-500" />}
         </div>
-        
+
         {expandedSections.executive && (
           <div className="space-y-6">
             {/* Key Metrics Gauges */}
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
               {/* Attendance Rate */}
               <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 text-center">
-                <GaugeChart 
-                  value={attendanceStats?.summary?.attendanceRate || 0} 
+                <GaugeChart
+                  value={attendanceStats?.summary?.attendanceRate || 0}
                   label="Attendance Rate"
                   color="auto"
                 />
               </div>
-              
+
               {/* Punctuality Rate */}
               <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 text-center">
-                <GaugeChart 
-                  value={attendanceStats?.summary?.punctualityRate || 0} 
+                <GaugeChart
+                  value={attendanceStats?.summary?.punctualityRate || 0}
                   label="Punctuality"
                   color="auto"
                 />
               </div>
-              
+
               {/* Task Completion Rate */}
               <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 text-center">
-                <GaugeChart 
-                  value={taskStats?.summary?.taskCompletionRate || 0} 
+                <GaugeChart
+                  value={taskStats?.summary?.taskCompletionRate || 0}
                   label="Task Completion"
                   color="auto"
                 />
               </div>
-              
+
               {/* On-Time Delivery */}
               <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 text-center">
-                <GaugeChart 
-                  value={taskStats?.summary?.onTimeDeliveryRate || 0} 
+                <GaugeChart
+                  value={taskStats?.summary?.onTimeDeliveryRate || 0}
                   label="On-Time Delivery"
                   color="auto"
                 />
               </div>
-              
+
               {/* AI Productivity Score */}
               <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 text-center">
-                <GaugeChart 
-                  value={reportData?.sessionProductivityScore || 0} 
+                <GaugeChart
+                  value={reportData?.sessionProductivityScore || 0}
                   label="AI Productivity"
                   color={CHART_COLORS.purple}
                 />
@@ -1201,7 +1178,7 @@ export default function PerformanceReportsPage() {
 
       {/* ==================== ATTENDANCE ANALYTICS ==================== */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <div 
+        <div
           className="flex items-center justify-between cursor-pointer mb-4"
           onClick={() => toggleSection('attendance')}
         >
@@ -1211,7 +1188,7 @@ export default function PerformanceReportsPage() {
           </h2>
           {expandedSections.attendance ? <FaChevronUp /> : <FaChevronDown />}
         </div>
-        
+
         {expandedSections.attendance && attendanceStats && (
           <div className="space-y-6">
             {/* Attendance Summary Cards */}
@@ -1249,7 +1226,7 @@ export default function PerformanceReportsPage() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
                       <YAxis dataKey="day" type="category" width={80} />
-                      <Tooltip 
+                      <Tooltip
                         formatter={(value, name) => [`${value}%`, name === 'attendanceRate' ? 'Attendance' : 'Late Rate']}
                       />
                       <Legend />
@@ -1287,7 +1264,7 @@ export default function PerformanceReportsPage() {
 
       {/* ==================== TASK ANALYTICS ==================== */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <div 
+        <div
           className="flex items-center justify-between cursor-pointer mb-4"
           onClick={() => toggleSection('tasks')}
         >
@@ -1297,7 +1274,7 @@ export default function PerformanceReportsPage() {
           </h2>
           {expandedSections.tasks ? <FaChevronUp /> : <FaChevronDown />}
         </div>
-        
+
         {expandedSections.tasks && taskStats && (
           <div className="space-y-6">
             {/* Task Summary Cards */}
@@ -1395,7 +1372,7 @@ export default function PerformanceReportsPage() {
 
       {/* ==================== ACTIONABLE INSIGHTS ==================== */}
       <div className="bg-gradient-to-r from-orange-50 via-white to-red-50 rounded-lg shadow-md p-6 mb-6 border border-orange-200">
-        <div 
+        <div
           className="flex items-center justify-between cursor-pointer mb-4"
           onClick={() => toggleSection('actionableInsights')}
         >
@@ -1405,7 +1382,7 @@ export default function PerformanceReportsPage() {
           </h2>
           {expandedSections.actionableInsights ? <FaChevronUp /> : <FaChevronDown />}
         </div>
-        
+
         {expandedSections.actionableInsights && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Top Performers */}
@@ -1508,14 +1485,14 @@ export default function PerformanceReportsPage() {
 
       {/* Overview Metrics */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <div 
+        <div
           className="flex items-center justify-between cursor-pointer mb-4"
           onClick={() => toggleSection('overview')}
         >
           <h2 className="text-xl font-bold text-gray-800">Performance Overview</h2>
           {expandedSections.overview ? <FaChevronUp /> : <FaChevronDown />}
         </div>
-        
+
         {expandedSections.overview && (
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
             <div className="bg-blue-50 rounded-lg p-4">
@@ -1525,7 +1502,7 @@ export default function PerformanceReportsPage() {
               </div>
               <p className="text-2xl font-bold text-blue-600">{reportData.totalEmployees}</p>
             </div>
-            
+
             <div className="bg-purple-50 rounded-lg p-4">
               <div className="flex items-center space-x-2 mb-2">
                 <FaStar className="text-purple-600" />
@@ -1640,7 +1617,7 @@ export default function PerformanceReportsPage() {
           <h3 className="text-lg font-bold text-gray-800 mb-4">Department Performance Comparison</h3>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart 
+              <BarChart
                 data={(attendanceStats?.departmentBreakdown || []).map(dept => {
                   const taskDept = (taskStats?.departmentBreakdown || []).find(t => t.departmentId === dept.departmentId)
                   const deptName = departments.find(d => d._id === dept.departmentId)?.name || 'Unknown'
@@ -1671,7 +1648,7 @@ export default function PerformanceReportsPage() {
           <h3 className="text-lg font-bold text-gray-800 mb-4">AI Productivity Scores (Top 10)</h3>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart 
+              <BarChart
                 data={(reportData?.employeePerformance || [])
                   .filter(e => e.sessionProductivity != null)
                   .slice(0, 10)
@@ -1755,14 +1732,14 @@ export default function PerformanceReportsPage() {
 
       {/* Department Breakdown Table */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <div 
+        <div
           className="flex items-center justify-between cursor-pointer mb-4"
           onClick={() => toggleSection('departmentAnalysis')}
         >
           <h2 className="text-xl font-bold text-gray-800">Department Analysis</h2>
           {expandedSections.departmentAnalysis ? <FaChevronUp /> : <FaChevronDown />}
         </div>
-        
+
         {expandedSections.departmentAnalysis && (
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -1796,11 +1773,10 @@ export default function PerformanceReportsPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-green-600 font-semibold">{dept.productivity}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {dept.sessionProductivity != null ? (
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                          dept.sessionProductivity >= 70 ? 'bg-green-100 text-green-800' :
-                          dept.sessionProductivity >= 40 ? 'bg-amber-100 text-amber-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
+                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${dept.sessionProductivity >= 70 ? 'bg-green-100 text-green-800' :
+                            dept.sessionProductivity >= 40 ? 'bg-amber-100 text-amber-800' :
+                              'bg-red-100 text-red-800'
+                          }`}>
                           {dept.sessionProductivity}%
                         </span>
                       ) : (
@@ -1819,14 +1795,14 @@ export default function PerformanceReportsPage() {
 
       {/* Employee Performance Table */}
       <div className="bg-white rounded-lg shadow-md p-6">
-        <div 
+        <div
           className="flex items-center justify-between cursor-pointer mb-4"
           onClick={() => toggleSection('employeeMetrics')}
         >
           <h2 className="text-xl font-bold text-gray-800">Individual Employee Performance</h2>
           {expandedSections.employeeMetrics ? <FaChevronUp /> : <FaChevronDown />}
         </div>
-        
+
         {expandedSections.employeeMetrics && (
           <>
             <div className="mb-4">
@@ -1882,11 +1858,10 @@ export default function PerformanceReportsPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{emp.employeeCode}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{emp.department}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                          emp.performanceScore >= 85 ? 'bg-green-100 text-green-800' :
-                          emp.performanceScore >= 70 ? 'bg-yellow-100 text-yellow-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
+                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${emp.performanceScore >= 85 ? 'bg-green-100 text-green-800' :
+                            emp.performanceScore >= 70 ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-red-100 text-red-800'
+                          }`}>
                           {emp.performanceScore}
                         </span>
                       </td>
@@ -1896,11 +1871,10 @@ export default function PerformanceReportsPage() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         {emp.sessionProductivity != null ? (
                           <div className="flex items-center gap-1">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                              emp.sessionProductivity >= 70 ? 'bg-green-100 text-green-800' :
-                              emp.sessionProductivity >= 40 ? 'bg-amber-100 text-amber-800' :
-                              'bg-red-100 text-red-800'
-                            }`}>
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${emp.sessionProductivity >= 70 ? 'bg-green-100 text-green-800' :
+                                emp.sessionProductivity >= 40 ? 'bg-amber-100 text-amber-800' :
+                                  'bg-red-100 text-red-800'
+                              }`}>
                               {emp.sessionProductivity}%
                             </span>
                             {emp.productivityTrend != null && emp.productivityTrend !== 0 && (

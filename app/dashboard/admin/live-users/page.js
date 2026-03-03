@@ -1,10 +1,13 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { Button } from '@heroui/react'
+import { useState, useMemo } from 'react'
+import { Button, Skeleton } from '@heroui/react'
 import { useSocket } from '@/contexts/SocketContext'
 import toast from '@/utils/toast'
-import Loader from '@/components/ui/Loader'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 import {
   HiOutlineSignal,
   HiOutlineUserGroup,
@@ -21,64 +24,51 @@ import {
 
 export default function LiveUsersPage() {
   const { isConnected } = useSocket()
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [data, setData] = useState(null)
-  const [error, setError] = useState(null)
   const [activeTab, setActiveTab] = useState('checkedIn')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedDepartment, setSelectedDepartment] = useState('')
   const [expandedDepartments, setExpandedDepartments] = useState({})
   const [selectedUsers, setSelectedUsers] = useState([])
-  const [broadcastLoading, setBroadcastLoading] = useState(false)
-  const [permissions, setPermissions] = useState({ canRefresh: false, viewScope: 'all', userRole: 'employee' })
 
-  const fetchData = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/admin/live-users', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
+  // SWR: fetch live users data (auto-refresh every 30s)
+  const { data: result, error, isLoading, isValidating, mutate: refresh } = useAuthedSWR(
+    '/api/admin/live-users',
+    { refreshInterval: 30000 }
+  )
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch live users data')
-      }
-
-      const result = await response.json()
-      
-      // Extract data from nested structure
-      const apiData = result.data || result
-      setData({
-        summary: apiData.summary || {},
-        checkedInToday: apiData.users?.checkedInToday || [],
-        loggedInToday: apiData.users?.loggedInToday || [],
-        activeUsers: apiData.users?.activeNow || [],
-        allUsers: apiData.users?.all || [],
-        byDepartment: apiData.byDepartment || [],
-        departments: apiData.departments || [],
-      })
-      setPermissions(apiData.permissions || { canRefresh: false, viewScope: 'all', userRole: 'employee' })
-      setError(null)
-    } catch (err) {
-      setError(err.message)
-      toast.error('Failed to load live users data')
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
+  // Derive data from SWR response
+  const data = useMemo(() => {
+    if (!result?.data && !result?.summary) return null
+    const apiData = result.data || result
+    return {
+      summary: apiData.summary || {},
+      checkedInToday: apiData.users?.checkedInToday || [],
+      loggedInToday: apiData.users?.loggedInToday || [],
+      activeUsers: apiData.users?.activeNow || [],
+      allUsers: apiData.users?.all || [],
+      byDepartment: apiData.byDepartment || [],
+      departments: apiData.departments || [],
     }
-  }, [])
+  }, [result])
 
-  useEffect(() => {
-    fetchData()
-    const interval = setInterval(fetchData, 30000)
-    return () => clearInterval(interval)
-  }, [fetchData])
+  const permissions = useMemo(() => {
+    if (!result?.data && !result?.summary) return { canRefresh: false, viewScope: 'all', userRole: 'employee' }
+    const apiData = result.data || result
+    return apiData.permissions || { canRefresh: false, viewScope: 'all', userRole: 'employee' }
+  }, [result])
+
+  // Mutation: broadcast refresh
+  const broadcastMutation = useApiMutation({
+    method: 'POST',
+    onSuccess: (data) => {
+      toast.success(data?.message || 'Refresh request sent successfully')
+      setSelectedUsers([])
+    },
+    onError: (msg) => toast.error(msg || 'Failed to send refresh request'),
+  })
 
   const handleRefresh = () => {
-    setRefreshing(true)
-    fetchData()
+    refresh()
   }
 
   const handleBroadcastRefresh = async (target, targetId = null) => {
@@ -87,42 +77,18 @@ export default function LiveUsersPage() {
       return
     }
 
-    setBroadcastLoading(true)
-    try {
-      const token = localStorage.getItem('token')
-      const body = { target }
+    const body = { target }
 
-      if (target === 'department' && targetId) {
-        body.departmentId = targetId
-      } else if (target === 'user' && targetId) {
-        body.userId = targetId
-      } else if (target === 'selected' && selectedUsers.length > 0) {
-        body.target = 'selected'
-        body.userIds = selectedUsers
-      }
-
-      const response = await fetch('/api/admin/broadcast-refresh', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(body)
-      })
-
-      const result = await response.json()
-
-      if (!response.ok) {
-        throw new Error(result.message || 'Failed to send refresh request')
-      }
-
-      toast.success(result.message || 'Refresh request sent successfully')
-      setSelectedUsers([])
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setBroadcastLoading(false)
+    if (target === 'department' && targetId) {
+      body.departmentId = targetId
+    } else if (target === 'user' && targetId) {
+      body.userId = targetId
+    } else if (target === 'selected' && selectedUsers.length > 0) {
+      body.target = 'selected'
+      body.userIds = selectedUsers
     }
+
+    broadcastMutation.execute('/api/admin/broadcast-refresh', body)
   }
 
   const toggleUserSelection = (userId) => {
@@ -222,11 +188,46 @@ export default function LiveUsersPage() {
     { id: 'byDepartment', label: 'By Department', count: departments.length }
   ]
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="page-container">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <Loader size="lg" />
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <div>
+            <Skeleton className="h-8 w-48 rounded-lg mb-2" />
+            <Skeleton className="h-4 w-72 rounded-lg" />
+          </div>
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-9 w-28 rounded-full" />
+            <Skeleton className="h-10 w-28 rounded-lg" />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="bg-white rounded-xl shadow-sm p-4 border border-gray-100">
+              <div className="flex items-center gap-4">
+                <Skeleton className="w-12 h-12 rounded-lg" />
+                <div>
+                  <Skeleton className="h-7 w-12 rounded-lg mb-1" />
+                  <Skeleton className="h-4 w-24 rounded-lg" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <Skeleton className="h-12 w-full rounded-xl mb-6" />
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+          {[1, 2, 3, 4, 5].map(i => (
+            <div key={i} className="flex items-center justify-between p-4 border-b border-gray-100">
+              <div className="flex items-center gap-3">
+                <Skeleton className="h-10 w-10 rounded-full" />
+                <div>
+                  <Skeleton className="h-4 w-32 rounded-lg mb-1" />
+                  <Skeleton className="h-3 w-48 rounded-lg" />
+                </div>
+              </div>
+              <Skeleton className="h-6 w-20 rounded-full" />
+            </div>
+          ))}
         </div>
       </div>
     )
@@ -235,23 +236,14 @@ export default function LiveUsersPage() {
   if (error) {
     return (
       <div className="page-container">
-        <div className="bg-white rounded-xl shadow-sm p-8 border border-gray-100 text-center">
-          <HiOutlineExclamationCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-800 mb-2">Error Loading Data</h3>
-          <p className="text-gray-600 mb-4">{error}</p>
-          <Button
-            onPress={handleRefresh}
-            color="primary"
-          >
-            Try Again
-          </Button>
-        </div>
+        <DataErrorState error={error} onRetry={refresh} title="Error Loading Data" />
       </div>
     )
   }
 
   return (
     <div className="page-container">
+      <BackgroundRefreshIndicator isValidating={isValidating} />
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
@@ -260,26 +252,25 @@ export default function LiveUsersPage() {
         </div>
         <div className="flex items-center gap-3">
           {/* Socket Status */}
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm ${
-            isConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-          }`}>
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm ${isConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+            }`}>
             <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></span>
             {isConnected ? 'Connected' : 'Disconnected'}
           </div>
           {/* Refresh Button */}
           <button
             onClick={handleRefresh}
-            disabled={refreshing}
+            disabled={isValidating}
             className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
           >
-            <HiOutlineArrowPath className={`h-5 w-5 ${refreshing ? 'animate-spin' : ''}`} />
+            <HiOutlineArrowPath className={`h-5 w-5 ${isValidating ? 'animate-spin' : ''}`} />
             <span className="hidden sm:inline">Refresh</span>
           </button>
           {/* Broadcast All Button - Admin Only */}
           {permissions.canRefresh && (
             <Button
               onPress={() => handleBroadcastRefresh('all')}
-              isDisabled={broadcastLoading}
+              isDisabled={broadcastMutation.isLoading}
               color="primary"
               startContent={<HiOutlineSignal className="h-5 w-5" />}
             >
@@ -348,7 +339,7 @@ export default function LiveUsersPage() {
           {permissions.canRefresh && selectedUsers.length > 0 && (
             <Button
               onPress={() => handleBroadcastRefresh('selected')}
-              isDisabled={broadcastLoading}
+              isDisabled={broadcastMutation.isLoading}
               color="primary"
               startContent={<HiOutlineSignal className="h-5 w-5" />}
             >
@@ -365,16 +356,14 @@ export default function LiveUsersPage() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-6 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-                activeTab === tab.id
+              className={`flex items-center gap-2 px-6 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${activeTab === tab.id
                   ? 'border-blue-600 text-blue-600 bg-blue-50'
                   : 'border-transparent text-gray-600 hover:text-gray-800 hover:bg-gray-50'
-              }`}
+                }`}
             >
               {tab.label}
-              <span className={`px-2 py-0.5 rounded-full text-xs ${
-                activeTab === tab.id ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
-              }`}>
+              <span className={`px-2 py-0.5 rounded-full text-xs ${activeTab === tab.id ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
+                }`}>
                 {tab.count}
               </span>
             </button>
@@ -416,7 +405,7 @@ export default function LiveUsersPage() {
                           e.stopPropagation()
                           handleBroadcastRefresh('department', dept.id)
                         }}
-                        disabled={broadcastLoading}
+                        disabled={broadcastMutation.isLoading}
                         className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                       >
                         Refresh Dept
@@ -468,7 +457,7 @@ export default function LiveUsersPage() {
                               {permissions.canRefresh && (
                                 <button
                                   onClick={() => handleBroadcastRefresh('user', user.userId)}
-                                  disabled={broadcastLoading}
+                                  disabled={broadcastMutation.isLoading}
                                   className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                                   title="Refresh this user"
                                 >
@@ -536,7 +525,7 @@ export default function LiveUsersPage() {
                     {permissions.canRefresh && (
                       <button
                         onClick={() => handleBroadcastRefresh('user', user.userId)}
-                        disabled={broadcastLoading}
+                        disabled={broadcastMutation.isLoading}
                         className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                         title="Refresh this user"
                       >

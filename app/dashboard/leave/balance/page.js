@@ -1,69 +1,39 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useMemo } from 'react'
 import { Card, CardBody, CardHeader, Skeleton, Select, SelectItem } from '@heroui/react'
 import toast from '@/utils/toast'
 import { FaCalendarAlt, FaClock, FaChartPie, FaHistory } from 'react-icons/fa'
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import CustomTooltip, { CustomPieTooltip } from '@/components/charts/CustomTooltip'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 
 export default function LeaveBalancePage() {
-  const [leaveBalance, setLeaveBalance] = useState([])
-  const [leaveHistory, setLeaveHistory] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [user, setUser] = useState(null)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
 
-  useEffect(() => {
+  const { user, employeeId } = useMemo(() => {
     const parsedUser = getCurrentUser()
-    if (parsedUser) {
-      setUser(parsedUser)
-      const empId = getEmployeeId(parsedUser)
-      if (empId) {
-        fetchLeaveBalance(empId)
-        fetchLeaveHistory(empId)
-      } else {
-        toast.error('Employee information not found. Please logout and login again.')
-        setLoading(false)
-      }
-    } else {
-      setLoading(false)
-    }
-  }, [selectedYear])
+    return { user: parsedUser, employeeId: parsedUser ? getEmployeeId(parsedUser) : null }
+  }, [])
 
-  const fetchLeaveBalance = async (employeeId) => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/leave/balance?employeeId=${employeeId}&year=${selectedYear}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-      const data = await response.json()
-      if (data.success) {
-        setLeaveBalance(data.data)
-      }
-    } catch (error) {
-      console.error('Fetch leave balance error:', error)
-      toast.error('Failed to fetch leave balance')
-    }
-  }
+  // --- SWR data fetching ---
+  const { data: balanceRes, error: balanceError, isLoading: balanceLoading, isValidating } = useAuthedSWR(
+    employeeId ? `/api/leave/balance?employeeId=${employeeId}&year=${selectedYear}` : null
+  )
+  const leaveBalance = balanceRes?.data || []
 
-  const fetchLeaveHistory = async (employeeId) => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/leave?employeeId=${employeeId}&year=${selectedYear}`, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-      const data = await response.json()
-      if (data.success) {
-        setLeaveHistory(data.data.filter(leave => leave.status === 'approved'))
-      }
-    } catch (error) {
-      console.error('Fetch leave history error:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  const { data: historyRes, error: historyError, isLoading: historyLoading } = useAuthedSWR(
+    employeeId ? `/api/leave?employeeId=${employeeId}&year=${selectedYear}` : null
+  )
+  const leaveHistory = useMemo(() => {
+    return (historyRes?.data || []).filter(leave => leave.status === 'approved')
+  }, [historyRes])
+
+  const loading = balanceLoading || historyLoading
+  const error = balanceError || historyError
 
   const getTotalBalance = () => {
     return leaveBalance.reduce((total, balance) => total + balance.remainingDays, 0)
@@ -132,6 +102,14 @@ export default function LeaveBalancePage() {
           <Skeleton className="h-80 rounded-lg" />
           <Skeleton className="h-80 rounded-lg" />
         </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <DataErrorState message="Failed to load leave balance" />
       </div>
     )
   }
@@ -279,8 +257,8 @@ export default function LeaveBalancePage() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="w-16 bg-default-200 rounded-full h-2 mr-2">
-                          <div 
-                            className="bg-primary h-2 rounded-full" 
+                          <div
+                            className="bg-primary h-2 rounded-full"
                             style={{ width: `${(balance.usedDays / balance.totalDays) * 100}%` }}
                           ></div>
                         </div>

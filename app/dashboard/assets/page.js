@@ -1,21 +1,19 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaLaptop, FaCheckCircle, FaClock, FaTools, FaTimes, FaBox } from 'react-icons/fa'
-import { getCurrentUser } from '@/utils/userHelper'
-import Loader from '@/components/ui/Loader'
+import useAuthedSWR from '@/hooks/useAuthedSWR'
+import useApiMutation from '@/hooks/useApiMutation'
+import LoadingButton from '@/components/ui/LoadingButton'
+import { DataErrorState } from '@/components/ui/ErrorBoundary'
+import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 import ModalPortal from '@/components/ui/ModalPortal'
-import { Select, SelectItem, Input, Textarea, Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@heroui/react'
+import { Select, SelectItem, Input, Textarea, Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Skeleton } from '@heroui/react'
 
 export default function AssetsPage() {
-  const [assets, setAssets] = useState([])
-  const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [employees, setEmployees] = useState([])
-  const [userRole, setUserRole] = useState(null)
-  const [currentUser, setCurrentUser] = useState(null)
   const [formData, setFormData] = useState({
     name: '',
     assetCode: '',
@@ -29,21 +27,28 @@ export default function AssetsPage() {
     purchasePrice: ''
   })
 
-  // Check if user is admin or HR (can manage all assets)
+  // User from localStorage
+  const currentUser = useMemo(() => { try { return JSON.parse(localStorage.getItem('user')) } catch { return null } }, [])
+  const userRole = currentUser?.role
   const isAdmin = ['admin', 'hr', 'super_admin'].includes(userRole)
+
+  // SWR: Assets (conditional URL based on role)
+  const assetsUrl = useMemo(() => {
+    if (!currentUser) return null
+    if (isAdmin) return '/api/assets'
+    const employeeId = currentUser.employeeId?._id || currentUser.employeeId
+    return employeeId ? `/api/assets?employeeId=${employeeId}` : '/api/assets'
+  }, [currentUser, isAdmin])
+
+  const { data: assetsRes, error, isLoading, isValidating, mutate: refreshAssets } = useAuthedSWR(assetsUrl)
+  const assets = assetsRes?.data || []
+
+  // SWR: Employees (admin only, for assignment dropdown)
+  const { data: employeesRes } = useAuthedSWR(isAdmin ? '/api/employees?limit=1000' : null)
+  const employees = employeesRes?.data?.employees || employeesRes?.data || []
 
   // Real-time updates
   const { socket, isConnected, subscribe } = useSocket()
-
-  useEffect(() => {
-    const user = getCurrentUser()
-    if (user) {
-      setUserRole(user.role)
-      setCurrentUser(user)
-    }
-    fetchAssets()
-    fetchEmployees()
-  }, [])
 
   // Subscribe to real-time asset updates
   useEffect(() => {
@@ -51,7 +56,7 @@ export default function AssetsPage() {
 
     const handleAssetUpdate = (data) => {
       console.log('🔄 [Assets] Real-time update received:', data)
-      fetchAssets()
+      refreshAssets()
     }
 
     const unsub = subscribe?.(REALTIME_EVENTS.ASSET_UPDATE, handleAssetUpdate)
@@ -59,98 +64,47 @@ export default function AssetsPage() {
     return () => {
       unsub?.()
     }
-  }, [socket, isConnected])
-
-  const fetchEmployees = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/employees?limit=1000', { // Fetch all employees
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-      const data = await response.json()
-      if (data.success) {
-        setEmployees(data.data.employees || []) // Adjust based on actual API response structure
-      }
-    } catch (error) {
-      console.error('Fetch employees error:', error)
-    }
-  }
+  }, [socket, isConnected, subscribe, refreshAssets])
 
   const handleInputChange = (e) => {
     const { name, value } = e.target
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch('/api/assets', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(formData)
-      })
-      const data = await response.json()
-      if (data.success) {
-        toast.success('Asset added successfully')
-        setIsModalOpen(false)
-        fetchAssets()
-        setFormData({
-          name: '',
-          assetCode: '',
-          uin: '',
-          category: 'laptop',
-          description: '',
-          specs: '',
-          assignedTo: '',
-          status: 'available',
-          purchaseDate: '',
-          purchasePrice: ''
-        })
-      } else {
-        toast.error(data.message || 'Failed to add asset')
-      }
-    } catch (error) {
-      console.error('Add asset error:', error)
-      toast.error('Failed to add asset')
-    }
+  // Mutations
+  const submitMutation = useApiMutation({
+    invalidateKeys: [assetsUrl],
+    onSuccess: () => {
+      toast.success('Asset added successfully')
+      closeModal()
+    },
+    onError: (msg) => toast.error(msg || 'Failed to add asset'),
+  })
+
+  const closeModal = () => {
+    setIsModalOpen(false)
+    setFormData({
+      name: '',
+      assetCode: '',
+      uin: '',
+      category: 'laptop',
+      description: '',
+      specs: '',
+      assignedTo: '',
+      status: 'available',
+      purchaseDate: '',
+      purchasePrice: ''
+    })
   }
 
-  const fetchAssets = async () => {
-    try {
-      const token = localStorage.getItem('token')
-      const user = getCurrentUser()
-      
-      // For employees, fetch only their assigned assets
-      let url = '/api/assets'
-      if (user && !['admin', 'hr', 'super_admin'].includes(user.role)) {
-        const employeeId = user.employeeId?._id || user.employeeId
-        if (employeeId) {
-          url = `/api/assets?employeeId=${employeeId}`
-        }
-      }
-      
-      const response = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${token}` },
-      })
-
-      const data = await response.json()
-      if (data.success) {
-        setAssets(data.data)
-      }
-    } catch (error) {
-      console.error('Fetch assets error:', error)
-      toast.error('Failed to fetch assets')
-    } finally {
-      setLoading(false)
-    }
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    submitMutation.execute('/api/assets', formData)
   }
 
   return (
-    <div className="p-6">
+    <div className="p-6 relative">
+      <BackgroundRefreshIndicator isValidating={isValidating} position="bar" />
       {/* Header */}
       <div className="flex md:justify-between md:items-center md:flex-row flex-col mb-6">
         <div>
@@ -160,7 +114,7 @@ export default function AssetsPage() {
           </p>
         </div>
         {['admin', 'hr'].includes(userRole) && (
-          <Button 
+          <Button
             onPress={() => setIsModalOpen(true)}
             color="primary"
             startContent={<FaPlus />}
@@ -241,10 +195,13 @@ export default function AssetsPage() {
           </h2>
         </div>
 
-        {loading ? (
-          <div className="p-8 text-center">
-            <Loader size="lg" className="mx-auto" />
-            <p className="mt-4 text-gray-600">Loading assets...</p>
+        {error ? (
+          <DataErrorState error={error} onRetry={() => refreshAssets()} />
+        ) : isLoading ? (
+          <div className="p-6 space-y-3">
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} className="h-12 w-full rounded-lg" />
+            ))}
           </div>
         ) : assets.length === 0 ? (
           <div className="p-8 text-center text-gray-500">
@@ -253,8 +210,8 @@ export default function AssetsPage() {
               {isAdmin ? 'No assets found' : 'No assets assigned to you'}
             </p>
             <p className="text-sm mt-1">
-              {isAdmin 
-                ? 'Add your first asset to get started' 
+              {isAdmin
+                ? 'Add your first asset to get started'
                 : 'Contact HR or your manager if you need equipment'}
             </p>
           </div>
@@ -317,12 +274,11 @@ export default function AssetsPage() {
                         : 'N/A'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        asset.status === 'assigned' ? 'bg-green-100 text-green-800' :
-                        asset.status === 'available' ? 'bg-blue-100 text-blue-800' :
-                        asset.status === 'maintenance' ? 'bg-orange-100 text-orange-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${asset.status === 'assigned' ? 'bg-green-100 text-green-800' :
+                          asset.status === 'available' ? 'bg-blue-100 text-blue-800' :
+                            asset.status === 'maintenance' ? 'bg-orange-100 text-orange-800' :
+                              'bg-red-100 text-red-800'
+                        }`}>
                         {asset.status}
                       </span>
                     </td>
@@ -340,7 +296,7 @@ export default function AssetsPage() {
           <div className="bg-white rounded-[30px] animate-modal-enter w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold">Add New Asset</h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-500 hover:text-gray-700">
+              <button onClick={closeModal} className="text-gray-500 hover:text-gray-700">
                 <FaTimes />
               </button>
             </div>
@@ -383,7 +339,7 @@ export default function AssetsPage() {
                     label="Category *"
                     isRequired
                     selectedKeys={[formData.category]}
-                    onSelectionChange={(keys) => handleInputChange({ target: { name: 'category', value: Array.from(keys)[0] || 'laptop' }})}
+                    onSelectionChange={(keys) => handleInputChange({ target: { name: 'category', value: Array.from(keys)[0] || 'laptop' } })}
                   >
                     <SelectItem key="laptop">Laptop</SelectItem>
                     <SelectItem key="desktop">Desktop</SelectItem>
@@ -422,7 +378,7 @@ export default function AssetsPage() {
                   <Select
                     label="Assigned To"
                     selectedKeys={formData.assignedTo ? [formData.assignedTo] : []}
-                    onSelectionChange={(keys) => handleInputChange({ target: { name: 'assignedTo', value: Array.from(keys)[0] || '' }})}
+                    onSelectionChange={(keys) => handleInputChange({ target: { name: 'assignedTo', value: Array.from(keys)[0] || '' } })}
                     placeholder="Unassigned"
                   >
                     {employees.map(emp => (
@@ -436,7 +392,7 @@ export default function AssetsPage() {
                   <Select
                     label="Status"
                     selectedKeys={[formData.status]}
-                    onSelectionChange={(keys) => handleInputChange({ target: { name: 'status', value: Array.from(keys)[0] || 'available' }})}
+                    onSelectionChange={(keys) => handleInputChange({ target: { name: 'status', value: Array.from(keys)[0] || 'available' } })}
                   >
                     <SelectItem key="available">Available</SelectItem>
                     <SelectItem key="assigned">Assigned</SelectItem>
@@ -469,17 +425,19 @@ export default function AssetsPage() {
               <div className="flex justify-end space-x-3 mt-6">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={closeModal}
                   className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
                 >
                   Cancel
                 </button>
-                <button
+                <LoadingButton
                   type="submit"
-                  className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+                  isLoading={submitMutation.isLoading}
+                  color="primary"
+                  className="px-4 py-2"
                 >
                   Add Asset
-                </button>
+                </LoadingButton>
               </div>
             </form>
           </div>
