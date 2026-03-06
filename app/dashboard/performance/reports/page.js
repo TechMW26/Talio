@@ -931,7 +931,7 @@ export default function PerformanceReportsPage() {
 
       {/* ==================== AI INSIGHTS (TOP) ==================== */}
       {aiInsights && (
-        <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg shadow-md p-6 mb-6 border border-purple-200">
+        <div className="bg-purple-50 dark:bg-purple-950/30 rounded-lg shadow-md p-6 mb-6 border border-purple-200 dark:border-purple-800">
           <div
             className="flex items-center justify-between cursor-pointer mb-4"
             onClick={() => toggleSection('aiInsights')}
@@ -1052,7 +1052,7 @@ export default function PerformanceReportsPage() {
       )}
 
       {/* ==================== EXECUTIVE SUMMARY ==================== */}
-      <div className="bg-gradient-to-r from-blue-50 via-white to-purple-50 rounded-lg shadow-lg p-6 mb-6 border border-blue-200">
+      <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg shadow-lg p-6 mb-6 border border-blue-200 dark:border-blue-800">
         <div
           className="flex items-center justify-between cursor-pointer mb-6"
           onClick={() => toggleSection('executive')}
@@ -1371,7 +1371,7 @@ export default function PerformanceReportsPage() {
       </div>
 
       {/* ==================== ACTIONABLE INSIGHTS ==================== */}
-      <div className="bg-gradient-to-r from-orange-50 via-white to-red-50 rounded-lg shadow-md p-6 mb-6 border border-orange-200">
+      <div className="bg-orange-50 dark:bg-orange-950/30 rounded-lg shadow-md p-6 mb-6 border border-orange-200 dark:border-orange-800">
         <div
           className="flex items-center justify-between cursor-pointer mb-4"
           onClick={() => toggleSection('actionableInsights')}

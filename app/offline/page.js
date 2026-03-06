@@ -247,7 +247,7 @@ export default function OfflinePage() {
 
           {/* Possible Reasons */}
           {!isOnline && (
-            <div className="bg-gradient-to-br from-orange-50 to-red-50 rounded-xl p-5 mb-6 text-left border border-orange-200">
+            <div className="bg-orange-50 dark:bg-orange-950/30 rounded-xl p-5 mb-6 text-left border border-orange-200 dark:border-orange-800">
               <div className="flex items-start space-x-3 mb-3">
                 <FaServer className="w-5 h-5 text-orange-600 mt-0.5" />
                 <div>
@@ -277,7 +277,7 @@ export default function OfflinePage() {
 
           {/* Available Features */}
           {!isOnline && (
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-5 mb-6 text-left border border-blue-200">
+            <div className="bg-blue-50 dark:bg-blue-950/30 rounded-xl p-5 mb-6 text-left border border-blue-200 dark:border-blue-800">
               <div className="flex items-start space-x-3">
                 <FaCloudDownloadAlt className="w-5 h-5 text-blue-600 mt-0.5" />
                 <div>

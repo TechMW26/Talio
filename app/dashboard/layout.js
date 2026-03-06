@@ -399,7 +399,7 @@ export default function DashboardLayout({ children }) {
                         className="md:hidden fixed left-0 right-0 h-[124px] pointer-events-none z-[39]"
                         style={{
                           bottom: '68px',
-                          background: `linear-gradient(179.13deg, rgba(249, 250, 251, 0) 0%, var(--color-bg-main) 71.18%)`,
+                          background: `linear-gradient(179.13deg, transparent 0%, var(--color-bg-main) 71.18%)`,
                           opacity: 1,
                           transition: 'opacity 0.6s ease-in-out'
                         }}

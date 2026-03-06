@@ -321,7 +321,7 @@ export default function RoleNewsWidget() {
                                         )}
 
                                         {/* Article Content */}
-                                        <div className="text-sm text-default-700 dark:text-default-300 leading-relaxed whitespace-pre-line">
+                                        <div className="text-sm text-default-700 dark:text-default-100 leading-relaxed whitespace-pre-line">
                                             {articleData.content}
                                         </div>
                                     </>

@@ -804,11 +804,11 @@ export default function ProjectOverview({ projectId }) {
                 </div>
 
                 {/* One Line Verdict */}
-                <div className="lg:col-span-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl p-5 shadow-sm border border-gray-200 flex items-center">
+                <div className="lg:col-span-3 bg-gray-50 dark:bg-gray-800 rounded-xl p-5 shadow-sm border border-gray-200 dark:border-gray-700 flex items-center">
                   <FaBrain className="text-blue-600 text-2xl mr-4 flex-shrink-0" />
                   <div>
-                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">AI Verdict</p>
-                    <p className="text-lg font-bold text-gray-900">{aiInsights.oneLineVerdict || 'Analysis complete'}</p>
+                    <p className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">AI Verdict</p>
+                    <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{aiInsights.oneLineVerdict || 'Analysis complete'}</p>
                   </div>
                 </div>
               </div>
@@ -1062,10 +1062,10 @@ export default function ProjectOverview({ projectId }) {
 
               {/* Projection Insight */}
               {aiInsights.projectionInsight && (
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-100">
+                <div className="bg-blue-50 dark:bg-blue-950/30 rounded-xl p-4 border border-blue-100 dark:border-blue-900">
                   <div className="flex items-center gap-3">
                     <FaCalendarAlt className="text-blue-600" />
-                    <p className="font-semibold text-gray-900">{aiInsights.projectionInsight}</p>
+                    <p className="font-semibold text-gray-900 dark:text-gray-100">{aiInsights.projectionInsight}</p>
                   </div>
                 </div>
               )}

@@ -465,7 +465,7 @@ export default function BulkImportEmployees() {
       {/* Preview Section - Our Template */}
       {preview && !importResult && preview.templateFields && (
         <div className="bg-white border rounded-lg overflow-hidden">
-          <div className="bg-gradient-to-r from-green-50 to-blue-50 px-4 py-3 border-b flex items-center justify-between">
+          <div className="bg-green-50 dark:bg-green-950/30 px-4 py-3 border-b flex items-center justify-between">
             <div className="flex items-center gap-2">
               <FaEye className="text-green-600" />
               <span className="font-medium text-gray-700">Extracted Data Preview</span>

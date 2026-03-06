@@ -293,7 +293,7 @@ export default function CertificatesPage() {
                 </button>
               </div>
               {/* Certificate preview would go here */}
-              <div className="bg-gradient-to-br from-yellow-100 to-yellow-200 p-8 rounded-lg text-center mb-4">
+              <div className="bg-yellow-100 dark:bg-yellow-900/30 p-8 rounded-lg text-center mb-4">
                 <FaTrophy className="text-6xl text-yellow-600 mx-auto mb-4" />
                 <h3 className="text-2xl font-bold text-gray-800 mb-2">
                   {selectedCertificate.courseTitle}

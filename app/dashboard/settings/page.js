@@ -1260,7 +1260,7 @@ function GeofenceLocationsManager() {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gradient-to-r from-gray-50 to-gray-100">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-gray-50 dark:bg-gray-800">
               <h3 className="text-xl font-bold flex items-center gap-3 text-gray-900">
                 <div className="p-2 rounded-lg bg-blue-500/10">
                   <FaMapMarkerAlt className="text-blue-500" size={20} />
@@ -1617,7 +1617,7 @@ function GeofencingTab() {
 
       <form onSubmit={handleSave} className="space-y-8">
         {/* Enable Geofencing */}
-        <div className="bg-gradient-to-r from-blue-50 to-primary-50 border-2 border-primary-200 rounded-lg p-6">
+        <div className="bg-blue-50 dark:bg-blue-950/30 border-2 border-primary-200 dark:border-primary-800 rounded-lg p-6">
           <label className="flex items-start space-x-4 cursor-pointer group">
             <input
               type="checkbox"
@@ -2732,7 +2732,7 @@ function PayrollSettingsTab() {
         </div>
 
         {/* Summary Preview */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-6 border border-blue-200">
+        <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-6 border border-blue-200 dark:border-blue-800">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">📊 Settings Summary</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div className="bg-white p-3 rounded-lg">
@@ -3030,7 +3030,7 @@ function NotificationsTab() {
 
           <div className="space-y-5">
             {/* Master toggle */}
-            <div className="flex items-start justify-between p-4 bg-gradient-to-r from-blue-50 to-primary-50 rounded-lg border border-primary-100">
+            <div className="flex items-start justify-between p-4 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-primary-100 dark:border-primary-800">
               <div className="flex-1">
                 <p className="text-sm font-bold text-gray-900">Enable email notifications</p>
                 <p className="text-xs text-gray-600 mt-1">
