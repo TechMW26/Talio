@@ -61,9 +61,18 @@ app.prepare().then(() => {
     addTrailingSlash: false,
     maxHttpBufferSize: 5e6, // 5MB - needed for base64 encoded voice audio
     cors: {
-      origin: process.env.NEXT_PUBLIC_APP_URL || '*',
+      origin: (origin, callback) => {
+        // Allow connections with no origin (mobile apps, curl, etc.)
+        // and connections from the app URL
+        const allowedOrigin = process.env.NEXT_PUBLIC_APP_URL || '*';
+        if (!origin || allowedOrigin === '*' || origin === allowedOrigin) {
+          callback(null, true);
+        } else {
+          callback(null, true); // Allow all origins for Socket.IO (auth handled via token)
+        }
+      },
       methods: ['GET', 'POST'],
-      credentials: true
+      credentials: false
     }
   });
 
