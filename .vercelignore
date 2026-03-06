@@ -1,0 +1,39 @@
+# ============================================================
+# .vercelignore — Files excluded from Vercel upload
+# ============================================================
+# Reduces upload size and prevents unnecessary cache invalidation.
+
+# Documentation
+*.md
+docs/
+PROJECT_MASTER_DOCUMENTATION.md
+
+# Desktop app (not deployed to Vercel)
+desktop-app/
+
+# Development scripts (not needed in production)
+scripts/seed.js
+scripts/seed-superadmin.js
+scripts/setup-tenant.js
+scripts/register-first-tenant.js
+scripts/reactivate-users.js
+scripts/create-initial-admin.js
+
+# Dev / editor config
+.vscode/
+.idea/
+.DS_Store
+*.log
+
+# Android (PWA wrapper — built separately)
+android/
+
+# Git
+.git/
+.github/
+
+# Environment examples (actual .env is handled by Vercel env vars)
+.env.example
+
+# Sentry config (already injected via next.config.js)
+.env.sentry-build-plugin

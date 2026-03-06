@@ -90,6 +90,12 @@ export async function middleware(request) {
     '/api/auth/validate'
   ]
 
+  // Socket.IO handles its own authentication via the handshake `auth` option.
+  // Exclude it from middleware token checks so polling/upgrade requests are not blocked.
+  if (request.nextUrl.pathname.startsWith('/api/socketio')) {
+    return NextResponse.next()
+  }
+
   const isPublicRoute = publicRoutes.some(route =>
     route === '/' ? request.nextUrl.pathname === '/' : request.nextUrl.pathname.startsWith(route)
   )

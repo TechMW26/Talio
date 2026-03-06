@@ -1,92 +1,60 @@
-name: Deploy HRMS to Vercel
+name: Talio CI — Lint Check
 
+# ============================================================
+# Lint gate for PRs — Vercel handles all builds & deploys
+# via its auto-deploy integration + ignoreCommand filter.
+# ============================================================
 on:
-  push:
-    branches: [ main ]
   pull_request:
-    branches: [ main ]
+    branches: [main]
+    paths:
+      # Source code
+      - "talio-web/Talio/app/**"
+      - "talio-web/Talio/components/**"
+      - "talio-web/Talio/config/**"
+      - "talio-web/Talio/contexts/**"
+      - "talio-web/Talio/hooks/**"
+      - "talio-web/Talio/lib/**"
+      - "talio-web/Talio/models/**"
+      - "talio-web/Talio/src/**"
+      - "talio-web/Talio/styles/**"
+      - "talio-web/Talio/utils/**"
+      - "talio-web/Talio/public/**"
+      # Config that affects build output
+      - "talio-web/Talio/package.json"
+      - "talio-web/Talio/package-lock.json"
+      - "talio-web/Talio/next.config.js"
+      - "talio-web/Talio/tailwind.config.js"
+      - "talio-web/Talio/postcss.config.js"
+      - "talio-web/Talio/middleware.js"
+      - "talio-web/Talio/server.js"
+      - "talio-web/Talio/vercel.json"
 
-env:
-  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
+# ============================================================
+# Jobs
+# ============================================================
 jobs:
-  test:
+  # ---- Quick lint check (PRs only, skip drafts) ----
+  lint:
     runs-on: ubuntu-latest
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
-        cache: 'npm'
-        
-    - name: Install dependencies
-      run: npm ci
-      
-    - name: Run linting
-      run: npm run lint --if-present
-      
-    - name: Build application
-      run: npm run build
-      env:
-        MONGODB_URI: ${{ secrets.MONGODB_URI }}
-        NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
-        JWT_SECRET: ${{ secrets.JWT_SECRET }}
-        NEXTAUTH_URL: https://hrms-x9xp.vercel.app
-        NEXT_PUBLIC_APP_NAME: HRMS System
-        NEXT_PUBLIC_APP_URL: https://hrms-x9xp.vercel.app
-        MAX_FILE_SIZE: 5242880
-        UPLOAD_DIR: ./public/uploads
-        NODE_ENV: production
+    if: github.event.pull_request.draft != true
+    defaults:
+      run:
+        working-directory: talio-web/Talio
 
-  deploy-preview:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Install Vercel CLI
-      run: npm install --global vercel@latest
-      
-    - name: Pull Vercel Environment Information
-      run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
-      
-    - name: Build Project Artifacts
-      run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
-      
-    - name: Deploy Project Artifacts to Vercel
-      run: vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }}
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-  deploy-production:
-    needs: test
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-      
-    - name: Install Vercel CLI
-      run: npm install --global vercel@latest
-      
-    - name: Pull Vercel Environment Information
-      run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-      
-    - name: Build Project Artifacts
-      run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-      
-    - name: Deploy Project Artifacts to Vercel
-      run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
-      
-    - name: Update deployment status
-      run: |
-        echo "🚀 Deployment completed successfully!"
-        echo "🔗 Production URL: https://hrms-x9xp.vercel.app"
-        echo "🧪 Test API: https://hrms-x9xp.vercel.app/api/test"
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+          cache-dependency-path: talio-web/Talio/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linting
+        run: npm run lint --if-present
