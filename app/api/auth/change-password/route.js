@@ -9,7 +9,7 @@ export async function POST(request) {
   try {
     // Get token from Authorization header
     const authHeader = request.headers.get('Authorization')
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json(
         { success: false, message: 'Unauthorized - No token provided' },
@@ -50,8 +50,8 @@ export async function POST(request) {
     const { User, Employee } = await getTenantModels(payload.databaseName, ['User', 'Employee'])
 
     // Get request body
-  const body = await request.json().catch(() => ({}))
-  const { currentPassword, newPassword } = body
+    const body = await request.json().catch(() => ({}))
+    const { currentPassword, newPassword } = body
 
     // Validate input
     if (!currentPassword || !newPassword || typeof currentPassword !== 'string' || typeof newPassword !== 'string') {
@@ -120,8 +120,8 @@ export async function POST(request) {
 
     // Sync updated password to backup database (fire-and-forget)
     const userWithNewPassword = await User.findById(user._id).select('+password').lean()
-    const empData = user.employeeId 
-      ? await Employee.findById(user.employeeId).select('firstName lastName').lean() 
+    const empData = user.employeeId
+      ? await Employee.findById(user.employeeId).select('firstName lastName').lean()
       : null
     syncUserToBackup({
       userId: user._id,
@@ -243,7 +243,7 @@ export async function GET(request) {
   try {
     // Get token from Authorization header
     const authHeader = request.headers.get('Authorization')
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json(
         { success: false, message: 'Unauthorized' },

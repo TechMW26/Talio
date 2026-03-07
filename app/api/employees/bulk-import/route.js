@@ -14,29 +14,29 @@ import { encryptPassword } from '@/lib/passwordEncryption'
  */
 function parseSalaryValue(value) {
   if (value === undefined || value === null || value === '') return 0
-  
+
   // If already a number, return it
   if (typeof value === 'number' && !isNaN(value)) return value
-  
+
   // Convert to string and clean up
   let strValue = String(value).trim()
-  
+
   // Remove currency symbols (₹, $, Rs, Rs., INR, etc.)
   strValue = strValue.replace(/^[\s₹$€£¥]*/g, '') // Leading currency symbols
   strValue = strValue.replace(/^(rs\.?|inr|usd|eur|gbp)\s*/gi, '') // Currency codes
   strValue = strValue.replace(/[\s₹$€£¥]*$/g, '') // Trailing currency symbols
-  
+
   // Remove thousands separators (commas and spaces used as separators)
   // Be careful not to remove decimal separators
   // Indian format: 1,00,000 or Western format: 100,000
   strValue = strValue.replace(/,/g, '')
-  
+
   // Remove any remaining whitespace
   strValue = strValue.trim()
-  
+
   // Parse the cleaned value
   const parsed = parseFloat(strValue)
-  
+
   return isNaN(parsed) ? 0 : parsed
 }
 
@@ -464,7 +464,7 @@ JSON only:`
     // Extract JSON from response (handle various formats)
     let jsonStr = response.trim()
     jsonStr = jsonStr.replace(/```json\s*/gi, '').replace(/```\s*/gi, '')
-    
+
     const jsonMatch = jsonStr.match(/\{[\s\S]*\}/)
     if (jsonMatch) {
       const mapping = JSON.parse(jsonMatch[0])
@@ -486,38 +486,38 @@ JSON only:`
 function findHeaderRow(rawData) {
   // Common header keywords that indicate an employee data header row
   const headerKeywords = [
-    'employee', 'emp', 'name', 'email', 'phone', 'mobile', 'gender', 'department', 
+    'employee', 'emp', 'name', 'email', 'phone', 'mobile', 'gender', 'department',
     'designation', 'dob', 'doj', 'date', 'salary', 'code', 'id', 'first', 'last',
     'contact', 'joining', 'birth', 'company', 'type', 'status'
   ]
-  
+
   // Check first 5 rows to find the header row
   for (let i = 0; i < Math.min(5, rawData.length); i++) {
     const row = rawData[i]
     if (!row || !Array.isArray(row)) continue
-    
+
     // Count how many cells in this row match header keywords
     let headerMatches = 0
     let nonEmptyCells = 0
-    
+
     for (const cell of row) {
       if (cell === undefined || cell === null || cell === '') continue
       nonEmptyCells++
-      
+
       const cellStr = String(cell).toLowerCase().trim()
       // Check if this cell contains any header keyword
       if (headerKeywords.some(keyword => cellStr.includes(keyword))) {
         headerMatches++
       }
     }
-    
+
     // If this row has at least 3 header-like cells and multiple non-empty cells, it's likely the header
     if (headerMatches >= 3 && nonEmptyCells >= 5) {
       console.log(`[HeaderDetection] Found header row at index ${i} (${headerMatches} header matches, ${nonEmptyCells} cells)`)
       return i
     }
   }
-  
+
   // Default to row 0 if no clear header row found
   console.log('[HeaderDetection] No clear header row found, defaulting to row 0')
   return 0
@@ -529,18 +529,18 @@ function findHeaderRow(rawData) {
  */
 function detectFieldFromSamples(samples) {
   if (!samples || samples.length === 0) return null
-  
+
   const validSamples = samples.filter(s => s !== undefined && s !== null && s !== '')
   if (validSamples.length === 0) return null
-  
+
   const stringSamples = validSamples.map(s => String(s).trim())
-  
+
   // Check for email pattern
   const emailMatches = stringSamples.filter(s => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s))
   if (emailMatches.length >= validSamples.length * 0.7) {
     return 'email'
   }
-  
+
   // Check for phone numbers
   const phoneMatches = stringSamples.filter(s => {
     const digits = s.replace(/[\s\-()+ ]/g, '')
@@ -549,14 +549,14 @@ function detectFieldFromSamples(samples) {
   if (phoneMatches.length >= validSamples.length * 0.7) {
     return 'phone'
   }
-  
+
   // Check for gender values
   const genderValues = ['m', 'f', 'male', 'female', 'other', 'man', 'woman']
   const genderMatches = stringSamples.filter(s => genderValues.includes(s.toLowerCase()))
   if (genderMatches.length >= validSamples.length * 0.8) {
     return 'gender'
   }
-  
+
   // Check for full names (multiple words)
   const nameMatches = stringSamples.filter(s => {
     if (!s.includes(' ')) return false
@@ -566,16 +566,16 @@ function detectFieldFromSamples(samples) {
   if (nameMatches.length >= validSamples.length * 0.6) {
     return 'fullName'
   }
-  
+
   // Check for employee codes
   const codeMatches = stringSamples.filter(s => {
     return /^[A-Za-z]{1,4}\d{1,5}$/.test(s) ||
-           /^[A-Za-z]{2,5}\d{2,4}[A-Za-z]{0,2}$/.test(s)
+      /^[A-Za-z]{2,5}\d{2,4}[A-Za-z]{0,2}$/.test(s)
   })
   if (codeMatches.length >= validSamples.length * 0.7) {
     return 'employeeCode'
   }
-  
+
   return null
 }
 
@@ -652,7 +652,7 @@ function ruleBasedColumnMapping(headers, sampleRows) {
     ],
     company: [
       'company name', 'company_name', 'companyname', 'organization name', 'organization_name',
-      'company', 'organization', 'organisation', 'org', 'org name', 'org_name', 
+      'company', 'organization', 'organisation', 'org', 'org name', 'org_name',
       'employer', 'firm', 'business', 'entity'
     ],
     employmentType: [
@@ -683,7 +683,7 @@ function ruleBasedColumnMapping(headers, sampleRows) {
   // Skip patterns - never map these (be specific to avoid false positives)
   const skipPatterns = [
     's no', 's.no', 'sno', 'serial', 'sr', 'sr.', 'sr no', 'sl', 'sl.', 'sl no',
-    '#', 'row', 'index', 'no.', 
+    '#', 'row', 'index', 'no.',
     'father', 'father name', 'fathers name', 'mother', 'mother name', 'mothers name',
     'spouse', 'spouse name', 'guardian', 'emergency contact', 'reference',
     'address', 'permanent address', 'current address', 'residential address',
@@ -715,13 +715,13 @@ function ruleBasedColumnMapping(headers, sampleRows) {
     if (neverSkipFields.some(field => normalizedHeader.includes(field) || field.includes(normalizedHeader))) {
       return false
     }
-    
+
     return skipPatterns.some(skip => {
       const normalizedSkip = normalizeHeader(skip)
       return normalizedHeader === normalizedSkip ||
-             normalizedHeader.startsWith(normalizedSkip + ' ') ||
-             normalizedHeader.endsWith(' ' + normalizedSkip) ||
-             (normalizedSkip.length > 3 && normalizedHeader.includes(normalizedSkip))
+        normalizedHeader.startsWith(normalizedSkip + ' ') ||
+        normalizedHeader.endsWith(' ' + normalizedSkip) ||
+        (normalizedSkip.length > 3 && normalizedHeader.includes(normalizedSkip))
     })
   }
 
@@ -760,7 +760,7 @@ function ruleBasedColumnMapping(headers, sampleRows) {
 
       for (const keyword of keywords) {
         const normalizedKeyword = normalizeHeader(keyword)
-        
+
         // Exact match
         if (normalizedHeader === normalizedKeyword) {
           console.log(`[RuleMapping]   → EXACT: ${field}`)
@@ -769,10 +769,10 @@ function ruleBasedColumnMapping(headers, sampleRows) {
           matched = true
           break
         }
-        
+
         // Partial match
         if (normalizedHeader.includes(normalizedKeyword) ||
-            (normalizedKeyword.length > 4 && normalizedKeyword.includes(normalizedHeader))) {
+          (normalizedKeyword.length > 4 && normalizedKeyword.includes(normalizedHeader))) {
           console.log(`[RuleMapping]   → PARTIAL: ${field} (keyword: "${keyword}")`)
           mapping[idx] = field
           usedFields.add(field)
@@ -811,31 +811,31 @@ function ruleBasedColumnMapping(headers, sampleRows) {
 async function getColumnMapping(headers, sampleRows) {
   console.log('[getColumnMapping] ═══════════════════════════════════════')
   console.log('[getColumnMapping] Headers:', JSON.stringify(headers))
-  
+
   // STEP 1: Pattern-based mapping FIRST (deterministic, reliable)
   console.log('[getColumnMapping] STEP 1: Pattern-based mapping...')
   const ruleMapping = ruleBasedColumnMapping(headers, sampleRows)
-  
+
   // Check what pattern mapping found
   const mappedFields = Object.values(ruleMapping).filter(v => v && v !== 'ignore' && v !== 'null')
   const hasEmail = mappedFields.includes('email')
   const hasName = mappedFields.includes('firstName') || mappedFields.includes('fullName')
-  
+
   console.log(`[getColumnMapping] Pattern found ${mappedFields.length} fields:`, mappedFields)
   console.log(`[getColumnMapping] Has email: ${hasEmail}, Has name: ${hasName}`)
-  
+
   // STEP 2: If pattern missed essentials, enhance with AI
   if (!hasEmail || !hasName) {
     console.log('[getColumnMapping] STEP 2: Pattern incomplete, trying AI...')
     const aiMapping = await aiMapColumns(headers, sampleRows)
-    
+
     if (aiMapping && Object.keys(aiMapping).length > 0) {
       console.log('[getColumnMapping] AI result:', JSON.stringify(aiMapping))
-      
+
       // Merge: AI fills in what pattern missed
       for (const [colIdx, field] of Object.entries(aiMapping)) {
-        if (field && field !== 'ignore' && field !== 'null' && 
-            (!ruleMapping[colIdx] || ruleMapping[colIdx] === 'ignore' || ruleMapping[colIdx] === 'null')) {
+        if (field && field !== 'ignore' && field !== 'null' &&
+          (!ruleMapping[colIdx] || ruleMapping[colIdx] === 'ignore' || ruleMapping[colIdx] === 'null')) {
           ruleMapping[colIdx] = field
         }
       }

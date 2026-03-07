@@ -17,7 +17,7 @@ export async function POST(request) {
     }
     const { user, models } = auth
     const { Employee, User, OnboardingEmail, CompanySettings } = models
-    
+
     // Only admin and HR can send onboarding emails
     if (!['admin', 'hr'].includes(user.role)) {
       return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
@@ -49,18 +49,18 @@ export async function POST(request) {
 
     // Generate a new password if resetPassword is true, otherwise use a placeholder
     let password = 'employee123' // Default password
-    
+
     if (resetPassword) {
       // Generate a random password
       password = crypto.randomBytes(4).toString('hex') + '1!' // 8 chars + special char
-      
+
       // Hash and update the user's password
       const bcrypt = await import('bcryptjs')
       const hashedPassword = await bcrypt.hash(password, 10)
-      await User.findByIdAndUpdate(targetUser._id, { 
+      await User.findByIdAndUpdate(targetUser._id, {
         password: hashedPassword,
         encryptedOnboardingPassword: encryptPassword(password), // Store encrypted for admin visibility
-        forcePasswordChange: true 
+        forcePasswordChange: true
       })
     }
 

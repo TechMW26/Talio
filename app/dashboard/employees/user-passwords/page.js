@@ -29,7 +29,7 @@ import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicat
 async function revealPassword(userId, action = 'view') {
   const token = localStorage.getItem('token')
   if (!token) throw new Error('Not authenticated')
-  
+
   const res = await fetch('/api/employees/user-passwords/reveal', {
     method: 'POST',
     headers: {
@@ -38,12 +38,12 @@ async function revealPassword(userId, action = 'view') {
     },
     body: JSON.stringify({ userId, action }),
   })
-  
+
   const data = await res.json()
   if (!res.ok || !data.success) {
     throw new Error(data.message || 'Failed to reveal password')
   }
-  
+
   return data
 }
 
@@ -55,7 +55,7 @@ export default function UserPasswordsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filter, setFilter] = useState('all') // 'all', 'with-password', 'without-password'
-  
+
   // Track which passwords are revealed (by userId)
   const [revealedPasswords, setRevealedPasswords] = useState({})
   const [loadingReveal, setLoadingReveal] = useState({})
@@ -101,7 +101,7 @@ export default function UserPasswordsPage() {
       })
       return
     }
-    
+
     setLoadingReveal(prev => ({ ...prev, [userId]: true }))
     try {
       const data = await revealPassword(userId, 'view')
@@ -360,11 +360,10 @@ export default function UserPasswordsPage() {
                           </span>
                         ) : user.hasPassword ? (
                           <div className="flex items-center gap-2">
-                            <code className={`px-3 py-1.5 border rounded-lg text-sm font-mono font-semibold ${
-                              revealedPasswords[user._id]
+                            <code className={`px-3 py-1.5 border rounded-lg text-sm font-mono font-semibold ${revealedPasswords[user._id]
                                 ? 'bg-warning-50 border-warning-200 text-warning-700'
                                 : 'bg-default-100 border-default-200 text-default-600'
-                            }`}>
+                              }`}>
                               {getDisplayPassword(user)}
                             </code>
                             <Button
@@ -375,7 +374,7 @@ export default function UserPasswordsPage() {
                               onPress={() => handleRevealPassword(user._id)}
                               title={revealedPasswords[user._id] ? 'Hide password' : 'Show password'}
                             >
-                              {revealedPasswords[user._id] 
+                              {revealedPasswords[user._id]
                                 ? <HiOutlineEyeSlash className="w-4 h-4 text-default-500" />
                                 : <HiOutlineEye className="w-4 h-4 text-default-500" />
                               }

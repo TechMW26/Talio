@@ -205,11 +205,11 @@ export async function POST(request, { params }) {
     // Clear the encrypted onboarding password — user has set their own password
     user.encryptedOnboardingPassword = null
     user.passwordChangedAt = new Date()
-    
+
     // Clear any legacy password reset fields
     user.passwordResetToken = undefined
     user.passwordResetExpires = undefined
-    
+
     await user.save()
 
     // Sync updated password to backup database (fire-and-forget)
@@ -233,10 +233,10 @@ export async function POST(request, { params }) {
     // Invalidate all user sessions (security: password change should logout everywhere)
     const revokedCount = await TenantUserSession.updateMany(
       { user: user._id, isActive: true },
-      { 
-        isActive: false, 
-        revokedAt: new Date(), 
-        revokedReason: 'password_change' 
+      {
+        isActive: false,
+        revokedAt: new Date(),
+        revokedReason: 'password_change'
       }
     )
 

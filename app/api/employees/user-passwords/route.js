@@ -22,7 +22,7 @@ export async function GET(request) {
     }
     const { user, models } = auth
     const { User, Employee, PasswordAuditLog } = models
-    
+
     // RBAC: Only admin and HR can access this
     if (!['admin', 'hr'].includes(user.role)) {
       return NextResponse.json({ success: false, message: 'Access denied. Only Admin and HR can view user passwords.' }, { status: 403 })
@@ -33,7 +33,7 @@ export async function GET(request) {
     const limit = parseInt(searchParams.get('limit')) || 50
     const search = searchParams.get('search') || ''
     const filter = searchParams.get('filter') || 'all' // 'all', 'with-password', 'without-password'
-    
+
     const skip = (page - 1) * limit
 
     // Build search query
@@ -69,12 +69,12 @@ export async function GET(request) {
     // Map results — decrypt and MASK passwords for list view
     let results = users.map(u => {
       const employee = u.employeeId
-      
+
       // Determine password state
       let passwordMasked = null
       let hasPassword = false
       let passwordStatus = 'unknown'
-      
+
       if (!u.forcePasswordChange && !u.encryptedOnboardingPassword) {
         // User has changed their password — encrypted value should be wiped
         passwordStatus = 'changed_by_user'
@@ -94,7 +94,7 @@ export async function GET(request) {
         passwordStatus = 'not_available'
         hasPassword = false
       }
-      
+
       return {
         _id: u._id,
         email: u.email,
@@ -117,7 +117,7 @@ export async function GET(request) {
     // Filter by name if search includes name
     if (search) {
       const searchLower = search.toLowerCase()
-      results = results.filter(r => 
+      results = results.filter(r =>
         r.email?.toLowerCase().includes(searchLower) ||
         r.firstName?.toLowerCase().includes(searchLower) ||
         r.lastName?.toLowerCase().includes(searchLower) ||
