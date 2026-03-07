@@ -46,7 +46,7 @@ export default function SlidingSidebar({
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const { unreadCount } = useUnreadMessages()
   const { toggleWidget } = useChatWidget()
-  const { startNavigation } = usePageTransition()
+  const { startNavigation, isNavigating, targetPath } = usePageTransition()
   const sidebarRef = useRef(null)
   const menuItemRefs = useRef({})
   const scrollContainerRef = useRef(null)
@@ -216,11 +216,12 @@ export default function SlidingSidebar({
     router.push('/login')
   }
 
-  // Helper to check if a menu item is active
+  // Helper to check if a menu item is active (optimistic highlight during navigation)
+  const effectivePath = (isNavigating && targetPath) ? targetPath : pathname
   const isMenuItemActive = (item) => {
-    if (item.path === pathname) return true
+    if (item.path === effectivePath) return true
     if (item.submenu) {
-      return item.submenu.some(subItem => subItem.path === pathname)
+      return item.submenu.some(subItem => subItem.path === effectivePath)
     }
     return false
   }
@@ -370,8 +371,8 @@ export default function SlidingSidebar({
                             onClick={() => handleLinkClick(subItem.path)}
                             className="w-full text-left flex items-center justify-between px-3 py-2 text-sm rounded-lg transition-all duration-200 cursor-pointer"
                             style={{
-                              backgroundColor: pathname === subItem.path ? 'var(--color-primary-500)' : 'transparent',
-                              color: pathname === subItem.path ? 'white' : 'var(--color-text-secondary)'
+                              backgroundColor: effectivePath === subItem.path ? 'var(--color-primary-500)' : 'transparent',
+                              color: effectivePath === subItem.path ? 'white' : 'var(--color-text-secondary)'
                             }}
                           >
                             <span>{subItem.name}</span>

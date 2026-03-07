@@ -31,7 +31,7 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
   const [mounted, setMounted] = useState(false)
   const { unreadCount } = useUnreadMessages()
   const { toggleWidget } = useChatWidget()
-  const { startNavigation } = usePageTransition()
+  const { startNavigation, isNavigating, targetPath } = usePageTransition()
   const [tooltipContent, setTooltipContent] = useState(null)
   const tooltipY = useRef(0)
   const tooltipRef = useRef(null)
@@ -105,11 +105,12 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
     }
   }
 
-  // Helper to check if a menu item is active
+  // Helper to check if a menu item is active (optimistic highlight during navigation)
+  const effectivePath = (isNavigating && targetPath) ? targetPath : pathname
   const isMenuItemActive = (item) => {
-    if (item.path === pathname) return true
+    if (item.path === effectivePath) return true
     if (item.submenu) {
-      return item.submenu.some(subItem => subItem.path === pathname)
+      return item.submenu.some(subItem => subItem.path === effectivePath)
     }
     return false
   }

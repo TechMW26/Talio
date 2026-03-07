@@ -14,15 +14,15 @@ export async function GET(request) {
     const { user, models } = auth
     const { Department, Employee, Leave, User } = models
 
-    // Get user's employee ID and department head info
+    // Get user's employee ID and department head/manager info
     const userRecord = await User.findById(user._id || user.userId)
-      .select('employeeId isDepartmentHead headOfDepartments')
+      .select('employeeId isDepartmentHead headOfDepartments isDepartmentManager departmentManagerOf')
       .lean()
     if (!userRecord || !userRecord.employeeId) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
-    // Check if user is a department head - support multiple departments
+    // Check if user is a department head or manager - support multiple departments
     let departmentIds = []
     let departments = []
 
@@ -32,27 +32,41 @@ export async function GET(request) {
       departments = await Department.find({ _id: { $in: departmentIds }, isActive: true }).lean()
     }
 
-    // Fallback: Check Department.head or Department.heads
+    // Also check departmentManagerOf
+    if (userRecord?.isDepartmentManager && userRecord?.departmentManagerOf?.length > 0) {
+      const mgrDeptIds = userRecord.departmentManagerOf.map(d => d.toString())
+      const mgrDepts = await Department.find({ _id: { $in: mgrDeptIds }, isActive: true }).lean()
+      for (const md of mgrDepts) {
+        if (!departmentIds.includes(md._id.toString())) {
+          departmentIds.push(md._id.toString())
+          departments.push(md)
+        }
+      }
+    }
+
+    // Fallback: Check Department.head, Department.heads, or Department.departmentManagers
     if (departmentIds.length === 0) {
-      departments = await Department.find({ 
+      departments = await Department.find({
         isActive: true,
         $or: [
           { head: userRecord.employeeId },
-          { heads: userRecord.employeeId }
+          { heads: userRecord.employeeId },
+          { departmentManager: userRecord.employeeId },
+          { departmentManagers: userRecord.employeeId }
         ]
       }).lean()
       departmentIds = departments.map(d => d._id.toString())
     }
 
     if (departmentIds.length === 0) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'You are not a department head' 
+      return NextResponse.json({
+        success: false,
+        message: 'You are not a department head or manager'
       }, { status: 403 })
     }
 
     // Get all team members (employees in ALL departments)
-    const teamMembers = await Employee.find({ 
+    const teamMembers = await Employee.find({
       department: { $in: departmentIds },
       status: 'active'
     }).select('_id')

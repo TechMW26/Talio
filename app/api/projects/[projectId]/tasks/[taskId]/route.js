@@ -1,16 +1,17 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-import { 
-  checkProjectAccess, 
+import {
+  checkProjectAccess,
   calculateCompletionPercentage,
-  createTimelineEvent 
+  createTimelineEvent
 } from '@/lib/projectService'
-import { 
+import {
   notifyTaskStatusChanged,
   notifyTaskAssigned,
   getProjectMemberUserIds
 } from '@/lib/projectNotifications'
 import { emitTaskUpdate } from '@/lib/realtimeEvents'
+import { hasDepartmentAuthority } from '@/lib/hierarchyAuth'
 
 // GET - Get single task details
 export async function GET(request, { params }) {
@@ -51,7 +52,7 @@ export async function GET(request, { params }) {
       .select('title status priority dueDate')
 
     // Check if current user is an assignee
-    const userAssignment = assignees.find(a => 
+    const userAssignment = assignees.find(a =>
       a.user._id.toString() === user.employeeId.toString()
     )
 
@@ -104,8 +105,21 @@ export async function PUT(request, { params }) {
     // Check permissions
     const isAdmin = ['admin'].includes(userRecord.role || user.role)
     const isCreator = task.createdBy.toString() === userRecord.employeeId.toString()
-    const isProjectHead = project.projectHead.toString() === userRecord.employeeId.toString()
-    
+    const isProjectHead = project.projectHead.toString() === userRecord.employeeId.toString() ||
+      project.projectHeads?.some(h => h.toString() === userRecord.employeeId.toString())
+
+    // Check hierarchy-based authority (dept manager / head of project's department)
+    const fullUser = await User.findById(user._id || user.userId)
+      .select('isDepartmentHead headOfDepartments isDepartmentManager departmentManagerOf teamLeaderOf')
+      .lean()
+    const projectDeptId = (project.department?._id || project.department)?.toString()
+    const isDeptAuthority = projectDeptId ? hasDepartmentAuthority({ ...user, ...fullUser }, projectDeptId) : false
+
+    // Check if user is a team leader on assigned teams
+    const isTeamLeaderOnProject = fullUser?.teamLeaderOf?.some(tId =>
+      project.assignedTeams?.some(at => at.toString() === tId.toString())
+    )
+
     // Check if user is an accepted assignee
     const userAssignment = await TaskAssignee.findOne({
       task: taskId,
@@ -115,12 +129,12 @@ export async function PUT(request, { params }) {
     const isAssignedAndAccepted = !!userAssignment
 
     const body = await request.json()
-    const { 
-      title, 
-      description, 
-      status, 
-      priority, 
-      dueDate, 
+    const {
+      title,
+      description,
+      status,
+      priority,
+      dueDate,
       startDate,
       tags,
       estimatedHours,
@@ -130,23 +144,23 @@ export async function PUT(request, { params }) {
       statusChangeReason // Reason for status change (required when manager/head changes status)
     } = body
 
-    // For status changes, only the assigned person (who accepted), project head, or admin can update
+    // For status changes, only the assigned person (who accepted), project head, dept authority, team leader on project, or admin can update
     if (status && status !== task.status) {
-      if (!isAssignedAndAccepted && !isAdmin && !isProjectHead) {
-        return NextResponse.json({ 
-          success: false, 
-          message: 'Only the assigned person or project head can update task status' 
+      if (!isAssignedAndAccepted && !isAdmin && !isProjectHead && !isDeptAuthority && !isTeamLeaderOnProject) {
+        return NextResponse.json({
+          success: false,
+          message: 'Only the assigned person, project head, department manager, or team leader can update task status'
         }, { status: 403 })
       }
     }
 
-    // For other updates, allow creator, project head, admin, or assignee
-    const canUpdate = isAdmin || isCreator || isProjectHead || isAssignedAndAccepted
+    // For other updates, allow creator, project head, admin, assignee, dept authority, or team leader
+    const canUpdate = isAdmin || isCreator || isProjectHead || isAssignedAndAccepted || isDeptAuthority || isTeamLeaderOnProject
 
     if (!canUpdate) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'You do not have permission to update this task' 
+      return NextResponse.json({
+        success: false,
+        message: 'You do not have permission to update this task'
       }, { status: 403 })
     }
 
@@ -169,21 +183,21 @@ export async function PUT(request, { params }) {
         const completedCount = task.subtasks.filter(st => st.completed).length
         taskProgress = Math.round((completedCount / task.subtasks.length) * 100)
       }
-      
-      // STRICT ENFORCEMENT: Cannot change from 'review' status when 100% complete (except project head/admin)
-      if (task.status === 'review' && taskProgress === 100 && !isProjectHead && !isAdmin) {
-        return NextResponse.json({ 
-          success: false, 
-          message: 'Task is under review and cannot be modified. Please wait for project head approval.' 
+
+      // STRICT ENFORCEMENT: Cannot change from 'review' status when 100% complete (except project head/admin/dept authority)
+      if (task.status === 'review' && taskProgress === 100 && !isProjectHead && !isAdmin && !isDeptAuthority) {
+        return NextResponse.json({
+          success: false,
+          message: 'Task is under review and cannot be modified. Please wait for project head approval.'
         }, { status: 403 })
       }
-      
-      // If assignee marks as completed, require approval from project head(s)
-      if (status === 'completed' && !isProjectHead && !isAdmin) {
+
+      // If assignee marks as completed, require approval from project head(s) — dept authority and team leaders can complete directly
+      if (status === 'completed' && !isProjectHead && !isAdmin && !isDeptAuthority) {
         // STRICTLY ENFORCE REVIEW STATUS
         updates.status = 'review'
         changes.push(`Status changed from ${oldStatus} to review`)
-        
+
         // Create approval request for task review (instead of completion)
         await ProjectApprovalRequest.create({
           project: projectId,
@@ -198,11 +212,11 @@ export async function PUT(request, { params }) {
             submittedBy: user.employeeId
           }
         })
-      } else if (status === 'review' && !isProjectHead && !isAdmin) {
+      } else if (status === 'review' && !isProjectHead && !isAdmin && !isDeptAuthority) {
         // If assignee moves to review, create approval request
         updates.status = 'review'
         changes.push(`Status changed from ${oldStatus} to review`)
-        
+
         // Create approval request for task review
         await ProjectApprovalRequest.create({
           project: projectId,
@@ -220,7 +234,7 @@ export async function PUT(request, { params }) {
       } else {
         updates.status = status
         changes.push(`Status changed from ${oldStatus} to ${status}`)
-        
+
         if (status === 'completed') {
           updates.completedAt = new Date()
         }
@@ -248,12 +262,12 @@ export async function PUT(request, { params }) {
     if (order !== undefined) {
       updates.order = order
     }
-    
+
     // Handle subtasks updates
     if (subtasks !== undefined) {
       const oldSubtasks = task.subtasks || []
       const oldSubtaskIds = oldSubtasks.map(st => st._id?.toString())
-      
+
       // Process subtasks - separate new ones from existing
       const processedSubtasks = subtasks.map(st => {
         // If it's a new subtask (has isNew flag or starts with 'new-')
@@ -279,21 +293,21 @@ export async function PUT(request, { params }) {
           createdAt: st.createdAt
         }
       })
-      
+
       updates.subtasks = processedSubtasks
-      
+
       // Track changes for timeline
       const newSubtaskCount = subtasks.filter(st => st.isNew || (st._id && st._id.toString().startsWith('new-'))).length
       const deletedCount = oldSubtaskIds.filter(id => !subtasks.find(st => st._id?.toString() === id)).length
-      
+
       // Check for ETA changes
       let etaChanges = []
       subtasks.forEach(st => {
         if (st._id && !st._id.toString().startsWith('new-')) {
           const oldSt = oldSubtasks.find(o => o._id?.toString() === st._id?.toString())
           if (oldSt) {
-            if ((oldSt.estimatedDays || 0) !== (parseInt(st.estimatedDays) || 0) || 
-                (oldSt.estimatedHours || 0) !== (parseInt(st.estimatedHours) || 0)) {
+            if ((oldSt.estimatedDays || 0) !== (parseInt(st.estimatedDays) || 0) ||
+              (oldSt.estimatedHours || 0) !== (parseInt(st.estimatedHours) || 0)) {
               etaChanges.push(`"${st.title}" ETA updated`)
             }
             if (oldSt.title !== st.title) {
@@ -305,7 +319,7 @@ export async function PUT(request, { params }) {
           }
         }
       })
-      
+
       if (newSubtaskCount > 0) {
         changes.push(`${newSubtaskCount} subtask${newSubtaskCount > 1 ? 's' : ''} added`)
       }
@@ -315,10 +329,10 @@ export async function PUT(request, { params }) {
       if (etaChanges.length > 0) {
         changes.push(`Subtask ETAs updated: ${etaChanges.join(', ')}`)
       }
-      
+
       // Recalculate progress
       const completedCount = processedSubtasks.filter(st => st.completed).length
-      updates.progressPercentage = processedSubtasks.length > 0 
+      updates.progressPercentage = processedSubtasks.length > 0
         ? Math.round((completedCount / processedSubtasks.length) * 100)
         : 0
     }
@@ -332,7 +346,7 @@ export async function PUT(request, { params }) {
       // Build description with reason if provided
       const reasonText = statusChangeReason ? ` - Reason: "${statusChangeReason}"` : ''
       const eventDescription = `Task "${task.title}" status changed from ${oldStatus} to ${status}${reasonText}`
-      
+
       // Create timeline event (don't await to speed up response)
       createTimelineEvent({
         project: projectId,
@@ -340,9 +354,9 @@ export async function PUT(request, { params }) {
         createdBy: user.employeeId,
         relatedTask: taskId,
         description: eventDescription,
-        metadata: { 
-          taskTitle: task.title, 
-          oldStatus, 
+        metadata: {
+          taskTitle: task.title,
+          oldStatus,
           newStatus: status,
           reason: statusChangeReason || null,
           changedBy: {
@@ -353,22 +367,22 @@ export async function PUT(request, { params }) {
       }, models).catch(console.error)
 
       // Notify relevant users (non-blocking)
-      TaskAssignee.find({ 
-        task: taskId, 
-        assignmentStatus: 'accepted' 
+      TaskAssignee.find({
+        task: taskId,
+        assignmentStatus: 'accepted'
       }).select('user').then(assignees => {
         const notifyEmployeeIds = [
           task.createdBy,
           ...assignees.map(a => a.user)
         ].filter(id => id.toString() !== user.employeeId.toString())
 
-        User.find({ 
-          employeeId: { $in: notifyEmployeeIds } 
+        User.find({
+          employeeId: { $in: notifyEmployeeIds }
         }).select('_id').then(notifyUsers => {
           notifyTaskStatusChanged(
-            project, 
-            task, 
-            updaterEmployee, 
+            project,
+            task,
+            updaterEmployee,
             notifyUsers.map(u => u._id),
             oldStatus,
             status
@@ -396,7 +410,7 @@ export async function PUT(request, { params }) {
     // Emit real-time task update to all project members
     try {
       const memberUserIds = await getProjectMemberUserIds(projectId, null, models)
-      
+
       emitTaskUpdate(
         {
           _id: updatedTask._id,
@@ -408,8 +422,8 @@ export async function PUT(request, { params }) {
           dueDate: updatedTask.dueDate
         },
         memberUserIds.map(id => id.toString()),
-        { 
-          action: 'update', 
+        {
+          action: 'update',
           statusChanged: status && status !== oldStatus,
           oldStatus,
           newStatus: status
@@ -463,10 +477,10 @@ export async function DELETE(request, { params }) {
 
     // Check permissions
     const isAdmin = ['admin'].includes(userRecord.role || user.role)
-    const projectHeadIds = project.projectHeads && project.projectHeads.length > 0 
+    const projectHeadIds = project.projectHeads && project.projectHeads.length > 0
       ? project.projectHeads.map(h => h.toString())
-      : project.projectHead 
-        ? [project.projectHead.toString()] 
+      : project.projectHead
+        ? [project.projectHead.toString()]
         : []
     const isProjectHead = projectHeadIds.includes(userRecord.employeeId.toString())
     const isCreator = task.createdBy.toString() === userRecord.employeeId.toString()
@@ -478,8 +492,17 @@ export async function DELETE(request, { params }) {
       assignmentStatus: 'accepted'
     })
 
-    // Project head and admins can delete immediately
-    if (isAdmin || isProjectHead) {
+    // Check hierarchy authority for project's department
+    const fullUserDel = await User.findById(user._id || user.userId)
+      .select('isDepartmentHead headOfDepartments isDepartmentManager departmentManagerOf')
+      .lean()
+    const delProjectDeptId = (project.department?._id || project.department)?.toString()
+    const isDeptAuthorityDel = delProjectDeptId
+      ? hasDepartmentAuthority({ ...user, ...fullUserDel }, delProjectDeptId)
+      : false
+
+    // Project head, dept authority, and admins can delete immediately
+    if (isAdmin || isProjectHead || isDeptAuthorityDel) {
       const taskTitle = task.title
 
       // Delete the task and its assignees
@@ -506,17 +529,17 @@ export async function DELETE(request, { params }) {
 
     // For task creator or assignee - create a deletion request
     if (!isCreator && !isAssignee) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'You do not have permission to request deletion of this task' 
+      return NextResponse.json({
+        success: false,
+        message: 'You do not have permission to request deletion of this task'
       }, { status: 403 })
     }
 
     // Check if there's already a pending deletion request
     if (task.deletionRequest && task.deletionRequest.status === 'pending') {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'A deletion request is already pending for this task' 
+      return NextResponse.json({
+        success: false,
+        message: 'A deletion request is already pending for this task'
       }, { status: 400 })
     }
 

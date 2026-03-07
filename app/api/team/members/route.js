@@ -19,10 +19,11 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url)
     const departmentFilter = searchParams.get('department')
 
-    // Get user to find employee ID and department head info
+    // Get user to find employee ID and department head/manager info
     const userRecord = await User.findById(user._id || user.userId)
-      .select('employeeId isDepartmentHead headOfDepartments')
+      .select('employeeId isDepartmentHead headOfDepartments isDepartmentManager departmentManagerOf')
       .populate('headOfDepartments', 'name code _id')
+      .populate('departmentManagerOf', 'name code _id')
       .lean()
 
     if (!userRecord || !userRecord.employeeId) {
@@ -45,14 +46,28 @@ export async function GET(request) {
     let teamMembers = []
     let departments = []
     let isDepartmentHead = false
+    let isDepartmentManager = false
     let filteredDepartmentIds = []
 
     // Check if user is a department head via User.headOfDepartments (supports multiple departments)
     if (userRecord.isDepartmentHead && userRecord.headOfDepartments?.length > 0) {
       isDepartmentHead = true
-      departments = userRecord.headOfDepartments
+      departments = [...userRecord.headOfDepartments]
+    }
+
+    // Also check if user is a department manager (has same operational authority)
+    if (userRecord.isDepartmentManager && userRecord.departmentManagerOf?.length > 0) {
+      isDepartmentManager = true
+      for (const md of userRecord.departmentManagerOf) {
+        if (!departments.some(d => d._id.toString() === md._id.toString())) {
+          departments.push(md)
+        }
+      }
+    }
+
+    if ((isDepartmentHead || isDepartmentManager) && departments.length > 0) {
       let departmentIds = departments.map(d => d._id.toString())
-      
+
       // Apply department filter if specified
       if (departmentFilter && departmentFilter !== 'all') {
         if (departmentIds.includes(departmentFilter)) {
@@ -63,7 +78,7 @@ export async function GET(request) {
       } else {
         filteredDepartmentIds = departmentIds
       }
-      
+
       // Get all team members from filtered departments
       teamMembers = await Employee.find({
         department: { $in: filteredDepartmentIds },
@@ -149,7 +164,7 @@ export async function GET(request) {
       }
 
       // Combine and sort
-      teamMembers = [...additionalHeads, ...teamMembers].sort((a, b) => 
+      teamMembers = [...additionalHeads, ...teamMembers].sort((a, b) =>
         (a.firstName || '').localeCompare(b.firstName || '')
       )
     } else {
@@ -169,7 +184,7 @@ export async function GET(request) {
         isDepartmentHead = true
         departments = headDepartments
         const departmentIds = departments.map(d => d._id)
-        
+
         // Get all team members from ALL departments user heads
         teamMembers = await Employee.find({
           department: { $in: departmentIds },
@@ -249,7 +264,7 @@ export async function GET(request) {
         }
 
         // Combine and sort
-        teamMembers = [...additionalHeads, ...teamMembers].sort((a, b) => 
+        teamMembers = [...additionalHeads, ...teamMembers].sort((a, b) =>
           (a.firstName || '').localeCompare(b.firstName || '')
         )
       } else if (userRole === 'department_head' || userRole === 'manager') {
@@ -260,7 +275,7 @@ export async function GET(request) {
           if (dept) {
             isDepartmentHead = true
             departments = [dept]
-            
+
             teamMembers = await Employee.find({
               department: dept._id,
               status: 'active'

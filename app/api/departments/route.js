@@ -89,6 +89,31 @@ export async function GET(request) {
           }
         }
       },
+      // Lookup department managers
+      {
+        $lookup: {
+          from: 'employees',
+          localField: 'departmentManagers',
+          foreignField: '_id',
+          as: 'departmentManagers',
+          pipeline: [
+            { $project: { firstName: 1, lastName: 1, employeeCode: 1, email: 1, designation: 1 } }
+          ]
+        }
+      },
+      // Lookup teams belonging to this department (by team.department reference)
+      {
+        $lookup: {
+          from: 'teams',
+          let: { deptId: '$_id' },
+          pipeline: [
+            { $match: { $expr: { $eq: ['$department', '$$deptId'] }, isActive: true } },
+            { $sort: { teamName: 1 } },
+            { $project: { teamName: 1, teamCode: 1, description: 1, teamLeaders: 1, members: 1 } }
+          ],
+          as: 'teams'
+        }
+      },
       { $project: { employeeStats: 0 } }
     ])
 

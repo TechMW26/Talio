@@ -6,9 +6,9 @@ import { updateDepartmentHeadsForDepartment } from '@/lib/departmentHeadSync'
 export async function GET(request, context) {
   try {
     const { id } = await context.params
-    
+
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Department'])
+    const auth = await getAuthAndModels(request, ['Department', 'Team'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
@@ -18,6 +18,16 @@ export async function GET(request, context) {
     const department = await Department.findById(id)
       .populate('head', 'firstName lastName employeeCode designation')
       .populate('heads', 'firstName lastName employeeCode designation')
+      .populate('departmentManager', 'firstName lastName employeeCode designation')
+      .populate('departmentManagers', 'firstName lastName employeeCode designation')
+      .populate({
+        path: 'teams',
+        match: { isActive: true },
+        populate: [
+          { path: 'teamLeaders', select: 'firstName lastName employeeCode department' },
+          { path: 'members', select: 'firstName lastName employeeCode' }
+        ]
+      })
 
     if (!department) {
       return NextResponse.json(
@@ -43,7 +53,7 @@ export async function GET(request, context) {
 export async function PUT(request, context) {
   try {
     const { id } = await context.params
-    
+
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Department', 'User', 'Employee'])
     if (!auth.success) {
@@ -53,7 +63,7 @@ export async function PUT(request, context) {
     const { Department, User, Employee } = models
 
     const data = await request.json()
-    
+
     // Get current department to compare heads
     const currentDepartment = await Department.findById(id).lean()
     if (!currentDepartment) {
@@ -62,7 +72,7 @@ export async function PUT(request, context) {
         { status: 404 }
       )
     }
-    
+
     // Collect previous heads
     const previousHeads = []
     if (currentDepartment.head) {
@@ -76,7 +86,7 @@ export async function PUT(request, context) {
         }
       })
     }
-    
+
     // Handle multiple heads - ensure backwards compatibility
     if (data.heads && data.heads.length > 0) {
       // Set the first head as the legacy 'head' field for backwards compatibility
@@ -107,7 +117,7 @@ export async function PUT(request, context) {
         }
       })
     }
-    
+
     // Sync department head status to User meta (fire and forget)
     updateDepartmentHeadsForDepartment(id, previousHeads, newHeads, { User, Employee, Department })
       .catch(err => console.error('Error syncing department heads:', err))
@@ -130,7 +140,7 @@ export async function PUT(request, context) {
 export async function DELETE(request, context) {
   try {
     const { id } = await context.params
-    
+
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Department', 'User', 'Employee'])
     if (!auth.success) {
@@ -147,7 +157,7 @@ export async function DELETE(request, context) {
         { status: 404 }
       )
     }
-    
+
     // Collect all heads to update their status
     const previousHeads = []
     if (department.head) {
@@ -163,7 +173,7 @@ export async function DELETE(request, context) {
     }
 
     await Department.findByIdAndDelete(id)
-    
+
     // Sync department head status - remove this department from heads (fire and forget)
     if (previousHeads.length > 0) {
       updateDepartmentHeadsForDepartment(id, previousHeads, [], { User, Employee, Department })

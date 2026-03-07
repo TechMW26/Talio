@@ -1,14 +1,15 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import mongoose from 'mongoose'
-import { 
-  checkProjectAccess, 
+import {
+  checkProjectAccess,
   calculateCompletionPercentage,
-  createTimelineEvent 
+  createTimelineEvent
 } from '@/lib/projectService'
 import { notifyTaskAssigned, getProjectMemberUserIds } from '@/lib/projectNotifications'
 import { emitTaskUpdate } from '@/lib/realtimeEvents'
 import { createTaskAssignmentNotification } from '@/lib/actionableNotifications'
+import { canAssignTask } from '@/lib/hierarchyAuth'
 
 // GET - Get tasks for a project
 export async function GET(request, { params }) {
@@ -89,12 +90,12 @@ export async function GET(request, { params }) {
 export async function POST(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'Task', 'TaskAssignee', 'User', 'Employee', 'ProjectTimelineEvent', 'ActionableNotification'])
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'Task', 'TaskAssignee', 'User', 'Employee', 'ProjectTimelineEvent', 'ActionableNotification', 'Team'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Project, ProjectMember, Task, TaskAssignee, User, Employee } = models
+    const { Project, ProjectMember, Task, TaskAssignee, User, Employee, Team } = models
 
     const { projectId } = await params
 
@@ -113,19 +114,19 @@ export async function POST(request, { params }) {
     if (!isAdmin) {
       const { hasAccess } = await checkProjectAccess(projectId, userRecord.employeeId, 'participate', models)
       if (!hasAccess) {
-        return NextResponse.json({ 
-          success: false, 
-          message: 'You must accept the project invitation to create tasks' 
+        return NextResponse.json({
+          success: false,
+          message: 'You must accept the project invitation to create tasks'
         }, { status: 403 })
       }
     }
 
     const body = await request.json()
-    const { 
-      title, 
-      description, 
-      priority, 
-      dueDate, 
+    const {
+      title,
+      description,
+      priority,
+      dueDate,
       startDate,
       assigneeIds = [],
       tags,
@@ -153,17 +154,17 @@ export async function POST(request, { params }) {
       console.warn('[Tasks] Failed to process attachments, skipping:', attachmentError)
       normalizedAttachments = []
     }
-    
+
     // Build final attachments array explicitly BEFORE Task.create
     const finalAttachments = normalizedAttachments.length > 0
       ? normalizedAttachments.map((file) => ({
-          name: String(file.name || ''),
-          url: String(file.url || ''),
-          type: file.type ? String(file.type) : undefined,
-          size: typeof file.size === 'number' ? file.size : undefined,
-          uploadedBy: userRecord.employeeId,
-          uploadedAt: new Date()
-        })).filter(file => file.name && file.url)
+        name: String(file.name || ''),
+        url: String(file.url || ''),
+        type: file.type ? String(file.type) : undefined,
+        size: typeof file.size === 'number' ? file.size : undefined,
+        uploadedBy: userRecord.employeeId,
+        uploadedAt: new Date()
+      })).filter(file => file.name && file.url)
       : [];
 
     if (!title) {
@@ -184,14 +185,14 @@ export async function POST(request, { params }) {
     }))
 
     // Calculate initial progress if subtasks exist
-    const progressPercentage = formattedSubtasks.length > 0 
+    const progressPercentage = formattedSubtasks.length > 0
       ? 0 // All subtasks start incomplete
       : 0
 
     // Calculate dates if ETA is provided and user is assigning to themselves
     let calculatedStartDate = startDate ? new Date(startDate) : undefined
     let calculatedDueDate = dueDate ? new Date(dueDate) : undefined
-    
+
     if (estimatedHours && assigneeIds.includes(userRecord.employeeId.toString())) {
       calculatedStartDate = new Date()
       const workDays = Math.ceil(estimatedHours / 8)
@@ -225,7 +226,7 @@ export async function POST(request, { params }) {
     const taskDescription = estimatedHours && assigneeIds.includes(user.employeeId.toString())
       ? `Task "${title}" was created with ${estimatedHours}h ETA (Due: ${calculatedDueDate.toLocaleDateString()})`
       : `Task "${title}" was created`
-    
+
     await createTimelineEvent({
       project: projectId,
       type: 'task_created',
@@ -235,12 +236,39 @@ export async function POST(request, { params }) {
       metadata: { taskTitle: title, priority, estimatedHours }
     }, models)
 
-    // Assign to users
+    // Fetch user's full auth record for hierarchy checks
+    const fullUser = await User.findById(user._id || user.userId)
+      .select('role isDepartmentHead headOfDepartments isDepartmentManager departmentManagerOf teamLeaderOf employeeId')
+      .lean()
+
+    // Pre-fetch teams the user leads (for canAssignTask checks)
+    let userTeams = []
+    if (fullUser?.teamLeaderOf?.length > 0) {
+      userTeams = await Team.find({ _id: { $in: fullUser.teamLeaderOf }, isActive: true })
+        .select('members teamLeaders')
+        .lean()
+    }
+
+    // Assign to users (with hierarchy-aware validation)
     const assignedNames = []
     for (const assigneeId of assigneeIds) {
       const assigneeIdStr = assigneeId.toString()
-      
-      // Verify assignee is an accepted member
+
+      // Hierarchy-aware assignment check
+      const assignCheck = canAssignTask(fullUser || user, project, assigneeIdStr, userTeams)
+      if (!assignCheck.allowed) {
+        // Fallback to membership check for backward compatibility
+        const isMember = await ProjectMember.findOne({
+          project: projectId,
+          user: assigneeIdStr,
+          invitationStatus: 'accepted'
+        })
+        if (!isMember && assigneeIdStr !== userRecord.employeeId.toString()) {
+          continue // Skip — no hierarchy authority and not a member
+        }
+      }
+
+      // Verify assignee is an accepted member (still needed for creating the assignment)
       const isMember = await ProjectMember.findOne({
         project: projectId,
         user: assigneeIdStr,
@@ -275,7 +303,7 @@ export async function POST(request, { params }) {
       // Send notification if not self-assignment
       if (assigneeIdStr !== user.employeeId.toString()) {
         await notifyTaskAssigned(project, task, assigneeEmployee, creatorEmployee, models)
-        
+
         // Create actionable notification for task assignment (persistent toast)
         try {
           const assigneeUser = await User.findOne({ employeeId: assigneeIdStr }).select('_id')
@@ -313,7 +341,7 @@ export async function POST(request, { params }) {
     // Emit real-time task creation to all project members
     try {
       const memberUserIds = await getProjectMemberUserIds(projectId, null, models)
-      
+
       emitTaskUpdate(
         {
           _id: task._id,

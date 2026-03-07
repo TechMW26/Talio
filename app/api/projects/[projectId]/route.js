@@ -1,11 +1,12 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-import { 
-  checkProjectAccess, 
+import {
+  checkProjectAccess,
   getProjectTaskStats,
   createTimelineEvent,
   updateProjectStatus
 } from '@/lib/projectService'
+import { hasDepartmentAuthority } from '@/lib/hierarchyAuth'
 
 // GET - Get project details
 export async function GET(request, { params }) {
@@ -31,17 +32,34 @@ export async function GET(request, { params }) {
       .populate('projectHeads', 'firstName lastName profilePicture email employeeCode')
       .populate('createdBy', 'firstName lastName profilePicture')
       .populate('department', 'name code')
+      .populate('projectManager', 'firstName lastName profilePicture email employeeCode')
+      .populate({
+        path: 'assignedTeams',
+        select: 'teamName teamCode department teamLeaders members isActive',
+        populate: [
+          { path: 'teamLeaders', select: 'firstName lastName profilePicture' },
+          { path: 'department', select: 'name' }
+        ]
+      })
       .populate('chatGroup')
 
     if (!project) {
       return NextResponse.json({ success: false, message: 'Project not found' }, { status: 404 })
     }
 
-    // Check access (allow admins to view any project)
+    // Check access (allow admins, hierarchy authorities, and project members)
     const isAdmin = ['admin', 'hr'].includes(user.role)
     if (!isAdmin) {
       const { hasAccess } = await checkProjectAccess(projectId, employeeId, 'view', models)
-      if (!hasAccess) {
+      // Also allow access via department hierarchy (dept head/manager of project's dept)
+      const hasHierarchyAccess = project.department
+        ? hasDepartmentAuthority(user, (project.department._id || project.department).toString())
+        : false
+      // Also allow team leaders of assigned teams
+      const isTeamLeaderOfAssigned = user.teamLeaderOf?.some(tId =>
+        project.assignedTeams?.some(at => (at._id || at).toString() === tId.toString())
+      )
+      if (!hasAccess && !hasHierarchyAccess && !isTeamLeaderOfAssigned) {
         return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
       }
     }
@@ -52,7 +70,7 @@ export async function GET(request, { params }) {
       .populate('invitedBy', 'firstName lastName')
       .populate('sourceDepartment', 'name')
       .sort({ role: 1, createdAt: 1 })
-    
+
     // Deduplicate members by user._id, keeping the first occurrence (usually 'head' role due to sort)
     const seenUserIds = new Set()
     const members = allMembers.filter(m => {
@@ -74,7 +92,7 @@ export async function GET(request, { params }) {
       .populate('requestedBy', 'firstName lastName')
 
     // Get current user's membership - use the extracted employeeId for consistency
-    const userMembership = members.find(m => 
+    const userMembership = members.find(m =>
       m.user._id.toString() === employeeId.toString()
     )
 
@@ -91,7 +109,7 @@ export async function GET(request, { params }) {
         currentUserRole: userMembership?.role,
         currentUserInvitationStatus: userMembership?.invitationStatus,
         isProjectHead: project.projectHead?._id?.toString() === employeeId.toString() ||
-                       project.projectHeads?.some(h => h._id?.toString() === employeeId.toString()),
+          project.projectHeads?.some(h => h._id?.toString() === employeeId.toString()),
         isCreator: project.createdBy._id.toString() === employeeId.toString()
       }
     })
@@ -128,12 +146,12 @@ export async function PUT(request, { params }) {
     // Check against both single projectHead and projectHeads array
     const isAdmin = ['admin'].includes(user.role)
     const isHead = project.projectHead?.toString() === employeeId.toString() ||
-                   project.projectHeads?.some(h => h.toString() === employeeId.toString())
+      project.projectHeads?.some(h => h.toString() === employeeId.toString())
 
     if (!isAdmin && !isHead) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'Only project head can update the project' 
+      return NextResponse.json({
+        success: false,
+        message: 'Only project head can update the project'
       }, { status: 403 })
     }
 
@@ -146,7 +164,7 @@ export async function PUT(request, { params }) {
     if (name && name !== project.name) {
       updates.name = name
       changes.push(`Name changed to "${name}"`)
-      
+
       // Also update chat group name
       if (project.chatGroup) {
         await Chat.findByIdAndUpdate(project.chatGroup, { name })
@@ -176,19 +194,19 @@ export async function PUT(request, { params }) {
     if (projectHeadIds && Array.isArray(projectHeadIds) && projectHeadIds.length > 0) {
       const currentHeadIds = (project.projectHeads || []).map(h => h.toString())
       const newHeadIds = projectHeadIds.map(h => h.toString())
-      
+
       // Check if heads changed
       const headsChanged = newHeadIds.length !== currentHeadIds.length ||
         newHeadIds.some(h => !currentHeadIds.includes(h)) ||
         currentHeadIds.some(h => !newHeadIds.includes(h))
-      
+
       if (headsChanged) {
         // Verify all new heads exist
         const newHeads = await Employee.find({ _id: { $in: projectHeadIds } })
         if (newHeads.length !== projectHeadIds.length) {
           return NextResponse.json({ success: false, message: 'One or more project heads not found' }, { status: 404 })
         }
-        
+
         // Remove head role from removed heads
         const removedHeads = currentHeadIds.filter(h => !newHeadIds.includes(h))
         for (const headId of removedHeads) {
@@ -198,7 +216,7 @@ export async function PUT(request, { params }) {
             { $set: { role: 'member' } }
           )
         }
-        
+
         // Add head role to new heads
         const addedHeads = newHeadIds.filter(h => !currentHeadIds.includes(h))
         for (const headId of addedHeads) {
@@ -220,10 +238,10 @@ export async function PUT(request, { params }) {
             })
           }
         }
-        
+
         updates.projectHeads = projectHeadIds
         updates.projectHead = projectHeadIds[0] // Keep first as legacy
-        
+
         const headNames = newHeads.map(h => `${h.firstName} ${h.lastName}`).join(', ')
         changes.push(`Project heads updated: ${headNames}`)
       }
@@ -295,12 +313,12 @@ export async function DELETE(request, { params }) {
     // Only admin or project head can delete
     const isAdmin = ['admin'].includes(user.role)
     const isHead = project.projectHead?.toString() === employeeId.toString() ||
-                   project.projectHeads?.some(h => h.toString() === employeeId.toString())
+      project.projectHeads?.some(h => h.toString() === employeeId.toString())
 
     if (!isAdmin && !isHead) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'Only admin or project head can delete the project' 
+      return NextResponse.json({
+        success: false,
+        message: 'Only admin or project head can delete the project'
       }, { status: 403 })
     }
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { Spinner } from '@heroui/react'
 import Sidebar from '@/components/Sidebar'
@@ -20,6 +20,7 @@ import { ActionableToastProvider } from '@/contexts/ActionableToastContext'
 import { ChatWidgetProvider, useChatWidget } from '@/contexts/ChatWidgetContext'
 import { PageTransitionProvider, usePageTransition } from '@/contexts/PageTransitionContext'
 import RouteProgressBar from '@/components/ui/RouteProgressBar'
+import { getSkeletonForRoute } from '@/components/ui/PageSkeletons'
 import { ErrorBoundaryWithRetry } from '@/components/ui/ErrorBoundary'
 import { getCurrentUser, getEmployeeId, syncUserData, getToken } from '@/utils/userHelper'
 import {
@@ -34,17 +35,45 @@ import {
 import WebAccessRestriction, { shouldRestrictWebAccess } from '@/components/WebAccessRestriction'
 import CallAlertReceiver from '@/components/CallAlertReceiver'
 
-// Page transition loading overlay
+// Page transition skeleton overlay — renders target page's skeleton instead of a blur spinner
 function PageTransitionOverlay() {
-  const { isNavigating } = usePageTransition()
+  const { isNavigating, targetPath } = usePageTransition()
 
   if (!isNavigating) return null
 
+  const SkeletonComponent = getSkeletonForRoute(targetPath)
+
   return (
-    <div className="fixed inset-0 bg-background/80 backdrop-blur-[10px] flex items-center justify-center z-[9998]">
-      <div className="flex flex-col items-center">
-        <Spinner size="lg" color="primary" />
-      </div>
+    <div className="absolute inset-0 z-[50] bg-background overflow-y-auto">
+      <SkeletonComponent />
+    </div>
+  )
+}
+
+// Wraps page children with a subtle fade-in when the route settles
+function PageContentWrapper({ children }) {
+  const pathname = usePathname()
+  const [show, setShow] = useState(false)
+  const prevPathRef = useRef(pathname)
+
+  useEffect(() => {
+    if (prevPathRef.current !== pathname) {
+      setShow(false)
+      prevPathRef.current = pathname
+    }
+    // Small delay so the skeleton is visible for at least ~150ms (anti-flash)
+    const t = setTimeout(() => setShow(true), 60)
+    return () => clearTimeout(t)
+  }, [pathname])
+
+  return (
+    <div
+      style={{
+        opacity: show ? 1 : 0,
+        transition: 'opacity 200ms ease-in',
+      }}
+    >
+      {children}
     </div>
   )
 }
@@ -354,9 +383,6 @@ export default function DashboardLayout({ children }) {
                 {/* Sync sidebar state to chat widget context */}
                 <SidebarStateSync sidebarCollapsed={sidebarCollapsed} />
 
-                {/* Page transition loading overlay */}
-                <PageTransitionOverlay />
-
                 {/* Route progress bar - slim top bar during navigation */}
                 <RouteProgressBar />
 
@@ -380,10 +406,15 @@ export default function DashboardLayout({ children }) {
                     <Header toggleSidebar={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
 
                     {/* Main Content Area - Scrollable */}
-                    <main className={`z-0 flex-1 overflow-y-auto ${isChatPage ? 'bg-white dark:bg-slate-800 md:bg-transparent' : ''}`}>
+                    <main className={`z-0 flex-1 overflow-y-auto relative ${isChatPage ? 'bg-white dark:bg-slate-800 md:bg-transparent' : ''}`}>
+                      {/* Navigation skeleton overlay */}
+                      <PageTransitionOverlay />
+
                       <div className={`min-h-full ${isChatPage ? 'sm:pb-16 px-0 md:px-4 lg:px-8' : 'px-0 sm:px-6 lg:px-8 pt-2 pb-6 sm:py-6'}`}>
                         <ErrorBoundaryWithRetry>
-                          {children}
+                          <PageContentWrapper>
+                            {children}
+                          </PageContentWrapper>
                         </ErrorBoundaryWithRetry>
                       </div>
 

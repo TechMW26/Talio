@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from 'next/navigation'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
+import { usePageTransition } from '@/contexts/PageTransitionContext'
 import UnreadBadge from './UnreadBadge'
 import { Button } from '@heroui/react'
 
@@ -11,53 +12,64 @@ export default function BottomNav() {
   const router = useRouter()
   const { currentTheme, themes, isDarkMode } = useTheme()
   const { unreadCount } = useUnreadMessages()
+  const { startNavigation, isNavigating, targetPath } = usePageTransition()
 
   // Get theme colors with fallbacks
   const bottomNavColor = '#FFFFFF' // White bottom nav
   const activeButtonColor = themes[currentTheme]?.primary?.[600] || '#3B82F6' // Active button uses theme color
 
+  // Use targetPath for optimistic active state during navigation
+  const effectivePath = (isNavigating && targetPath) ? targetPath : pathname
+
   // Check if current page is a bottom nav page (for showing the elevated button ring)
-  const isBottomNavPage = 
-    pathname === '/dashboard' || 
-    pathname.startsWith('/dashboard/projects') || 
-    pathname.startsWith('/dashboard/leave') ||
-    pathname.startsWith('/dashboard/sandbox')
+  const isBottomNavPage =
+    effectivePath === '/dashboard' ||
+    effectivePath.startsWith('/dashboard/projects') ||
+    effectivePath.startsWith('/dashboard/leave') ||
+    effectivePath.startsWith('/dashboard/sandbox')
 
   // Only show the ring shadow on bottom nav pages (excluding chat)
-  const shouldShowRing = isBottomNavPage && !pathname.startsWith('/dashboard/chat')
+  const shouldShowRing = isBottomNavPage && !effectivePath.startsWith('/dashboard/chat')
 
   const navItems = [
     {
       name: 'Home',
       icon: '/assets/Bottom Bar/proicons_home.svg',
       path: '/dashboard',
-      active: pathname === '/dashboard'
+      active: effectivePath === '/dashboard'
     },
     {
       name: 'Projects',
       icon: '/assets/Bottom Bar/Frame 69.svg',
       path: '/dashboard/projects/my-tasks',
-      active: pathname.startsWith('/dashboard/projects')
+      active: effectivePath.startsWith('/dashboard/projects')
     },
     {
       name: 'Chat',
       icon: '/assets/Bottom Bar/proicons_chat.svg',
       path: '/dashboard/chat',
-      active: pathname.startsWith('/dashboard/chat')
+      active: effectivePath.startsWith('/dashboard/chat')
     },
     {
       name: 'Leave',
       icon: '/assets/Bottom Bar/proicons_calendar.svg',
       path: '/dashboard/leave',
-      active: pathname.startsWith('/dashboard/leave')
+      active: effectivePath.startsWith('/dashboard/leave')
     },
     {
       name: 'Ideas',
       icon: '/assets/Bottom Bar/proicons_lightbulb.svg',
       path: '/dashboard/sandbox',
-      active: pathname.startsWith('/dashboard/sandbox')
+      active: effectivePath.startsWith('/dashboard/sandbox')
     }
   ]
+
+  const handleNavPress = (path) => {
+    if (path !== pathname) {
+      startNavigation(path)
+    }
+    router.push(path)
+  }
 
   return (
     <div
@@ -77,14 +89,12 @@ export default function BottomNav() {
               <Button
                 isIconOnly
                 radius="full"
-                onPress={() => router.push(item.path)}
-                className={`h-14 w-14 ${
-                  isChat ? 'border border-default-300' : ''
-                } ${
-                  item.active && !isChat
+                onPress={() => handleNavPress(item.path)}
+                className={`h-14 w-14 ${isChat ? 'border border-default-300' : ''
+                  } ${item.active && !isChat
                     ? '-translate-y-[24px]'
                     : ''
-                }`}
+                  }`}
                 style={{
                   backgroundColor: item.active ? activeButtonColor : 'transparent',
                   boxShadow: item.active && !isChat && shouldShowRing ? '0 0 0 10px var(--color-bg-main)' : 'none',

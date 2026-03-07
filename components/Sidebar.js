@@ -56,7 +56,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
   const [isDesktop, setIsDesktop] = useState(false)
   const { unreadCount } = useUnreadMessages()
   const { toggleWidget } = useChatWidget()
-  const { startNavigation } = usePageTransition()
+  const { startNavigation, isNavigating, targetPath } = usePageTransition()
   const { subscribe, isConnected } = useSocket()
   const sidebarDebounceRef = useRef(null)
   const wasConnectedRef = useRef(null) // null = never connected yet
@@ -272,11 +272,12 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
     router.push('/login')
   }
 
-  // Helper to check if a menu item is active
+  // Helper to check if a menu item is active (uses targetPath for optimistic highlight during navigation)
+  const effectivePath = (isNavigating && targetPath) ? targetPath : pathname
   const isMenuItemActive = (item) => {
-    if (item.path === pathname) return true
+    if (item.path === effectivePath) return true
     if (item.submenu) {
-      return item.submenu.some(subItem => subItem.path === pathname)
+      return item.submenu.some(subItem => subItem.path === effectivePath)
     }
     return false
   }
@@ -447,8 +448,8 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                                 onClick={() => handleLinkClick(subItem.path)}
                                 className="w-full text-left flex items-center justify-between px-3 py-2 text-sm rounded-lg transition-all duration-200 cursor-pointer"
                                 style={{
-                                  backgroundColor: pathname === subItem.path ? 'var(--color-primary-500)' : 'transparent',
-                                  color: pathname === subItem.path ? 'white' : 'var(--color-text-secondary)'
+                                  backgroundColor: effectivePath === subItem.path ? 'var(--color-primary-500)' : 'transparent',
+                                  color: effectivePath === subItem.path ? 'white' : 'var(--color-text-secondary)'
                                 }}
                               >
                                 <span>{subItem.name}</span>
@@ -552,7 +553,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
                 >
                   <HiOutlineCog6Tooth
                     className="w-5 h-5"
-                    style={{ color: pathname === '/dashboard/settings' ? 'var(--color-primary-600)' : 'var(--color-primary-500)' }}
+                    style={{ color: effectivePath === '/dashboard/settings' ? 'var(--color-primary-600)' : 'var(--color-primary-500)' }}
                   />
                   <span className="text-sm font-medium">Settings</span>
                 </Link>

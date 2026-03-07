@@ -24,12 +24,12 @@ export async function GET(request) {
       })
     }
 
-    // Get user record to check headOfDepartments
+    // Get user record to check headOfDepartments AND departmentManagerOf
     const userRecord = await User.findById(user._id || user.userId)
-      .select('isDepartmentHead headOfDepartments')
+      .select('isDepartmentHead headOfDepartments isDepartmentManager departmentManagerOf')
       .lean()
 
-    // Check if user is a department head - support multiple departments
+    // Check if user is a department head or manager - support multiple departments
     let departmentIds = []
     let departments = []
 
@@ -39,28 +39,43 @@ export async function GET(request) {
       departments = await Department.find({ _id: { $in: departmentIds }, isActive: true }).lean()
     }
 
-    // Fallback: Check Department.head or Department.heads
+    // Also check departmentManagerOf
+    if (userRecord?.isDepartmentManager && userRecord?.departmentManagerOf?.length > 0) {
+      const mgrDeptIds = userRecord.departmentManagerOf.map(d => d.toString())
+      const mgrDepts = await Department.find({ _id: { $in: mgrDeptIds }, isActive: true }).lean()
+      for (const md of mgrDepts) {
+        if (!departmentIds.includes(md._id.toString())) {
+          departmentIds.push(md._id.toString())
+          departments.push(md)
+        }
+      }
+    }
+
+    // Fallback: Check Department.head, Department.heads, or Department.departmentManagers
     if (departmentIds.length === 0) {
-      departments = await Department.find({ 
+      const headDepartments = await Department.find({
         isActive: true,
         $or: [
           { head: employeeId },
-          { heads: employeeId }
+          { heads: employeeId },
+          { departmentManager: employeeId },
+          { departmentManagers: employeeId }
         ]
       }).lean()
-      departmentIds = departments.map(d => d._id.toString())
+      departmentIds = headDepartments.map(d => d._id.toString())
+      departments = headDepartments
     }
 
     if (departmentIds.length === 0) {
-      return NextResponse.json({ 
-        success: true, 
+      return NextResponse.json({
+        success: true,
         data: [],
-        message: 'You are not a department head' 
+        message: 'You are not a department head or manager'
       })
     }
 
     // Get all team members from ALL departments
-    const teamMembers = await Employee.find({ 
+    const teamMembers = await Employee.find({
       department: { $in: departmentIds },
       status: 'active'
     }).select('_id')
@@ -114,12 +129,12 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
     }
 
-    // Get user record to check headOfDepartments
+    // Get user record to check headOfDepartments and departmentManagerOf
     const userRecord = await User.findById(user._id || user.userId)
-      .select('isDepartmentHead headOfDepartments')
+      .select('isDepartmentHead headOfDepartments isDepartmentManager departmentManagerOf')
       .lean()
 
-    // Check if user is a department head - support multiple departments
+    // Check if user is a department head or manager - support multiple departments
     let departmentIds = []
 
     // First check User.headOfDepartments (supports multiple departments)
@@ -127,22 +142,32 @@ export async function POST(request) {
       departmentIds = userRecord.headOfDepartments.map(d => d.toString())
     }
 
-    // Fallback: Check Department.head or Department.heads
+    // Also check departmentManagerOf
+    if (userRecord?.isDepartmentManager && userRecord?.departmentManagerOf?.length > 0) {
+      const mgrDeptIds = userRecord.departmentManagerOf.map(d => d.toString())
+      for (const id of mgrDeptIds) {
+        if (!departmentIds.includes(id)) departmentIds.push(id)
+      }
+    }
+
+    // Fallback: Check Department.head, Department.heads, or Department.departmentManagers
     if (departmentIds.length === 0) {
-      const headDepartments = await Department.find({ 
+      const headDepartments = await Department.find({
         isActive: true,
         $or: [
           { head: employeeId },
-          { heads: employeeId }
+          { heads: employeeId },
+          { departmentManager: employeeId },
+          { departmentManagers: employeeId }
         ]
       }).select('_id').lean()
       departmentIds = headDepartments.map(d => d._id.toString())
     }
 
     if (departmentIds.length === 0) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'You are not a department head' 
+      return NextResponse.json({
+        success: false,
+        message: 'You are not a department head or manager'
       }, { status: 403 })
     }
 
@@ -150,16 +175,16 @@ export async function POST(request) {
     const { leaveId, action, comments } = body
 
     if (!leaveId || !action) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'Leave ID and action are required' 
+      return NextResponse.json({
+        success: false,
+        message: 'Leave ID and action are required'
       }, { status: 400 })
     }
 
     if (!['approved', 'rejected'].includes(action)) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'Invalid action. Must be "approved" or "rejected"' 
+      return NextResponse.json({
+        success: false,
+        message: 'Invalid action. Must be "approved" or "rejected"'
       }, { status: 400 })
     }
 
@@ -167,18 +192,18 @@ export async function POST(request) {
     const leave = await Leave.findById(leaveId).populate('employee', 'department')
 
     if (!leave) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'Leave request not found' 
+      return NextResponse.json({
+        success: false,
+        message: 'Leave request not found'
       }, { status: 404 })
     }
 
     // Verify the employee belongs to one of the departments the user heads
     const leaveDeptId = leave.employee.department?.toString()
     if (!departmentIds.includes(leaveDeptId)) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'This leave request is not from your department' 
+      return NextResponse.json({
+        success: false,
+        message: 'This leave request is not from your department'
       }, { status: 403 })
     }
 

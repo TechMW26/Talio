@@ -12,12 +12,12 @@ export async function GET(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-  const { user, models, tenant } = auth
+    const { user, models, tenant } = auth
     const { Department, Employee, User } = models
 
     // Get user's employee ID from auth
     let employeeId = user?.employeeId?._id || user?.employeeId;
-    
+
     // If user doesn't have employeeId directly, try to find employee by userId
     if (!employeeId) {
       const employee = await Employee.findOne({ userId: user._id }).select('_id');
@@ -25,13 +25,13 @@ export async function GET(request) {
     }
 
     if (!employeeId) {
-      return NextResponse.json({ 
-        success: true, 
+      return NextResponse.json({
+        success: true,
         isDepartmentHead: false,
         departments: [],
         department: null,
         departmentId: null,
-        message: 'Employee not found' 
+        message: 'Employee not found'
       })
     }
 
@@ -47,12 +47,14 @@ export async function GET(request) {
       return NextResponse.json(cached)
     }
 
-    // Get user record to check headOfDepartments (supports multiple departments)
+    // Get user record to check headOfDepartments AND departmentManagerOf
     const userRecord = await User.findById(user._id || user.userId)
-      .select('isDepartmentHead headOfDepartments')
+      .select('isDepartmentHead headOfDepartments isDepartmentManager departmentManagerOf teamLeaderOf')
       .lean()
 
     let departments = []
+    let managedDepartments = []
+    let teamLeaderTeams = []
 
     // First check User.headOfDepartments (supports multiple departments)
     if (userRecord?.isDepartmentHead && userRecord?.headOfDepartments?.length > 0) {
@@ -64,31 +66,84 @@ export async function GET(request) {
 
     // Fallback: Check Department.head or Department.heads
     if (departments.length === 0) {
-      departments = await Department.find({ 
+      departments = await Department.find({
         $or: [
           { head: employeeId },
           { heads: employeeId }
         ],
-        isActive: true 
+        isActive: true
       }).select('name code _id').lean()
     }
 
-    console.log('[Check Head API] Result:', { 
-      userId: user._id, 
-      employeeId: employeeId?.toString(), 
+    // Check if user is a department manager
+    if (userRecord?.isDepartmentManager && userRecord?.departmentManagerOf?.length > 0) {
+      managedDepartments = await Department.find({
+        _id: { $in: userRecord.departmentManagerOf },
+        isActive: true
+      }).select('name code _id').lean()
+    }
+
+    // Fallback: Check Department.departmentManagers
+    if (managedDepartments.length === 0) {
+      const mgdDepts = await Department.find({
+        $or: [
+          { departmentManager: employeeId },
+          { departmentManagers: employeeId }
+        ],
+        isActive: true
+      }).select('name code _id').lean()
+      if (mgdDepts.length > 0) managedDepartments = mgdDepts
+    }
+
+    // Check team leadership
+    if (userRecord?.teamLeaderOf?.length > 0) {
+      // Import Team model if not already loaded
+      const { Team } = await (async () => {
+        const auth2 = await getAuthAndModels(request, ['Team'])
+        return auth2.models
+      })()
+      if (Team) {
+        teamLeaderTeams = await Team.find({
+          _id: { $in: userRecord.teamLeaderOf },
+          isActive: true
+        }).select('teamName teamCode department').populate('department', 'name code').lean()
+      }
+    }
+
+    console.log('[Check Head API] Result:', {
+      userId: user._id,
+      employeeId: employeeId?.toString(),
       isDepartmentHead: departments.length > 0,
+      isDepartmentManager: managedDepartments.length > 0,
+      isTeamLeader: teamLeaderTeams.length > 0,
       departmentCount: departments.length,
       departmentNames: departments.map(d => d.name).join(', ')
     });
 
+    // Combine all department-level authority (head + manager) for operational access
+    const allAuthorityDepts = [...departments]
+    for (const md of managedDepartments) {
+      if (!allAuthorityDepts.some(d => d._id.toString() === md._id.toString())) {
+        allAuthorityDepts.push(md)
+      }
+    }
+
     const response = {
       success: true,
       isDepartmentHead: departments.length > 0,
+      isDepartmentManager: managedDepartments.length > 0,
+      isTeamLeader: teamLeaderTeams.length > 0,
+      // Has operational authority (head OR manager)
+      hasOperationalAuthority: allAuthorityDepts.length > 0,
       departments: departments,
+      managedDepartments: managedDepartments,
+      teamLeaderTeams: teamLeaderTeams,
+      // All departments the user has authority over (head or manager)
+      authorityDepartments: allAuthorityDepts,
       // Backward compatibility - return first department
-      department: departments[0] || null,
-      departmentId: departments[0]?._id || null,
-      departmentName: departments[0]?.name || null
+      department: departments[0] || managedDepartments[0] || null,
+      departmentId: departments[0]?._id || managedDepartments[0]?._id || null,
+      departmentName: departments[0]?.name || managedDepartments[0]?.name || null
     }
 
     await setCache(cacheKey, response, 10 * 60)
