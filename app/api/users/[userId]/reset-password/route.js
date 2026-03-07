@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { encryptPassword } from '@/lib/passwordEncryption'
 
 /**
  * POST - Admin/HR directly reset user password
@@ -52,7 +53,7 @@ export async function POST(request, { params }) {
 
     // Update password and set forcePasswordChange to true
     targetUser.password = newPassword // Will be hashed by pre-save hook
-    targetUser.plaintextPassword = newPassword // Store plaintext for admin visibility
+    targetUser.encryptedOnboardingPassword = encryptPassword(newPassword) // Store encrypted for admin visibility
     targetUser.forcePasswordChange = true
     await targetUser.save()
 

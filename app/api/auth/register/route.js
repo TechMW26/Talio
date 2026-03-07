@@ -3,6 +3,7 @@ import connectDB from '@/lib/mongodb'
 import User from '@/models/User'
 import Employee from '@/models/Employee'
 import { syncUserToBackup } from '@/lib/backupDb'
+import { encryptPassword } from '@/lib/passwordEncryption'
 
 export async function POST(request) {
   try {
@@ -60,7 +61,7 @@ export async function POST(request) {
     const user = await User.create({
       email: normalizedEmail,
       password,
-      plaintextPassword: password, // Store plaintext for admin visibility
+      encryptedOnboardingPassword: encryptPassword(password), // Store encrypted for admin visibility
       role: role || 'employee',
       employeeId,
       forcePasswordChange: true, // Force password change on first login

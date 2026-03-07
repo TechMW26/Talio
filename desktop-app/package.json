@@ -4,6 +4,7 @@
   "description": "Talio HRMS Desktop - Productivity Monitoring with Screen Capture",
   "main": "src/main.js",
   "author": "MW FutureTech <support@talio.in>",
+  "homepage": "https://app.talio.in",
   "license": "MIT",
   "private": true,
   "scripts": {
@@ -14,6 +15,8 @@
     "build:mac-intel": "electron-builder --mac --x64",
     "build:mac-arm": "electron-builder --mac --arm64",
     "build:win": "electron-builder --win --x64",
+    "build:linux": "electron-builder --linux --x64",
+    "build:linux-arm64": "electron-builder --linux --arm64",
     "build:signed": "CSC_LINK=$CSC_LINK CSC_KEY_PASSWORD=$CSC_KEY_PASSWORD npm run build",
     "postinstall": "electron-builder install-app-deps"
   },
@@ -94,6 +97,47 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Talio",
       "artifactName": "${productName}.Setup.${version}.${ext}"
+    },
+    "linux": {
+      "target": [
+        {
+          "target": "deb",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "AppImage",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png",
+      "category": "Office",
+      "maintainer": "MW FutureTech <support@talio.in>",
+      "vendor": "MW FutureTech",
+      "synopsis": "Talio HRMS Desktop App",
+      "description": "Talio HRMS Desktop - Productivity Monitoring with Screen Capture",
+      "desktop": {
+        "Name": "Talio",
+        "Comment": "Talio HRMS Desktop App",
+        "Categories": "Office;ProjectManagement;",
+        "StartupWMClass": "talio-desktop"
+      },
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "deb": {
+      "depends": [
+        "libnotify4",
+        "libappindicator3-1",
+        "libsecret-1-0",
+        "libxss1"
+      ],
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "appImage": {
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "publish": {
       "provider": "github",

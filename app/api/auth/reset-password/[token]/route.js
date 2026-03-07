@@ -201,8 +201,9 @@ export async function POST(request, { params }) {
 
     // Update user password (will be hashed by pre-save hook)
     user.password = password
-    user.plaintextPassword = password // Store plaintext for admin visibility
     user.forcePasswordChange = false
+    // Clear the encrypted onboarding password — user has set their own password
+    user.encryptedOnboardingPassword = null
     user.passwordChangedAt = new Date()
     
     // Clear any legacy password reset fields

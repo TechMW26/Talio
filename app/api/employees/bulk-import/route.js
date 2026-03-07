@@ -6,6 +6,7 @@ import { sendAndLogOnboardingEmail } from '@/lib/mailer'
 import { generateContent } from '@/lib/gemini'
 import { syncUserToBackup } from '@/lib/backupDb'
 import { registerUserTenantMapping, getTenantCompanyByDbName } from '@/lib/tenantContext'
+import { encryptPassword } from '@/lib/passwordEncryption'
 
 /**
  * Parse salary value from various formats (handles commas, currency symbols, etc.)
@@ -1522,7 +1523,7 @@ async function createOrUpdateEmployeeAndUser(data, allDepartments, allDesignatio
     const userData = {
       email: email,
       password: plainTextPassword, // Pass plain text - will be hashed by pre-save hook
-      plaintextPassword: plainTextPassword, // Store plaintext for admin visibility
+      encryptedOnboardingPassword: encryptPassword(plainTextPassword), // Store encrypted for admin visibility
       role: detectedRole,
       employeeId: employee._id,
       forcePasswordChange: true,

@@ -24,19 +24,19 @@ if (forceDisableGPU) {
 } else {
   // Enable hardware acceleration with BALANCED settings to prevent flickering
   // DO NOT use disable-frame-rate-limit as it causes screen tearing/flickering
-  
+
   // Basic GPU acceleration (safe defaults)
   app.commandLine.appendSwitch('enable-gpu-rasterization');
-  
+
   // Smooth scrolling
   app.commandLine.appendSwitch('enable-smooth-scrolling');
-  
+
   // Use hardware acceleration for animations
   app.commandLine.appendSwitch('enable-accelerated-2d-canvas');
-  
+
   // Force enable VSYNC to prevent tearing and flickering
   app.commandLine.appendSwitch('disable-gpu-vsync', 'false');
-  
+
   // Platform-specific optimizations
   if (process.platform === 'win32') {
     // Use D3D11 on Windows for best compatibility
@@ -46,8 +46,12 @@ if (forceDisableGPU) {
   } else if (process.platform === 'darwin') {
     // macOS-specific: use Metal for best performance
     app.commandLine.appendSwitch('enable-features', 'Metal');
+  } else if (process.platform === 'linux') {
+    // Linux-specific: use GL for best compatibility
+    app.commandLine.appendSwitch('use-gl', 'desktop');
+    app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder');
   }
-  
+
   // Prevent GPU process crashes from affecting the main process
   app.commandLine.appendSwitch('disable-gpu-process-crash-limit');
 }
@@ -802,7 +806,7 @@ function setupIPCHandlers() {
   ipcMain.handle('get-displays', function () {
     const displays = screen.getAllDisplays();
     const primaryDisplay = screen.getPrimaryDisplay();
-    
+
     return displays.map(function (display, index) {
       const isPrimary = display.id === primaryDisplay.id;
       return {
@@ -821,19 +825,19 @@ function setupIPCHandlers() {
   ipcMain.handle('request-screen-share', async function () {
     try {
       logger.log('info', 'Main', 'Screen share requested');
-      
+
       // Get all available sources (screens and windows)
       const sources = await desktopCapturer.getSources({
         types: ['screen', 'window'],
         thumbnailSize: { width: 320, height: 180 },
         fetchWindowIcons: true
       });
-      
+
       if (sources.length === 0) {
         logger.log('warn', 'Main', 'No screen sources available');
         return { success: false, error: 'No screens or windows available' };
       }
-      
+
       // On Windows, we need to show our own picker since getDisplayMedia doesn't work well
       if (process.platform === 'win32') {
         // Return sources for the renderer to show a picker UI
@@ -852,7 +856,7 @@ function setupIPCHandlers() {
           })
         };
       }
-      
+
       // On macOS, return the sources and let navigator.mediaDevices.getDisplayMedia handle it
       return {
         success: true,
@@ -934,7 +938,7 @@ function handleAuthentication(data) {
     role: userData.role,
     token: data.token,
     mainWindow: mainWindow,
-    onPermissionError: function(message) {
+    onPermissionError: function (message) {
       showNotification('Screen Recording Permission Required', message);
       // Also open system preferences on macOS
       if (process.platform === 'darwin') {
@@ -1119,6 +1123,15 @@ function getTrayIcon() {
     } catch (e) {
       return getAppIcon();
     }
+  } else if (process.platform === 'linux') {
+    // Linux uses regular PNG icon (tray/appindicator)
+    var linuxIconPath = path.join(__dirname, '..', 'build', 'icon.png');
+    try {
+      var icon = nativeImage.createFromPath(linuxIconPath);
+      return icon.resize({ width: 22, height: 22 });
+    } catch (e) {
+      return getAppIcon();
+    }
   } else {
     // Windows uses regular icon
     return getAppIcon();
@@ -1210,11 +1223,11 @@ function setupSessionPermissions() {
 
     try {
       // Get all available sources
-      const sources = await desktopCapturer.getSources({ 
+      const sources = await desktopCapturer.getSources({
         types: ['screen', 'window'],
         thumbnailSize: { width: 320, height: 180 }
       });
-      
+
       if (sources.length === 0) {
         logger.log('warn', 'Main', 'No display sources available');
         callback({});
@@ -1224,23 +1237,23 @@ function setupSessionPermissions() {
       // On Windows, we need special handling because getDisplayMedia doesn't work properly
       if (process.platform === 'win32') {
         // Get all screens first
-        const screens = sources.filter(function(s) { return s.id.startsWith('screen:'); });
+        const screens = sources.filter(function (s) { return s.id.startsWith('screen:'); });
         const displays = screen.getAllDisplays();
-        
+
         if (screens.length > 1) {
           // Multiple displays - show picker dialog
           logger.log('info', 'Main', 'Multiple displays detected: ' + screens.length);
-          
+
           // Build options for dialog
-          const displayOptions = screens.map(function(s, index) {
+          const displayOptions = screens.map(function (s, index) {
             const displayInfo = displays[index];
-            const label = displayInfo ? 
-              (displayInfo.id === screen.getPrimaryDisplay().id ? 'Primary Display' : 'Display ' + (index + 1)) + 
+            const label = displayInfo ?
+              (displayInfo.id === screen.getPrimaryDisplay().id ? 'Primary Display' : 'Display ' + (index + 1)) +
               ' (' + displayInfo.bounds.width + 'x' + displayInfo.bounds.height + ')' :
               s.name;
             return label;
           });
-          
+
           // Show display picker dialog
           const result = await dialog.showMessageBox(mainWindow, {
             type: 'question',
@@ -1250,7 +1263,7 @@ function setupSessionPermissions() {
             defaultId: 0,
             cancelId: displayOptions.length
           });
-          
+
           if (result.response < screens.length) {
             const selectedSource = screens[result.response];
             logger.log('info', 'Main', 'Selected screen: ' + selectedSource.name);
@@ -1267,10 +1280,10 @@ function setupSessionPermissions() {
           return;
         }
       }
-      
+
       // For macOS or fallback: Return the first screen source
       // macOS will show its own system picker
-      const screenSources = sources.filter(function(s) { return s.id.startsWith('screen:'); });
+      const screenSources = sources.filter(function (s) { return s.id.startsWith('screen:'); });
       if (screenSources.length > 0) {
         callback({ video: screenSources[0], audio: 'loopback' });
       } else {
@@ -1294,21 +1307,21 @@ const MIN_RELOAD_INTERVAL = 3000; // Minimum 3 seconds between reload attempts
 
 function scheduleReload(delayMs) {
   const now = Date.now();
-  
+
   // Debounce - don't reload too frequently
   if (now - lastReloadAttempt < MIN_RELOAD_INTERVAL) {
     logger.log('info', 'Main', 'Skipping reload - too soon since last attempt');
     return;
   }
-  
+
   // Clear any pending reload
   if (pendingReloadTimeout) {
     clearTimeout(pendingReloadTimeout);
   }
-  
-  pendingReloadTimeout = setTimeout(function() {
+
+  pendingReloadTimeout = setTimeout(function () {
     if (!mainWindow || mainWindow.isDestroyed()) return;
-    
+
     lastReloadAttempt = Date.now();
     logger.log('info', 'Main', 'Executing scheduled reload');
     loadRetries = 0;
@@ -1321,7 +1334,7 @@ function scheduleReload(delayMs) {
  */
 async function checkForWhitescreen() {
   if (!mainWindow || mainWindow.isDestroyed()) return false;
-  
+
   try {
     const result = await mainWindow.webContents.executeJavaScript(`
       (function() {
@@ -1357,7 +1370,7 @@ async function checkForWhitescreen() {
         };
       })()
     `);
-    
+
     return result.isBlank;
   } catch (e) {
     // If we can't execute JS, page might be broken
@@ -1415,18 +1428,18 @@ function setupNetworkMonitoring() {
       }
     }
   };
-  
+
   // Check for whitescreen and recover
-  const checkAndRecoverWhitescreen = async function() {
+  const checkAndRecoverWhitescreen = async function () {
     if (!mainWindow || mainWindow.isDestroyed()) return;
-    
+
     const currentUrl = mainWindow.webContents.getURL();
-    
+
     // Only check on app pages, not offline/loader pages
     if (!currentUrl.startsWith('https://app.talio.in')) return;
-    
+
     const isBlank = await checkForWhitescreen();
-    
+
     if (isBlank) {
       logger.log('warn', 'Main', 'Whitescreen detected, attempting recovery...');
       scheduleReload(1000);
@@ -1435,36 +1448,36 @@ function setupNetworkMonitoring() {
 
   // Start periodic network check (every 10 seconds)
   networkCheckInterval = setInterval(checkNetworkAndReload, 10000);
-  
+
   // Start periodic whitescreen check (every 30 seconds, less aggressive)
   whitescreenCheckInterval = setInterval(checkAndRecoverWhitescreen, 30000);
 
   // Handle system suspend (sleep)
-  powerMonitor.on('suspend', function() {
+  powerMonitor.on('suspend', function () {
     logger.log('info', 'Main', 'System going to sleep');
     systemWasAsleep = true;
   });
-  
+
   // Handle system resume (wake)
-  powerMonitor.on('resume', function() {
+  powerMonitor.on('resume', function () {
     logger.log('info', 'Main', 'System waking up from sleep');
-    
+
     if (systemWasAsleep) {
       systemWasAsleep = false;
-      
+
       // Wait a bit for network to reconnect, then check and reload if needed
-      setTimeout(async function() {
+      setTimeout(async function () {
         if (!mainWindow || mainWindow.isDestroyed()) return;
-        
+
         const currentUrl = mainWindow.webContents.getURL();
-        
+
         // If on offline page, try to reload
         if (currentUrl.includes('offline.html') || currentUrl.startsWith('file://')) {
           logger.log('info', 'Main', 'On offline page after wake, checking network...');
           checkNetworkAndReload();
           return;
         }
-        
+
         // Check for whitescreen after resume
         const isBlank = await checkForWhitescreen();
         if (isBlank) {
@@ -1472,7 +1485,7 @@ function setupNetworkMonitoring() {
           scheduleReload(500);
           return;
         }
-        
+
         // Even if not blank, do a soft check by injecting a heartbeat
         try {
           const isAlive = await mainWindow.webContents.executeJavaScript(`
@@ -1481,7 +1494,7 @@ function setupNetworkMonitoring() {
               return typeof window !== 'undefined' && document.readyState === 'complete';
             })()
           `);
-          
+
           if (!isAlive) {
             logger.log('warn', 'Main', 'Page unresponsive after resume, reloading...');
             scheduleReload(500);
@@ -1494,20 +1507,20 @@ function setupNetworkMonitoring() {
       }, 3000); // Wait 3 seconds for network to stabilize
     }
   });
-  
+
   // Handle lock screen (user locked their screen)
-  powerMonitor.on('lock-screen', function() {
+  powerMonitor.on('lock-screen', function () {
     logger.log('info', 'Main', 'Screen locked');
   });
-  
+
   // Handle unlock screen
-  powerMonitor.on('unlock-screen', function() {
+  powerMonitor.on('unlock-screen', function () {
     logger.log('info', 'Main', 'Screen unlocked');
-    
+
     // Brief check after unlock - sometimes pages get stuck
-    setTimeout(async function() {
+    setTimeout(async function () {
       if (!mainWindow || mainWindow.isDestroyed()) return;
-      
+
       const currentUrl = mainWindow.webContents.getURL();
       if (currentUrl.startsWith('https://app.talio.in')) {
         const isBlank = await checkForWhitescreen();
@@ -1523,7 +1536,7 @@ function setupNetworkMonitoring() {
   if (mainWindow) {
     mainWindow.on('focus', function () {
       const currentUrl = mainWindow.webContents.getURL();
-      
+
       if (currentUrl.includes('offline.html') || currentUrl.startsWith('file://')) {
         logger.log('info', 'Main', 'Window focused while on offline page, checking network...');
         setTimeout(checkNetworkAndReload, 1000);
@@ -1532,12 +1545,12 @@ function setupNetworkMonitoring() {
         setTimeout(checkAndRecoverWhitescreen, 500);
       }
     });
-    
+
     // Also handle window show (might be restored from minimized/hidden state)
-    mainWindow.on('show', function() {
-      setTimeout(async function() {
+    mainWindow.on('show', function () {
+      setTimeout(async function () {
         if (!mainWindow || mainWindow.isDestroyed()) return;
-        
+
         const currentUrl = mainWindow.webContents.getURL();
         if (currentUrl.startsWith('https://app.talio.in')) {
           const isBlank = await checkForWhitescreen();

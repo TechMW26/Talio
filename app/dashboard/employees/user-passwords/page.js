@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Card, CardBody, Button, Skeleton, Input, Chip } from '@heroui/react'
 import {
   HiOutlineKey,
@@ -12,12 +12,40 @@ import {
   HiOutlineClipboard,
   HiOutlineFunnel,
   HiOutlineArrowLeft,
+  HiOutlineShieldCheck,
+  HiOutlineEye,
+  HiOutlineEyeSlash,
 } from 'react-icons/hi2'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
+
+/**
+ * Reveal a user's full password by calling the secure reveal API.
+ * This triggers an audit log entry on the server side.
+ */
+async function revealPassword(userId, action = 'view') {
+  const token = localStorage.getItem('token')
+  if (!token) throw new Error('Not authenticated')
+  
+  const res = await fetch('/api/employees/user-passwords/reveal', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify({ userId, action }),
+  })
+  
+  const data = await res.json()
+  if (!res.ok || !data.success) {
+    throw new Error(data.message || 'Failed to reveal password')
+  }
+  
+  return data
+}
 
 export default function UserPasswordsPage() {
   const router = useRouter()
@@ -27,6 +55,10 @@ export default function UserPasswordsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filter, setFilter] = useState('all') // 'all', 'with-password', 'without-password'
+  
+  // Track which passwords are revealed (by userId)
+  const [revealedPasswords, setRevealedPasswords] = useState({})
+  const [loadingReveal, setLoadingReveal] = useState({})
 
   // Debounce search
   useEffect(() => {
@@ -58,17 +90,60 @@ export default function UserPasswordsPage() {
   const stats = swrData?.stats || { total: 0, withPassword: 0, withoutPassword: 0 }
   const pagination = swrData?.pagination || { page: 1, limit: 50, total: 0, pages: 0 }
 
-  // Copy password to clipboard
-  const copyPassword = (password, email) => {
-    navigator.clipboard.writeText(password)
-    toast.success(`Password copied for ${email}`)
-  }
+  // Reveal a password (calls secure API)
+  const handleRevealPassword = useCallback(async (userId) => {
+    if (revealedPasswords[userId]) {
+      // Toggle off — hide the revealed password
+      setRevealedPasswords(prev => {
+        const next = { ...prev }
+        delete next[userId]
+        return next
+      })
+      return
+    }
+    
+    setLoadingReveal(prev => ({ ...prev, [userId]: true }))
+    try {
+      const data = await revealPassword(userId, 'view')
+      setRevealedPasswords(prev => ({ ...prev, [userId]: data.password }))
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setLoadingReveal(prev => ({ ...prev, [userId]: false }))
+    }
+  }, [revealedPasswords])
+
+  // Copy password to clipboard (calls reveal API if not already revealed)
+  const copyPassword = useCallback(async (userId, email) => {
+    try {
+      let password = revealedPasswords[userId]
+      if (!password) {
+        const data = await revealPassword(userId, 'copy')
+        password = data.password
+        setRevealedPasswords(prev => ({ ...prev, [userId]: password }))
+      }
+      await navigator.clipboard.writeText(password)
+      toast.success(`Password copied for ${email}`)
+    } catch (err) {
+      toast.error(err.message)
+    }
+  }, [revealedPasswords])
 
   // Copy credentials (email + password)
-  const copyCredentials = (email, password) => {
-    navigator.clipboard.writeText(`Email: ${email}\nPassword: ${password}`)
-    toast.success('Credentials copied!')
-  }
+  const copyCredentials = useCallback(async (userId, email) => {
+    try {
+      let password = revealedPasswords[userId]
+      if (!password) {
+        const data = await revealPassword(userId, 'copy_credentials')
+        password = data.password
+        setRevealedPasswords(prev => ({ ...prev, [userId]: password }))
+      }
+      await navigator.clipboard.writeText(`Email: ${email}\nPassword: ${password}`)
+      toast.success('Credentials copied!')
+    } catch (err) {
+      toast.error(err.message)
+    }
+  }, [revealedPasswords])
 
   const formatDate = (dateString) => {
     if (!dateString) return '-'
@@ -79,6 +154,14 @@ export default function UserPasswordsPage() {
       hour: '2-digit',
       minute: '2-digit',
     })
+  }
+
+  // Get display password — either revealed (full) or masked from API
+  const getDisplayPassword = (user) => {
+    if (revealedPasswords[user._id]) {
+      return revealedPasswords[user._id]
+    }
+    return user.password // This is already masked from the API
   }
 
   return (
@@ -97,9 +180,10 @@ export default function UserPasswordsPage() {
             <h1 className="text-2xl font-bold text-theme-text-primary flex items-center gap-2">
               <HiOutlineKey className="w-7 h-7 text-warning" />
               User Passwords
+              <HiOutlineShieldCheck className="w-5 h-5 text-success ml-1" title="Passwords are encrypted at rest" />
             </h1>
             <p className="text-theme-text-secondary mt-1">
-              View all user credentials from onboarding emails
+              View onboarding credentials (encrypted at rest, audit-logged)
             </p>
             <BackgroundRefreshIndicator isValidating={isValidating} />
           </div>
@@ -200,7 +284,7 @@ export default function UserPasswordsPage() {
                     Email
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-default-500 uppercase tracking-wider">
-                    Current Password
+                    Onboarding Password
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-default-500 uppercase tracking-wider">
                     Password Status
@@ -269,20 +353,48 @@ export default function UserPasswordsPage() {
                         </Chip>
                       </td>
                       <td className="px-4 py-3">
-                        {user.password ? (
-                          <code className="px-3 py-1.5 bg-success-50 border border-success-200 rounded-lg text-sm font-mono text-success-700 font-semibold">
-                            {user.password}
-                          </code>
+                        {user.passwordStatus === 'changed_by_user' ? (
+                          <span className="text-sm text-success-600 italic flex items-center gap-1">
+                            <HiOutlineShieldCheck className="w-4 h-4" />
+                            Password changed by user
+                          </span>
+                        ) : user.hasPassword ? (
+                          <div className="flex items-center gap-2">
+                            <code className={`px-3 py-1.5 border rounded-lg text-sm font-mono font-semibold ${
+                              revealedPasswords[user._id]
+                                ? 'bg-warning-50 border-warning-200 text-warning-700'
+                                : 'bg-default-100 border-default-200 text-default-600'
+                            }`}>
+                              {getDisplayPassword(user)}
+                            </code>
+                            <Button
+                              isIconOnly
+                              size="sm"
+                              variant="light"
+                              isLoading={loadingReveal[user._id]}
+                              onPress={() => handleRevealPassword(user._id)}
+                              title={revealedPasswords[user._id] ? 'Hide password' : 'Show password'}
+                            >
+                              {revealedPasswords[user._id] 
+                                ? <HiOutlineEyeSlash className="w-4 h-4 text-default-500" />
+                                : <HiOutlineEye className="w-4 h-4 text-default-500" />
+                              }
+                            </Button>
+                          </div>
                         ) : (
                           <span className="text-sm text-danger-500 italic">Not available</span>
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        {user.forcePasswordChange ? (
+                        {user.passwordStatus === 'changed_by_user' ? (
+                          <Chip size="sm" variant="flat" color="success">
+                            Changed
+                          </Chip>
+                        ) : user.passwordStatus === 'must_change' ? (
                           <Chip size="sm" variant="flat" color="warning">
                             Must Change
                           </Chip>
-                        ) : user.password ? (
+                        ) : user.hasPassword ? (
                           <Chip size="sm" variant="flat" color="success">
                             Active
                           </Chip>
@@ -298,13 +410,13 @@ export default function UserPasswordsPage() {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {user.password ? (
+                        {user.hasPassword ? (
                           <div className="flex items-center justify-end gap-2">
                             <Button
                               size="sm"
                               variant="flat"
                               color="primary"
-                              onPress={() => copyPassword(user.password, user.email)}
+                              onPress={() => copyPassword(user._id, user.email)}
                               startContent={<HiOutlineClipboard className="w-4 h-4" />}
                             >
                               Copy
@@ -313,7 +425,7 @@ export default function UserPasswordsPage() {
                               size="sm"
                               variant="flat"
                               color="secondary"
-                              onPress={() => copyCredentials(user.email, user.password)}
+                              onPress={() => copyCredentials(user._id, user.email)}
                             >
                               Copy All
                             </Button>

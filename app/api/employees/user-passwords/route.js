@@ -1,23 +1,31 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { decryptPassword, maskPassword } from '@/lib/passwordEncryption'
 
 /**
- * GET - Fetch all users with their current passwords
- * Only admin and HR can access this
- * Passwords are fetched directly from User.plaintextPassword field
+ * GET - Fetch all users with their onboarding password status
+ * Only admin and HR can access this.
+ * 
+ * SECURITY:
+ * - Passwords are stored as AES-256-GCM encrypted values in `encryptedOnboardingPassword`
+ * - List responses return MASKED passwords only (e.g., "Mar***")
+ * - Full password reveal requires a separate POST call to /api/employees/user-passwords/reveal
+ * - Every access is logged to PasswordAuditLog
+ * - Users who have changed their password (forcePasswordChange: false) have their
+ *   encrypted password wiped — admin sees "Password changed by user" instead
  */
 export async function GET(request) {
   try {
-    const auth = await getAuthAndModels(request, ['User', 'Employee'])
+    const auth = await getAuthAndModels(request, ['User', 'Employee', 'PasswordAuditLog'])
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { User, Employee } = models
+    const { User, Employee, PasswordAuditLog } = models
     
-    // Only admin and HR can access this
+    // RBAC: Only admin and HR can access this
     if (!['admin', 'hr'].includes(user.role)) {
-      return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
+      return NextResponse.json({ success: false, message: 'Access denied. Only Admin and HR can view user passwords.' }, { status: 403 })
     }
 
     const { searchParams } = new URL(request.url)
@@ -36,8 +44,7 @@ export async function GET(request) {
       ]
     }
 
-    // Get all users with plaintextPassword field directly from DB
-    // Use projection object to explicitly include the select:false field
+    // Get all users with encryptedOnboardingPassword field from DB
     const users = await User.find(matchStage, {
       email: 1,
       role: 1,
@@ -46,7 +53,7 @@ export async function GET(request) {
       createdAt: 1,
       updatedAt: 1,
       employeeId: 1,
-      plaintextPassword: 1,  // This overrides schema's select: false
+      encryptedOnboardingPassword: 1,  // This overrides schema's select: false
     })
       .populate({
         path: 'employeeId',
@@ -59,9 +66,34 @@ export async function GET(request) {
       .sort({ createdAt: -1 })
       .lean()
 
-    // Map results
+    // Map results — decrypt and MASK passwords for list view
     let results = users.map(u => {
       const employee = u.employeeId
+      
+      // Determine password state
+      let passwordMasked = null
+      let hasPassword = false
+      let passwordStatus = 'unknown'
+      
+      if (!u.forcePasswordChange && !u.encryptedOnboardingPassword) {
+        // User has changed their password — encrypted value should be wiped
+        passwordStatus = 'changed_by_user'
+        hasPassword = false
+      } else if (u.encryptedOnboardingPassword) {
+        // Decrypt to get the real password, then mask it for list view
+        const decrypted = decryptPassword(u.encryptedOnboardingPassword)
+        if (decrypted) {
+          passwordMasked = maskPassword(decrypted)
+          hasPassword = true
+          passwordStatus = u.forcePasswordChange ? 'must_change' : 'active'
+        } else {
+          passwordStatus = 'decryption_failed'
+          hasPassword = false
+        }
+      } else {
+        passwordStatus = 'not_available'
+        hasPassword = false
+      }
       
       return {
         _id: u._id,
@@ -73,7 +105,9 @@ export async function GET(request) {
         designation: employee?.designation?.title || '',
         role: u.role,
         isActive: u.isActive,
-        password: u.plaintextPassword || null,
+        password: passwordMasked, // MASKED — never the real password in list responses
+        hasPassword,
+        passwordStatus,
         forcePasswordChange: u.forcePasswordChange,
         createdAt: u.createdAt,
         updatedAt: u.updatedAt,
@@ -93,17 +127,33 @@ export async function GET(request) {
 
     // Apply password filter
     if (filter === 'with-password') {
-      results = results.filter(r => r.password)
+      results = results.filter(r => r.hasPassword)
     } else if (filter === 'without-password') {
-      results = results.filter(r => !r.password)
+      results = results.filter(r => !r.hasPassword)
     }
 
     const total = results.length
     const paginatedResults = results.slice(skip, skip + limit)
 
     // Stats
-    const withPassword = results.filter(r => r.password).length
-    const withoutPassword = results.filter(r => !r.password).length
+    const withPassword = results.filter(r => r.hasPassword).length
+    const withoutPassword = results.filter(r => !r.hasPassword).length
+
+    // Audit log: record that an admin listed passwords
+    try {
+      await PasswordAuditLog.create({
+        action: 'list_passwords',
+        performedBy: user._id || user.userId,
+        performedByEmail: user.email,
+        performedByRole: user.role,
+        ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
+        userAgent: request.headers.get('user-agent') || 'unknown',
+        metadata: { page, limit, filter, search: search || null, resultCount: paginatedResults.length },
+      })
+    } catch (auditError) {
+      // Don't fail the request if audit logging fails
+      console.error('[UserPasswords] Audit log error:', auditError.message)
+    }
 
     return NextResponse.json({
       success: true,

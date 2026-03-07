@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { sendAndLogOnboardingEmail } from '@/lib/mailer'
 import crypto from 'crypto'
+import { encryptPassword } from '@/lib/passwordEncryption'
 
 /**
  * POST - Send/resend onboarding email to an employee by email address
@@ -58,7 +59,7 @@ export async function POST(request) {
       const hashedPassword = await bcrypt.hash(password, 10)
       await User.findByIdAndUpdate(targetUser._id, { 
         password: hashedPassword,
-        plaintextPassword: password, // Store plaintext for admin visibility
+        encryptedOnboardingPassword: encryptPassword(password), // Store encrypted for admin visibility
         forcePasswordChange: true 
       })
     }
