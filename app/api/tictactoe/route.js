@@ -162,10 +162,13 @@ export async function POST(request) {
     }
 
     if (action === 'move') {
-      game = await TicTacToeGame.findOne({ gameId, status: 'playing' })
+      // Match playing OR ended to handle race with concurrent 'end' call
+      game = await TicTacToeGame.findOne({ gameId, status: { $in: ['playing', 'ended'] } })
       if (game) {
         const board = [...game.board]
-        board[payload.index] = payload.symbol
+        if (board[payload.index] == null) {
+          board[payload.index] = payload.symbol
+        }
         const result = checkWinner(board)
         game.board = board
         game.currentTurn = payload.symbol === 'X' ? 'O' : 'X'
@@ -175,15 +178,35 @@ export async function POST(request) {
           game.status = 'ended'
         }
         await game.save()
+
+        // If game ended, also emit END event so opponent gets the result
+        if (result && global.io) {
+          const endData = {
+            gameId,
+            result,
+            board,
+            fromUserId: senderId,
+            fromName: senderName,
+            targetUserId,
+            timestamp: new Date().toISOString(),
+          }
+          global.io.to(`user:${targetUserId}`).emit(REALTIME_EVENTS.TICTACTOE_END, endData)
+          global.io.to(`user:${senderId}`).emit(REALTIME_EVENTS.TICTACTOE_END, endData)
+        }
       }
     }
 
     if (action === 'end') {
+      // Only update if not already ended by the move handler
       game = await TicTacToeGame.findOneAndUpdate(
-        { gameId },
+        { gameId, status: { $ne: 'ended' } },
         { status: 'ended', result: payload.result || null },
         { new: true }
       )
+      if (!game) {
+        // Already ended by move handler — just fetch current state
+        game = await TicTacToeGame.findOne({ gameId }).lean()
+      }
     }
 
     // ── Socket.IO: emit if available (fast path) ──

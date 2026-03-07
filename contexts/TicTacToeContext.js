@@ -3,7 +3,8 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { useSocket } from './SocketContext'
 import { REALTIME_EVENTS } from '@/lib/realtimeEvents'
-import { playGameInviteSound } from '@/utils/audio'
+import { playGameInviteSound, playSuccessSound, playErrorSound } from '@/utils/audio'
+import confetti from 'canvas-confetti'
 import {
   HiOutlineTrophy,
   HiOutlineXMark,
@@ -26,6 +27,33 @@ function checkWinner(board) {
 function normalizeBoard(raw) {
   if (!Array.isArray(raw) || raw.length !== 9) return Array(9).fill(null)
   return raw.map(c => (c === 'X' || c === 'O') ? c : null)
+}
+
+// Fire confetti burst for the winner
+function fireCrackers() {
+  const duration = 2500
+  const end = Date.now() + duration
+  const colors = ['#6366f1', '#a855f7', '#ec4899', '#f59e0b', '#10b981']
+
+  ;(function frame() {
+    confetti({
+      particleCount: 4,
+      angle: 60,
+      spread: 70,
+      origin: { x: 0, y: 0.7 },
+      colors,
+      zIndex: 2147483647,
+    })
+    confetti({
+      particleCount: 4,
+      angle: 120,
+      spread: 70,
+      origin: { x: 1, y: 0.7 },
+      colors,
+      zIndex: 2147483647,
+    })
+    if (Date.now() < end) requestAnimationFrame(frame)
+  })()
 }
 
 const TicTacToeContext = createContext({
@@ -107,7 +135,7 @@ export function TicTacToeProvider({ children }) {
     setPhase('closed')
   }, [incomingInvite, sendAction])
 
-  // Make a move
+  // Make a move — server handles win detection + end event
   const makeMove = useCallback((idx) => {
     if (!isMyTurn || board[idx] || result) return
     const newBoard = [...board]
@@ -115,11 +143,13 @@ export function TicTacToeProvider({ children }) {
     setBoard(newBoard)
     setIsMyTurn(false)
     sendAction('move', opponent.userId, { gameId, index: idx, symbol: mySymbol })
+    // Client-side win detection for instant feedback on this side
     const res = checkWinner(newBoard)
     if (res) {
       setResult(res)
       setPhase('result')
-      sendAction('end', opponent.userId, { gameId, result: res })
+      // No separate 'end' call — the 'move' API handler already detects
+      // the win, saves it, and emits END to both players.
     }
   }, [isMyTurn, board, result, mySymbol, opponent, gameId, sendAction])
 
@@ -173,6 +203,8 @@ export function TicTacToeProvider({ children }) {
       }),
       subscribe(REALTIME_EVENTS.TICTACTOE_END, (data) => {
         if (data.fromUserId === currentUserId) return
+        // Sync the final board if included (ensures last move is visible)
+        if (data.board) setBoard(normalizeBoard(data.board))
         if (data.result) { setResult(data.result); setPhase('result') }
       }),
     ]
@@ -215,7 +247,7 @@ export function TicTacToeProvider({ children }) {
     }
 
     poll() // Check immediately
-    const timer = setInterval(poll, 5000)
+    const timer = setInterval(poll, 3000)
     return () => clearInterval(timer)
   }, [isConnected, phase])
 
@@ -282,9 +314,21 @@ export function TicTacToeProvider({ children }) {
       } catch { /* ignore */ }
     }
 
-    const timer = setInterval(poll, 1500)
+    poll() // Check immediately
+    const timer = setInterval(poll, 800)
     return () => clearInterval(timer)
   }, [isConnected, gameId, phase, mySymbol])
+
+  // ─── Win/Loss effects ───
+  useEffect(() => {
+    if (phase !== 'result' || !result) return
+    if (result.winner === mySymbol) {
+      fireCrackers()
+      playSuccessSound().catch(() => {})
+    } else if (result.winner !== 'draw') {
+      playErrorSound().catch(() => {})
+    }
+  }, [phase, result, mySymbol])
 
   const showPopup = phase !== 'closed'
 
@@ -407,7 +451,7 @@ export function TicTacToeProvider({ children }) {
                   </div>
 
                   {/* Board */}
-                  <div className="grid grid-cols-3 gap-3 w-[280px] mx-auto">
+                  <div className="grid grid-cols-3 gap-2.5 mx-auto" style={{ width: 'fit-content' }}>
                     {board.map((cell, i) => {
                       const winLine = result?.line || []
                       const isWinCell = winLine.includes(i)
@@ -416,8 +460,7 @@ export function TicTacToeProvider({ children }) {
                           key={i}
                           onClick={() => makeMove(i)}
                           disabled={!isMyTurn || !!cell || !!result}
-                          style={{ width: '84px', height: '84px' }}
-                          className={`rounded-2xl text-3xl font-extrabold flex items-center justify-center transition-all
+                          className={`w-20 h-20 rounded-2xl text-3xl font-extrabold flex items-center justify-center transition-all
                             ${!cell && isMyTurn && !result ? 'hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:scale-105 cursor-pointer' : 'cursor-default'}
                             ${isWinCell ? 'bg-emerald-100 dark:bg-emerald-900/30 ring-2 ring-emerald-400 scale-105' : 'bg-gray-100 dark:bg-slate-700'}
                             ${cell === 'X' ? 'text-indigo-600 dark:text-indigo-400' : 'text-rose-500 dark:text-rose-400'}
