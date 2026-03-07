@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { useSocket } from './SocketContext'
 import { REALTIME_EVENTS } from '@/lib/realtimeEvents'
-import { playGameInviteSound, playSuccessSound, playErrorSound } from '@/utils/audio'
+import { playGameInviteSound, playSuccessSound, playGameOverSound } from '@/utils/audio'
 import confetti from 'canvas-confetti'
 import {
   HiOutlineTrophy,
@@ -153,8 +153,12 @@ export function TicTacToeProvider({ children }) {
     }
   }, [isMyTurn, board, result, mySymbol, opponent, gameId, sendAction])
 
-  // Close / reset
+  // Close / reset — also notifies the other player
   const closeGame = useCallback(() => {
+    // If in an active game, notify the opponent
+    if (opponent?.userId && gameId && (phase === 'waiting' || phase === 'playing' || phase === 'result')) {
+      sendAction('close', opponent.userId, { gameId }).catch(() => {})
+    }
     setPhase('closed')
     setBoard(Array(9).fill(null))
     setResult(null)
@@ -162,7 +166,7 @@ export function TicTacToeProvider({ children }) {
     setGameId(null)
     setIncomingInvite(null)
     lastPollVersionRef.current = null
-  }, [])
+  }, [opponent, gameId, phase, sendAction])
 
   // ─── Socket listeners (fast path when Socket.IO is available) ───
   useEffect(() => {
@@ -206,6 +210,17 @@ export function TicTacToeProvider({ children }) {
         // Sync the final board if included (ensures last move is visible)
         if (data.board) setBoard(normalizeBoard(data.board))
         if (data.result) { setResult(data.result); setPhase('result') }
+      }),
+      subscribe(REALTIME_EVENTS.TICTACTOE_CLOSE, (data) => {
+        console.log('[TicTacToe] Received CLOSE event:', data)
+        if (data.fromUserId === currentUserId) return
+        setPhase('closed')
+        setBoard(Array(9).fill(null))
+        setResult(null)
+        setOpponent(null)
+        setGameId(null)
+        setIncomingInvite(null)
+        lastPollVersionRef.current = null
       }),
     ]
     return () => unsubs.forEach(fn => fn())
@@ -305,11 +320,23 @@ export function TicTacToeProvider({ children }) {
           setIsMyTurn(myTurn)
         }
 
-        // Game ended
+        // Game ended with result
         if (g.status === 'ended' && g.result) {
           setBoard(normalizeBoard(g.board))
           setResult(g.result)
           setPhase('result')
+          return
+        }
+
+        // Game ended without result (opponent closed)
+        if (g.status === 'ended' && !g.result) {
+          setPhase('closed')
+          setBoard(Array(9).fill(null))
+          setResult(null)
+          setOpponent(null)
+          setGameId(null)
+          lastPollVersionRef.current = null
+          return
         }
       } catch { /* ignore */ }
     }
@@ -326,7 +353,7 @@ export function TicTacToeProvider({ children }) {
       fireCrackers()
       playSuccessSound().catch(() => {})
     } else if (result.winner !== 'draw') {
-      playErrorSound().catch(() => {})
+      playGameOverSound().catch(() => {})
     }
   }, [phase, result, mySymbol])
 

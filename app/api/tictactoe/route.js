@@ -43,6 +43,32 @@ export async function GET(request) {
       return NextResponse.json({ success: true, invite: pending || null })
     }
 
+    // Game history — last 10 finished games for this user
+    if (check === 'history') {
+      const games = await TicTacToeGame.find({
+        $or: [{ hostUserId: userId }, { guestUserId: userId }],
+        status: 'ended',
+        result: { $ne: null },
+      })
+        .sort({ updatedAt: -1 })
+        .limit(10)
+        .select('hostUserId guestUserId hostName guestName hostSymbol result updatedAt')
+        .lean()
+
+      const history = games.map(g => {
+        const isHost = g.hostUserId === userId
+        const opponentName = isHost ? g.guestName : g.hostName
+        const mySymbol = isHost ? (g.hostSymbol || 'X') : (g.hostSymbol === 'X' ? 'O' : 'X')
+        let outcome = 'draw'
+        if (g.result?.winner && g.result.winner !== 'draw') {
+          outcome = g.result.winner === mySymbol ? 'win' : 'loss'
+        }
+        return { opponentName, outcome, date: g.updatedAt }
+      })
+
+      return NextResponse.json({ success: true, history })
+    }
+
     // Poll game state
     if (gameId) {
       const game = await TicTacToeGame.findOne({ gameId }).lean()
@@ -79,7 +105,7 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: 'targetUserId is required' }, { status: 400 })
     }
 
-    const validActions = ['invite', 'accept', 'decline', 'move', 'end']
+    const validActions = ['invite', 'accept', 'decline', 'move', 'end', 'close']
     if (!validActions.includes(action)) {
       return NextResponse.json({ success: false, message: 'Invalid action' }, { status: 400 })
     }
@@ -207,6 +233,24 @@ export async function POST(request) {
         // Already ended by move handler — just fetch current state
         game = await TicTacToeGame.findOne({ gameId }).lean()
       }
+    }
+
+    if (action === 'close') {
+      // Mark game as ended if still active
+      game = await TicTacToeGame.findOneAndUpdate(
+        { gameId, status: { $in: ['pending', 'playing'] } },
+        { status: 'ended' },
+        { new: true }
+      )
+      // Emit close event to the other user
+      if (global.io) {
+        global.io.to(`user:${targetUserId}`).emit(REALTIME_EVENTS.TICTACTOE_CLOSE, {
+          gameId,
+          fromUserId: senderId,
+          timestamp: new Date().toISOString(),
+        })
+      }
+      return NextResponse.json({ success: true })
     }
 
     // ── Socket.IO: emit if available (fast path) ──

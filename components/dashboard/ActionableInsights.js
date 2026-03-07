@@ -26,7 +26,20 @@ function TicTacToeCard() {
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [searching, setSearching] = useState(false)
+  const [history, setHistory] = useState([])
   const debounceRef = useRef(null)
+
+  // Fetch game history on mount
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+    fetch('/api/tictactoe?check=history', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(r => r.json())
+      .then(d => { if (d.history) setHistory(d.history) })
+      .catch(() => {})
+  }, [])
 
   const searchUsers = useCallback(async (q) => {
     setSearching(true)
@@ -117,16 +130,39 @@ function TicTacToeCard() {
 
   // ── Idle state ──
   return (
-    <div className="rounded-2xl p-5 bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/20 flex flex-col justify-between min-h-[140px] relative">
+    <div className="rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/20 flex flex-col min-h-[140px] relative overflow-hidden">
       {hasIncomingInvite && (
         <span className="absolute top-3 right-3 w-3 h-3 rounded-full bg-amber-400 animate-pulse" />
       )}
-      <div className="flex items-center gap-2 text-white/70 text-xs font-medium">
+      <div className="px-5 pt-4 pb-2 flex items-center gap-2 text-white/70 text-xs font-medium">
         <HiOutlineTrophy className="w-4 h-4" />
         <span>Tic-Tac-Toe</span>
       </div>
-      <div className="mt-auto">
-        <p className="text-sm text-white/80 mb-3">Challenge a teammate!</p>
+
+      {/* Recent games */}
+      {history.length > 0 && (
+        <div className="px-5 flex-1 overflow-hidden">
+          <div className="space-y-1">
+            {history.slice(0, 3).map((g, i) => (
+              <div key={i} className="flex items-center justify-between text-[11px]">
+                <span className="text-white/80 truncate max-w-[120px]">vs {g.opponentName || 'Unknown'}</span>
+                <span className={`font-semibold ${
+                  g.outcome === 'win' ? 'text-emerald-300' : g.outcome === 'loss' ? 'text-red-300' : 'text-white/60'
+                }`}>
+                  {g.outcome === 'win' ? '🏆 Won' : g.outcome === 'loss' ? '😔 Lost' : '🤝 Draw'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {history.length === 0 && (
+        <div className="px-5 flex-1 flex items-center">
+          <p className="text-sm text-white/80">Challenge a teammate!</p>
+        </div>
+      )}
+
+      <div className="px-5 pb-4 pt-2">
         <button
           onClick={() => setPhase('searching')}
           className="w-full py-2 rounded-xl bg-white/20 hover:bg-white/30 text-sm font-semibold transition-colors flex items-center justify-center gap-2"
