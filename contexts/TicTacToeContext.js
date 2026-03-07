@@ -22,6 +22,12 @@ function checkWinner(board) {
   return board.every(c => c) ? { winner: 'draw', line: null } : null
 }
 
+// Normalize board from DB (may have empty strings, missing slots, etc.)
+function normalizeBoard(raw) {
+  if (!Array.isArray(raw) || raw.length !== 9) return Array(9).fill(null)
+  return raw.map(c => (c === 'X' || c === 'O') ? c : null)
+}
+
 const TicTacToeContext = createContext({
   openInvite: () => {},
   hasIncomingInvite: false,
@@ -249,7 +255,7 @@ export function TicTacToeProvider({ children }) {
         // Game accepted — transition from waiting to playing
         if (g.status === 'playing' && phase === 'waiting') {
           setPhase('playing')
-          setBoard(g.board || Array(9).fill(null))
+          setBoard(normalizeBoard(g.board))
           // Update opponent name from DB
           setOpponent(prev => ({
             ...prev,
@@ -261,8 +267,7 @@ export function TicTacToeProvider({ children }) {
 
         // During play — sync board from DB
         if (g.status === 'playing' && phase === 'playing') {
-          const dbBoard = g.board || Array(9).fill(null)
-          setBoard(dbBoard)
+          setBoard(normalizeBoard(g.board))
           // Determine whose turn it is
           const myTurn = g.currentTurn === mySymbol
           setIsMyTurn(myTurn)
@@ -270,7 +275,7 @@ export function TicTacToeProvider({ children }) {
 
         // Game ended
         if (g.status === 'ended' && g.result) {
-          setBoard(g.board || Array(9).fill(null))
+          setBoard(normalizeBoard(g.board))
           setResult(g.result)
           setPhase('result')
         }
@@ -402,7 +407,7 @@ export function TicTacToeProvider({ children }) {
                   </div>
 
                   {/* Board */}
-                  <div className="grid grid-cols-3 gap-3 max-w-[300px] mx-auto">
+                  <div className="grid grid-cols-3 gap-3 w-[280px] mx-auto">
                     {board.map((cell, i) => {
                       const winLine = result?.line || []
                       const isWinCell = winLine.includes(i)
@@ -411,13 +416,14 @@ export function TicTacToeProvider({ children }) {
                           key={i}
                           onClick={() => makeMove(i)}
                           disabled={!isMyTurn || !!cell || !!result}
-                          className={`aspect-square rounded-2xl text-3xl font-extrabold flex items-center justify-center transition-all
+                          style={{ width: '84px', height: '84px' }}
+                          className={`rounded-2xl text-3xl font-extrabold flex items-center justify-center transition-all
                             ${!cell && isMyTurn && !result ? 'hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:scale-105 cursor-pointer' : 'cursor-default'}
-                            ${isWinCell ? 'bg-emerald-100 dark:bg-emerald-900/30 ring-2 ring-emerald-400 scale-105' : 'bg-gray-50 dark:bg-slate-700/40'}
+                            ${isWinCell ? 'bg-emerald-100 dark:bg-emerald-900/30 ring-2 ring-emerald-400 scale-105' : 'bg-gray-100 dark:bg-slate-700'}
                             ${cell === 'X' ? 'text-indigo-600 dark:text-indigo-400' : 'text-rose-500 dark:text-rose-400'}
                           `}
                         >
-                          {cell}
+                          {cell || ''}
                         </button>
                       )
                     })}
