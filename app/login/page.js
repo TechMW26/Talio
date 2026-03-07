@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import toast from '@/utils/toast'
-import { FaEnvelope, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa'
+import { FaEnvelope, FaLock, FaEye, FaEyeSlash, FaExclamationTriangle, FaRedoAlt } from 'react-icons/fa'
 import { resetRedirectFlag } from '@/utils/userHelper'
 import { resetAuthRedirectFlag } from '@/hooks/useAuthedSWR'
 import { 
@@ -16,7 +16,12 @@ import {
   Checkbox,
   Spinner,
   Divider,
-  Link as HeroLink
+  Link as HeroLink,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
 } from '@heroui/react'
 
 export default function LoginPage() {
@@ -29,6 +34,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [checking, setChecking] = useState(true)
   const [isRedirecting, setIsRedirecting] = useState(false)
+  const [loginError, setLoginError] = useState(null) // { errorType, message }
 
   // Check if running in Electron/desktop app
   const isDesktopApp = () => {
@@ -259,13 +265,74 @@ export default function LoginPage() {
         // Use window.location.href for reliable redirect
         window.location.href = '/dashboard'
       } else {
-        toast.error(data.message || 'Login failed')
+        setLoginError({
+          errorType: data.errorType || 'unknown',
+          message: data.message || 'Login failed. Please try again.',
+        })
       }
     } catch (error) {
-      toast.error('An error occurred. Please try again.')
+      setLoginError({
+        errorType: 'network_error',
+        message: 'Could not connect to the server. Please check your internet connection and try again.',
+      })
     } finally {
       setLoading(false)
     }
+  }
+
+  const getErrorDetails = () => {
+    if (!loginError) return {}
+    switch (loginError.errorType) {
+      case 'email_not_found':
+        return {
+          title: 'Email Not Found',
+          icon: '📧',
+          description: loginError.message,
+          suggestion: 'Please double-check your email address and try again.',
+          retryLabel: 'Try Again',
+          focusField: 'email',
+        }
+      case 'wrong_password':
+        return {
+          title: 'Incorrect Password',
+          icon: '🔒',
+          description: loginError.message,
+          suggestion: 'Make sure Caps Lock is off and try entering your password again.',
+          retryLabel: 'Retry Password',
+          focusField: 'password',
+        }
+      case 'network_error':
+        return {
+          title: 'Connection Error',
+          icon: '🌐',
+          description: loginError.message,
+          suggestion: 'Check your internet connection and try again.',
+          retryLabel: 'Try Again',
+          focusField: null,
+        }
+      default:
+        return {
+          title: 'Login Failed',
+          icon: '⚠️',
+          description: loginError.message,
+          suggestion: 'Please try again or contact your administrator if the problem persists.',
+          retryLabel: 'Try Again',
+          focusField: null,
+        }
+    }
+  }
+
+  const handleRetry = () => {
+    const details = getErrorDetails()
+    setLoginError(null)
+    if (details.focusField === 'password') {
+      setFormData(prev => ({ ...prev, password: '' }))
+    }
+    // Focus the relevant input after modal closes
+    setTimeout(() => {
+      const input = document.querySelector(`input[name="${details.focusField || 'email'}"]`)
+      if (input) input.focus()
+    }, 100)
   }
 
   // Show loading screen while checking session
@@ -426,6 +493,85 @@ export default function LoginPage() {
           </p>
         </div>
       </div>
+
+      {/* Login Error Modal */}
+      <Modal 
+        isOpen={!!loginError} 
+        onClose={() => setLoginError(null)}
+        placement="center"
+        backdrop="blur"
+        size="md"
+        classNames={{
+          base: "border-2 border-red-500/30 dark:border-red-500/40 bg-white dark:bg-[#1a1f2e] shadow-2xl shadow-red-500/10",
+          closeButton: "text-gray-500 dark:text-gray-300 hover:bg-red-100 dark:hover:bg-red-900/30 active:bg-red-200",
+        }}
+      >
+        <ModalContent>
+          {() => {
+            const details = getErrorDetails()
+            return (
+              <>
+                <ModalBody className="pt-8 pb-6 px-6 md:px-8">
+                  {/* Big Red Icon */}
+                  <div className="flex justify-center mb-5">
+                    <div className="w-20 h-20 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center ring-4 ring-red-200 dark:ring-red-800/40">
+                      {loginError?.errorType === 'wrong_password' ? (
+                        <FaLock className="text-red-500 dark:text-red-400 text-3xl" />
+                      ) : loginError?.errorType === 'email_not_found' ? (
+                        <FaEnvelope className="text-red-500 dark:text-red-400 text-3xl" />
+                      ) : loginError?.errorType === 'network_error' ? (
+                        <FaExclamationTriangle className="text-amber-500 dark:text-amber-400 text-3xl" />
+                      ) : (
+                        <FaExclamationTriangle className="text-red-500 dark:text-red-400 text-3xl" />
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Title — big and bold */}
+                  <h2 className="text-center text-2xl font-bold text-red-600 dark:text-red-400 mb-3">
+                    {details.title}
+                  </h2>
+
+                  {/* Main message — large and clear */}
+                  <p className="text-center text-base font-medium text-gray-800 dark:text-gray-100 leading-relaxed mb-2">
+                    {details.description}
+                  </p>
+
+                  {/* Suggestion — visible in both modes */}
+                  <p className="text-center text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
+                    {details.suggestion}
+                  </p>
+
+                  {/* Forgot password link for wrong password */}
+                  {loginError?.errorType === 'wrong_password' && (
+                    <div className="text-center mt-4">
+                      <Link 
+                        href="/auth/forgot-password" 
+                        className="inline-flex items-center gap-1.5 text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 text-sm font-semibold transition-colors underline underline-offset-2"
+                      >
+                        Forgot your password? Reset it here
+                      </Link>
+                    </div>
+                  )}
+                </ModalBody>
+
+                <ModalFooter className="justify-center pb-7 pt-2 px-6">
+                  <Button
+                    color="danger"
+                    size="lg"
+                    radius="lg"
+                    className="font-bold text-base px-10 shadow-lg shadow-red-500/25 bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white"
+                    onPress={handleRetry}
+                    startContent={<FaRedoAlt className="text-sm" />}
+                  >
+                    {details.retryLabel}
+                  </Button>
+                </ModalFooter>
+              </>
+            )
+          }}
+        </ModalContent>
+      </Modal>
     </div>
   )
 }

@@ -96,16 +96,164 @@ export function SocketProvider({ children }) {
       reconnection: true,
       reconnectionDelay: 2000,
       reconnectionDelayMax: 10000,
-      reconnectionAttempts: 5, // Reduce attempts to avoid console spam
-      timeout: 20000,
+      reconnectionAttempts: 3, // Low attempts — if Socket.IO server isn't running (Vercel), stop quickly
+      timeout: 10000,
       autoConnect: true,
       forceNew: false
     })
+
+    // =============================================
+    // Polling fallback for force-refresh (Vercel)
+    // When Socket.IO is not available, poll the DB
+    // =============================================
+    let refreshPollTimer = null
+    let socketConnectedOnce = false
+
+    const startRefreshPolling = () => {
+      // Only poll if we have a token and never connected to Socket.IO
+      if (refreshPollTimer || socketConnectedOnce) return
+      const token = localStorage.getItem('token')
+      if (!token) return
+
+      console.log('🔄 [Socket.IO Client] Socket.IO unavailable — starting refresh polling fallback')
+      refreshPollTimer = setInterval(async () => {
+        try {
+          const res = await fetch('/api/user/check-refresh', {
+            headers: { 'Authorization': `Bearer ${token}` },
+          })
+          if (!res.ok) return
+          const data = await res.json()
+          if (data.pending) {
+            console.log('🔄 [Socket.IO Client] Pending refresh found via polling:', data)
+            // Trigger the same refresh flow as Socket.IO force-refresh
+            handleForceRefresh(data)
+          }
+        } catch {
+          // Silently ignore polling errors
+        }
+      }, 15000) // Poll every 15 seconds
+    }
+
+    const stopRefreshPolling = () => {
+      if (refreshPollTimer) {
+        clearInterval(refreshPollTimer)
+        refreshPollTimer = null
+      }
+    }
+
+    // =============================================
+    // Heartbeat for DB-backed presence (Vercel)
+    // When Socket.IO is unavailable, periodically POST
+    // to /api/user/heartbeat so the live-users API
+    // can determine who is active.
+    // =============================================
+    let heartbeatTimer = null
+
+    const sendHeartbeat = async () => {
+      const token = localStorage.getItem('token')
+      if (!token) return
+      try {
+        await fetch('/api/user/heartbeat', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            employeeId: employeeId || undefined,
+            currentPage: window.location.pathname,
+          }),
+        })
+      } catch {
+        // Silently ignore heartbeat errors
+      }
+    }
+
+    const startHeartbeat = () => {
+      if (heartbeatTimer || socketConnectedOnce) return
+      sendHeartbeat() // Send immediately
+      heartbeatTimer = setInterval(sendHeartbeat, 60000) // Then every 60s
+    }
+
+    const stopHeartbeat = () => {
+      if (heartbeatTimer) {
+        clearInterval(heartbeatTimer)
+        heartbeatTimer = null
+      }
+    }
+
+    // Shared force-refresh handler (used by both Socket.IO and polling)
+    const handleForceRefresh = (data) => {
+      try {
+        console.log('🔄 [Socket.IO Client] Force refresh request received:', data)
+
+        const message = data?.message || 'The administrator has requested a page refresh.'
+
+        // Show toast notification before refresh
+        toast.custom((t) => (
+          <div
+            className={`${t.visible ? 'animate-enter' : 'animate-leave'
+              } max-w-md w-full bg-amber-50 border border-amber-200 shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-amber-300`}
+          >
+            <div className="flex-1 w-0 p-4">
+              <div className="flex items-start">
+                <div className="flex-shrink-0 pt-0.5">
+                  <div className="h-10 w-10 rounded-full bg-amber-500 flex items-center justify-center">
+                    <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="ml-3 flex-1">
+                  <p className="text-sm font-medium text-amber-900">
+                    Page Refresh Required
+                  </p>
+                  <p className="mt-1 text-sm text-amber-700">
+                    {message}
+                  </p>
+                  <p className="mt-2 text-xs text-amber-600">
+                    Refreshing in 3 seconds...
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        ), {
+          duration: 4000,
+          position: 'top-center',
+        })
+
+        // Delay the refresh to let user see the message
+        setTimeout(() => {
+          // Hard refresh: clear cache and reload
+          if (data?.hard) {
+            const keysToRemove = []
+            for (let i = 0; i < localStorage.length; i++) {
+              const key = localStorage.key(i)
+              if (key && (key.startsWith('cache_') || key.startsWith('query_'))) {
+                keysToRemove.push(key)
+              }
+            }
+            keysToRemove.forEach(key => localStorage.removeItem(key))
+            sessionStorage.clear()
+            window.location.reload(true)
+          } else {
+            window.location.reload()
+          }
+        }, 3000)
+      } catch (error) {
+        console.error('❌ [Socket.IO Client] Error handling force-refresh:', error)
+        setTimeout(() => window.location.reload(), 2000)
+      }
+    }
 
     // Connection event handlers
     socketInstance.on('connect', () => {
       console.log('✅ [Socket.IO Client] Connected:', socketInstance.id)
       setIsConnected(true)
+      socketConnectedOnce = true
+      stopRefreshPolling() // No need to poll if Socket.IO works
+      stopHeartbeat() // Socket.IO handles presence natively
 
       // Authenticate user if we have userId
       if (userId) {
@@ -125,10 +273,20 @@ export function SocketProvider({ children }) {
     socketInstance.on('connect_error', (error) => {
       // Only log once, not on every retry to avoid console spam
       if (!socketInstance._hasLoggedError) {
-        console.warn('⚠️ [Socket.IO Client] Connection error - server may not be running. Use "npm run dev" for Socket.IO support.')
+        console.warn('⚠️ [Socket.IO Client] Connection error — real-time features will use polling fallback.')
         socketInstance._hasLoggedError = true
+        // Proactively start heartbeat and polling — if Socket.IO fails once on Vercel it won't recover
+        startRefreshPolling()
+        startHeartbeat()
       }
       setIsConnected(false)
+    })
+
+    // When all reconnection attempts are exhausted, start DB polling fallback
+    socketInstance.on('reconnect_failed', () => {
+      console.warn('⚠️ [Socket.IO Client] All reconnection attempts failed — switching to polling fallback.')
+      startRefreshPolling()
+      startHeartbeat() // Start DB-backed presence heartbeat
     })
 
     socketInstance.on('reconnect', (attemptNumber) => {
@@ -200,77 +358,8 @@ export function SocketProvider({ children }) {
     })
 
     // Handle force-refresh events from admin
-    // This triggers a hard refresh to clear cache and reload the page
-    socketInstance.on('force-refresh', (data) => {
-      try {
-        console.log('🔄 [Socket.IO Client] Force refresh request received:', data)
-
-        const message = data?.message || 'The administrator has requested a page refresh.'
-
-        // Show toast notification before refresh
-        toast.custom((t) => (
-          <div
-            className={`${t.visible ? 'animate-enter' : 'animate-leave'
-              } max-w-md w-full bg-amber-50 border border-amber-200 shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-amber-300`}
-          >
-            <div className="flex-1 w-0 p-4">
-              <div className="flex items-start">
-                <div className="flex-shrink-0 pt-0.5">
-                  <div className="h-10 w-10 rounded-full bg-amber-500 flex items-center justify-center">
-                    <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                  </div>
-                </div>
-                <div className="ml-3 flex-1">
-                  <p className="text-sm font-medium text-amber-900">
-                    Page Refresh Required
-                  </p>
-                  <p className="mt-1 text-sm text-amber-700">
-                    {message}
-                  </p>
-                  <p className="mt-2 text-xs text-amber-600">
-                    Refreshing in 3 seconds...
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-        ), {
-          duration: 4000,
-          position: 'top-center',
-        })
-
-        // Delay the refresh to let user see the message
-        setTimeout(() => {
-          // Hard refresh: clear cache and reload
-          if (data?.hard) {
-            // Clear localStorage cache items (but not auth)
-            const keysToRemove = []
-            for (let i = 0; i < localStorage.length; i++) {
-              const key = localStorage.key(i)
-              if (key && (key.startsWith('cache_') || key.startsWith('query_'))) {
-                keysToRemove.push(key)
-              }
-            }
-            keysToRemove.forEach(key => localStorage.removeItem(key))
-
-            // Clear session storage
-            sessionStorage.clear()
-
-            // Force reload bypassing cache
-            window.location.reload(true)
-          } else {
-            // Normal reload
-            window.location.reload()
-          }
-        }, 3000)
-      } catch (error) {
-        console.error('❌ [Socket.IO Client] Error handling force-refresh:', error)
-        // Still try to refresh even if there's an error
-        setTimeout(() => window.location.reload(), 2000)
-      }
-    })
+    // Uses shared handler that works for both Socket.IO and polling
+    socketInstance.on('force-refresh', handleForceRefresh)
 
     setSocket(socketInstance)
 
@@ -279,6 +368,8 @@ export function SocketProvider({ children }) {
 
     // Cleanup on unmount
     return () => {
+      stopRefreshPolling()
+      stopHeartbeat()
       if (socketInstance) {
         socketInstance.disconnect()
       }

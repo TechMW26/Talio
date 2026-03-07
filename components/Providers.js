@@ -5,8 +5,11 @@ import { SWRConfig } from 'swr'
 import { HeroUIProvider } from '@heroui/react'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import { AILoadingProvider } from '@/contexts/AILoadingContext'
+import { AIAssistantProvider } from '@/contexts/AIAssistantContext'
 import GlobalAILoadingOverlay from '@/components/ui/GlobalAILoadingOverlay'
 import MiraTransitionOverlay from '@/components/ui/MiraTransitionOverlay'
+import AIAssistant from '@/components/AIAssistant'
+import AIAssistantBridge from '@/components/AIAssistantBridge'
 import AutoRefresh from '@/components/AutoRefresh'
 import WebNetworkRecovery from '@/components/WebNetworkRecovery'
 import ScrollToTop from '@/components/ScrollToTop'
@@ -77,6 +80,7 @@ export function Providers({ children }) {
         <HeroUIProvider>
             <ThemeProvider>
                 <AILoadingProvider>
+                <AIAssistantProvider>
                     <SWRConfig
                         value={{
                             // Stale-while-revalidate: show cached data immediately
@@ -103,8 +107,11 @@ export function Providers({ children }) {
                         <ScrollToTop />
                         <WebNetworkRecovery />
                         <AutoRefresh />
+                        <AIAssistant />
+                        <AIAssistantBridge />
                         {children}
                     </SWRConfig>
+                </AIAssistantProvider>
                 </AILoadingProvider>
             </ThemeProvider>
         </HeroUIProvider>

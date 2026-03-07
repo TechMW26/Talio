@@ -14,13 +14,13 @@ import { getAuthAndModels } from '@/lib/auth';
  */
 export async function GET(request) {
   try {
-    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Attendance', 'Department']);
+    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Attendance', 'Department', 'UserPresence']);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
 
     const { user, models } = auth;
-    const { User, Employee, Attendance, Department } = models;
+    const { User, Employee, Attendance, Department, UserPresence } = models;
 
     const userRole = user.role;
     const isAdmin = userRole === 'admin';
@@ -164,14 +164,31 @@ export async function GET(request) {
     );
 
     // Get active users from socket presence (real-time connection tracking)
+    // On Vercel (serverless), global.presenceByUserId is always empty,
+    // so fall back to DB-backed heartbeat presence (UserPresence collection).
     const presenceByUserId = global.presenceByUserId || new Map();
-    
-    // Helper function to check if a user is currently connected via socket
+    const hasSocketPresence = presenceByUserId.size > 0;
+
+    // DB-backed presence: users with a heartbeat in the last 2 minutes are "active"
+    let dbActiveUserIds = new Set();
+    if (!hasSocketPresence) {
+      const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000);
+      const activePresences = await UserPresence.find(
+        { lastHeartbeat: { $gte: twoMinutesAgo } },
+        { userId: 1 }
+      ).lean();
+      dbActiveUserIds = new Set(activePresences.map(p => p.userId));
+    }
+
+    // Helper function to check if a user is currently active
     const isUserActiveNow = (userId) => {
       if (!userId) return false;
       const userIdStr = userId.toString();
-      const entry = presenceByUserId.get(userIdStr);
-      return entry && entry.sockets && entry.sockets.size > 0;
+      if (hasSocketPresence) {
+        const entry = presenceByUserId.get(userIdStr);
+        return entry && entry.sockets && entry.sockets.size > 0;
+      }
+      return dbActiveUserIds.has(userIdStr);
     };
 
     // Categorize users

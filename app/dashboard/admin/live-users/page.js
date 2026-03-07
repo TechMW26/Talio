@@ -84,7 +84,7 @@ export default function LiveUsersPage() {
     } else if (target === 'user' && targetId) {
       body.userId = targetId
     } else if (target === 'selected' && selectedUsers.length > 0) {
-      body.target = 'selected'
+      body.target = 'user'
       body.userIds = selectedUsers
     }
 
@@ -251,11 +251,11 @@ export default function LiveUsersPage() {
           <p className="text-gray-600 mt-1">Monitor active users and send refresh requests</p>
         </div>
         <div className="flex items-center gap-3">
-          {/* Socket Status */}
-          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm ${isConnected ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+          {/* Connection Status */}
+          <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm ${isConnected ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
             }`}>
-            <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></span>
-            {isConnected ? 'Connected' : 'Disconnected'}
+            <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-amber-500'}`}></span>
+            {isConnected ? 'Live' : 'Polling'}
           </div>
           {/* Refresh Button */}
           <button

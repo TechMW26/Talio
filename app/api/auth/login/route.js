@@ -68,7 +68,7 @@ export async function POST(request) {
       // SECURITY: No tenant mapping = no access
       console.warn(`[Login] No tenant mapping found for ${email} - access denied`);
       return NextResponse.json(
-        { message: 'Invalid email or password' },
+        { message: 'No account found with this email address. Please check and try again.', errorType: 'email_not_found' },
         { status: 401 }
       );
     }
@@ -102,7 +102,7 @@ export async function POST(request) {
 
     if (!user) {
       return NextResponse.json(
-        { message: 'Invalid credentials' },
+        { message: 'No account found with this email address. Please check and try again.', errorType: 'email_not_found' },
         { status: 401 }
       )
     }
@@ -133,7 +133,7 @@ export async function POST(request) {
 
     if (!isPasswordMatch) {
       return NextResponse.json(
-        { message: 'Invalid credentials' },
+        { message: 'The password you entered is incorrect. Please try again.', errorType: 'wrong_password' },
         { status: 401 }
       )
     }

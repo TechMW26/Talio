@@ -4,7 +4,7 @@ import mongoose from 'mongoose';
 
 /**
  * POST /api/admin/broadcast-refresh
- * Send a force-refresh event to users via Socket.IO
+ * Send a force-refresh event to users via Socket.IO (or DB fallback for Vercel)
  * ADMIN ONLY - HR and Department Heads can view but not refresh
  * 
  * Body:
@@ -16,13 +16,13 @@ import mongoose from 'mongoose';
  */
 export async function POST(request) {
   try {
-    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department']);
+    const auth = await getAuthAndModels(request, ['User', 'Employee', 'Department', 'ForceRefresh']);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
 
     const { user, models } = auth;
-    const { User, Employee, Department } = models;
+    const { User, Employee, Department, ForceRefresh } = models;
 
     // ONLY admin can broadcast refresh - HR and department heads can view but not refresh
     if (user.role !== 'admin') {
@@ -67,12 +67,7 @@ export async function POST(request) {
     }
 
     // Check if Socket.IO is available
-    if (!global.io) {
-      return NextResponse.json(
-        { success: false, message: 'Real-time server not available. Please try again.' },
-        { status: 503 }
-      );
-    }
+    const hasSocketIO = !!global.io;
 
     let targetUserIds = [];
     let targetDescription = '';
@@ -143,13 +138,27 @@ export async function POST(request) {
     };
 
     let sentCount = 0;
-    for (const uid of targetUserIds) {
-      // Emit to user's personal room
-      global.io.to(`user:${uid}`).emit('force-refresh', refreshPayload);
-      sentCount++;
-    }
 
-    console.log(`[Broadcast Refresh] ${user.email} sent refresh to ${sentCount} users (${targetDescription})`);
+    if (hasSocketIO) {
+      // Primary path: Send via Socket.IO (custom server / npm run dev)
+      for (const uid of targetUserIds) {
+        global.io.to(`user:${uid}`).emit('force-refresh', refreshPayload);
+        sentCount++;
+      }
+      console.log(`[Broadcast Refresh] ${user.email} sent refresh via Socket.IO to ${sentCount} users (${targetDescription})`);
+    } else {
+      // Fallback path: Store in DB for polling clients (Vercel deployment)
+      const docs = targetUserIds.map(uid => ({
+        userId: uid,
+        message: refreshPayload.message,
+        hard: refreshPayload.hard,
+        initiatedBy: refreshPayload.initiatedBy,
+        consumed: false,
+      }));
+      await ForceRefresh.insertMany(docs);
+      sentCount = docs.length;
+      console.log(`[Broadcast Refresh] ${user.email} stored refresh in DB for ${sentCount} users (${targetDescription}) — Socket.IO unavailable`);
+    }
 
     return NextResponse.json({
       success: true,
