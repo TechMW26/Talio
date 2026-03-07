@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, useCallback } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { useSocket } from './SocketContext'
 import { REALTIME_EVENTS } from '@/lib/realtimeEvents'
 import { playGameInviteSound } from '@/utils/audio'
@@ -28,7 +28,7 @@ const TicTacToeContext = createContext({
 })
 
 export function TicTacToeProvider({ children }) {
-  const { subscribe, currentUserId } = useSocket()
+  const { subscribe, currentUserId, isConnected } = useSocket()
 
   // Game state
   const [phase, setPhase] = useState('closed') // closed | invite-incoming | waiting | playing | result
@@ -39,6 +39,9 @@ export function TicTacToeProvider({ children }) {
   const [result, setResult] = useState(null)
   const [gameId, setGameId] = useState(null)
   const [incomingInvite, setIncomingInvite] = useState(null)
+
+  // Track last polled game version to avoid redundant state updates
+  const lastPollVersionRef = useRef(null)
 
   // API helper
   const sendAction = useCallback(async (action, targetUserId, extra = {}) => {
@@ -73,21 +76,27 @@ export function TicTacToeProvider({ children }) {
   // Accept incoming invite
   const acceptInvite = useCallback(() => {
     if (!incomingInvite) return
-    setOpponent({ userId: incomingInvite.fromUserId, name: incomingInvite.fromName, avatar: incomingInvite.fromAvatar })
-    setGameId(incomingInvite.gameId)
+    const hostId = incomingInvite.fromUserId || incomingInvite.hostUserId
+    const hostName = incomingInvite.fromName || incomingInvite.hostName
+    const hostAvatar = incomingInvite.fromAvatar || incomingInvite.hostAvatar
+    const gid = incomingInvite.gameId
+    setOpponent({ userId: hostId, name: hostName, avatar: hostAvatar })
+    setGameId(gid)
     setMySymbol('O')
     setIsMyTurn(false)
     setBoard(Array(9).fill(null))
     setResult(null)
     setPhase('playing')
-    sendAction('accept', incomingInvite.fromUserId, { gameId: incomingInvite.gameId })
+    sendAction('accept', hostId, { gameId: gid })
     setIncomingInvite(null)
   }, [incomingInvite, sendAction])
 
   // Decline incoming invite
   const declineInvite = useCallback(() => {
     if (!incomingInvite) return
-    sendAction('decline', incomingInvite.fromUserId, { gameId: incomingInvite.gameId })
+    const hostId = incomingInvite.fromUserId || incomingInvite.hostUserId
+    const gid = incomingInvite.gameId
+    sendAction('decline', hostId, { gameId: gid })
     setIncomingInvite(null)
     setPhase('closed')
   }, [incomingInvite, sendAction])
@@ -116,9 +125,10 @@ export function TicTacToeProvider({ children }) {
     setOpponent(null)
     setGameId(null)
     setIncomingInvite(null)
+    lastPollVersionRef.current = null
   }, [])
 
-  // Socket listeners
+  // ─── Socket listeners (fast path when Socket.IO is available) ───
   useEffect(() => {
     if (!subscribe) return
     console.log('[TicTacToe] Setting up socket listeners, currentUserId:', currentUserId)
@@ -162,6 +172,114 @@ export function TicTacToeProvider({ children }) {
     ]
     return () => unsubs.forEach(fn => fn())
   }, [subscribe, currentUserId])
+
+  // ─── DB Polling fallback (when Socket.IO is unavailable) ───
+  // Poll for pending invites when idle (every 5s)
+  useEffect(() => {
+    if (isConnected) return // Socket.IO is working, no need to poll
+    if (phase !== 'closed') return // Already in a game flow
+    const token = localStorage.getItem('token')
+    if (!token) return
+
+    console.log('[TicTacToe] Socket.IO unavailable, starting invite polling')
+
+    const poll = async () => {
+      try {
+        const res = await fetch('/api/tictactoe?check=pending', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        if (!res.ok) return
+        const data = await res.json()
+        if (data.invite) {
+          console.log('[TicTacToe] Found pending invite via polling:', data.invite)
+          // Convert DB format to the invite format expected by the UI
+          setIncomingInvite({
+            gameId: data.invite.gameId,
+            fromUserId: data.invite.hostUserId,
+            hostUserId: data.invite.hostUserId,
+            fromName: data.invite.hostName,
+            hostName: data.invite.hostName,
+            fromAvatar: data.invite.hostAvatar,
+            hostAvatar: data.invite.hostAvatar,
+          })
+          setPhase('invite-incoming')
+          playGameInviteSound().catch(() => {})
+        }
+      } catch { /* ignore */ }
+    }
+
+    poll() // Check immediately
+    const timer = setInterval(poll, 5000)
+    return () => clearInterval(timer)
+  }, [isConnected, phase])
+
+  // Poll game state during active gameplay (every 1.5s)
+  useEffect(() => {
+    if (isConnected) return // Socket.IO handles updates
+    if (!gameId) return
+    if (phase !== 'waiting' && phase !== 'playing') return
+    const token = localStorage.getItem('token')
+    if (!token) return
+
+    console.log('[TicTacToe] Polling game state for:', gameId)
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/tictactoe?gameId=${encodeURIComponent(gameId)}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        if (!res.ok) return
+        const data = await res.json()
+        if (!data.game) return
+
+        const g = data.game
+        const version = g.lastMoveAt || g.updatedAt
+
+        // Skip if no change
+        if (lastPollVersionRef.current === version) return
+        lastPollVersionRef.current = version
+
+        // Game was declined
+        if (g.status === 'declined') {
+          setPhase('closed')
+          setOpponent(null)
+          return
+        }
+
+        // Game accepted — transition from waiting to playing
+        if (g.status === 'playing' && phase === 'waiting') {
+          setPhase('playing')
+          setBoard(g.board || Array(9).fill(null))
+          // Update opponent name from DB
+          setOpponent(prev => ({
+            ...prev,
+            name: g.guestName || prev?.name,
+            avatar: g.guestAvatar || prev?.avatar,
+          }))
+          return
+        }
+
+        // During play — sync board from DB
+        if (g.status === 'playing' && phase === 'playing') {
+          const dbBoard = g.board || Array(9).fill(null)
+          setBoard(dbBoard)
+          // Determine whose turn it is
+          const myTurn = g.currentTurn === mySymbol
+          setIsMyTurn(myTurn)
+        }
+
+        // Game ended
+        if (g.status === 'ended' && g.result) {
+          setBoard(g.board || Array(9).fill(null))
+          setResult(g.result)
+          setPhase('result')
+        }
+      } catch { /* ignore */ }
+    }
+
+    const timer = setInterval(poll, 1500)
+    return () => clearInterval(timer)
+  }, [isConnected, gameId, phase, mySymbol])
 
   const showPopup = phase !== 'closed'
 
