@@ -20,17 +20,9 @@ export async function POST(request) {
     if (!action) {
       return NextResponse.json({ success: false, message: 'action is required' }, { status: 400 })
     }
-
-    const io = global.io
-    if (!io) {
-      return NextResponse.json({ success: false, message: 'Real-time not available' }, { status: 503 })
+    if (!targetUserId) {
+      return NextResponse.json({ success: false, message: 'targetUserId is required' }, { status: 400 })
     }
-
-    // Get sender info
-    const { Employee } = auth.models
-    const senderEmployee = await Employee.findById(auth.user.employeeId).select('firstName lastName avatar').lean()
-    const senderName = senderEmployee ? `${senderEmployee.firstName} ${senderEmployee.lastName}` : 'Someone'
-    const senderAvatar = senderEmployee?.avatar || null
 
     const eventMap = {
       invite: REALTIME_EVENTS.TICTACTOE_INVITE,
@@ -45,25 +37,44 @@ export async function POST(request) {
       return NextResponse.json({ success: false, message: 'Invalid action' }, { status: 400 })
     }
 
-    if (!targetUserId) {
-      return NextResponse.json({ success: false, message: 'targetUserId is required' }, { status: 400 })
+    // Sender's user ID — use _id which is always present
+    const senderId = (auth.user._id || auth.user.id || auth.user.userId).toString()
+
+    // Get sender info
+    const { Employee } = auth.models
+    let senderName = 'Someone'
+    let senderAvatar = null
+    if (auth.user.employeeId) {
+      const senderEmployee = await Employee.findById(auth.user.employeeId).select('firstName lastName avatar').lean()
+      if (senderEmployee) {
+        senderName = `${senderEmployee.firstName} ${senderEmployee.lastName}`.trim()
+        senderAvatar = senderEmployee.avatar || null
+      }
     }
 
     const eventData = {
       ...payload,
-      fromUserId: auth.user.userId,
+      fromUserId: senderId,
       fromName: senderName,
       fromAvatar: senderAvatar,
       targetUserId,
       timestamp: new Date().toISOString(),
     }
 
+    const io = global.io
+    if (!io) {
+      console.warn('[TicTacToe API] global.io not available — are you running the custom server?')
+      return NextResponse.json({ success: false, message: 'Real-time not available. Use npm run dev (custom server).' }, { status: 503 })
+    }
+
+    console.log(`[TicTacToe API] ${action} from ${senderId} to ${targetUserId}`)
+
     // Emit to the target user
     io.to(`user:${targetUserId}`).emit(eventName, eventData)
 
     // For moves/accept/end, also emit back to the sender so both sides stay synced
     if (['accept', 'move', 'end'].includes(action)) {
-      io.to(`user:${auth.user.userId}`).emit(eventName, eventData)
+      io.to(`user:${senderId}`).emit(eventName, eventData)
     }
 
     return NextResponse.json({ success: true })

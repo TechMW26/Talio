@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react'
+import { playTaskDoneSound } from '@/utils/audio'
 
 const FocusTimerContext = createContext(null)
 
@@ -27,6 +28,26 @@ export function FocusTimerProvider({ children }) {
     }, 1000)
     return () => clearInterval(intervalRef.current)
   }, [running])
+
+  // Play sound and send push notification when timer completes
+  const hasNotifiedRef = useRef(false)
+  useEffect(() => {
+    if (left === 0 && !running && total > 0 && !hasNotifiedRef.current) {
+      hasNotifiedRef.current = true
+      playTaskDoneSound().catch(() => {})
+
+      // Send push notification to all user devices
+      const token = localStorage.getItem('token')
+      if (token) {
+        fetch('/api/focus-timer/complete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ duration }),
+        }).catch(() => {})
+      }
+    }
+    if (left > 0) hasNotifiedRef.current = false
+  }, [left, running, total, duration])
 
   const pickDuration = useCallback((mins) => {
     setDuration(mins)

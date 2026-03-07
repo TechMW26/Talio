@@ -3,9 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Skeleton } from '@heroui/react'
 import { useFocusTimer } from '@/contexts/FocusTimerContext'
-import { useSocket } from '@/contexts/SocketContext'
-import { REALTIME_EVENTS } from '@/lib/realtimeEvents'
-import { playGameInviteSound } from '@/utils/audio'
+import { useTicTacToe } from '@/contexts/TicTacToeContext'
 import {
   HiOutlineSparkles,
   HiOutlineClock,
@@ -18,47 +16,26 @@ import {
   HiOutlineXMark,
   HiOutlineMagnifyingGlass,
   HiOutlineUserPlus,
-  HiOutlineXCircle,
-  HiOutlineArrowLeft,
   HiOutlineTrophy,
 } from 'react-icons/hi2'
 
-// ─── Win detection helpers ───
-const WIN_LINES = [
-  [0,1,2],[3,4,5],[6,7,8], // rows
-  [0,3,6],[1,4,7],[2,5,8], // cols
-  [0,4,8],[2,4,6],         // diagonals
-]
-function checkWinner(board) {
-  for (const [a,b,c] of WIN_LINES) {
-    if (board[a] && board[a] === board[b] && board[a] === board[c]) return { winner: board[a], line: [a,b,c] }
-  }
-  return board.every(c => c) ? { winner: 'draw', line: null } : null
-}
-
-// ─── Tic-Tac-Toe Card ───
+// ─── Tic-Tac-Toe Card (invite trigger only — game plays in popup) ───
 function TicTacToeCard() {
-  const { subscribe, currentUserId, REALTIME_EVENTS: RE } = useSocket()
-  const [phase, setPhase] = useState('idle') // idle | searching | waiting | playing | result
+  const { openInvite, hasIncomingInvite } = useTicTacToe()
+  const [phase, setPhase] = useState('idle') // idle | searching
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
   const [searching, setSearching] = useState(false)
-  const [opponent, setOpponent] = useState(null) // { userId, name, avatar }
-  const [board, setBoard] = useState(Array(9).fill(null))
-  const [mySymbol, setMySymbol] = useState('X')
-  const [isMyTurn, setIsMyTurn] = useState(false)
-  const [result, setResult] = useState(null) // { winner, line }
-  const [gameId, setGameId] = useState(null)
-  const [invite, setInvite] = useState(null) // incoming invite
   const debounceRef = useRef(null)
 
-  // Search users
   const searchUsers = useCallback(async (q) => {
-    if (!q.trim()) { setSearchResults([]); return }
     setSearching(true)
     try {
       const token = localStorage.getItem('token')
-      const res = await fetch(`/api/users/search?q=${encodeURIComponent(q)}&limit=6`, {
+      const url = q.trim()
+        ? `/api/users/search?q=${encodeURIComponent(q)}&limit=10`
+        : `/api/users/search?limit=10`
+      const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` }
       })
       const data = await res.json()
@@ -67,7 +44,6 @@ function TicTacToeCard() {
     setSearching(false)
   }, [])
 
-  // Debounced search
   useEffect(() => {
     if (phase !== 'searching') return
     clearTimeout(debounceRef.current)
@@ -75,152 +51,19 @@ function TicTacToeCard() {
     return () => clearTimeout(debounceRef.current)
   }, [searchQuery, phase, searchUsers])
 
-  // Send API call helper
-  const sendAction = useCallback(async (action, targetUserId, extra = {}) => {
-    const token = localStorage.getItem('token')
-    await fetch('/api/tictactoe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ action, targetUserId, ...extra })
-    })
-  }, [])
-
-  // Invite a user
-  const inviteUser = useCallback((user) => {
-    const gid = `ttt_${currentUserId}_${user._id}_${Date.now()}`
-    setOpponent({ userId: user._id, name: user.name, avatar: user.avatar })
-    setGameId(gid)
-    setMySymbol('X')
-    setIsMyTurn(true)
-    setPhase('waiting')
-    sendAction('invite', user._id, { gameId: gid })
-  }, [currentUserId, sendAction])
-
-  // Accept incoming invite
-  const acceptInvite = useCallback(() => {
-    if (!invite) return
-    setOpponent({ userId: invite.fromUserId, name: invite.fromName, avatar: invite.fromAvatar })
-    setGameId(invite.gameId)
-    setMySymbol('O')
-    setIsMyTurn(false)
-    setBoard(Array(9).fill(null))
-    setResult(null)
-    setPhase('playing')
-    sendAction('accept', invite.fromUserId, { gameId: invite.gameId })
-    setInvite(null)
-  }, [invite, sendAction])
-
-  // Decline incoming invite
-  const declineInvite = useCallback(() => {
-    if (!invite) return
-    sendAction('decline', invite.fromUserId, { gameId: invite.gameId })
-    setInvite(null)
-  }, [invite, sendAction])
-
-  // Make a move
-  const makeMove = useCallback((idx) => {
-    if (!isMyTurn || board[idx] || result) return
-    const newBoard = [...board]
-    newBoard[idx] = mySymbol
-    setBoard(newBoard)
-    setIsMyTurn(false)
-    sendAction('move', opponent.userId, { gameId, index: idx, symbol: mySymbol })
-    const res = checkWinner(newBoard)
-    if (res) {
-      setResult(res)
-      setPhase('result')
-      sendAction('end', opponent.userId, { gameId, result: res })
-    }
-  }, [isMyTurn, board, result, mySymbol, opponent, gameId, sendAction])
-
-  // Socket listeners
+  // Preload employees when search panel opens
   useEffect(() => {
-    if (!subscribe) return
-    const unsubs = [
-      subscribe(REALTIME_EVENTS.TICTACTOE_INVITE, (data) => {
-        if (data.fromUserId === currentUserId) return
-        setInvite(data)
-        playGameInviteSound().catch(() => {})
-      }),
-      subscribe(REALTIME_EVENTS.TICTACTOE_ACCEPT, (data) => {
-        if (data.gameId !== gameId && phase !== 'waiting') return
-        if (data.gameId) setGameId(data.gameId)
-        setBoard(Array(9).fill(null))
-        setResult(null)
-        setPhase('playing')
-      }),
-      subscribe(REALTIME_EVENTS.TICTACTOE_DECLINE, (data) => {
-        if (data.gameId !== gameId) return
-        setPhase('idle')
-        setOpponent(null)
-      }),
-      subscribe(REALTIME_EVENTS.TICTACTOE_MOVE, (data) => {
-        if (data.fromUserId === currentUserId) return
-        setBoard(prev => {
-          const newBoard = [...prev]
-          newBoard[data.index] = data.symbol
-          const res = checkWinner(newBoard)
-          if (res) { setResult(res); setPhase('result') }
-          return newBoard
-        })
-        setIsMyTurn(true)
-      }),
-      subscribe(REALTIME_EVENTS.TICTACTOE_END, (data) => {
-        if (data.fromUserId === currentUserId) return
-        if (data.result) { setResult(data.result); setPhase('result') }
-      }),
-    ]
-    return () => unsubs.forEach(fn => fn())
-  }, [subscribe, currentUserId, gameId, phase, REALTIME_EVENTS])
+    if (phase === 'searching' && searchResults.length === 0 && !searchQuery) {
+      searchUsers('')
+    }
+  }, [phase]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const resetGame = useCallback(() => {
+  const handleInvite = useCallback((user) => {
+    openInvite(user)
     setPhase('idle')
-    setBoard(Array(9).fill(null))
-    setResult(null)
-    setOpponent(null)
-    setGameId(null)
-    setInvite(null)
     setSearchQuery('')
     setSearchResults([])
-  }, [])
-
-  // ── Incoming invite banner ──
-  if (invite && phase === 'idle') {
-    return (
-      <div className="rounded-2xl p-5 bg-gradient-to-br from-amber-500 to-orange-600 text-white shadow-lg shadow-amber-500/20 flex flex-col justify-between min-h-[140px]">
-        <div className="flex items-center gap-2 text-white/80 text-xs font-medium">
-          <HiOutlineTrophy className="w-4 h-4" />
-          <span>Game Invite!</span>
-        </div>
-        <p className="text-sm font-semibold mt-2">{invite.fromName} wants to play</p>
-        <div className="flex gap-2 mt-3">
-          <button onClick={acceptInvite} className="flex-1 py-1.5 rounded-xl bg-white/20 hover:bg-white/30 text-xs font-semibold transition-colors">Accept</button>
-          <button onClick={declineInvite} className="flex-1 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-xs font-semibold transition-colors">Decline</button>
-        </div>
-      </div>
-    )
-  }
-
-  // ── Idle state ──
-  if (phase === 'idle') {
-    return (
-      <div className="rounded-2xl p-5 bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/20 flex flex-col justify-between min-h-[140px]">
-        <div className="flex items-center gap-2 text-white/70 text-xs font-medium">
-          <HiOutlineTrophy className="w-4 h-4" />
-          <span>Tic-Tac-Toe</span>
-        </div>
-        <div className="mt-auto">
-          <p className="text-sm text-white/80 mb-3">Challenge a teammate!</p>
-          <button
-            onClick={() => setPhase('searching')}
-            className="w-full py-2 rounded-xl bg-white/20 hover:bg-white/30 text-sm font-semibold transition-colors flex items-center justify-center gap-2"
-          >
-            <HiOutlineUserPlus className="w-4 h-4" /> Invite to Play
-          </button>
-        </div>
-      </div>
-    )
-  }
+  }, [openInvite])
 
   // ── Searching for opponent ──
   if (phase === 'searching') {
@@ -231,7 +74,7 @@ function TicTacToeCard() {
             <HiOutlineTrophy className="w-4 h-4" />
             <span>Find Opponent</span>
           </div>
-          <button onClick={resetGame} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700">
+          <button onClick={() => { setPhase('idle'); setSearchQuery(''); setSearchResults([]) }} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700">
             <HiOutlineXMark className="w-4 h-4 text-gray-400" />
           </button>
         </div>
@@ -246,7 +89,7 @@ function TicTacToeCard() {
             className="w-full pl-8 pr-3 py-1.5 rounded-lg text-xs bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-400 text-gray-800 dark:text-gray-200"
           />
         </div>
-        <div className="flex-1 overflow-y-auto max-h-[100px] space-y-1">
+        <div className="flex-1 overflow-y-auto max-h-[140px] space-y-1">
           {searching && <p className="text-[10px] text-gray-400 text-center py-2">Searching...</p>}
           {!searching && searchResults.length === 0 && searchQuery && (
             <p className="text-[10px] text-gray-400 text-center py-2">No users found</p>
@@ -254,7 +97,7 @@ function TicTacToeCard() {
           {searchResults.map(u => (
             <button
               key={u._id}
-              onClick={() => inviteUser(u)}
+              onClick={() => handleInvite(u)}
               className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors text-left"
             >
               {u.avatar ? (
@@ -272,67 +115,24 @@ function TicTacToeCard() {
     )
   }
 
-  // ── Waiting for acceptance ──
-  if (phase === 'waiting') {
-    return (
-      <div className="rounded-2xl p-5 bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/20 flex flex-col items-center justify-center min-h-[140px]">
-        <div className="w-6 h-6 border-2 border-white/60 border-t-white rounded-full animate-spin mb-3" />
-        <p className="text-sm font-semibold">Waiting for {opponent?.name}...</p>
-        <button onClick={resetGame} className="mt-3 text-xs text-white/60 hover:text-white/90 transition-colors">Cancel</button>
-      </div>
-    )
-  }
-
-  // ── Playing / Result ──
-  const winLine = result?.line || []
-  const iWon = result?.winner === mySymbol
-  const isDraw = result?.winner === 'draw'
-
+  // ── Idle state ──
   return (
-    <div className="rounded-2xl p-4 bg-white dark:bg-slate-800/60 border border-gray-100 dark:border-slate-700/50 shadow-sm flex flex-col min-h-[140px]">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-2">
-        <div className="flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400">
-          <HiOutlineTrophy className="w-4 h-4" />
-          <span className="truncate">vs {opponent?.name}</span>
-        </div>
-        {phase === 'result' ? (
-          <button onClick={resetGame} className="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400 hover:bg-indigo-200 transition-colors">
-            New Game
-          </button>
-        ) : (
-          <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${isMyTurn ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'}`}>
-            {isMyTurn ? 'Your turn' : 'Waiting...'}
-          </span>
-        )}
-      </div>
-
-      {/* Result banner */}
-      {phase === 'result' && (
-        <div className={`text-center text-xs font-bold mb-1 ${iWon ? 'text-emerald-600 dark:text-emerald-400' : isDraw ? 'text-gray-500' : 'text-red-500 dark:text-red-400'}`}>
-          {isDraw ? "It's a draw!" : iWon ? 'You won! 🎉' : 'You lost!'}
-        </div>
+    <div className="rounded-2xl p-5 bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/20 flex flex-col justify-between min-h-[140px] relative">
+      {hasIncomingInvite && (
+        <span className="absolute top-3 right-3 w-3 h-3 rounded-full bg-amber-400 animate-pulse" />
       )}
-
-      {/* Board */}
-      <div className="grid grid-cols-3 gap-1 flex-1">
-        {board.map((cell, i) => {
-          const isWinCell = winLine.includes(i)
-          return (
-            <button
-              key={i}
-              onClick={() => makeMove(i)}
-              disabled={!isMyTurn || !!cell || !!result}
-              className={`aspect-square rounded-lg text-lg font-extrabold flex items-center justify-center transition-all
-                ${cell ? '' : isMyTurn && !result ? 'hover:bg-indigo-50 dark:hover:bg-indigo-900/20 cursor-pointer' : 'cursor-default'}
-                ${isWinCell ? 'bg-emerald-100 dark:bg-emerald-900/30 ring-2 ring-emerald-400' : 'bg-gray-50 dark:bg-slate-700/40'}
-                ${cell === 'X' ? 'text-indigo-600 dark:text-indigo-400' : 'text-rose-500 dark:text-rose-400'}
-              `}
-            >
-              {cell}
-            </button>
-          )
-        })}
+      <div className="flex items-center gap-2 text-white/70 text-xs font-medium">
+        <HiOutlineTrophy className="w-4 h-4" />
+        <span>Tic-Tac-Toe</span>
+      </div>
+      <div className="mt-auto">
+        <p className="text-sm text-white/80 mb-3">Challenge a teammate!</p>
+        <button
+          onClick={() => setPhase('searching')}
+          className="w-full py-2 rounded-xl bg-white/20 hover:bg-white/30 text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+        >
+          <HiOutlineUserPlus className="w-4 h-4" /> Invite to Play
+        </button>
       </div>
     </div>
   )

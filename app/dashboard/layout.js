@@ -19,6 +19,7 @@ import { InAppNotificationProvider } from '@/contexts/InAppNotificationContext'
 import { ActionableToastProvider } from '@/contexts/ActionableToastContext'
 import { ChatWidgetProvider, useChatWidget } from '@/contexts/ChatWidgetContext'
 import { PageTransitionProvider, usePageTransition } from '@/contexts/PageTransitionContext'
+import { TicTacToeProvider } from '@/contexts/TicTacToeContext'
 import RouteProgressBar from '@/components/ui/RouteProgressBar'
 import { getSkeletonForRoute } from '@/components/ui/PageSkeletons'
 import { ErrorBoundaryWithRetry } from '@/components/ui/ErrorBoundary'
@@ -359,6 +360,7 @@ export default function DashboardLayout({ children }) {
   if (isMeetingRoomPage) {
     return (
       <SocketProvider>
+        <TicTacToeProvider>
         <UnreadMessagesProvider>
           <ChatWidgetProvider>
             <InAppNotificationProvider>
@@ -369,12 +371,14 @@ export default function DashboardLayout({ children }) {
             </InAppNotificationProvider>
           </ChatWidgetProvider>
         </UnreadMessagesProvider>
+        </TicTacToeProvider>
       </SocketProvider>
     )
   }
 
   return (
     <SocketProvider>
+      <TicTacToeProvider>
       <UnreadMessagesProvider>
         <ChatWidgetProvider>
           <PageTransitionProvider>
@@ -465,6 +469,7 @@ export default function DashboardLayout({ children }) {
           </PageTransitionProvider>
         </ChatWidgetProvider>
       </UnreadMessagesProvider>
+      </TicTacToeProvider>
     </SocketProvider>
   )
 }

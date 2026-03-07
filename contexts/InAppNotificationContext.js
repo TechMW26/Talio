@@ -4,6 +4,7 @@ import { createContext, useContext, useState, useCallback, useEffect } from 'rea
 import { usePathname } from 'next/navigation'
 import InAppNotification from '@/components/InAppNotification'
 import { useSocket } from './SocketContext'
+import { REALTIME_EVENTS } from '@/lib/realtimeEvents'
 import { playNotificationSound, playMessageNotificationSound, playTaskDoneSound, playGameInviteSound } from '@/utils/audio'
 
 const InAppNotificationContext = createContext({
@@ -15,6 +16,7 @@ export function InAppNotificationProvider({ children }) {
   const {
     socket,
     isConnected,
+    subscribe,
     onNewMessage,
     onTaskUpdate,
     onAnnouncement,
@@ -27,9 +29,7 @@ export function InAppNotificationProvider({ children }) {
     onHelpdeskTicket,
     onDocumentUpdate,
     onAssetUpdate,
-    onPayrollUpdate,
-    subscribe,
-    REALTIME_EVENTS
+    onPayrollUpdate
   } = useSocket()
   const pathname = usePathname()
 
@@ -559,27 +559,33 @@ export function InAppNotificationProvider({ children }) {
     return unsubscribe
   }, [onPayrollUpdate, showNotification])
 
-  // Listen for TicTacToe game invites via Socket.IO
+
+  // Listen for TicTacToe invites via Socket.IO (toast notification)
   useEffect(() => {
     if (!subscribe) return
 
-    const unsubscribe = subscribe(REALTIME_EVENTS.TICTACTOE_INVITE, (data) => {
+    const unsub = subscribe(REALTIME_EVENTS.TICTACTOE_INVITE, (data) => {
       try {
+        const userStr = localStorage.getItem('user')
+        if (!userStr) return
+        const user = JSON.parse(userStr)
+        const currentUserId = (user?.userId || user?._id || user?.id || '').toString()
+        if (data.fromUserId === currentUserId) return
+
         playGameInviteSound().catch(() => {})
+
         showNotification({
           title: '🎮 Game Invite!',
-          message: `${data?.fromName || 'Someone'} wants to play Tic-Tac-Toe`,
-          url: '/dashboard',
+          message: `${data.fromName || 'Someone'} wants to play Tic-Tac-Toe with you!`,
           type: 'game_invite',
-          soundType: 'gameInvite'
-        }, false) // sound already played above
+        }, false)
       } catch (error) {
-        console.error('[InAppNotification] Error handling game invite:', error)
+        console.error('[InAppNotification] Error handling TicTacToe invite:', error)
       }
     })
 
-    return unsubscribe
-  }, [subscribe, REALTIME_EVENTS, showNotification])
+    return unsub
+  }, [subscribe, showNotification])
 
 
   return (
