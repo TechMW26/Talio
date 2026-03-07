@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { REALTIME_EVENTS } from '@/lib/realtimeEvents'
+import { sendPushToUser } from '@/lib/pushNotification'
 
 /**
  * POST /api/tictactoe — Send a game invite, relay a move, accept/decline/end
@@ -9,7 +10,7 @@ import { REALTIME_EVENTS } from '@/lib/realtimeEvents'
  */
 export async function POST(request) {
   try {
-    const auth = await getAuthAndModels(request, ['Employee'])
+    const auth = await getAuthAndModels(request, ['Employee', 'User', 'Notification'])
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
@@ -41,7 +42,7 @@ export async function POST(request) {
     const senderId = (auth.user._id || auth.user.id || auth.user.userId).toString()
 
     // Get sender info
-    const { Employee } = auth.models
+    const { Employee, User, Notification } = auth.models
     let senderName = 'Someone'
     let senderAvatar = null
     if (auth.user.employeeId) {
@@ -50,6 +51,11 @@ export async function POST(request) {
         senderName = `${senderEmployee.firstName} ${senderEmployee.lastName}`.trim()
         senderAvatar = senderEmployee.avatar || null
       }
+    }
+    // Fallback: use User model name
+    if (senderName === 'Someone') {
+      const senderUser = await User.findById(senderId).select('name email').lean()
+      if (senderUser) senderName = senderUser.name || senderUser.email || 'Someone'
     }
 
     const eventData = {
@@ -75,6 +81,18 @@ export async function POST(request) {
     // For moves/accept/end, also emit back to the sender so both sides stay synced
     if (['accept', 'move', 'end'].includes(action)) {
       io.to(`user:${senderId}`).emit(eventName, eventData)
+    }
+
+    // Send push notification for invites so receiver sees it on all devices
+    if (action === 'invite') {
+      sendPushToUser(targetUserId, {
+        title: '🎮 Game Invite!',
+        body: `${senderName} wants to play Tic-Tac-Toe with you!`,
+      }, {
+        url: '/dashboard',
+        type: 'system',
+        models: { User, Notification },
+      }).catch(err => console.warn('[TicTacToe API] Push notification error:', err))
     }
 
     return NextResponse.json({ success: true })

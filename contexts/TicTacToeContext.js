@@ -121,21 +121,25 @@ export function TicTacToeProvider({ children }) {
   // Socket listeners
   useEffect(() => {
     if (!subscribe) return
+    console.log('[TicTacToe] Setting up socket listeners, currentUserId:', currentUserId)
 
     const unsubs = [
       subscribe(REALTIME_EVENTS.TICTACTOE_INVITE, (data) => {
+        console.log('[TicTacToe] Received INVITE event:', data, 'myId:', currentUserId)
         if (data.fromUserId === currentUserId) return
         setIncomingInvite(data)
         setPhase('invite-incoming')
         playGameInviteSound().catch(() => {})
       }),
       subscribe(REALTIME_EVENTS.TICTACTOE_ACCEPT, (data) => {
+        console.log('[TicTacToe] Received ACCEPT event:', data)
         if (data.fromUserId === currentUserId) return
         setBoard(Array(9).fill(null))
         setResult(null)
         setPhase('playing')
       }),
       subscribe(REALTIME_EVENTS.TICTACTOE_DECLINE, (data) => {
+        console.log('[TicTacToe] Received DECLINE event:', data)
         if (data.fromUserId === currentUserId) return
         setPhase('closed')
         setOpponent(null)
@@ -172,16 +176,16 @@ export function TicTacToeProvider({ children }) {
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={phase === 'result' || phase === 'invite-incoming' ? closeGame : undefined} />
 
           {/* Popup card */}
-          <div className="relative w-full max-w-sm bg-white dark:bg-slate-800 rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <div className="relative w-full max-w-md bg-white dark:bg-slate-800 rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             {/* Header */}
-            <div className="flex items-center justify-between px-6 pt-5 pb-3">
+            <div className="flex items-center justify-between px-8 pt-6 pb-4">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-                  <HiOutlineTrophy className="w-4 h-4 text-white" />
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                  <HiOutlineTrophy className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-bold text-gray-900 dark:text-white">Tic-Tac-Toe</h3>
-                  {opponent && <p className="text-[11px] text-gray-500 dark:text-gray-400">vs {opponent.name}</p>}
+                  <h3 className="text-base font-bold text-gray-900 dark:text-white">Tic-Tac-Toe</h3>
+                  {opponent && <p className="text-xs text-gray-500 dark:text-gray-400">vs {opponent.name}</p>}
                 </div>
               </div>
               <button
@@ -193,29 +197,29 @@ export function TicTacToeProvider({ children }) {
             </div>
 
             {/* Content */}
-            <div className="px-6 pb-6">
+            <div className="px-8 pb-8">
               {/* ── Incoming invite ── */}
               {phase === 'invite-incoming' && incomingInvite && (
-                <div className="text-center py-6">
-                  <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-2xl shadow-lg shadow-amber-500/30">
+                <div className="text-center py-8">
+                  <div className="w-20 h-20 mx-auto mb-5 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-3xl shadow-lg shadow-amber-500/30 animate-bounce">
                     🎮
                   </div>
-                  <p className="text-lg font-bold text-gray-900 dark:text-white mb-1">
+                  <p className="text-xl font-bold text-gray-900 dark:text-white mb-1">
                     {incomingInvite.fromName}
                   </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-8">
                     wants to play Tic-Tac-Toe with you!
                   </p>
-                  <div className="flex gap-3">
+                  <div className="flex gap-4">
                     <button
                       onClick={declineInvite}
-                      className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-slate-600 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                      className="flex-1 py-3 rounded-xl border border-gray-200 dark:border-slate-600 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
                     >
                       Decline
                     </button>
                     <button
                       onClick={acceptInvite}
-                      className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-sm font-semibold text-white hover:opacity-90 transition-opacity shadow-lg shadow-indigo-500/30"
+                      className="flex-1 py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-sm font-semibold text-white hover:opacity-90 transition-opacity shadow-lg shadow-indigo-500/30"
                     >
                       Accept & Play
                     </button>
@@ -225,8 +229,8 @@ export function TicTacToeProvider({ children }) {
 
               {/* ── Waiting for opponent ── */}
               {phase === 'waiting' && (
-                <div className="text-center py-8">
-                  <div className="w-10 h-10 mx-auto mb-4 border-3 border-indigo-200 border-t-indigo-500 rounded-full animate-spin" />
+                <div className="text-center py-10">
+                  <div className="w-12 h-12 mx-auto mb-5 border-3 border-indigo-200 border-t-indigo-500 rounded-full animate-spin" />
                   <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
                     Waiting for {opponent?.name}...
                   </p>
@@ -268,19 +272,19 @@ export function TicTacToeProvider({ children }) {
                   </div>
 
                   {/* Symbol legend */}
-                  <div className="flex items-center justify-center gap-4 mb-3">
-                    <div className="flex items-center gap-1.5 text-xs">
-                      <span className="w-5 h-5 rounded bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-[10px] font-bold text-indigo-600 dark:text-indigo-400">X</span>
+                  <div className="flex items-center justify-center gap-6 mb-4">
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="w-7 h-7 rounded-lg bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center text-xs font-bold text-indigo-600 dark:text-indigo-400">X</span>
                       <span className="text-gray-500 dark:text-gray-400">{mySymbol === 'X' ? 'You' : opponent?.name}</span>
                     </div>
-                    <div className="flex items-center gap-1.5 text-xs">
-                      <span className="w-5 h-5 rounded bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center text-[10px] font-bold text-rose-500 dark:text-rose-400">O</span>
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="w-7 h-7 rounded-lg bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center text-xs font-bold text-rose-500 dark:text-rose-400">O</span>
                       <span className="text-gray-500 dark:text-gray-400">{mySymbol === 'O' ? 'You' : opponent?.name}</span>
                     </div>
                   </div>
 
                   {/* Board */}
-                  <div className="grid grid-cols-3 gap-2 max-w-[240px] mx-auto">
+                  <div className="grid grid-cols-3 gap-3 max-w-[300px] mx-auto">
                     {board.map((cell, i) => {
                       const winLine = result?.line || []
                       const isWinCell = winLine.includes(i)
@@ -289,7 +293,7 @@ export function TicTacToeProvider({ children }) {
                           key={i}
                           onClick={() => makeMove(i)}
                           disabled={!isMyTurn || !!cell || !!result}
-                          className={`aspect-square rounded-xl text-2xl font-extrabold flex items-center justify-center transition-all
+                          className={`aspect-square rounded-2xl text-3xl font-extrabold flex items-center justify-center transition-all
                             ${!cell && isMyTurn && !result ? 'hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:scale-105 cursor-pointer' : 'cursor-default'}
                             ${isWinCell ? 'bg-emerald-100 dark:bg-emerald-900/30 ring-2 ring-emerald-400 scale-105' : 'bg-gray-50 dark:bg-slate-700/40'}
                             ${cell === 'X' ? 'text-indigo-600 dark:text-indigo-400' : 'text-rose-500 dark:text-rose-400'}
@@ -303,7 +307,7 @@ export function TicTacToeProvider({ children }) {
 
                   {/* Play again button */}
                   {phase === 'result' && (
-                    <div className="flex gap-3 mt-5">
+                    <div className="flex gap-4 mt-6">
                       <button
                         onClick={closeGame}
                         className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-slate-600 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
