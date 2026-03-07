@@ -76,16 +76,27 @@ async function main() {
     log('info', 'Plaintext Password Verification Script');
     log('info', '══════════════════════════════════════════════════════════════');
 
-    const superadminUri = process.env.SUPERADMIN_DB_URI || process.env.MONGODB_URI;
-    if (!superadminUri) {
+    const mongoUri = process.env.SUPERADMIN_DB_URI || process.env.MONGODB_URI;
+    if (!mongoUri) {
         log('error', 'SUPERADMIN_DB_URI or MONGODB_URI required');
         process.exit(1);
     }
+
+    // Build explicit superadmin URI
+    const uriMatch = mongoUri.match(/^(mongodb(?:\+srv)?:\/\/[^/]+)\/?([^?]*)?(\?.*)?$/);
+    if (!uriMatch) {
+        log('error', 'Invalid MONGODB_URI format');
+        process.exit(1);
+    }
+    const clusterBase = uriMatch[1];
+    const uriOptions = uriMatch[3] || '';
+    const superadminUri = `${clusterBase}/talio_superadmin${uriOptions}`;
 
     // Discover tenants
     const connection = await mongoose.createConnection(superadminUri, {
         maxPoolSize: 5,
         serverSelectionTimeoutMS: 10000,
+        family: 4,
     }).asPromise();
 
     let tenants = [];
@@ -102,12 +113,9 @@ async function main() {
     log('info', `Found ${tenants.length} tenant databases to verify`);
     log('info', '');
 
-    const mongoUri = process.env.MONGODB_URI;
-    const baseUri = mongoUri.replace(/\/[^/?]+(\?|$)/, '/$1');
-
     const results = [];
     for (const tenant of tenants) {
-        const result = await verifyDatabase(baseUri, tenant.databaseName);
+        const result = await verifyDatabase(mongoUri, tenant.databaseName);
         results.push(result);
     }
 

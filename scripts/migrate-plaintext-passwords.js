@@ -212,18 +212,29 @@ async function migrateTenantDatabase(uri, dbName) {
     }
 }
 
-async function discoverTenantDatabases() {
-    const superadminUri = process.env.SUPERADMIN_DB_URI || process.env.MONGODB_URI;
+function getClusterBaseUri(uri) {
+    const match = uri.match(/^(mongodb(?:\+srv)?:\/\/[^/]+)\/?([^?]*)?(\?.*)?$/);
+    if (!match) throw new Error('Invalid MONGODB_URI format');
+    return { baseUri: match[1], dbName: match[2] || '', options: match[3] || '' };
+}
 
-    if (!superadminUri) {
+async function discoverTenantDatabases() {
+    const mongoUri = process.env.SUPERADMIN_DB_URI || process.env.MONGODB_URI;
+
+    if (!mongoUri) {
         throw new Error('SUPERADMIN_DB_URI or MONGODB_URI is required');
     }
+
+    // Connect to talio_superadmin database explicitly (where tenantcompanies live)
+    const { baseUri, options } = getClusterBaseUri(mongoUri);
+    const superadminUri = `${baseUri}/talio_superadmin${options}`;
 
     log('info', 'Connecting to superadmin database to discover tenants...');
 
     const connection = await mongoose.createConnection(superadminUri, {
         maxPoolSize: 5,
         serverSelectionTimeoutMS: 10000,
+        family: 4,
     }).asPromise();
 
     try {
@@ -266,16 +277,13 @@ async function main() {
             throw new Error('MONGODB_URI is required');
         }
 
-        // Extract base URI (without database name)
-        const baseUri = mongoUri.replace(/\/[^/?]+(\?|$)/, '/$1');
-
         // Process each tenant database
         for (const tenant of tenants) {
-            await migrateTenantDatabase(baseUri, tenant.databaseName);
+            await migrateTenantDatabase(mongoUri, tenant.databaseName);
         }
 
         // Also process the default database (if any users exist there)
-        const defaultDb = mongoUri.match(/\/([^/?]+)(?:\?|$)/)?.[1];
+        const { dbName: defaultDb } = getClusterBaseUri(mongoUri);
         if (defaultDb && !tenants.some(t => t.databaseName === defaultDb)) {
             await migrateTenantDatabase(mongoUri, defaultDb);
         }
