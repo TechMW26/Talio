@@ -345,7 +345,7 @@ export default function MyPerformancePage() {
                       </div>
                     ))}
                     {goals.length === 0 && (
-                      <div className="text-center py-10 bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl border-2 border-dashed border-gray-200">
+                      <div className="text-center py-10 bg-gray-50 dark:bg-gray-800/50 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700">
                         <div className="w-16 h-16 mx-auto bg-blue-100 rounded-full flex items-center justify-center mb-4">
                           <FaBullseye className="w-8 h-8 text-blue-500" />
                         </div>
@@ -400,7 +400,7 @@ export default function MyPerformancePage() {
                       </div>
                     ))}
                     {reviews.length === 0 && (
-                      <div className="text-center py-10 bg-gradient-to-br from-gray-50 to-yellow-50 rounded-xl border-2 border-dashed border-gray-200">
+                      <div className="text-center py-10 bg-gray-50 dark:bg-gray-800/50 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700">
                         <div className="w-16 h-16 mx-auto bg-yellow-100 rounded-full flex items-center justify-center mb-4">
                           <FaStar className="w-8 h-8 text-yellow-500" />
                         </div>
@@ -430,7 +430,7 @@ export default function MyPerformancePage() {
               </div>
 
               {goals.length === 0 ? (
-                <div className="text-center py-16 bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl border-2 border-dashed border-gray-200">
+                <div className="text-center py-16 bg-gray-50 dark:bg-gray-800/50 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700">
                   <div className="w-20 h-20 mx-auto bg-blue-100 rounded-full flex items-center justify-center mb-5">
                     <FaBullseye className="w-10 h-10 text-blue-500" />
                   </div>
@@ -560,7 +560,7 @@ export default function MyPerformancePage() {
               <h3 className="text-lg font-semibold text-gray-800 mb-4">Reviews & Feedback ({reviews.length})</h3>
 
               {reviews.length === 0 ? (
-                <div className="text-center py-16 bg-gradient-to-br from-gray-50 to-yellow-50 rounded-xl border-2 border-dashed border-gray-200">
+                <div className="text-center py-16 bg-gray-50 dark:bg-gray-800/50 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700">
                   <div className="w-20 h-20 mx-auto bg-yellow-100 rounded-full flex items-center justify-center mb-5">
                     <FaStar className="w-10 h-10 text-yellow-500" />
                   </div>
@@ -617,7 +617,7 @@ export default function MyPerformancePage() {
               </h3>
 
               {performanceReviews.length === 0 ? (
-                <div className="text-center py-16 bg-gradient-to-br from-gray-50 to-purple-50 rounded-xl border-2 border-dashed border-gray-200">
+                <div className="text-center py-16 bg-gray-50 dark:bg-gray-800/50 rounded-xl border-2 border-dashed border-gray-200 dark:border-gray-700">
                   <div className="w-20 h-20 mx-auto bg-purple-100 rounded-full flex items-center justify-center mb-5">
                     <FaUserTie className="w-10 h-10 text-purple-500" />
                   </div>

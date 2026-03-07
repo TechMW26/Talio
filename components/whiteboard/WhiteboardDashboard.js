@@ -526,7 +526,7 @@ function BoardGrid({ boards, viewMode, activeMenu, setActiveMenu, deleteBoard, f
           onClick={() => router.push(`/dashboard/talioboard/${board._id}`)}
         >
           {/* Preview */}
-          <div className="aspect-[4/3] relative overflow-hidden" style={{ background: 'linear-gradient(135deg, var(--color-primary-50), var(--color-primary-100))' }}>
+          <div className="aspect-[4/3] relative overflow-hidden bg-primary-50 dark:bg-primary-950/30">
             {board.thumbnail ? (
               <img 
                 src={board.thumbnail} 

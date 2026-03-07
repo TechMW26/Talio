@@ -19,7 +19,7 @@ export function HRMSCard({
     elevated: 'shadow-md hover:shadow-lg',
     flat: 'shadow-none border border-default-200',
     bordered: 'shadow-sm border-2 border-default-100',
-    gradient: 'bg-gradient-to-br from-white to-default-50',
+    gradient: 'bg-white dark:bg-default-100',
   }
 
   return (

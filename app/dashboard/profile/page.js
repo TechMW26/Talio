@@ -926,7 +926,7 @@ export default function ProfilePage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
                 {/* Email (read-only) */}
-                <div className="flex items-start gap-3 p-4 rounded-2xl bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200/70 shadow-xs">
+                <div className="flex items-start gap-3 p-4 rounded-2xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200/70 dark:border-blue-800/50 shadow-xs">
                   <div className="w-11 h-11 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0 shadow-md shadow-blue-500/40">
                     <FaEnvelope className="text-white text-base" />
                   </div>
@@ -944,7 +944,7 @@ export default function ProfilePage() {
                 </div>
 
                 {/* Phone */}
-                <div className="flex items-start gap-3 p-4 rounded-2xl bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200/70 shadow-xs">
+                <div className="flex items-start gap-3 p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/70 dark:border-emerald-800/50 shadow-xs">
                   <div className="w-11 h-11 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0 shadow-md shadow-emerald-500/40">
                     <FaPhone className="text-white text-base" />
                   </div>
@@ -973,7 +973,7 @@ export default function ProfilePage() {
                 </div>
 
                 {/* Date of birth */}
-                <div className="flex items-start gap-3 p-4 rounded-2xl bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200/70 shadow-xs">
+                <div className="flex items-start gap-3 p-4 rounded-2xl bg-purple-50 dark:bg-purple-950/30 border border-purple-200/70 dark:border-purple-800/50 shadow-xs">
                   <div className="w-11 h-11 rounded-full bg-purple-500 flex items-center justify-center flex-shrink-0 shadow-md shadow-purple-500/40">
                     <FaCalendarAlt className="text-white text-base" />
                   </div>
@@ -1080,7 +1080,7 @@ export default function ProfilePage() {
                 </div>
 
                 {/* Gender */}
-                <div className="flex items-start gap-3 p-4 rounded-2xl bg-gradient-to-br from-pink-50 to-pink-100 border border-pink-200/70 shadow-xs">
+                <div className="flex items-start gap-3 p-4 rounded-2xl bg-pink-50 dark:bg-pink-950/30 border border-pink-200/70 dark:border-pink-800/50 shadow-xs">
                   <div className="w-11 h-11 rounded-full bg-pink-500 flex items-center justify-center flex-shrink-0 shadow-md shadow-pink-500/40">
                     <FaUser className="text-white text-base" />
                   </div>
@@ -1108,7 +1108,7 @@ export default function ProfilePage() {
                 </div>
 
                 {/* Address */}
-                <div className="flex items-start gap-3 p-4 rounded-2xl bg-gradient-to-br from-rose-50 to-rose-100 border border-rose-200/70 shadow-xs sm:col-span-2">
+                <div className="flex items-start gap-3 p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200/70 dark:border-rose-800/50 shadow-xs sm:col-span-2">
                   <div className="w-11 h-11 rounded-full bg-rose-500 flex items-center justify-center flex-shrink-0 shadow-md shadow-rose-500/40">
                     <FaMapMarkerAlt className="text-white text-base" />
                   </div>
@@ -1179,7 +1179,7 @@ export default function ProfilePage() {
                 </div>
 
                 {/* Blood Group */}
-                <div className="flex items-start gap-3 p-4 rounded-2xl bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200/70 shadow-xs">
+                <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200/70 dark:border-amber-800/50 shadow-xs">
                   <div className="w-11 h-11 rounded-full bg-amber-500 flex items-center justify-center flex-shrink-0 shadow-md shadow-amber-500/40">
                     <FaUser className="text-white text-base" />
                   </div>
@@ -1227,7 +1227,7 @@ export default function ProfilePage() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-50 to-indigo-100 border border-indigo-200/70 shadow-xs">
+                <div className="p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200/70 dark:border-indigo-800/50 shadow-xs">
                   <p className="text-[11px] font-medium text-indigo-700 tracking-wide uppercase mb-1.5">
                     Date of Joining
                   </p>
@@ -1242,7 +1242,7 @@ export default function ProfilePage() {
                   </p>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-teal-50 to-teal-100 border border-teal-200/70 shadow-xs">
+                <div className="p-4 rounded-2xl bg-teal-50 dark:bg-teal-950/30 border border-teal-200/70 dark:border-teal-800/50 shadow-xs">
                   <p className="text-[11px] font-medium text-teal-700 tracking-wide uppercase mb-1.5">
                     Employment Type
                   </p>
@@ -1251,7 +1251,7 @@ export default function ProfilePage() {
                   </p>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-cyan-50 to-cyan-100 border border-cyan-200/70 shadow-xs">
+                <div className="p-4 rounded-2xl bg-cyan-50 dark:bg-cyan-950/30 border border-cyan-200/70 dark:border-cyan-800/50 shadow-xs">
                   <p className="text-[11px] font-medium text-cyan-700 tracking-wide uppercase mb-1.5">
                     Department(s)
                   </p>
@@ -1260,7 +1260,7 @@ export default function ProfilePage() {
                   </p>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-violet-50 to-violet-100 border border-violet-200/70 shadow-xs">
+                <div className="p-4 rounded-2xl bg-violet-50 dark:bg-violet-950/30 border border-violet-200/70 dark:border-violet-800/50 shadow-xs">
                   <p className="text-[11px] font-medium text-violet-700 tracking-wide uppercase mb-1.5">
                     Designation
                   </p>
@@ -1269,7 +1269,7 @@ export default function ProfilePage() {
                   </p>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-50 to-amber-100 border border-amber-200/70 shadow-xs">
+                <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200/70 dark:border-amber-800/50 shadow-xs">
                   <p className="text-[11px] font-medium text-amber-700 tracking-wide uppercase mb-1.5">
                     Reporting Manager
                   </p>
@@ -1280,7 +1280,7 @@ export default function ProfilePage() {
                   </p>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200/70 shadow-xs">
+                <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200/70 dark:border-emerald-800/50 shadow-xs">
                   <p className="text-[11px] font-medium text-emerald-700 tracking-wide uppercase mb-1.5">
                     Work Location
                   </p>
@@ -1306,7 +1306,7 @@ export default function ProfilePage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
                 {/* Name */}
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-rose-50 to-rose-100 border border-rose-200/70 shadow-xs">
+                <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200/70 dark:border-rose-800/50 shadow-xs">
                   <p className="text-[11px] font-medium text-rose-700 tracking-wide uppercase mb-1.5">
                     Contact Name
                   </p>
@@ -1328,7 +1328,7 @@ export default function ProfilePage() {
                 </div>
 
                 {/* Relationship */}
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-fuchsia-50 to-fuchsia-100 border border-fuchsia-200/70 shadow-xs">
+                <div className="p-4 rounded-2xl bg-fuchsia-50 dark:bg-fuchsia-950/30 border border-fuchsia-200/70 dark:border-fuchsia-800/50 shadow-xs">
                   <p className="text-[11px] font-medium text-fuchsia-700 tracking-wide uppercase mb-1.5">
                     Relationship
                   </p>
@@ -1350,7 +1350,7 @@ export default function ProfilePage() {
                 </div>
 
                 {/* Phone */}
-                <div className="p-4 rounded-2xl bg-gradient-to-br from-lime-50 to-lime-100 border border-lime-200/70 shadow-xs">
+                <div className="p-4 rounded-2xl bg-lime-50 dark:bg-lime-950/30 border border-lime-200/70 dark:border-lime-800/50 shadow-xs">
                   <p className="text-[11px] font-medium text-lime-700 tracking-wide uppercase mb-1.5">
                     Phone Number
                   </p>

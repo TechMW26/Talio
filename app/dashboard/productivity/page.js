@@ -829,7 +829,7 @@ export default function ProductivityPage() {
                         {/* Preview Screenshots */}
                         <div className="p-4">
                           {session.screenshotsDeleted || session.analysis?.isAnalyzed ? (
-                            <div className="aspect-video bg-gradient-to-br from-primary-50 to-primary-100 rounded-lg flex items-center justify-center">
+                            <div className="aspect-video bg-primary-50 dark:bg-primary-950/30 rounded-lg flex items-center justify-center">
                               <div className="text-center">
                                 <HiOutlineSparkles className="w-8 h-8 text-primary-400 mx-auto mb-2" />
                                 <p className="text-sm text-primary-600 font-medium">Analysis Complete</p>
@@ -956,7 +956,7 @@ export default function ProductivityPage() {
                           onClick={() => handleSelectEmployee(member)}
                         >
                           {/* Card Header with Profile */}
-                          <div className="p-4 border-b bg-gradient-to-r from-primary-50 to-primary-100">
+                          <div className="p-4 border-b bg-primary-50 dark:bg-primary-950/30">
                             <div className="flex items-center gap-3">
                               <div className="w-12 h-12 bg-gradient-to-br from-primary-500 to-primary-700 rounded-full flex items-center justify-center text-white text-lg font-semibold shadow-lg">
                                 {member.name?.charAt(0) || member.firstName?.charAt(0) || 'U'}
@@ -1219,7 +1219,7 @@ export default function ProductivityPage() {
                       </div>
 
                       {/* Summary */}
-                      <div className="bg-gradient-to-r from-primary-50 to-primary-100 rounded-xl p-4">
+                      <div className="bg-primary-50 dark:bg-primary-950/30 rounded-xl p-4">
                         <h4 className="font-medium text-primary-900 mb-2 flex items-center gap-2">
                           <HiOutlineSparkles className="w-4 h-4" />
                           AI Summary
@@ -1231,7 +1231,7 @@ export default function ProductivityPage() {
 
                       {/* Task Relativity */}
                       {selectedSession.analysis.taskRelativity && (
-                        <div className="bg-gradient-to-r from-violet-50 to-purple-50 rounded-xl p-4 space-y-3">
+                        <div className="bg-violet-50 dark:bg-violet-950/30 rounded-xl p-4 space-y-3">
                           <div className="flex items-center justify-between">
                             <h4 className="font-medium text-violet-900 flex items-center gap-2">
                               <HiOutlineClipboardDocumentList className="w-4 h-4" />
@@ -1441,7 +1441,7 @@ export default function ProductivityPage() {
 
                       {/* Overall Assessment */}
                       {selectedSession.analysis.overallAssessment && (
-                        <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl p-4 space-y-3">
+                        <div className="bg-blue-50 dark:bg-blue-950/30 rounded-xl p-4 space-y-3">
                           <h4 className="font-medium text-blue-900">Overall Assessment</h4>
 
                           {/* Genuine Work Percentage */}
@@ -1548,7 +1548,7 @@ export default function ProductivityPage() {
                     </div>
                   ) : (
                     <div className="h-full flex flex-col items-center justify-center text-center py-12">
-                      <div className="w-20 h-20 bg-gradient-to-br from-primary-100 to-primary-200 rounded-2xl flex items-center justify-center mb-4">
+                      <div className="w-20 h-20 bg-primary-100 dark:bg-primary-900/50 rounded-2xl flex items-center justify-center mb-4">
                         <HiOutlineSparkles className="w-10 h-10 text-primary-500" />
                       </div>
                       <h3 className="text-lg font-semibold text-gray-900 mb-2">AI Analysis Available</h3>

@@ -602,7 +602,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
               isIconOnly
               variant="light"
               onPress={() => router.push('/dashboard/sandbox')}
-              className="group-hover:bg-gradient-to-br group-hover:from-warning-50 group-hover:to-warning-100"
+              className="group-hover:bg-warning-50 dark:group-hover:bg-warning-900/30"
             >
               {/* Animated lightbulb container */}
               <div className="relative">
@@ -762,7 +762,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                     if (items.length === 0) return null
                     return (
                       <div key={category} className="border-b border-divider">
-                        <div className="px-4 py-3 bg-gradient-to-r from-default-50 to-default-100 font-semibold text-sm text-default-700 uppercase sticky top-0 z-10">
+                        <div className="px-4 py-3 bg-default-100 dark:bg-default-50 font-semibold text-sm text-default-700 uppercase sticky top-0 z-10">
                           {getCategoryLabel(category)} <span className="text-default-500">({items.length})</span>
                         </div>
                         {items.map((item, index) => (

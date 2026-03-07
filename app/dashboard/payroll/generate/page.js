@@ -810,7 +810,7 @@ export default function GeneratePayrollPage() {
 
       {/* Company Settings Info Card - Simplified for Addition-Based Calculation */}
       {companySettings && (
-        <HRMSCard className="bg-gradient-to-r from-success-50 to-success-100 border border-success-200">
+        <HRMSCard className="bg-success-50 dark:bg-success-950/30 border border-success-200 dark:border-success-800">
           <HRMSCardBody className="p-6">
             <div className="flex items-center mb-4">
               <FaInfoCircle className="text-success-600 mr-2" />

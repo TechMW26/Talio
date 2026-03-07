@@ -178,7 +178,7 @@ export default function ManualCapturePanel() {
   return (
     <div className="bg-white rounded-2xl shadow-sm border overflow-hidden">
       {/* Header */}
-      <div className="p-4 border-b bg-gradient-to-r from-orange-50 to-amber-50">
+      <div className="p-4 border-b bg-orange-50 dark:bg-orange-950/30">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl">
             <HiOutlineCamera className="w-5 h-5 text-white" />

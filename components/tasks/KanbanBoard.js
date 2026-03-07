@@ -141,10 +141,10 @@ export default function KanbanBoard({
 
     // Card styling based on whether it has subtasks
     const cardBgClass = hasSubtasks 
-      ? 'bg-gradient-to-br from-purple-50 to-indigo-50 border-purple-200' // Tasks with subtasks - purple gradient
+      ? 'bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800' // Tasks with subtasks
       : isNotAccepted
-        ? 'bg-yellow-50 border-yellow-200' // Pending acceptance - yellow tint
-        : 'bg-white border-gray-100' // Tasks without subtasks - plain white
+        ? 'bg-yellow-50 dark:bg-yellow-950/30 border-yellow-200 dark:border-yellow-800' // Pending acceptance
+        : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700' // Tasks without subtasks
 
     return (
       <div

@@ -194,7 +194,7 @@ export default function SetupPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="min-h-screen flex items-center justify-center bg-blue-50 dark:bg-[#0F172A]">
         <div className="text-center">
           <Loader size="lg" />
           <p className="mt-4 text-gray-600">Checking system status...</p>
@@ -204,7 +204,7 @@ export default function SetupPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-100 px-4 py-12">
+    <div className="min-h-screen flex items-center justify-center bg-blue-50 dark:bg-[#0F172A] px-4 py-12">
       <div className="w-full max-w-lg">
         {/* Header */}
         <div className="text-center mb-8">

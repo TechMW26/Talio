@@ -1745,7 +1745,7 @@ export default function ProjectDetailPage() {
 
                 {/* Main vertical line - only show when we have timeline data */}
                 {!timelineLoading && !timelineError && timeline.length > 0 && (
-                  <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-gradient-to-b from-indigo-200 via-gray-200 to-gray-100" />
+                  <div className="absolute left-5 top-0 bottom-0 w-0.5 bg-indigo-200 dark:bg-indigo-800" />
                 )}
 
                 {!timelineLoading && !timelineError && (

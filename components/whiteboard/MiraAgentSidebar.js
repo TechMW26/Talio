@@ -42,8 +42,8 @@ const TEMPLATE_CONFIG = {
       </svg>
     ),
     gradient: 'from-purple-500 to-violet-600',
-    lightGradient: 'from-purple-50 to-violet-100',
-    border: 'border-purple-200',
+    lightGradient: 'from-purple-50 to-violet-100 dark:from-purple-950/30 dark:to-violet-950/30',
+    border: 'border-purple-200 dark:border-purple-800',
     text: 'text-purple-700',
     label: 'Mindmap',
     description: 'Radial thought map with branches',
@@ -59,8 +59,8 @@ const TEMPLATE_CONFIG = {
       </svg>
     ),
     gradient: 'from-blue-500 to-cyan-600',
-    lightGradient: 'from-blue-50 to-cyan-100',
-    border: 'border-blue-200',
+    lightGradient: 'from-blue-50 to-cyan-100 dark:from-blue-950/30 dark:to-cyan-950/30',
+    border: 'border-blue-200 dark:border-blue-800',
     text: 'text-blue-700',
     label: 'Flowchart',
     description: 'Process flow with decisions',
@@ -81,8 +81,8 @@ const TEMPLATE_CONFIG = {
       </svg>
     ),
     gradient: 'from-rose-500 to-pink-600',
-    lightGradient: 'from-rose-50 to-pink-100',
-    border: 'border-rose-200',
+    lightGradient: 'from-rose-50 to-pink-100 dark:from-rose-950/30 dark:to-pink-950/30',
+    border: 'border-rose-200 dark:border-rose-800',
     text: 'text-rose-700',
     label: 'Event Circuit',
     description: 'Decision chain reactions & outcomes',
@@ -96,8 +96,8 @@ const TEMPLATE_CONFIG = {
       </svg>
     ),
     gradient: 'from-emerald-500 to-green-600',
-    lightGradient: 'from-emerald-50 to-green-100',
-    border: 'border-emerald-200',
+    lightGradient: 'from-emerald-50 to-green-100 dark:from-emerald-950/30 dark:to-green-950/30',
+    border: 'border-emerald-200 dark:border-emerald-800',
     text: 'text-emerald-700',
     label: 'Planning',
     description: 'Kanban-style task organization',
@@ -111,8 +111,8 @@ const TEMPLATE_CONFIG = {
       </svg>
     ),
     gradient: 'from-amber-500 to-yellow-600',
-    lightGradient: 'from-amber-50 to-yellow-100',
-    border: 'border-amber-200',
+    lightGradient: 'from-amber-50 to-yellow-100 dark:from-amber-950/30 dark:to-yellow-950/30',
+    border: 'border-amber-200 dark:border-amber-800',
     text: 'text-amber-700',
     label: 'Ideas',
     description: 'Creative brainstorming board',
@@ -1147,7 +1147,7 @@ export default function MiraAgentSidebar({
 
               {/* Overall conclusion */}
               {preparedContent.conclusion && (
-                <div className="p-4 rounded-xl bg-gradient-to-br from-violet-50 to-purple-50 border border-violet-200">
+                <div className="p-4 rounded-xl bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-800">
                   <div className="flex items-center gap-2 mb-2">
                     <svg className="w-4 h-4 text-violet-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <circle cx="12" cy="12" r="10" />

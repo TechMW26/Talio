@@ -370,7 +370,7 @@ export default function MeetingDetailPage({ params }) {
 
               {/* Guest Link Sharing - Only for online meetings and organizer */}
               {meeting.type === 'online' && meeting.isOrganizer && guestAccess && (
-                <div className="p-4 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl md:col-span-2 border border-indigo-100">
+                <div className="p-4 bg-indigo-50 dark:bg-indigo-950/30 rounded-xl md:col-span-2 border border-indigo-100 dark:border-indigo-800">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <HiOutlineGlobeAlt className="w-5 h-5 text-indigo-600" />
