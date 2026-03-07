@@ -145,6 +145,7 @@ export default function SlidingSidebar({
         name: 'Team',
         icon: HiOutlineUsers,
         path: '/dashboard/team/members',
+        group: 'Main',
         submenu: [
           { name: 'Team Members', path: '/dashboard/team/members' },
           { name: 'Team Ratings', path: '/dashboard/performance/ratings' },
@@ -316,16 +317,25 @@ export default function SlidingSidebar({
         </div>
 
         {/* Scrollable Menu Section */}
-        <ScrollShadow ref={scrollContainerRef} className="pt-4 pb-8 flex-1 scrollbar-hide px-3 space-y-2">
+        <ScrollShadow ref={scrollContainerRef} className="pt-4 pb-8 flex-1 scrollbar-hide px-3 space-y-1">
           {menuItems.map((item, index) => {
             const isActive = isMenuItemActive(item)
             const isTargeted = activeSubmenu === item.name
+            const showGroupHeader = item.group && (index === 0 || menuItems[index - 1]?.group !== item.group)
             return (
-              <div key={item.name} ref={el => menuItemRefs.current[index] = el} className="w-full rounded-xl transition-all duration-300" style={{
-                boxShadow: isTargeted ? '0 0 0 2px var(--color-primary-300)' : 'none',
-                backgroundColor: isTargeted ? 'color-mix(in srgb, var(--color-primary-100) 40%, transparent)' : 'transparent',
-                paddingBottom: isTargeted ? '4px' : '0',
-              }}>
+              <div key={item.name} ref={el => menuItemRefs.current[index] = el} className="w-full">
+                {showGroupHeader && (
+                  <div className={`px-4 ${index === 0 ? 'pt-0 pb-2' : 'pt-4 pb-2'}`}>
+                    <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-tertiary, var(--color-text-secondary))' }}>
+                      {item.group}
+                    </p>
+                  </div>
+                )}
+                <div className="rounded-xl transition-all duration-300" style={{
+                  boxShadow: isTargeted ? '0 0 0 2px var(--color-primary-300)' : 'none',
+                  backgroundColor: isTargeted ? 'color-mix(in srgb, var(--color-primary-100) 40%, transparent)' : 'transparent',
+                  paddingBottom: isTargeted ? '4px' : '0',
+                }}>
                 {item.submenu ? (
                   <div className="w-full">
                     <button
@@ -437,6 +447,7 @@ export default function SlidingSidebar({
                     </div>
                   </Link>
                 )}
+              </div>
               </div>
             )
           })}

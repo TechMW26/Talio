@@ -11,7 +11,8 @@ const SOUNDS = {
   error: '/sounds/error.mp3',
   notification: '/sounds/notification.mp3',
   success: '/sounds/success.mp3',
-  taskDone: '/sounds/taskdone.mp3'
+  taskDone: '/sounds/taskdone.mp3',
+  gameInvite: '/sounds/yay-6120.mp3'
 }
 
 // Global AudioContext instance (same pattern as CallAlertReceiver)
@@ -387,6 +388,14 @@ export const playSuccessSound = async () => {
 export const playTaskDoneSound = async () => {
   console.log('[Audio] >> playTaskDoneSound called')
   return playSound('taskDone', 0.8)
+}
+
+/**
+ * Play game invite sound - for tic-tac-toe invitations
+ */
+export const playGameInviteSound = async () => {
+  console.log('[Audio] >> playGameInviteSound called')
+  return playSound('gameInvite', 0.8)
 }
 
 /**

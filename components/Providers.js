@@ -13,6 +13,7 @@ import AIAssistantBridge from '@/components/AIAssistantBridge'
 import AutoRefresh from '@/components/AutoRefresh'
 import WebNetworkRecovery from '@/components/WebNetworkRecovery'
 import ScrollToTop from '@/components/ScrollToTop'
+import { FocusTimerProvider } from '@/contexts/FocusTimerContext'
 
 // Cache operations completely disabled - no imports needed
 // import { checkAndClearCaches } from '@/lib/cacheManager'
@@ -81,6 +82,7 @@ export function Providers({ children }) {
             <ThemeProvider>
                 <AILoadingProvider>
                 <AIAssistantProvider>
+                <FocusTimerProvider>
                     <SWRConfig
                         value={{
                             // Stale-while-revalidate: show cached data immediately
@@ -111,6 +113,7 @@ export function Providers({ children }) {
                         <AIAssistantBridge />
                         {children}
                     </SWRConfig>
+                </FocusTimerProvider>
                 </AIAssistantProvider>
                 </AILoadingProvider>
             </ThemeProvider>

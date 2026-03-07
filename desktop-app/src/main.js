@@ -962,6 +962,13 @@ function handleAuthentication(data) {
     }
   });
 
+  socketHandler.on('gameInvite', function (data) {
+    showNotification('🎮 Game Invite!', (data.fromName || 'Someone') + ' wants to play Tic-Tac-Toe', { urgency: 'critical' });
+    if (mainWindow) {
+      mainWindow.webContents.send('game-invite', data);
+    }
+  });
+
   socketHandler.on('connect', function () {
     if (mainWindow) {
       mainWindow.webContents.send('socket-status', { connected: true });
@@ -1085,12 +1092,14 @@ async function toggleAutoLaunch(menuItem) {
 /**
  * Show desktop notification
  */
-function showNotification(title, body) {
+function showNotification(title, body, options) {
   if (Notification.isSupported()) {
     var notification = new Notification({
       title: title || 'Talio',
       body: body || '',
-      icon: getAppIcon()
+      icon: getAppIcon(),
+      silent: options?.silent || false,
+      urgency: options?.urgency || 'normal'
     });
     notification.show();
   }

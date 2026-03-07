@@ -122,9 +122,18 @@ class SocketHandler {
     
     // Handle attendance update
     this.socket.on('attendance-update', function(data) {
+      self.isConnected = true;
       logger.log('info', 'SocketHandler', 'Attendance update');
       if (self.callbacks.onAttendanceUpdate) {
         self.callbacks.onAttendanceUpdate(data);
+      }
+    });
+
+    // Handle TicTacToe game invite
+    this.socket.on('tictactoe:invite', function(data) {
+      logger.log('info', 'SocketHandler', 'Game invite from: ' + (data.fromName || 'Unknown'));
+      if (self.callbacks.onGameInvite) {
+        self.callbacks.onGameInvite(data);
       }
     });
   }

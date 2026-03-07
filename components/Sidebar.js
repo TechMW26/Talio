@@ -204,6 +204,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
         name: 'Team',
         icon: HiOutlineUsers,
         path: '/dashboard/team/members',
+        group: 'Main',
         submenu: [
           { name: 'Team Members', path: '/dashboard/team/members' },
           { name: 'Team Ratings', path: '/dashboard/performance/ratings' },
@@ -398,11 +399,19 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
             </div>
 
             {/* Scrollable Menu Section */}
-            <ScrollShadow className="pt-4 pb-8 flex-1 scrollbar-hide px-3 space-y-2">
-              {menuItems.map((item) => {
+            <ScrollShadow className="pt-4 pb-8 flex-1 scrollbar-hide px-3 space-y-1">
+              {menuItems.map((item, index) => {
                 const isActive = isMenuItemActive(item)
+                const showGroupHeader = item.group && (index === 0 || menuItems[index - 1]?.group !== item.group)
                 return (
                   <div key={item.name} className="w-full">
+                    {showGroupHeader && (
+                      <div className={`px-4 ${index === 0 ? 'pt-0 pb-2' : 'pt-4 pb-2'}`}>
+                        <p className="text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--color-text-tertiary, var(--color-text-secondary))' }}>
+                          {item.group}
+                        </p>
+                      </div>
+                    )}
                     {item.submenu ? (
                       <div className="w-full">
                         <button

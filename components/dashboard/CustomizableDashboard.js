@@ -16,6 +16,7 @@ import {
 } from '@dnd-kit/sortable'
 import DraggableWidget from './DraggableWidget'
 import AddWidgetModal from './AddWidgetModal'
+import ActionableInsights from './ActionableInsights'
 import { useDashboardWidgets } from '@/hooks/useDashboardWidgets'
 import { WIDGET_REGISTRY } from '@/lib/widgetRegistry'
 import { FaPlus, FaUndo, FaCog, FaTh, FaThLarge } from 'react-icons/fa'
@@ -123,6 +124,11 @@ export default function CustomizableDashboard({
   const orderedWidgets = getOrderedWidgets().filter(
     widget => widgetComponents[widget.id]
   )
+
+  // Separate top widgets (check-in-out, quick-glance) from the rest
+  const TOP_WIDGET_IDS = new Set(['check-in-out', 'quick-glance'])
+  const topWidgets = orderedWidgets.filter(w => TOP_WIDGET_IDS.has(w.id))
+  const remainingWidgets = orderedWidgets.filter(w => !TOP_WIDGET_IDS.has(w.id))
 
   return (
     <div className="relative">
@@ -234,25 +240,54 @@ export default function CustomizableDashboard({
             items={orderedWidgets.map(w => w.id)}
             strategy={rectSortingStrategy}
           >
-            <div className={`${columnLayout === 2 ? 'grid md:grid-cols-2 gap-5' : className}`} style={columnLayout === 2 && isDesktop ? { gridAutoRows: '1fr' } : {}}>
-              {orderedWidgets.map((widget, index) => {
-                const WidgetContent = widgetComponents[widget.id]
+            {/* Top Widgets (Check-In/Out, Quick Glance) */}
+            {topWidgets.length > 0 && (
+              <div className={`${columnLayout === 2 ? 'grid md:grid-cols-2 gap-5' : className}`} style={columnLayout === 2 && isDesktop ? { gridAutoRows: '1fr' } : {}}>
+                {topWidgets.map((widget, index) => {
+                  const WidgetContent = widgetComponents[widget.id]
+                  return (
+                    <DraggableWidget
+                      key={widget.id}
+                      id={widget.id}
+                      title={widget.name}
+                      colorIndex={index}
+                      onRemove={isEditMode ? handleRemoveWidget : null}
+                      removable={isEditMode}
+                      className="rounded-[30px] overflow-hidden"
+                    >
+                      {WidgetContent}
+                    </DraggableWidget>
+                  )
+                })}
+              </div>
+            )}
 
-                return (
-                  <DraggableWidget
-                    key={widget.id}
-                    id={widget.id}
-                    title={widget.name}
-                    colorIndex={index}
-                    onRemove={isEditMode ? handleRemoveWidget : null}
-                    removable={isEditMode}
-                    className="rounded-[30px] overflow-hidden"
-                  >
-                    {WidgetContent}
-                  </DraggableWidget>
-                )
-              })}
+            {/* Actionable Insights — AI-powered dashboard section */}
+            <div className="mt-5">
+              <ActionableInsights />
             </div>
+
+            {/* Remaining Widgets */}
+            {remainingWidgets.length > 0 && (
+              <div className={`mt-5 ${columnLayout === 2 ? 'grid md:grid-cols-2 gap-5' : className}`} style={columnLayout === 2 && isDesktop ? { gridAutoRows: '1fr' } : {}}>
+                {remainingWidgets.map((widget, index) => {
+                  const WidgetContent = widgetComponents[widget.id]
+                  return (
+                    <DraggableWidget
+                      key={widget.id}
+                      id={widget.id}
+                      title={widget.name}
+                      colorIndex={topWidgets.length + index}
+                      onRemove={isEditMode ? handleRemoveWidget : null}
+                      removable={isEditMode}
+                      className="rounded-[30px] overflow-hidden"
+                    >
+                      {WidgetContent}
+                    </DraggableWidget>
+                  )
+                })}
+              </div>
+            )}
           </SortableContext>
         </DndContext>
       )}

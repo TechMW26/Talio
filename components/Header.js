@@ -10,6 +10,7 @@ import { handleSessionExpired } from '@/utils/userHelper'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
+import { useFocusTimer } from '@/contexts/FocusTimerContext'
 import UnreadBadge from '@/components/UnreadBadge'
 import { formatDesignation as formatDesignationLib, formatDepartments, getLevelNameFromNumber } from '@/lib/formatters'
 import { getCachedEmployeeData, setCachedEmployeeData } from '@/utils/sessionCache'
@@ -540,6 +541,9 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
             </span>
           </div>
 
+          {/* Focus Timer Pill */}
+          <FocusTimerPill />
+
           {/* Real-time Clock - Desktop Only */}
           <div className="hidden md:flex items-center gap-2 px-4 py-2.5 text-default-600">
             <RealTimeClock timezone={timezone} />
@@ -855,6 +859,60 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
         </Button>
       )}
     </header>
+  )
+}
+
+// Focus Timer Pill — persists in header when timer is active
+function FocusTimerPill() {
+  const { running, done, mins, secs, pct, toggle, reset } = useFocusTimer()
+  const pathname = usePathname()
+
+  // Only show pill when not on dashboard (where the full card is visible) AND timer is active
+  const onDashboard = pathname === '/dashboard'
+  const active = running || done
+  if (!active || onDashboard) return null
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/50 shadow-sm animate-in fade-in slide-in-from-right-2 duration-300">
+      {/* Progress ring */}
+      <div className="relative w-6 h-6 flex-shrink-0">
+        <svg className="w-6 h-6 -rotate-90" viewBox="0 0 24 24">
+          <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" className="text-gray-200 dark:text-slate-700" strokeWidth="2.5" />
+          <circle cx="12" cy="12" r="10" fill="none" stroke={done ? '#10B981' : '#6366F1'} strokeWidth="2.5" strokeDasharray={`${2 * Math.PI * 10}`} strokeDashoffset={`${2 * Math.PI * 10 * (1 - pct / 100)}`} strokeLinecap="round" className="transition-all duration-1000" />
+        </svg>
+      </div>
+
+      {/* Time */}
+      <span className={`text-xs font-bold tabular-nums ${done ? 'text-emerald-600 dark:text-emerald-400' : 'text-indigo-700 dark:text-indigo-300'}`}>
+        {done ? 'Done!' : `${mins}:${secs}`}
+      </span>
+
+      {/* Play/Pause */}
+      <button
+        onClick={toggle}
+        className="p-0.5 rounded-md hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors"
+        title={done ? 'Restart' : running ? 'Pause' : 'Resume'}
+      >
+        {done ? (
+          <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" /></svg>
+        ) : running ? (
+          <svg className="w-3.5 h-3.5 text-amber-500" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25v13.5m-7.5-13.5v13.5" /></svg>
+        ) : (
+          <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" /></svg>
+        )}
+      </button>
+
+      {/* Reset */}
+      {!done && (
+        <button
+          onClick={reset}
+          className="p-0.5 rounded-md hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors"
+          title="Reset"
+        >
+          <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" /></svg>
+        </button>
+      )}
+    </div>
   )
 }
 

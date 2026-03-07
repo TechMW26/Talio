@@ -61,6 +61,7 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
         name: 'Team',
         icon: require('react-icons/hi2').HiOutlineUsers,
         path: '/dashboard/team/members',
+        group: 'Main',
         submenu: [
           { name: 'Team Members', path: '/dashboard/team/members' },
           { name: 'Team Ratings', path: '/dashboard/performance/ratings' },
@@ -167,16 +168,18 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
         </div>
 
         {/* Menu Icons */}
-        <div ref={menuContainerRef} className="flex-1 overflow-y-auto scrollbar-hide py-4 px-2 space-y-2">
+        <div ref={menuContainerRef} className="flex-1 overflow-y-auto scrollbar-hide py-4 px-2 space-y-1">
           {menuItems.map((item, index) => {
             const isActive = isMenuItemActive(item)
             const badgeCount = getBadgeCount(item.name)
+            const showGroupDivider = item.group && index > 0 && menuItems[index - 1]?.group !== item.group
+
+            let iconButton
 
             // Special handling for Chat on desktop - opens widget instead of navigating
             if (item.name === 'Chat') {
-              return (
+              iconButton = (
                 <Tooltip
-                  key={item.name}
                   content={item.name}
                   placement="right"
                   delay={200}
@@ -196,13 +199,10 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
                   </button>
                 </Tooltip>
               )
-            }
-
-            // For items with submenu, clicking expands the sliding sidebar
-            if (item.submenu) {
-              return (
+            } else if (item.submenu) {
+              // For items with submenu, clicking expands the sliding sidebar
+              iconButton = (
                 <Tooltip
-                  key={item.name}
                   content={item.name}
                   placement="right"
                   delay={200}
@@ -225,34 +225,42 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
                   </button>
                 </Tooltip>
               )
+            } else {
+              // Regular menu items - navigate directly
+              iconButton = (
+                <Tooltip
+                  content={item.name}
+                  placement="right"
+                  delay={200}
+                  closeDelay={0}
+                >
+                  <Link
+                    href={item.path}
+                    onClick={() => handleLinkClick(item.path)}
+                    className={`w-full flex items-center justify-center p-2.5 rounded-xl transition-all duration-200 group relative hover:bg-black/10 dark:hover:bg-white/10`}
+                    style={{
+                      backgroundColor: isActive ? 'var(--color-primary-500)' : 'var(--color-primary-100)',
+                    }}
+                  >
+                    <div className="relative">
+                      <item.icon
+                        className="w-6 h-6 group-hover:text-white"
+                        style={{ color: isActive ? 'white' : 'var(--color-primary-600)' }}
+                      />
+                      <SidebarBadge count={badgeCount} />
+                    </div>
+                  </Link>
+                </Tooltip>
+              )
             }
 
-            // Regular menu items - navigate directly
             return (
-              <Tooltip
-                key={item.name}
-                content={item.name}
-                placement="right"
-                delay={200}
-                closeDelay={0}
-              >
-                <Link
-                  href={item.path}
-                  onClick={() => handleLinkClick(item.path)}
-                  className={`w-full flex items-center justify-center p-2.5 rounded-xl transition-all duration-200 group relative hover:bg-black/10 dark:hover:bg-white/10`}
-                  style={{
-                    backgroundColor: isActive ? 'var(--color-primary-500)' : 'var(--color-primary-100)',
-                  }}
-                >
-                  <div className="relative">
-                    <item.icon
-                      className="w-6 h-6 group-hover:text-white"
-                      style={{ color: isActive ? 'white' : 'var(--color-primary-600)' }}
-                    />
-                    <SidebarBadge count={badgeCount} />
-                  </div>
-                </Link>
-              </Tooltip>
+              <div key={item.name}>
+                {showGroupDivider && (
+                  <div className="my-2 mx-2 border-t" style={{ borderColor: 'var(--color-primary-200)' }} />
+                )}
+                {iconButton}
+              </div>
             )
           })}
         </div>

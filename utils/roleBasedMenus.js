@@ -27,21 +27,23 @@ import {
 } from 'react-icons/hi2'
 
 // Define menu items for each role
+// Each item has an optional `group` field used by the sidebar to render section headings
 // NOTE: MIRA AI Assistant is only available in the desktop apps (Mac/Windows) via floating widget
 // It has been removed from the web version entirely
 export const roleBasedMenus = {
   // ADMIN - Full access to everything
   admin: [
-    { name: 'Dashboard', icon: HiOutlineSquares2X2, path: '/dashboard' },
-    { name: 'Chat', icon: HiOutlineChatBubbleLeftRight, path: '/dashboard/chat' },
-    { name: 'Mail', icon: HiOutlineEnvelope, path: '/dashboard/mail' },
-    { name: 'Meetings', icon: HiOutlineVideoCamera, path: '/dashboard/meetings' },
-    { name: "To-Do's", icon: HiOutlineListBullet, path: '/dashboard/todo' },
-    { name: 'TalioBoard', icon: HiOutlineRectangleGroup, path: '/dashboard/talioboard' },
+    { name: 'Dashboard', icon: HiOutlineSquares2X2, path: '/dashboard', group: 'Main' },
+    { name: 'Chat', icon: HiOutlineChatBubbleLeftRight, path: '/dashboard/chat', group: 'Main' },
+    { name: 'Mail', icon: HiOutlineEnvelope, path: '/dashboard/mail', group: 'Main' },
+    { name: 'Meetings', icon: HiOutlineVideoCamera, path: '/dashboard/meetings', group: 'Main' },
+    { name: "To-Do's", icon: HiOutlineListBullet, path: '/dashboard/todo', group: 'Main' },
+    { name: 'TalioBoard', icon: HiOutlineRectangleGroup, path: '/dashboard/talioboard', group: 'Main' },
     {
       name: 'Projects',
       icon: HiOutlineClipboardDocumentList,
       path: '/dashboard/projects',
+      group: 'Work',
       submenu: [
         { name: 'All Projects', path: '/dashboard/projects' },
         { name: 'My Tasks', path: '/dashboard/projects/my-tasks' },
@@ -51,23 +53,10 @@ export const roleBasedMenus = {
       ]
     },
     {
-      name: 'Employees',
-      icon: HiOutlineUserGroup,
-      path: '/dashboard/employees',
-      submenu: [
-        { name: 'All Employees', path: '/dashboard/employees' },
-        { name: 'Add Employee', path: '/dashboard/employees/add' },
-        { name: 'Onboarding Emails', path: '/dashboard/employees/onboarding-emails' },
-        { name: 'Departments', path: '/dashboard/departments' },
-        { name: 'Designations', path: '/dashboard/designations' },
-        { name: 'User Passwords', path: '/dashboard/employees/user-passwords' },
-      ]
-    },
-    { name: 'Live Users', icon: HiOutlineSignal, path: '/dashboard/admin/live-users' },
-    {
       name: 'Attendance & Leaves',
       icon: HiOutlineClock,
       path: '/dashboard/attendance',
+      group: 'Work',
       submenu: [
         { name: 'My Attendance', path: '/dashboard/attendance' },
         { name: 'Team Attendance', path: '/dashboard/attendance/team' },
@@ -82,20 +71,27 @@ export const roleBasedMenus = {
         { name: 'Leave Allocations', path: '/dashboard/leave/allocations' },
       ]
     },
+    { name: 'Productivity', icon: HiOutlineComputerDesktop, path: '/dashboard/productivity', group: 'Work' },
     {
-      name: 'Payroll',
-      icon: HiOutlineBanknotes,
-      path: '/dashboard/payroll',
+      name: 'Employees',
+      icon: HiOutlineUserGroup,
+      path: '/dashboard/employees',
+      group: 'People',
       submenu: [
-        { name: 'Process Payroll', path: '/dashboard/payroll' },
-        { name: 'Generate Payroll', path: '/dashboard/payroll/generate' },
-        { name: 'Payslips', path: '/dashboard/payroll/payslips' },
+        { name: 'All Employees', path: '/dashboard/employees' },
+        { name: 'Add Employee', path: '/dashboard/employees/add' },
+        { name: 'Onboarding Emails', path: '/dashboard/employees/onboarding-emails' },
+        { name: 'Departments', path: '/dashboard/departments' },
+        { name: 'Designations', path: '/dashboard/designations' },
+        { name: 'User Passwords', path: '/dashboard/employees/user-passwords' },
       ]
     },
+    { name: 'Live Users', icon: HiOutlineSignal, path: '/dashboard/admin/live-users', group: 'People' },
     {
       name: 'Performance',
       icon: HiOutlineTrophy,
       path: '/dashboard/performance',
+      group: 'People',
       submenu: [
         { name: 'My Performance', path: '/dashboard/performance/my-performance' },
         { name: 'Employee Ratings', path: '/dashboard/performance/ratings' },
@@ -107,6 +103,7 @@ export const roleBasedMenus = {
       name: 'Recruitment',
       icon: HiOutlineBriefcase,
       path: '/dashboard/recruitment',
+      group: 'People',
       submenu: [
         { name: 'Job Openings', path: '/dashboard/recruitment' },
         { name: 'Candidates', path: '/dashboard/recruitment/candidates' },
@@ -114,23 +111,36 @@ export const roleBasedMenus = {
         { name: 'Analytics', path: '/dashboard/recruitment/analytics' },
       ]
     },
-    { name: 'Documents', icon: HiOutlineDocumentText, path: '/dashboard/documents' },
-    { name: 'Assets', icon: HiOutlineCube, path: '/dashboard/assets' },
+    {
+      name: 'Payroll',
+      icon: HiOutlineBanknotes,
+      path: '/dashboard/payroll',
+      group: 'Finance',
+      submenu: [
+        { name: 'Process Payroll', path: '/dashboard/payroll' },
+        { name: 'Generate Payroll', path: '/dashboard/payroll/generate' },
+        { name: 'Payslips', path: '/dashboard/payroll/payslips' },
+      ]
+    },
     {
       name: 'Expenses',
       icon: HiOutlineReceiptPercent,
       path: '/dashboard/expenses',
+      group: 'Finance',
       submenu: [
         { name: 'My Expenses', path: '/dashboard/expenses' },
         { name: 'Approvals', path: '/dashboard/expenses/approvals' },
       ]
     },
-    { name: 'Helpdesk', icon: HiOutlineLifebuoy, path: '/dashboard/helpdesk' },
-    { name: 'Policies', icon: HiOutlineBookOpen, path: '/dashboard/policies' },
+    { name: 'Documents', icon: HiOutlineDocumentText, path: '/dashboard/documents', group: 'Resources' },
+    { name: 'Assets', icon: HiOutlineCube, path: '/dashboard/assets', group: 'Resources' },
+    { name: 'Helpdesk', icon: HiOutlineLifebuoy, path: '/dashboard/helpdesk', group: 'Resources' },
+    { name: 'Policies', icon: HiOutlineBookOpen, path: '/dashboard/policies', group: 'Resources' },
     {
       name: 'Learning (LMS)',
       icon: HiOutlineAcademicCap,
       path: '/dashboard/learning',
+      group: 'Resources',
       submenu: [
         { name: 'Courses', path: '/dashboard/learning/courses' },
         { name: 'My Trainings', path: '/dashboard/learning/trainings' },
@@ -141,28 +151,29 @@ export const roleBasedMenus = {
       name: 'Announcements',
       icon: HiOutlineMegaphone,
       path: '/dashboard/announcements',
+      group: 'Company',
       submenu: [
         { name: 'All Announcements', path: '/dashboard/announcements' },
         { name: 'Create Announcement', path: '/dashboard/announcements/create' },
       ]
     },
-    { name: 'Holidays', icon: HiOutlineCalendarDays, path: '/dashboard/holidays' },
-    { name: 'General Calendar', icon: HiOutlineCalendarDays, path: '/dashboard/calendar' },
-    { name: 'Productivity', icon: HiOutlineComputerDesktop, path: '/dashboard/productivity' },
+    { name: 'Holidays', icon: HiOutlineCalendarDays, path: '/dashboard/holidays', group: 'Company' },
+    { name: 'General Calendar', icon: HiOutlineCalendarDays, path: '/dashboard/calendar', group: 'Company' },
   ],
 
   // HR - Full HR management access (similar to admin for HR functions)
   hr: [
-    { name: 'Dashboard', icon: HiOutlineSquares2X2, path: '/dashboard' },
-    { name: 'Chat', icon: HiOutlineChatBubbleLeftRight, path: '/dashboard/chat' },
-    { name: 'Mail', icon: HiOutlineEnvelope, path: '/dashboard/mail' },
-    { name: 'Meetings', icon: HiOutlineVideoCamera, path: '/dashboard/meetings' },
-    { name: "To-Do's", icon: HiOutlineListBullet, path: '/dashboard/todo' },
-    { name: 'TalioBoard', icon: HiOutlineRectangleGroup, path: '/dashboard/talioboard' },
+    { name: 'Dashboard', icon: HiOutlineSquares2X2, path: '/dashboard', group: 'Main' },
+    { name: 'Chat', icon: HiOutlineChatBubbleLeftRight, path: '/dashboard/chat', group: 'Main' },
+    { name: 'Mail', icon: HiOutlineEnvelope, path: '/dashboard/mail', group: 'Main' },
+    { name: 'Meetings', icon: HiOutlineVideoCamera, path: '/dashboard/meetings', group: 'Main' },
+    { name: "To-Do's", icon: HiOutlineListBullet, path: '/dashboard/todo', group: 'Main' },
+    { name: 'TalioBoard', icon: HiOutlineRectangleGroup, path: '/dashboard/talioboard', group: 'Main' },
     {
       name: 'Projects',
       icon: HiOutlineClipboardDocumentList,
       path: '/dashboard/projects',
+      group: 'Work',
       submenu: [
         { name: 'All Projects', path: '/dashboard/projects' },
         { name: 'My Tasks', path: '/dashboard/projects/my-tasks' },
@@ -172,23 +183,10 @@ export const roleBasedMenus = {
       ]
     },
     {
-      name: 'Employees',
-      icon: HiOutlineUserGroup,
-      path: '/dashboard/employees',
-      submenu: [
-        { name: 'All Employees', path: '/dashboard/employees' },
-        { name: 'Add Employee', path: '/dashboard/employees/add' },
-        { name: 'Onboarding Emails', path: '/dashboard/employees/onboarding-emails' },
-        { name: 'Departments', path: '/dashboard/departments' },
-        { name: 'Designations', path: '/dashboard/designations' },
-        { name: 'User Passwords', path: '/dashboard/employees/user-passwords' },
-      ]
-    },
-    { name: 'Live Users', icon: HiOutlineSignal, path: '/dashboard/admin/live-users' },
-    {
       name: 'Attendance & Leaves',
       icon: HiOutlineClock,
       path: '/dashboard/attendance',
+      group: 'Work',
       submenu: [
         { name: 'My Attendance', path: '/dashboard/attendance' },
         { name: 'Team Attendance', path: '/dashboard/attendance/team' },
@@ -203,20 +201,27 @@ export const roleBasedMenus = {
         { name: 'Leave Allocations', path: '/dashboard/leave/allocations' },
       ]
     },
+    { name: 'Productivity', icon: HiOutlineComputerDesktop, path: '/dashboard/productivity', group: 'Work' },
     {
-      name: 'Payroll',
-      icon: HiOutlineBanknotes,
-      path: '/dashboard/payroll',
+      name: 'Employees',
+      icon: HiOutlineUserGroup,
+      path: '/dashboard/employees',
+      group: 'People',
       submenu: [
-        { name: 'Process Payroll', path: '/dashboard/payroll' },
-        { name: 'Generate Payroll', path: '/dashboard/payroll/generate' },
-        { name: 'Payslips', path: '/dashboard/payroll/payslips' },
+        { name: 'All Employees', path: '/dashboard/employees' },
+        { name: 'Add Employee', path: '/dashboard/employees/add' },
+        { name: 'Onboarding Emails', path: '/dashboard/employees/onboarding-emails' },
+        { name: 'Departments', path: '/dashboard/departments' },
+        { name: 'Designations', path: '/dashboard/designations' },
+        { name: 'User Passwords', path: '/dashboard/employees/user-passwords' },
       ]
     },
+    { name: 'Live Users', icon: HiOutlineSignal, path: '/dashboard/admin/live-users', group: 'People' },
     {
       name: 'Performance',
       icon: HiOutlineTrophy,
       path: '/dashboard/performance',
+      group: 'People',
       submenu: [
         { name: 'My Performance', path: '/dashboard/performance/my-performance' },
         { name: 'Employee Ratings', path: '/dashboard/performance/ratings' },
@@ -228,6 +233,7 @@ export const roleBasedMenus = {
       name: 'Recruitment',
       icon: HiOutlineBriefcase,
       path: '/dashboard/recruitment',
+      group: 'People',
       submenu: [
         { name: 'Job Openings', path: '/dashboard/recruitment' },
         { name: 'Candidates', path: '/dashboard/recruitment/candidates' },
@@ -235,23 +241,36 @@ export const roleBasedMenus = {
         { name: 'Analytics', path: '/dashboard/recruitment/analytics' },
       ]
     },
-    { name: 'Documents', icon: HiOutlineDocumentText, path: '/dashboard/documents' },
-    { name: 'Assets', icon: HiOutlineCube, path: '/dashboard/assets' },
+    {
+      name: 'Payroll',
+      icon: HiOutlineBanknotes,
+      path: '/dashboard/payroll',
+      group: 'Finance',
+      submenu: [
+        { name: 'Process Payroll', path: '/dashboard/payroll' },
+        { name: 'Generate Payroll', path: '/dashboard/payroll/generate' },
+        { name: 'Payslips', path: '/dashboard/payroll/payslips' },
+      ]
+    },
     {
       name: 'Expenses',
       icon: HiOutlineReceiptPercent,
       path: '/dashboard/expenses',
+      group: 'Finance',
       submenu: [
         { name: 'My Expenses', path: '/dashboard/expenses' },
         { name: 'Approvals', path: '/dashboard/expenses/approvals' },
       ]
     },
-    { name: 'Policies', icon: HiOutlineBookOpen, path: '/dashboard/policies' },
-    { name: 'Helpdesk', icon: HiOutlineLifebuoy, path: '/dashboard/helpdesk' },
+    { name: 'Documents', icon: HiOutlineDocumentText, path: '/dashboard/documents', group: 'Resources' },
+    { name: 'Assets', icon: HiOutlineCube, path: '/dashboard/assets', group: 'Resources' },
+    { name: 'Policies', icon: HiOutlineBookOpen, path: '/dashboard/policies', group: 'Resources' },
+    { name: 'Helpdesk', icon: HiOutlineLifebuoy, path: '/dashboard/helpdesk', group: 'Resources' },
     {
       name: 'Learning (LMS)',
       icon: HiOutlineAcademicCap,
       path: '/dashboard/learning',
+      group: 'Resources',
       submenu: [
         { name: 'Courses', path: '/dashboard/learning/courses' },
         { name: 'My Trainings', path: '/dashboard/learning/trainings' },
@@ -262,28 +281,29 @@ export const roleBasedMenus = {
       name: 'Announcements',
       icon: HiOutlineMegaphone,
       path: '/dashboard/announcements',
+      group: 'Company',
       submenu: [
         { name: 'All Announcements', path: '/dashboard/announcements' },
         { name: 'Create Announcement', path: '/dashboard/announcements/create' },
       ]
     },
-    { name: 'Holidays', icon: HiOutlineCalendarDays, path: '/dashboard/holidays' },
-    { name: 'General Calendar', icon: HiOutlineCalendarDays, path: '/dashboard/calendar' },
-    { name: 'Productivity', icon: HiOutlineComputerDesktop, path: '/dashboard/productivity' },
+    { name: 'Holidays', icon: HiOutlineCalendarDays, path: '/dashboard/holidays', group: 'Company' },
+    { name: 'General Calendar', icon: HiOutlineCalendarDays, path: '/dashboard/calendar', group: 'Company' },
   ],
 
   // MANAGER - Team management focused
   manager: [
-    { name: 'Dashboard', icon: HiOutlineSquares2X2, path: '/dashboard' },
-    { name: 'Chat', icon: HiOutlineChatBubbleLeftRight, path: '/dashboard/chat' },
-    { name: 'Mail', icon: HiOutlineEnvelope, path: '/dashboard/mail' },
-    { name: 'Meetings', icon: HiOutlineVideoCamera, path: '/dashboard/meetings' },
-    { name: "To-Do's", icon: HiOutlineListBullet, path: '/dashboard/todo' },
-    { name: 'TalioBoard', icon: HiOutlineRectangleGroup, path: '/dashboard/talioboard' },
+    { name: 'Dashboard', icon: HiOutlineSquares2X2, path: '/dashboard', group: 'Main' },
+    { name: 'Chat', icon: HiOutlineChatBubbleLeftRight, path: '/dashboard/chat', group: 'Main' },
+    { name: 'Mail', icon: HiOutlineEnvelope, path: '/dashboard/mail', group: 'Main' },
+    { name: 'Meetings', icon: HiOutlineVideoCamera, path: '/dashboard/meetings', group: 'Main' },
+    { name: "To-Do's", icon: HiOutlineListBullet, path: '/dashboard/todo', group: 'Main' },
+    { name: 'TalioBoard', icon: HiOutlineRectangleGroup, path: '/dashboard/talioboard', group: 'Main' },
     {
       name: 'Projects',
       icon: HiOutlineClipboardDocumentList,
       path: '/dashboard/projects',
+      group: 'Work',
       submenu: [
         { name: 'All Projects', path: '/dashboard/projects' },
         { name: 'My Tasks', path: '/dashboard/projects/my-tasks' },
@@ -296,6 +316,7 @@ export const roleBasedMenus = {
       name: 'Attendance & Leaves',
       icon: HiOutlineClock,
       path: '/dashboard/attendance',
+      group: 'Work',
       submenu: [
         { name: 'My Attendance', path: '/dashboard/attendance' },
         { name: 'Apply Leave', path: '/dashboard/leave/apply' },
@@ -304,45 +325,48 @@ export const roleBasedMenus = {
         { name: 'Leave Approvals', path: '/dashboard/leave/approvals' },
       ]
     },
-    { name: 'Payslips', icon: HiOutlineBanknotes, path: '/dashboard/payroll/payslips' },
-    { name: 'Documents', icon: HiOutlineDocumentText, path: '/dashboard/documents' },
-    { name: 'Assets', icon: HiOutlineCube, path: '/dashboard/assets' },
+    { name: 'Payslips', icon: HiOutlineBanknotes, path: '/dashboard/payroll/payslips', group: 'Finance' },
     {
       name: 'Expenses',
       icon: HiOutlineReceiptPercent,
       path: '/dashboard/expenses',
+      group: 'Finance',
       submenu: [
         { name: 'My Expenses', path: '/dashboard/expenses' },
         { name: 'Approvals', path: '/dashboard/expenses/approvals' },
       ]
     },
-    { name: 'Policies', icon: HiOutlineBookOpen, path: '/dashboard/policies' },
+    { name: 'Documents', icon: HiOutlineDocumentText, path: '/dashboard/documents', group: 'Resources' },
+    { name: 'Assets', icon: HiOutlineCube, path: '/dashboard/assets', group: 'Resources' },
+    { name: 'Policies', icon: HiOutlineBookOpen, path: '/dashboard/policies', group: 'Resources' },
     {
       name: 'Learning',
       icon: HiOutlineAcademicCap,
       path: '/dashboard/learning',
+      group: 'Resources',
       submenu: [
         { name: 'My Trainings', path: '/dashboard/learning/trainings' },
         { name: 'Certificates', path: '/dashboard/learning/certificates' },
       ]
     },
-    { name: 'Announcements', icon: HiOutlineMegaphone, path: '/dashboard/announcements' },
-    { name: 'Helpdesk', icon: HiOutlineLifebuoy, path: '/dashboard/helpdesk' },
-    { name: 'General Calendar', icon: HiOutlineCalendarDays, path: '/dashboard/calendar' },
+    { name: 'Announcements', icon: HiOutlineMegaphone, path: '/dashboard/announcements', group: 'Company' },
+    { name: 'Helpdesk', icon: HiOutlineLifebuoy, path: '/dashboard/helpdesk', group: 'Resources' },
+    { name: 'General Calendar', icon: HiOutlineCalendarDays, path: '/dashboard/calendar', group: 'Company' },
   ],
 
   // EMPLOYEE - Personal focused
   employee: [
-    { name: 'Dashboard', icon: HiOutlineSquares2X2, path: '/dashboard' },
-    { name: 'Chat', icon: HiOutlineChatBubbleLeftRight, path: '/dashboard/chat' },
-    { name: 'Mail', icon: HiOutlineEnvelope, path: '/dashboard/mail' },
-    { name: 'Meetings', icon: HiOutlineVideoCamera, path: '/dashboard/meetings' },
-    { name: "To-Do's", icon: HiOutlineListBullet, path: '/dashboard/todo' },
-    { name: 'TalioBoard', icon: HiOutlineRectangleGroup, path: '/dashboard/talioboard' },
+    { name: 'Dashboard', icon: HiOutlineSquares2X2, path: '/dashboard', group: 'Main' },
+    { name: 'Chat', icon: HiOutlineChatBubbleLeftRight, path: '/dashboard/chat', group: 'Main' },
+    { name: 'Mail', icon: HiOutlineEnvelope, path: '/dashboard/mail', group: 'Main' },
+    { name: 'Meetings', icon: HiOutlineVideoCamera, path: '/dashboard/meetings', group: 'Main' },
+    { name: "To-Do's", icon: HiOutlineListBullet, path: '/dashboard/todo', group: 'Main' },
+    { name: 'TalioBoard', icon: HiOutlineRectangleGroup, path: '/dashboard/talioboard', group: 'Main' },
     {
       name: 'Projects',
       icon: HiOutlineClipboardDocumentList,
       path: '/dashboard/projects',
+      group: 'Work',
       submenu: [
         { name: 'My Projects', path: '/dashboard/projects' },
         { name: 'My Tasks', path: '/dashboard/projects/my-tasks' },
@@ -355,6 +379,7 @@ export const roleBasedMenus = {
       name: 'Attendance & Leaves',
       icon: HiOutlineClock,
       path: '/dashboard/attendance',
+      group: 'Work',
       submenu: [
         { name: 'My Attendance', path: '/dashboard/attendance' },
         { name: 'Apply Leave', path: '/dashboard/leave/apply' },
@@ -362,47 +387,50 @@ export const roleBasedMenus = {
         { name: 'My Leave Requests', path: '/dashboard/leave/requests' },
       ]
     },
-    { name: 'Payslips', icon: HiOutlineBanknotes, path: '/dashboard/payroll/payslips' },
-    { name: 'Documents', icon: HiOutlineDocumentText, path: '/dashboard/documents' },
-    { name: 'Assets', icon: HiOutlineCube, path: '/dashboard/assets' },
+    { name: 'Payslips', icon: HiOutlineBanknotes, path: '/dashboard/payroll/payslips', group: 'Finance' },
     {
       name: 'Expenses',
       icon: HiOutlineReceiptPercent,
       path: '/dashboard/expenses',
+      group: 'Finance',
       submenu: [
         { name: 'My Expenses', path: '/dashboard/expenses' },
         { name: 'Approvals', path: '/dashboard/expenses/approvals' },
       ]
     },
-    { name: 'Policies', icon: HiOutlineBookOpen, path: '/dashboard/policies' },
+    { name: 'Documents', icon: HiOutlineDocumentText, path: '/dashboard/documents', group: 'Resources' },
+    { name: 'Assets', icon: HiOutlineCube, path: '/dashboard/assets', group: 'Resources' },
+    { name: 'Policies', icon: HiOutlineBookOpen, path: '/dashboard/policies', group: 'Resources' },
     {
       name: 'Learning',
       icon: HiOutlineAcademicCap,
       path: '/dashboard/learning',
+      group: 'Resources',
       submenu: [
         { name: 'My Trainings', path: '/dashboard/learning/trainings' },
         { name: 'Certificates', path: '/dashboard/learning/certificates' },
       ]
     },
-    { name: 'Announcements', icon: HiOutlineMegaphone, path: '/dashboard/announcements' },
-    { name: 'Helpdesk', icon: HiOutlineLifebuoy, path: '/dashboard/helpdesk' },
-    { name: 'General Calendar', icon: HiOutlineCalendarDays, path: '/dashboard/calendar' },
+    { name: 'Announcements', icon: HiOutlineMegaphone, path: '/dashboard/announcements', group: 'Company' },
+    { name: 'Helpdesk', icon: HiOutlineLifebuoy, path: '/dashboard/helpdesk', group: 'Resources' },
+    { name: 'General Calendar', icon: HiOutlineCalendarDays, path: '/dashboard/calendar', group: 'Company' },
   ],
 
   // DEPARTMENT HEAD - Department management focused (inherits from manager with department oversight)
   department_head: [
-    { name: 'Dashboard', icon: HiOutlineSquares2X2, path: '/dashboard' },
-    { name: 'Productivity', icon: HiOutlineComputerDesktop, path: '/dashboard/productivity' },
-    { name: 'Live Users', icon: HiOutlineSignal, path: '/dashboard/admin/live-users' },
-    { name: 'Chat', icon: HiOutlineChatBubbleLeftRight, path: '/dashboard/chat' },
-    { name: 'Mail', icon: HiOutlineEnvelope, path: '/dashboard/mail' },
-    { name: 'Meetings', icon: HiOutlineVideoCamera, path: '/dashboard/meetings' },
-    { name: "To-Do's", icon: HiOutlineListBullet, path: '/dashboard/todo' },
-    { name: 'TalioBoard', icon: HiOutlineRectangleGroup, path: '/dashboard/talioboard' },
+    { name: 'Dashboard', icon: HiOutlineSquares2X2, path: '/dashboard', group: 'Main' },
+    { name: 'Productivity', icon: HiOutlineComputerDesktop, path: '/dashboard/productivity', group: 'Main' },
+    { name: 'Live Users', icon: HiOutlineSignal, path: '/dashboard/admin/live-users', group: 'Main' },
+    { name: 'Chat', icon: HiOutlineChatBubbleLeftRight, path: '/dashboard/chat', group: 'Main' },
+    { name: 'Mail', icon: HiOutlineEnvelope, path: '/dashboard/mail', group: 'Main' },
+    { name: 'Meetings', icon: HiOutlineVideoCamera, path: '/dashboard/meetings', group: 'Main' },
+    { name: "To-Do's", icon: HiOutlineListBullet, path: '/dashboard/todo', group: 'Main' },
+    { name: 'TalioBoard', icon: HiOutlineRectangleGroup, path: '/dashboard/talioboard', group: 'Main' },
     {
       name: 'Projects',
       icon: HiOutlineClipboardDocumentList,
       path: '/dashboard/projects',
+      group: 'Work',
       submenu: [
         { name: 'All Projects', path: '/dashboard/projects' },
         { name: 'My Tasks', path: '/dashboard/projects/my-tasks' },
@@ -415,6 +443,7 @@ export const roleBasedMenus = {
       name: 'Attendance & Leaves',
       icon: HiOutlineClock,
       path: '/dashboard/attendance',
+      group: 'Work',
       submenu: [
         { name: 'My Attendance', path: '/dashboard/attendance' },
         { name: 'Team Attendance', path: '/dashboard/attendance/team' },
@@ -425,31 +454,33 @@ export const roleBasedMenus = {
         { name: 'Leave Approvals', path: '/dashboard/leave/approvals' },
       ]
     },
-    { name: 'Payslips', icon: HiOutlineBanknotes, path: '/dashboard/payroll/payslips' },
-    { name: 'Documents', icon: HiOutlineDocumentText, path: '/dashboard/documents' },
-    { name: 'Assets', icon: HiOutlineCube, path: '/dashboard/assets' },
+    { name: 'Payslips', icon: HiOutlineBanknotes, path: '/dashboard/payroll/payslips', group: 'Finance' },
     {
       name: 'Expenses',
       icon: HiOutlineReceiptPercent,
       path: '/dashboard/expenses',
+      group: 'Finance',
       submenu: [
         { name: 'My Expenses', path: '/dashboard/expenses' },
         { name: 'Approvals', path: '/dashboard/expenses/approvals' },
       ]
     },
-    { name: 'Policies', icon: HiOutlineBookOpen, path: '/dashboard/policies' },
+    { name: 'Documents', icon: HiOutlineDocumentText, path: '/dashboard/documents', group: 'Resources' },
+    { name: 'Assets', icon: HiOutlineCube, path: '/dashboard/assets', group: 'Resources' },
+    { name: 'Policies', icon: HiOutlineBookOpen, path: '/dashboard/policies', group: 'Resources' },
     {
       name: 'Learning',
       icon: HiOutlineAcademicCap,
       path: '/dashboard/learning',
+      group: 'Resources',
       submenu: [
         { name: 'My Trainings', path: '/dashboard/learning/trainings' },
         { name: 'Certificates', path: '/dashboard/learning/certificates' },
       ]
     },
-    { name: 'Announcements', icon: HiOutlineMegaphone, path: '/dashboard/announcements' },
-    { name: 'Helpdesk', icon: HiOutlineLifebuoy, path: '/dashboard/helpdesk' },
-    { name: 'General Calendar', icon: HiOutlineCalendarDays, path: '/dashboard/calendar' },
+    { name: 'Announcements', icon: HiOutlineMegaphone, path: '/dashboard/announcements', group: 'Company' },
+    { name: 'Helpdesk', icon: HiOutlineLifebuoy, path: '/dashboard/helpdesk', group: 'Resources' },
+    { name: 'General Calendar', icon: HiOutlineCalendarDays, path: '/dashboard/calendar', group: 'Company' },
   ],
 }
 
