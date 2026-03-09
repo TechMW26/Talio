@@ -15,12 +15,12 @@ import toast from '@/utils/toast'
 import { Skeleton } from '@heroui/react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
-import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 
 export default function CalendarPage() {
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [viewMode, setViewMode] = useState('calendar')
   const [loading, setLoading] = useState(true)
+  const [fetchError, setFetchError] = useState(null)
 
   const [holidays, setHolidays] = useState([])
   const [birthdays, setBirthdays] = useState([])
@@ -66,6 +66,7 @@ export default function CalendarPage() {
 
   const fetchAllData = async () => {
     setLoading(true)
+    setFetchError(null)
     try {
       const token = localStorage.getItem('token')
       const headers = { Authorization: `Bearer ${token}` }
@@ -93,6 +94,7 @@ export default function CalendarPage() {
       if (announcementsData.success) setAnnouncements(announcementsData.data)
     } catch (err) {
       console.error(err)
+      setFetchError(err)
       toast.error('Failed to load calendar data')
     } finally {
       setLoading(false)
@@ -198,13 +200,12 @@ export default function CalendarPage() {
     )
   }
 
-  if (error) {
-    return <DataErrorState error={error} onRetry={refreshAll} title="Failed to load calendar data" />
+  if (fetchError) {
+    return <DataErrorState error={fetchError} onRetry={fetchAllData} title="Failed to load calendar data" />
   }
 
   return (
     <div className="p-4 sm:p-6">
-      <BackgroundRefreshIndicator isValidating={isValidating} />
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-6">
         <div>
