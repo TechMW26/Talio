@@ -169,6 +169,24 @@ export async function POST(request) {
       )
     }
 
+    // Validate status value
+    const validStatuses = ['not-started', 'in-progress', 'on-hold', 'completed', 'cancelled']
+    if (status && !validStatuses.includes(status)) {
+      return NextResponse.json(
+        { success: false, message: `Invalid status. Allowed values: ${validStatuses.join(', ')}` },
+        { status: 400 }
+      )
+    }
+
+    // Validate priority value
+    const validPriorities = ['low', 'medium', 'high', 'critical']
+    if (priority && !validPriorities.includes(priority)) {
+      return NextResponse.json(
+        { success: false, message: `Invalid priority. Allowed values: ${validPriorities.join(', ')}` },
+        { status: 400 }
+      )
+    }
+
     const targetEmployee = await Employee.findById(employeeId).select('_id department')
     if (!targetEmployee) {
       return NextResponse.json(
@@ -218,8 +236,21 @@ export async function POST(request) {
 
   } catch (error) {
     console.error('Create performance goal error:', error)
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(e => e.message)
+      return NextResponse.json(
+        { success: false, message: messages.join('. ') },
+        { status: 400 }
+      )
+    }
+    if (error.name === 'CastError') {
+      return NextResponse.json(
+        { success: false, message: 'Invalid data format provided' },
+        { status: 400 }
+      )
+    }
     return NextResponse.json(
-      { success: false, message: error.message || 'Internal server error' },
+      { success: false, message: 'Something went wrong. Please try again.' },
       { status: 500 }
     )
   }
@@ -251,6 +282,15 @@ export async function PUT(request) {
       return NextResponse.json(
         { success: false, message: 'Goal not found' },
         { status: 404 }
+      )
+    }
+
+    // Validate status if being updated
+    const validStatuses = ['not-started', 'in-progress', 'on-hold', 'completed', 'cancelled']
+    if (updateData.status && !validStatuses.includes(updateData.status)) {
+      return NextResponse.json(
+        { success: false, message: `Invalid status. Allowed values: ${validStatuses.join(', ')}` },
+        { status: 400 }
       )
     }
 
@@ -299,8 +339,21 @@ export async function PUT(request) {
 
   } catch (error) {
     console.error('Update performance goal error:', error)
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(e => e.message)
+      return NextResponse.json(
+        { success: false, message: messages.join('. ') },
+        { status: 400 }
+      )
+    }
+    if (error.name === 'CastError') {
+      return NextResponse.json(
+        { success: false, message: 'Invalid data format provided' },
+        { status: 400 }
+      )
+    }
     return NextResponse.json(
-      { success: false, message: error.message || 'Internal server error' },
+      { success: false, message: 'Something went wrong. Please try again.' },
       { status: 500 }
     )
   }

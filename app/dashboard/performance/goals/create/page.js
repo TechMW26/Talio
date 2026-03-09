@@ -178,6 +178,7 @@ export default function CreateGoalPage() {
                 <SelectItem key="in-progress">In Progress</SelectItem>
                 <SelectItem key="on-hold">On Hold</SelectItem>
                 <SelectItem key="completed">Completed</SelectItem>
+                <SelectItem key="cancelled">Cancelled</SelectItem>
               </Select>
             </div>
           </div>
