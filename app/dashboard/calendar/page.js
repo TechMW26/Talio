@@ -169,7 +169,7 @@ export default function CalendarPage() {
     return days
   }, [currentMonth, holidays, birthdays, announcements])
 
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="p-4 sm:p-6">
         <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center gap-4 mb-6">
