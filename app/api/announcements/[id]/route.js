@@ -3,20 +3,94 @@ import { getAuthAndModels } from '@/lib/auth'
 import { sendPushToUsers } from '@/lib/pushNotification'
 import mongoose from 'mongoose'
 
-// PUT - Update announcement
+// GET - Get single announcement by ID and mark as read
+export async function GET(request, { params }) {
+  try {
+    const { id } = await params
+
+    const auth = await getAuthAndModels(request, ['Announcement', 'User', 'Employee'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { models } = auth
+    const { Announcement, User, Employee } = models
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { success: false, message: 'Invalid announcement ID format' },
+        { status: 400 }
+      )
+    }
+
+    const announcement = await Announcement.findById(id)
+      .populate('createdBy', 'firstName lastName profilePicture department designation')
+      .populate('departments', 'name')
+      .populate('targetDepartments', 'name')
+
+    if (!announcement) {
+      return NextResponse.json(
+        { success: false, message: 'Announcement not found' },
+        { status: 404 }
+      )
+    }
+
+    // Mark as read (add to views array if not already viewed)
+    try {
+      const userId = auth.user._id || auth.user.userId
+      const employee = await Employee.findOne({ userId }).select('_id')
+      if (employee) {
+        const alreadyViewed = announcement.views?.some(
+          v => v.employee?.toString() === employee._id.toString()
+        )
+        if (!alreadyViewed) {
+          await Announcement.findByIdAndUpdate(id, {
+            $push: { views: { employee: employee._id, viewedAt: new Date() } },
+            $inc: { 'engagement.totalViews': 1 }
+          })
+        }
+      }
+    } catch (viewErr) {
+      console.error('[Announcement GET] Error marking as read:', viewErr)
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: announcement,
+    })
+  } catch (error) {
+    console.error('[Announcement GET] Error:', error)
+    return NextResponse.json(
+      { success: false, message: 'Failed to fetch announcement' },
+      { status: 500 }
+    )
+  }
+}
+
+// PUT - Update announcement (Admin, HR, Manager, Department Head only)
 export async function PUT(request, { params }) {
   try {
+    const { id } = await params
+
     // Get authenticated user and tenant-specific models
-  const auth = await getAuthAndModels(request, ['Announcement', 'User', 'Notification'])
+    const auth = await getAuthAndModels(request, ['Announcement', 'User', 'Notification'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-  const { Announcement, User, Notification } = models
+    const { Announcement, User, Notification } = models
+
+    // Role-based access: only admin, hr, super_admin, manager, department_head can update
+    const allowedRoles = ['admin', 'hr', 'super_admin', 'manager', 'department_head']
+    if (!allowedRoles.includes(user.role)) {
+      return NextResponse.json(
+        { success: false, message: 'You do not have permission to update announcements' },
+        { status: 403 }
+      )
+    }
 
     const data = await request.json()
 
-    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
         { success: false, message: 'Invalid announcement ID format' },
         { status: 400 }
@@ -24,7 +98,7 @@ export async function PUT(request, { params }) {
     }
 
     const announcement = await Announcement.findByIdAndUpdate(
-      params.id,
+      id,
       data,
       { new: true, runValidators: true }
     ).populate('createdBy', 'firstName lastName')
@@ -52,7 +126,7 @@ export async function PUT(request, { params }) {
             url: '/dashboard/announcements',
             type: 'announcement_update',
             data: {
-              announcementId: announcement._id.toString()
+              announcementId: id.toString()
             },
             models: { User, Notification }
           }
@@ -78,25 +152,36 @@ export async function PUT(request, { params }) {
   }
 }
 
-// DELETE - Delete announcement
+// DELETE - Delete announcement (Admin, HR only)
 export async function DELETE(request, { params }) {
   try {
+    const { id } = await params
+
     // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Announcement'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { user, models } = auth
     const { Announcement } = models
 
-    if (!mongoose.Types.ObjectId.isValid(params.id)) {
+    // Role-based access: only admin, hr, super_admin can delete
+    const allowedRoles = ['admin', 'hr', 'super_admin']
+    if (!allowedRoles.includes(user.role)) {
+      return NextResponse.json(
+        { success: false, message: 'You do not have permission to delete announcements' },
+        { status: 403 }
+      )
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
       return NextResponse.json(
         { success: false, message: 'Invalid announcement ID format' },
         { status: 400 }
       )
     }
 
-    const announcement = await Announcement.findByIdAndDelete(params.id)
+    const announcement = await Announcement.findByIdAndDelete(id)
 
     if (!announcement) {
       return NextResponse.json(

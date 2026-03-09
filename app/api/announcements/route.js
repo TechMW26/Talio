@@ -16,6 +16,9 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url)
     const limit = parseInt(searchParams.get('limit')) || 50
+    const page = parseInt(searchParams.get('page')) || 1
+    const search = searchParams.get('search') || ''
+    const priority = searchParams.get('priority') || ''
     const status = searchParams.get('status') || 'published'
 
     // Get user info from auth to filter department announcements
@@ -63,16 +66,26 @@ export async function GET(request) {
             { expiryDate: { $gte: now } },
             { expiresAt: { $gte: now } },
           ]
-        }
+        },
+        // Search filter
+        ...(search ? [{ title: { $regex: search, $options: 'i' } }] : []),
+        // Priority filter
+        ...(priority ? [{ priority }] : []),
       ]
     }
 
-    const announcements = await Announcement.find(query)
-      .populate('createdBy', 'firstName lastName')
-      .populate('departments', 'name')
-      .populate('targetDepartments', 'name')
-      .sort({ createdAt: -1 })
-      .limit(limit)
+    const skip = (page - 1) * limit
+
+    const [announcements, totalCount] = await Promise.all([
+      Announcement.find(query)
+        .populate('createdBy', 'firstName lastName profilePicture')
+        .populate('departments', 'name')
+        .populate('targetDepartments', 'name')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      Announcement.countDocuments(query),
+    ])
 
     console.log('[Announcements GET] Total announcements found:', announcements.length)
 
@@ -109,9 +122,31 @@ export async function GET(request) {
 
     console.log('[Announcements GET] Filtered announcements:', filteredAnnouncements.length)
 
+    // Compute unread count for the current user
+    let unreadCount = 0
+    try {
+      const userId = auth.user._id || auth.user.userId
+      const employee = await Employee.findOne({ userId }).select('_id')
+      if (employee) {
+        const employeeIdStr = employee._id.toString()
+        unreadCount = filteredAnnouncements.filter(a => {
+          return !a.views?.some(v => v.employee?.toString() === employeeIdStr)
+        }).length
+      }
+    } catch (err) {
+      console.error('[Announcements GET] Error computing unread count:', err)
+    }
+
     return NextResponse.json({
       success: true,
       data: filteredAnnouncements,
+      unreadCount,
+      pagination: {
+        page,
+        limit,
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+      },
     })
   } catch (error) {
     console.error('[Announcements GET] Error:', error)
@@ -122,7 +157,7 @@ export async function GET(request) {
   }
 }
 
-// POST - Create announcement
+// POST - Create announcement (Admin, HR, Manager, Department Head only)
 export async function POST(request) {
   try {
     // Get authenticated user and tenant-specific models
@@ -132,6 +167,15 @@ export async function POST(request) {
     }
     const { user, models } = auth
     const { Announcement, User, Employee, Notification } = models
+
+    // Role-based access: only admin, hr, super_admin, manager, department_head can create
+    const allowedRoles = ['admin', 'hr', 'super_admin', 'manager', 'department_head']
+    if (!allowedRoles.includes(user.role)) {
+      return NextResponse.json(
+        { success: false, message: 'You do not have permission to create announcements' },
+        { status: 403 }
+      )
+    }
 
     const data = await request.json()
 
