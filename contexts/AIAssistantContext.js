@@ -28,58 +28,58 @@ const ERROR_PATTERNS = [
 const QUICK_TIPS = {
   auth: [
     'Double-check your email for typos',
-    'Make sure Caps Lock is turned off',
-    'Try using "Forgot Password" to reset',
+    'Ensure Caps Lock is turned off',
+    'Use "Forgot Password" to reset your credentials',
   ],
   session: [
-    'Your session has expired for security',
-    'Simply log in again to continue',
-    'This is normal after being inactive',
+    'Log in again — your session refreshes automatically',
+    'This is normal after a period of inactivity',
+    'Your data is safe, just sign back in',
   ],
   permission: [
-    'You may not have access to this feature',
-    'Contact your administrator for permissions',
-    'Some features are role-restricted',
+    'Reach out to your administrator for access',
+    'Some features are available for specific roles',
+    'Check if this feature is enabled for your team',
   ],
   network: [
     'Check your internet connection',
-    'Try refreshing the page',
-    'Wait a moment and try again',
+    'Refresh the page and try again',
+    'Wait a moment, then retry',
   ],
   location: [
-    'Enable location access in your browser',
-    'Make sure GPS is turned on',
-    'Move to an area with better signal',
+    'Open browser settings and allow location access for Talio',
+    'Ensure device location services are turned on',
+    'Move to an area with a clearer GPS signal',
   ],
   attendance: [
-    'Make sure you are within the office geofence',
-    'Check if you have already checked in/out',
-    'Try refreshing the page and retry',
+    'Make sure you are within the office geofence area',
+    'Check if you have already checked in or out today',
+    'Refresh the page and try again',
   ],
   leave: [
-    'Check your remaining leave balance',
-    'Contact HR for leave adjustments',
-    'Try a different leave type',
+    'Review your remaining leave balance in the Leave section',
+    'Reach out to HR if you need a leave adjustment',
+    'Try selecting a different leave type',
   ],
   upload: [
-    'Check file size (usually max 5-10 MB)',
-    'Use supported formats (PDF, JPG, PNG)',
-    'Try compressing the file first',
+    'Ensure your file is under the size limit (5–10 MB)',
+    'Use supported formats: PDF, JPG, or PNG',
+    'Try compressing the file and re-uploading',
   ],
   navigation: [
-    'The page may have been moved or removed',
-    'Check the URL for typos',
-    'Go back to the dashboard and navigate again',
+    'The page may have been moved or is no longer available',
+    'Check the URL for any typos',
+    'Head back to the Dashboard and navigate from there',
   ],
   server: [
-    'This is a temporary server issue',
-    'Wait a moment and try again',
-    'If persistent, contact your administrator',
+    'This is a temporary service interruption',
+    'Wait a moment and try your action again',
+    'If it persists, reach out to your administrator',
   ],
   account: [
-    'Your account may have been disabled',
-    'Contact your HR or administrator',
-    'This cannot be self-resolved',
+    'Contact your HR or administrator for account help',
+    'Your account status may need to be reviewed',
+    'This usually requires admin assistance to resolve',
   ],
 }
 
@@ -100,6 +100,7 @@ export function AIAssistantProvider({ children }) {
   const [aiResponse, setAiResponse] = useState('')
   const [isAiLoading, setIsAiLoading] = useState(false)
   const [conversationHistory, setConversationHistory] = useState([])
+  const [isSolutionProvided, setIsSolutionProvided] = useState(false)
   const [errorLog, setErrorLog] = useState([])
   const cooldownRef = useRef(false)
 
@@ -127,6 +128,7 @@ export function AIAssistantProvider({ children }) {
       setErrorContext(entry)
       setAiResponse('')
       setConversationHistory([])
+      setIsSolutionProvided(false)
       setIsOpen(true)
 
       // Auto-fetch AI guidance
@@ -164,6 +166,8 @@ export function AIAssistantProvider({ children }) {
         } else {
           setConversationHistory([{ role: 'assistant', content: data.response }])
         }
+        // Disable further input once a tangible solution is provided
+        setIsSolutionProvided(true)
       } else {
         setAiResponse('I\'m having trouble connecting right now. Please try the quick tips above or contact your administrator.')
       }
@@ -186,6 +190,7 @@ export function AIAssistantProvider({ children }) {
     setClassification(null)
     setAiResponse('')
     setConversationHistory([])
+    setIsSolutionProvided(false)
     setIsOpen(true)
     if (question) {
       fetchAIHelp(null, [], question)
@@ -205,6 +210,7 @@ export function AIAssistantProvider({ children }) {
         aiResponse,
         isAiLoading,
         conversationHistory,
+        isSolutionProvided,
         errorLog,
         interceptError,
         askQuestion,

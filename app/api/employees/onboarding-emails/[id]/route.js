@@ -30,7 +30,7 @@ export async function POST(request, { params }) {
     const emailLog = await OnboardingEmail.findById(id)
     
     if (!emailLog) {
-      return NextResponse.json({ success: false, message: 'Email not found' }, { status: 404 })
+      return NextResponse.json({ success: false, message: 'Incorrect Email Address !' }, { status: 404 })
     }
     
     // Retry sending the email - pass tenant models for multi-tenant support
@@ -82,7 +82,7 @@ export async function GET(request, { params }) {
       .lean()
     
     if (!email) {
-      return NextResponse.json({ success: false, message: 'Email not found' }, { status: 404 })
+      return NextResponse.json({ success: false, message: 'Incorrect Email Address !' }, { status: 404 })
     }
     
     return NextResponse.json({

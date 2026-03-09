@@ -285,7 +285,7 @@ export default function LoginPage() {
     switch (loginError.errorType) {
       case 'email_not_found':
         return {
-          title: 'Email Not Found',
+          title: 'Incorrect Email Address !',
           icon: '📧',
           description: loginError.message,
           suggestion: 'Please double-check your email address and try again.',

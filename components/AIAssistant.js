@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import {
   Modal,
   ModalContent,
@@ -11,23 +11,61 @@ import {
   Input,
   Spinner,
   Chip,
-  Divider,
 } from '@heroui/react'
-import { FaPaperPlane, FaLightbulb, FaRobot, FaTimesCircle, FaInfoCircle, FaRedoAlt } from 'react-icons/fa'
+import { FaPaperPlane, FaRobot, FaInfoCircle, FaCheckCircle, FaHeadset } from 'react-icons/fa'
 import { useAIAssistant } from '@/contexts/AIAssistantContext'
+import { useRouter } from 'next/navigation'
 
 const CATEGORY_META = {
-  auth: { label: 'Login Issue', color: 'danger', icon: '🔐' },
-  session: { label: 'Session Issue', color: 'warning', icon: '⏱️' },
-  permission: { label: 'Access Issue', color: 'warning', icon: '🚫' },
-  network: { label: 'Connection Issue', color: 'default', icon: '🌐' },
-  location: { label: 'Location Issue', color: 'secondary', icon: '📍' },
-  attendance: { label: 'Attendance Issue', color: 'primary', icon: '📋' },
-  leave: { label: 'Leave Issue', color: 'success', icon: '🏖️' },
-  upload: { label: 'Upload Issue', color: 'warning', icon: '📁' },
-  navigation: { label: 'Page Not Found', color: 'default', icon: '🔍' },
-  server: { label: 'Server Issue', color: 'danger', icon: '🖥️' },
-  account: { label: 'Account Issue', color: 'danger', icon: '👤' },
+  auth: { label: 'Login Help', color: 'primary', icon: '🔐' },
+  session: { label: 'Session Help', color: 'warning', icon: '⏱️' },
+  permission: { label: 'Access Help', color: 'secondary', icon: '🛡️' },
+  network: { label: 'Connectivity', color: 'default', icon: '🌐' },
+  location: { label: 'Location Setup', color: 'secondary', icon: '📍' },
+  attendance: { label: 'Attendance Help', color: 'primary', icon: '📋' },
+  leave: { label: 'Leave Guide', color: 'success', icon: '🏖️' },
+  upload: { label: 'Upload Guide', color: 'warning', icon: '📁' },
+  navigation: { label: 'Navigation', color: 'default', icon: '🔍' },
+  server: { label: 'Service Status', color: 'warning', icon: '🖥️' },
+  account: { label: 'Account Help', color: 'primary', icon: '👤' },
+}
+
+// Render formatted AI response with bold, numbered lists, etc.
+function FormattedMessage({ content }) {
+  const parts = useMemo(() => {
+    if (!content) return []
+    return content.split('\n').map((line, i) => {
+      // Bold text: **text**
+      const boldParsed = line.split(/\*\*(.*?)\*\*/g).map((segment, j) =>
+        j % 2 === 1 ? <strong key={j}>{segment}</strong> : segment
+      )
+      // Numbered list
+      const numberedMatch = line.match(/^(\d+)\.\s+(.*)/)
+      if (numberedMatch) {
+        return (
+          <div key={i} className="flex items-start gap-2.5 py-1">
+            <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary-100 dark:bg-primary-900/40 flex items-center justify-center text-[11px] font-bold text-primary-600 dark:text-primary-400 mt-0.5">
+              {numberedMatch[1]}
+            </span>
+            <span className="flex-1">{boldParsed}</span>
+          </div>
+        )
+      }
+      // Bullet list
+      if (line.match(/^[-•]\s+/)) {
+        return (
+          <div key={i} className="flex items-start gap-2 py-0.5 pl-1">
+            <span className="text-primary-400 mt-1.5 text-[6px]">●</span>
+            <span className="flex-1">{boldParsed}</span>
+          </div>
+        )
+      }
+      if (line.trim() === '') return <div key={i} className="h-2" />
+      return <p key={i} className="py-0.5">{boldParsed}</p>
+    })
+  }, [content])
+
+  return <div className="text-sm leading-relaxed">{parts}</div>
 }
 
 export default function AIAssistant() {
@@ -38,13 +76,17 @@ export default function AIAssistant() {
     aiResponse,
     isAiLoading,
     conversationHistory,
+    isSolutionProvided,
     askQuestion,
     closeAssistant,
   } = useAIAssistant()
 
+  const router = useRouter()
   const [userInput, setUserInput] = useState('')
   const chatEndRef = useRef(null)
   const inputRef = useRef(null)
+
+  const chatDisabled = isSolutionProvided || isAiLoading
 
   // Scroll to bottom when new messages appear
   useEffect(() => {
@@ -63,7 +105,7 @@ export default function AIAssistant() {
   }, [isOpen])
 
   const handleSend = () => {
-    if (!userInput.trim() || isAiLoading) return
+    if (!userInput.trim() || chatDisabled) return
     askQuestion(userInput)
     setUserInput('')
   }
@@ -73,6 +115,11 @@ export default function AIAssistant() {
       e.preventDefault()
       handleSend()
     }
+  }
+
+  const handleContactSupport = () => {
+    closeAssistant()
+    router.push('/dashboard/helpdesk')
   }
 
   const meta = classification ? CATEGORY_META[classification.category] || {} : {}
@@ -86,11 +133,11 @@ export default function AIAssistant() {
       size="2xl"
       scrollBehavior="inside"
       classNames={{
-        base: 'border border-gray-200 dark:border-slate-600 max-h-[85vh] bg-white dark:bg-[#1a1f2e]',
-        header: 'border-b border-gray-200 dark:border-slate-600 pb-3',
+        base: 'border border-gray-200 dark:border-slate-600 max-h-[85vh] bg-white dark:bg-[#1a1f2e] rounded-2xl overflow-hidden',
+        header: 'border-b border-gray-200 dark:border-slate-600 pb-3 rounded-t-2xl',
         footer: 'border-t border-gray-200 dark:border-slate-600 pt-3',
         body: 'py-4',
-        closeButton: 'text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700',
+        closeButton: 'text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 top-3 right-3',
       }}
     >
       <ModalContent>
@@ -101,7 +148,7 @@ export default function AIAssistant() {
                 <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900/40 dark:to-primary-800/40 rounded-xl">
                   <FaRobot className="text-primary-600 dark:text-primary-400 text-lg" />
                 </div>
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                   <h3 className="text-lg font-bold text-gray-900 dark:text-white">MIRA Assistant</h3>
                   <p className="text-xs text-gray-500 dark:text-gray-400">AI-powered help for Talio</p>
                 </div>
@@ -111,6 +158,7 @@ export default function AIAssistant() {
                     variant="flat"
                     size="sm"
                     startContent={<span className="text-sm ml-1">{meta.icon}</span>}
+                    className="flex-shrink-0"
                   >
                     {meta.label}
                   </Chip>
@@ -119,48 +167,45 @@ export default function AIAssistant() {
             </ModalHeader>
 
             <ModalBody>
-              {/* Error Context Banner */}
+              {/* Guidance Context Banner — friendly, non-alarming */}
               {errorContext && (
-                <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-700/50 rounded-xl p-4 mb-4">
+                <div className="bg-primary-50 dark:bg-primary-900/15 border border-primary-200 dark:border-primary-700/40 rounded-xl p-4 mb-4">
                   <div className="flex items-start gap-3">
-                    <FaTimesCircle className="text-red-500 dark:text-red-400 mt-0.5 flex-shrink-0 text-lg" />
-                    <div>
-                      <p className="text-sm font-bold text-red-700 dark:text-red-300">Error Detected</p>
-                      <p className="text-sm font-medium text-red-600 dark:text-red-200 mt-1">
+                    <FaInfoCircle className="text-primary-500 dark:text-primary-400 mt-0.5 flex-shrink-0 text-base" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-primary-700 dark:text-primary-300">
+                        MIRA noticed something that needs your attention
+                      </p>
+                      <p className="text-sm text-primary-600/80 dark:text-primary-200/80 mt-1">
                         {errorContext.message}
                       </p>
-                      {errorContext.page && (
-                        <p className="text-xs text-red-500 dark:text-red-400/70 mt-1">
-                          Page: {errorContext.page}
-                        </p>
-                      )}
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Quick Tips */}
+              {/* Actionable Steps */}
               {classification && classification.tips.length > 0 && (
-                <div className="bg-amber-50 dark:bg-amber-900/15 border border-amber-300 dark:border-amber-700/40 rounded-xl p-4 mb-4">
-                  <div className="flex items-center gap-2 mb-2.5">
-                    <FaLightbulb className="text-amber-500 dark:text-amber-400" />
-                    <span className="text-sm font-bold text-amber-700 dark:text-amber-300">Quick Tips</span>
+                <div className="bg-gray-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700/60 rounded-xl p-4 mb-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <FaCheckCircle className="text-primary-500 dark:text-primary-400 text-sm" />
+                    <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">Try these steps</span>
                   </div>
-                  <ul className="space-y-1.5">
+                  <div className="space-y-2">
                     {classification.tips.map((tip, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm text-amber-800 dark:text-amber-200">
-                        <span className="text-amber-500 dark:text-amber-400 mt-0.5">•</span>
-                        {tip}
-                      </li>
+                      <div key={i} className="flex items-start gap-2.5">
+                        <span className="flex-shrink-0 w-5 h-5 rounded-full bg-primary-100 dark:bg-primary-900/40 flex items-center justify-center text-[11px] font-bold text-primary-600 dark:text-primary-400 mt-0.5">
+                          {i + 1}
+                        </span>
+                        <span className="text-sm text-gray-700 dark:text-gray-300">{tip}</span>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 </div>
               )}
 
-              <Divider className="my-2" />
-
               {/* AI Response / Conversation */}
-              <div className="space-y-4 min-h-[100px]">
+              <div className="space-y-3 min-h-[80px]">
                 {/* Show conversation history */}
                 {conversationHistory.length > 0 ? (
                   conversationHistory.map((msg, i) => (
@@ -169,30 +214,34 @@ export default function AIAssistant() {
                       className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
                       <div
-                        className={`max-w-[85%] rounded-xl px-4 py-3 ${
+                        className={`max-w-[85%] px-4 py-3 ${
                           msg.role === 'user'
-                            ? 'bg-primary-500 text-white'
-                            : 'bg-gray-100 dark:bg-slate-700/80 text-gray-800 dark:text-gray-100'
+                            ? 'bg-primary-500 text-white rounded-2xl rounded-br-md'
+                            : 'bg-gray-100 dark:bg-slate-700/80 text-gray-800 dark:text-gray-100 rounded-2xl rounded-bl-md'
                         }`}
                       >
                         {msg.role === 'assistant' && (
-                          <div className="flex items-center gap-1.5 mb-1.5">
+                          <div className="flex items-center gap-1.5 mb-2">
                             <FaRobot className="text-primary-500 dark:text-primary-400 text-xs" />
                             <span className="text-xs font-semibold text-primary-600 dark:text-primary-400">MIRA</span>
                           </div>
                         )}
-                        <div className="text-sm leading-relaxed whitespace-pre-wrap">{msg.content}</div>
+                        {msg.role === 'assistant' ? (
+                          <FormattedMessage content={msg.content} />
+                        ) : (
+                          <div className="text-sm leading-relaxed">{msg.content}</div>
+                        )}
                       </div>
                     </div>
                   ))
                 ) : aiResponse ? (
                   <div className="flex justify-start">
-                    <div className="max-w-[85%] rounded-xl px-4 py-3 bg-gray-100 dark:bg-slate-700/80 text-gray-800 dark:text-gray-100">
-                      <div className="flex items-center gap-1.5 mb-1.5">
+                    <div className="max-w-[85%] rounded-2xl rounded-bl-md px-4 py-3 bg-gray-100 dark:bg-slate-700/80 text-gray-800 dark:text-gray-100">
+                      <div className="flex items-center gap-1.5 mb-2">
                         <FaRobot className="text-primary-500 dark:text-primary-400 text-xs" />
                         <span className="text-xs font-semibold text-primary-600 dark:text-primary-400">MIRA</span>
                       </div>
-                      <div className="text-sm leading-relaxed whitespace-pre-wrap">{aiResponse}</div>
+                      <FormattedMessage content={aiResponse} />
                     </div>
                   </div>
                 ) : null}
@@ -200,10 +249,10 @@ export default function AIAssistant() {
                 {/* Loading indicator */}
                 {isAiLoading && (
                   <div className="flex justify-start">
-                    <div className="rounded-xl px-4 py-3 bg-gray-100 dark:bg-slate-700/80">
+                    <div className="rounded-2xl rounded-bl-md px-4 py-3 bg-gray-100 dark:bg-slate-700/80">
                       <div className="flex items-center gap-2">
                         <Spinner size="sm" color="primary" />
-                        <span className="text-sm text-gray-600 dark:text-gray-300">MIRA is thinking...</span>
+                        <span className="text-sm text-gray-600 dark:text-gray-300">MIRA is looking into this...</span>
                       </div>
                     </div>
                   </div>
@@ -222,34 +271,53 @@ export default function AIAssistant() {
             </ModalBody>
 
             <ModalFooter>
-              <div className="flex w-full gap-2">
-                <Input
-                  ref={inputRef}
-                  placeholder="Ask MIRA anything about Talio..."
-                  value={userInput}
-                  onChange={(e) => setUserInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  variant="bordered"
-                  radius="lg"
-                  size="md"
-                  isDisabled={isAiLoading}
-                  classNames={{
-                    inputWrapper: 'bg-gray-50 dark:bg-slate-700/60 border-gray-300 dark:border-slate-600',
-                    input: 'text-sm text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500',
-                  }}
-                  startContent={<FaRobot className="text-gray-400 dark:text-gray-500 text-sm" />}
-                />
-                <Button
-                  color="primary"
-                  radius="lg"
-                  isIconOnly
-                  isDisabled={!userInput.trim() || isAiLoading}
-                  onPress={handleSend}
-                  className="min-w-[44px]"
-                >
-                  <FaPaperPlane className="text-sm" />
-                </Button>
-              </div>
+              {isSolutionProvided ? (
+                <div className="flex flex-col w-full gap-2.5">
+                  <p className="text-xs text-center text-gray-500 dark:text-gray-400">
+                    Hope that helped! If you still need assistance:
+                  </p>
+                  <Button
+                    color="primary"
+                    variant="flat"
+                    radius="lg"
+                    fullWidth
+                    onPress={handleContactSupport}
+                    startContent={<FaHeadset className="text-sm" />}
+                    className="font-medium"
+                  >
+                    Contact Support
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex w-full gap-2">
+                  <Input
+                    ref={inputRef}
+                    placeholder="Ask MIRA anything about Talio..."
+                    value={userInput}
+                    onChange={(e) => setUserInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    variant="bordered"
+                    radius="lg"
+                    size="md"
+                    isDisabled={chatDisabled}
+                    classNames={{
+                      inputWrapper: 'bg-gray-50 dark:bg-slate-700/60 border-gray-300 dark:border-slate-600',
+                      input: 'text-sm text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500',
+                    }}
+                    startContent={<FaRobot className="text-gray-400 dark:text-gray-500 text-sm" />}
+                  />
+                  <Button
+                    color="primary"
+                    radius="lg"
+                    isIconOnly
+                    isDisabled={!userInput.trim() || chatDisabled}
+                    onPress={handleSend}
+                    className="min-w-[44px]"
+                  >
+                    <FaPaperPlane className="text-sm" />
+                  </Button>
+                </div>
+              )}
             </ModalFooter>
           </>
         )}
