@@ -291,12 +291,12 @@ export async function PUT(request, { params }) {
 export async function DELETE(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'ProjectTimelineEvent', 'Task', 'Chat', 'Message', 'ProjectNote'])
+    const auth = await getAuthAndModels(request, ['Project', 'ProjectMember', 'ProjectTimelineEvent', 'Task', 'Chat', 'ProjectNote'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Project, ProjectMember, ProjectTimelineEvent, Task, Chat, Message, ProjectNote } = models
+    const { Project, ProjectMember, ProjectTimelineEvent, Task, Chat, ProjectNote } = models
 
     const { projectId } = await params
 
@@ -322,12 +322,9 @@ export async function DELETE(request, { params }) {
       }, { status: 403 })
     }
 
-    // Delete associated chat group and messages
+    // Delete associated chat group (messages are embedded subdocuments, deleted with the chat)
     if (project.chatGroup) {
       try {
-        // Delete all messages in the chat
-        await Message.deleteMany({ chat: project.chatGroup })
-        // Delete the chat group
         await Chat.findByIdAndDelete(project.chatGroup)
         console.log(`Deleted chat group ${project.chatGroup} for project ${projectId}`)
       } catch (chatErr) {
