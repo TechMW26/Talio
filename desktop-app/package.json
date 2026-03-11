@@ -1,6 +1,6 @@
 {
   "name": "talio-desktop",
-  "version": "3.3.0",
+  "version": "4.3.0",
   "description": "Talio HRMS Desktop - Productivity Monitoring with Screen Capture",
   "main": "src/main.js",
   "author": "MW FutureTech <support@talio.in>",
@@ -23,6 +23,7 @@
   "dependencies": {
     "auto-launch": "^5.0.6",
     "electron-store": "^8.1.0",
+    "electron-updater": "^6.8.3",
     "form-data": "^4.0.0",
     "node-fetch": "^2.7.0",
     "socket.io-client": "^4.7.4"
@@ -44,6 +45,11 @@
     "files": [
       "src/**/*",
       "build/icon.png",
+      "build/icon-256.png",
+      "build/icon.ico",
+      "build/icon.icns",
+      "build/trayIconTemplate.png",
+      "build/trayIconTemplate@2x.png",
       "package.json"
     ],
     "mac": {

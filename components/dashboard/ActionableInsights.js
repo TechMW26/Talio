@@ -102,7 +102,7 @@ function TicTacToeCard() {
             className="w-full pl-8 pr-3 py-1.5 rounded-lg text-xs bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-400 text-gray-800 dark:text-gray-200"
           />
         </div>
-        <div className="flex-1 overflow-y-auto max-h-[140px] space-y-1">
+        <div className="flex-1 overflow-y-auto space-y-1">
           {searching && <p className="text-[10px] text-gray-400 text-center py-2">Searching...</p>}
           {!searching && searchResults.length === 0 && searchQuery && (
             <p className="text-[10px] text-gray-400 text-center py-2">No users found</p>

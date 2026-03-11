@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Welcome to Talio</title>
+  <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary-50: #EFF6FF;
+      --primary-100: #DBEAFE;
+      --primary-200: #BFDBFE;
+      --primary-300: #93C5FD;
+      --primary-400: #60A5FA;
+      --primary-500: #3B82F6;
+      --primary-600: #2563EB;
+      --primary-700: #1D4ED8;
+      --primary-800: #1E40AF;
+      --primary-900: #1E3A8A;
+      --talio-teal: #7DBCAF;
+      --talio-teal-dark: #5FA899;
+      --bg-main: #F8FAFC;
+      --bg-card: #FFFFFF;
+      --text-primary: #0F172A;
+      --text-secondary: #475569;
+      --text-muted: #94A3B8;
+      --success: #10B981;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+      --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
+      --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
+      --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Raleway', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg-main);
+      height: 100vh;
+      overflow: hidden;
+      color: var(--text-primary);
+      -webkit-app-region: drag;
+      user-select: none;
+    }
+
+    .welcome-wrapper {
+      display: flex;
+      height: 100vh;
+    }
+
+    /* Left panel - decorative */
+    .left-panel {
+      width: 38%;
+      background: linear-gradient(160deg, #1E3A8A 0%, #2563EB 40%, #3B82F6 70%, #60A5FA 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .left-panel::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -50%;
+      width: 100%;
+      height: 200%;
+      background: radial-gradient(ellipse, rgba(255,255,255,0.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .left-panel::after {
+      content: '';
+      position: absolute;
+      bottom: -30%;
+      left: -30%;
+      width: 80%;
+      height: 80%;
+      background: radial-gradient(ellipse, rgba(125,188,175,0.15) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    /* Floating shapes */
+    .shape {
+      position: absolute;
+      border-radius: 50%;
+      opacity: 0.06;
+      background: white;
+    }
+    .shape-1 { width: 300px; height: 300px; top: -80px; right: -80px; }
+    .shape-2 { width: 200px; height: 200px; bottom: -40px; left: -60px; }
+    .shape-3 { width: 100px; height: 100px; top: 40%; left: 10%; }
+    .shape-4 { width: 60px; height: 60px; bottom: 20%; right: 15%; opacity: 0.1; }
+
+    .left-content {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding: 40px;
+    }
+
+    .logo-container {
+      width: 100px;
+      height: 100px;
+      margin: 0 auto 28px;
+      animation: logoEntrance 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }
+
+    @keyframes logoEntrance {
+      from { opacity: 0; transform: scale(0.5) rotate(-10deg); }
+      to { opacity: 1; transform: scale(1) rotate(0deg); }
+    }
+
+    .logo-container svg {
+      width: 100%;
+      height: 100%;
+      filter: drop-shadow(0 4px 12px rgba(0,0,0,0.2));
+    }
+
+    .brand-name {
+      font-size: 36px;
+      font-weight: 800;
+      color: white;
+      letter-spacing: 2px;
+      margin-bottom: 8px;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      animation: fadeUp 0.6s 0.2s both;
+    }
+
+    .brand-tagline {
+      font-size: 14px;
+      font-weight: 400;
+      color: rgba(255,255,255,0.7);
+      letter-spacing: 1px;
+      animation: fadeUp 0.6s 0.35s both;
+    }
+
+    .version-badge {
+      display: inline-block;
+      margin-top: 24px;
+      padding: 5px 14px;
+      border-radius: 20px;
+      background: rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.8);
+      font-size: 12px;
+      font-weight: 600;
+      border: 1px solid rgba(255,255,255,0.15);
+      backdrop-filter: blur(4px);
+      animation: fadeUp 0.6s 0.5s both;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Right panel - content */
+    .right-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      -webkit-app-region: no-drag;
+    }
+
+    /* Slides container */
+    .slides-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .slide {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 48px 56px;
+      opacity: 0;
+      transform: translateX(60px);
+      transition: all 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+      pointer-events: none;
+    }
+
+    .slide.active {
+      opacity: 1;
+      transform: translateX(0);
+      pointer-events: auto;
+    }
+
+    .slide.exit-left {
+      opacity: 0;
+      transform: translateX(-60px);
+    }
+
+    .slide-icon {
+      width: 72px;
+      height: 72px;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 28px;
+      font-size: 32px;
+    }
+
+    .slide-icon.blue { background: linear-gradient(135deg, #DBEAFE, #BFDBFE); }
+    .slide-icon.teal { background: linear-gradient(135deg, #D1FAE5, #A7F3D0); }
+    .slide-icon.purple { background: linear-gradient(135deg, #EDE9FE, #DDD6FE); }
+    .slide-icon.amber { background: linear-gradient(135deg, #FEF3C7, #FDE68A); }
+
+    .slide h2 {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 12px;
+      text-align: center;
+      line-height: 1.3;
+    }
+
+    .slide p.subtitle {
+      font-size: 15px;
+      color: var(--text-secondary);
+      text-align: center;
+      line-height: 1.6;
+      max-width: 400px;
+      margin-bottom: 32px;
+    }
+
+    /* Feature grid */
+    .features-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      width: 100%;
+      max-width: 440px;
+    }
+
+    .feature-card {
+      background: var(--bg-card);
+      border: 1px solid #E2E8F0;
+      border-radius: 14px;
+      padding: 18px 16px;
+      transition: all 0.2s ease;
+    }
+
+    .feature-card:hover {
+      border-color: var(--primary-300);
+      box-shadow: var(--shadow-md);
+      transform: translateY(-1px);
+    }
+
+    .feature-card .fc-icon {
+      font-size: 22px;
+      margin-bottom: 8px;
+    }
+
+    .feature-card h4 {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .feature-card span {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      line-height: 1.4;
+      display: block;
+    }
+
+    /* Permission items */
+    .permissions-list {
+      width: 100%;
+      max-width: 400px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .perm-item {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 16px 18px;
+      background: var(--bg-card);
+      border: 1px solid #E2E8F0;
+      border-radius: 14px;
+      transition: all 0.2s ease;
+    }
+
+    .perm-item:hover {
+      border-color: var(--primary-200);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .perm-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .perm-icon.blue { background: #DBEAFE; }
+    .perm-icon.green { background: #D1FAE5; }
+    .perm-icon.purple { background: #EDE9FE; }
+
+    .perm-text h4 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 2px;
+    }
+
+    .perm-text span {
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* Final slide */
+    .ready-check {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #D1FAE5, #A7F3D0);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 28px;
+      animation: scaleIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }
+
+    @keyframes scaleIn {
+      from { opacity: 0; transform: scale(0.3); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    .ready-check svg {
+      width: 36px;
+      height: 36px;
+      stroke: #059669;
+      stroke-width: 3;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .ready-check svg path {
+      stroke-dasharray: 40;
+      stroke-dashoffset: 40;
+      animation: drawCheck 0.5s 0.3s forwards;
+    }
+
+    @keyframes drawCheck {
+      to { stroke-dashoffset: 0; }
+    }
+
+    /* Bottom bar */
+    .bottom-bar {
+      padding: 20px 56px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-top: 1px solid #F1F5F9;
+      -webkit-app-region: no-drag;
+    }
+
+    /* Dots indicator */
+    .dots {
+      display: flex;
+      gap: 8px;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #E2E8F0;
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+
+    .dot.active {
+      background: var(--primary-500);
+      width: 24px;
+      border-radius: 4px;
+    }
+
+    /* Buttons */
+    .btn-group {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      padding: 10px 22px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s ease;
+      font-family: inherit;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text-muted);
+    }
+
+    .btn-ghost:hover {
+      color: var(--text-secondary);
+      background: #F1F5F9;
+    }
+
+    .btn-primary {
+      background: var(--primary-500);
+      color: white;
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25);
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-600);
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    .btn-success {
+      background: linear-gradient(135deg, #059669, #10B981);
+      color: white;
+      padding: 12px 32px;
+      font-size: 15px;
+      box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+    }
+
+    .btn-success:hover {
+      box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4);
+      transform: translateY(-1px);
+    }
+
+    .btn-success:active {
+      transform: translateY(0);
+    }
+
+    .btn svg {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      stroke-width: 2;
+      fill: none;
+    }
+
+    /* Skip button hidden on last slide */
+    .hide { display: none; }
+
+    /* Responsive for smaller windows */
+    @media (max-height: 620px) {
+      .slide { padding: 28px 40px; }
+      .slide-icon { width: 56px; height: 56px; margin-bottom: 18px; font-size: 26px; }
+      .slide h2 { font-size: 22px; margin-bottom: 8px; }
+      .slide p.subtitle { font-size: 13px; margin-bottom: 20px; }
+      .feature-card { padding: 12px; }
+      .perm-item { padding: 12px 14px; }
+      .bottom-bar { padding: 14px 40px 20px; }
+      .left-panel { width: 34%; }
+      .brand-name { font-size: 30px; }
+      .logo-container { width: 76px; height: 76px; margin-bottom: 20px; }
+    }
+
+    @media (max-width: 780px) {
+      .left-panel { display: none; }
+      .slide { padding: 36px 32px; }
+      .bottom-bar { padding: 16px 32px 24px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="welcome-wrapper">
+    <!-- Left decorative panel -->
+    <div class="left-panel">
+      <div class="shape shape-1"></div>
+      <div class="shape shape-2"></div>
+      <div class="shape shape-3"></div>
+      <div class="shape shape-4"></div>
+      <div class="left-content">
+        <div class="logo-container">
+          <svg viewBox="0 0 385.322 416.819" xmlns="http://www.w3.org/2000/svg">
+            <path fill="white" d="M218.185 401.899C213.175 405.409 205.665 410.209 201.505 412.549L193.935 416.819L189.125 414.309C160.555 399.389 135.805 375.379 112.155 339.649L106.765 331.509L110.285 328.509C112.225 326.859 113.805 325.139 113.805 324.689C113.805 322.859 101.875 311.469 95.305 307.029C83.255 298.879 72.455 294.379 59.375 292.059C52.495 290.839 35.495 290.769 28.465 291.919C24.655 292.549 23.515 292.419 23.075 291.279C22.235 289.079 24.635 267.739 26.945 257.059C31.605 235.419 41.995 208.849 51.455 194.429C52.745 192.449 52.255 191.349 44.945 179.899C27.095 151.939 14.145 121.479 6.915 90.5085C0.754998 64.0785 -1.615 31.4185 1.135 10.6085C1.975 4.23853 2.785 1.40853 4.005 0.64853C9.065 -2.52147 39.985 6.51853 62.255 17.6785C96.355 34.7685 124.205 56.0885 158.125 91.0885L176.465 110.009H193.385L210.305 109.999L221.305 98.0185C243.725 73.5985 270.475 50.6185 296.315 33.5885C303.725 28.6985 308.245 26.0985 322.805 18.3585C332.255 13.3285 353.105 4.88853 360.805 2.98853C376.165 -0.81147 380.135 -0.93147 382.265 2.30853C384.815 6.19853 386.105 27.2385 384.815 44.0085C381.675 84.8885 371.875 119.939 353.105 157.399C347.505 168.569 346.875 169.669 337.885 183.689L332.645 191.859L336.055 197.189C349.295 217.879 360.175 252.099 362.705 281.009C363.735 292.799 363.335 293.439 355.875 292.019C343.145 289.609 323.715 291.709 310.075 296.969C297.415 301.849 282.845 312.119 275.595 321.269L272.465 325.229L276.225 328.379L279.975 331.529L273.795 340.949C257.305 366.049 235.945 389.469 218.185 401.899ZM67.095 162.839L71.135 169.159L75.225 164.359C81.485 156.999 95.305 143.529 104.325 135.999C113.865 128.029 133.585 113.029 135.485 112.299C136.215 112.019 136.805 111.429 136.805 110.979C136.805 108.299 114.365 87.1485 95.305 71.8585C79.025 58.7985 49.815 41.4285 35.925 36.5485C35.665 36.4485 35.405 36.3585 35.155 36.2685C32.345 35.2785 30.705 34.6985 29.805 35.2785C28.535 36.0685 28.685 39.0985 29.035 46.3285C29.065 46.7885 29.085 47.2685 29.105 47.7585C30.865 84.3585 45.725 129.349 67.095 162.839ZM311.415 164.889L314.195 168.259L316.245 165.679C319.605 161.459 329.665 142.809 334.825 131.259C341.895 115.409 346.765 101.229 350.355 86.0085C351.205 82.4385 352.325 77.7085 352.845 75.5085C353.375 73.3085 354.015 70.1585 354.275 68.5085C356.185 56.2785 356.765 50.4385 356.785 43.1485L356.805 34.7885L354.055 35.4685C349.035 36.7085 334.085 43.7585 323.425 49.8985C309.895 57.6885 298.105 66.0185 284.055 77.7185C271.155 88.4585 249.535 109.769 250.295 110.999C250.575 111.449 255.395 115.099 261.005 119.099C277.805 131.089 300.715 151.909 311.415 164.889ZM133.395 304.289L141.305 312.679L154.965 302.299C162.485 296.589 169.175 291.269 169.835 290.469C170.805 289.299 170.225 287.719 166.805 282.269C148.655 253.309 123.965 230.579 96.805 217.809C92.685 215.869 86.165 213.039 82.335 211.529L75.365 208.769L72.695 211.979C64.785 221.449 50.405 265.279 55.535 264.269C57.955 263.789 78.115 268.159 85.145 270.699C101.125 276.459 118.685 288.679 133.395 304.289ZM238.005 307.059L245.035 312.599L256.675 301.009C269.605 288.119 283.235 278.369 296.305 272.679C304.535 269.089 321.045 265.009 327.315 265.009C331.755 265.009 332.365 263.579 330.815 256.769C327.495 242.159 315.305 211.669 311.955 209.599C309.355 207.999 284.825 219.279 270.805 228.539C257.485 237.329 247.035 246.559 237.645 257.829C230.125 266.859 215.805 287.399 215.805 289.159C215.805 289.589 219.215 292.539 223.395 295.719C227.565 298.909 234.145 304.009 238.005 307.059ZM184.085 373.029L193.035 378.929L197.175 376.829C202.805 373.959 214.415 365.089 219.415 359.829C224.665 354.299 233.805 342.059 233.805 340.549C233.805 339.429 231.465 337.619 217.805 328.119C196.395 313.249 193.945 311.869 191.475 313.229C188.405 314.909 159.105 335.289 155.525 338.229L152.755 340.509L156.175 345.569C162.345 354.679 174.735 366.869 184.085 373.029Z"/>
+          </svg>
+        </div>
+        <div class="brand-name">TALIO</div>
+        <div class="brand-tagline">Workforce Intelligence Platform</div>
+        <div class="version-badge">Desktop App v4.2.0</div>
+      </div>
+    </div>
+
+    <!-- Right content panel -->
+    <div class="right-panel">
+      <div class="slides-container">
+
+        <!-- Slide 1: Welcome -->
+        <div class="slide active" data-slide="0">
+          <div class="slide-icon blue">&#128075;</div>
+          <h2>Welcome to Talio Desktop</h2>
+          <p class="subtitle">Your all-in-one companion for productivity tracking, screen capture, and seamless team collaboration — right from your desktop.</p>
+          <div class="features-grid">
+            <div class="feature-card">
+              <div class="fc-icon">&#128247;</div>
+              <h4>Smart Capture</h4>
+              <span>Automatic screen activity tracking with AI insights</span>
+            </div>
+            <div class="feature-card">
+              <div class="fc-icon">&#128276;</div>
+              <h4>Live Alerts</h4>
+              <span>Instant notifications for tasks, meetings & updates</span>
+            </div>
+            <div class="feature-card">
+              <div class="fc-icon">&#128200;</div>
+              <h4>Productivity</h4>
+              <span>Real-time dashboard with activity analytics</span>
+            </div>
+            <div class="feature-card">
+              <div class="fc-icon">&#129302;</div>
+              <h4>MAYA AI</h4>
+              <span>Your AI assistant for work summaries & insights</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Slide 2: How It Works -->
+        <div class="slide" data-slide="1">
+          <div class="slide-icon teal">&#9881;&#65039;</div>
+          <h2>How It Works</h2>
+          <p class="subtitle">Talio Desktop runs quietly in the background, keeping you connected and productive throughout your workday.</p>
+          <div class="permissions-list">
+            <div class="perm-item">
+              <div class="perm-icon blue">&#128187;</div>
+              <div class="perm-text">
+                <h4>Runs in System Tray</h4>
+                <span>The app stays active in your system tray for quick access and uninterrupted monitoring</span>
+              </div>
+            </div>
+            <div class="perm-item">
+              <div class="perm-icon green">&#128260;</div>
+              <div class="perm-text">
+                <h4>Auto-Start on Boot</h4>
+                <span>Automatically launches when you start your computer so you never miss a beat</span>
+              </div>
+            </div>
+            <div class="perm-item">
+              <div class="perm-icon purple">&#128274;</div>
+              <div class="perm-text">
+                <h4>Always Connected</h4>
+                <span>Maintains a secure connection to keep your status and data in sync</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Slide 3: Permissions -->
+        <div class="slide" data-slide="2">
+          <div class="slide-icon purple">&#128737;&#65039;</div>
+          <h2>Required Permissions</h2>
+          <p class="subtitle">The app needs a few permissions to function. You'll be prompted to grant these after setup.</p>
+          <div class="permissions-list">
+            <div class="perm-item">
+              <div class="perm-icon blue">&#128248;</div>
+              <div class="perm-text">
+                <h4>Screen Recording</h4>
+                <span>Needed for activity capture and screen sharing during calls</span>
+              </div>
+            </div>
+            <div class="perm-item">
+              <div class="perm-icon green">&#128276;</div>
+              <div class="perm-text">
+                <h4>Notifications</h4>
+                <span>To alert you about tasks, meetings, messages, and updates</span>
+              </div>
+            </div>
+            <div class="perm-item">
+              <div class="perm-icon purple">&#128188;</div>
+              <div class="perm-text">
+                <h4>Startup Access</h4>
+                <span>To launch automatically when your workday begins</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Slide 4: Ready -->
+        <div class="slide" data-slide="3">
+          <div class="ready-check">
+            <svg viewBox="0 0 24 24">
+              <path d="M5 13l4 4L19 7"/>
+            </svg>
+          </div>
+          <h2>You're All Set!</h2>
+          <p class="subtitle">Everything is configured. Click the button below to launch Talio and sign in to your workspace. Welcome aboard!</p>
+          <button class="btn btn-success" onclick="getStarted()">
+            Launch Talio
+            <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+
+      </div>
+
+      <!-- Bottom navigation bar -->
+      <div class="bottom-bar">
+        <div class="dots">
+          <div class="dot active" onclick="goToSlide(0)"></div>
+          <div class="dot" onclick="goToSlide(1)"></div>
+          <div class="dot" onclick="goToSlide(2)"></div>
+          <div class="dot" onclick="goToSlide(3)"></div>
+        </div>
+        <div class="btn-group">
+          <button id="skipBtn" class="btn btn-ghost" onclick="skipWelcome()">Skip</button>
+          <button id="nextBtn" class="btn btn-primary" onclick="nextSlide()">
+            Next
+            <svg viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var currentSlide = 0;
+    var totalSlides = 4;
+    var slides = document.querySelectorAll('.slide');
+    var dots = document.querySelectorAll('.dot');
+    var nextBtn = document.getElementById('nextBtn');
+    var skipBtn = document.getElementById('skipBtn');
+
+    function goToSlide(index) {
+      if (index < 0 || index >= totalSlides || index === currentSlide) return;
+
+      // Mark old slide
+      slides[currentSlide].classList.remove('active');
+      slides[currentSlide].classList.add(index > currentSlide ? 'exit-left' : '');
+
+      // Clean up exit classes after transition
+      var oldSlide = currentSlide;
+      setTimeout(function() {
+        slides[oldSlide].classList.remove('exit-left');
+      }, 500);
+
+      currentSlide = index;
+
+      // Activate new slide
+      slides[currentSlide].classList.add('active');
+
+      // Update dots
+      dots.forEach(function(d, i) {
+        d.classList.toggle('active', i === currentSlide);
+      });
+
+      // Update buttons
+      if (currentSlide === totalSlides - 1) {
+        nextBtn.classList.add('hide');
+        skipBtn.classList.add('hide');
+      } else {
+        nextBtn.classList.remove('hide');
+        skipBtn.classList.remove('hide');
+      }
+    }
+
+    function nextSlide() {
+      goToSlide(currentSlide + 1);
+    }
+
+    function skipWelcome() {
+      getStarted();
+    }
+
+    function getStarted() {
+      // Communicate with Electron main process
+      if (window.electronAPI && window.electronAPI.welcomeComplete) {
+        window.electronAPI.welcomeComplete();
+      } else {
+        // Fallback: post message
+        window.postMessage({ type: 'welcome-complete' }, '*');
+      }
+    }
+
+    // Keyboard navigation
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'ArrowRight' || e.key === 'Enter') {
+        if (currentSlide < totalSlides - 1) {
+          nextSlide();
+        } else {
+          getStarted();
+        }
+      } else if (e.key === 'ArrowLeft' && currentSlide > 0) {
+        goToSlide(currentSlide - 1);
+      } else if (e.key === 'Escape') {
+        getStarted();
+      }
+    });
+  </script>
+</body>
+</html>

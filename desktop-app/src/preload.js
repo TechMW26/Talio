@@ -1,5 +1,5 @@
 /**
- * Preload Script v4.1.0
+ * Preload Script v4.3.0
  * Exposes secure IPC channels to the renderer process
  * With enhanced screen sharing support for Windows multi-display
  */
@@ -157,9 +157,36 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return ipcRenderer.invoke('restart-app');
   },
   
+  // Welcome screen completion
+  welcomeComplete: function() {
+    return ipcRenderer.invoke('welcome-complete');
+  },
+
   // Load main app (for offline page retry)
   loadApp: function() {
     return ipcRenderer.invoke('load-app');
+  },
+
+  // ── Auto-Update ──────────────────────────────────────────────────────
+  checkForUpdate: function() {
+    return ipcRenderer.invoke('check-for-update');
+  },
+
+  startUpdate: function() {
+    return ipcRenderer.invoke('start-update');
+  },
+
+  retryUpdate: function() {
+    return ipcRenderer.invoke('retry-update');
+  },
+
+  installUpdate: function() {
+    return ipcRenderer.invoke('install-update');
+  },
+
+  // ── Title Bar ──────────────────────────────────────────────────────
+  setTitleBarColor: function(color) {
+    return ipcRenderer.invoke('set-title-bar-color', color);
   },
   
   // Check if running on Windows (for screen share workaround)

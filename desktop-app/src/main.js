@@ -1,15 +1,17 @@
 /**
- * Talio Desktop App v4.1.0
+ * Talio Desktop App v4.3.0
  * Main Electron process
  * 
  * Performance optimized for smooth rendering
  * With whitescreen recovery and network change handling
+ * Force-persistent mode: app cannot be closed by users, auto-restarts if killed
  */
 
 const { app, BrowserWindow, ipcMain, Tray, Menu, Notification, shell, nativeImage, session, systemPreferences, dialog, desktopCapturer, screen, powerMonitor } = require('electron');
 const path = require('path');
 const Store = require('electron-store');
 const AutoLaunch = require('auto-launch');
+const { autoUpdater } = require('electron-updater');
 const logger = require('./logger');
 const screenshotService = require('./screenshotService');
 const socketHandler = require('./socketHandler');
@@ -60,12 +62,19 @@ if (forceDisableGPU) {
 // deploying the Providers.js fix to production (app.talio.in)
 // which disables AudioContext initialization for desktop apps
 
+// Set Windows App User Model ID for proper notification grouping & taskbar identity
+if (process.platform === 'win32') {
+  app.setAppUserModelId('in.talio.desktop');
+}
+
 // Configuration
 const APP_URL = 'https://app.talio.in';
 const LOADER_TIMEOUT_MS = 30000; // 30 seconds max loading time
 const RETRY_DELAY_MS = 5000;
 const MAX_LOAD_RETRIES = 3;
 const MAX_CRASH_RECOVERY = 3; // Max crash recovery attempts
+const MIN_VERSION_CHECK_URL = APP_URL + '/api/desktop/min-version';
+const UPDATE_CHECK_INTERVAL = 60 * 60 * 1000; // Check for updates every hour
 
 // Global references
 let mainWindow = null;
@@ -77,6 +86,10 @@ let isAuthenticated = false;
 let userData = null;
 let crashCount = 0;
 let lastCrashTime = 0;
+let forceCloseAttempts = 0;
+let windowRecreateTimer = null;
+let isUpdating = false;
+let updateCheckTimer = null;
 
 // Persistent store
 const store = new Store({ name: 'app-data' });
@@ -88,49 +101,115 @@ const autoLauncher = new AutoLaunch({
 });
 
 /**
- * Request macOS permissions for camera, microphone, and screen recording
+ * Request all required permissions (notifications on all platforms, media on macOS)
  */
 async function requestPermissions() {
-  if (process.platform !== 'darwin') return;
+  logger.log('info', 'Main', 'Checking permissions...');
 
-  logger.log('info', 'Main', 'Checking macOS permissions...');
-
-  // Check and request camera permission
-  const cameraStatus = systemPreferences.getMediaAccessStatus('camera');
-  if (cameraStatus !== 'granted') {
-    logger.log('info', 'Main', 'Requesting camera permission...');
-    const granted = await systemPreferences.askForMediaAccess('camera');
-    logger.log('info', 'Main', 'Camera permission: ' + (granted ? 'granted' : 'denied'));
-  }
-
-  // Check and request microphone permission
-  const micStatus = systemPreferences.getMediaAccessStatus('microphone');
-  if (micStatus !== 'granted') {
-    logger.log('info', 'Main', 'Requesting microphone permission...');
-    const granted = await systemPreferences.askForMediaAccess('microphone');
-    logger.log('info', 'Main', 'Microphone permission: ' + (granted ? 'granted' : 'denied'));
-  }
-
-  // Check screen recording permission (can't request programmatically, but can check and prompt)
-  const screenStatus = systemPreferences.getMediaAccessStatus('screen');
-  if (screenStatus !== 'granted') {
-    logger.log('info', 'Main', 'Screen recording permission not granted, showing dialog...');
-    const result = await dialog.showMessageBox(mainWindow, {
-      type: 'info',
-      title: 'Screen Recording Permission Required',
-      message: 'Talio needs screen recording permission for productivity monitoring and screen sharing in meetings.',
-      detail: 'Please grant Screen Recording permission in System Preferences → Privacy & Security → Screen Recording, then restart the app.',
-      buttons: ['Open System Preferences', 'Later'],
-      defaultId: 0,
-      cancelId: 1
-    });
-
-    if (result.response === 0) {
-      // Open System Preferences to Screen Recording
-      shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
-    }
+  // ── Notification permissions (all platforms) ──
+  if (Notification.isSupported()) {
+    logger.log('info', 'Main', 'Notifications supported');
   } else {
-    logger.log('info', 'Main', 'Screen recording permission already granted');
+    logger.log('warn', 'Main', 'Notifications not supported on this platform');
+  }
+
+  // Windows: Set up toast notifications via AppUserModelId
+  if (process.platform === 'win32') {
+    logger.log('info', 'Main', 'Windows notification setup - AppUserModelId: in.talio.desktop');
+    // Show initial notification to verify the permission pipeline
+    try {
+      var testNotif = new Notification({
+        title: 'Talio',
+        body: 'Talio is running in the background and monitoring your activity.',
+        icon: getAppIcon(),
+        silent: true
+      });
+      testNotif.show();
+      setTimeout(function() { testNotif.close(); }, 4000);
+      logger.log('info', 'Main', 'Windows notification test OK');
+    } catch (e) {
+      logger.log('warn', 'Main', 'Windows notification test failed: ' + e.message);
+    }
+  }
+
+  // Linux: notifications via libnotify
+  if (process.platform === 'linux') {
+    logger.log('info', 'Main', 'Linux notifications via libnotify');
+    try {
+      var testNotif = new Notification({
+        title: 'Talio',
+        body: 'Talio is running. You will receive work notifications here.',
+        icon: getAppIcon(),
+        silent: true
+      });
+      testNotif.show();
+      setTimeout(function() { testNotif.close(); }, 4000);
+    } catch (e) {
+      logger.log('warn', 'Main', 'Linux notification test failed: ' + e.message);
+    }
+  }
+
+  // macOS: Request media + notification permissions
+  if (process.platform === 'darwin') {
+    logger.log('info', 'Main', 'Checking macOS permissions...');
+
+    // Camera permission
+    var cameraStatus = systemPreferences.getMediaAccessStatus('camera');
+    if (cameraStatus !== 'granted') {
+      logger.log('info', 'Main', 'Requesting camera permission...');
+      var granted = await systemPreferences.askForMediaAccess('camera');
+      logger.log('info', 'Main', 'Camera permission: ' + (granted ? 'granted' : 'denied'));
+    }
+
+    // Microphone permission
+    var micStatus = systemPreferences.getMediaAccessStatus('microphone');
+    if (micStatus !== 'granted') {
+      logger.log('info', 'Main', 'Requesting microphone permission...');
+      var granted = await systemPreferences.askForMediaAccess('microphone');
+      logger.log('info', 'Main', 'Microphone permission: ' + (granted ? 'granted' : 'denied'));
+    }
+
+    // Screen recording permission (can only check, not request programmatically)
+    var screenStatus = systemPreferences.getMediaAccessStatus('screen');
+    if (screenStatus !== 'granted') {
+      logger.log('info', 'Main', 'Screen recording permission not granted, showing dialog...');
+      var result = await dialog.showMessageBox(mainWindow, {
+        type: 'info',
+        title: 'Screen Recording Permission Required',
+        message: 'Talio needs screen recording permission for productivity monitoring and screen sharing in meetings.',
+        detail: 'Please grant Screen Recording permission in System Preferences → Privacy & Security → Screen Recording, then restart the app.',
+        buttons: ['Open System Preferences', 'Later'],
+        defaultId: 0,
+        cancelId: 1
+      });
+
+      if (result.response === 0) {
+        shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
+      }
+    } else {
+      logger.log('info', 'Main', 'Screen recording permission already granted');
+    }
+
+    // macOS notification permission — trigger via test notification
+    // macOS shows a system permission dialog on the first Notification()
+    try {
+      var testNotif = new Notification({
+        title: 'Talio',
+        body: 'Talio is running. You will receive work notifications here.',
+        icon: getAppIcon(),
+        silent: true
+      });
+      testNotif.show();
+      setTimeout(function() { testNotif.close(); }, 4000);
+      logger.log('info', 'Main', 'macOS notification permission triggered');
+    } catch (e) {
+      logger.log('warn', 'Main', 'macOS notification test failed: ' + e.message);
+    }
+  }
+
+  // Clear macOS dock badge on startup
+  if (process.platform === 'darwin') {
+    app.setBadgeCount(0);
   }
 }
 
@@ -167,8 +246,7 @@ function createWindow() {
       contextIsolation: true,
       webSecurity: true,
       allowRunningInsecureContent: false,
-      // Enable DevTools for debugging
-      devTools: true,
+      devTools: !app.isPackaged,
       // PERFORMANCE: Disable background throttling for smooth animations
       backgroundThrottling: false,
       // PERFORMANCE: Enable hardware acceleration in renderer
@@ -183,12 +261,16 @@ function createWindow() {
       v8CacheOptions: 'bypassHeatCheck'
     },
     icon: getAppIcon(),
-    show: false, // Don't show until ready-to-show
-    backgroundColor: '#ffffff', // White background for loader
+    show: false,
+    backgroundColor: '#ffffff',
     autoHideMenuBar: true,
-    // PERFORMANCE: Use native window frame for better performance
-    frame: true,
-    // Enable smooth resizing
+    titleBarStyle: 'hidden',
+    titleBarOverlay: {
+      color: '#ffffff',
+      symbolColor: '#64748B',
+      height: 40
+    },
+    trafficLightPosition: { x: 16, y: 13 },
     hasShadow: true
   });
 
@@ -196,6 +278,28 @@ function createWindow() {
   mainWindow.once('ready-to-show', function () {
     mainWindow.show();
     logger.log('info', 'Main', 'Window ready-to-show triggered');
+  });
+
+  // ── Seamless Title Bar: inject CSS/JS after page loads ──────────────
+  mainWindow.webContents.on('did-finish-load', function () {
+    injectTitleBarAdaptations();
+  });
+
+  // Block DevTools shortcuts in production
+  if (app.isPackaged) {
+    mainWindow.webContents.on('before-input-event', function (event, input) {
+      // Block F12, Ctrl+Shift+I, Ctrl+Shift+J, Cmd+Option+I, Cmd+Option+J
+      if (input.key === 'F12') { event.preventDefault(); return; }
+      if ((input.control || input.meta) && input.shift && (input.key === 'I' || input.key === 'i' || input.key === 'J' || input.key === 'j')) { event.preventDefault(); return; }
+      if (input.meta && input.alt && (input.key === 'I' || input.key === 'i')) { event.preventDefault(); return; }
+    });
+  }
+
+  // Clear macOS dock badge when window receives focus
+  mainWindow.on('focus', function () {
+    if (process.platform === 'darwin') {
+      app.setBadgeCount(0);
+    }
   });
 
   // Log renderer console messages for debugging
@@ -240,16 +344,92 @@ function createWindow() {
     logger.log('info', 'Main', 'Page became responsive');
   });
 
-  // Show loader first, then load app
-  showLoader();
-
   // Setup window events
   setupWindowEvents();
 
   // Setup IPC handlers
   setupIPCHandlers();
 
+  // Show welcome screen on first launch, otherwise show loader
+  var hasSeenWelcome = store.get('hasSeenWelcome', false);
+  if (!hasSeenWelcome) {
+    showWelcomeScreen();
+  } else {
+    showLoader();
+  }
+
   logger.log('info', 'Main', 'Window created');
+}
+
+/**
+ * Inject CSS and JS into the loaded page for seamless title bar integration.
+ * - Makes the header draggable (window move).
+ * - Adds platform-specific padding so traffic lights (macOS) or 
+ *   window controls (Windows) don't overlap interactive elements.
+ * - Detects theme/dark mode changes and updates the title bar overlay color.
+ */
+function injectTitleBarAdaptations() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+
+  var platformCSS = '';
+  if (process.platform === 'darwin') {
+    // macOS: push sidebar content below traffic lights
+    platformCSS = '\n' +
+      'aside[style*="--color-bg-sidebar"] { padding-top: 38px !important; }\n' +
+      'aside.fixed.inset-y-0 { padding-top: 38px !important; }\n';
+  } else {
+    // Windows / Linux: push header right side left of window controls
+    platformCSS = '\n' +
+      'header { padding-right: 140px !important; }\n';
+  }
+
+  var css =
+    '/* Electron: Seamless title bar */\n' +
+    'header { -webkit-app-region: drag; }\n' +
+    'header button, header input, header a, header [role="button"],\n' +
+    'header [data-slot], header .cursor-pointer, header .relative,\n' +
+    'header > div > div > * { -webkit-app-region: no-drag; }\n' +
+    platformCSS;
+
+  mainWindow.webContents.insertCSS(css).catch(function () {});
+
+  // Inject theme color detection — watches for dark mode / theme changes and syncs title bar
+  var themeScript =
+    '(function() {\n' +
+    '  function syncTitleBar() {\n' +
+    '    var header = document.querySelector("header");\n' +
+    '    var bgColor = "#ffffff";\n' +
+    '    if (header) {\n' +
+    '      bgColor = getComputedStyle(header).backgroundColor;\n' +
+    '    } else {\n' +
+    '      bgColor = getComputedStyle(document.body).backgroundColor || "#ffffff";\n' +
+    '    }\n' +
+    '    if (window.electronAPI && window.electronAPI.setTitleBarColor) {\n' +
+    '      window.electronAPI.setTitleBarColor(bgColor);\n' +
+    '    }\n' +
+    '  }\n' +
+    '  var obs = new MutationObserver(function() { setTimeout(syncTitleBar, 200); });\n' +
+    '  obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "style", "data-theme"] });\n' +
+    '  setTimeout(syncTitleBar, 800);\n' +
+    '  setTimeout(syncTitleBar, 2500);\n' +
+    '  setInterval(syncTitleBar, 5000);\n' +
+    '})()';
+
+  mainWindow.webContents.executeJavaScript(themeScript).catch(function () {});
+}
+
+/**
+ * Show welcome/onboarding screen on first launch
+ */
+function showWelcomeScreen() {
+  var welcomePath = path.join(__dirname, 'welcome.html');
+  mainWindow.loadFile(welcomePath);
+
+  if (!mainWindow.isVisible()) {
+    mainWindow.show();
+  }
+
+  logger.log('info', 'Main', 'Showing welcome screen (first launch)');
 }
 
 /**
@@ -385,15 +565,38 @@ function showCrashPage() {
  */
 function setupWindowEvents() {
   mainWindow.on('close', function (event) {
-    if (!isQuitting) {
-      event.preventDefault();
-      mainWindow.hide();
-      return false;
+    // FORCE PERSISTENT: Never let the window close
+    event.preventDefault();
+
+    if (isQuitting) {
+      // Even when quitting, warn the user
+      forceCloseAttempts++;
+      logger.log('warn', 'Main', 'Close attempt #' + forceCloseAttempts + ' while quitting');
+
+      if (forceCloseAttempts >= 3) {
+        // After 3 attempts, allow quit but warn
+        showNotification('⚠️ Talio Closing', 'Talio has been force-closed. Your activity will not be monitored. This action has been logged.');
+        logger.log('warn', 'Main', 'Force close allowed after ' + forceCloseAttempts + ' attempts - LOGGED');
+        // Log the force close event for admin visibility
+        logForceCloseEvent();
+        // Actually destroy the window
+        mainWindow.destroy();
+        return;
+      }
     }
+
+    // Show warning and minimize to tray instead
+    showNotification('⚠️ Talio Cannot Be Closed', 'Talio must remain running on company devices. The app has been minimized to the system tray.');
+    mainWindow.hide();
+    logger.log('warn', 'Main', 'User attempted to close app - minimized to tray instead');
+    return false;
   });
 
   mainWindow.on('closed', function () {
+    logger.log('warn', 'Main', 'Window was closed/destroyed - scheduling recreation');
     mainWindow = null;
+    // Auto-recreate window if it was destroyed
+    scheduleWindowRecreation();
   });
 
   mainWindow.on('resize', saveWindowBounds);
@@ -453,9 +656,11 @@ function setupWindowEvents() {
 
   // Handle HTTP errors (4xx, 5xx) - intercept responses
   mainWindow.webContents.on('did-navigate', function (event, url, httpResponseCode) {
-    if (httpResponseCode >= 400) {
+    if (httpResponseCode >= 500) {
       logger.log('error', 'Main', 'HTTP error ' + httpResponseCode + ' for ' + url);
       showOfflinePage('server-error', httpResponseCode.toString(), 'HTTP ' + httpResponseCode);
+    } else if (httpResponseCode >= 400 && httpResponseCode !== 401 && httpResponseCode !== 404) {
+      logger.log('warn', 'Main', 'HTTP client error ' + httpResponseCode + ' for ' + url);
     }
   });
 
@@ -494,6 +699,77 @@ function setupWindowEvents() {
     logger.log('warn', 'Main', 'Certificate error: ' + error);
     callback(false);
   });
+}
+
+/**
+ * Schedule window recreation if the window was destroyed
+ * Acts as a watchdog to ensure the app stays running
+ */
+function scheduleWindowRecreation() {
+  if (windowRecreateTimer) {
+    clearTimeout(windowRecreateTimer);
+  }
+
+  windowRecreateTimer = setTimeout(function () {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      logger.log('info', 'Main', 'Watchdog: Recreating destroyed window');
+      createWindow();
+
+      // Setup network monitoring for new window
+      setupNetworkMonitoring();
+
+      // Re-authenticate if we had saved credentials
+      var savedToken = store.get('authToken');
+      var savedUser = store.get('userData');
+      if (savedToken && savedUser) {
+        setTimeout(function () {
+          handleAuthentication({ token: savedToken, user: savedUser });
+        }, 2000);
+      }
+
+      showNotification('\u26a0\ufe0f Talio Restarted', 'Talio window was closed and has been automatically reopened. This action has been logged.');
+    }
+  }, 2000); // Recreate after 2 seconds
+}
+
+/**
+ * Log force-close event for admin audit trail
+ */
+function logForceCloseEvent() {
+  try {
+    var savedToken = store.get('authToken');
+    var savedUser = store.get('userData');
+    if (savedToken && savedUser) {
+      var https = require('https');
+      var postData = JSON.stringify({
+        event: 'desktop-app-force-closed',
+        userId: savedUser.userId || savedUser._id,
+        employeeId: savedUser.employeeId,
+        timestamp: new Date().toISOString(),
+        platform: process.platform,
+        appVersion: app.getVersion(),
+        attempts: forceCloseAttempts
+      });
+
+      var req = https.request({
+        hostname: 'app.talio.in',
+        port: 443,
+        path: '/api/maya/screen-capture',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + savedToken,
+          'Content-Length': Buffer.byteLength(postData)
+        },
+        timeout: 5000
+      });
+      req.on('error', function () { /* ignore */ });
+      req.write(postData);
+      req.end();
+    }
+  } catch (e) {
+    logger.log('error', 'Main', 'Failed to log force close: ' + e.message);
+  }
 }
 
 /**
@@ -794,6 +1070,14 @@ function setupIPCHandlers() {
     app.exit(0);
   });
 
+  // Welcome screen completed
+  ipcMain.handle('welcome-complete', function () {
+    logger.log('info', 'Main', 'Welcome screen completed');
+    store.set('hasSeenWelcome', true);
+    showLoader();
+    return { success: true };
+  });
+
   // Load app (for offline page retry)
   ipcMain.handle('load-app', function () {
     logger.log('info', 'Main', 'Load app requested from offline page');
@@ -912,6 +1196,63 @@ function setupIPCHandlers() {
       return { success: false, error: error.message };
     }
   });
+
+  // ── Title Bar Color IPC ────────────────────────────────────────────
+  ipcMain.handle('set-title-bar-color', function (event, bgColor) {
+    if (!mainWindow || mainWindow.isDestroyed()) return;
+    try {
+      var parsed = parseRGBColor(bgColor);
+      if (!parsed) return;
+      // Determine if background is dark (luminance check)
+      var lum = parsed.r * 0.299 + parsed.g * 0.587 + parsed.b * 0.114;
+      var isDark = lum < 128;
+      var hexColor = rgbToHex(parsed.r, parsed.g, parsed.b);
+      mainWindow.setTitleBarOverlay({
+        color: hexColor,
+        symbolColor: isDark ? '#E2E8F0' : '#64748B',
+        height: 40
+      });
+      mainWindow.setBackgroundColor(hexColor);
+    } catch (e) {
+      // Silently ignore color parse failures
+    }
+  });
+
+  // ── Auto-Update IPC ──────────────────────────────────────────────────
+  ipcMain.handle('check-for-update', function () {
+    logger.log('info', 'Updater', 'Manual update check requested');
+    checkForUpdates(false);
+    return { success: true };
+  });
+
+  ipcMain.handle('start-update', function () {
+    logger.log('info', 'Updater', 'Start update / download requested');
+    autoUpdater.checkForUpdates().then(function (result) {
+      if (result && result.updateInfo) {
+        autoUpdater.downloadUpdate().catch(function (err) {
+          logger.log('error', 'Updater', 'Download failed: ' + err.message);
+        });
+      }
+    }).catch(function (err) {
+      logger.log('error', 'Updater', 'Check failed: ' + err.message);
+    });
+    return { success: true };
+  });
+
+  ipcMain.handle('retry-update', function () {
+    logger.log('info', 'Updater', 'Retry update download');
+    autoUpdater.downloadUpdate().catch(function (err) {
+      logger.log('error', 'Updater', 'Retry download failed: ' + err.message);
+    });
+    return { success: true };
+  });
+
+  ipcMain.handle('install-update', function () {
+    logger.log('info', 'Updater', 'Install update and restart');
+    isQuitting = true;
+    forceCloseAttempts = 999;
+    autoUpdater.quitAndInstall(false, true);
+  });
 }
 
 /**
@@ -956,27 +1297,44 @@ function handleAuthentication(data) {
   });
 
   socketHandler.on('notification', function (notif) {
-    showNotification(notif.title, notif.message || notif.body);
-    if (mainWindow) {
+    showNotification(notif.title, notif.message || notif.body, { url: notif.url });
+    if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('notification', notif);
     }
   });
 
   socketHandler.on('gameInvite', function (data) {
     showNotification('🎮 Game Invite!', (data.fromName || 'Someone') + ' wants to play Tic-Tac-Toe', { urgency: 'critical' });
-    if (mainWindow) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('game-invite', data);
     }
   });
 
+  socketHandler.on('callAlert', function (data) {
+    showNotification('📞 Incoming Call', (data.callerName || 'Someone') + ' is calling you', { urgency: 'critical', url: data.url });
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('call-alert', data);
+    }
+  });
+
+  socketHandler.on('forceRefresh', function () {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      logger.log('info', 'Main', 'Force refresh - reloading app');
+      setTimeout(function () {
+        loadRetries = 0;
+        loadApp();
+      }, 2000);
+    }
+  });
+
   socketHandler.on('connect', function () {
-    if (mainWindow) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('socket-status', { connected: true });
     }
   });
 
   socketHandler.on('disconnect', function () {
-    if (mainWindow) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('socket-status', { connected: false });
     }
   });
@@ -1063,7 +1421,7 @@ function updateTrayMenu() {
   menuItems.push(
     { label: 'Start at Login', type: 'checkbox', checked: store.get('autoLaunch', true), click: toggleAutoLaunch },
     { type: 'separator' },
-    { label: 'Quit', click: function () { isQuitting = true; app.quit(); } }
+    { label: 'Talio v' + app.getVersion(), enabled: false }
   );
 
   var contextMenu = Menu.buildFromTemplate(menuItems);
@@ -1090,19 +1448,354 @@ async function toggleAutoLaunch(menuItem) {
 }
 
 /**
- * Show desktop notification
+ * Show desktop notification with click-to-navigate support
+ * @param {string} title - Notification title
+ * @param {string} body - Notification body text
+ * @param {Object} options - Options: silent, urgency, url
  */
 function showNotification(title, body, options) {
-  if (Notification.isSupported()) {
+  if (!Notification.isSupported()) return;
+
+  try {
+    // Use 256px icon for notifications (better rendering on all platforms)
+    var notifIconPath = path.join(__dirname, '..', 'build', 'icon-256.png');
+    var notifIcon;
+    try { notifIcon = nativeImage.createFromPath(notifIconPath); } catch (e) { notifIcon = getAppIcon(); }
+
     var notification = new Notification({
       title: title || 'Talio',
       body: body || '',
-      icon: getAppIcon(),
+      icon: notifIcon,
       silent: options?.silent || false,
-      urgency: options?.urgency || 'normal'
+      urgency: options?.urgency || 'normal',
+      timeoutType: 'default'
     });
+
+    // Click notification → focus window and navigate to URL if provided
+    notification.on('click', function () {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.show();
+        mainWindow.focus();
+
+        // Navigate to specific page if URL is provided
+        if (options?.url) {
+          var targetUrl = options.url.startsWith('http') ? options.url : APP_URL + options.url;
+          mainWindow.webContents.loadURL(targetUrl).catch(function (err) {
+            logger.log('warn', 'Main', 'Notification navigate failed: ' + err.message);
+          });
+        }
+      }
+    });
+
     notification.show();
+
+    // Update macOS dock badge count
+    if (process.platform === 'darwin' && !options?.silent) {
+      var currentBadge = app.getBadgeCount() || 0;
+      app.setBadgeCount(currentBadge + 1);
+    }
+  } catch (e) {
+    logger.log('warn', 'Main', 'Failed to show notification: ' + e.message);
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// AUTO-UPDATER SYSTEM
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Setup electron-updater with GitHub Releases
+ */
+function setupAutoUpdater() {
+  // Configure updater
+  autoUpdater.autoDownload = false; // We control download manually
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.allowDowngrade = false;
+
+  // Log provider config
+  logger.log('info', 'Updater', 'Auto-updater configured for GitHub Releases');
+
+  autoUpdater.on('checking-for-update', function () {
+    logger.log('info', 'Updater', 'Checking for updates...');
+  });
+
+  autoUpdater.on('update-available', function (info) {
+    logger.log('info', 'Updater', 'Update available: v' + info.version);
+    handleUpdateAvailable(info);
+  });
+
+  autoUpdater.on('update-not-available', function (info) {
+    logger.log('info', 'Updater', 'App is up to date: v' + info.version);
+  });
+
+  autoUpdater.on('download-progress', function (progress) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.executeJavaScript(
+        'window.postMessage(' + JSON.stringify({
+          type: 'update-progress',
+          percent: progress.percent,
+          bytesPerSecond: progress.bytesPerSecond,
+          transferred: progress.transferred,
+          total: progress.total
+        }) + ', "*")'
+      ).catch(function () {});
+    }
+    // Update taskbar progress (Windows) / dock progress (macOS)
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.setProgressBar(progress.percent / 100);
+    }
+  });
+
+  autoUpdater.on('update-downloaded', function (info) {
+    logger.log('info', 'Updater', 'Update downloaded: v' + info.version);
+
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.setProgressBar(-1); // Clear progress bar
+      mainWindow.webContents.executeJavaScript(
+        'window.postMessage({ type: "update-downloaded" }, "*")'
+      ).catch(function () {});
+    }
+
+    // Clear old cache before installing
+    clearAppCache();
+
+    // Wait a moment to show the completion animation, then install
+    setTimeout(function () {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.executeJavaScript(
+          'window.postMessage({ type: "update-complete" }, "*")'
+        ).catch(function () {});
+      }
+
+      // Quit and install after showing completion screen
+      setTimeout(function () {
+        isQuitting = true;
+        forceCloseAttempts = 999; // Bypass force-close protection for update
+        autoUpdater.quitAndInstall(false, true); // isSilent=false, isForceRunAfter=true
+      }, 2500);
+    }, 1500);
+  });
+
+  autoUpdater.on('error', function (error) {
+    logger.log('error', 'Updater', 'Update error: ' + error.message);
+
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.setProgressBar(-1);
+      mainWindow.webContents.executeJavaScript(
+        'window.postMessage(' + JSON.stringify({
+          type: 'update-error',
+          message: error.message
+        }) + ', "*")'
+      ).catch(function () {});
+    }
+  });
+
+  // Schedule periodic update checks
+  updateCheckTimer = setInterval(function () {
+    checkForUpdates(true);
+  }, UPDATE_CHECK_INTERVAL);
+}
+
+/**
+ * Check for updates (called on startup and periodically)
+ * @param {boolean} silent - If true, don't show UI for "no update" case
+ */
+function checkForUpdates(silent) {
+  if (isUpdating) return;
+
+  autoUpdater.checkForUpdates().catch(function (error) {
+    logger.log('warn', 'Updater', 'Update check failed: ' + error.message);
+  });
+}
+
+/**
+ * Handle update available — show update screen and start download
+ */
+function handleUpdateAvailable(info) {
+  isUpdating = true;
+
+  // Show update page
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    var updatePath = path.join(__dirname, 'update.html');
+    mainWindow.loadFile(updatePath).then(function () {
+      // Send version info to the update page
+      mainWindow.webContents.executeJavaScript(
+        'window.postMessage(' + JSON.stringify({
+          type: 'update-versions',
+          current: app.getVersion(),
+          latest: info.version
+        }) + ', "*")'
+      ).catch(function () {});
+
+      mainWindow.show();
+      mainWindow.focus();
+    }).catch(function (err) {
+      logger.log('error', 'Updater', 'Failed to load update page: ' + err.message);
+    });
+
+    // Start downloading the update
+    autoUpdater.downloadUpdate().catch(function (error) {
+      logger.log('error', 'Updater', 'Download failed: ' + error.message);
+    });
+  }
+}
+
+/**
+ * Clear app cache to ensure clean update
+ */
+function clearAppCache() {
+  try {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.session.clearCache();
+      mainWindow.webContents.session.clearStorageData({
+        storages: ['cachestorage', 'serviceworkers']
+      });
+      logger.log('info', 'Updater', 'App cache cleared for clean update');
+    }
+  } catch (e) {
+    logger.log('warn', 'Updater', 'Cache clear failed: ' + e.message);
+  }
+}
+
+/**
+ * Check if the current version is below the minimum required version.
+ * If so, block the app and force an update.
+ */
+async function checkForceUpdate() {
+  try {
+    var response = await fetch(MIN_VERSION_CHECK_URL, {
+      headers: { 'x-app-version': app.getVersion() }
+    });
+
+    if (!response.ok) {
+      logger.log('warn', 'Updater', 'Min version check failed: HTTP ' + response.status);
+      return false;
+    }
+
+    var data = await response.json();
+    var minVersion = data.minVersion;
+    var currentVersion = app.getVersion();
+
+    if (!minVersion) {
+      logger.log('info', 'Updater', 'No minimum version enforced');
+      return false;
+    }
+
+    logger.log('info', 'Updater', 'Min version: ' + minVersion + ', Current: ' + currentVersion);
+
+    if (compareVersions(currentVersion, minVersion) < 0) {
+      logger.log('warn', 'Updater', 'App version is below minimum! Blocking usage.');
+      showUpdateRequiredScreen(currentVersion, minVersion, data.message);
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    logger.log('warn', 'Updater', 'Force update check failed: ' + error.message);
+    return false; // Don't block on network errors
+  }
+}
+
+/**
+ * Compare two semver version strings.
+ * Returns -1 if a < b, 0 if equal, 1 if a > b.
+ */
+function compareVersions(a, b) {
+  var pa = a.split('.').map(Number);
+  var pb = b.split('.').map(Number);
+  for (var i = 0; i < 3; i++) {
+    var na = pa[i] || 0;
+    var nb = pb[i] || 0;
+    if (na < nb) return -1;
+    if (na > nb) return 1;
+  }
+  return 0;
+}
+
+/**
+ * Show the "Update Required" blocking screen
+ */
+function showUpdateRequiredScreen(currentVersion, minVersion, serverMessage) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+
+  var msg = serverMessage || 'A critical update is available. You must update to continue using Talio.';
+
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Update Required - Talio</title>' +
+    '<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;500;600;700;800&display=swap" rel="stylesheet">' +
+    '<style>' +
+    '*{margin:0;padding:0;box-sizing:border-box}' +
+    'body{font-family:Raleway,-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;background:linear-gradient(145deg,#FEF2F2 0%,#FFF7ED 50%,#FFFBEB 100%);height:100vh;display:flex;align-items:center;justify-content:center;-webkit-app-region:drag;user-select:none}' +
+    '.c{text-align:center;max-width:440px;padding:40px;animation:fadeIn .5s ease-out}' +
+    '@keyframes fadeIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}' +
+    '.shield{width:80px;height:80px;margin:0 auto 28px;background:linear-gradient(135deg,#FEE2E2,#FECACA);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:36px;animation:pulse 2s ease-in-out infinite}' +
+    '@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}' +
+    'h1{font-size:24px;font-weight:700;color:#991B1B;margin-bottom:10px}' +
+    'p{font-size:14px;color:#78716C;line-height:1.6;margin-bottom:24px}' +
+    '.vr{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:28px}' +
+    '.vb{padding:6px 16px;border-radius:20px;font-size:13px;font-weight:600}' +
+    '.vo{background:#FEE2E2;color:#DC2626;text-decoration:line-through}' +
+    '.va{color:#94A3B8;font-size:18px}' +
+    '.vn{background:#D1FAE5;color:#059669}' +
+    '.blocked{padding:14px 20px;background:#FEF3C7;border:1px solid #FDE68A;border-radius:12px;color:#92400E;font-size:13px;font-weight:500;margin-bottom:28px;display:flex;align-items:center;gap:8px}' +
+    '.btn{-webkit-app-region:no-drag;padding:14px 36px;borrder-radius:12px;background:linear-gradient(135deg,#2563EB,#3B82F6);color:white;border:none;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;border-radius:12px;box-shadow:0 4px 14px rgba(59,130,246,0.35);transition:all .2s}' +
+    '.btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(59,130,246,0.45)}' +
+    '.btn:active{transform:translateY(0)}' +
+    '.note{margin-top:20px;font-size:12px;color:#94A3B8}' +
+    '</style></head><body><div class="c">' +
+    '<div class="shield">\u26a0\ufe0f</div>' +
+    '<h1>Update Required</h1>' +
+    '<p>' + escapeHtml(msg) + '</p>' +
+    '<div class="vr"><span class="vb vo">v' + escapeHtml(currentVersion) + '</span><span class="va">\u2192</span><span class="vb vn">v' + escapeHtml(minVersion) + '+</span></div>' +
+    '<div class="blocked">\ud83d\udeab App access is blocked until you update to the latest version.</div>' +
+    '<button class="btn" onclick="doUpdate()">Update Now</button>' +
+    '<p class="note">The update will download and install automatically.</p>' +
+    '</div>' +
+    '<script>' +
+    'function doUpdate(){' +
+    'if(window.electronAPI&&window.electronAPI.startUpdate){window.electronAPI.startUpdate()}' +
+    'else{window.postMessage({type:"start-update"},"*")}' +
+    '}' +
+    '</script></body></html>';
+
+  mainWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+/**
+ * Escape HTML to prevent injection
+ */
+function escapeHtml(str) {
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/**
+ * Parse CSS rgb/rgba color string into { r, g, b }
+ */
+function parseRGBColor(str) {
+  if (!str) return null;
+  // Handle hex
+  var hexMatch = String(str).match(/^#([0-9a-f]{6})$/i);
+  if (hexMatch) {
+    return {
+      r: parseInt(hexMatch[1].substr(0, 2), 16),
+      g: parseInt(hexMatch[1].substr(2, 2), 16),
+      b: parseInt(hexMatch[1].substr(4, 2), 16)
+    };
+  }
+  // Handle rgb(r, g, b) / rgba(r, g, b, a)
+  var rgbMatch = String(str).match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+  if (rgbMatch) {
+    return { r: parseInt(rgbMatch[1]), g: parseInt(rgbMatch[2]), b: parseInt(rgbMatch[3]) };
+  }
+  return null;
+}
+
+/**
+ * Convert r, g, b values to hex color string
+ */
+function rgbToHex(r, g, b) {
+  return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
 }
 
 /**
@@ -1148,17 +1841,16 @@ function getTrayIcon() {
 }
 
 /**
- * Initialize auto-launch
+ * Initialize auto-launch (always enabled for company devices)
  */
 async function initAutoLaunch() {
   try {
     var isEnabled = await autoLauncher.isEnabled();
-    var shouldEnable = store.get('autoLaunch', true);
 
-    if (shouldEnable && !isEnabled) {
+    if (!isEnabled) {
       await autoLauncher.enable();
-    } else if (!shouldEnable && isEnabled) {
-      await autoLauncher.disable();
+      store.set('autoLaunch', true);
+      logger.log('info', 'Main', 'Auto-launch enabled (company device policy)');
     }
   } catch (error) {
     logger.log('error', 'Main', 'Auto-launch init failed: ' + error.message);
@@ -1592,6 +2284,14 @@ app.whenReady().then(async function () {
   // Request permissions on macOS (camera, mic, screen recording)
   await requestPermissions();
 
+  // Setup auto-updater and check for forced updates
+  setupAutoUpdater();
+  var isForced = await checkForceUpdate();
+  if (!isForced) {
+    // Check for optional updates after a short delay
+    setTimeout(function () { checkForUpdates(true); }, 5000);
+  }
+
   // Check for saved auth
   var savedToken = store.get('authToken');
   var savedUser = store.get('userData');
@@ -1611,23 +2311,49 @@ app.whenReady().then(async function () {
 });
 
 app.on('window-all-closed', function () {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  // FORCE PERSISTENT: Never quit when windows are closed
+  // Instead, recreate the window
+  logger.log('warn', 'Main', 'All windows closed - recreating (force persistent mode)');
+  scheduleWindowRecreation();
 });
 
-app.on('before-quit', function () {
+app.on('before-quit', function (event) {
+  // Intercept quit attempts - only allow after multiple force-close attempts
+  if (forceCloseAttempts < 3) {
+    event.preventDefault();
+    logger.log('warn', 'Main', 'Quit attempt blocked (force persistent mode)');
+    
+    // Show the window again
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
+      mainWindow.focus();
+    } else {
+      scheduleWindowRecreation();
+    }
+    
+    showNotification('\u26a0\ufe0f Talio Cannot Be Closed', 'Talio must remain running on company devices. Contact your administrator if you need to stop the application.');
+    forceCloseAttempts++;
+    return;
+  }
+
+  // After 3 attempts, allow quit
   isQuitting = true;
   screenshotService.stop();
   socketHandler.disconnect();
-  logger.log('info', 'Main', 'App quitting');
+  logger.log('info', 'Main', 'App quitting after ' + forceCloseAttempts + ' force-close attempts');
 });
 
-// Handle uncaught exceptions
+// Handle uncaught exceptions - NEVER let the app crash
 process.on('uncaughtException', function (error) {
-  logger.log('error', 'Main', 'Uncaught exception: ' + error.message);
+  logger.log('error', 'Main', 'Uncaught exception: ' + error.message + '\n' + error.stack);
+  // Don't exit - try to recover
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    logger.log('warn', 'Main', 'Recovering from uncaught exception - recreating window');
+    scheduleWindowRecreation();
+  }
 });
 
 process.on('unhandledRejection', function (reason) {
   logger.log('error', 'Main', 'Unhandled rejection: ' + reason);
+  // Don't crash - just log
 });

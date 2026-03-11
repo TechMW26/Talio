@@ -81,6 +81,7 @@ export async function middleware(request) {
     '/api/notifications/config', // Firebase config for service worker (public=true)
     '/api/health', // Health check endpoint (load balancers, monitoring)
     '/api/redis-status', // Redis connectivity status (operational)
+    '/api/desktop/min-version', // Desktop app minimum version check (unauthenticated)
   ]
 
   // Routes allowed during forced password change

@@ -50,7 +50,8 @@ export default function CustomizableDashboard({
     if (typeof window !== 'undefined') {
       const savedLayout = localStorage.getItem(`${LAYOUT_STORAGE_KEY}_${userId}`)
       if (savedLayout) {
-        setColumnLayout(parseInt(savedLayout, 10))
+        const parsed = parseInt(savedLayout, 10)
+        setColumnLayout(parsed === 1 ? 1 : 3) // Only 1 or 3 columns supported
       }
     }
   }, [userId])
@@ -64,7 +65,7 @@ export default function CustomizableDashboard({
   }
 
   // Grid class based on column layout (static classes for Tailwind purging)
-  const gridClass = columnLayout === 3 ? 'grid md:grid-cols-3 gap-5' : columnLayout === 2 ? 'grid md:grid-cols-2 gap-5' : ''
+  const gridClass = columnLayout === 1 ? '' : 'grid md:grid-cols-3 gap-5'
 
   const {
     enabledWidgets,
@@ -181,18 +182,6 @@ export default function CustomizableDashboard({
             >
               <FaTh className="w-3 h-3" />
               <span>1 Col</span>
-            </button>
-            <button
-              onClick={() => columnLayout !== 2 && toggleColumnLayout(2)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors ${
-                columnLayout === 2
-                  ? 'bg-primary-500 text-white'
-                  : 'text-gray-500 hover:bg-gray-100'
-              }`}
-              title="Two column layout"
-            >
-              <FaThLarge className="w-3 h-3" />
-              <span>2 Col</span>
             </button>
             <button
               onClick={() => columnLayout !== 3 && toggleColumnLayout(3)}
