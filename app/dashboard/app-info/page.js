@@ -11,11 +11,14 @@ import {
   HiOutlineCpuChip,
   HiOutlineFolder,
   HiOutlineGlobeAlt,
+  HiOutlineArrowDownTray,
 } from 'react-icons/hi2'
 
 export default function AppInfoPage() {
   const [appInfo, setAppInfo] = useState(null)
-  const [updateStatus, setUpdateStatus] = useState(null) // 'checking' | 'available' | 'up-to-date' | 'error' | 'downloading'
+  const [currentVersion, setCurrentVersion] = useState(null)
+  const [latestVersion, setLatestVersion] = useState(null)
+  const [updateStatus, setUpdateStatus] = useState(null)
   const [updateVersion, setUpdateVersion] = useState(null)
   const [updateError, setUpdateError] = useState(null)
   const [isElectron, setIsElectron] = useState(false)
@@ -24,10 +27,27 @@ export default function AppInfoPage() {
     const hasElectron = typeof window !== 'undefined' && (window.electronAPI !== undefined || window.isElectron === true)
     setIsElectron(hasElectron)
 
-    if (hasElectron && window.electronAPI?.getAppInfo) {
-      window.electronAPI.getAppInfo().then(info => {
-        setAppInfo(info)
-      }).catch(() => {})
+    // Get app info — try full info first, fallback to just version
+    if (hasElectron && window.electronAPI) {
+      if (window.electronAPI.getAppInfo) {
+        window.electronAPI.getAppInfo().then(info => {
+          setAppInfo(info)
+          setCurrentVersion(info.version)
+        }).catch(() => {
+          // getAppInfo not available on older versions, try getAppVersion
+          if (window.electronAPI.getAppVersion) {
+            window.electronAPI.getAppVersion().then(version => {
+              setCurrentVersion(version)
+              setAppInfo({ version })
+            }).catch(() => {})
+          }
+        })
+      } else if (window.electronAPI.getAppVersion) {
+        window.electronAPI.getAppVersion().then(version => {
+          setCurrentVersion(version)
+          setAppInfo({ version })
+        }).catch(() => {})
+      }
 
       // Listen for update status events from main process
       if (window.electronAPI.onUpdateStatus) {
@@ -39,6 +59,14 @@ export default function AppInfoPage() {
       }
     }
 
+    // Always fetch latest version from web API (works even on outdated apps)
+    fetch('/api/desktop/min-version')
+      .then(res => res.json())
+      .then(data => {
+        if (data.latestVersion) setLatestVersion(data.latestVersion)
+      })
+      .catch(() => {})
+
     return () => {
       if (hasElectron && window.electronAPI?.removeAllListeners) {
         window.electronAPI.removeAllListeners('update-status')
@@ -47,11 +75,16 @@ export default function AppInfoPage() {
   }, [])
 
   const handleCheckUpdate = useCallback(() => {
-    if (!window.electronAPI?.checkForUpdate) return
-    setUpdateStatus('checking')
-    setUpdateError(null)
-    setUpdateVersion(null)
-    window.electronAPI.checkForUpdate({ silent: true })
+    if (window.electronAPI?.checkForUpdate) {
+      setUpdateStatus('checking')
+      setUpdateError(null)
+      setUpdateVersion(null)
+      window.electronAPI.checkForUpdate({ silent: true })
+    } else if (window.electronAPI?.startUpdate) {
+      // Older apps may have startUpdate but not the silent option
+      setUpdateStatus('checking')
+      window.electronAPI.startUpdate()
+    }
   }, [])
 
   if (!isElectron) {
@@ -80,16 +113,21 @@ export default function AppInfoPage() {
     ia32: 'x86 (32-bit)',
   }
 
-  const infoRows = appInfo ? [
-    { icon: HiOutlineInformationCircle, label: 'App Version', value: `v${appInfo.version}` },
-    { icon: HiOutlineComputerDesktop, label: 'Platform', value: platformLabel[appInfo.platform] || appInfo.platform },
-    { icon: HiOutlineCpuChip, label: 'Architecture', value: archLabel[appInfo.arch] || appInfo.arch },
-    { icon: HiOutlineGlobeAlt, label: 'Electron', value: `v${appInfo.electronVersion}` },
-    { icon: HiOutlineGlobeAlt, label: 'Chromium', value: `v${appInfo.chromeVersion}` },
-    { icon: HiOutlineCpuChip, label: 'Node.js', value: `v${appInfo.nodeVersion}` },
-    { icon: HiOutlineFolder, label: 'User Data', value: appInfo.userDataPath },
-    { icon: HiOutlineFolder, label: 'App Path', value: appInfo.appPath },
-  ] : []
+  // Compare versions to check if outdated
+  const isOutdated = currentVersion && latestVersion && currentVersion !== latestVersion
+
+  // Build info rows from whatever data we have
+  const infoRows = []
+  if (appInfo) {
+    infoRows.push({ icon: HiOutlineInformationCircle, label: 'App Version', value: `v${appInfo.version}` })
+    if (appInfo.platform) infoRows.push({ icon: HiOutlineComputerDesktop, label: 'Platform', value: platformLabel[appInfo.platform] || appInfo.platform })
+    if (appInfo.arch) infoRows.push({ icon: HiOutlineCpuChip, label: 'Architecture', value: archLabel[appInfo.arch] || appInfo.arch })
+    if (appInfo.electronVersion) infoRows.push({ icon: HiOutlineGlobeAlt, label: 'Electron', value: `v${appInfo.electronVersion}` })
+    if (appInfo.chromeVersion) infoRows.push({ icon: HiOutlineGlobeAlt, label: 'Chromium', value: `v${appInfo.chromeVersion}` })
+    if (appInfo.nodeVersion) infoRows.push({ icon: HiOutlineCpuChip, label: 'Node.js', value: `v${appInfo.nodeVersion}` })
+    if (appInfo.userDataPath) infoRows.push({ icon: HiOutlineFolder, label: 'User Data', value: appInfo.userDataPath })
+    if (appInfo.appPath) infoRows.push({ icon: HiOutlineFolder, label: 'App Path', value: appInfo.appPath })
+  }
 
   return (
     <div className="max-w-2xl mx-auto py-8 px-4 sm:px-6 space-y-6">
@@ -100,11 +138,11 @@ export default function AppInfoPage() {
         </div>
         <div>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>Talio Desktop</h1>
-          {appInfo && (
-            <p className="text-sm" style={{ color: 'var(--color-text-secondary, #6b7280)' }}>
-              Version {appInfo.version} • {platformLabel[appInfo.platform] || appInfo.platform} ({archLabel[appInfo.arch] || appInfo.arch})
-            </p>
-          )}
+          <p className="text-sm" style={{ color: 'var(--color-text-secondary, #6b7280)' }}>
+            {currentVersion ? `Version ${currentVersion}` : 'Loading...'}
+            {appInfo?.platform ? ` • ${platformLabel[appInfo.platform] || appInfo.platform}` : ''}
+            {appInfo?.arch ? ` (${archLabel[appInfo.arch] || appInfo.arch})` : ''}
+          </p>
         </div>
       </div>
 
@@ -112,14 +150,14 @@ export default function AppInfoPage() {
       <div className="rounded-2xl border p-5 space-y-4" style={{ borderColor: 'var(--color-primary-200)', backgroundColor: 'var(--color-bg-card, white)' }}>
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>Software Update</h2>
-          {updateStatus === 'up-to-date' && (
+          {updateStatus === 'up-to-date' && !isOutdated && (
             <Chip color="success" variant="flat" size="sm" startContent={<HiOutlineCheckCircle className="w-4 h-4" />}>
               Up to date
             </Chip>
           )}
-          {updateStatus === 'available' && (
-            <Chip color="warning" variant="flat" size="sm" startContent={<HiOutlineArrowPath className="w-4 h-4" />}>
-              Update available — v{updateVersion}
+          {(updateStatus === 'available' || isOutdated) && (
+            <Chip color="warning" variant="flat" size="sm" startContent={<HiOutlineArrowDownTray className="w-4 h-4" />}>
+              Update available{updateVersion ? ` — v${updateVersion}` : latestVersion ? ` — v${latestVersion}` : ''}
             </Chip>
           )}
           {updateStatus === 'error' && (
@@ -129,6 +167,15 @@ export default function AppInfoPage() {
           )}
         </div>
 
+        {/* Version comparison */}
+        {currentVersion && latestVersion && (
+          <div className="flex items-center gap-3 text-sm">
+            <span style={{ color: 'var(--color-text-secondary, #6b7280)' }}>Installed: <strong>v{currentVersion}</strong></span>
+            <span style={{ color: 'var(--color-text-secondary, #6b7280)' }}>•</span>
+            <span style={{ color: 'var(--color-text-secondary, #6b7280)' }}>Latest: <strong style={{ color: isOutdated ? 'var(--color-warning-500, #f59e0b)' : 'var(--color-success-500, #22c55e)' }}>v{latestVersion}</strong></span>
+          </div>
+        )}
+
         {updateStatus === 'checking' && (
           <div className="flex items-center gap-3 text-sm" style={{ color: 'var(--color-text-secondary, #6b7280)' }}>
             <Spinner size="sm" />
@@ -136,15 +183,21 @@ export default function AppInfoPage() {
           </div>
         )}
 
-        {updateStatus === 'up-to-date' && (
+        {updateStatus === 'up-to-date' && !isOutdated && (
           <p className="text-sm" style={{ color: 'var(--color-text-secondary, #6b7280)' }}>
             You are running the latest version of Talio Desktop.
           </p>
         )}
 
-        {updateStatus === 'available' && (
+        {(updateStatus === 'available') && (
           <p className="text-sm" style={{ color: 'var(--color-text-secondary, #6b7280)' }}>
-            A new version (v{updateVersion}) is being downloaded and will be installed automatically. The app will restart when ready.
+            A new version (v{updateVersion || latestVersion}) is being downloaded and will be installed automatically. The app will restart when ready.
+          </p>
+        )}
+
+        {isOutdated && updateStatus !== 'available' && updateStatus !== 'checking' && (
+          <p className="text-sm" style={{ color: 'var(--color-text-secondary, #6b7280)' }}>
+            A newer version (v{latestVersion}) is available. Click the button below to check and install the update.
           </p>
         )}
 
@@ -154,16 +207,16 @@ export default function AppInfoPage() {
           </p>
         )}
 
-        {(!updateStatus || updateStatus === 'up-to-date' || updateStatus === 'error') && (
+        {(!updateStatus || updateStatus === 'up-to-date' || updateStatus === 'error' || (isOutdated && updateStatus !== 'available')) && (
           <Button
             onPress={handleCheckUpdate}
             variant="flat"
-            color="primary"
+            color={isOutdated ? 'warning' : 'primary'}
             startContent={<HiOutlineArrowPath className="w-4 h-4" />}
             isLoading={updateStatus === 'checking'}
             size="sm"
           >
-            Check for Updates
+            {isOutdated ? 'Update Now' : 'Check for Updates'}
           </Button>
         )}
       </div>
