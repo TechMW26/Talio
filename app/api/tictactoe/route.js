@@ -160,22 +160,39 @@ export async function POST(request) {
         hostSymbol: 'X',
       })
 
-      // Send push notification
-      sendPushToUser(targetUserId, {
-        title: `🎮 ${senderName} challenged you!`,
-        body: `Tap to accept and play Tic-Tac-Toe now`,
-      }, {
-        data: {
+      console.log(`[TicTacToe] Invite created: gameId=${gameId} host=${senderId} guest=${targetUserId}`)
+
+      // ── Delivery: Push notification ──
+      // Await so we can log the result; do NOT let failures block the response
+      try {
+        // Check if guest has FCM tokens before attempting push
+        const guestUser = await User.findById(targetUserId).select('fcmTokens email').lean()
+        const tokenCount = guestUser?.fcmTokens?.length ?? 0
+        console.log(`[TicTacToe] Push target: userId=${targetUserId} email=${guestUser?.email ?? 'NOT_FOUND'} fcmTokens=${tokenCount}`)
+
+        if (tokenCount === 0) {
+          console.warn(`[TicTacToe] ⚠️ Guest ${targetUserId} has 0 FCM tokens — push delivery impossible`)
+        }
+
+        const pushResult = await sendPushToUser(targetUserId, {
+          title: `🎮 ${senderName} challenged you!`,
+          body: `Tap to accept and play Tic-Tac-Toe now`,
+        }, {
+          data: {
+            type: 'tictactoe_invite',
+            gameId,
+            hostUserId: senderId,
+            hostName: senderName,
+            hostAvatar: senderAvatar,
+          },
+          url: '/dashboard',
           type: 'tictactoe_invite',
-          gameId,
-          hostUserId: senderId,
-          hostName: senderName,
-          hostAvatar: senderAvatar,
-        },
-        url: '/dashboard',
-        type: 'tictactoe_invite',
-        models: { User, Notification },
-      }).catch(err => console.warn('[TicTacToe API] Push notification error:', err))
+          models: { User, Notification },
+        })
+        console.log(`[TicTacToe] Push result: success=${pushResult?.success} sent=${pushResult?.successCount ?? 0} failed=${pushResult?.failureCount ?? 0}`)
+      } catch (pushErr) {
+        console.error('[TicTacToe] Push notification error:', pushErr)
+      }
     }
 
     if (action === 'accept') {
@@ -285,6 +302,20 @@ export async function POST(request) {
     // Every event payload includes the complete game state so clients
     // never need a follow-up GET request after receiving an event.
     const io = global.io
+
+    // ── Delivery diagnostics ──
+    console.log(`[TicTacToe] Socket.IO delivery: io=${!!io} action=${action}`)
+    if (io) {
+      const targetRoom = io.sockets.adapter.rooms.get(`user:${targetUserId}`)
+      const targetRoomSize = targetRoom ? targetRoom.size : 0
+      console.log(`[TicTacToe] Socket.IO emit: room=user:${targetUserId} connected=${targetRoomSize > 0} roomSize=${targetRoomSize}`)
+      if (targetRoomSize === 0) {
+        console.warn(`[TicTacToe] ⚠️ Guest room user:${targetUserId} is EMPTY — Socket.IO event will not be received`)
+      }
+    } else {
+      console.error(`[TicTacToe] ❌ global.io is NULL — Socket.IO emission skipped entirely. Events cannot be delivered in real-time.`)
+    }
+
     if (io) {
       const eventMap = {
         invite: REALTIME_EVENTS.TICTACTOE_INVITE,
@@ -327,7 +358,7 @@ export async function POST(request) {
       }
     }
 
-    console.log(`[TicTacToe API] ${action} from ${senderId} to ${targetUserId} (io=${!!io})`)
+    console.log(`[TicTacToe] ✅ ${action} completed: gameId=${gameId} host=${senderId} guest=${targetUserId} io=${!!io}`)
 
     return NextResponse.json({ success: true, game: game?.toObject?.() || game || null })
   } catch (error) {

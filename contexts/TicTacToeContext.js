@@ -352,6 +352,47 @@ export function TicTacToeProvider({ children }) {
     }).catch(() => { })
   }, [])
 
+  // ─── Polling fallback: catch pending invites when Socket.IO is down ───
+  // This fires every 3s ONLY when the socket is disconnected AND we're idle.
+  // Once the socket connects, the interval is cleared immediately.
+  useEffect(() => {
+    // Only poll when Socket.IO is NOT connected and we're in closed phase
+    if (isConnected) return
+    if (phaseRef.current !== 'closed') return
+
+    const token = localStorage.getItem('token')
+    if (!token) return
+
+    console.log('[TicTacToe] Socket disconnected — starting invite polling fallback')
+    const interval = setInterval(() => {
+      if (phaseRef.current !== 'closed') {
+        clearInterval(interval)
+        return
+      }
+      fetch('/api/tictactoe?check=pending', {
+        headers: { Authorization: `Bearer ${token}` }
+      }).then(r => r.json()).then(data => {
+        if (data.invite) {
+          console.log('[TicTacToe] Polling found pending invite:', data.invite.gameId)
+          setIncomingInvite({
+            gameId: data.invite.gameId,
+            fromUserId: data.invite.hostUserId,
+            hostUserId: data.invite.hostUserId,
+            fromName: data.invite.hostName,
+            hostName: data.invite.hostName,
+            fromAvatar: data.invite.hostAvatar,
+            hostAvatar: data.invite.hostAvatar,
+          })
+          setPhase('invite-incoming')
+          playGameInviteSound().catch(() => { })
+          clearInterval(interval)
+        }
+      }).catch(() => { })
+    }, 3000)
+
+    return () => clearInterval(interval)
+  }, [isConnected])
+
   // ─── Win/Loss effects ───
   useEffect(() => {
     if (phase !== 'result' || !result) return
