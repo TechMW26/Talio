@@ -7,6 +7,20 @@ const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
 const port = process.env.PORT || 3000;
 
+// Minimum desktop app version — when bumped, all connected desktop clients
+// running an older version will be told to check for updates automatically.
+const LATEST_DESKTOP_VERSION = '4.4.0';
+
+function compareVersions(a, b) {
+  const pa = a.split('.').map(Number);
+  const pb = b.split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    if ((pa[i] || 0) > (pb[i] || 0)) return 1;
+    if ((pa[i] || 0) < (pb[i] || 0)) return -1;
+  }
+  return 0;
+}
+
 // Initialize Next.js app (webpack mode for reliable compilation)
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
@@ -145,15 +159,23 @@ app.prepare().then(() => {
     // Desktop app ready
     socket.on('desktop-app-ready', (data) => {
       const userId = data?.userId;
+      const appVersion = data?.appVersion;
       if (userId) {
         socket.userId = userId;
         socket.join(`user:${userId}`);
 
         // CRITICAL FIX: Mark this socket as a desktop app
         socket.isDesktopApp = true;
+        socket.appVersion = appVersion;
 
         socket.emit('registration-confirmed', { status: 'ok', userId });
-        console.log(`🖥️ [Socket.IO] Desktop app registered for user ${userId} (isDesktopApp=true)`);
+        console.log(`🖥️ [Socket.IO] Desktop app registered for user ${userId} v${appVersion || 'unknown'} (isDesktopApp=true)`);
+
+        // If the desktop app is running an older version, tell it to check for updates
+        if (appVersion && compareVersions(appVersion, LATEST_DESKTOP_VERSION) < 0) {
+          console.log(`🔄 [Socket.IO] Desktop app v${appVersion} is outdated (latest: ${LATEST_DESKTOP_VERSION}), triggering update check`);
+          socket.emit('trigger-update-check', { latestVersion: LATEST_DESKTOP_VERSION });
+        }
       }
     });
 

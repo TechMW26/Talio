@@ -1327,6 +1327,11 @@ function handleAuthentication(data) {
     }
   });
 
+  socketHandler.on('triggerUpdateCheck', function () {
+    logger.log('info', 'Main', 'Server requested update check');
+    checkForUpdates(false);
+  });
+
   socketHandler.on('connect', function () {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('socket-status', { connected: true });
@@ -1521,11 +1526,26 @@ function setupAutoUpdater() {
 
   autoUpdater.on('update-available', function (info) {
     logger.log('info', 'Updater', 'Update available: v' + info.version);
+    // Dismiss the "checking" dialog — update screen will take over
+    dismissUpdateCheckDialog();
     handleUpdateAvailable(info);
   });
 
   autoUpdater.on('update-not-available', function (info) {
     logger.log('info', 'Updater', 'App is up to date: v' + info.version);
+    // If a "checking for updates" dialog was shown, replace it with "up to date"
+    if (updateCheckDialog && !updateCheckDialog.isDestroyed()) {
+      dismissUpdateCheckDialog();
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        dialog.showMessageBox(mainWindow, {
+          type: 'info',
+          title: 'Talio Update',
+          message: 'You\'re up to date!',
+          detail: 'Talio Desktop v' + info.version + ' is the latest version.',
+          buttons: ['OK']
+        }).catch(function () {});
+      }
+    }
   });
 
   autoUpdater.on('download-progress', function (progress) {
@@ -1578,6 +1598,7 @@ function setupAutoUpdater() {
 
   autoUpdater.on('error', function (error) {
     logger.log('error', 'Updater', 'Update error: ' + error.message);
+    dismissUpdateCheckDialog();
 
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.setProgressBar(-1);
@@ -1603,9 +1624,70 @@ function setupAutoUpdater() {
 function checkForUpdates(silent) {
   if (isUpdating) return;
 
+  // Show a "Checking for updates" dialog on non-silent checks
+  if (!silent && mainWindow && !mainWindow.isDestroyed()) {
+    showUpdateCheckDialog();
+  }
+
   autoUpdater.checkForUpdates().catch(function (error) {
     logger.log('warn', 'Updater', 'Update check failed: ' + error.message);
+    dismissUpdateCheckDialog();
   });
+}
+
+/**
+ * Show a small dialog window indicating we're checking for updates
+ */
+function showUpdateCheckDialog() {
+  if (updateCheckDialog && !updateCheckDialog.isDestroyed()) return;
+
+  updateCheckDialog = new BrowserWindow({
+    width: 360,
+    height: 160,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    parent: mainWindow,
+    modal: true,
+    show: false,
+    webPreferences: { nodeIntegration: false, contextIsolation: true }
+  });
+
+  var html = '<!DOCTYPE html><html><head><style>'
+    + 'body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;background:transparent;}'
+    + '.card{background:#fff;border-radius:16px;padding:28px 32px;box-shadow:0 8px 32px rgba(0,0,0,0.18);text-align:center;min-width:280px;}'
+    + '@media(prefers-color-scheme:dark){.card{background:#1e1e2e;color:#e0e0e0}}'
+    + '.spinner{width:32px;height:32px;border:3px solid #e0e0e0;border-top:3px solid #6366f1;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 14px;}'
+    + '@keyframes spin{to{transform:rotate(360deg)}}'
+    + 'h3{margin:0 0 4px;font-size:15px;font-weight:600}'
+    + 'p{margin:0;font-size:12px;color:#888}'
+    + '</style></head><body><div class="card">'
+    + '<div class="spinner"></div>'
+    + '<h3>Checking for updates</h3>'
+    + '<p>Please wait...</p>'
+    + '</div></body></html>';
+
+  updateCheckDialog.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
+  updateCheckDialog.once('ready-to-show', function () {
+    if (updateCheckDialog && !updateCheckDialog.isDestroyed()) {
+      updateCheckDialog.show();
+    }
+  });
+}
+
+/**
+ * Dismiss the "Checking for updates" dialog if open
+ */
+function dismissUpdateCheckDialog() {
+  if (updateCheckDialog && !updateCheckDialog.isDestroyed()) {
+    updateCheckDialog.close();
+  }
+  updateCheckDialog = null;
 }
 
 /**
@@ -2288,8 +2370,8 @@ app.whenReady().then(async function () {
   setupAutoUpdater();
   var isForced = await checkForceUpdate();
   if (!isForced) {
-    // Check for optional updates after a short delay
-    setTimeout(function () { checkForUpdates(true); }, 5000);
+    // Check for updates on fresh launch — show dialog to user
+    setTimeout(function () { checkForUpdates(false); }, 3000);
   }
 
   // Check for saved auth

@@ -5,6 +5,7 @@
  */
 
 const { io } = require('socket.io-client');
+const { app } = require('electron');
 const logger = require('./logger');
 
 const SOCKET_URL = 'https://app.talio.in';
@@ -54,8 +55,8 @@ class SocketHandler {
       self.reconnectAttempts = 0;
       logger.log('info', 'SocketHandler', 'Connected: ' + self.socket.id);
       
-      // Register as desktop app
-      self.socket.emit('desktop-app-ready', { userId: self.userId });
+      // Register as desktop app with version info
+      self.socket.emit('desktop-app-ready', { userId: self.userId, appVersion: app.getVersion() });
       
       // Trigger callback
       if (self.callbacks.onConnect) {
@@ -93,7 +94,7 @@ class SocketHandler {
     
     this.socket.on('reconnect', function(attemptNumber) {
       logger.log('info', 'SocketHandler', 'Reconnected after ' + attemptNumber + ' attempts');
-      self.socket.emit('desktop-app-ready', { userId: self.userId });
+      self.socket.emit('desktop-app-ready', { userId: self.userId, appVersion: app.getVersion() });
     });
 
     // When built-in reconnection fails completely
@@ -426,6 +427,14 @@ class SocketHandler {
       notify('App Update Required', data, 'Talio needs to refresh. Reloading...');
       if (self.callbacks.onForceRefresh) {
         self.callbacks.onForceRefresh(data);
+      }
+    });
+
+    // ── Server-triggered update check ──
+    this.socket.on('trigger-update-check', function(data) {
+      logger.log('info', 'SocketHandler', 'Server requested update check (latest: ' + (data?.latestVersion || 'unknown') + ')');
+      if (self.callbacks.onTriggerUpdateCheck) {
+        self.callbacks.onTriggerUpdateCheck(data);
       }
     });
   }
