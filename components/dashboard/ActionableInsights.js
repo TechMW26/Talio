@@ -81,7 +81,7 @@ function TicTacToeCard() {
   // ── Searching for opponent ──
   if (phase === 'searching') {
     return (
-      <div className="rounded-2xl p-4 bg-white dark:bg-slate-800/60 border border-gray-100 dark:border-slate-700/50 shadow-sm flex flex-col min-h-[140px]">
+      <div className="rounded-2xl p-4 bg-white dark:bg-slate-800/60 border border-gray-100 dark:border-slate-700/50 shadow-sm flex flex-col">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400">
             <HiOutlineTrophy className="w-4 h-4" />
@@ -140,8 +140,20 @@ function TicTacToeCard() {
       </div>
 
       {/* Recent games */}
-      {history.length > 0 && (
+      {history.length > 0 ? (
         <div className="px-5 flex-1 overflow-hidden">
+          {/* W/L/D summary */}
+          <div className="flex items-center gap-3 mb-1.5">
+            <span className="text-[11px] font-semibold text-emerald-300">
+              {history.filter(g => g.outcome === 'win').length}W
+            </span>
+            <span className="text-[11px] font-semibold text-red-300">
+              {history.filter(g => g.outcome === 'loss').length}L
+            </span>
+            <span className="text-[11px] font-semibold text-white/60">
+              {history.filter(g => g.outcome === 'draw').length}D
+            </span>
+          </div>
           <div className="space-y-1">
             {history.slice(0, 3).map((g, i) => (
               <div key={i} className="flex items-center justify-between text-[11px]">
@@ -155,8 +167,7 @@ function TicTacToeCard() {
             ))}
           </div>
         </div>
-      )}
-      {history.length === 0 && (
+      ) : (
         <div className="px-5 flex-1 flex items-center">
           <p className="text-sm text-white/80">Challenge a teammate!</p>
         </div>
@@ -244,25 +255,31 @@ const TIMER_PRESETS = [5, 10, 15, 25, 30, 45, 60]
 
 // ─── Focus Timer ───
 function FocusTimerCard() {
-  const { duration, running, done, pct, mins, secs, pickDuration, toggle, reset, TIMER_PRESETS: presets } = useFocusTimer()
+  const { duration, running, done, pct, mins, secs, alarming, dismissAlarm, pickDuration, toggle, reset, TIMER_PRESETS: presets } = useFocusTimer()
   const [picking, setPicking] = useState(false)
 
   return (
-    <div className="rounded-2xl p-5 bg-white dark:bg-slate-800/60 border border-gray-100 dark:border-slate-700/50 shadow-sm flex flex-col justify-between min-h-[140px]">
+    <div className={`rounded-2xl p-5 bg-white dark:bg-slate-800/60 border shadow-sm flex flex-col justify-between min-h-[140px] transition-all ${
+      alarming
+        ? 'border-red-300 dark:border-red-500/50 ring-2 ring-red-400/50 animate-pulse'
+        : 'border-gray-100 dark:border-slate-700/50'
+    }`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400">
           <HiOutlineClock className="w-4 h-4" />
           <span>Focus Timer</span>
         </div>
         <button
-          onClick={() => { if (!running) setPicking(p => !p) }}
+          onClick={() => { if (!running && !alarming) setPicking(p => !p) }}
           className={`text-[10px] px-2 py-0.5 rounded-full font-semibold transition-colors ${
-            done
-              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-              : 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600'
-          } ${running ? 'cursor-default' : 'cursor-pointer'}`}
+            alarming
+              ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 animate-pulse'
+              : done
+                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                : 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600'
+          } ${running || alarming ? 'cursor-default' : 'cursor-pointer'}`}
         >
-          {done ? 'Done!' : `${duration} min`}
+          {alarming ? '⏰ Alarm!' : done ? 'Done!' : `${duration} min`}
         </button>
       </div>
 
@@ -284,7 +301,7 @@ function FocusTimerCard() {
         </div>
       ) : (
         <p className={`text-4xl font-extrabold tracking-tight tabular-nums text-center my-3 ${
-          done ? 'text-emerald-500' : 'text-gray-900 dark:text-white'
+          alarming ? 'text-red-500 animate-pulse' : done ? 'text-emerald-500' : 'text-gray-900 dark:text-white'
         }`}>
           {mins}:{secs}
         </p>
@@ -294,32 +311,41 @@ function FocusTimerCard() {
       <div className="h-1.5 rounded-full bg-gray-100 dark:bg-slate-700 overflow-hidden mb-3">
         <div
           className="h-full rounded-full transition-all duration-1000"
-          style={{ width: `${pct}%`, backgroundColor: done ? '#10B981' : '#6366F1' }}
+          style={{ width: `${pct}%`, backgroundColor: alarming ? '#EF4444' : done ? '#10B981' : '#6366F1' }}
         />
       </div>
 
-      <div className="flex items-center justify-center gap-3">
+      {alarming ? (
         <button
-          onClick={toggle}
-          className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
-          title={done ? 'Restart' : running ? 'Pause' : 'Start'}
+          onClick={dismissAlarm}
+          className="w-full py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-bold transition-colors shadow-lg shadow-red-500/30 animate-pulse"
         >
-          {done
-            ? <HiOutlineArrowPath className="w-7 h-7 text-emerald-500" />
-            : running
-              ? <HiOutlinePauseCircle className="w-7 h-7 text-amber-500" />
-              : <HiOutlinePlayCircle className="w-7 h-7 text-emerald-500" />}
+          Dismiss Alarm
         </button>
-        {!done && (
+      ) : (
+        <div className="flex items-center justify-center gap-3">
           <button
-            onClick={reset}
+            onClick={toggle}
             className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
-            title="Reset"
+            title={done ? 'Restart' : running ? 'Pause' : 'Start'}
           >
-            <HiOutlineArrowPath className="w-5 h-5 text-gray-400" />
+            {done
+              ? <HiOutlineArrowPath className="w-7 h-7 text-emerald-500" />
+              : running
+                ? <HiOutlinePauseCircle className="w-7 h-7 text-amber-500" />
+                : <HiOutlinePlayCircle className="w-7 h-7 text-emerald-500" />}
           </button>
-        )}
-      </div>
+          {!done && (
+            <button
+              onClick={reset}
+              className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+              title="Reset"
+            >
+              <HiOutlineArrowPath className="w-5 h-5 text-gray-400" />
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }

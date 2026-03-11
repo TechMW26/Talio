@@ -407,6 +407,92 @@ export const playGameOverSound = async () => {
   return playSound('gameOver', 0.8)
 }
 
+// ── Timer Alarm (looping, loud, alarm-like) ──
+let timerAlarmNodes = null
+
+/**
+ * Start a looping alarm tone for the focus timer.
+ * Uses two detuned oscillators for a classic alarm sound.
+ * Returns immediately — call stopTimerAlarm() to silence it.
+ */
+export const startTimerAlarm = () => {
+  stopTimerAlarm() // clear any previous alarm
+
+  const ctx = getAudioContext()
+  if (!ctx || ctx.state !== 'running') {
+    // Fallback: loop the taskDone mp3 at full volume
+    try {
+      const audio = new Audio(SOUNDS.taskDone)
+      audio.volume = 1.0
+      audio.loop = true
+      audio.play().catch(() => {})
+      timerAlarmNodes = { fallbackAudio: audio }
+    } catch { /* ignore */ }
+    return
+  }
+
+  try {
+    const masterGain = ctx.createGain()
+    masterGain.gain.value = 0.95
+    masterGain.connect(ctx.destination)
+
+    // Two oscillators for a richer alarm
+    const osc1 = ctx.createOscillator()
+    osc1.type = 'square'
+    osc1.frequency.value = 880
+
+    const osc2 = ctx.createOscillator()
+    osc2.type = 'sawtooth'
+    osc2.frequency.value = 740
+
+    const gain1 = ctx.createGain()
+    gain1.gain.value = 0.5
+    const gain2 = ctx.createGain()
+    gain2.gain.value = 0.35
+
+    osc1.connect(gain1)
+    osc2.connect(gain2)
+    gain1.connect(masterGain)
+    gain2.connect(masterGain)
+
+    // Pulse the alarm on/off (beep-beep pattern)
+    const now = ctx.currentTime
+    for (let t = 0; t < 60; t += 1) {
+      // 0.4s on, 0.6s off
+      masterGain.gain.setValueAtTime(0.95, now + t)
+      masterGain.gain.setValueAtTime(0, now + t + 0.4)
+    }
+
+    osc1.start()
+    osc2.start()
+
+    timerAlarmNodes = { osc1, osc2, gain1, gain2, masterGain }
+    console.log('[Audio] Timer alarm started')
+  } catch (err) {
+    console.error('[Audio] Timer alarm error:', err)
+  }
+}
+
+/**
+ * Stop the timer alarm immediately.
+ */
+export const stopTimerAlarm = () => {
+  if (!timerAlarmNodes) return
+
+  try {
+    if (timerAlarmNodes.fallbackAudio) {
+      timerAlarmNodes.fallbackAudio.pause()
+      timerAlarmNodes.fallbackAudio.currentTime = 0
+    }
+    if (timerAlarmNodes.osc1) timerAlarmNodes.osc1.stop()
+    if (timerAlarmNodes.osc2) timerAlarmNodes.osc2.stop()
+    if (timerAlarmNodes.masterGain) timerAlarmNodes.masterGain.disconnect()
+  } catch { /* already stopped */ }
+
+  timerAlarmNodes = null
+  console.log('[Audio] Timer alarm stopped')
+}
+
 /**
  * Play message sent sound (Web Audio API beep)
  */

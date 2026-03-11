@@ -1,6 +1,6 @@
 'use client'
 
-import { FaUser, FaSignInAlt, FaSignOutAlt, FaCheckCircle, FaTimesCircle } from 'react-icons/fa'
+import { FaUser, FaSignInAlt, FaSignOutAlt, FaCheckCircle, FaTimesCircle, FaEnvelope, FaPhone, FaCalendarAlt, FaBriefcase, FaUserTie } from 'react-icons/fa'
 import { Card, CardBody, Button, Avatar, Chip } from '@heroui/react'
 import { formatDesignation } from '@/lib/formatters'
 
@@ -36,6 +36,34 @@ export default function CheckInOutWidget({
 
   const departmentName = getDepartmentName()
   const designationText = getDesignationText()
+
+  const getReportingManagerName = () => {
+    const rm = employeeData?.reportingManager
+    if (!rm) return null
+    if (typeof rm === 'object') return `${rm.firstName || ''} ${rm.lastName || ''}`.trim() || null
+    return null
+  }
+
+  const getEmploymentType = () => {
+    const type = employeeData?.employmentType || user?.employmentType
+    if (!type) return null
+    return type.charAt(0).toUpperCase() + type.slice(1).replace(/-/g, ' ')
+  }
+
+  const getDateOfJoining = () => {
+    const doj = employeeData?.dateOfJoining || user?.dateOfJoining
+    if (!doj) return null
+    return new Date(doj).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+  }
+
+  const getEmail = () => employeeData?.email || user?.email || null
+  const getPhone = () => employeeData?.phone || user?.phone || null
+
+  const reportingManager = getReportingManagerName()
+  const employmentType = getEmploymentType()
+  const dateOfJoining = getDateOfJoining()
+  const email = getEmail()
+  const phone = getPhone()
 
   const getUserName = () => {
     if (employeeData) {
@@ -120,6 +148,40 @@ export default function CheckInOutWidget({
               </p>
             )}
           </div>
+        </div>
+
+        {/* Additional Details */}
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 mt-4 pt-3 border-t border-white/15">
+          {email && (
+            <div className="flex items-center gap-2 min-w-0">
+              <FaEnvelope className="w-3 h-3 text-white/50 flex-shrink-0" />
+              <span className="text-xs text-white/70 truncate">{email}</span>
+            </div>
+          )}
+          {phone && (
+            <div className="flex items-center gap-2 min-w-0">
+              <FaPhone className="w-3 h-3 text-white/50 flex-shrink-0" />
+              <span className="text-xs text-white/70 truncate">{phone}</span>
+            </div>
+          )}
+          {employmentType && (
+            <div className="flex items-center gap-2 min-w-0">
+              <FaBriefcase className="w-3 h-3 text-white/50 flex-shrink-0" />
+              <span className="text-xs text-white/70 truncate">{employmentType}</span>
+            </div>
+          )}
+          {dateOfJoining && (
+            <div className="flex items-center gap-2 min-w-0">
+              <FaCalendarAlt className="w-3 h-3 text-white/50 flex-shrink-0" />
+              <span className="text-xs text-white/70 truncate">Joined {dateOfJoining}</span>
+            </div>
+          )}
+          {reportingManager && (
+            <div className="flex items-center gap-2 min-w-0 col-span-2">
+              <FaUserTie className="w-3 h-3 text-white/50 flex-shrink-0" />
+              <span className="text-xs text-white/70 truncate">Reports to {reportingManager}</span>
+            </div>
+          )}
         </div>
 
         {/* Action Buttons */}

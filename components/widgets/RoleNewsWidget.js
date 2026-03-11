@@ -302,7 +302,7 @@ export default function RoleNewsWidget() {
                                                         AI Summary
                                                     </span>
                                                 </div>
-                                                <p className="text-sm text-default-800 dark:text-default-200 leading-relaxed">
+                                                <p className="text-sm text-default-800 dark:text-white leading-relaxed">
                                                     {articleData.summary}
                                                 </p>
                                             </div>

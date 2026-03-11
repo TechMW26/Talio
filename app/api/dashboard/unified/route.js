@@ -45,10 +45,11 @@ export async function GET(request) {
     const userWithEmployee = await User.findById(user._id || user.userId)
       .populate({
         path: 'employeeId',
-        select: 'firstName lastName employeeCode designation department profilePicture status _id',
+        select: 'firstName lastName employeeCode designation department profilePicture status email phone dateOfJoining employmentType reportingManager _id',
         populate: [
           { path: 'designation', select: 'title' },
-          { path: 'department', select: 'name' }
+          { path: 'department', select: 'name' },
+          { path: 'reportingManager', select: 'firstName lastName' }
         ]
       })
       .lean()
@@ -96,7 +97,12 @@ export async function GET(request) {
         designation: employee.designation,
         department: employee.department,
         profilePicture: employee.profilePicture,
-        status: employee.status
+        status: employee.status,
+        email: employee.email,
+        phone: employee.phone,
+        dateOfJoining: employee.dateOfJoining,
+        employmentType: employee.employmentType,
+        reportingManager: employee.reportingManager,
       }
     }
 

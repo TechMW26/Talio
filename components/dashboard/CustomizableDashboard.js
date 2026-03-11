@@ -32,7 +32,7 @@ export default function CustomizableDashboard({
 }) {
   const [showAddModal, setShowAddModal] = useState(false)
   const [isEditMode, setIsEditMode] = useState(false)
-  const [columnLayout, setColumnLayout] = useState(2) // Default to 2 columns for desktop
+  const [columnLayout, setColumnLayout] = useState(3) // Default to 3 columns for desktop
   const [isDesktop, setIsDesktop] = useState(false) // Track if on desktop for height matching
 
   // Check if on desktop (md breakpoint = 768px)
@@ -56,13 +56,15 @@ export default function CustomizableDashboard({
   }, [userId])
 
   // Save column layout
-  const toggleColumnLayout = () => {
-    const newLayout = columnLayout === 1 ? 2 : 1
-    setColumnLayout(newLayout)
+  const toggleColumnLayout = (cols) => {
+    setColumnLayout(cols)
     if (typeof window !== 'undefined') {
-      localStorage.setItem(`${LAYOUT_STORAGE_KEY}_${userId}`, newLayout.toString())
+      localStorage.setItem(`${LAYOUT_STORAGE_KEY}_${userId}`, cols.toString())
     }
   }
+
+  // Grid class based on column layout (static classes for Tailwind purging)
+  const gridClass = columnLayout === 3 ? 'grid md:grid-cols-3 gap-5' : columnLayout === 2 ? 'grid md:grid-cols-2 gap-5' : ''
 
   const {
     enabledWidgets,
@@ -125,8 +127,8 @@ export default function CustomizableDashboard({
     widget => widgetComponents[widget.id]
   )
 
-  // Separate top widgets (check-in-out, quick-glance) from the rest
-  const TOP_WIDGET_IDS = new Set(['check-in-out', 'quick-glance'])
+  // Separate top widgets (check-in-out, quick-glance, attendance-summary) from the rest
+  const TOP_WIDGET_IDS = new Set(['check-in-out', 'quick-glance', 'attendance-summary'])
   const topWidgets = orderedWidgets.filter(w => TOP_WIDGET_IDS.has(w.id))
   const remainingWidgets = orderedWidgets.filter(w => !TOP_WIDGET_IDS.has(w.id))
 
@@ -169,7 +171,7 @@ export default function CustomizableDashboard({
           {/* Column Layout Toggle - Desktop Only */}
           <div className="hidden md:flex items-center border border-gray-200 rounded-lg overflow-hidden">
             <button
-              onClick={() => columnLayout !== 1 && toggleColumnLayout()}
+              onClick={() => columnLayout !== 1 && toggleColumnLayout(1)}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors ${
                 columnLayout === 1
                   ? 'bg-primary-500 text-white'
@@ -181,7 +183,7 @@ export default function CustomizableDashboard({
               <span>1 Col</span>
             </button>
             <button
-              onClick={() => columnLayout !== 2 && toggleColumnLayout()}
+              onClick={() => columnLayout !== 2 && toggleColumnLayout(2)}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors ${
                 columnLayout === 2
                   ? 'bg-primary-500 text-white'
@@ -191,6 +193,18 @@ export default function CustomizableDashboard({
             >
               <FaThLarge className="w-3 h-3" />
               <span>2 Col</span>
+            </button>
+            <button
+              onClick={() => columnLayout !== 3 && toggleColumnLayout(3)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs transition-colors ${
+                columnLayout === 3
+                  ? 'bg-primary-500 text-white'
+                  : 'text-gray-500 hover:bg-gray-100'
+              }`}
+              title="Three column layout"
+            >
+              <FaThLarge className="w-3 h-3" />
+              <span>3 Col</span>
             </button>
           </div>
 
@@ -242,7 +256,7 @@ export default function CustomizableDashboard({
           >
             {/* Top Widgets (Check-In/Out, Quick Glance) */}
             {topWidgets.length > 0 && (
-              <div className={`${columnLayout === 2 ? 'grid md:grid-cols-2 gap-5' : className}`} style={columnLayout === 2 && isDesktop ? { gridAutoRows: '1fr' } : {}}>
+              <div className={`${gridClass || className}`} style={columnLayout >= 2 && isDesktop ? { gridAutoRows: 'minmax(280px, 1fr)' } : {}}>
                 {topWidgets.map((widget, index) => {
                   const WidgetContent = widgetComponents[widget.id]
                   return (
@@ -269,7 +283,7 @@ export default function CustomizableDashboard({
 
             {/* Remaining Widgets */}
             {remainingWidgets.length > 0 && (
-              <div className={`mt-5 ${columnLayout === 2 ? 'grid md:grid-cols-2 gap-5' : className}`} style={columnLayout === 2 && isDesktop ? { gridAutoRows: '1fr' } : {}}>
+              <div className={`mt-5 ${gridClass || className}`} style={columnLayout >= 2 && isDesktop ? { gridAutoRows: 'minmax(280px, 1fr)' } : {}}>
                 {remainingWidgets.map((widget, index) => {
                   const WidgetContent = widgetComponents[widget.id]
                   return (

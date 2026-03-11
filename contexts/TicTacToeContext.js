@@ -510,12 +510,14 @@ export function TicTacToeProvider({ children }) {
                       </button>
                       <button
                         onClick={() => {
+                          const newGameId = `ttt_${currentUserId}_${opponent.userId}_${Date.now()}`
+                          setGameId(newGameId)
                           setBoard(Array(9).fill(null))
                           setResult(null)
-                          setMySymbol(prev => prev === 'X' ? 'O' : 'X')
-                          setIsMyTurn(prev => !prev)
-                          setPhase('playing')
-                          sendAction('accept', opponent.userId, { gameId, rematch: true })
+                          setMySymbol('X')
+                          setIsMyTurn(true)
+                          setPhase('waiting')
+                          sendAction('invite', opponent.userId, { gameId: newGameId })
                         }}
                         className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-sm font-semibold text-white hover:opacity-90 transition-opacity shadow-lg shadow-indigo-500/30"
                       >
