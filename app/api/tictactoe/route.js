@@ -238,6 +238,8 @@ export async function POST(request) {
         }
         await game.save()
 
+        console.log(`[Move] global.io available: ${!!global.io}, gameId=${gameId}, cell=${payload.index}, symbol=${payload.symbol}, winner=${result ? JSON.stringify(result) : 'none'}`)
+
         // If game ended via this move, also emit END event so opponent gets the result
         if (result && global.io) {
           const endData = {
