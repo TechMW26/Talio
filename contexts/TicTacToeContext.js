@@ -451,17 +451,17 @@ export function TicTacToeProvider({ children }) {
                   <div className="mb-4 text-center">
                     {phase === 'result' ? (
                       <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-bold ${result?.winner === mySymbol
-                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                          : result?.winner === 'draw'
-                            ? 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300'
-                            : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                        : result?.winner === 'draw'
+                          ? 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300'
+                          : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
                         }`}>
                         {result?.winner === mySymbol ? '🎉 You won!' : result?.winner === 'draw' ? "🤝 It's a draw!" : '😔 You lost!'}
                       </div>
                     ) : (
                       <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold ${isMyTurn
-                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                          : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                        ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
+                        : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
                         }`}>
                         <span className={`w-2 h-2 rounded-full ${isMyTurn ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
                         {isMyTurn ? 'Your turn' : `${opponent?.name}'s turn`}
