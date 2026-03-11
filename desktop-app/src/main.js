@@ -966,6 +966,21 @@ function setupIPCHandlers() {
     return app.getVersion();
   });
 
+  // App info (full details for App Info page)
+  ipcMain.handle('get-app-info', function () {
+    return {
+      version: app.getVersion(),
+      electronVersion: process.versions.electron,
+      chromeVersion: process.versions.chrome,
+      nodeVersion: process.versions.node,
+      platform: process.platform,
+      arch: process.arch,
+      appPath: app.getAppPath(),
+      userDataPath: app.getPath('userData'),
+      isPackaged: app.isPackaged,
+    };
+  });
+
   // Authentication
   ipcMain.handle('auth-data', function (event, data) {
     handleAuthentication(data);
@@ -1219,9 +1234,10 @@ function setupIPCHandlers() {
   });
 
   // ── Auto-Update IPC ──────────────────────────────────────────────────
-  ipcMain.handle('check-for-update', function () {
+  ipcMain.handle('check-for-update', function (event, options) {
     logger.log('info', 'Updater', 'Manual update check requested');
-    checkForUpdates(false);
+    var silent = options && options.silent;
+    checkForUpdates(silent);
     return { success: true };
   });
 
@@ -1599,6 +1615,7 @@ function setupAutoUpdater() {
   autoUpdater.on('error', function (error) {
     logger.log('error', 'Updater', 'Update error: ' + error.message);
     dismissUpdateCheckDialog();
+    sendUpdateStatus('error', { message: error.message });
 
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.setProgressBar(-1);
@@ -1615,6 +1632,15 @@ function setupAutoUpdater() {
   updateCheckTimer = setInterval(function () {
     checkForUpdates(true);
   }, UPDATE_CHECK_INTERVAL);
+}
+
+/**
+ * Send update status to the renderer via IPC
+ */
+function sendUpdateStatus(status, data) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('update-status', { status: status, ...data });
+  }
 }
 
 /**

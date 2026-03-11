@@ -10,6 +10,7 @@ import {
   HiOutlineChatBubbleLeftRight,
   HiOutlineUsers,
   HiOutlineUserCircle,
+  HiOutlineInformationCircle,
 } from 'react-icons/hi2'
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { getMenuItemsForRole } from '@/utils/roleBasedMenus'
@@ -45,6 +46,7 @@ export default function SlidingSidebar({
   const [user, setUser] = useState(null)
   const [mounted, setMounted] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
+  const [isDesktopApp, setIsDesktopApp] = useState(false)
   const { unreadCount } = useUnreadMessages()
   const { toggleWidget } = useChatWidget()
   const { startNavigation, isNavigating, targetPath } = usePageTransition()
@@ -130,6 +132,7 @@ export default function SlidingSidebar({
       const parsedUser = JSON.parse(userData)
       setUser(parsedUser)
     }
+    setIsDesktopApp(typeof window !== 'undefined' && (window.electronAPI !== undefined || window.isElectron === true))
   }, [])
 
   // Get menu items based on user role (memoized)
@@ -510,6 +513,31 @@ export default function SlidingSidebar({
               <span className="text-sm font-medium truncate">Settings</span>
             </div>
           </Link>
+
+          {isDesktopApp && (
+            <Link
+              href="/dashboard/app-info"
+              onClick={() => handleLinkClick('/dashboard/app-info')}
+              className="w-full flex items-center text-left rounded-xl transition-all duration-200 group cursor-pointer relative px-4 py-3"
+              style={{
+                backgroundColor: effectivePath === '/dashboard/app-info' ? 'var(--color-primary-500)' : 'transparent',
+                color: effectivePath === '/dashboard/app-info' ? 'white' : 'var(--color-text-primary)'
+              }}
+            >
+              <div className="flex items-center gap-3 flex-1">
+                <div
+                  className="transition-colors p-2 rounded-lg"
+                  style={{
+                    backgroundColor: effectivePath === '/dashboard/app-info' ? 'var(--color-primary-600)' : 'color-mix(in srgb, var(--color-primary-100) 60%, transparent)',
+                    color: effectivePath === '/dashboard/app-info' ? 'white' : 'var(--color-primary-600)'
+                  }}
+                >
+                  <HiOutlineInformationCircle className="w-5 h-5" />
+                </div>
+                <span className="text-sm font-medium truncate">App Info</span>
+              </div>
+            </Link>
+          )}
 
           <button
             onClick={() => setShowLogoutConfirm(true)}

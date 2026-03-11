@@ -7,6 +7,7 @@ import {
   HiOutlineCog6Tooth,
   HiOutlineArrowRightOnRectangle,
   HiOutlineUserCircle,
+  HiOutlineInformationCircle,
 } from 'react-icons/hi2'
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
@@ -33,6 +34,7 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
   const router = useRouter()
   const [user, setUser] = useState(null)
   const [mounted, setMounted] = useState(false)
+  const [isDesktopApp, setIsDesktopApp] = useState(false)
   const { unreadCount } = useUnreadMessages()
   const { toggleWidget } = useChatWidget()
   const { startNavigation, isNavigating, targetPath } = usePageTransition()
@@ -49,6 +51,7 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
       const parsedUser = JSON.parse(userData)
       setUser(parsedUser)
     }
+    setIsDesktopApp(typeof window !== 'undefined' && (window.electronAPI !== undefined || window.isElectron === true))
   }, [])
 
   // Get menu items based on user role (memoized)
@@ -336,6 +339,24 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
               />
             </Link>
           </Tooltip>
+
+          {isDesktopApp && (
+            <Tooltip content="App Info" placement="right" delay={200} closeDelay={0}>
+              <Link
+                href="/dashboard/app-info"
+                onClick={() => handleLinkClick('/dashboard/app-info')}
+                className="w-full flex items-center justify-center p-2.5 rounded-xl transition-all duration-200 group hover:bg-black/10 dark:hover:bg-white/10"
+                style={{
+                  backgroundColor: effectivePath === '/dashboard/app-info' ? 'var(--color-primary-500)' : 'color-mix(in srgb, var(--color-primary-100) 60%, transparent)',
+                }}
+              >
+                <HiOutlineInformationCircle
+                  className="w-5 h-5 group-hover:text-white transition-colors"
+                  style={{ color: effectivePath === '/dashboard/app-info' ? 'white' : 'var(--color-primary-600)' }}
+                />
+              </Link>
+            </Tooltip>
+          )}
 
           <Tooltip content="Logout" placement="right" delay={200} closeDelay={0}>
             <button

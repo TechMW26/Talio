@@ -168,8 +168,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
 
   // ── Auto-Update ──────────────────────────────────────────────────────
-  checkForUpdate: function() {
-    return ipcRenderer.invoke('check-for-update');
+  checkForUpdate: function(options) {
+    return ipcRenderer.invoke('check-for-update', options);
   },
 
   startUpdate: function() {
@@ -182,6 +182,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   installUpdate: function() {
     return ipcRenderer.invoke('install-update');
+  },
+
+  // ── App Info ──────────────────────────────────────────────────────
+  getAppInfo: function() {
+    return ipcRenderer.invoke('get-app-info');
+  },
+
+  onUpdateStatus: function(callback) {
+    ipcRenderer.on('update-status', function(event, data) {
+      callback(data);
+    });
   },
 
   // ── Title Bar ──────────────────────────────────────────────────────
