@@ -12,13 +12,13 @@ import {
 
 // ─── Win detection ───
 const WIN_LINES = [
-  [0,1,2],[3,4,5],[6,7,8],
-  [0,3,6],[1,4,7],[2,5,8],
-  [0,4,8],[2,4,6],
+  [0, 1, 2], [3, 4, 5], [6, 7, 8],
+  [0, 3, 6], [1, 4, 7], [2, 5, 8],
+  [0, 4, 8], [2, 4, 6],
 ]
 function checkWinner(board) {
-  for (const [a,b,c] of WIN_LINES) {
-    if (board[a] && board[a] === board[b] && board[a] === board[c]) return { winner: board[a], line: [a,b,c] }
+  for (const [a, b, c] of WIN_LINES) {
+    if (board[a] && board[a] === board[b] && board[a] === board[c]) return { winner: board[a], line: [a, b, c] }
   }
   return board.every(c => c) ? { winner: 'draw', line: null } : null
 }
@@ -35,29 +35,29 @@ function fireCrackers() {
   const end = Date.now() + duration
   const colors = ['#6366f1', '#a855f7', '#ec4899', '#f59e0b', '#10b981']
 
-  ;(function frame() {
-    confetti({
-      particleCount: 4,
-      angle: 60,
-      spread: 70,
-      origin: { x: 0, y: 0.7 },
-      colors,
-      zIndex: 2147483647,
-    })
-    confetti({
-      particleCount: 4,
-      angle: 120,
-      spread: 70,
-      origin: { x: 1, y: 0.7 },
-      colors,
-      zIndex: 2147483647,
-    })
-    if (Date.now() < end) requestAnimationFrame(frame)
-  })()
+    ; (function frame() {
+      confetti({
+        particleCount: 4,
+        angle: 60,
+        spread: 70,
+        origin: { x: 0, y: 0.7 },
+        colors,
+        zIndex: 2147483647,
+      })
+      confetti({
+        particleCount: 4,
+        angle: 120,
+        spread: 70,
+        origin: { x: 1, y: 0.7 },
+        colors,
+        zIndex: 2147483647,
+      })
+      if (Date.now() < end) requestAnimationFrame(frame)
+    })()
 }
 
 const TicTacToeContext = createContext({
-  openInvite: () => {},
+  openInvite: () => { },
   hasIncomingInvite: false,
 })
 
@@ -165,7 +165,7 @@ export function TicTacToeProvider({ children }) {
   const closeGame = useCallback(() => {
     // If in an active game, notify the opponent
     if (opponent?.userId && gameId && (phase === 'waiting' || phase === 'playing' || phase === 'result')) {
-      sendAction('close', opponent.userId, { gameId }).catch(() => {})
+      sendAction('close', opponent.userId, { gameId }).catch(() => { })
     }
     setPhase('closed')
     setBoard(Array(9).fill(null))
@@ -186,7 +186,7 @@ export function TicTacToeProvider({ children }) {
         if (data.fromUserId === currentUserId) return
         setIncomingInvite(data)
         setPhase('invite-incoming')
-        playGameInviteSound().catch(() => {})
+        playGameInviteSound().catch(() => { })
       }),
       subscribe(REALTIME_EVENTS.TICTACTOE_ACCEPT, (data) => {
         console.log('[TicTacToe] Received ACCEPT event:', data)
@@ -300,7 +300,7 @@ export function TicTacToeProvider({ children }) {
           setOpponent(null)
           setGameId(null)
         }
-      }).catch(() => {})
+      }).catch(() => { })
     } else if (phaseRef.current === 'closed') {
       // No active game — check for missed invites
       fetch('/api/tictactoe?check=pending', {
@@ -317,9 +317,9 @@ export function TicTacToeProvider({ children }) {
             hostAvatar: data.invite.hostAvatar,
           })
           setPhase('invite-incoming')
-          playGameInviteSound().catch(() => {})
+          playGameInviteSound().catch(() => { })
         }
-      }).catch(() => {})
+      }).catch(() => { })
     }
   }, [isConnected])
 
@@ -328,9 +328,9 @@ export function TicTacToeProvider({ children }) {
     if (phase !== 'result' || !result) return
     if (result.winner === mySymbol) {
       fireCrackers()
-      playSuccessSound().catch(() => {})
+      playSuccessSound().catch(() => { })
     } else if (result.winner !== 'draw') {
-      playGameOverSound().catch(() => {})
+      playGameOverSound().catch(() => { })
     }
   }, [phase, result, mySymbol])
 
@@ -421,21 +421,19 @@ export function TicTacToeProvider({ children }) {
                   {/* Turn / result indicator */}
                   <div className="mb-4 text-center">
                     {phase === 'result' ? (
-                      <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-bold ${
-                        result?.winner === mySymbol
+                      <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-bold ${result?.winner === mySymbol
                           ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
                           : result?.winner === 'draw'
                             ? 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300'
                             : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
-                      }`}>
+                        }`}>
                         {result?.winner === mySymbol ? '🎉 You won!' : result?.winner === 'draw' ? "🤝 It's a draw!" : '😔 You lost!'}
                       </div>
                     ) : (
-                      <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold ${
-                        isMyTurn
+                      <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold ${isMyTurn
                           ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
                           : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                      }`}>
+                        }`}>
                         <span className={`w-2 h-2 rounded-full ${isMyTurn ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
                         {isMyTurn ? 'Your turn' : `${opponent?.name}'s turn`}
                       </div>
