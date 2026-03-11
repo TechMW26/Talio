@@ -82,17 +82,72 @@
       pointer-events: none;
     }
 
-    /* Floating shapes */
-    .shape {
+    /* Animated blobs */
+    .blob {
       position: absolute;
       border-radius: 50%;
-      opacity: 0.06;
-      background: white;
+      filter: blur(40px);
+      opacity: 0.15;
+      animation: blobFloat 8s ease-in-out infinite;
     }
-    .shape-1 { width: 300px; height: 300px; top: -80px; right: -80px; }
-    .shape-2 { width: 200px; height: 200px; bottom: -40px; left: -60px; }
-    .shape-3 { width: 100px; height: 100px; top: 40%; left: 10%; }
-    .shape-4 { width: 60px; height: 60px; bottom: 20%; right: 15%; opacity: 0.1; }
+    .blob-1 {
+      width: 220px; height: 220px;
+      top: -60px; right: -40px;
+      background: radial-gradient(circle, rgba(125,188,175,0.8), rgba(59,130,246,0.4));
+      animation-delay: 0s;
+      animation-duration: 10s;
+    }
+    .blob-2 {
+      width: 180px; height: 180px;
+      bottom: -30px; left: -50px;
+      background: radial-gradient(circle, rgba(99,102,241,0.8), rgba(37,99,235,0.4));
+      animation-delay: -3s;
+      animation-duration: 12s;
+    }
+    .blob-3 {
+      width: 120px; height: 120px;
+      top: 45%; left: 15%;
+      background: radial-gradient(circle, rgba(255,255,255,0.6), rgba(125,188,175,0.3));
+      animation-delay: -5s;
+      animation-duration: 9s;
+    }
+    .blob-4 {
+      width: 80px; height: 80px;
+      bottom: 25%; right: 10%;
+      background: radial-gradient(circle, rgba(167,139,250,0.7), rgba(59,130,246,0.3));
+      animation-delay: -7s;
+      animation-duration: 11s;
+    }
+
+    @keyframes blobFloat {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      25% { transform: translate(15px, -20px) scale(1.05); }
+      50% { transform: translate(-10px, 15px) scale(0.95); }
+      75% { transform: translate(20px, 10px) scale(1.08); }
+    }
+
+    /* Right panel blobs */
+    .right-blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(60px);
+      opacity: 0.06;
+      pointer-events: none;
+      animation: blobFloat 14s ease-in-out infinite;
+    }
+    .right-blob-1 {
+      width: 300px; height: 300px;
+      top: -80px; right: -80px;
+      background: radial-gradient(circle, var(--primary-300), var(--primary-100));
+      animation-delay: -2s;
+    }
+    .right-blob-2 {
+      width: 200px; height: 200px;
+      bottom: -40px; left: -40px;
+      background: radial-gradient(circle, #A7F3D0, #D1FAE5);
+      animation-delay: -6s;
+      animation-duration: 16s;
+    }
 
     .left-content {
       position: relative;
@@ -162,6 +217,7 @@
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      position: relative;
       -webkit-app-region: no-drag;
     }
 
@@ -197,6 +253,36 @@
       transform: translateX(-60px);
     }
 
+    /* Staggered entrance animations for slide children */
+    .slide.active .slide-icon { animation: slideChildIn 0.5s 0.05s cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .slide.active h2 { animation: slideChildIn 0.5s 0.12s cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .slide.active .subtitle { animation: slideChildIn 0.5s 0.19s cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .slide.active .features-grid { animation: slideChildIn 0.5s 0.26s cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .slide.active .permissions-list { animation: slideChildIn 0.5s 0.26s cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .slide.active .ready-check { animation: scaleIn 0.5s 0.05s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+    .slide.active .btn-success { animation: slideChildIn 0.5s 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+    /* Staggered feature cards */
+    .slide.active .feature-card:nth-child(1) { animation: cardIn 0.4s 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .slide.active .feature-card:nth-child(2) { animation: cardIn 0.4s 0.38s cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .slide.active .feature-card:nth-child(3) { animation: cardIn 0.4s 0.46s cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .slide.active .feature-card:nth-child(4) { animation: cardIn 0.4s 0.54s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+    /* Staggered permission items */
+    .slide.active .perm-item:nth-child(1) { animation: cardIn 0.4s 0.3s cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .slide.active .perm-item:nth-child(2) { animation: cardIn 0.4s 0.4s cubic-bezier(0.16, 1, 0.3, 1) both; }
+    .slide.active .perm-item:nth-child(3) { animation: cardIn 0.4s 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+    @keyframes slideChildIn {
+      from { opacity: 0; transform: translateY(18px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes cardIn {
+      from { opacity: 0; transform: translateY(12px) scale(0.96); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
     .slide-icon {
       width: 72px;
       height: 72px;
@@ -205,13 +291,25 @@
       align-items: center;
       justify-content: center;
       margin-bottom: 28px;
-      font-size: 32px;
+    }
+
+    .slide-icon svg {
+      width: 32px;
+      height: 32px;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
     }
 
     .slide-icon.blue { background: linear-gradient(135deg, #DBEAFE, #BFDBFE); }
+    .slide-icon.blue svg { stroke: var(--primary-600); }
     .slide-icon.teal { background: linear-gradient(135deg, #D1FAE5, #A7F3D0); }
+    .slide-icon.teal svg { stroke: #059669; }
     .slide-icon.purple { background: linear-gradient(135deg, #EDE9FE, #DDD6FE); }
+    .slide-icon.purple svg { stroke: #7C3AED; }
     .slide-icon.amber { background: linear-gradient(135deg, #FEF3C7, #FDE68A); }
+    .slide-icon.amber svg { stroke: #D97706; }
 
     .slide h2 {
       font-size: 26px;
@@ -255,8 +353,18 @@
     }
 
     .feature-card .fc-icon {
-      font-size: 22px;
+      width: 28px;
+      height: 28px;
       margin-bottom: 8px;
+    }
+
+    .feature-card .fc-icon svg {
+      width: 100%;
+      height: 100%;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
     }
 
     .feature-card h4 {
@@ -305,13 +413,24 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 20px;
       flex-shrink: 0;
     }
 
+    .perm-icon svg {
+      width: 22px;
+      height: 22px;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      fill: none;
+    }
+
     .perm-icon.blue { background: #DBEAFE; }
+    .perm-icon.blue svg { stroke: var(--primary-600); }
     .perm-icon.green { background: #D1FAE5; }
+    .perm-icon.green svg { stroke: #059669; }
     .perm-icon.purple { background: #EDE9FE; }
+    .perm-icon.purple svg { stroke: #7C3AED; }
 
     .perm-text h4 {
       font-size: 14px;
@@ -336,7 +455,6 @@
       align-items: center;
       justify-content: center;
       margin-bottom: 28px;
-      animation: scaleIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
     }
 
     @keyframes scaleIn {
@@ -472,7 +590,8 @@
     /* Responsive for smaller windows */
     @media (max-height: 620px) {
       .slide { padding: 28px 40px; }
-      .slide-icon { width: 56px; height: 56px; margin-bottom: 18px; font-size: 26px; }
+      .slide-icon { width: 56px; height: 56px; margin-bottom: 18px; }
+      .slide-icon svg { width: 26px; height: 26px; }
       .slide h2 { font-size: 22px; margin-bottom: 8px; }
       .slide p.subtitle { font-size: 13px; margin-bottom: 20px; }
       .feature-card { padding: 12px; }
@@ -494,10 +613,10 @@
   <div class="welcome-wrapper">
     <!-- Left decorative panel -->
     <div class="left-panel">
-      <div class="shape shape-1"></div>
-      <div class="shape shape-2"></div>
-      <div class="shape shape-3"></div>
-      <div class="shape shape-4"></div>
+      <div class="blob blob-1"></div>
+      <div class="blob blob-2"></div>
+      <div class="blob blob-3"></div>
+      <div class="blob blob-4"></div>
       <div class="left-content">
         <div class="logo-container">
           <svg viewBox="0 0 385.322 416.819" xmlns="http://www.w3.org/2000/svg">
@@ -506,38 +625,50 @@
         </div>
         <div class="brand-name">TALIO</div>
         <div class="brand-tagline">Workforce Intelligence Platform</div>
-        <div class="version-badge">Desktop App v4.2.0</div>
+        <div class="version-badge">Desktop App v4.4.0</div>
       </div>
     </div>
 
     <!-- Right content panel -->
     <div class="right-panel">
+      <div class="right-blob right-blob-1"></div>
+      <div class="right-blob right-blob-2"></div>
       <div class="slides-container">
 
         <!-- Slide 1: Welcome -->
         <div class="slide active" data-slide="0">
-          <div class="slide-icon blue">&#128075;</div>
+          <div class="slide-icon blue">
+            <svg viewBox="0 0 24 24"><path d="M15.59 14.37a6 6 0 0 1-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 0 0 6.16-12.12A14.98 14.98 0 0 0 9.631 8.41m5.96 5.96a14.926 14.926 0 0 1-5.841 2.58m-.119-8.54a6 6 0 0 0-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 0 0-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 0 1-2.448-2.448 14.9 14.9 0 0 1 .06-.312m-2.24 2.39a4.493 4.493 0 0 0-3.32 3.32m5.56-5.71a16.037 16.037 0 0 0 1.72-6.33 16.045 16.045 0 0 0-6.33 1.72" stroke="currentColor"/></svg>
+          </div>
           <h2>Welcome to Talio Desktop</h2>
-          <p class="subtitle">Your all-in-one companion for productivity tracking, screen capture, and seamless team collaboration — right from your desktop.</p>
+          <p class="subtitle">Your companion for seamless collaboration, instant alerts, and AI-powered insights — right from your desktop.</p>
           <div class="features-grid">
             <div class="feature-card">
-              <div class="fc-icon">&#128247;</div>
-              <h4>Smart Capture</h4>
-              <span>Automatic screen activity tracking with AI insights</span>
+              <div class="fc-icon">
+                <svg viewBox="0 0 24 24" stroke="#3B82F6"><path d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <h4>Quick Access</h4>
+              <span>One-click launch to your dashboard, tasks & team tools</span>
             </div>
             <div class="feature-card">
-              <div class="fc-icon">&#128276;</div>
+              <div class="fc-icon">
+                <svg viewBox="0 0 24 24" stroke="#3B82F6"><path d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
               <h4>Live Alerts</h4>
               <span>Instant notifications for tasks, meetings & updates</span>
             </div>
             <div class="feature-card">
-              <div class="fc-icon">&#128200;</div>
-              <h4>Productivity</h4>
-              <span>Real-time dashboard with activity analytics</span>
+              <div class="fc-icon">
+                <svg viewBox="0 0 24 24" stroke="#3B82F6"><path d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <h4>Focus Timer</h4>
+              <span>Built-in timer to help you stay in the zone</span>
             </div>
             <div class="feature-card">
-              <div class="fc-icon">&#129302;</div>
-              <h4>MAYA AI</h4>
+              <div class="fc-icon">
+                <svg viewBox="0 0 24 24" stroke="#3B82F6"><path d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <h4>MIRA AI</h4>
               <span>Your AI assistant for work summaries & insights</span>
             </div>
           </div>
@@ -545,26 +676,34 @@
 
         <!-- Slide 2: How It Works -->
         <div class="slide" data-slide="1">
-          <div class="slide-icon teal">&#9881;&#65039;</div>
+          <div class="slide-icon teal">
+            <svg viewBox="0 0 24 24"><path d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.325.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" stroke="currentColor"/><path d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" stroke="currentColor"/></svg>
+          </div>
           <h2>How It Works</h2>
-          <p class="subtitle">Talio Desktop runs quietly in the background, keeping you connected and productive throughout your workday.</p>
+          <p class="subtitle">Talio Desktop stays connected in the background, keeping you in sync with your team throughout your workday.</p>
           <div class="permissions-list">
             <div class="perm-item">
-              <div class="perm-icon blue">&#128187;</div>
+              <div class="perm-icon blue">
+                <svg viewBox="0 0 24 24"><path d="M9 17.25v1.007a3 3 0 0 1-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0 1 15 18.257V17.25m6-12V15a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 15V5.25m18 0A2.25 2.25 0 0 0 18.75 3H5.25A2.25 2.25 0 0 0 3 5.25m18 0V12a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 12V5.25" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
               <div class="perm-text">
                 <h4>Runs in System Tray</h4>
-                <span>The app stays active in your system tray for quick access and uninterrupted monitoring</span>
+                <span>The app stays in your system tray for quick access and instant connectivity</span>
               </div>
             </div>
             <div class="perm-item">
-              <div class="perm-icon green">&#128260;</div>
+              <div class="perm-icon green">
+                <svg viewBox="0 0 24 24"><path d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
               <div class="perm-text">
                 <h4>Auto-Start on Boot</h4>
                 <span>Automatically launches when you start your computer so you never miss a beat</span>
               </div>
             </div>
             <div class="perm-item">
-              <div class="perm-icon purple">&#128274;</div>
+              <div class="perm-icon purple">
+                <svg viewBox="0 0 24 24"><path d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
               <div class="perm-text">
                 <h4>Always Connected</h4>
                 <span>Maintains a secure connection to keep your status and data in sync</span>
@@ -575,26 +714,25 @@
 
         <!-- Slide 3: Permissions -->
         <div class="slide" data-slide="2">
-          <div class="slide-icon purple">&#128737;&#65039;</div>
-          <h2>Required Permissions</h2>
-          <p class="subtitle">The app needs a few permissions to function. You'll be prompted to grant these after setup.</p>
+          <div class="slide-icon purple">
+            <svg viewBox="0 0 24 24"><path d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+          <h2>Permissions Needed</h2>
+          <p class="subtitle">The app needs a couple of permissions to work properly. You'll be prompted to grant these after setup.</p>
           <div class="permissions-list">
             <div class="perm-item">
-              <div class="perm-icon blue">&#128248;</div>
-              <div class="perm-text">
-                <h4>Screen Recording</h4>
-                <span>Needed for activity capture and screen sharing during calls</span>
+              <div class="perm-icon blue">
+                <svg viewBox="0 0 24 24"><path d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
               </div>
-            </div>
-            <div class="perm-item">
-              <div class="perm-icon green">&#128276;</div>
               <div class="perm-text">
                 <h4>Notifications</h4>
                 <span>To alert you about tasks, meetings, messages, and updates</span>
               </div>
             </div>
             <div class="perm-item">
-              <div class="perm-icon purple">&#128188;</div>
+              <div class="perm-icon green">
+                <svg viewBox="0 0 24 24"><path d="M5.25 14.25h13.5m-13.5 0a3 3 0 0 1-3-3m3 3a3 3 0 1 0 0 6h13.5a3 3 0 1 0 0-6m-16.5-3a3 3 0 0 1 3-3h13.5a3 3 0 0 1 3 3m-19.5 0a4.5 4.5 0 0 1 .9-2.7L5.737 5.1a3.375 3.375 0 0 1 2.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 0 1 .9 2.7m0 0a3 3 0 0 1-3 3m0 3h.008v.008h-.008v-.008Zm0-6h.008v.008h-.008v-.008Zm-3 6h.008v.008h-.008v-.008Zm0-6h.008v.008h-.008v-.008Z" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
               <div class="perm-text">
                 <h4>Startup Access</h4>
                 <span>To launch automatically when your workday begins</span>

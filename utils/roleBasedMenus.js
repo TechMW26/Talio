@@ -24,6 +24,7 @@ import {
   HiOutlineComputerDesktop,
   HiOutlineListBullet,
   HiOutlineSignal,
+  HiOutlineLightBulb,
 } from 'react-icons/hi2'
 
 // Define menu items for each role
@@ -136,6 +137,7 @@ export const roleBasedMenus = {
     { name: 'Assets', icon: HiOutlineCube, path: '/dashboard/assets', group: 'Resources' },
     { name: 'Helpdesk', icon: HiOutlineLifebuoy, path: '/dashboard/helpdesk', group: 'Resources' },
     { name: 'Policies', icon: HiOutlineBookOpen, path: '/dashboard/policies', group: 'Resources' },
+    { name: 'Ideas', icon: HiOutlineLightBulb, path: '/dashboard/sandbox', group: 'Resources' },
     {
       name: 'Learning (LMS)',
       icon: HiOutlineAcademicCap,
@@ -266,6 +268,7 @@ export const roleBasedMenus = {
     { name: 'Assets', icon: HiOutlineCube, path: '/dashboard/assets', group: 'Resources' },
     { name: 'Policies', icon: HiOutlineBookOpen, path: '/dashboard/policies', group: 'Resources' },
     { name: 'Helpdesk', icon: HiOutlineLifebuoy, path: '/dashboard/helpdesk', group: 'Resources' },
+    { name: 'Ideas', icon: HiOutlineLightBulb, path: '/dashboard/sandbox', group: 'Resources' },
     {
       name: 'Learning (LMS)',
       icon: HiOutlineAcademicCap,
@@ -351,6 +354,7 @@ export const roleBasedMenus = {
     },
     { name: 'Announcements', icon: HiOutlineMegaphone, path: '/dashboard/announcements', group: 'Company' },
     { name: 'Helpdesk', icon: HiOutlineLifebuoy, path: '/dashboard/helpdesk', group: 'Resources' },
+    { name: 'Ideas', icon: HiOutlineLightBulb, path: '/dashboard/sandbox', group: 'Resources' },
     { name: 'General Calendar', icon: HiOutlineCalendarDays, path: '/dashboard/calendar', group: 'Company' },
   ],
 
@@ -413,6 +417,7 @@ export const roleBasedMenus = {
     },
     { name: 'Announcements', icon: HiOutlineMegaphone, path: '/dashboard/announcements', group: 'Company' },
     { name: 'Helpdesk', icon: HiOutlineLifebuoy, path: '/dashboard/helpdesk', group: 'Resources' },
+    { name: 'Ideas', icon: HiOutlineLightBulb, path: '/dashboard/sandbox', group: 'Resources' },
     { name: 'General Calendar', icon: HiOutlineCalendarDays, path: '/dashboard/calendar', group: 'Company' },
   ],
 
@@ -480,6 +485,7 @@ export const roleBasedMenus = {
     },
     { name: 'Announcements', icon: HiOutlineMegaphone, path: '/dashboard/announcements', group: 'Company' },
     { name: 'Helpdesk', icon: HiOutlineLifebuoy, path: '/dashboard/helpdesk', group: 'Resources' },
+    { name: 'Ideas', icon: HiOutlineLightBulb, path: '/dashboard/sandbox', group: 'Resources' },
     { name: 'General Calendar', icon: HiOutlineCalendarDays, path: '/dashboard/calendar', group: 'Company' },
   ],
 }

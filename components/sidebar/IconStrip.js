@@ -6,14 +6,17 @@ import {
   HiOutlineChevronRight,
   HiOutlineCog6Tooth,
   HiOutlineArrowRightOnRectangle,
+  HiOutlineUserCircle,
 } from 'react-icons/hi2'
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { getMenuItemsForRole } from '@/utils/roleBasedMenus'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
 import { usePageTransition } from '@/contexts/PageTransitionContext'
 import UnreadBadge from '@/components/UnreadBadge'
-import { Chip, Tooltip } from '@heroui/react'
+import toast from '@/utils/toast'
+import { Chip, Tooltip, Avatar } from '@heroui/react'
 
 // Badge component for sidebar counts
 function SidebarBadge({ count }) {
@@ -27,6 +30,7 @@ function SidebarBadge({ count }) {
 
 export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartmentHead = false }) {
   const pathname = usePathname()
+  const router = useRouter()
   const [user, setUser] = useState(null)
   const [mounted, setMounted] = useState(false)
   const { unreadCount } = useUnreadMessages()
@@ -138,6 +142,31 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
     return null
   }
 
+  const getUserInitials = () => {
+    const firstName = user?.firstName || ''
+    const lastName = user?.lastName || ''
+    if (firstName || lastName) {
+      return `${firstName[0] || ''}${lastName[0] || ''}`.toUpperCase()
+    }
+    return user?.email?.[0]?.toUpperCase() || 'U'
+  }
+
+  const handleLogout = () => {
+    const token = localStorage.getItem('token')
+    if (token) {
+      fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      }).catch(() => {})
+    }
+    localStorage.removeItem('token')
+    localStorage.removeItem('user')
+    localStorage.removeItem('userId')
+    document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
+    toast.success('Logged out successfully')
+    router.push('/login')
+  }
+
   return (
     <>
       {/* Icon Strip - Always visible on desktop */}
@@ -147,28 +176,53 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
           backgroundColor: 'var(--color-bg-sidebar)'
         }}
       >
-        {/* Logo + Expand Button Section */}
-        <div
-          className="h-[60.5px] flex items-center justify-between px-2 flex-shrink-0"
-        >
+        {/* Logo Section */}
+        <div className="flex flex-col items-center pt-3 pb-1 flex-shrink-0">
           <img
             src="/assets/lanyard-card-logo.webp"
             alt="Talio"
-            className="h-10 w-auto object-contain"
+            className="h-9 w-auto object-contain"
           />
-          <Tooltip content="Expand Menu" placement="right" delay={200} closeDelay={0}>
-            <button
-              onClick={() => onExpandClick(null)}
-              className="p-1.5 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-slate-700"
-              title="Expand sidebar"
-            >
-              <HiOutlineChevronRight className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-            </button>
-          </Tooltip>
         </div>
 
         {/* Menu Icons */}
         <div ref={menuContainerRef} className="flex-1 overflow-y-auto scrollbar-hide py-4 px-2 space-y-1">
+          {/* Expand sidebar — styled like a menu item */}
+          <Tooltip content="Expand Menu" placement="right" delay={200} closeDelay={0}>
+            <button
+              onClick={() => onExpandClick(null)}
+              className="w-full flex items-center justify-center p-2.5 rounded-xl transition-all duration-200 hover:bg-black/10 dark:hover:bg-white/10"
+              style={{ backgroundColor: 'var(--color-primary-100)' }}
+            >
+              <HiOutlineChevronRight className="w-6 h-6" style={{ color: 'var(--color-primary-600)' }} />
+            </button>
+          </Tooltip>
+
+          {/* Profile avatar */}
+          <Tooltip content={user?.firstName ? `${user.firstName} ${user.lastName || ''}` : 'Profile'} placement="right" delay={200} closeDelay={0}>
+            <Link
+              href="/dashboard/profile"
+              onClick={() => handleLinkClick('/dashboard/profile')}
+              className="w-full flex items-center justify-center p-1.5 rounded-xl transition-all duration-200 group hover:bg-black/10 dark:hover:bg-white/10"
+              style={{
+                backgroundColor: effectivePath === '/dashboard/profile' ? 'var(--color-primary-500)' : 'transparent',
+              }}
+            >
+              <Avatar
+                size="sm"
+                src={user?.profilePicture}
+                name={getUserInitials()}
+                className="w-8 h-8 text-xs"
+                style={{
+                  backgroundColor: effectivePath === '/dashboard/profile' ? 'white' : 'var(--color-primary-500)',
+                  color: effectivePath === '/dashboard/profile' ? 'var(--color-primary-500)' : 'white',
+                }}
+              />
+            </Link>
+          </Tooltip>
+
+          <div className="my-2 mx-2 border-t" style={{ borderColor: 'var(--color-primary-200)' }} />
+
           {menuItems.map((item, index) => {
             const isActive = isMenuItemActive(item)
             const badgeCount = getBadgeCount(item.name)
@@ -263,8 +317,38 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
               </div>
             )
           })}
-        </div>
 
+          {/* Divider + Settings / Logout — bottom of menu */}
+          <div className="my-2 mx-2 border-t" style={{ borderColor: 'var(--color-primary-200)' }} />
+
+          <Tooltip content="Settings" placement="right" delay={200} closeDelay={0}>
+            <Link
+              href="/dashboard/settings"
+              onClick={() => handleLinkClick('/dashboard/settings')}
+              className="w-full flex items-center justify-center p-2.5 rounded-xl transition-all duration-200 group hover:bg-black/10 dark:hover:bg-white/10"
+              style={{
+                backgroundColor: effectivePath === '/dashboard/settings' ? 'var(--color-primary-500)' : 'color-mix(in srgb, var(--color-primary-100) 60%, transparent)',
+              }}
+            >
+              <HiOutlineCog6Tooth
+                className="w-5 h-5 group-hover:text-white transition-colors"
+                style={{ color: effectivePath === '/dashboard/settings' ? 'white' : 'var(--color-primary-600)' }}
+              />
+            </Link>
+          </Tooltip>
+
+          <Tooltip content="Logout" placement="right" delay={200} closeDelay={0}>
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center justify-center p-2.5 rounded-xl transition-all duration-200 group hover:bg-danger-100 dark:hover:bg-danger-900/30"
+              style={{
+                backgroundColor: 'color-mix(in srgb, var(--color-primary-100) 60%, transparent)',
+              }}
+            >
+              <HiOutlineArrowRightOnRectangle className="w-5 h-5 text-danger-500 group-hover:text-danger-600 transition-colors" />
+            </button>
+          </Tooltip>
+        </div>
 
       </aside>
 

@@ -8,7 +8,8 @@ import {
   HiOutlineCog6Tooth,
   HiOutlineArrowRightOnRectangle,
   HiOutlineChatBubbleLeftRight,
-  HiOutlineUsers
+  HiOutlineUsers,
+  HiOutlineUserCircle,
 } from 'react-icons/hi2'
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { getMenuItemsForRole } from '@/utils/roleBasedMenus'
@@ -17,7 +18,7 @@ import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
 import { usePageTransition } from '@/contexts/PageTransitionContext'
 import UnreadBadge from '@/components/UnreadBadge'
-import { Button, Chip, ScrollShadow, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter } from '@heroui/react'
+import { Button, Chip, ScrollShadow, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Avatar } from '@heroui/react'
 
 // Inline badge component for expanded menu items
 function InlineBadge({ count }) {
@@ -318,6 +319,38 @@ export default function SlidingSidebar({
 
         {/* Scrollable Menu Section */}
         <ScrollShadow ref={scrollContainerRef} className="pt-4 pb-8 flex-1 scrollbar-hide px-3 space-y-1">
+          {/* Profile — top of menu */}
+          <Link
+            href="/dashboard/profile"
+            onClick={() => handleLinkClick('/dashboard/profile')}
+            className="w-full flex items-center text-left rounded-xl transition-all duration-200 group cursor-pointer relative px-4 py-3"
+            style={{
+              backgroundColor: effectivePath === '/dashboard/profile' ? 'var(--color-primary-500)' : 'transparent',
+              color: effectivePath === '/dashboard/profile' ? 'white' : 'var(--color-text-primary)'
+            }}
+          >
+            <div className="flex items-center gap-3 flex-1">
+              <Avatar
+                size="sm"
+                src={user?.profilePicture}
+                name={(() => {
+                  const fn = user?.firstName || '', ln = user?.lastName || ''
+                  return (fn || ln) ? `${fn[0] || ''}${ln[0] || ''}`.toUpperCase() : (user?.email?.[0]?.toUpperCase() || 'U')
+                })()}
+                className="w-9 h-9 text-xs"
+                style={{
+                  backgroundColor: effectivePath === '/dashboard/profile' ? 'white' : 'var(--color-primary-500)',
+                  color: effectivePath === '/dashboard/profile' ? 'var(--color-primary-500)' : 'white',
+                }}
+              />
+              <span className="text-sm font-medium truncate">
+                {user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'My Profile'}
+              </span>
+            </div>
+          </Link>
+
+          <div className="my-2 mx-2 border-t" style={{ borderColor: 'var(--color-primary-200)' }} />
+
           {menuItems.map((item, index) => {
             const isActive = isMenuItemActive(item)
             const isTargeted = activeSubmenu === item.name
@@ -451,6 +484,47 @@ export default function SlidingSidebar({
               </div>
             )
           })}
+
+          {/* Divider + Settings / Logout — bottom of menu */}
+          <div className="my-2 mx-2 border-t" style={{ borderColor: 'var(--color-primary-200)' }} />
+
+          <Link
+            href="/dashboard/settings"
+            onClick={() => handleLinkClick('/dashboard/settings')}
+            className="w-full flex items-center text-left rounded-xl transition-all duration-200 group cursor-pointer relative px-4 py-3"
+            style={{
+              backgroundColor: effectivePath === '/dashboard/settings' ? 'var(--color-primary-500)' : 'transparent',
+              color: effectivePath === '/dashboard/settings' ? 'white' : 'var(--color-text-primary)'
+            }}
+          >
+            <div className="flex items-center gap-3 flex-1">
+              <div
+                className="transition-colors p-2 rounded-lg"
+                style={{
+                  backgroundColor: effectivePath === '/dashboard/settings' ? 'var(--color-primary-600)' : 'color-mix(in srgb, var(--color-primary-100) 60%, transparent)',
+                  color: effectivePath === '/dashboard/settings' ? 'white' : 'var(--color-primary-600)'
+                }}
+              >
+                <HiOutlineCog6Tooth className="w-5 h-5" />
+              </div>
+              <span className="text-sm font-medium truncate">Settings</span>
+            </div>
+          </Link>
+
+          <button
+            onClick={() => setShowLogoutConfirm(true)}
+            className="w-full flex items-center text-left rounded-xl transition-all duration-200 group cursor-pointer relative px-4 py-3 hover:bg-danger-50 dark:hover:bg-danger-900/20"
+            style={{
+              color: 'var(--color-text-primary)'
+            }}
+          >
+            <div className="flex items-center gap-3 flex-1">
+              <div className="transition-colors p-2 rounded-lg" style={{ backgroundColor: 'color-mix(in srgb, var(--color-primary-100) 60%, transparent)' }}>
+                <HiOutlineArrowRightOnRectangle className="w-5 h-5 text-danger-500" />
+              </div>
+              <span className="text-sm font-medium truncate text-danger-500">Logout</span>
+            </div>
+          </button>
         </ScrollShadow>
       </aside>
 
