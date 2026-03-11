@@ -79,6 +79,7 @@ export function TicTacToeProvider({ children }) {
   const gameIdRef = useRef(gameId)
   const mySymbolRef = useRef(mySymbol)
   const wasConnectedRef = useRef(false)
+  const hasConnectedOnceRef = useRef(false)
 
   // Keep refs in sync
   useEffect(() => { phaseRef.current = phase }, [phase])
@@ -263,11 +264,14 @@ export function TicTacToeProvider({ children }) {
       return
     }
 
-    const wasDisconnected = !wasConnectedRef.current
     wasConnectedRef.current = true
 
-    // Skip the initial connection (not a reconnection)
-    if (!wasDisconnected) return
+    // Skip the very first connection — not a reconnection.
+    // The component will check for pending invites on mount separately.
+    if (!hasConnectedOnceRef.current) {
+      hasConnectedOnceRef.current = true
+      return
+    }
 
     console.log('[TicTacToe] Socket reconnected — running catch-up sync')
     const token = localStorage.getItem('token')
@@ -322,6 +326,31 @@ export function TicTacToeProvider({ children }) {
       }).catch(() => { })
     }
   }, [isConnected])
+
+  // ─── Initial mount: check for pending invite (single GET) ───
+  useEffect(() => {
+    const token = localStorage.getItem('token')
+    if (!token) return
+    if (phaseRef.current !== 'closed') return
+
+    fetch('/api/tictactoe?check=pending', {
+      headers: { Authorization: `Bearer ${token}` }
+    }).then(r => r.json()).then(data => {
+      if (data.invite) {
+        setIncomingInvite({
+          gameId: data.invite.gameId,
+          fromUserId: data.invite.hostUserId,
+          hostUserId: data.invite.hostUserId,
+          fromName: data.invite.hostName,
+          hostName: data.invite.hostName,
+          fromAvatar: data.invite.hostAvatar,
+          hostAvatar: data.invite.hostAvatar,
+        })
+        setPhase('invite-incoming')
+        playGameInviteSound().catch(() => { })
+      }
+    }).catch(() => { })
+  }, [])
 
   // ─── Win/Loss effects ───
   useEffect(() => {
