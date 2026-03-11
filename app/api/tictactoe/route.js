@@ -5,20 +5,29 @@ import { sendPushToUser } from '@/lib/pushNotification'
 
 // ─── Win detection (server-side) ───
 const WIN_LINES = [
-  [0,1,2],[3,4,5],[6,7,8],
-  [0,3,6],[1,4,7],[2,5,8],
-  [0,4,8],[2,4,6],
+  [0, 1, 2], [3, 4, 5], [6, 7, 8],
+  [0, 3, 6], [1, 4, 7], [2, 5, 8],
+  [0, 4, 8], [2, 4, 6],
 ]
 function checkWinner(board) {
-  for (const [a,b,c] of WIN_LINES) {
-    if (board[a] && board[a] === board[b] && board[a] === board[c]) return { winner: board[a], line: [a,b,c] }
+  for (const [a, b, c] of WIN_LINES) {
+    if (board[a] && board[a] === board[b] && board[a] === board[c]) return { winner: board[a], line: [a, b, c] }
   }
   return board.every(c => c) ? { winner: 'draw', line: null } : null
 }
 
 /**
- * GET /api/tictactoe?check=pending  — Check for pending invites for current user
- * GET /api/tictactoe?gameId=xxx     — Poll game state
+ * GET /api/tictactoe
+ *
+ * ⚠️  ON-DEMAND ONLY — NEVER call these endpoints on an interval/timer.
+ * All real-time game updates are pushed via Socket.IO events.
+ *
+ * Acceptable use cases:
+ *   1. ?check=history  — Load game history on widget mount (one-time)
+ *   2. ?check=pending  — Check for pending invite on initial page load only
+ *   3. ?gameId=xxx     — Catch-up sync after reconnection or foreground resume
+ *
+ * These must NEVER be called via setInterval or any polling mechanism.
  */
 export async function GET(request) {
   try {
@@ -153,11 +162,18 @@ export async function POST(request) {
 
       // Send push notification
       sendPushToUser(targetUserId, {
-        title: '🎮 Game Invite!',
-        body: `${senderName} wants to play Tic-Tac-Toe with you!`,
+        title: `🎮 ${senderName} challenged you!`,
+        body: `Tap to accept and play Tic-Tac-Toe now`,
       }, {
+        data: {
+          type: 'tictactoe_invite',
+          gameId,
+          hostUserId: senderId,
+          hostName: senderName,
+          hostAvatar: senderAvatar,
+        },
         url: '/dashboard',
-        type: 'system',
+        type: 'tictactoe_invite',
         models: { User, Notification },
       }).catch(err => console.warn('[TicTacToe API] Push notification error:', err))
     }
@@ -205,15 +221,26 @@ export async function POST(request) {
         }
         await game.save()
 
-        // If game ended, also emit END event so opponent gets the result
+        // If game ended via this move, also emit END event so opponent gets the result
         if (result && global.io) {
           const endData = {
             gameId,
             result,
             board,
+            currentTurn: null,
+            status: 'ended',
+            lastMoveAt: game.lastMoveAt?.toISOString() || new Date().toISOString(),
             fromUserId: senderId,
             fromName: senderName,
+            fromAvatar: senderAvatar,
             targetUserId,
+            hostUserId: game.hostUserId,
+            hostName: game.hostName,
+            hostAvatar: game.hostAvatar,
+            guestUserId: game.guestUserId,
+            guestName: game.guestName,
+            guestAvatar: game.guestAvatar,
+            hostSymbol: game.hostSymbol || 'X',
             timestamp: new Date().toISOString(),
           }
           global.io.to(`user:${targetUserId}`).emit(REALTIME_EVENTS.TICTACTOE_END, endData)
@@ -247,13 +274,16 @@ export async function POST(request) {
         global.io.to(`user:${targetUserId}`).emit(REALTIME_EVENTS.TICTACTOE_CLOSE, {
           gameId,
           fromUserId: senderId,
+          fromName: senderName,
           timestamp: new Date().toISOString(),
         })
       }
       return NextResponse.json({ success: true })
     }
 
-    // ── Socket.IO: emit if available (fast path) ──
+    // ── Socket.IO: emit self-contained event with full game state ──
+    // Every event payload includes the complete game state so clients
+    // never need a follow-up GET request after receiving an event.
     const io = global.io
     if (io) {
       const eventMap = {
@@ -263,14 +293,34 @@ export async function POST(request) {
         move: REALTIME_EVENTS.TICTACTOE_MOVE,
         end: REALTIME_EVENTS.TICTACTOE_END,
       }
+
+      // Build a rich payload that includes everything the client needs
+      const gameObj = game?.toObject?.() || game || {}
       const eventData = {
+        // Action-specific fields from the original request
         ...payload,
+        // Identity fields
         fromUserId: senderId,
         fromName: senderName,
         fromAvatar: senderAvatar,
         targetUserId,
         timestamp: new Date().toISOString(),
+        // Full self-contained game state — clients never need a follow-up GET
+        gameId: gameObj.gameId || gameId,
+        board: gameObj.board || null,
+        currentTurn: gameObj.currentTurn || null,
+        status: gameObj.status || null,
+        result: gameObj.result || null,
+        lastMoveAt: gameObj.lastMoveAt || null,
+        hostUserId: gameObj.hostUserId || senderId,
+        hostName: gameObj.hostName || senderName,
+        hostAvatar: gameObj.hostAvatar || senderAvatar,
+        guestUserId: gameObj.guestUserId || targetUserId,
+        guestName: gameObj.guestName || null,
+        guestAvatar: gameObj.guestAvatar || null,
+        hostSymbol: gameObj.hostSymbol || 'X',
       }
+
       io.to(`user:${targetUserId}`).emit(eventMap[action], eventData)
       if (['accept', 'move', 'end'].includes(action)) {
         io.to(`user:${senderId}`).emit(eventMap[action], eventData)
