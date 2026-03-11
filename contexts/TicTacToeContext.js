@@ -352,46 +352,101 @@ export function TicTacToeProvider({ children }) {
     }).catch(() => { })
   }, [])
 
-  // ─── Polling fallback: catch pending invites when Socket.IO is down ───
-  // This fires every 3s ONLY when the socket is disconnected AND we're idle.
-  // Once the socket connects, the interval is cleared immediately.
+  // ─── Polling fallback: keep game in sync when Socket.IO is down ───
+  // Covers ALL phases: closed (invite detection), waiting (accept/decline),
+  // playing (opponent moves), and result (game end).
+  // Automatically stops when Socket.IO connects.
   useEffect(() => {
-    // Only poll when Socket.IO is NOT connected and we're in closed phase
-    if (isConnected) return
-    if (phaseRef.current !== 'closed') return
+    if (isConnected) return // Socket.IO is working — no polling needed
 
     const token = localStorage.getItem('token')
     if (!token) return
 
-    console.log('[TicTacToe] Socket disconnected — starting invite polling fallback')
+    console.log('[TicTacToe] Socket disconnected — starting game polling fallback (phase:', phaseRef.current, ')')
     const interval = setInterval(() => {
-      if (phaseRef.current !== 'closed') {
-        clearInterval(interval)
+      const currentPhase = phaseRef.current
+      const gid = gameIdRef.current
+
+      // Phase: closed — check for incoming invites
+      if (currentPhase === 'closed') {
+        fetch('/api/tictactoe?check=pending', {
+          headers: { Authorization: `Bearer ${token}` }
+        }).then(r => r.json()).then(data => {
+          if (data.invite) {
+            console.log('[TicTacToe] Polling found pending invite:', data.invite.gameId)
+            setIncomingInvite({
+              gameId: data.invite.gameId,
+              fromUserId: data.invite.hostUserId,
+              hostUserId: data.invite.hostUserId,
+              fromName: data.invite.hostName,
+              hostName: data.invite.hostName,
+              fromAvatar: data.invite.hostAvatar,
+              hostAvatar: data.invite.hostAvatar,
+            })
+            setPhase('invite-incoming')
+            playGameInviteSound().catch(() => { })
+          }
+        }).catch(() => { })
         return
       }
-      fetch('/api/tictactoe?check=pending', {
-        headers: { Authorization: `Bearer ${token}` }
-      }).then(r => r.json()).then(data => {
-        if (data.invite) {
-          console.log('[TicTacToe] Polling found pending invite:', data.invite.gameId)
-          setIncomingInvite({
-            gameId: data.invite.gameId,
-            fromUserId: data.invite.hostUserId,
-            hostUserId: data.invite.hostUserId,
-            fromName: data.invite.hostName,
-            hostName: data.invite.hostName,
-            fromAvatar: data.invite.hostAvatar,
-            hostAvatar: data.invite.hostAvatar,
-          })
-          setPhase('invite-incoming')
-          playGameInviteSound().catch(() => { })
-          clearInterval(interval)
-        }
-      }).catch(() => { })
-    }, 3000)
+
+      // Phases: waiting, playing, result — sync game state from server
+      if (gid && (currentPhase === 'waiting' || currentPhase === 'playing')) {
+        fetch(`/api/tictactoe?gameId=${encodeURIComponent(gid)}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        }).then(r => r.json()).then(data => {
+          if (!data.success || !data.game) return
+          const g = data.game
+
+          if (currentPhase === 'waiting') {
+            // Host waiting — check if guest accepted, declined, or closed
+            if (g.status === 'playing') {
+              console.log('[TicTacToe] Polling: opponent accepted — transitioning to playing')
+              setBoard(normalizeBoard(g.board))
+              setResult(null)
+              setPhase('playing')
+              setIsMyTurn(g.currentTurn === mySymbolRef.current)
+              if (g.guestName) {
+                setOpponent(prev => prev ? { ...prev, name: g.guestName || prev.name, avatar: g.guestAvatar ?? prev.avatar } : prev)
+              }
+            } else if (g.status === 'declined') {
+              console.log('[TicTacToe] Polling: opponent declined')
+              setPhase('closed')
+              setOpponent(null)
+            } else if (g.status === 'ended') {
+              console.log('[TicTacToe] Polling: game ended while waiting')
+              setPhase('closed')
+              setBoard(Array(9).fill(null))
+              setResult(null)
+              setOpponent(null)
+              setGameId(null)
+            }
+          } else if (currentPhase === 'playing') {
+            // In-game — sync board, check for new moves / game end
+            const serverBoard = normalizeBoard(g.board)
+            setBoard(serverBoard)
+            setIsMyTurn(g.currentTurn === mySymbolRef.current)
+
+            if (g.status === 'ended') {
+              if (g.result) {
+                setResult(g.result)
+                setPhase('result')
+              } else {
+                // Opponent closed the game
+                setPhase('closed')
+                setBoard(Array(9).fill(null))
+                setResult(null)
+                setOpponent(null)
+                setGameId(null)
+              }
+            }
+          }
+        }).catch(() => { })
+      }
+    }, 2000)
 
     return () => clearInterval(interval)
-  }, [isConnected])
+  }, [isConnected, phase])
 
   // ─── Win/Loss effects ───
   useEffect(() => {
