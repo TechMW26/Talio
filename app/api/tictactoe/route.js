@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-import { REALTIME_EVENTS } from '@/lib/realtimeEvents'
 import { sendPushToUser } from '@/lib/pushNotification'
+import pusherServer from '@/lib/pusherServer'
 
 // ─── Win detection (server-side) ───
 const WIN_LINES = [
@@ -238,33 +238,7 @@ export async function POST(request) {
         }
         await game.save()
 
-        console.log(`[Move] global.io available: ${!!global.io}, gameId=${gameId}, cell=${payload.index}, symbol=${payload.symbol}, winner=${result ? JSON.stringify(result) : 'none'}`)
-
-        // If game ended via this move, also emit END event so opponent gets the result
-        if (result && global.io) {
-          const endData = {
-            gameId,
-            result,
-            board,
-            currentTurn: null,
-            status: 'ended',
-            lastMoveAt: game.lastMoveAt?.toISOString() || new Date().toISOString(),
-            fromUserId: senderId,
-            fromName: senderName,
-            fromAvatar: senderAvatar,
-            targetUserId,
-            hostUserId: game.hostUserId,
-            hostName: game.hostName,
-            hostAvatar: game.hostAvatar,
-            guestUserId: game.guestUserId,
-            guestName: game.guestName,
-            guestAvatar: game.guestAvatar,
-            hostSymbol: game.hostSymbol || 'X',
-            timestamp: new Date().toISOString(),
-          }
-          global.io.to(`user:${targetUserId}`).emit(REALTIME_EVENTS.TICTACTOE_END, endData)
-          global.io.to(`user:${senderId}`).emit(REALTIME_EVENTS.TICTACTOE_END, endData)
-        }
+        console.log(`[Move] gameId=${gameId}, cell=${payload.index}, symbol=${payload.symbol}, winner=${result ? JSON.stringify(result) : 'none'}`)
       }
     }
 
@@ -288,79 +262,80 @@ export async function POST(request) {
         { status: 'ended' },
         { new: true }
       )
-      // Emit close event to the other user
-      if (global.io) {
-        global.io.to(`user:${targetUserId}`).emit(REALTIME_EVENTS.TICTACTOE_CLOSE, {
+      // Emit close event to the other user via Pusher
+      try {
+        await pusherServer.trigger(`user-${targetUserId}`, 'tictactoe:close', {
           gameId,
           fromUserId: senderId,
           fromName: senderName,
           timestamp: new Date().toISOString(),
         })
+      } catch (pusherErr) {
+        console.error('[TicTacToe] Pusher close error:', pusherErr)
       }
       return NextResponse.json({ success: true })
     }
 
-    // ── Socket.IO: emit self-contained event with full game state ──
+    // ── Pusher: emit self-contained event with full game state ──
     // Every event payload includes the complete game state so clients
     // never need a follow-up GET request after receiving an event.
-    const io = global.io
-
-    // ── Delivery diagnostics ──
-    console.log(`[TicTacToe] Socket.IO delivery: io=${!!io} action=${action}`)
-    if (io) {
-      const targetRoom = io.sockets.adapter.rooms.get(`user:${targetUserId}`)
-      const targetRoomSize = targetRoom ? targetRoom.size : 0
-      console.log(`[TicTacToe] Socket.IO emit: room=user:${targetUserId} connected=${targetRoomSize > 0} roomSize=${targetRoomSize}`)
-      if (targetRoomSize === 0) {
-        console.warn(`[TicTacToe] ⚠️ Guest room user:${targetUserId} is EMPTY — Socket.IO event will not be received`)
-      }
-    } else {
-      console.error(`[TicTacToe] ❌ global.io is NULL — Socket.IO emission skipped entirely. Events cannot be delivered in real-time.`)
+    const eventMap = {
+      invite: 'tictactoe:invite',
+      accept: 'tictactoe:accept',
+      decline: 'tictactoe:decline',
+      move: 'tictactoe:move',
+      end: 'tictactoe:end',
     }
 
-    if (io) {
-      const eventMap = {
-        invite: REALTIME_EVENTS.TICTACTOE_INVITE,
-        accept: REALTIME_EVENTS.TICTACTOE_ACCEPT,
-        decline: REALTIME_EVENTS.TICTACTOE_DECLINE,
-        move: REALTIME_EVENTS.TICTACTOE_MOVE,
-        end: REALTIME_EVENTS.TICTACTOE_END,
-      }
+    // Build a rich payload that includes everything the client needs
+    const gameObj = game?.toObject?.() || game || {}
+    const eventData = {
+      // Action-specific fields from the original request
+      ...payload,
+      // Identity fields
+      fromUserId: senderId,
+      fromName: senderName,
+      fromAvatar: senderAvatar,
+      targetUserId,
+      timestamp: new Date().toISOString(),
+      // Full self-contained game state — clients never need a follow-up GET
+      gameId: gameObj.gameId || gameId,
+      board: gameObj.board || null,
+      currentTurn: gameObj.currentTurn || null,
+      status: gameObj.status || null,
+      result: gameObj.result || null,
+      lastMoveAt: gameObj.lastMoveAt || null,
+      hostUserId: gameObj.hostUserId || senderId,
+      hostName: gameObj.hostName || senderName,
+      hostAvatar: gameObj.hostAvatar || senderAvatar,
+      guestUserId: gameObj.guestUserId || targetUserId,
+      guestName: gameObj.guestName || null,
+      guestAvatar: gameObj.guestAvatar || null,
+      hostSymbol: gameObj.hostSymbol || 'X',
+    }
 
-      // Build a rich payload that includes everything the client needs
-      const gameObj = game?.toObject?.() || game || {}
-      const eventData = {
-        // Action-specific fields from the original request
-        ...payload,
-        // Identity fields
-        fromUserId: senderId,
-        fromName: senderName,
-        fromAvatar: senderAvatar,
-        targetUserId,
-        timestamp: new Date().toISOString(),
-        // Full self-contained game state — clients never need a follow-up GET
-        gameId: gameObj.gameId || gameId,
-        board: gameObj.board || null,
-        currentTurn: gameObj.currentTurn || null,
-        status: gameObj.status || null,
-        result: gameObj.result || null,
-        lastMoveAt: gameObj.lastMoveAt || null,
-        hostUserId: gameObj.hostUserId || senderId,
-        hostName: gameObj.hostName || senderName,
-        hostAvatar: gameObj.hostAvatar || senderAvatar,
-        guestUserId: gameObj.guestUserId || targetUserId,
-        guestName: gameObj.guestName || null,
-        guestAvatar: gameObj.guestAvatar || null,
-        hostSymbol: gameObj.hostSymbol || 'X',
-      }
-
-      io.to(`user:${targetUserId}`).emit(eventMap[action], eventData)
+    try {
+      // Send to target user
+      await pusherServer.trigger(`user-${targetUserId}`, eventMap[action], eventData)
+      // For accept/move/end, also send to sender so they get confirmation
       if (['accept', 'move', 'end'].includes(action)) {
-        io.to(`user:${senderId}`).emit(eventMap[action], eventData)
+        await pusherServer.trigger(`user-${senderId}`, eventMap[action], eventData)
       }
+      // If game ended via a move, also send explicit END event to both players
+      if (action === 'move' && gameObj.status === 'ended' && gameObj.result) {
+        const endData = { ...eventData, status: 'ended' }
+        await pusherServer.trigger(
+          [`user-${targetUserId}`, `user-${senderId}`],
+          'tictactoe:end',
+          endData
+        )
+      }
+      console.log(`[TicTacToe] ✅ Pusher ${action} sent: gameId=${gameId} target=user-${targetUserId}`)
+    } catch (pusherErr) {
+      console.error(`[TicTacToe] ❌ Pusher trigger error for ${action}:`, pusherErr)
     }
 
-    console.log(`[TicTacToe] ✅ ${action} completed: gameId=${gameId} host=${senderId} guest=${targetUserId} io=${!!io}`)
+    console.log(`[TicTacToe] ✅ ${action} completed: gameId=${gameId} host=${senderId} guest=${targetUserId}`)
 
     return NextResponse.json({ success: true, game: game?.toObject?.() || game || null })
   } catch (error) {
