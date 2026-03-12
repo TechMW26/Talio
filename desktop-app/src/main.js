@@ -1,5 +1,5 @@
 /**
- * Talio Desktop App v4.4.0
+ * Talio Desktop App v4.5.1
  * Main Electron process
  * 
  * Performance optimized for smooth rendering
@@ -90,6 +90,7 @@ let forceCloseAttempts = 0;
 let windowRecreateTimer = null;
 let isUpdating = false;
 let updateCheckTimer = null;
+let updateCheckDialog = null;
 
 // Persistent store
 const store = new Store({ name: 'app-data' });
@@ -125,7 +126,7 @@ async function requestPermissions() {
         silent: true
       });
       testNotif.show();
-      setTimeout(function() { testNotif.close(); }, 4000);
+      setTimeout(function () { testNotif.close(); }, 4000);
       logger.log('info', 'Main', 'Windows notification test OK');
     } catch (e) {
       logger.log('warn', 'Main', 'Windows notification test failed: ' + e.message);
@@ -143,7 +144,7 @@ async function requestPermissions() {
         silent: true
       });
       testNotif.show();
-      setTimeout(function() { testNotif.close(); }, 4000);
+      setTimeout(function () { testNotif.close(); }, 4000);
     } catch (e) {
       logger.log('warn', 'Main', 'Linux notification test failed: ' + e.message);
     }
@@ -200,7 +201,7 @@ async function requestPermissions() {
         silent: true
       });
       testNotif.show();
-      setTimeout(function() { testNotif.close(); }, 4000);
+      setTimeout(function () { testNotif.close(); }, 4000);
       logger.log('info', 'Main', 'macOS notification permission triggered');
     } catch (e) {
       logger.log('warn', 'Main', 'macOS notification test failed: ' + e.message);
@@ -311,6 +312,12 @@ function createWindow() {
 
   // Handle render process crashes - with recovery limit to prevent infinite loop
   mainWindow.webContents.on('render-process-gone', function (event, details) {
+    // Don't attempt recovery during update installation
+    if (isUpdating) {
+      logger.log('info', 'Main', 'Renderer crash during update — not recovering (update in progress)');
+      return;
+    }
+
     const now = Date.now();
     logger.log('error', 'Main', 'Render process gone: ' + details.reason + ' (exitCode: ' + details.exitCode + ')');
 
@@ -391,7 +398,7 @@ function injectTitleBarAdaptations() {
     'header > div > div > * { -webkit-app-region: no-drag; }\n' +
     platformCSS;
 
-  mainWindow.webContents.insertCSS(css).catch(function () {});
+  mainWindow.webContents.insertCSS(css).catch(function () { });
 
   // Inject theme color detection — watches for dark mode / theme changes and syncs title bar
   var themeScript =
@@ -415,7 +422,7 @@ function injectTitleBarAdaptations() {
     '  setInterval(syncTitleBar, 5000);\n' +
     '})()';
 
-  mainWindow.webContents.executeJavaScript(themeScript).catch(function () {});
+  mainWindow.webContents.executeJavaScript(themeScript).catch(function () { });
 }
 
 /**
@@ -565,6 +572,12 @@ function showCrashPage() {
  */
 function setupWindowEvents() {
   mainWindow.on('close', function (event) {
+    // CRITICAL: Let the window close during update installation
+    if (isUpdating) {
+      logger.log('info', 'Main', 'Window close allowed — update installing');
+      return; // Don't prevent default
+    }
+
     // FORCE PERSISTENT: Never let the window close
     event.preventDefault();
 
@@ -706,11 +719,22 @@ function setupWindowEvents() {
  * Acts as a watchdog to ensure the app stays running
  */
 function scheduleWindowRecreation() {
+  // CRITICAL: Never recreate while an update is being installed
+  if (isUpdating) {
+    logger.log('info', 'Main', 'Watchdog: Skipping window recreation — update in progress');
+    return;
+  }
+
   if (windowRecreateTimer) {
     clearTimeout(windowRecreateTimer);
   }
 
   windowRecreateTimer = setTimeout(function () {
+    // Double-check: update may have started while timer was pending
+    if (isUpdating) {
+      logger.log('info', 'Main', 'Watchdog: Aborting recreation — update started during delay');
+      return;
+    }
     if (!mainWindow || mainWindow.isDestroyed()) {
       logger.log('info', 'Main', 'Watchdog: Recreating destroyed window');
       createWindow();
@@ -1266,6 +1290,7 @@ function setupIPCHandlers() {
   ipcMain.handle('install-update', function () {
     logger.log('info', 'Updater', 'Install update and restart');
     isQuitting = true;
+    isUpdating = true;
     forceCloseAttempts = 999;
     autoUpdater.quitAndInstall(false, true);
   });
@@ -1533,22 +1558,22 @@ function setupAutoUpdater() {
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.allowDowngrade = false;
 
-  // Log provider config
-  logger.log('info', 'Updater', 'Auto-updater configured for GitHub Releases');
+  // Detailed provider config logging
+  logger.log('info', 'Updater', 'Auto-updater configured — provider: GitHub Releases, version: ' + app.getVersion() + ', platform: ' + process.platform + ', arch: ' + process.arch);
 
   autoUpdater.on('checking-for-update', function () {
-    logger.log('info', 'Updater', 'Checking for updates...');
+    logger.log('info', 'Updater', '[LIFECYCLE] Checking for update...');
   });
 
   autoUpdater.on('update-available', function (info) {
-    logger.log('info', 'Updater', 'Update available: v' + info.version);
+    logger.log('info', 'Updater', '[LIFECYCLE] Update available: v' + info.version + ' (releaseDate: ' + (info.releaseDate || 'unknown') + ', files: ' + JSON.stringify((info.files || []).map(function (f) { return f.url; })) + ')');
     // Dismiss the "checking" dialog — update screen will take over
     dismissUpdateCheckDialog();
     handleUpdateAvailable(info);
   });
 
   autoUpdater.on('update-not-available', function (info) {
-    logger.log('info', 'Updater', 'App is up to date: v' + info.version);
+    logger.log('info', 'Updater', '[LIFECYCLE] No update available. Current: v' + app.getVersion() + ', Latest: v' + info.version);
     // If a "checking for updates" dialog was shown, replace it with "up to date"
     if (updateCheckDialog && !updateCheckDialog.isDestroyed()) {
       dismissUpdateCheckDialog();
@@ -1559,12 +1584,16 @@ function setupAutoUpdater() {
           message: 'You\'re up to date!',
           detail: 'Talio Desktop v' + info.version + ' is the latest version.',
           buttons: ['OK']
-        }).catch(function () {});
+        }).catch(function () { });
       }
     }
   });
 
   autoUpdater.on('download-progress', function (progress) {
+    var pct = Math.round(progress.percent || 0);
+    if (pct % 25 === 0 || pct === 100) {
+      logger.log('info', 'Updater', '[LIFECYCLE] Download progress: ' + pct + '% (' + Math.round((progress.transferred || 0) / 1048576) + '/' + Math.round((progress.total || 0) / 1048576) + ' MB)');
+    }
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.executeJavaScript(
         'window.postMessage(' + JSON.stringify({
@@ -1574,7 +1603,7 @@ function setupAutoUpdater() {
           transferred: progress.transferred,
           total: progress.total
         }) + ', "*")'
-      ).catch(function () {});
+      ).catch(function () { });
     }
     // Update taskbar progress (Windows) / dock progress (macOS)
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -1583,13 +1612,13 @@ function setupAutoUpdater() {
   });
 
   autoUpdater.on('update-downloaded', function (info) {
-    logger.log('info', 'Updater', 'Update downloaded: v' + info.version);
+    logger.log('info', 'Updater', '[LIFECYCLE] Update downloaded. Preparing to install v' + info.version + '...');
 
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.setProgressBar(-1); // Clear progress bar
       mainWindow.webContents.executeJavaScript(
         'window.postMessage({ type: "update-downloaded" }, "*")'
-      ).catch(function () {});
+      ).catch(function () { });
     }
 
     // Clear old cache before installing
@@ -1600,12 +1629,15 @@ function setupAutoUpdater() {
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.executeJavaScript(
           'window.postMessage({ type: "update-complete" }, "*")'
-        ).catch(function () {});
+        ).catch(function () { });
       }
 
       // Quit and install after showing completion screen
       setTimeout(function () {
+        logger.log('info', 'Updater', '[LIFECYCLE] quitAndInstall() called (isSilent=false, isForceRunAfter=true)');
+        // CRITICAL: Set flags BEFORE quitAndInstall so before-quit/close handlers allow it
         isQuitting = true;
+        isUpdating = true; // Tells window-all-closed & scheduleWindowRecreation to stand down
         forceCloseAttempts = 999; // Bypass force-close protection for update
         autoUpdater.quitAndInstall(false, true); // isSilent=false, isForceRunAfter=true
       }, 2500);
@@ -1613,8 +1645,12 @@ function setupAutoUpdater() {
   });
 
   autoUpdater.on('error', function (error) {
-    logger.log('error', 'Updater', 'Update error: ' + error.message);
+    logger.log('error', 'Updater', '[LIFECYCLE] Update error: ' + error.message + (error.stack ? '\n' + error.stack : ''));
     dismissUpdateCheckDialog();
+
+    // CRITICAL: Reset isUpdating so future update checks are not blocked
+    isUpdating = false;
+
     sendUpdateStatus('error', { message: error.message });
 
     if (mainWindow && !mainWindow.isDestroyed()) {
@@ -1624,11 +1660,11 @@ function setupAutoUpdater() {
           type: 'update-error',
           message: error.message
         }) + ', "*")'
-      ).catch(function () {});
+      ).catch(function () { });
     }
   });
 
-  // Schedule periodic update checks
+  // Schedule periodic update checks (silent)
   updateCheckTimer = setInterval(function () {
     checkForUpdates(true);
   }, UPDATE_CHECK_INTERVAL);
@@ -1648,7 +1684,12 @@ function sendUpdateStatus(status, data) {
  * @param {boolean} silent - If true, don't show UI for "no update" case
  */
 function checkForUpdates(silent) {
-  if (isUpdating) return;
+  if (isUpdating) {
+    logger.log('info', 'Updater', 'checkForUpdates skipped — update already in progress');
+    return;
+  }
+
+  logger.log('info', 'Updater', 'checkForUpdates called (silent=' + silent + ')');
 
   // Show a "Checking for updates" dialog on non-silent checks
   if (!silent && mainWindow && !mainWindow.isDestroyed()) {
@@ -1721,6 +1762,7 @@ function dismissUpdateCheckDialog() {
  */
 function handleUpdateAvailable(info) {
   isUpdating = true;
+  logger.log('info', 'Updater', 'handleUpdateAvailable — loading update screen for v' + info.version);
 
   // Show update page
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -1733,7 +1775,7 @@ function handleUpdateAvailable(info) {
           current: app.getVersion(),
           latest: info.version
         }) + ', "*")'
-      ).catch(function () {});
+      ).catch(function () { });
 
       mainWindow.show();
       mainWindow.focus();
@@ -1792,7 +1834,23 @@ async function checkForceUpdate() {
     logger.log('info', 'Updater', 'Min version: ' + minVersion + ', Current: ' + currentVersion);
 
     if (compareVersions(currentVersion, minVersion) < 0) {
-      logger.log('warn', 'Updater', 'App version is below minimum! Blocking usage.');
+      logger.log('warn', 'Updater', 'App version is below minimum! Triggering auto-update before blocking UI.');
+
+      // Try to start the auto-update FIRST — only block the UI if we can't update silently
+      try {
+        var result = await autoUpdater.checkForUpdates();
+        if (result && result.updateInfo && compareVersions(result.updateInfo.version, currentVersion) > 0) {
+          logger.log('info', 'Updater', 'Update available (v' + result.updateInfo.version + ') — update screen will take over');
+          // handleUpdateAvailable is triggered by the 'update-available' event
+          // Don't show the blocking screen since the update UI handles it
+          return true;
+        }
+      } catch (updateErr) {
+        logger.log('warn', 'Updater', 'Auto-update check failed during force-update: ' + updateErr.message);
+      }
+
+      // Only show the blocking screen if auto-update couldn't start
+      logger.log('warn', 'Updater', 'No update found or update check failed — showing blocking screen');
       showUpdateRequiredScreen(currentVersion, minVersion, data.message);
       return true;
     }
@@ -1828,6 +1886,23 @@ function showUpdateRequiredScreen(currentVersion, minVersion, serverMessage) {
 
   var msg = serverMessage || 'A critical update is available. You must update to continue using Talio.';
 
+  // Use webContents.on('console-message') as a communication channel from data URL
+  // The page will console.log('TALIO_START_UPDATE') which we intercept
+  // (data URLs don't get preload.js, so electronAPI won't be available)
+  var updateListener = function (event, level, message) {
+    if (message === 'TALIO_START_UPDATE') {
+      logger.log('info', 'Updater', 'Update triggered from required-update screen');
+      mainWindow.webContents.removeListener('console-message', updateListener);
+      checkForUpdates(false);
+    }
+  };
+  // Remove any previous listener to prevent duplicates if called multiple times
+  if (mainWindow._updateRequiredListener) {
+    mainWindow.webContents.removeListener('console-message', mainWindow._updateRequiredListener);
+  }
+  mainWindow._updateRequiredListener = updateListener;
+  mainWindow.webContents.on('console-message', updateListener);
+
   var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Update Required - Talio</title>' +
     '<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;500;600;700;800&display=swap" rel="stylesheet">' +
     '<style>' +
@@ -1845,7 +1920,7 @@ function showUpdateRequiredScreen(currentVersion, minVersion, serverMessage) {
     '.va{color:#94A3B8;font-size:18px}' +
     '.vn{background:#D1FAE5;color:#059669}' +
     '.blocked{padding:14px 20px;background:#FEF3C7;border:1px solid #FDE68A;border-radius:12px;color:#92400E;font-size:13px;font-weight:500;margin-bottom:28px;display:flex;align-items:center;gap:8px}' +
-    '.btn{-webkit-app-region:no-drag;padding:14px 36px;borrder-radius:12px;background:linear-gradient(135deg,#2563EB,#3B82F6);color:white;border:none;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;border-radius:12px;box-shadow:0 4px 14px rgba(59,130,246,0.35);transition:all .2s}' +
+    '.btn{-webkit-app-region:no-drag;padding:14px 36px;border-radius:12px;background:linear-gradient(135deg,#2563EB,#3B82F6);color:white;border:none;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;box-shadow:0 4px 14px rgba(59,130,246,0.35);transition:all .2s}' +
     '.btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(59,130,246,0.45)}' +
     '.btn:active{transform:translateY(0)}' +
     '.note{margin-top:20px;font-size:12px;color:#94A3B8}' +
@@ -1860,8 +1935,9 @@ function showUpdateRequiredScreen(currentVersion, minVersion, serverMessage) {
     '</div>' +
     '<script>' +
     'function doUpdate(){' +
-    'if(window.electronAPI&&window.electronAPI.startUpdate){window.electronAPI.startUpdate()}' +
-    'else{window.postMessage({type:"start-update"},"*")}' +
+    'console.log("TALIO_START_UPDATE");' +
+    'document.querySelector(".btn").textContent="Checking for updates...";' +
+    'document.querySelector(".btn").disabled=true;' +
     '}' +
     '</script></body></html>';
 
@@ -2379,6 +2455,21 @@ function setupNetworkMonitoring() {
 app.whenReady().then(async function () {
   logger.log('info', 'Main', 'App ready - version ' + app.getVersion());
 
+  // ── Crash-loop detection ──────────────────────────────────────────
+  // Track rapid restarts: if the app started 5+ times in the last 60 seconds,
+  // skip auto-update and min-version enforcement so the user isn't stuck.
+  var startHistory = store.get('startHistory', []);
+  var now = Date.now();
+  // Keep only starts within the last 60 seconds
+  startHistory = startHistory.filter(function (t) { return now - t < 60000; });
+  startHistory.push(now);
+  store.set('startHistory', startHistory);
+
+  var isCrashLoop = startHistory.length >= 5;
+  if (isCrashLoop) {
+    logger.log('error', 'Main', 'CRASH LOOP DETECTED — ' + startHistory.length + ' starts in 60s. Entering safe mode: skipping auto-update and min-version enforcement.');
+  }
+
   // Setup session permissions for screen sharing
   setupSessionPermissions();
 
@@ -2392,12 +2483,29 @@ app.whenReady().then(async function () {
   // Request permissions on macOS (camera, mic, screen recording)
   await requestPermissions();
 
-  // Setup auto-updater and check for forced updates
+  // Setup auto-updater (registers event listeners — safe even in crash loop)
   setupAutoUpdater();
-  var isForced = await checkForceUpdate();
-  if (!isForced) {
-    // Check for updates on fresh launch — show dialog to user
-    setTimeout(function () { checkForUpdates(false); }, 3000);
+
+  if (!isCrashLoop) {
+    // Check for forced updates (min version)
+    var isForced = await checkForceUpdate();
+    if (!isForced) {
+      // Check for updates on fresh launch — SILENT so no dialog blocks startup
+      setTimeout(function () { checkForUpdates(true); }, 5000);
+    }
+  } else {
+    // In crash-loop safe mode: notify user
+    setTimeout(function () {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        dialog.showMessageBox(mainWindow, {
+          type: 'warning',
+          title: 'Safe Mode',
+          message: 'Talio started in safe mode',
+          detail: 'The app detected multiple rapid restarts. Auto-update and minimum version checks have been temporarily disabled. If the problem persists, please reinstall the app or contact support.',
+          buttons: ['OK']
+        }).catch(function () { });
+      }
+    }, 3000);
   }
 
   // Check for saved auth
@@ -2419,6 +2527,11 @@ app.whenReady().then(async function () {
 });
 
 app.on('window-all-closed', function () {
+  // If an update is installing, let the app quit cleanly
+  if (isUpdating) {
+    logger.log('info', 'Main', 'All windows closed during update — allowing quit');
+    return;
+  }
   // FORCE PERSISTENT: Never quit when windows are closed
   // Instead, recreate the window
   logger.log('warn', 'Main', 'All windows closed - recreating (force persistent mode)');
@@ -2426,11 +2539,20 @@ app.on('window-all-closed', function () {
 });
 
 app.on('before-quit', function (event) {
+  // Always allow quit when an update is installing
+  if (isUpdating) {
+    logger.log('info', 'Main', 'Allowing quit — update is installing');
+    isQuitting = true;
+    screenshotService.stop();
+    socketHandler.disconnect();
+    return;
+  }
+
   // Intercept quit attempts - only allow after multiple force-close attempts
   if (forceCloseAttempts < 3) {
     event.preventDefault();
     logger.log('warn', 'Main', 'Quit attempt blocked (force persistent mode)');
-    
+
     // Show the window again
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.show();
@@ -2438,7 +2560,7 @@ app.on('before-quit', function (event) {
     } else {
       scheduleWindowRecreation();
     }
-    
+
     showNotification('\u26a0\ufe0f Talio Cannot Be Closed', 'Talio must remain running on company devices. Contact your administrator if you need to stop the application.');
     forceCloseAttempts++;
     return;
