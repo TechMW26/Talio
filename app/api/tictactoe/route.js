@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { sendPushToUser } from '@/lib/pushNotification'
-import pusherServer from '@/lib/pusherServer'
 
 // ─── Win detection (server-side) ───
 const WIN_LINES = [
@@ -19,15 +18,12 @@ function checkWinner(board) {
 /**
  * GET /api/tictactoe
  *
- * ⚠️  ON-DEMAND ONLY — NEVER call these endpoints on an interval/timer.
- * All real-time game updates are pushed via Socket.IO events.
+ * Smart-polling compatible — clients poll during active game phases only.
  *
- * Acceptable use cases:
+ * Endpoints:
  *   1. ?check=history  — Load game history on widget mount (one-time)
- *   2. ?check=pending  — Check for pending invite on initial page load only
- *   3. ?gameId=xxx     — Catch-up sync after reconnection or foreground resume
- *
- * These must NEVER be called via setInterval or any polling mechanism.
+ *   2. ?check=pending  — Check for pending invites (polled every ~5s when idle)
+ *   3. ?gameId=xxx     — Poll game state (every ~1.5s during active game)
  */
 export async function GET(request) {
   try {
@@ -93,7 +89,7 @@ export async function GET(request) {
 }
 
 /**
- * POST /api/tictactoe — DB-first game actions. Socket.IO used when available.
+ * POST /api/tictactoe — DB-first game actions. Clients poll for state changes.
  * Body: { action, targetUserId, ...payload }
  * Actions: invite | accept | decline | move | end
  */
@@ -262,77 +258,7 @@ export async function POST(request) {
         { status: 'ended' },
         { new: true }
       )
-      // Emit close event to the other user via Pusher
-      try {
-        await pusherServer.trigger(`user-${targetUserId}`, 'tictactoe:close', {
-          gameId,
-          fromUserId: senderId,
-          fromName: senderName,
-          timestamp: new Date().toISOString(),
-        })
-      } catch (pusherErr) {
-        console.error('[TicTacToe] Pusher close error:', pusherErr)
-      }
       return NextResponse.json({ success: true })
-    }
-
-    // ── Pusher: emit self-contained event with full game state ──
-    // Every event payload includes the complete game state so clients
-    // never need a follow-up GET request after receiving an event.
-    const eventMap = {
-      invite: 'tictactoe:invite',
-      accept: 'tictactoe:accept',
-      decline: 'tictactoe:decline',
-      move: 'tictactoe:move',
-      end: 'tictactoe:end',
-    }
-
-    // Build a rich payload that includes everything the client needs
-    const gameObj = game?.toObject?.() || game || {}
-    const eventData = {
-      // Action-specific fields from the original request
-      ...payload,
-      // Identity fields
-      fromUserId: senderId,
-      fromName: senderName,
-      fromAvatar: senderAvatar,
-      targetUserId,
-      timestamp: new Date().toISOString(),
-      // Full self-contained game state — clients never need a follow-up GET
-      gameId: gameObj.gameId || gameId,
-      board: gameObj.board || null,
-      currentTurn: gameObj.currentTurn || null,
-      status: gameObj.status || null,
-      result: gameObj.result || null,
-      lastMoveAt: gameObj.lastMoveAt || null,
-      hostUserId: gameObj.hostUserId || senderId,
-      hostName: gameObj.hostName || senderName,
-      hostAvatar: gameObj.hostAvatar || senderAvatar,
-      guestUserId: gameObj.guestUserId || targetUserId,
-      guestName: gameObj.guestName || null,
-      guestAvatar: gameObj.guestAvatar || null,
-      hostSymbol: gameObj.hostSymbol || 'X',
-    }
-
-    try {
-      // Send to target user
-      await pusherServer.trigger(`user-${targetUserId}`, eventMap[action], eventData)
-      // For accept/move/end, also send to sender so they get confirmation
-      if (['accept', 'move', 'end'].includes(action)) {
-        await pusherServer.trigger(`user-${senderId}`, eventMap[action], eventData)
-      }
-      // If game ended via a move, also send explicit END event to both players
-      if (action === 'move' && gameObj.status === 'ended' && gameObj.result) {
-        const endData = { ...eventData, status: 'ended' }
-        await pusherServer.trigger(
-          [`user-${targetUserId}`, `user-${senderId}`],
-          'tictactoe:end',
-          endData
-        )
-      }
-      console.log(`[TicTacToe] ✅ Pusher ${action} sent: gameId=${gameId} target=user-${targetUserId}`)
-    } catch (pusherErr) {
-      console.error(`[TicTacToe] ❌ Pusher trigger error for ${action}:`, pusherErr)
     }
 
     console.log(`[TicTacToe] ✅ ${action} completed: gameId=${gameId} host=${senderId} guest=${targetUserId}`)
