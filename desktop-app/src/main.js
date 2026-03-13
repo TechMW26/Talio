@@ -997,13 +997,15 @@ function setupIPCHandlers() {
 
   // App info (full details for App Info page)
   ipcMain.handle('get-app-info', function () {
+    // Detect native architecture — on Apple Silicon running x64 under Rosetta, report arm64
+    const nativeArch = (process.platform === 'darwin' && process.arch === 'x64' && app.runningUnderARM64Translation)
+      ? 'arm64'
+      : process.arch;
+
     return {
       version: app.getVersion(),
-      electronVersion: process.versions.electron,
-      chromeVersion: process.versions.chrome,
-      nodeVersion: process.versions.node,
       platform: process.platform,
-      arch: process.arch,
+      arch: nativeArch,
       appPath: app.getAppPath(),
       userDataPath: app.getPath('userData'),
       isPackaged: app.isPackaged,
