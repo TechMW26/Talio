@@ -12,6 +12,7 @@ import {
   HiOutlineFolder,
   HiOutlineGlobeAlt,
   HiOutlineArrowDownTray,
+  HiOutlineArrowPathRoundedSquare,
 } from 'react-icons/hi2'
 
 export default function AppInfoPage() {
@@ -21,6 +22,7 @@ export default function AppInfoPage() {
   const [updateStatus, setUpdateStatus] = useState(null)
   const [updateVersion, setUpdateVersion] = useState(null)
   const [updateError, setUpdateError] = useState(null)
+  const [downloadPercent, setDownloadPercent] = useState(0)
   const [isElectron, setIsElectron] = useState(false)
 
   useEffect(() => {
@@ -55,6 +57,9 @@ export default function AppInfoPage() {
           setUpdateStatus(data.status)
           if (data.version) setUpdateVersion(data.version)
           if (data.message) setUpdateError(data.message)
+          if (data.status === 'downloading' && typeof data.percent === 'number') {
+            setDownloadPercent(data.percent)
+          }
         })
       }
     }
@@ -79,11 +84,18 @@ export default function AppInfoPage() {
       setUpdateStatus('checking')
       setUpdateError(null)
       setUpdateVersion(null)
+      setDownloadPercent(0)
       window.electronAPI.checkForUpdate({ silent: true })
     } else if (window.electronAPI?.startUpdate) {
-      // Older apps may have startUpdate but not the silent option
       setUpdateStatus('checking')
       window.electronAPI.startUpdate()
+    }
+  }, [])
+
+  const handleInstallUpdate = useCallback(() => {
+    if (window.electronAPI?.installUpdate) {
+      setUpdateStatus('installing')
+      window.electronAPI.installUpdate()
     }
   }, [])
 
@@ -160,6 +172,21 @@ export default function AppInfoPage() {
               Update available{updateVersion ? ` — v${updateVersion}` : latestVersion ? ` — v${latestVersion}` : ''}
             </Chip>
           )}
+          {updateStatus === 'downloading' && (
+            <Chip color="primary" variant="flat" size="sm" startContent={<HiOutlineArrowDownTray className="w-4 h-4" />}>
+              Downloading{updateVersion ? ` v${updateVersion}` : ''} — {downloadPercent}%
+            </Chip>
+          )}
+          {updateStatus === 'downloaded' && (
+            <Chip color="success" variant="flat" size="sm" startContent={<HiOutlineCheckCircle className="w-4 h-4" />}>
+              Ready to install
+            </Chip>
+          )}
+          {updateStatus === 'installing' && (
+            <Chip color="primary" variant="flat" size="sm" startContent={<HiOutlineArrowPathRoundedSquare className="w-4 h-4" />}>
+              Installing...
+            </Chip>
+          )}
           {updateStatus === 'error' && (
             <Chip color="danger" variant="flat" size="sm" startContent={<HiOutlineExclamationTriangle className="w-4 h-4" />}>
               Error
@@ -180,6 +207,45 @@ export default function AppInfoPage() {
           <div className="flex items-center gap-3 text-sm" style={{ color: 'var(--color-text-secondary, #6b7280)' }}>
             <Spinner size="sm" />
             <span>Checking for updates...</span>
+          </div>
+        )}
+
+        {updateStatus === 'downloading' && (
+          <div className="space-y-3">
+            <p className="text-sm" style={{ color: 'var(--color-text-secondary, #6b7280)' }}>
+              Downloading update{updateVersion ? ` v${updateVersion}` : ''}...
+            </p>
+            <div className="w-full rounded-full h-2.5" style={{ backgroundColor: 'var(--color-primary-100, #e0e7ff)' }}>
+              <div
+                className="h-2.5 rounded-full transition-all duration-300"
+                style={{ width: `${downloadPercent}%`, backgroundColor: 'var(--color-primary-500, #6366f1)' }}
+              />
+            </div>
+            <p className="text-xs" style={{ color: 'var(--color-text-secondary, #6b7280)' }}>{downloadPercent}% complete</p>
+          </div>
+        )}
+
+        {updateStatus === 'downloaded' && (
+          <div className="space-y-3">
+            <p className="text-sm" style={{ color: 'var(--color-text-secondary, #6b7280)' }}>
+              Update{updateVersion ? ` v${updateVersion}` : ''} has been downloaded and is ready to install. The app will restart.
+            </p>
+            <Button
+              onPress={handleInstallUpdate}
+              variant="flat"
+              color="success"
+              startContent={<HiOutlineArrowPathRoundedSquare className="w-4 h-4" />}
+              size="sm"
+            >
+              Restart &amp; Update
+            </Button>
+          </div>
+        )}
+
+        {updateStatus === 'installing' && (
+          <div className="flex items-center gap-3 text-sm" style={{ color: 'var(--color-text-secondary, #6b7280)' }}>
+            <Spinner size="sm" />
+            <span>Installing update and restarting...</span>
           </div>
         )}
 
@@ -207,7 +273,7 @@ export default function AppInfoPage() {
           </p>
         )}
 
-        {(!updateStatus || updateStatus === 'up-to-date' || updateStatus === 'error' || (isOutdated && updateStatus !== 'available')) && (
+        {(!updateStatus || updateStatus === 'up-to-date' || updateStatus === 'error' || (isOutdated && updateStatus !== 'available' && updateStatus !== 'downloading' && updateStatus !== 'downloaded' && updateStatus !== 'checking')) && (
           <Button
             onPress={handleCheckUpdate}
             variant="flat"

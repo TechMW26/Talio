@@ -1,5 +1,9 @@
 /**
+<<<<<<< Updated upstream
  * Talio Desktop App v4.5.1
+=======
+ * Talio Desktop App v4.7.0
+>>>>>>> Stashed changes
  * Main Electron process
  * 
  * Performance optimized for smooth rendering
@@ -43,8 +47,7 @@ if (forceDisableGPU) {
   if (process.platform === 'win32') {
     // Use D3D11 on Windows for best compatibility
     app.commandLine.appendSwitch('use-angle', 'd3d11');
-    // Disable DXGI swap chain for older systems
-    app.commandLine.appendSwitch('disable-direct-composition');
+    // DO NOT disable direct composition — it breaks input handling on modern Windows
   } else if (process.platform === 'darwin') {
     // macOS-specific: use Metal for best performance
     app.commandLine.appendSwitch('enable-features', 'Metal');
@@ -90,7 +93,11 @@ let forceCloseAttempts = 0;
 let windowRecreateTimer = null;
 let isUpdating = false;
 let updateCheckTimer = null;
+<<<<<<< Updated upstream
 let updateCheckDialog = null;
+=======
+let inAppUpdateMode = false; // When true, don't navigate to update.html — send IPC status instead
+>>>>>>> Stashed changes
 
 // Persistent store
 const store = new Store({ name: 'app-data' });
@@ -266,7 +273,11 @@ function createWindow() {
     backgroundColor: '#ffffff',
     autoHideMenuBar: true,
     titleBarStyle: 'hidden',
-    titleBarOverlay: {
+    titleBarOverlay: process.platform === 'win32' ? {
+      color: '#00000000',
+      symbolColor: '#64748B',
+      height: 32
+    } : {
       color: '#ffffff',
       symbolColor: '#64748B',
       height: 40
@@ -392,6 +403,7 @@ function injectTitleBarAdaptations() {
 
   var css =
     '/* Electron: Seamless title bar */\n' +
+    '*, *::before, *::after { -webkit-app-region: no-drag; }\n' +
     'header { -webkit-app-region: drag; }\n' +
     'header button, header input, header a, header [role="button"],\n' +
     'header [data-slot], header .cursor-pointer, header .relative,\n' +
@@ -1246,10 +1258,12 @@ function setupIPCHandlers() {
       var lum = parsed.r * 0.299 + parsed.g * 0.587 + parsed.b * 0.114;
       var isDark = lum < 128;
       var hexColor = rgbToHex(parsed.r, parsed.g, parsed.b);
+      // On Windows use transparent overlay so controls blend with app
+      var overlayColor = process.platform === 'win32' ? '#00000000' : hexColor;
       mainWindow.setTitleBarOverlay({
-        color: hexColor,
+        color: overlayColor,
         symbolColor: isDark ? '#E2E8F0' : '#64748B',
-        height: 40
+        height: process.platform === 'win32' ? 32 : 40
       });
       mainWindow.setBackgroundColor(hexColor);
     } catch (e) {
@@ -1261,6 +1275,8 @@ function setupIPCHandlers() {
   ipcMain.handle('check-for-update', function (event, options) {
     logger.log('info', 'Updater', 'Manual update check requested');
     var silent = options && options.silent;
+    // When called from App Info page (silent), stay in-app — don't navigate to update.html
+    inAppUpdateMode = !!silent;
     checkForUpdates(silent);
     return { success: true };
   });
@@ -1562,18 +1578,40 @@ function setupAutoUpdater() {
   logger.log('info', 'Updater', 'Auto-updater configured — provider: GitHub Releases, version: ' + app.getVersion() + ', platform: ' + process.platform + ', arch: ' + process.arch);
 
   autoUpdater.on('checking-for-update', function () {
+<<<<<<< Updated upstream
     logger.log('info', 'Updater', '[LIFECYCLE] Checking for update...');
+=======
+    logger.log('info', 'Updater', 'Checking for updates...');
+    sendUpdateStatus('checking');
+>>>>>>> Stashed changes
   });
 
   autoUpdater.on('update-available', function (info) {
     logger.log('info', 'Updater', '[LIFECYCLE] Update available: v' + info.version + ' (releaseDate: ' + (info.releaseDate || 'unknown') + ', files: ' + JSON.stringify((info.files || []).map(function (f) { return f.url; })) + ')');
     // Dismiss the "checking" dialog — update screen will take over
     dismissUpdateCheckDialog();
-    handleUpdateAvailable(info);
+    sendUpdateStatus('available', { version: info.version });
+
+    if (inAppUpdateMode) {
+      // In-app mode: don't navigate away, just download in background
+      isUpdating = true;
+      sendUpdateStatus('downloading', { version: info.version, percent: 0 });
+      autoUpdater.downloadUpdate().catch(function (error) {
+        logger.log('error', 'Updater', 'Download failed: ' + error.message);
+        sendUpdateStatus('error', { message: error.message });
+      });
+    } else {
+      handleUpdateAvailable(info);
+    }
   });
 
   autoUpdater.on('update-not-available', function (info) {
+<<<<<<< Updated upstream
     logger.log('info', 'Updater', '[LIFECYCLE] No update available. Current: v' + app.getVersion() + ', Latest: v' + info.version);
+=======
+    logger.log('info', 'Updater', 'App is up to date: v' + info.version);
+    sendUpdateStatus('up-to-date', { version: info.version });
+>>>>>>> Stashed changes
     // If a "checking for updates" dialog was shown, replace it with "up to date"
     if (updateCheckDialog && !updateCheckDialog.isDestroyed()) {
       dismissUpdateCheckDialog();
@@ -1590,10 +1628,19 @@ function setupAutoUpdater() {
   });
 
   autoUpdater.on('download-progress', function (progress) {
+<<<<<<< Updated upstream
     var pct = Math.round(progress.percent || 0);
     if (pct % 25 === 0 || pct === 100) {
       logger.log('info', 'Updater', '[LIFECYCLE] Download progress: ' + pct + '% (' + Math.round((progress.transferred || 0) / 1048576) + '/' + Math.round((progress.total || 0) / 1048576) + ' MB)');
     }
+=======
+    sendUpdateStatus('downloading', {
+      percent: Math.round(progress.percent),
+      bytesPerSecond: progress.bytesPerSecond,
+      transferred: progress.transferred,
+      total: progress.total
+    });
+>>>>>>> Stashed changes
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.executeJavaScript(
         'window.postMessage(' + JSON.stringify({
@@ -1612,7 +1659,12 @@ function setupAutoUpdater() {
   });
 
   autoUpdater.on('update-downloaded', function (info) {
+<<<<<<< Updated upstream
     logger.log('info', 'Updater', '[LIFECYCLE] Update downloaded. Preparing to install v' + info.version + '...');
+=======
+    logger.log('info', 'Updater', 'Update downloaded: v' + info.version);
+    sendUpdateStatus('downloaded', { version: info.version });
+>>>>>>> Stashed changes
 
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.setProgressBar(-1); // Clear progress bar
@@ -1624,7 +1676,13 @@ function setupAutoUpdater() {
     // Clear old cache before installing
     clearAppCache();
 
-    // Wait a moment to show the completion animation, then install
+    // In-app mode: let the user click "Restart to Update" from the App Info page
+    if (inAppUpdateMode) {
+      inAppUpdateMode = false;
+      return;
+    }
+
+    // Non-in-app mode: auto-install after showing completion animation
     setTimeout(function () {
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.executeJavaScript(
