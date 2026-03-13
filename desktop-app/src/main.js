@@ -1,5 +1,5 @@
 /**
- * Talio Desktop App v4.7.0
+ * Talio Desktop App v4.8.0
  * Main Electron process
  * 
  * Performance optimized for smooth rendering
@@ -1106,6 +1106,69 @@ function setupIPCHandlers() {
   ipcMain.handle('show-notification', function (event, data) {
     showNotification(data.title, data.body);
     return { success: true };
+  });
+
+  // Notification permission check
+  ipcMain.handle('check-notification-permission', function () {
+    var supported = Notification.isSupported();
+    var status = 'unknown';
+
+    if (!supported) {
+      status = 'unsupported';
+    } else if (process.platform === 'darwin') {
+      // macOS: check via systemPreferences
+      try {
+        var notifStatus = systemPreferences.getMediaAccessStatus ? 'granted' : 'unknown';
+        // On macOS, notifications are permission-managed by the OS
+        // We can only check if Notification is supported and try to send
+        status = 'granted'; // Assume granted if supported; macOS blocks silently
+      } catch (e) {
+        status = 'unknown';
+      }
+    } else if (process.platform === 'win32') {
+      // Windows: notifications work if app model ID is set
+      status = 'granted';
+    } else {
+      status = supported ? 'granted' : 'denied';
+    }
+
+    return { supported: supported, status: status, platform: process.platform };
+  });
+
+  // Open notification settings (OS-level)
+  ipcMain.handle('open-notification-settings', async function () {
+    if (process.platform === 'darwin') {
+      // macOS: open System Settings > Notifications for this app
+      try {
+        // macOS Ventura+ uses System Settings
+        await shell.openExternal('x-apple.systempreferences:com.apple.Notifications-Settings.extension');
+      } catch (e) {
+        // Fallback for older macOS
+        try {
+          await shell.openExternal('x-apple.systempreferences:com.apple.preference.notifications');
+        } catch (e2) {
+          logger.log('warn', 'Main', 'Could not open notification settings: ' + e2.message);
+        }
+      }
+    } else if (process.platform === 'win32') {
+      // Windows: open notification settings
+      try {
+        await shell.openExternal('ms-settings:notifications');
+      } catch (e) {
+        logger.log('warn', 'Main', 'Could not open notification settings: ' + e.message);
+      }
+    }
+    return { success: true };
+  });
+
+  // Test notification (for verifying permission works)
+  ipcMain.handle('test-notification', function () {
+    try {
+      showNotification('Talio Notifications', 'Notifications are working! You will receive updates for messages, tasks, and more.');
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: e.message };
+    }
   });
 
   // Restart app (for crash recovery)

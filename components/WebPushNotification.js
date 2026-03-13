@@ -69,7 +69,9 @@ export function WebPushPrompt({ onClose }) {
 
     // Don't show if not supported, already subscribed, permission denied, or dismissed
     // Wait for initialization before deciding to show
-    if (!isInitialized || !isSupported || isSubscribed || permission === 'denied' || dismissed || subscribeSuccess) {
+    // Don't show in Electron desktop app — it uses native notifications via DesktopNotificationPrompt
+    const isElectronApp = typeof window !== 'undefined' && (window.isElectron === true || window.electronAPI !== undefined);
+    if (isElectronApp || !isInitialized || !isSupported || isSubscribed || permission === 'denied' || dismissed || subscribeSuccess) {
         // Show success message briefly before disappearing
         if (subscribeSuccess) {
             return (

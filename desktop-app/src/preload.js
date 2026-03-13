@@ -1,5 +1,5 @@
 /**
- * Preload Script v4.7.0
+ * Preload Script v4.8.0
  * Exposes secure IPC channels to the renderer process
  * With enhanced screen sharing support for Windows multi-display
  */
@@ -115,7 +115,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
   showNotification: function(title, body) {
     return ipcRenderer.invoke('show-notification', { title: title, body: body });
   },
-  
+
+  // Notification permission management
+  checkNotificationPermission: function() {
+    return ipcRenderer.invoke('check-notification-permission');
+  },
+
+  openNotificationSettings: function() {
+    return ipcRenderer.invoke('open-notification-settings');
+  },
+
+  testNotification: function() {
+    return ipcRenderer.invoke('test-notification');
+  },
+
   // Event listeners
   onCaptureStatus: function(callback) {
     ipcRenderer.on('capture-status', function(event, data) {

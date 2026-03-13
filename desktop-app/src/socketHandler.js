@@ -1,7 +1,7 @@
 /**
- * Socket Handler v4.2.0
+ * Socket Handler v4.8.0
  * Manages real-time communication with Talio server
- * Enhanced with full notification event coverage and robust reconnection
+ * Enhanced with full notification event coverage, chat messages, and robust reconnection
  */
 
 const { io } = require('socket.io-client');
@@ -419,6 +419,42 @@ class SocketHandler {
 
     this.socket.on('sidebar.counts.updated', function(data) {
       silentEvent('SidebarCountsUpdated', data);
+    });
+
+    // ── Chat message events (native notification for new messages) ──
+    this.socket.on('new-message', function(data) {
+      logger.log('info', 'SocketHandler', 'New chat message received');
+      var message = data.message || {};
+      var senderFirstName = (message.sender && message.sender.firstName) || '';
+      var senderLastName = (message.sender && message.sender.lastName) || '';
+      var senderName = senderFirstName ? (senderFirstName + ' ' + senderLastName).trim() : 'Someone';
+      var content = message.content || message.text || message.fileName || 'Sent a message';
+      // Truncate long messages
+      if (content.length > 100) content = content.substring(0, 100) + '...';
+      if (self.callbacks.onNotification) {
+        self.callbacks.onNotification({
+          title: '💬 ' + senderName,
+          message: content,
+          url: '/dashboard/chat?chatId=' + (data.chatId || ''),
+          type: 'message',
+          chatId: data.chatId,
+          senderId: data.senderId
+        });
+      }
+    });
+
+    // ── Actionable notification events ──
+    this.socket.on('actionable-notification', function(data) {
+      logger.log('info', 'SocketHandler', 'Actionable notification: ' + (data.title || 'Unknown'));
+      notify(data.title || 'Action Required', data, data.message || 'You have a new actionable notification');
+    });
+
+    this.socket.on('actionable-notification-updated', function(data) {
+      silentEvent('ActionableNotificationUpdated', data);
+    });
+
+    this.socket.on('actionable-notification-removed', function(data) {
+      silentEvent('ActionableNotificationRemoved', data);
     });
 
     // ── Force refresh from server ──

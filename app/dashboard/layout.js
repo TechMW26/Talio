@@ -11,6 +11,7 @@ import OutOfPremisesPopup from '@/components/OutOfPremisesPopup'
 import ChatWidgetContainer from '@/components/chat/ChatWidgetContainer'
 import ProfileCompletionModal from '@/components/ProfileCompletionModal'
 import { WebPushPrompt } from '@/components/WebPushNotification'
+import DesktopNotificationPrompt from '@/components/DesktopNotificationPrompt'
 
 import useGeofencing from '@/hooks/useGeofencing'
 import { SocketProvider } from '@/contexts/SocketContext'
@@ -463,6 +464,9 @@ export default function DashboardLayout({ children }) {
 
                   {/* Web Push Notification Prompt */}
                   <WebPushPrompt />
+
+                  {/* Desktop Notification Permission Prompt (Electron only) */}
+                  <DesktopNotificationPrompt />
                 </div>
               </ActionableToastProvider>
             </InAppNotificationProvider>
