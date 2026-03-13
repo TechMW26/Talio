@@ -176,11 +176,6 @@ export async function POST(request) {
 
             const holidayType = mapEventType(event.description || '')
 
-            // Only sync public holidays
-            if (holidayType !== 'public') {
-                continue
-            }
-
             const holidayData = {
                 name,
                 date: holidayDate,
@@ -191,22 +186,30 @@ export async function POST(request) {
                 applicableTo: 'all',
                 isActive: true,
                 source: 'google-calendar',
+                googleEventId: event.id || null,
             }
 
-            // Check if holiday already exists (by name + date)
-            const existing = await Holiday.findOne({
-                name: { $regex: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
-                date: {
-                    $gte: new Date(holidayDate.getFullYear(), holidayDate.getMonth(), holidayDate.getDate()),
-                    $lt: new Date(holidayDate.getFullYear(), holidayDate.getMonth(), holidayDate.getDate() + 1),
-                },
-            })
+            // Find existing google-calendar holiday by googleEventId or name+date
+            let existing = null
+            if (event.id) {
+                existing = await Holiday.findOne({ googleEventId: event.id })
+            }
+            if (!existing) {
+                existing = await Holiday.findOne({
+                    source: 'google-calendar',
+                    name: { $regex: new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+                    date: {
+                        $gte: new Date(holidayDate.getFullYear(), holidayDate.getMonth(), holidayDate.getDate()),
+                        $lt: new Date(holidayDate.getFullYear(), holidayDate.getMonth(), holidayDate.getDate() + 1),
+                    },
+                })
+            }
 
             if (existing) {
-                // Update existing holiday with Google Calendar data
+                // Only update google-calendar sourced holidays — never overwrite manual ones
                 existing.description = holidayData.description
                 existing.type = holidayData.type
-                existing.source = 'google-calendar'
+                existing.googleEventId = event.id || existing.googleEventId
                 if (endDate) existing.endDate = endDate
                 await existing.save()
                 updatedCount++
@@ -224,20 +227,9 @@ export async function POST(request) {
             skippedCount = events.length - addedCount - updatedCount
         }
 
-        // Remove any non-public holidays previously synced from Google Calendar
-        const cleanupResult = await Holiday.deleteMany({
-            source: 'google-calendar',
-            year: parseInt(year),
-            type: { $ne: 'public' },
-        })
-        const removedCount = cleanupResult.deletedCount || 0
-        if (removedCount > 0) {
-            console.log(`[Google Calendar] Cleaned up ${removedCount} non-public holidays from DB`)
-        }
-
         return NextResponse.json({
             success: true,
-            message: `Google Calendar sync complete. Added ${addedCount} new holidays, updated ${updatedCount}, skipped ${skippedCount}, removed ${removedCount} non-public (${events.length} total from Google).`,
+            message: `Google Calendar sync complete. Added ${addedCount} new holidays, updated ${updatedCount}, skipped ${skippedCount} (${events.length} total from Google).`,
             data: {
                 country,
                 year,
@@ -245,7 +237,6 @@ export async function POST(request) {
                 added: addedCount,
                 updated: updatedCount,
                 skipped: skippedCount,
-                removedNonPublic: removedCount,
                 holidays: processedHolidays,
             },
         })

@@ -11,8 +11,17 @@ const HolidaySchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['public', 'optional', 'restricted'],
+    enum: ['public', 'optional', 'restricted', 'company'],
     default: 'public',
+  },
+  source: {
+    type: String,
+    enum: ['manual', 'google-calendar'],
+    default: 'manual',
+  },
+  googleEventId: {
+    type: String,
+    default: null,
   },
   description: {
     type: String,
@@ -114,7 +123,7 @@ const HolidaySchema = new mongoose.Schema({
 });
 
 // Virtual for duration in days
-HolidaySchema.virtual('duration').get(function() {
+HolidaySchema.virtual('duration').get(function () {
   if (!this.endDate) return 1
   const start = new Date(this.date)
   const end = new Date(this.endDate)
@@ -122,7 +131,7 @@ HolidaySchema.virtual('duration').get(function() {
 })
 
 // Virtual for days until holiday
-HolidaySchema.virtual('daysUntil').get(function() {
+HolidaySchema.virtual('daysUntil').get(function () {
   const today = new Date()
   const holidayDate = new Date(this.date)
   const timeDiff = holidayDate.getTime() - today.getTime()
@@ -130,7 +139,7 @@ HolidaySchema.virtual('daysUntil').get(function() {
 })
 
 // Check if holiday is applicable for employee
-HolidaySchema.methods.isApplicableFor = function(employee) {
+HolidaySchema.methods.isApplicableFor = function (employee) {
   if (this.applicableFor.allEmployees) return true
 
   const { departments, designations, employeeTypes } = this.applicableFor
