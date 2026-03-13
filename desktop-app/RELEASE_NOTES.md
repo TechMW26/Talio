@@ -40,3 +40,4 @@
 ### Platforms
 - macOS (ARM64 + Intel x64)
 - Windows (x64 NSIS installer)
+- Linux (x64 AppImage + deb)

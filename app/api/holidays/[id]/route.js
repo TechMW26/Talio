@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import { buildCachePattern, clearCachePattern } from '@/lib/cache'
 // GET - Get single holiday
 export async function GET(request, { params }) {
   try {
@@ -40,7 +41,7 @@ export async function PUT(request, { params }) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { models, tenant } = auth
     const { Holiday } = models
 
     const data = await request.json()
@@ -56,6 +57,13 @@ export async function PUT(request, { params }) {
         { success: false, message: 'Holiday not found' },
         { status: 404 }
       )
+    }
+
+    // Invalidate holiday caches
+    try {
+      await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'holidays' }))
+    } catch (cacheErr) {
+      console.error('Failed to clear holiday cache:', cacheErr)
     }
 
     return NextResponse.json({
@@ -79,7 +87,7 @@ export async function DELETE(request, { params }) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { models, tenant } = auth
     const { Holiday } = models
 
     const holiday = await Holiday.findByIdAndDelete(params.id)
@@ -89,6 +97,13 @@ export async function DELETE(request, { params }) {
         { success: false, message: 'Holiday not found' },
         { status: 404 }
       )
+    }
+
+    // Invalidate holiday caches
+    try {
+      await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'holidays' }))
+    } catch (cacheErr) {
+      console.error('Failed to clear holiday cache:', cacheErr)
     }
 
     return NextResponse.json({

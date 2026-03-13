@@ -89,12 +89,19 @@ export async function POST(request) {
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { models } = auth
+    const { models, tenant } = auth
     const { Holiday } = models
 
     const data = await request.json()
 
     const holiday = await Holiday.create(data)
+
+    // Invalidate holiday caches so the new holiday appears immediately
+    try {
+      await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'holidays' }))
+    } catch (cacheErr) {
+      console.error('Failed to clear holiday cache:', cacheErr)
+    }
 
     // Emit real-time holiday update to all users
     try {
