@@ -6,7 +6,7 @@ const MIN_DESKTOP_VERSION = '4.2.0';
 
 // Latest available desktop app version.
 // Bump this whenever a new release is published.
-const LATEST_DESKTOP_VERSION = '4.8.0';
+const LATEST_DESKTOP_VERSION = '4.8.1';
 
 export async function GET(request) {
   const clientVersion = request.headers.get('x-app-version') || 'unknown';

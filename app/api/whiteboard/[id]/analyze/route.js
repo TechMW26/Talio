@@ -3,6 +3,8 @@ import { getAuthAndModels } from '@/lib/auth'
 import { generateContent, generateVisionContent } from '@/lib/gemini';
 import { generateSmartContent } from '@/lib/promptEngine';
 
+export const maxDuration = 60;
+
 // Convert canvas objects to a text description for AI
 function describeCanvasObjects(pages) {
   const descriptions = [];

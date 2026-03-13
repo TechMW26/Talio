@@ -2931,11 +2931,18 @@ const WhiteboardCanvas = forwardRef(({
         })
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to analyze canvas');
+        let errorMsg = 'Failed to analyze canvas';
+        try {
+          const errData = await response.json();
+          errorMsg = errData.error || errorMsg;
+        } catch {
+          errorMsg = `Server error (${response.status}). Please try again.`;
+        }
+        throw new Error(errorMsg);
       }
+
+      const data = await response.json();
 
       setAiAnalysis(data.aiAnalysis);
       setIsDirty(true);
@@ -3104,11 +3111,18 @@ const WhiteboardCanvas = forwardRef(({
         body: JSON.stringify({ action: 'chat', message, canvasScreenshot })
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to send message');
+        let errorMsg = 'Failed to send message';
+        try {
+          const errData = await response.json();
+          errorMsg = errData.error || errorMsg;
+        } catch {
+          errorMsg = `Server error (${response.status}). Please try again.`;
+        }
+        throw new Error(errorMsg);
       }
+
+      const data = await response.json();
 
       setAiAnalysis(data.aiAnalysis);
       setIsDirty(true);
@@ -3166,11 +3180,18 @@ const WhiteboardCanvas = forwardRef(({
         })
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to plot content');
+        let errorMsg = 'Failed to plot content';
+        try {
+          const errData = await response.json();
+          errorMsg = errData.error || errorMsg;
+        } catch {
+          errorMsg = `Server error (${response.status}). Please try again.`;
+        }
+        throw new Error(errorMsg);
       }
+
+      const data = await response.json();
 
       // Update canvas with generated objects
       if (data.pages) {
@@ -3262,11 +3283,18 @@ const WhiteboardCanvas = forwardRef(({
         })
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to continue generation');
+        let errorMsg = 'Failed to continue generation';
+        try {
+          const errData = await response.json();
+          errorMsg = errData.error || errorMsg;
+        } catch {
+          errorMsg = `Server error (${response.status}). Please try again.`;
+        }
+        throw new Error(errorMsg);
       }
+
+      const data = await response.json();
 
       // Update canvas with new objects
       if (data.pages) {
@@ -3322,11 +3350,18 @@ const WhiteboardCanvas = forwardRef(({
         body: JSON.stringify({ action: 'restructure' })
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to restructure canvas');
+        let errorMsg = 'Failed to restructure canvas';
+        try {
+          const errData = await response.json();
+          errorMsg = errData.error || errorMsg;
+        } catch {
+          errorMsg = `Server error (${response.status}). Please try again.`;
+        }
+        throw new Error(errorMsg);
       }
+
+      const data = await response.json();
 
       // Replace all objects with restructured version
       if (data.pages && data.pages[0]) {

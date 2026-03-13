@@ -570,11 +570,19 @@ export default function MiraAgentSidebar({
         }),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to prepare content');
+        let errorMsg = 'Failed to prepare content';
+        try {
+          const errData = await response.json();
+          errorMsg = errData.error || errorMsg;
+        } catch {
+          if (response.status === 504) errorMsg = 'Request timed out. Try a shorter or simpler topic.';
+          else errorMsg = `Server error (${response.status}). Please try again.`;
+        }
+        throw new Error(errorMsg);
       }
+
+      const data = await response.json();
 
       clearInterval(progressInterval);
       setLoadingProgress(100);
@@ -620,11 +628,18 @@ export default function MiraAgentSidebar({
         }),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to expand section');
+        let errorMsg = 'Failed to expand section';
+        try {
+          const errData = await response.json();
+          errorMsg = errData.error || errorMsg;
+        } catch {
+          errorMsg = `Server error (${response.status}). Please try again.`;
+        }
+        throw new Error(errorMsg);
       }
+
+      const data = await response.json();
 
       // Update the section with expanded content
       const updatedContent = { ...preparedContent };
@@ -666,11 +681,18 @@ export default function MiraAgentSidebar({
         }),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to regenerate section');
+        let errorMsg = 'Failed to regenerate section';
+        try {
+          const errData = await response.json();
+          errorMsg = errData.error || errorMsg;
+        } catch {
+          errorMsg = `Server error (${response.status}). Please try again.`;
+        }
+        throw new Error(errorMsg);
       }
+
+      const data = await response.json();
 
       // Update the section with new content
       const updatedContent = { ...preparedContent };
@@ -721,11 +743,18 @@ export default function MiraAgentSidebar({
         }),
       });
 
-      const data = await response.json();
-
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to edit content');
+        let errorMsg = 'Failed to edit content';
+        try {
+          const errData = await response.json();
+          errorMsg = errData.error || errorMsg;
+        } catch {
+          errorMsg = `Server error (${response.status}). Please try again.`;
+        }
+        throw new Error(errorMsg);
       }
+
+      const data = await response.json();
 
       setPreparedContent(data.updatedContent);
       onContentUpdate?.(data.updatedContent);
