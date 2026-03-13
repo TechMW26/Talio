@@ -1,9 +1,5 @@
 /**
-<<<<<<< Updated upstream
- * Talio Desktop App v4.5.1
-=======
  * Talio Desktop App v4.7.0
->>>>>>> Stashed changes
  * Main Electron process
  * 
  * Performance optimized for smooth rendering
@@ -93,11 +89,8 @@ let forceCloseAttempts = 0;
 let windowRecreateTimer = null;
 let isUpdating = false;
 let updateCheckTimer = null;
-<<<<<<< Updated upstream
 let updateCheckDialog = null;
-=======
 let inAppUpdateMode = false; // When true, don't navigate to update.html — send IPC status instead
->>>>>>> Stashed changes
 
 // Persistent store
 const store = new Store({ name: 'app-data' });
@@ -1578,12 +1571,8 @@ function setupAutoUpdater() {
   logger.log('info', 'Updater', 'Auto-updater configured — provider: GitHub Releases, version: ' + app.getVersion() + ', platform: ' + process.platform + ', arch: ' + process.arch);
 
   autoUpdater.on('checking-for-update', function () {
-<<<<<<< Updated upstream
     logger.log('info', 'Updater', '[LIFECYCLE] Checking for update...');
-=======
-    logger.log('info', 'Updater', 'Checking for updates...');
     sendUpdateStatus('checking');
->>>>>>> Stashed changes
   });
 
   autoUpdater.on('update-available', function (info) {
@@ -1606,12 +1595,8 @@ function setupAutoUpdater() {
   });
 
   autoUpdater.on('update-not-available', function (info) {
-<<<<<<< Updated upstream
     logger.log('info', 'Updater', '[LIFECYCLE] No update available. Current: v' + app.getVersion() + ', Latest: v' + info.version);
-=======
-    logger.log('info', 'Updater', 'App is up to date: v' + info.version);
     sendUpdateStatus('up-to-date', { version: info.version });
->>>>>>> Stashed changes
     // If a "checking for updates" dialog was shown, replace it with "up to date"
     if (updateCheckDialog && !updateCheckDialog.isDestroyed()) {
       dismissUpdateCheckDialog();
@@ -1628,19 +1613,16 @@ function setupAutoUpdater() {
   });
 
   autoUpdater.on('download-progress', function (progress) {
-<<<<<<< Updated upstream
     var pct = Math.round(progress.percent || 0);
     if (pct % 25 === 0 || pct === 100) {
       logger.log('info', 'Updater', '[LIFECYCLE] Download progress: ' + pct + '% (' + Math.round((progress.transferred || 0) / 1048576) + '/' + Math.round((progress.total || 0) / 1048576) + ' MB)');
     }
-=======
     sendUpdateStatus('downloading', {
-      percent: Math.round(progress.percent),
+      percent: pct,
       bytesPerSecond: progress.bytesPerSecond,
       transferred: progress.transferred,
       total: progress.total
     });
->>>>>>> Stashed changes
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.executeJavaScript(
         'window.postMessage(' + JSON.stringify({
@@ -1659,12 +1641,8 @@ function setupAutoUpdater() {
   });
 
   autoUpdater.on('update-downloaded', function (info) {
-<<<<<<< Updated upstream
     logger.log('info', 'Updater', '[LIFECYCLE] Update downloaded. Preparing to install v' + info.version + '...');
-=======
-    logger.log('info', 'Updater', 'Update downloaded: v' + info.version);
     sendUpdateStatus('downloaded', { version: info.version });
->>>>>>> Stashed changes
 
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.setProgressBar(-1); // Clear progress bar
