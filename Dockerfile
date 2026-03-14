@@ -7,13 +7,16 @@ WORKDIR /app
 # Install native build dependencies for sharp, canvas, bcrypt
 RUN apk add --no-cache libc6-compat python3 make g++
 
-# Copy package files. The lockfile may have been generated on macOS so
-# we run `npm install` (not `npm ci`) to let npm resolve any platform-
-# specific optional deps (e.g. @rollup/rollup-linux-x64-musl).
-# The npm cache mount makes repeat installs fast even without --no-cache.
+# Copy package files. We use `npm install` (not `npm ci`) because the
+# lockfile is generated on macOS and npm ci would skip Linux optional deps.
 COPY package.json package-lock.json* ./
 RUN --mount=type=cache,target=/root/.npm \
     npm install --prefer-offline
+
+# Fix cross-platform optional deps: the macOS lockfile omits Linux/musl
+# binaries that rollup (used by Sentry/Next.js) needs at build time.
+RUN ARCH=$(node -p "process.arch") && \
+    npm install --no-save "@rollup/rollup-linux-${ARCH}-musl" 2>/dev/null || true
 
 # ---- Stage 2: Build the Next.js app ----
 FROM node:20-alpine AS builder
