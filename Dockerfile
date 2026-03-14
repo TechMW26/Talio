@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1
+
 # ---- Stage 1: Install ALL dependencies (needed for build) ----
 FROM node:20-alpine AS deps
 WORKDIR /app
@@ -5,9 +7,16 @@ WORKDIR /app
 # Install native build dependencies for sharp, canvas, bcrypt
 RUN apk add --no-cache libc6-compat python3 make g++
 
-COPY package.json package-lock.json* ./
-# Use npm ci for clean, repeatable, and cached installs
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+COPY package.json package-lock.json ./
+
+# Use npm ci for fast, deterministic installs that leverage Docker layer cache.
+# --ignore-scripts prevents native rebuilds during install; we rebuild explicitly below.
+# BuildKit cache mount reuses the npm cache across builds so repeated installs are near-instant.
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --ignore-scripts
+
+# Rebuild only the native addons that need platform-specific compilation on Alpine/musl
+RUN npm rebuild sharp bcrypt 2>/dev/null || true
 
 # ---- Stage 2: Build the Next.js app ----
 FROM node:20-alpine AS builder
@@ -32,6 +41,9 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
+
+# libc6-compat needed at runtime for sharp and other native modules
+RUN apk add --no-cache libc6-compat
 
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs

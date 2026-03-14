@@ -14,3 +14,14 @@ coverage
 *.pem
 .vscode
 .idea
+.github
+nginx
+docker-compose.yml
+deploy-production.sh
+Dockerfile
+.dockerignore
+*.sh
+docs
+android
+release
+scripts/desktop*

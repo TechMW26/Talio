@@ -212,7 +212,7 @@ if $SSL_FIRST_RUN; then
 fi
 
 info "Building Docker image (using cache for faster builds)..."
-docker compose build talio-app
+DOCKER_BUILDKIT=1 docker compose build talio-app
 
 info "Starting containers..."
 docker compose up -d
