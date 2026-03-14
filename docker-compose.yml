@@ -11,7 +11,7 @@ services:
       - NODE_ENV=production
       - PORT=3000
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     volumes:
       - uploads_data:/app/public/uploads
     networks:
@@ -22,6 +22,11 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   nginx:
     image: nginx:alpine
@@ -37,9 +42,15 @@ services:
       - certbot_var:/var/lib/letsencrypt
       - webroot:/var/www/certbot
     depends_on:
-      - talio-app
+      talio-app:
+        condition: service_started
     networks:
       - talio-network
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   certbot:
     image: certbot/certbot

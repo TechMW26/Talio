@@ -1,55 +1,57 @@
 # syntax=docker/dockerfile:1
 
-# ---- Stage 1: Install ALL dependencies (needed for build) ----
+# ── Stage 1: deps ── Install ALL dependencies (dev + prod needed for build) ──
 FROM node:20-alpine AS deps
 WORKDIR /app
 
-# Install native build dependencies for sharp, canvas, bcrypt
+# Native build tools for sharp, bcrypt, canvas
 RUN apk add --no-cache libc6-compat python3 make g++
 
-# Copy package files. We use `npm install` (not `npm ci`) because the
-# lockfile is generated on macOS and npm ci would skip Linux optional deps.
 COPY package.json package-lock.json* ./
+
+# Install from lockfile. We use `npm install` (not `npm ci`) because the
+# lockfile was generated on macOS and ci would skip Linux optional deps.
+# Then forcibly add the Alpine-specific native binaries that macOS lockfile
+# omits — sharp needs both the binding AND libvips for linuxmusl.
 RUN --mount=type=cache,target=/root/.npm \
-    npm install --prefer-offline
-
-# Fix cross-platform optional deps: the macOS lockfile omits Linux/musl
-# native binaries needed at build time (rollup for Sentry, sharp for images).
-RUN npm install --no-save --os=linux --libc=musl --cpu=$(node -p "process.arch") sharp 2>/dev/null || true && \
     ARCH=$(node -p "process.arch") && \
-    npm install --no-save "@rollup/rollup-linux-${ARCH}-musl" 2>/dev/null || true
+    npm install --prefer-offline && \
+    npm install --no-save \
+      "@img/sharp-linuxmusl-${ARCH}" \
+      "@img/sharp-libvips-linuxmusl-${ARCH}" \
+      "@rollup/rollup-linux-${ARCH}-musl"
 
-# ---- Stage 2: Build the Next.js app ----
+# ── Stage 2: builder ── Build Next.js production output ──────────────────────
 FROM node:20-alpine AS builder
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-ENV NEXT_TELEMETRY_DISABLED=1
-ENV SKIP_ENV_VALIDATION=true
-ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    SKIP_ENV_VALIDATION=true \
+    NODE_ENV=production \
+    NODE_OPTIONS="--max-old-space-size=4096"
 
 RUN npm run build
 
-# Prune devDependencies after build so runner gets only production deps
+# Strip devDependencies — runner only needs production deps
 RUN npm prune --omit=dev
 
-# ---- Stage 3: Production runner ----
+# ── Stage 3: runner ── Minimal production image ─────────────────────────────
 FROM node:20-alpine AS runner
 WORKDIR /app
 
-ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
-ENV PORT=3000
+ENV NODE_ENV=production \
+    NEXT_TELEMETRY_DISABLED=1 \
+    PORT=3000
 
 # libc6-compat needed at runtime for sharp and other native modules
-RUN apk add --no-cache libc6-compat
-
-RUN addgroup --system --gid 1001 nodejs && \
+RUN apk add --no-cache libc6-compat && \
+    addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
-# Copy build output and server
+# Build output & server
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/node_modules ./node_modules
@@ -57,7 +59,7 @@ COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/server.js ./server.js
 COPY --from=builder /app/next.config.js ./next.config.js
 
-# Copy application source needed at runtime (API routes, lib, models, etc.)
+# Runtime source (API routes, lib, models, etc.)
 COPY --from=builder /app/app ./app
 COPY --from=builder /app/lib ./lib
 COPY --from=builder /app/models ./models
@@ -67,18 +69,18 @@ COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/src ./src
 COPY --from=builder /app/styles ./styles
 
-# Create upload directory
-RUN mkdir -p ./public/uploads && chown -R nextjs:nodejs ./public/uploads
-
-# Sentry config files (if they exist)
+# Sentry config
 COPY --from=builder /app/sentry.server.config.js ./sentry.server.config.js
 COPY --from=builder /app/sentry.edge.config.js ./sentry.edge.config.js
 COPY --from=builder /app/instrumentation.js ./instrumentation.js
 COPY --from=builder /app/instrumentation-client.js ./instrumentation-client.js
 
+# Upload directory (volume-mounted in docker-compose)
+RUN mkdir -p ./public/uploads && chown -R nextjs:nodejs ./public/uploads
+
 USER nextjs
 
 EXPOSE 3000
 
-# Use the custom server (Socket.IO support)
+# Custom server with Socket.IO support
 CMD ["node", "--max-old-space-size=4096", "server.js"]
