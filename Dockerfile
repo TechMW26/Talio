@@ -6,8 +6,9 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat python3 make g++
 
 COPY package.json package-lock.json* ./
-RUN npm ci --ignore-scripts && \
-    npm rebuild sharp bcryptjs 2>/dev/null; true
+RUN npm ci --ignore-scripts
+RUN npm rebuild sharp 2>/dev/null || true
+RUN npm rebuild bcryptjs 2>/dev/null || true
 
 # ---- Stage 2: Build the Next.js app ----
 FROM node:20-alpine AS builder
