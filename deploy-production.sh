@@ -208,7 +208,7 @@ if $NEED_SSL_PROVISION; then
   # STEP A: Start with HTTP-only config so nginx can boot without certs
   #         and Certbot can complete the ACME HTTP-01 challenge on port 80.
   info "Using HTTP-only nginx config for SSL provisioning..."
-  cp "$NGINX_DIR/default-http-only.conf" "$NGINX_DIR/default.conf"
+  cp "$NGINX_DIR/default-http-only.conf.template" "$NGINX_DIR/default.conf"
   sed -i "s/_DOMAIN_/$DOMAIN/g" "$NGINX_DIR/default.conf"
 else
   # Normal deploy: use the full HTTPS template (certs already exist or no SSL)
