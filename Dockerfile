@@ -6,7 +6,7 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat python3 make g++
 
 COPY package.json package-lock.json* ./
-RUN npm ci --ignore-scripts
+RUN npm install --ignore-scripts
 RUN npm rebuild sharp 2>/dev/null || true
 RUN npm rebuild bcryptjs 2>/dev/null || true
 
