@@ -84,7 +84,9 @@ if $FRESH; then
 
   # ── Update system ──
   info "Updating system packages..."
-  apt-get update -y && apt-get upgrade -y
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get update -y
+  apt-get -y -o Dpkg::Options::="--force-confold" upgrade
 
   # ── Install essentials ──
   info "Installing essential packages..."
