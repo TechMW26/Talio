@@ -62,6 +62,7 @@ COPY --from=builder /app/utils ./utils
 COPY --from=builder /app/config ./config
 COPY --from=builder /app/scripts ./scripts
 COPY --from=builder /app/src ./src
+COPY --from=builder /app/styles ./styles
 
 # Create upload directory
 RUN mkdir -p ./public/uploads && chown -R nextjs:nodejs ./public/uploads

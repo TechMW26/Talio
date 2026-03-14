@@ -52,13 +52,13 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 log "Working directory: $SCRIPT_DIR"
 
-# ─── Load .env for DOMAIN and EMAIL ─────────────────────────────────────────
+# ─── Load .env ──────────────────────────────────────────────────────────────
 if [[ ! -f .env ]]; then
   err ".env file not found! Copy .env.example to .env and fill in your values."
   exit 1
 fi
 
-# Extract domain from NEXT_PUBLIC_APP_URL (strip protocol)
+# Extract domain from NEXT_PUBLIC_APP_URL (strip protocol and trailing path)
 APP_URL=$(grep -E '^NEXT_PUBLIC_APP_URL=' .env | head -1 | cut -d'=' -f2- | tr -d '"' | tr -d "'")
 DOMAIN=$(echo "$APP_URL" | sed -E 's|https?://||' | sed 's|/.*||')
 
@@ -67,14 +67,23 @@ if [[ -z "$DOMAIN" ]]; then
   exit 1
 fi
 
-# Email for Let's Encrypt (falls back to EMAIL_USER from .env)
-SSL_EMAIL=$(grep -E '^SSL_EMAIL=' .env 2>/dev/null | head -1 | cut -d'=' -f2- | tr -d '"' | tr -d "'" || true)
+# Email for Let's Encrypt — reads EMAIL_USER from .env
+SSL_EMAIL=$(grep -E '^EMAIL_USER=' .env | head -1 | cut -d'=' -f2- | tr -d '"' | tr -d "'")
 if [[ -z "$SSL_EMAIL" ]]; then
-  SSL_EMAIL=$(grep -E '^EMAIL_USER=' .env | head -1 | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+  err "EMAIL_USER not found in .env. Certbot needs an email for certificate notifications."
+  exit 1
 fi
 
 log "Domain: $DOMAIN"
 log "SSL Email: $SSL_EMAIL"
+
+NGINX_DIR="$SCRIPT_DIR/nginx/conf.d"
+
+# ─── Helper: check if SSL certs already exist (inside the Docker volume) ────
+ssl_certs_exist() {
+  docker compose run --rm --entrypoint "" certbot \
+    test -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem" 2>/dev/null
+}
 
 # =============================================================================
 #  PHASE 1 — FRESH INSTALL (system dependencies)
@@ -82,13 +91,11 @@ log "SSL Email: $SSL_EMAIL"
 if $FRESH; then
   header "Phase 1: Installing System Dependencies"
 
-  # ── Update system ──
-  info "Updating system packages..."
   export DEBIAN_FRONTEND=noninteractive
+  info "Updating system packages..."
   apt-get update -y
   apt-get -y -o Dpkg::Options::="--force-confold" upgrade
 
-  # ── Install essentials ──
   info "Installing essential packages..."
   apt-get install -y \
     apt-transport-https \
@@ -173,58 +180,62 @@ SYSCTL
 fi
 
 # =============================================================================
-#  PHASE 2 — PREPARE NGINX CONFIG (substitute domain)
+#  PHASE 2 — PREPARE NGINX CONFIG
 # =============================================================================
 header "Phase 2: Configuring Nginx"
 
-NGINX_DIR="$SCRIPT_DIR/nginx/conf.d"
+# Determine if we need SSL provisioning (first-time) or already have certs
+NEED_SSL_PROVISION=false
 
-info "Setting domain ($DOMAIN) in nginx configs..."
-# Replace placeholder _DOMAIN_ in all nginx config files
-for conf_file in "$NGINX_DIR"/*.conf; do
-  sed -i "s/_DOMAIN_/$DOMAIN/g" "$conf_file"
-done
-log "Nginx configs updated with domain: $DOMAIN"
+if $SSL; then
+  # Check if certs already exist in the Docker volume
+  # First ensure the volume exists by pulling the certbot image
+  docker compose pull certbot 2>/dev/null || true
+  if ssl_certs_exist; then
+    info "SSL certificates already exist for $DOMAIN — will renew if needed."
+  else
+    NEED_SSL_PROVISION=true
+    info "No SSL certificates found — will provision new ones."
+  fi
+fi
+
+# Generate the correct nginx config from template
+if $NEED_SSL_PROVISION; then
+  # STEP A: Start with HTTP-only config so nginx can boot without certs
+  #         and Certbot can complete the ACME HTTP-01 challenge on port 80.
+  info "Using HTTP-only nginx config for SSL provisioning..."
+  cp "$NGINX_DIR/default-http-only.conf" "$NGINX_DIR/default.conf"
+  sed -i "s/_DOMAIN_/$DOMAIN/g" "$NGINX_DIR/default.conf"
+else
+  # Normal deploy: use the full HTTPS template (certs already exist or no SSL)
+  if $SSL; then
+    info "Using HTTPS nginx config (certs exist)..."
+    cp "$NGINX_DIR/default.conf.template" "$NGINX_DIR/default.conf"
+  fi
+  sed -i "s/_DOMAIN_/$DOMAIN/g" "$NGINX_DIR/default.conf"
+fi
+
+log "Nginx config ready for $DOMAIN"
 
 # =============================================================================
 #  PHASE 3 — BUILD & START CONTAINERS
 # =============================================================================
 header "Phase 3: Building & Starting Docker Containers"
 
-# If SSL is requested and no cert exists yet, start with HTTP-only nginx
-# so Certbot can complete the ACME challenge
-if $SSL; then
-  if [[ ! -d "/etc/letsencrypt/live/$DOMAIN" ]] && \
-     ! docker volume inspect talio_certbot_etc >/dev/null 2>&1; then
-    SSL_FIRST_RUN=true
-  else
-    SSL_FIRST_RUN=false
-  fi
-else
-  SSL_FIRST_RUN=false
-fi
-
-if $SSL_FIRST_RUN; then
-  info "First-time SSL: starting with HTTP-only nginx for certificate provisioning..."
-  # Swap in the HTTP-only config
-  cp "$NGINX_DIR/default.conf" "$NGINX_DIR/default-ssl.conf.bak"
-  cp "$NGINX_DIR/default-http-only.conf" "$NGINX_DIR/default.conf"
-fi
-
-info "Building Docker image (using cache for faster builds)..."
-DOCKER_BUILDKIT=1 docker compose build talio-app
+info "Building Docker image (clean build, no cache)..."
+DOCKER_BUILDKIT=1 docker compose build --no-cache talio-app
 
 info "Starting containers..."
 docker compose up -d
 
-# Wait for app to be healthy
+# Wait for the app to be healthy
 info "Waiting for application to become healthy..."
 RETRIES=0
 MAX_RETRIES=30
 until docker compose exec -T talio-app wget --no-verbose --tries=1 --spider http://localhost:3000 2>/dev/null; do
   RETRIES=$((RETRIES + 1))
   if [[ $RETRIES -ge $MAX_RETRIES ]]; then
-    warn "App did not become healthy after ${MAX_RETRIES} attempts. Check logs: docker compose logs talio-app"
+    warn "App did not become healthy after ${MAX_RETRIES} attempts. Check: docker compose logs talio-app"
     break
   fi
   sleep 5
@@ -240,46 +251,43 @@ fi
 if $SSL; then
   header "Phase 4: SSL Certificate (Let's Encrypt)"
 
-  if $SSL_FIRST_RUN; then
+  if $NEED_SSL_PROVISION; then
+    # ── First-time: obtain certificate ───────────────────────────────────────
     info "Requesting SSL certificate for $DOMAIN..."
 
-    # Give nginx a moment to be ready
+    # Give nginx a moment to fully start and bind port 80
     sleep 5
 
-    # Run Certbot to obtain the certificate
-    docker compose run --rm certbot certbot certonly \
+    # Verify nginx is responding on port 80 before calling Certbot
+    if ! docker compose exec -T nginx wget --no-verbose --tries=1 --spider http://localhost 2>/dev/null; then
+      warn "Nginx may not be ready yet — waiting 10 more seconds..."
+      sleep 10
+    fi
+
+    docker compose run --rm certbot certonly \
       --webroot \
       -w /var/www/certbot \
       -d "$DOMAIN" \
       --email "$SSL_EMAIL" \
       --agree-tos \
       --no-eff-email \
-      --non-interactive \
-      --force-renewal
+      --non-interactive
 
-    if [[ $? -eq 0 ]]; then
-      log "SSL certificate obtained successfully!"
+    log "SSL certificate obtained successfully!"
 
-      # Restore the full HTTPS nginx config
-      info "Switching nginx to HTTPS configuration..."
-      cp "$NGINX_DIR/default-ssl.conf.bak" "$NGINX_DIR/default.conf"
-      rm -f "$NGINX_DIR/default-ssl.conf.bak"
+    # ── Switch to full HTTPS config now that certs exist ─────────────────────
+    info "Switching nginx to HTTPS configuration..."
+    cp "$NGINX_DIR/default.conf.template" "$NGINX_DIR/default.conf"
+    sed -i "s/_DOMAIN_/$DOMAIN/g" "$NGINX_DIR/default.conf"
 
-      # Reload nginx to pick up SSL config
-      docker compose restart nginx
-      log "Nginx restarted with SSL enabled!"
-    else
-      err "Failed to obtain SSL certificate. Check DNS and ensure $DOMAIN points to this server."
-      # Restore original config
-      if [[ -f "$NGINX_DIR/default-ssl.conf.bak" ]]; then
-        cp "$NGINX_DIR/default-ssl.conf.bak" "$NGINX_DIR/default.conf"
-        rm -f "$NGINX_DIR/default-ssl.conf.bak"
-      fi
-      exit 1
-    fi
+    # Restart nginx so it picks up the HTTPS config + certs
+    docker compose restart nginx
+    log "Nginx restarted with SSL enabled!"
+
   else
+    # ── Renewal: certs already exist ─────────────────────────────────────────
     info "Renewing SSL certificate..."
-    docker compose run --rm certbot certbot renew --quiet
+    docker compose run --rm certbot renew --quiet
     docker compose exec -T nginx nginx -s reload 2>/dev/null || docker compose restart nginx
     log "SSL renewal complete!"
   fi
@@ -290,13 +298,14 @@ fi
 # =============================================================================
 header "Phase 5: Setting Up Cron Jobs"
 
-# SSL auto-renewal cron (runs twice daily)
-CRON_RENEW="0 3,15 * * * cd $SCRIPT_DIR && docker compose run --rm certbot certbot renew --quiet && docker compose exec -T nginx nginx -s reload 2>/dev/null"
-
-# App cron jobs
+# Read cron-related env values
 CRON_SECRET=$(grep -E '^CRON_SECRET=' .env 2>/dev/null | head -1 | cut -d'=' -f2- | tr -d '"' | tr -d "'" || true)
 NEXTAUTH_URL_VAL=$(grep -E '^NEXTAUTH_URL=' .env | head -1 | cut -d'=' -f2- | tr -d '"' | tr -d "'")
 
+# SSL auto-renewal (twice daily)
+CRON_RENEW="0 3,15 * * * cd $SCRIPT_DIR && docker compose run --rm certbot renew --quiet && docker compose exec -T nginx nginx -s reload 2>/dev/null"
+
+# Application cron jobs
 CRON_ABSENT="30 19 * * * curl -s -H 'x-cron-secret: ${CRON_SECRET}' '${NEXTAUTH_URL_VAL}/api/cron/mark-absent' >/dev/null 2>&1"
 CRON_NOTIF="*/5 * * * * curl -s -H 'x-cron-secret: ${CRON_SECRET}' '${NEXTAUTH_URL_VAL}/api/cron/process-scheduled-notifications' >/dev/null 2>&1"
 CRON_PROFILE="0 6 * * * curl -s -H 'x-cron-secret: ${CRON_SECRET}' '${NEXTAUTH_URL_VAL}/api/cron/check-profile-deadlines' >/dev/null 2>&1"
@@ -319,7 +328,7 @@ header "Phase 6: Deployment Summary"
 
 echo ""
 echo -e "${GREEN}┌─────────────────────────────────────────────────┐${NC}"
-echo -e "${GREEN}│         🚀 Talio HRMS — Deployed!               │${NC}"
+echo -e "${GREEN}│         Talio HRMS — Deployed!                  │${NC}"
 echo -e "${GREEN}├─────────────────────────────────────────────────┤${NC}"
 echo -e "${GREEN}│${NC}  Domain:    ${BOLD}$DOMAIN${NC}"
 if $SSL; then
@@ -327,7 +336,7 @@ echo -e "${GREEN}│${NC}  URL:       ${BOLD}https://$DOMAIN${NC}"
 echo -e "${GREEN}│${NC}  SSL:       ${GREEN}Active (auto-renew enabled)${NC}"
 else
 echo -e "${GREEN}│${NC}  URL:       ${BOLD}http://$DOMAIN${NC}"
-echo -e "${GREEN}│${NC}  SSL:       ${YELLOW}Not configured${NC}"
+echo -e "${GREEN}│${NC}  SSL:       ${YELLOW}Not configured (run with --ssl)${NC}"
 fi
 echo -e "${GREEN}│${NC}  App Port:  ${BOLD}3000 (internal)${NC}"
 echo -e "${GREEN}│${NC}  Nginx:     ${BOLD}80/443 → 3000${NC}"

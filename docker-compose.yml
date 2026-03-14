@@ -48,7 +48,8 @@ services:
       - certbot_etc:/etc/letsencrypt
       - certbot_var:/var/lib/letsencrypt
       - webroot:/var/www/certbot
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do sleep 12h & wait $${!}; certbot renew --webroot -w /var/www/certbot --quiet; done'"
+    # No entrypoint override — the deploy script and cron call
+    # `docker compose run --rm certbot certonly ...` or `certbot renew` directly.
     networks:
       - talio-network
 
