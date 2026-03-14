@@ -1,4 +1,4 @@
-# ---- Stage 1: Dependencies ----
+# ---- Stage 1: Install ALL dependencies (needed for build) ----
 FROM node:20-alpine AS deps
 WORKDIR /app
 
@@ -6,10 +6,10 @@ WORKDIR /app
 RUN apk add --no-cache libc6-compat python3 make g++
 
 COPY package.json package-lock.json* ./
-RUN npm ci --omit=dev --ignore-scripts && \
+RUN npm ci --ignore-scripts && \
     npm rebuild sharp bcryptjs 2>/dev/null; true
 
-# ---- Stage 2: Builder ----
+# ---- Stage 2: Build the Next.js app ----
 FROM node:20-alpine AS builder
 WORKDIR /app
 
@@ -22,7 +22,10 @@ ENV NODE_ENV=production
 
 RUN npm run build
 
-# ---- Stage 3: Runner ----
+# Prune devDependencies after build so runner gets only production deps
+RUN npm prune --omit=dev
+
+# ---- Stage 3: Production runner ----
 FROM node:20-alpine AS runner
 WORKDIR /app
 
