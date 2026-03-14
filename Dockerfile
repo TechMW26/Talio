@@ -14,8 +14,9 @@ RUN --mount=type=cache,target=/root/.npm \
     npm install --prefer-offline
 
 # Fix cross-platform optional deps: the macOS lockfile omits Linux/musl
-# binaries that rollup (used by Sentry/Next.js) needs at build time.
-RUN ARCH=$(node -p "process.arch") && \
+# native binaries needed at build time (rollup for Sentry, sharp for images).
+RUN npm install --no-save --os=linux --libc=musl --cpu=$(node -p "process.arch") sharp 2>/dev/null || true && \
+    ARCH=$(node -p "process.arch") && \
     npm install --no-save "@rollup/rollup-linux-${ARCH}-musl" 2>/dev/null || true
 
 # ---- Stage 2: Build the Next.js app ----
