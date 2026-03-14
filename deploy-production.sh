@@ -192,8 +192,6 @@ header "Phase 2: Configuring Nginx"
 NEED_SSL_PROVISION=false
 
 if $SSL; then
-  # Check if certs already exist in the Docker volume
-  # First ensure the volume exists by pulling the certbot image
   docker compose pull certbot 2>/dev/null || true
   if ssl_certs_exist; then
     info "SSL certificates already exist for $DOMAIN — will renew if needed."
@@ -203,20 +201,90 @@ if $SSL; then
   fi
 fi
 
-# Generate the correct nginx config from template
+# Write the correct nginx config BEFORE starting containers.
+# Only ONE file should ever exist as *.conf — templates are *.conf.template
+# and are ignored by nginx's `include *.conf` directive.
+write_http_only_config() {
+  # Inline the HTTP-only config directly (no separate file needed)
+  cat > "$NGINX_DIR/default.conf" <<NGINXCONF
+upstream talio_backend {
+    server talio-app:3000;
+    keepalive 64;
+}
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${DOMAIN};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location /api/socketio {
+        proxy_pass http://talio_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_read_timeout 86400s;
+        proxy_send_timeout 86400s;
+    }
+
+    location /api/ {
+        proxy_pass http://talio_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Connection "";
+        proxy_read_timeout 120s;
+        proxy_connect_timeout 10s;
+    }
+
+    location /_next/static/ {
+        proxy_pass http://talio_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        expires 365d;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+        access_log off;
+    }
+
+    location / {
+        proxy_pass http://talio_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+        proxy_set_header Connection "";
+    }
+}
+NGINXCONF
+  log "HTTP-only nginx config written"
+}
+
+write_https_config() {
+  cp "$NGINX_DIR/default.conf.template" "$NGINX_DIR/default.conf"
+  sed -i "s/_DOMAIN_/$DOMAIN/g" "$NGINX_DIR/default.conf"
+  log "HTTPS nginx config written"
+}
+
 if $NEED_SSL_PROVISION; then
-  # STEP A: Start with HTTP-only config so nginx can boot without certs
-  #         and Certbot can complete the ACME HTTP-01 challenge on port 80.
-  info "Using HTTP-only nginx config for SSL provisioning..."
-  cp "$NGINX_DIR/default-http-only.conf.template" "$NGINX_DIR/default.conf"
-  sed -i "s/_DOMAIN_/$DOMAIN/g" "$NGINX_DIR/default.conf"
+  # First-time SSL: start with HTTP-only so nginx can boot without certs
+  info "Using HTTP-only nginx config for initial SSL provisioning..."
+  write_http_only_config
+elif $SSL; then
+  # Certs exist: use full HTTPS config
+  info "Using HTTPS nginx config (certs exist)..."
+  write_https_config
 else
-  # Normal deploy: use the full HTTPS template (certs already exist or no SSL)
-  if $SSL; then
-    info "Using HTTPS nginx config (certs exist)..."
-    cp "$NGINX_DIR/default.conf.template" "$NGINX_DIR/default.conf"
-  fi
-  sed -i "s/_DOMAIN_/$DOMAIN/g" "$NGINX_DIR/default.conf"
+  # No SSL requested: ensure domain is substituted in existing config
+  sed -i "s/_DOMAIN_/$DOMAIN/g" "$NGINX_DIR/default.conf" 2>/dev/null || true
 fi
 
 log "Nginx config ready for $DOMAIN"
@@ -258,6 +326,12 @@ if [[ $RETRIES -lt $MAX_RETRIES ]]; then
   log "Application is running and healthy!"
 fi
 
+# Also verify nginx is running (not crash-looping)
+if ! docker compose exec -T nginx nginx -t 2>/dev/null; then
+  warn "Nginx config test failed — checking logs..."
+  docker compose logs nginx --tail 20
+fi
+
 # =============================================================================
 #  PHASE 4 — SSL CERTIFICATE (Let's Encrypt via Certbot)
 # =============================================================================
@@ -268,14 +342,19 @@ if $SSL; then
     # ── First-time: obtain certificate ───────────────────────────────────────
     info "Requesting SSL certificate for $DOMAIN..."
 
-    # Give nginx a moment to fully start and bind port 80
-    sleep 5
-
-    # Verify nginx is responding on port 80 before calling Certbot
-    if ! docker compose exec -T nginx wget --no-verbose --tries=1 --spider http://localhost 2>/dev/null; then
-      warn "Nginx may not be ready yet — waiting 10 more seconds..."
-      sleep 10
-    fi
+    # Wait for nginx to be fully up and serving port 80
+    info "Waiting for nginx to be ready on port 80..."
+    NGINX_RETRIES=0
+    until curl -s -o /dev/null -w '%{http_code}' http://localhost | grep -qE '(200|301|302|404)'; do
+      NGINX_RETRIES=$((NGINX_RETRIES + 1))
+      if [[ $NGINX_RETRIES -ge 12 ]]; then
+        err "Nginx is not responding on port 80 after 60 seconds."
+        err "Check: docker compose logs nginx --tail 30"
+        exit 1
+      fi
+      sleep 5
+    done
+    log "Nginx is serving HTTP on port 80"
 
     docker compose run --rm certbot certonly \
       --webroot \
@@ -290,12 +369,18 @@ if $SSL; then
 
     # ── Switch to full HTTPS config now that certs exist ─────────────────────
     info "Switching nginx to HTTPS configuration..."
-    cp "$NGINX_DIR/default.conf.template" "$NGINX_DIR/default.conf"
-    sed -i "s/_DOMAIN_/$DOMAIN/g" "$NGINX_DIR/default.conf"
+    write_https_config
 
     # Restart nginx so it picks up the HTTPS config + certs
     docker compose restart nginx
-    log "Nginx restarted with SSL enabled!"
+    sleep 3
+
+    # Verify HTTPS nginx is running
+    if docker compose exec -T nginx nginx -t 2>/dev/null; then
+      log "Nginx restarted with SSL enabled!"
+    else
+      err "Nginx failed to start with HTTPS config. Check: docker compose logs nginx"
+    fi
 
   else
     # ── Renewal: certs already exist ─────────────────────────────────────────
