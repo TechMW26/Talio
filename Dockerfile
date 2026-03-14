@@ -9,9 +9,10 @@ RUN apk add --no-cache libc6-compat python3 make g++
 
 COPY package.json package-lock.json* ./
 
-# Install dependencies — uses npm install (not ci) because the lockfile is generated
-# on macOS while Docker builds on Alpine Linux, causing platform-specific mismatches.
-# Docker layer caching still works: this layer only rebuilds when package*.json changes.
+# Delete lockfile — it was generated on macOS and is missing Alpine-specific
+# optional deps like @rollup/rollup-linux-x64-musl (npm bug #4828).
+# npm install will regenerate it for the correct platform.
+RUN rm -f package-lock.json
 RUN --mount=type=cache,target=/root/.npm \
     npm install
 
