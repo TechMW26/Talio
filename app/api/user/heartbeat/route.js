@@ -5,7 +5,7 @@ import { getAuthAndModels } from '@/lib/auth';
  * POST /api/user/heartbeat
  * Clients call this every 60s to report presence.
  * Upserts a UserPresence document with the current timestamp.
- * Used by the live-users API as a fallback when Socket.IO is unavailable (Vercel).
+ * Used by the live-users API as a fallback when Socket.IO is unavailable.
  */
 export async function POST(request) {
   try {

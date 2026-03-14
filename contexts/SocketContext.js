@@ -96,14 +96,14 @@ export function SocketProvider({ children }) {
       reconnection: true,
       reconnectionDelay: 2000,
       reconnectionDelayMax: 10000,
-      reconnectionAttempts: 3, // Low attempts — if Socket.IO server isn't running (Vercel), stop quickly
+      reconnectionAttempts: 3,
       timeout: 10000,
       autoConnect: true,
       forceNew: false
     })
 
     // =============================================
-    // Polling fallback for force-refresh (Vercel)
+    // Polling fallback for force-refresh
     // When Socket.IO is not available, poll the DB
     // =============================================
     let refreshPollTimer = null
@@ -142,7 +142,7 @@ export function SocketProvider({ children }) {
     }
 
     // =============================================
-    // Heartbeat for DB-backed presence (Vercel)
+    // Heartbeat for DB-backed presence fallback
     // When Socket.IO is unavailable, periodically POST
     // to /api/user/heartbeat so the live-users API
     // can determine who is active.
@@ -275,7 +275,7 @@ export function SocketProvider({ children }) {
       if (!socketInstance._hasLoggedError) {
         console.warn('⚠️ [Socket.IO Client] Connection error — real-time features will use polling fallback.')
         socketInstance._hasLoggedError = true
-        // Proactively start heartbeat and polling — if Socket.IO fails once on Vercel it won't recover
+        // Proactively start heartbeat and polling fallback
         startRefreshPolling()
         startHeartbeat()
       }

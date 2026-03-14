@@ -164,7 +164,7 @@ export async function GET(request) {
     );
 
     // Get active users from socket presence (real-time connection tracking)
-    // On Vercel (serverless), global.presenceByUserId is always empty,
+    // In serverless mode, global.presenceByUserId is always empty,
     // so fall back to DB-backed heartbeat presence (UserPresence collection).
     const presenceByUserId = global.presenceByUserId || new Map();
     const hasSocketPresence = presenceByUserId.size > 0;

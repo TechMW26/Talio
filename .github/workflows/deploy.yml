@@ -1,8 +1,7 @@
 name: Talio CI — Lint Check
 
 # ============================================================
-# Lint gate for PRs — Vercel handles all builds & deploys
-# via its auto-deploy integration + ignoreCommand filter.
+# Lint gate for PRs
 # ============================================================
 on:
   pull_request:
@@ -28,7 +27,6 @@ on:
       - "talio-web/Talio/postcss.config.js"
       - "talio-web/Talio/middleware.js"
       - "talio-web/Talio/server.js"
-      - "talio-web/Talio/vercel.json"
 
 # ============================================================
 # Jobs

@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic'
  * to process scheduled and recurring notifications
  * 
  * You can use services like:
- * - Vercel Cron Jobs
+ * - System cron jobs
  * - GitHub Actions
  * - External cron services (cron-job.org, etc.)
  * 

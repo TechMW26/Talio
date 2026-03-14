@@ -4,7 +4,7 @@
  * 
  * Reminder thresholds: 85%, 90%, 95% of tenure
  * 
- * Run daily via external cron service (e.g., Vercel Cron, cron-job.org)
+ * Run daily via cron job
  * Endpoint: POST /api/cron/subscription-reminders
  * Required Header: x-cron-secret: {CRON_SECRET}
  */

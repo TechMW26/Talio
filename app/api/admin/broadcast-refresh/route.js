@@ -4,7 +4,7 @@ import mongoose from 'mongoose';
 
 /**
  * POST /api/admin/broadcast-refresh
- * Send a force-refresh event to users via Socket.IO (or DB fallback for Vercel)
+ * Send a force-refresh event to users via Socket.IO (or DB fallback)
  * ADMIN ONLY - HR and Department Heads can view but not refresh
  * 
  * Body:
@@ -147,7 +147,7 @@ export async function POST(request) {
       }
       console.log(`[Broadcast Refresh] ${user.email} sent refresh via Socket.IO to ${sentCount} users (${targetDescription})`);
     } else {
-      // Fallback path: Store in DB for polling clients (Vercel deployment)
+      // Fallback path: Store in DB for polling clients
       const docs = targetUserIds.map(uid => ({
         userId: uid,
         message: refreshPayload.message,

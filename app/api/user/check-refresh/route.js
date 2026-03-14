@@ -4,7 +4,7 @@ import { getAuthAndModels } from '@/lib/auth';
 /**
  * GET /api/user/check-refresh
  * Check if there are any pending force-refresh commands for the current user.
- * Used as a polling fallback when Socket.IO is unavailable (e.g. Vercel deployment).
+ * Used as a polling fallback when Socket.IO is unavailable.
  * Marks consumed refreshes so they aren't returned again.
  */
 export async function GET(request) {
