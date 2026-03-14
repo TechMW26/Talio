@@ -211,8 +211,8 @@ if $SSL_FIRST_RUN; then
   cp "$NGINX_DIR/default-http-only.conf" "$NGINX_DIR/default.conf"
 fi
 
-info "Building Docker image (this may take a few minutes on first run)..."
-docker compose build --no-cache talio-app
+info "Building Docker image (using cache for faster builds)..."
+docker compose build talio-app
 
 info "Starting containers..."
 docker compose up -d
