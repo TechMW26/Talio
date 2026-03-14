@@ -5,12 +5,14 @@
 # Usage:
 #   chmod +x deploy-production.sh
 #   ./deploy-production.sh --fresh --ssl        # First-time full setup
-#   ./deploy-production.sh                      # Redeploy / update (rebuild & restart)
+#   ./deploy-production.sh                      # Redeploy / update (fast cached rebuild)
 #   ./deploy-production.sh --ssl                # Redeploy + renew/issue SSL
+#   ./deploy-production.sh --clean               # Full rebuild from scratch (no Docker cache)
 #
 # Flags:
 #   --fresh   Install all system dependencies (Docker, Docker Compose, etc.)
 #   --ssl     Provision or renew SSL certificate via Let's Encrypt
+#   --clean   Force a full Docker rebuild with no layer cache
 # =============================================================================
 
 set -euo pipefail
@@ -33,10 +35,12 @@ header(){ echo -e "\n${BOLD}━━━━━━━━━━━━━━━━━�
 # ─── Parse flags ─────────────────────────────────────────────────────────────
 FRESH=false
 SSL=false
+CLEAN=false
 for arg in "$@"; do
   case "$arg" in
     --fresh) FRESH=true ;;
     --ssl)   SSL=true ;;
+    --clean) CLEAN=true ;;
     *) err "Unknown flag: $arg"; exit 1 ;;
   esac
 done
@@ -222,11 +226,20 @@ log "Nginx config ready for $DOMAIN"
 # =============================================================================
 header "Phase 3: Building & Starting Docker Containers"
 
-info "Building Docker image (clean build, no cache)..."
-DOCKER_BUILDKIT=1 docker compose build --no-cache talio-app
+if $CLEAN || $FRESH; then
+  info "Building Docker image (full rebuild, no cache)..."
+  DOCKER_BUILDKIT=1 docker compose build --no-cache talio-app
+else
+  info "Building Docker image (cached — use --clean for full rebuild)..."
+  DOCKER_BUILDKIT=1 docker compose build talio-app
+fi
 
 info "Starting containers..."
 docker compose up -d
+
+# Clean up old Docker images/layers to prevent storage bloat
+info "Pruning old Docker images..."
+docker image prune -f --filter "until=1h" 2>/dev/null || true
 
 # Wait for the app to be healthy
 info "Waiting for application to become healthy..."
@@ -309,7 +322,7 @@ CRON_RENEW="0 3,15 * * * cd $SCRIPT_DIR && docker compose run --rm certbot renew
 CRON_ABSENT="30 19 * * * curl -s -H 'x-cron-secret: ${CRON_SECRET}' '${NEXTAUTH_URL_VAL}/api/cron/mark-absent' >/dev/null 2>&1"
 CRON_NOTIF="*/5 * * * * curl -s -H 'x-cron-secret: ${CRON_SECRET}' '${NEXTAUTH_URL_VAL}/api/cron/process-scheduled-notifications' >/dev/null 2>&1"
 CRON_PROFILE="0 6 * * * curl -s -H 'x-cron-secret: ${CRON_SECRET}' '${NEXTAUTH_URL_VAL}/api/cron/check-profile-deadlines' >/dev/null 2>&1"
-CRON_CLEANUP="0 2 * * 0 docker system prune -af --volumes --filter 'until=168h' >/dev/null 2>&1"
+CRON_CLEANUP="0 2 * * 0 docker image prune -af --filter 'until=168h' && docker builder prune -af --keep-storage=2GB 2>/dev/null >/dev/null 2>&1"
 
 # Install cron jobs (idempotent — removes old talio entries first)
 ( crontab -l 2>/dev/null | grep -v '# talio-' || true

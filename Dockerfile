@@ -7,14 +7,13 @@ WORKDIR /app
 # Install native build dependencies for sharp, canvas, bcrypt
 RUN apk add --no-cache libc6-compat python3 make g++
 
+# Copy package files. The lockfile may have been generated on macOS so
+# we run `npm install` (not `npm ci`) to let npm resolve any platform-
+# specific optional deps (e.g. @rollup/rollup-linux-x64-musl).
+# The npm cache mount makes repeat installs fast even without --no-cache.
 COPY package.json package-lock.json* ./
-
-# Delete lockfile — it was generated on macOS and is missing Alpine-specific
-# optional deps like @rollup/rollup-linux-x64-musl (npm bug #4828).
-# npm install will regenerate it for the correct platform.
-RUN rm -f package-lock.json
 RUN --mount=type=cache,target=/root/.npm \
-    npm install
+    npm install --prefer-offline
 
 # ---- Stage 2: Build the Next.js app ----
 FROM node:20-alpine AS builder
