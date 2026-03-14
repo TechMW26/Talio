@@ -1394,8 +1394,8 @@ export default function ProjectDetailPage() {
             </button>
           )}
 
-          {/* Mark Complete button - ONLY for Project Head (green, permanent) */}
-          {isProjectHead && project.status === 'ongoing' && (
+          {/* Mark Complete button - ALWAYS visible for Project Head */}
+          {isProjectHead && project.status !== 'completed' && (
             <button
               onClick={handleMarkComplete}
               disabled={submitting || !completionStatus.canComplete}

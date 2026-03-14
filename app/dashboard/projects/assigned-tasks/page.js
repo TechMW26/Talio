@@ -18,6 +18,7 @@ import { playNotificationSound, NotificationSoundTypes } from '@/lib/notificatio
 import Portal from '@/components/ui/Portal'
 import ModalPortal from '@/components/ui/ModalPortal'
 import KanbanBoard from '@/components/tasks/KanbanBoard'
+import CreateTaskModal from '@/components/tasks/CreateTaskModal'
 
 const statusColors = {
   'todo': 'default',
@@ -117,6 +118,7 @@ export default function AssignedTasksPage() {
   }, [])
 
   // Reason modal for status changes
+  const [showCreateTask, setShowCreateTask] = useState(false)
   const [showReasonModal, setShowReasonModal] = useState(false)
   const [pendingStatusChange, setPendingStatusChange] = useState(null) // { task, newStatus, source: 'kanban' | 'modal' }
   const [statusChangeReason, setStatusChangeReason] = useState('')
@@ -149,16 +151,37 @@ export default function AssignedTasksPage() {
   const projects = tasksData?.projects || []
   const stats = tasksData?.stats || {}
 
-  // Fetch project members when a task is selected
+  // Helper: get the correct API base for a task (project-based or standalone)
+  const getTaskApiBase = (task) => {
+    const projectId = task?.project?._id || task?.project
+    if (projectId) return `/api/projects/${projectId}/tasks/${task._id}`
+    return `/api/tasks/${task._id}`
+  }
+
+  // Fetch project members or all employees when a task is selected
   const fetchProjectMembers = async (projectId) => {
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch(`/api/projects/${projectId}/members`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-      const data = await response.json()
-      if (data.success) {
-        setProjectMembers(data.data.filter(m => m.invitationStatus === 'accepted'))
+      if (projectId) {
+        const response = await fetch(`/api/projects/${projectId}/members`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+        const data = await response.json()
+        if (data.success) {
+          setProjectMembers(data.data.filter(m => m.invitationStatus === 'accepted'))
+        }
+      } else {
+        // For standalone tasks, fetch all employees
+        const response = await fetch(`/api/employees/list?includeAdmins=true`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+        const data = await response.json()
+        if (data.success) {
+          setProjectMembers(data.data?.map(emp => ({
+            employee: emp,
+            invitationStatus: 'accepted'
+          })) || [])
+        }
       }
     } catch (error) {
       console.error('Fetch members error:', error)
@@ -173,18 +196,23 @@ export default function AssignedTasksPage() {
     try {
       setSubmitting(true)
       const token = localStorage.getItem('token')
-      const response = await fetch(`/api/projects/${selectedTask.project._id}/tasks/${selectedTask._id}`, {
+      const response = await fetch(getTaskApiBase(selectedTask), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(editForm)
+        body: JSON.stringify({
+          title: editForm.title,
+          description: editForm.description,
+          priority: editForm.priority,
+          dueDate: editForm.dueDate || undefined
+        })
       })
 
       const data = await response.json()
       if (data.success) {
-        playNotificationSound(NotificationSoundTypes.SUCCESS)
+        playNotificationSound(NotificationSoundTypes.POP)
         toast.success('Task updated successfully')
         setShowEditModal(false)
         setSelectedTask(null)
@@ -207,7 +235,7 @@ export default function AssignedTasksPage() {
       setSubmitting(true)
       const token = localStorage.getItem('token')
       const response = await fetch(
-        `/api/projects/${selectedTask.project._id}/tasks/${selectedTask._id}?reason=${encodeURIComponent(deleteReason)}`,
+        `${getTaskApiBase(selectedTask)}?reason=${encodeURIComponent(deleteReason)}`,
         {
           method: 'DELETE',
           headers: { 'Authorization': `Bearer ${token}` }
@@ -238,15 +266,15 @@ export default function AssignedTasksPage() {
 
     // Handle both populated and unpopulated project field
     const projectId = selectedTask.project?._id || selectedTask.project
-    if (!projectId) {
-      toast.error('Project not found')
-      return
-    }
 
     try {
       setSubmitting(true)
       const token = localStorage.getItem('token')
-      const response = await fetch(`/api/projects/${projectId}/tasks/${selectedTask._id}/subtasks`, {
+      // Subtasks route works with either project-based or standalone task path
+      const subtaskUrl = projectId
+        ? `/api/projects/${projectId}/tasks/${selectedTask._id}/subtasks`
+        : `/api/projects/_/tasks/${selectedTask._id}/subtasks`
+      const response = await fetch(subtaskUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -279,7 +307,7 @@ export default function AssignedTasksPage() {
     try {
       setSubmitting(true)
       const token = localStorage.getItem('token')
-      const response = await fetch(`/api/projects/${selectedTask.project._id}/tasks/${selectedTask._id}/reassign`, {
+      const response = await fetch(`${getTaskApiBase(selectedTask)}/reassign`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -315,7 +343,7 @@ export default function AssignedTasksPage() {
       const token = localStorage.getItem('token')
 
       for (const userId of addUserIds) {
-        await fetch(`/api/projects/${selectedTask.project._id}/tasks/${selectedTask._id}/assign`, {
+        await fetch(`${getTaskApiBase(selectedTask)}/assign`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -344,7 +372,7 @@ export default function AssignedTasksPage() {
     try {
       setSubmitting(true)
       const token = localStorage.getItem('token')
-      const response = await fetch(`/api/projects/${selectedTask.project._id}/tasks/${selectedTask._id}/deletion-response`, {
+      const response = await fetch(`${getTaskApiBase(selectedTask)}/deletion-response`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -430,7 +458,7 @@ export default function AssignedTasksPage() {
 
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch(`/api/projects/${task.project._id || task.project}/tasks/${task._id}`, {
+      const response = await fetch(getTaskApiBase(task), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -438,7 +466,7 @@ export default function AssignedTasksPage() {
         },
         body: JSON.stringify({
           status: newStatus,
-          statusChangeReason: reason
+          reason
         })
       })
 
@@ -511,6 +539,13 @@ export default function AssignedTasksPage() {
             <p className="text-default-600">Tasks you&apos;ve assigned to team members</p>
           </div>
         </div>
+        <Button
+          color="primary"
+          onPress={() => setShowCreateTask(true)}
+          startContent={<FaPlus />}
+        >
+          Assign Task
+        </Button>
       </div>
 
       {/* Stats */}
@@ -745,19 +780,19 @@ export default function AssignedTasksPage() {
                     }}
                     onAddUser={() => {
                       setSelectedTask(task)
-                      fetchProjectMembers(task.project._id)
+                      fetchProjectMembers(task.project?._id)
                       setShowAddUserModal(true)
                     }}
                     onReassign={() => {
                       setSelectedTask(task)
-                      fetchProjectMembers(task.project._id)
+                      fetchProjectMembers(task.project?._id)
                       setShowReassignModal(true)
                     }}
                     onAddSubtask={() => {
                       setSelectedTask(task)
                       setShowAddSubtaskModal(true)
                     }}
-                    onViewProject={() => router.push(`/dashboard/projects/${task.project._id}`)}
+                    onViewProject={task.project?._id ? () => router.push(`/dashboard/projects/${task.project._id}`) : undefined}
                     onRespondToDeletion={() => {
                       setSelectedTask(task)
                       setShowDeletionApprovalModal(true)
@@ -800,19 +835,19 @@ export default function AssignedTasksPage() {
                     }}
                     onAddUser={() => {
                       setSelectedTask(task)
-                      fetchProjectMembers(task.project._id)
+                      fetchProjectMembers(task.project?._id)
                       setShowAddUserModal(true)
                     }}
                     onReassign={() => {
                       setSelectedTask(task)
-                      fetchProjectMembers(task.project._id)
+                      fetchProjectMembers(task.project?._id)
                       setShowReassignModal(true)
                     }}
                     onAddSubtask={() => {
                       setSelectedTask(task)
                       setShowAddSubtaskModal(true)
                     }}
-                    onViewProject={() => router.push(`/dashboard/projects/${task.project._id}`)}
+                    onViewProject={task.project?._id ? () => router.push(`/dashboard/projects/${task.project._id}`) : undefined}
                   />
                 ))}
               </div>
@@ -850,19 +885,19 @@ export default function AssignedTasksPage() {
                     }}
                     onAddUser={() => {
                       setSelectedTask(task)
-                      fetchProjectMembers(task.project._id)
+                      fetchProjectMembers(task.project?._id)
                       setShowAddUserModal(true)
                     }}
                     onReassign={() => {
                       setSelectedTask(task)
-                      fetchProjectMembers(task.project._id)
+                      fetchProjectMembers(task.project?._id)
                       setShowReassignModal(true)
                     }}
                     onAddSubtask={() => {
                       setSelectedTask(task)
                       setShowAddSubtaskModal(true)
                     }}
-                    onViewProject={() => router.push(`/dashboard/projects/${task.project._id}`)}
+                    onViewProject={task.project?._id ? () => router.push(`/dashboard/projects/${task.project._id}`) : undefined}
                     isOverdue={isOverdue(task)}
                   />
                 ))}
@@ -899,7 +934,7 @@ export default function AssignedTasksPage() {
                       setSelectedTask(task)
                       setShowDeleteModal(true)
                     }}
-                    onViewProject={() => router.push(`/dashboard/projects/${task.project._id}`)}
+                    onViewProject={task.project?._id ? () => router.push(`/dashboard/projects/${task.project._id}`) : undefined}
                     isCompleted
                   />
                 ))}
@@ -1360,14 +1395,16 @@ export default function AssignedTasksPage() {
                 >
                   Edit Task
                 </Button>
-                <Button
-                  onPress={() => router.push(`/dashboard/projects/${selectedTask.project?._id || selectedTask.project}`)}
-                  variant="flat"
-                  size="sm"
-                  startContent={<FaProjectDiagram className="w-3 h-3" />}
-                >
-                  View Project
-                </Button>
+                {selectedTask.project && (
+                  <Button
+                    onPress={() => router.push(`/dashboard/projects/${selectedTask.project?._id || selectedTask.project}`)}
+                    variant="flat"
+                    size="sm"
+                    startContent={<FaProjectDiagram className="w-3 h-3" />}
+                  >
+                    View Project
+                  </Button>
+                )}
                 <button
                   onClick={() => setSelectedTask(null)}
                   className="p-2 hover:bg-gray-100 rounded-lg text-gray-500"
@@ -1502,7 +1539,7 @@ export default function AssignedTasksPage() {
                             try {
                               setModalUpdatingSubtask(subtaskId)
                               const token = localStorage.getItem('token')
-                              const response = await fetch(`/api/projects/${projectId}/tasks/${selectedTask._id}/subtasks`, {
+                              const response = await fetch(`/api/projects/${projectId || '_'}/tasks/${selectedTask._id}/subtasks`, {
                                 method: 'PUT',
                                 headers: {
                                   'Content-Type': 'application/json',
@@ -1661,7 +1698,7 @@ export default function AssignedTasksPage() {
               <div className="flex flex-wrap gap-3 pt-4 border-t">
                 <button
                   onClick={() => {
-                    fetchProjectMembers(selectedTask.project._id)
+                    fetchProjectMembers(selectedTask.project?._id)
                     setShowAddUserModal(true)
                   }}
                   className="btn-secondary flex items-center gap-2"
@@ -1671,7 +1708,7 @@ export default function AssignedTasksPage() {
                 </button>
                 <button
                   onClick={() => {
-                    fetchProjectMembers(selectedTask.project._id)
+                    fetchProjectMembers(selectedTask.project?._id)
                     setShowReassignModal(true)
                   }}
                   className="btn-secondary flex items-center gap-2"
@@ -1698,6 +1735,13 @@ export default function AssignedTasksPage() {
           </div>
         </div>}
       </ModalPortal>
+
+      {/* Create Task Modal */}
+      <CreateTaskModal
+        isOpen={showCreateTask}
+        onClose={() => setShowCreateTask(false)}
+        onTaskCreated={() => mutateTasks()}
+      />
     </div>
   )
 }
@@ -1744,13 +1788,21 @@ function TaskCard({ task, onEdit, onDelete, onAddUser, onReassign, onAddSubtask,
           )}
 
           <div className="flex items-center gap-4 text-sm text-gray-500 flex-wrap">
-            <button
-              onClick={onViewProject}
-              className={`flex items-center gap-1 px-2 py-0.5 rounded ${projectColor.badge} ${projectColor.text} hover:opacity-80`}
-            >
-              <FaProjectDiagram className="text-xs" />
-              {task.project?.name}
-            </button>
+            {task.project && onViewProject && (
+              <button
+                onClick={onViewProject}
+                className={`flex items-center gap-1 px-2 py-0.5 rounded ${projectColor.badge} ${projectColor.text} hover:opacity-80`}
+              >
+                <FaProjectDiagram className="text-xs" />
+                {task.project?.name}
+              </button>
+            )}
+            {!task.project && (
+              <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 text-gray-600">
+                <FaTasks className="text-xs" />
+                Standalone Task
+              </span>
+            )}
             {task.dueDate && (
               <div className={`flex items-center gap-1 ${isOverdue ? 'text-red-500' : ''}`}>
                 <FaCalendarAlt className="text-xs" />

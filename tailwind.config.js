@@ -10,10 +10,6 @@ module.exports = {
     './src/**/*.{js,ts,jsx,tsx}',
     './node_modules/@heroui/theme/dist/**/*.{js,ts,jsx,tsx,mjs}',
   ],
-  safelist: [
-    { pattern: /^peer-placeholder-shown:/ },
-    { pattern: /^peer-focus:/ },
-  ],
   theme: {
     extend: {
       fontFamily: {

@@ -193,6 +193,7 @@ export async function PUT(request, { params }) {
       }
 
       // If assignee marks as completed, require approval from project head(s) — dept authority and team leaders can complete directly
+      // Project head bypasses approval — their tasks go directly to completed
       if (status === 'completed' && !isProjectHead && !isAdmin && !isDeptAuthority) {
         // STRICTLY ENFORCE REVIEW STATUS
         updates.status = 'review'
@@ -230,6 +231,18 @@ export async function PUT(request, { params }) {
             taskPriority: task.priority,
             submittedBy: user.employeeId
           }
+        })
+      } else if ((status === 'review' || status === 'completed') && isProjectHead) {
+        // Project head moves task to review or completed — auto-complete directly (no approval needed)
+        updates.status = 'completed'
+        updates.completedAt = new Date()
+        changes.push(`Status changed from ${oldStatus} to completed (auto-approved by project head)`)
+
+        // Cancel any existing pending approval requests for this task
+        await ProjectApprovalRequest.deleteMany({
+          relatedTask: taskId,
+          type: 'task_review',
+          status: 'pending'
         })
       } else {
         updates.status = status

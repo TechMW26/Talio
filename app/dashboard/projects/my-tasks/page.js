@@ -35,6 +35,7 @@ import { playNotificationSound, NotificationSoundTypes } from '@/lib/notificatio
 import Portal from '@/components/ui/Portal'
 import ModalPortal from '@/components/ui/ModalPortal'
 import KanbanBoard from '@/components/tasks/KanbanBoard'
+import CreateTaskModal from '@/components/tasks/CreateTaskModal'
 
 const statusColors = {
   'todo': 'default',
@@ -142,6 +143,7 @@ export default function MyTasksPage() {
   const [modalUpdatingSubtask, setModalUpdatingSubtask] = useState(null) // For modal subtask toggle loading
   const [modalUpdatingStatus, setModalUpdatingStatus] = useState(false) // For modal status change loading
   const [showModalStatusDropdown, setShowModalStatusDropdown] = useState(false) // For status dropdown visibility
+  const [showCreateTask, setShowCreateTask] = useState(false)
 
   // --- SWR Data Fetching ---
   const tasksQueryString = useMemo(() => {
@@ -185,6 +187,13 @@ export default function MyTasksPage() {
     return uniqueProjects.sort((a, b) => a.name.localeCompare(b.name))
   }, [tasksData])
 
+  // Helper: get the correct API base for a task (project-based or standalone)
+  const getTaskApiBase = (task) => {
+    const projectId = task?.project?._id || task?.project
+    if (projectId) return `/api/projects/${projectId}/tasks/${task._id}`
+    return `/api/tasks/${task._id}`
+  }
+
   const handleRespondToAssignment = async (task, action, estimatedDays = null, estimatedHours = null) => {
     try {
       setRespondingTo(task._id)
@@ -198,7 +207,7 @@ export default function MyTasksPage() {
         totalEstimatedHours = (days * 8) + hours // Assuming 8 work hours per day
       }
 
-      const response = await fetch(`/api/projects/${task.project._id}/tasks/${task._id}/respond`, {
+      const response = await fetch(`${getTaskApiBase(task)}/respond`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -318,7 +327,7 @@ export default function MyTasksPage() {
     try {
       setDeleting(true)
       const token = localStorage.getItem('token')
-      const response = await fetch(`/api/projects/${taskToDelete.project._id}/tasks/${taskToDelete._id}`, {
+      const response = await fetch(getTaskApiBase(taskToDelete), {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -359,7 +368,7 @@ export default function MyTasksPage() {
     try {
       setRespondingTo(task._id)
       const token = localStorage.getItem('token')
-      const response = await fetch(`/api/projects/${task.project._id || task.project}/tasks/${task._id}`, {
+      const response = await fetch(getTaskApiBase(task), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -492,6 +501,13 @@ export default function MyTasksPage() {
             View and manage your tasks across all projects
           </p>
         </div>
+        <Button
+          color="primary"
+          onPress={() => setShowCreateTask(true)}
+          startContent={<FaPlus />}
+        >
+          Assign Task
+        </Button>
       </div>
 
       {/* Stats Cards */}
@@ -750,7 +766,7 @@ export default function MyTasksPage() {
                     }}
                     onReject={() => { setSelectedTask(task); setShowRejectModal(true) }}
                     onStatusChange={handleUpdateStatus}
-                    onViewProject={() => router.push(`/dashboard/projects/${task.project._id}`)}
+                    onViewProject={task.project?._id ? () => router.push(`/dashboard/projects/${task.project._id}`) : undefined}
                     onDelete={() => { setTaskToDelete(task); setShowDeleteModal(true) }}
                     respondingTo={respondingTo}
                     isPendingAcceptance
@@ -774,7 +790,7 @@ export default function MyTasksPage() {
                     key={task._id}
                     task={task}
                     onStatusChange={handleUpdateStatus}
-                    onViewProject={() => router.push(`/dashboard/projects/${task.project._id}`)}
+                    onViewProject={task.project?._id ? () => router.push(`/dashboard/projects/${task.project._id}`) : undefined}
                     onDelete={() => { setTaskToDelete(task); setShowDeleteModal(true) }}
                     respondingTo={respondingTo}
                     isOverdue
@@ -798,7 +814,7 @@ export default function MyTasksPage() {
                     key={task._id}
                     task={task}
                     onStatusChange={handleUpdateStatus}
-                    onViewProject={() => router.push(`/dashboard/projects/${task.project._id}`)}
+                    onViewProject={task.project?._id ? () => router.push(`/dashboard/projects/${task.project._id}`) : undefined}
                     onDelete={() => { setTaskToDelete(task); setShowDeleteModal(true) }}
                     respondingTo={respondingTo}
                     currentEmployeeId={currentEmployeeId}
@@ -820,7 +836,7 @@ export default function MyTasksPage() {
                     key={task._id}
                     task={task}
                     onStatusChange={handleUpdateStatus}
-                    onViewProject={() => router.push(`/dashboard/projects/${task.project._id}`)}
+                    onViewProject={task.project?._id ? () => router.push(`/dashboard/projects/${task.project._id}`) : undefined}
                     onDelete={() => { setTaskToDelete(task); setShowDeleteModal(true) }}
                     respondingTo={respondingTo}
                     currentEmployeeId={currentEmployeeId}
@@ -1054,13 +1070,15 @@ export default function MyTasksPage() {
             <div className="px-6 py-4 bg-default-50 flex items-center justify-between flex-shrink-0">
               <h3 className="text-lg font-semibold text-default-800">Task Details</h3>
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => router.push(`/dashboard/projects/${selectedTask.project?._id || selectedTask.project}`)}
-                  className="btn-secondary flex items-center gap-2 text-sm py-1.5 px-3"
-                >
-                  <FaProjectDiagram className="w-3 h-3" />
-                  View Project
-                </button>
+                {selectedTask.project && (
+                  <button
+                    onClick={() => router.push(`/dashboard/projects/${selectedTask.project?._id || selectedTask.project}`)}
+                    className="btn-secondary flex items-center gap-2 text-sm py-1.5 px-3"
+                  >
+                    <FaProjectDiagram className="w-3 h-3" />
+                    View Project
+                  </button>
+                )}
                 <button
                   onClick={() => setSelectedTask(null)}
                   className="p-2 hover:bg-default-100 rounded-lg text-default-500"
@@ -1197,7 +1215,7 @@ export default function MyTasksPage() {
                             try {
                               setModalUpdatingSubtask(subtaskId)
                               const token = localStorage.getItem('token')
-                              const response = await fetch(`/api/projects/${projectId}/tasks/${selectedTask._id}/subtasks`, {
+                              const response = await fetch(`/api/projects/${projectId || '_'}/tasks/${selectedTask._id}/subtasks`, {
                                 method: 'PUT',
                                 headers: {
                                   'Content-Type': 'application/json',
@@ -1337,7 +1355,10 @@ export default function MyTasksPage() {
                                   setShowModalStatusDropdown(false)
                                   const token = localStorage.getItem('token')
                                   const projectId = selectedTask.project?._id || selectedTask.project
-                                  const response = await fetch(`/api/projects/${projectId}/tasks/${selectedTask._id}`, {
+                                  const apiUrl = projectId
+                                    ? `/api/projects/${projectId}/tasks/${selectedTask._id}`
+                                    : `/api/tasks/${selectedTask._id}`
+                                  const response = await fetch(apiUrl, {
                                     method: 'PUT',
                                     headers: {
                                       'Content-Type': 'application/json',
@@ -1402,6 +1423,13 @@ export default function MyTasksPage() {
           </div>
         </div>}
       </ModalPortal>
+
+      {/* Create Task Modal */}
+      <CreateTaskModal
+        isOpen={showCreateTask}
+        onClose={() => setShowCreateTask(false)}
+        onTaskCreated={() => mutateTasks()}
+      />
     </div>
   )
 }
@@ -1443,15 +1471,14 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
 
     // Handle both populated and unpopulated project field
     const projectId = task.project?._id || task.project
-    if (!projectId) {
-      toast.error('Project not found')
-      return
-    }
 
     try {
       setAddingSubtask(true)
       const token = localStorage.getItem('token')
-      const response = await fetch(`/api/projects/${projectId}/tasks/${task._id}/subtasks`, {
+      const subtaskUrl = projectId
+        ? `/api/projects/${projectId}/tasks/${task._id}/subtasks`
+        : `/api/projects/_/tasks/${task._id}/subtasks`
+      const response = await fetch(subtaskUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1517,7 +1544,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
       const idToSend = typeof subtaskId === 'object' && subtaskId._id ? subtaskId._id.toString() :
         subtaskId.toString ? subtaskId.toString() : String(subtaskId)
 
-      const response = await fetch(`/api/projects/${projectId}/tasks/${task._id}/subtasks`, {
+      const response = await fetch(`/api/projects/${projectId || '_'}/tasks/${task._id}/subtasks`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1578,7 +1605,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
       // Handle both populated and unpopulated project field
       const projectId = task.project?._id || task.project
 
-      const response = await fetch(`/api/projects/${projectId}/tasks/${task._id}/subtasks?subtaskId=${idToSend}`, {
+      const response = await fetch(`/api/projects/${projectId || '_'}/tasks/${task._id}/subtasks?subtaskId=${idToSend}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -1611,7 +1638,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
       const projectId = task.project?._id || task.project
       const idToSend = subtaskId?.toString() || subtaskId
 
-      const response = await fetch(`/api/projects/${projectId}/tasks/${task._id}/subtasks`, {
+      const response = await fetch(`/api/projects/${projectId || '_'}/tasks/${task._id}/subtasks`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1661,7 +1688,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
       const projectId = task.project?._id || task.project
       const idToSend = subtaskId?.toString() || subtaskId
 
-      const response = await fetch(`/api/projects/${projectId}/tasks/${task._id}/subtasks`, {
+      const response = await fetch(`/api/projects/${projectId || '_'}/tasks/${task._id}/subtasks`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1712,7 +1739,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
 
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch(`/api/projects/${projectId}/tasks/${task._id}/subtasks/${subtaskId}/comments`, {
+      const response = await fetch(`/api/projects/${projectId || '_'}/tasks/${task._id}/subtasks/${subtaskId}/comments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1789,13 +1816,21 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                 <p className="text-sm text-gray-600 mb-2">{task.description}</p>
               )}
               <div className="flex items-center gap-4 text-sm text-gray-500 flex-wrap">
-                <button
-                  onClick={onViewProject}
-                  className={`flex items-center gap-1 px-2 py-0.5 rounded ${projectColor.badge} ${projectColor.text} hover:opacity-80`}
-                >
-                  <FaProjectDiagram className="text-xs" />
-                  {task.project?.name}
-                </button>
+                {task.project && onViewProject && (
+                  <button
+                    onClick={onViewProject}
+                    className={`flex items-center gap-1 px-2 py-0.5 rounded ${projectColor.badge} ${projectColor.text} hover:opacity-80`}
+                  >
+                    <FaProjectDiagram className="text-xs" />
+                    {task.project?.name}
+                  </button>
+                )}
+                {!task.project && (
+                  <span className="flex items-center gap-1 px-2 py-0.5 rounded bg-gray-100 text-gray-600">
+                    <FaTasks className="text-xs" />
+                    Standalone Task
+                  </span>
+                )}
                 {task.dueDate && (
                   <div className={`flex items-center gap-1 ${isOverdue ? 'text-red-500' : ''}`}>
                     <FaCalendarAlt className="text-xs" />

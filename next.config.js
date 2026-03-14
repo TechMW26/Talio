@@ -2,7 +2,9 @@
 const nextConfig = {
   // Production optimizations
   poweredByHeader: false,
-  compress: true,
+  // Disable Next.js compression — nginx handles gzip in production.
+  // Having both causes double-compression that corrupts CSS/JS responses.
+  compress: false,
 
   reactStrictMode: false,
 

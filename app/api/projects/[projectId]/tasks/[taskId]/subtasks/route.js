@@ -448,39 +448,54 @@ export async function PUT(request, { params }) {
         newStatus = 'in-progress'
       }
       
-      // 2. If progress reaches 100% → move to 'review' and create approval request
+      // 2. If progress reaches 100% → move to 'review' (or 'completed' if project head)
       if (progressPercentage === 100 && !['completed', 'review', 'archived'].includes(task.status)) {
-        setOperations.status = 'review'
-        statusChanged = true
-        newStatus = 'review'
-        
-        // Create approval request for task review
-        const projectId = task.project?._id || task.project
-        
-        // Check if there's already a pending approval request for this task
-        const existingRequest = await ProjectApprovalRequest.findOne({
-          relatedTask: taskId,
-          type: 'task_review',
-          status: 'pending'
-        })
-        
-        if (!existingRequest) {
-          await ProjectApprovalRequest.create({
-            project: projectId,
-            type: 'task_review',
-            status: 'pending',
-            requestedBy: user.employeeId,
+        // Project head bypass: auto-complete directly without review/approval
+        if (isProjectHead) {
+          setOperations.status = 'completed'
+          setOperations.completedAt = new Date()
+          statusChanged = true
+          newStatus = 'completed'
+          
+          // Cancel any existing pending approval requests for this task
+          await ProjectApprovalRequest.deleteMany({
             relatedTask: taskId,
-            reason: `Task "${task.title}" is 100% complete and ready for review`,
-            metadata: {
-              taskTitle: task.title,
-              taskPriority: task.priority,
-              completedBy: user.employeeId,
-              progressPercentage: 100,
-              trigger: 'subtask_completion'
-            }
+            type: 'task_review',
+            status: 'pending'
           })
-          approvalCreated = true
+        } else {
+          setOperations.status = 'review'
+          statusChanged = true
+          newStatus = 'review'
+          
+          // Create approval request for task review
+          const projectId = task.project?._id || task.project
+          
+          // Check if there's already a pending approval request for this task
+          const existingRequest = await ProjectApprovalRequest.findOne({
+            relatedTask: taskId,
+            type: 'task_review',
+            status: 'pending'
+          })
+          
+          if (!existingRequest) {
+            await ProjectApprovalRequest.create({
+              project: projectId,
+              type: 'task_review',
+              status: 'pending',
+              requestedBy: user.employeeId,
+              relatedTask: taskId,
+              reason: `Task "${task.title}" is 100% complete and ready for review`,
+              metadata: {
+                taskTitle: task.title,
+                taskPriority: task.priority,
+                completedBy: user.employeeId,
+                progressPercentage: 100,
+                trigger: 'subtask_completion'
+              }
+            })
+            approvalCreated = true
+          }
         }
       }
       
