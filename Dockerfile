@@ -7,16 +7,13 @@ WORKDIR /app
 # Install native build dependencies for sharp, canvas, bcrypt
 RUN apk add --no-cache libc6-compat python3 make g++
 
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json* ./
 
-# Use npm ci for fast, deterministic installs that leverage Docker layer cache.
-# --ignore-scripts prevents native rebuilds during install; we rebuild explicitly below.
-# BuildKit cache mount reuses the npm cache across builds so repeated installs are near-instant.
+# Install dependencies — uses npm install (not ci) because the lockfile is generated
+# on macOS while Docker builds on Alpine Linux, causing platform-specific mismatches.
+# Docker layer caching still works: this layer only rebuilds when package*.json changes.
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --ignore-scripts
-
-# Rebuild only the native addons that need platform-specific compilation on Alpine/musl
-RUN npm rebuild sharp bcrypt 2>/dev/null || true
+    npm install
 
 # ---- Stage 2: Build the Next.js app ----
 FROM node:20-alpine AS builder
