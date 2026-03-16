@@ -260,14 +260,6 @@ export default function AIAssistant() {
 
                 <div ref={chatEndRef} />
               </div>
-
-              {/* Scope disclaimer */}
-              <div className="flex items-center gap-2 mt-3 px-1">
-                <FaInfoCircle className="text-gray-400 dark:text-gray-500 text-xs flex-shrink-0" />
-                <p className="text-[11px] text-gray-500 dark:text-gray-400">
-                  MIRA can only help with Talio-related questions and features.
-                </p>
-              </div>
             </ModalBody>
 
             <ModalFooter>
