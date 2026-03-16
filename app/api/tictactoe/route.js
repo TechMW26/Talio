@@ -2,6 +2,14 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { sendPushToUser } from '@/lib/pushNotification'
 
+// ─── Socket.IO emit helper ───
+function emitToUser(userId, event, payload) {
+  const io = global.io
+  if (!io) return
+  const room = `user:${userId}`
+  io.to(room).emit(event, payload)
+}
+
 // ─── Win detection (server-side) ───
 const WIN_LINES = [
   [0, 1, 2], [3, 4, 5], [6, 7, 8],
@@ -189,6 +197,15 @@ export async function POST(request) {
       } catch (pushErr) {
         console.error('[TicTacToe] Push notification error:', pushErr)
       }
+
+      // Real-time: notify guest via Socket.IO
+      emitToUser(targetUserId, 'tictactoe:invite', {
+        gameId,
+        hostUserId: senderId,
+        hostName: senderName,
+        hostAvatar: senderAvatar,
+        createdAt: game.createdAt,
+      })
     }
 
     if (action === 'accept') {
@@ -206,6 +223,21 @@ export async function POST(request) {
         },
         { new: true }
       )
+
+      // Real-time: notify both players the game is starting
+      if (game) {
+        const acceptPayload = {
+          gameId,
+          board: game.board,
+          currentTurn: game.currentTurn,
+          hostSymbol: game.hostSymbol || 'X',
+          guestName,
+          guestAvatar,
+          status: 'playing',
+        }
+        emitToUser(game.hostUserId, 'tictactoe:accept', acceptPayload)
+        emitToUser(senderId, 'tictactoe:accept', acceptPayload)
+      }
     }
 
     if (action === 'decline') {
@@ -214,6 +246,11 @@ export async function POST(request) {
         { status: 'declined' },
         { new: true }
       )
+
+      // Real-time: notify host their invite was declined
+      if (game) {
+        emitToUser(game.hostUserId, 'tictactoe:decline', { gameId })
+      }
     }
 
     if (action === 'move') {
@@ -235,6 +272,25 @@ export async function POST(request) {
         await game.save()
 
         console.log(`[Move] gameId=${gameId}, cell=${payload.index}, symbol=${payload.symbol}, winner=${result ? JSON.stringify(result) : 'none'}`)
+
+        // Real-time: notify opponent of the move
+        const opponentId = senderId === game.hostUserId ? game.guestUserId : game.hostUserId
+        emitToUser(opponentId, 'tictactoe:move', {
+          gameId,
+          board: game.board,
+          currentTurn: game.currentTurn,
+          lastMove: payload.index,
+          status: game.status,
+          result: result || null,
+          lastMoveAt: game.lastMoveAt,
+        })
+
+        // If game ended with this move, notify both players
+        if (result) {
+          const endPayload = { gameId, result }
+          emitToUser(game.hostUserId, 'tictactoe:end', endPayload)
+          emitToUser(game.guestUserId, 'tictactoe:end', endPayload)
+        }
       }
     }
 
@@ -258,6 +314,12 @@ export async function POST(request) {
         { status: 'ended' },
         { new: true }
       )
+
+      // Real-time: notify the opponent the game was closed
+      if (game) {
+        emitToUser(targetUserId, 'tictactoe:close', { gameId })
+      }
+
       return NextResponse.json({ success: true })
     }
 

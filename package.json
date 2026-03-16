@@ -7,7 +7,15 @@
     "build": "SKIP_ENV_VALIDATION=true next build",
     "start": "next start",
     "lint": "next lint",
-    "seed": "node scripts/seed.js"
+    "seed": "node scripts/seed.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:socket": "jest tests/socket --verbose",
+    "test:api": "jest tests/api --verbose",
+    "test:e2e": "jest tests/e2e --verbose --runInBand",
+    "test:web": "jest tests/web --verbose",
+    "test:mobile": "jest tests/mobile --verbose"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -55,10 +63,16 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "autoprefixer": "^10.4.20",
     "cross-env": "^10.1.0",
     "eslint": "^9.17.0",
     "eslint-config-next": "^15.1.3",
+    "jest": "^30.3.0",
+    "jest-environment-jsdom": "^30.3.0",
+    "mongodb-memory-server": "^11.0.1",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.9.3"

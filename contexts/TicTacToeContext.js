@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
+import { useSocket } from '@/contexts/SocketContext'
 import { playGameInviteSound, playSuccessSound, playGameOverSound } from '@/utils/audio'
 import confetti from 'canvas-confetti'
 import {
@@ -60,6 +61,8 @@ const TicTacToeContext = createContext({
 })
 
 export function TicTacToeProvider({ children }) {
+  const { socket, isConnected } = useSocket()
+
   // Get currentUserId from token (JWT decode)
   const [currentUserId, setCurrentUserId] = useState(null)
   useEffect(() => {
@@ -151,8 +154,8 @@ export function TicTacToeProvider({ children }) {
     setPhase('closed')
   }, [incomingInvite, sendAction])
 
-  // ─── Smart poll helper — handles all phase transitions ───
-  const pollGameState = useCallback(async () => {
+  // ─── One-time game state fetch (for reconnection / safety net) ───
+  const fetchGameState = useCallback(async () => {
     const gid = gameIdRef.current
     if (!gid) return
     const token = localStorage.getItem('token')
@@ -167,7 +170,6 @@ export function TicTacToeProvider({ children }) {
 
       setBoard(normalizeBoard(g.board))
 
-      // waiting → playing (opponent accepted)
       if (g.status === 'playing' && phaseRef.current === 'waiting') {
         setPhase('playing')
         setIsMyTurn(g.currentTurn === mySymbolRef.current)
@@ -186,7 +188,6 @@ export function TicTacToeProvider({ children }) {
         setOpponent(null)
         setGameId(null)
       } else if (g.status === 'ended' && !g.result) {
-        // Opponent closed the game
         setPhase('closed')
         setBoard(Array(9).fill(null))
         setResult(null)
@@ -194,7 +195,7 @@ export function TicTacToeProvider({ children }) {
         setGameId(null)
       }
     } catch (err) {
-      console.warn('[TicTacToe] pollGameState error:', err)
+      console.warn('[TicTacToe] fetchGameState error:', err)
     }
   }, [])
 
@@ -208,12 +209,12 @@ export function TicTacToeProvider({ children }) {
     setIsMyTurn(false)
     sendAction('move', opponent.userId, { gameId, index: idx, symbol: mySymbol })
 
-    // Move acknowledgement timeout — single GET if no poll catches it in 3s
+    // Safety net: if Socket.IO event doesn't arrive in 4s, do one GET
     clearTimeout(moveTimeoutRef.current)
     moveTimeoutRef.current = setTimeout(() => {
-      console.warn('[TicTacToe] Move ack timeout (3s) — running single sync GET')
-      pollGameState()
-    }, 3000)
+      console.warn('[TicTacToe] Move ack timeout (4s) — running single sync GET')
+      fetchGameState()
+    }, 4000)
 
     // Client-side win detection for instant feedback on this side
     const res = checkWinner(newBoard)
@@ -222,7 +223,7 @@ export function TicTacToeProvider({ children }) {
       setPhase('result')
       clearTimeout(moveTimeoutRef.current) // No ack needed on game-ending move
     }
-  }, [isMyTurn, board, result, mySymbol, opponent, gameId, sendAction, pollGameState])
+  }, [isMyTurn, board, result, mySymbol, opponent, gameId, sendAction, fetchGameState])
 
   // Close / reset — also notifies the other player
   const closeGame = useCallback(() => {
@@ -238,48 +239,100 @@ export function TicTacToeProvider({ children }) {
     setIncomingInvite(null)
   }, [opponent, gameId, phase, sendAction])
 
-  // ─── Smart polling (replaces Pusher) ───
-  // Poll game state during active phases; poll pending invites when idle.
+  // ─── Socket.IO real-time event handlers ───
   useEffect(() => {
-    if (!currentUserId) return
+    if (!socket || !currentUserId) return
 
-    // During active game: poll game state every 1.5s
-    if (gameId && (phase === 'waiting' || phase === 'playing')) {
-      const interval = setInterval(pollGameState, 1500)
-      return () => clearInterval(interval)
+    const handleInvite = (data) => {
+      if (phaseRef.current !== 'closed') return // ignore if already in a game
+      setIncomingInvite({
+        gameId: data.gameId,
+        fromUserId: data.hostUserId,
+        hostUserId: data.hostUserId,
+        fromName: data.hostName,
+        hostName: data.hostName,
+        fromAvatar: data.hostAvatar,
+        hostAvatar: data.hostAvatar,
+      })
+      setPhase('invite-incoming')
+      playGameInviteSound().catch(() => { })
     }
 
-    // When idle: poll for pending invites every 5s
-    if (phase === 'closed') {
-      const checkPending = async () => {
-        const token = localStorage.getItem('token')
-        if (!token || phaseRef.current !== 'closed') return
-        try {
-          const res = await fetch('/api/tictactoe?check=pending', {
-            headers: { Authorization: `Bearer ${token}` }
-          })
-          const data = await res.json()
-          if (data.success && data.invite) {
-            setIncomingInvite({
-              gameId: data.invite.gameId,
-              fromUserId: data.invite.hostUserId,
-              hostUserId: data.invite.hostUserId,
-              fromName: data.invite.hostName,
-              hostName: data.invite.hostName,
-              fromAvatar: data.invite.hostAvatar,
-              hostAvatar: data.invite.hostAvatar,
-            })
-            setPhase('invite-incoming')
-            playGameInviteSound().catch(() => { })
-          }
-        } catch { /* ignore */ }
+    const handleAccept = (data) => {
+      if (gameIdRef.current !== data.gameId) return
+      setBoard(normalizeBoard(data.board))
+      setPhase('playing')
+      setIsMyTurn(data.currentTurn === mySymbolRef.current)
+      if (data.guestName) {
+        setOpponent(prev => prev ? { ...prev, name: data.guestName || prev.name, avatar: data.guestAvatar ?? prev.avatar } : prev)
       }
-      // Check once immediately on mount/phase-change, then every 5s
-      checkPending()
-      const interval = setInterval(checkPending, 5000)
-      return () => clearInterval(interval)
     }
-  }, [currentUserId, gameId, phase, pollGameState])
+
+    const handleDecline = (data) => {
+      if (gameIdRef.current !== data.gameId) return
+      setPhase('closed')
+      setOpponent(null)
+      setGameId(null)
+    }
+
+    const handleMove = (data) => {
+      if (gameIdRef.current !== data.gameId) return
+      clearTimeout(moveTimeoutRef.current) // cancel safety net
+      setBoard(normalizeBoard(data.board))
+      setIsMyTurn(data.currentTurn === mySymbolRef.current)
+      if (data.result) {
+        setResult(data.result)
+        setPhase('result')
+      }
+    }
+
+    const handleEnd = (data) => {
+      if (gameIdRef.current !== data.gameId) return
+      if (data.result) {
+        setResult(data.result)
+        setPhase('result')
+      }
+    }
+
+    const handleClose = (data) => {
+      if (gameIdRef.current !== data.gameId) return
+      setPhase('closed')
+      setBoard(Array(9).fill(null))
+      setResult(null)
+      setOpponent(null)
+      setGameId(null)
+    }
+
+    socket.on('tictactoe:invite', handleInvite)
+    socket.on('tictactoe:accept', handleAccept)
+    socket.on('tictactoe:decline', handleDecline)
+    socket.on('tictactoe:move', handleMove)
+    socket.on('tictactoe:end', handleEnd)
+    socket.on('tictactoe:close', handleClose)
+
+    return () => {
+      socket.off('tictactoe:invite', handleInvite)
+      socket.off('tictactoe:accept', handleAccept)
+      socket.off('tictactoe:decline', handleDecline)
+      socket.off('tictactoe:move', handleMove)
+      socket.off('tictactoe:end', handleEnd)
+      socket.off('tictactoe:close', handleClose)
+    }
+  }, [socket, currentUserId])
+
+  // ─── Catch-up on Socket.IO reconnect ───
+  useEffect(() => {
+    if (!socket) return
+
+    const handleReconnect = () => {
+      if (gameIdRef.current && (phaseRef.current === 'waiting' || phaseRef.current === 'playing')) {
+        fetchGameState()
+      }
+    }
+
+    socket.on('reconnect', handleReconnect)
+    return () => socket.off('reconnect', handleReconnect)
+  }, [socket, fetchGameState])
 
   // ─── Win/Loss effects ───
   useEffect(() => {
