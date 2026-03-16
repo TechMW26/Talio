@@ -220,6 +220,13 @@ server {
         root /var/www/certbot;
     }
 
+    # Maintenance page for upstream failures
+    error_page 502 503 504 /maintenance.html;
+    location = /maintenance.html {
+        root /usr/share/nginx/html;
+        internal;
+    }
+
     location /api/socketio {
         proxy_pass http://talio_backend;
         proxy_http_version 1.1;
@@ -294,6 +301,12 @@ log "Nginx config ready for $DOMAIN"
 # =============================================================================
 header "Phase 3: Building & Starting Docker Containers"
 
+# ── Stale container cleanup ──────────────────────────────────────────────────
+# Remove orphan containers and stop any old containers that may be holding
+# port 3000 or lingering from a previous failed deploy.
+info "Cleaning up stale containers..."
+docker compose down --remove-orphans 2>/dev/null || true
+
 if $CLEAN || $FRESH; then
   info "Building Docker image (full rebuild, no cache)..."
   DOCKER_BUILDKIT=1 docker compose build --no-cache talio-app
@@ -309,21 +322,53 @@ docker compose up -d
 info "Pruning old Docker images..."
 docker image prune -f --filter "until=1h" 2>/dev/null || true
 
-# Wait for the app to be healthy
-info "Waiting for application to become healthy..."
-RETRIES=0
-MAX_RETRIES=30
-until docker compose exec -T talio-app wget --no-verbose --tries=1 --spider http://localhost:3000 2>/dev/null; do
-  RETRIES=$((RETRIES + 1))
-  if [[ $RETRIES -ge $MAX_RETRIES ]]; then
-    warn "App did not become healthy after ${MAX_RETRIES} attempts. Check: docker compose logs talio-app"
+# ── Wait for health check ────────────────────────────────────────────────────
+# Polls `docker inspect` for the container health status every 5 seconds,
+# up to 120 seconds. Only declares success after confirmed healthy.
+info "Waiting for talio-app to become healthy (timeout: 120s)..."
+HEALTH_TIMEOUT=120
+HEALTH_INTERVAL=5
+ELAPSED=0
+
+while [[ $ELAPSED -lt $HEALTH_TIMEOUT ]]; do
+  HEALTH=$(docker inspect talio-app --format='{{.State.Health.Status}}' 2>/dev/null || echo "missing")
+
+  if [[ "$HEALTH" == "healthy" ]]; then
+    log "Application is healthy after ${ELAPSED}s!"
     break
   fi
-  sleep 5
+
+  # ── Restart loop detection ─────────────────────────────────────────────
+  # If the container has restarted more than 2 times, it's crash-looping.
+  RESTART_COUNT=$(docker inspect talio-app --format='{{.RestartCount}}' 2>/dev/null || echo "0")
+  if [[ "$RESTART_COUNT" -gt 2 ]]; then
+    err "Container is crash-looping (RestartCount: $RESTART_COUNT)."
+    err "Stopping container to prevent infinite restart loop..."
+    docker compose stop talio-app
+    err "Last 50 lines of talio-app logs:"
+    docker logs talio-app --tail 50
+    err "Fix the issue above, then re-run the deploy script."
+    exit 1
+  fi
+
+  if [[ "$HEALTH" == "unhealthy" ]]; then
+    warn "Health check reports unhealthy at ${ELAPSED}s — checking logs..."
+    docker logs talio-app --tail 20
+    # Don't exit yet — the app may just be slow to start
+  fi
+
+  sleep $HEALTH_INTERVAL
+  ELAPSED=$((ELAPSED + HEALTH_INTERVAL))
 done
 
-if [[ $RETRIES -lt $MAX_RETRIES ]]; then
-  log "Application is running and healthy!"
+# ── Final health verdict ─────────────────────────────────────────────────────
+if [[ "$HEALTH" != "healthy" ]]; then
+  err "Application did NOT become healthy within ${HEALTH_TIMEOUT}s."
+  err "Current health status: $HEALTH"
+  err "Last 50 lines of talio-app logs:"
+  docker logs talio-app --tail 50
+  err "Deployment FAILED. Fix the issue above and re-deploy."
+  exit 1
 fi
 
 # Also verify nginx is running (not crash-looping)
