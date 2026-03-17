@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { Card, CardBody, CardHeader, Button, Input, Select, SelectItem, Textarea, Skeleton, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Spinner } from '@heroui/react'
@@ -65,6 +65,20 @@ export default function CreateProjectPage() {
   })
   const [showHeadSearch, setShowHeadSearch] = useState(false)
   const [searchHead, setSearchHead] = useState('')
+
+  // Auto-select creator as project head if not manually selected
+  useEffect(() => {
+    if (employees.length > 0 && formData.projectHeadIds.length === 0 && user?.employeeId) {
+      const creatorEmployeeId = typeof user.employeeId === 'object' ? user.employeeId._id : user.employeeId
+      const creatorExists = employees.some(emp => emp._id === creatorEmployeeId)
+      if (creatorExists) {
+        setFormData(prev => ({
+          ...prev,
+          projectHeadIds: [creatorEmployeeId]
+        }))
+      }
+    }
+  }, [employees])
 
   const handleChange = (e) => {
     const { name, value } = e.target

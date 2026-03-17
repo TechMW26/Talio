@@ -223,7 +223,12 @@ export async function POST(request) {
     } = body
 
     // Support both single and multiple heads
-    const headIds = projectHeadIds?.length ? projectHeadIds : (projectHeadId ? [projectHeadId] : [])
+    let headIds = projectHeadIds?.length ? projectHeadIds : (projectHeadId ? [projectHeadId] : [])
+
+    // Default to creator as project head if none specified
+    if (headIds.length === 0) {
+      headIds = [employeeId.toString()]
+    }
 
     // Validate required fields
     if (!name || !startDate || !endDate || headIds.length === 0) {

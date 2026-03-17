@@ -27,7 +27,7 @@ export async function GET(request, { params }) {
 
     const totalTasks = tasks.length
     const completedTasks = tasks.filter(t => t.status === 'completed').length
-    const allTasksCompleted = totalTasks > 0 && completedTasks === totalTasks
+    const allTasksCompleted = totalTasks === 0 || completedTasks === totalTasks
     const incompleteTasks = tasks.filter(t => t.status !== 'completed')
 
     return NextResponse.json({
@@ -78,9 +78,10 @@ export async function POST(request, { params }) {
         : []
 
     const isProjectHead = projectHeadIds.includes(userRecord.employeeId.toString())
+    const isCreator = project.createdBy?.toString() === userRecord.employeeId.toString()
     const isAdmin = ['admin'].includes(userRecord.role || user.role)
 
-    if (!isProjectHead && !isAdmin) {
+    if (!isProjectHead && !isCreator && !isAdmin) {
       return NextResponse.json({ 
         success: false, 
         message: 'Only project heads can mark the project as complete' 
@@ -96,14 +97,7 @@ export async function POST(request, { params }) {
     const totalTasks = tasks.length
     const completedTasks = tasks.filter(t => t.status === 'completed').length
     
-    if (totalTasks === 0) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'Cannot complete a project with no tasks' 
-      }, { status: 400 })
-    }
-
-    if (completedTasks !== totalTasks) {
+    if (totalTasks > 0 && completedTasks !== totalTasks) {
       const incompleteTasks = tasks.filter(t => t.status !== 'completed')
       return NextResponse.json({ 
         success: false, 
