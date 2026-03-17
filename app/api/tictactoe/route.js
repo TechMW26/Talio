@@ -5,8 +5,16 @@ import { sendPushToUser } from '@/lib/pushNotification'
 // ─── Socket.IO emit helper ───
 function emitToUser(userId, event, payload) {
   const io = global.io
-  if (!io) return
+  if (!io) {
+    console.error(`[TicTacToe:Emit] ❌ global.io is NULL — cannot emit ${event} to user ${userId}`);
+    return
+  }
   const room = `user:${userId}`
+  const roomSize = io.sockets?.adapter?.rooms?.get(room)?.size ?? 0;
+  console.log(`[TicTacToe:Emit] Emitting ${event} to room "${room}" (size: ${roomSize})`);
+  if (roomSize === 0) {
+    console.warn(`[TicTacToe:Emit] ⚠️ Room "${room}" has 0 connected sockets — event will be lost!`);
+  }
   io.to(room).emit(event, payload)
 }
 
@@ -166,6 +174,16 @@ export async function POST(request) {
 
       console.log(`[TicTacToe] Invite created: gameId=${gameId} host=${senderId} guest=${targetUserId}`)
 
+      // ── Phase 1 Diagnostic: Invite room check ──
+      console.log('\n=== TICTACTOE:INVITE ===');
+      console.log('Host userId:', senderId);
+      console.log('Guest userId:', targetUserId);
+      const guestInviteRoom = `user:${targetUserId}`;
+      const guestInviteRoomSize = global.io?.sockets?.adapter?.rooms?.get(guestInviteRoom)?.size ?? 0;
+      console.log(`Guest room "${guestInviteRoom}" connected clients:`, guestInviteRoomSize);
+      console.log('global.io available:', !!global.io);
+      console.log('All current rooms:', [...(global.io?.sockets?.adapter?.rooms?.keys() ?? [])]);
+
       // ── Delivery: Push notification ──
       // Await so we can log the result; do NOT let failures block the response
       try {
@@ -206,9 +224,16 @@ export async function POST(request) {
         hostAvatar: senderAvatar,
         createdAt: game.createdAt,
       })
+      console.log('Invite emit fired. Guest was in room:', guestInviteRoomSize > 0 ? 'YES' : 'NO — event dropped silently');
+      console.log('=== END TICTACTOE:INVITE ===\n');
     }
 
     if (action === 'accept') {
+      console.log('[TicTacToe:Accept] ──────────────────────────────────');
+      console.log('[TicTacToe:Accept] Action triggered by senderId:', senderId);
+      console.log('[TicTacToe:Accept] gameId received:', gameId);
+      console.log('[TicTacToe:Accept] global.io available:', !!global.io);
+
       // Get guest name for the game record
       let guestName = senderName
       let guestAvatar = senderAvatar
@@ -224,8 +249,30 @@ export async function POST(request) {
         { new: true }
       )
 
+      if (!game) {
+        console.error('[TicTacToe:Accept] ❌ Game NOT found in DB for gameId:', gameId);
+      } else {
+        console.log('[TicTacToe:Accept] ✅ DB updated — status now:', game.status);
+        console.log('[TicTacToe:Accept] hostUserId:', game.hostUserId);
+        console.log('[TicTacToe:Accept] guestUserId:', game.guestUserId);
+        console.log('[TicTacToe:Accept] senderId (guest accepting):', senderId);
+        console.log('[TicTacToe:Accept] guestName resolved:', guestName);
+      }
+
       // Real-time: notify both players the game is starting
       if (game) {
+        // ── Phase 1 Diagnostic: Accept room check ──
+        console.log('\n=== TICTACTOE:ACCEPT ===');
+        console.log('Guest accepting, userId:', senderId);
+        console.log('gameId:', gameId);
+        const hostAcceptRoom = `user:${game.hostUserId}`;
+        const guestAcceptRoom = `user:${game.guestUserId}`;
+        const hostRoomSize = global.io?.sockets?.adapter?.rooms?.get(hostAcceptRoom)?.size ?? 0;
+        const guestRoomSize = global.io?.sockets?.adapter?.rooms?.get(guestAcceptRoom)?.size ?? 0;
+        console.log(`Host room "${hostAcceptRoom}" size:`, hostRoomSize);
+        console.log(`Guest room "${guestAcceptRoom}" size:`, guestRoomSize);
+        console.log('All current rooms:', [...(global.io?.sockets?.adapter?.rooms?.keys() ?? [])]);
+
         const acceptPayload = {
           gameId,
           board: game.board,
@@ -235,9 +282,17 @@ export async function POST(request) {
           guestAvatar,
           status: 'playing',
         }
+        console.log('[TicTacToe:Accept] acceptPayload keys:', Object.keys(acceptPayload));
+        console.log('[TicTacToe:Accept] Emitting to host:', game.hostUserId);
         emitToUser(game.hostUserId, 'tictactoe:accept', acceptPayload)
+        console.log('[TicTacToe:Accept] Emitting to guest (sender):', senderId);
         emitToUser(senderId, 'tictactoe:accept', acceptPayload)
+        console.log('[TicTacToe:Accept] ✅ Socket.IO emit completed for both players');
+        console.log('Accept emit fired. Host in room:', hostRoomSize > 0 ? 'YES' : 'NO — event dropped');
+        console.log('Accept emit fired. Guest in room:', guestRoomSize > 0 ? 'YES' : 'NO — event dropped');
+        console.log('=== END TICTACTOE:ACCEPT ===\n');
       }
+      console.log('[TicTacToe:Accept] ──────────────────────────────────');
     }
 
     if (action === 'decline') {

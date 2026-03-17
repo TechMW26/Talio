@@ -105,6 +105,8 @@ app.prepare().then(() => {
         socket.userId = resolvedUserId.toString();
         socket.join(`user:${socket.userId}`);
         console.log(`🔐 [Socket.IO] User ${socket.userId} authenticated`);
+        console.log(`[Socket:Server] userId ${socket.userId} joined room user:${socket.userId}`);
+        console.log('[Socket:Server] All current rooms:', [...io.sockets.adapter.rooms.keys()]);
 
         // Track user presence by userId
         const userEntry = presenceByUserId.get(socket.userId) || { sockets: new Set(), lastSeenAt: null };
