@@ -165,7 +165,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
   if (!mounted) {
     return (
       <header
-        className="h-[60.5px] bg-content1 w-full z-[50] shadow-[0_2px_6px_rgba(15,23,42,0.08)] transition-all duration-300 flex-shrink-0"
+        className="h-[60.5px] bg-content1 w-full z-[40] shadow-[0_2px_6px_rgba(15,23,42,0.08)] transition-all duration-300 flex-shrink-0"
       >
         <div className="flex items-center justify-between px-1 sm:px-4 lg:px-6 h-[60.5px] lg:h-[60px]">
           <div className="flex items-center space-x-2 sm:space-x-4">
@@ -190,7 +190,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
 
   return (
     <header
-      className="h-[60.5px] bg-content1 w-full z-[50] shadow-[0_2px_6px_rgba(15,23,42,0.08)] dark:shadow-[0_2px_6px_rgba(0,0,0,0.3)] transition-all duration-300 flex-shrink-0"
+      className="h-[60.5px] bg-content1 w-full z-[40] shadow-[0_2px_6px_rgba(15,23,42,0.08)] dark:shadow-[0_2px_6px_rgba(0,0,0,0.3)] transition-all duration-300 flex-shrink-0"
     >
       <div className="flex items-center justify-between px-1 sm:px-4 lg:px-6 h-[60.5px] lg:h-[60px]">
         {/* Left side — Hamburger (mobile/tablet) + Search pill */}

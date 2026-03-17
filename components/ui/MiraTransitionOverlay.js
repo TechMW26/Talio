@@ -96,10 +96,10 @@ export default function MiraTransitionOverlay() {
       colorsRef.current = getThemeColors()
       sourcePositionRef.current = getMiraSpherePosition()
       
-      const miraContainer = document.querySelector('[data-mira-sphere]')
-      if (miraContainer) {
-        miraContainer.style.opacity = '0'
-        miraContainer.style.transition = 'opacity 0.1s'
+      const miraCanvas = document.querySelector('[data-mira-sphere] canvas')
+      if (miraCanvas) {
+        miraCanvas.style.opacity = '0'
+        miraCanvas.style.transition = 'opacity 0.1s'
       }
     } else if (!isAILoading && phaseRef.current === PHASE.HANDOFF) {
       // AI loading ended while we were in HANDOFF - start REVERSE animation
@@ -109,10 +109,10 @@ export default function MiraTransitionOverlay() {
       phaseStartRef.current = Date.now()
       setIsVisible(true) // Make sure we're visible for reverse animation
       
-      // Keep header sphere hidden during reverse animation
-      const miraContainer = document.querySelector('[data-mira-sphere]')
-      if (miraContainer) {
-        miraContainer.style.opacity = '0'
+      // Keep header sphere canvas hidden during reverse animation
+      const miraCanvas = document.querySelector('[data-mira-sphere] canvas')
+      if (miraCanvas) {
+        miraCanvas.style.opacity = '0'
       }
     } else if (!isAILoading && phaseRef.current === PHASE.IDLE) {
       // Already idle, nothing to do
@@ -249,10 +249,10 @@ export default function MiraTransitionOverlay() {
         setIsVisible(false)
         phaseRef.current = PHASE.IDLE
         isReversingRef.current = false
-        const miraContainer = document.querySelector('[data-mira-sphere]')
-        if (miraContainer) {
-          miraContainer.style.opacity = '1'
-          miraContainer.style.transition = 'opacity 0.2s'
+        const miraCanvas = document.querySelector('[data-mira-sphere] canvas')
+        if (miraCanvas) {
+          miraCanvas.style.opacity = '1'
+          miraCanvas.style.transition = 'opacity 0.2s'
         }
         return
       }

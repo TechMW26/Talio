@@ -15,6 +15,12 @@ export function PageTransitionProvider({ children }) {
   const [targetPath, setTargetPath] = useState(null)
   const pathname = usePathname()
   const prevPathnameRef = useRef(pathname)
+  const pathnameRef = useRef(pathname)
+
+  // Keep pathnameRef in sync
+  useEffect(() => {
+    pathnameRef.current = pathname
+  }, [pathname])
 
   // When pathname changes, navigation is complete
   useEffect(() => {
@@ -59,7 +65,7 @@ export function PageTransitionProvider({ children }) {
 
       // Skip same-page navigation
       const path = href.split('?')[0].split('#')[0]
-      if (path === pathname) return
+      if (path === pathnameRef.current) return
 
       // Skip non-dashboard links (login, etc.) — they leave this layout
       if (!path.startsWith('/dashboard')) return
@@ -70,20 +76,34 @@ export function PageTransitionProvider({ children }) {
 
     document.addEventListener('click', handleClick, true)
     return () => document.removeEventListener('click', handleClick, true)
-  }, [pathname])
+  }, [])
 
   // Intercept programmatic router.push / router.replace via history.pushState
+  // Patch once and use refs to access current pathname to avoid re-patching
   useEffect(() => {
     const originalPushState = history.pushState.bind(history)
     const originalReplaceState = history.replaceState.bind(history)
 
     const handleStateChange = (url) => {
-      if (!url || typeof url !== 'string') return
-      const path = url.split('?')[0].split('#')[0]
-      if (path === pathname) return
-      if (!path.startsWith('/dashboard')) return
-      setTargetPath(path)
-      setIsNavigating(true)
+      if (!url) return
+      // Handle both string and URL object
+      const urlStr = typeof url === 'object' && url !== null ? url.toString() : String(url)
+      try {
+        // Parse relative or absolute URLs
+        const parsed = new URL(urlStr, window.location.origin)
+        const path = parsed.pathname
+        if (path === pathnameRef.current) return
+        if (!path.startsWith('/dashboard')) return
+        setTargetPath(path)
+        setIsNavigating(true)
+      } catch {
+        // Fallback for simple path strings
+        const path = urlStr.split('?')[0].split('#')[0]
+        if (path === pathnameRef.current) return
+        if (!path.startsWith('/dashboard')) return
+        setTargetPath(path)
+        setIsNavigating(true)
+      }
     }
 
     history.pushState = function (state, title, url) {
@@ -99,7 +119,7 @@ export function PageTransitionProvider({ children }) {
     // Also handle browser back/forward
     const handlePopState = () => {
       const path = window.location.pathname
-      if (path !== pathname && path.startsWith('/dashboard')) {
+      if (path !== pathnameRef.current && path.startsWith('/dashboard')) {
         setTargetPath(path)
         setIsNavigating(true)
       }
@@ -112,7 +132,7 @@ export function PageTransitionProvider({ children }) {
       history.replaceState = originalReplaceState
       window.removeEventListener('popstate', handlePopState)
     }
-  }, [pathname])
+  }, []) // Run once — uses refs for current pathname
 
   // Call this when starting navigation
   const startNavigation = useCallback((path) => {
