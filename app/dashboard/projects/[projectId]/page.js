@@ -1394,8 +1394,8 @@ export default function ProjectDetailPage() {
             </button>
           )}
 
-          {/* Mark Complete button - ALWAYS visible for Project Head or Creator */}
-          {(isProjectHead || isCreator) && project.status !== 'completed' && (
+          {/* Mark Complete button - ONLY visible for Project Head */}
+          {isProjectHead && project.status !== 'completed' && (
             <button
               onClick={handleMarkComplete}
               disabled={submitting || !completionStatus.canComplete}

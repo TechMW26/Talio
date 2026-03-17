@@ -109,7 +109,9 @@ export async function GET(request, { params }) {
         currentUserRole: userMembership?.role,
         currentUserInvitationStatus: userMembership?.invitationStatus,
         isProjectHead: project.projectHead?._id?.toString() === employeeId.toString() ||
-          project.projectHeads?.some(h => h._id?.toString() === employeeId.toString()),
+          project.projectHead?.toString() === employeeId.toString() ||
+          project.projectHeads?.some(h => (h._id?.toString() || h.toString()) === employeeId.toString()) ||
+          userMembership?.role === 'head',
         isCreator: project.createdBy._id.toString() === employeeId.toString()
       }
     })

@@ -78,10 +78,9 @@ export async function POST(request, { params }) {
         : []
 
     const isProjectHead = projectHeadIds.includes(userRecord.employeeId.toString())
-    const isCreator = project.createdBy?.toString() === userRecord.employeeId.toString()
     const isAdmin = ['admin'].includes(userRecord.role || user.role)
 
-    if (!isProjectHead && !isCreator && !isAdmin) {
+    if (!isProjectHead && !isAdmin) {
       return NextResponse.json({ 
         success: false, 
         message: 'Only project heads can mark the project as complete' 
