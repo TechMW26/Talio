@@ -14,15 +14,19 @@ import {
   HiOutlineChevronDown,
   HiOutlineChevronUp,
   HiOutlinePlus,
-  HiOutlineTrash
+  HiOutlineTrash,
+  HiOutlineSparkles
 } from 'react-icons/hi2'
 import toast from '@/utils/toast'
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button } from '@heroui/react'
+import { useAILoading } from '@/contexts/AILoadingContext'
 
 export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
   const [step, setStep] = useState(1) // 1: Basic Info, 2: Invitees, 3: Review
   const [loading, setLoading] = useState(false)
   const [loadingInvitees, setLoadingInvitees] = useState(false)
+  const [generatingDescription, setGeneratingDescription] = useState(false)
+  const { startAILoading, stopAILoading } = useAILoading()
   
   const [formData, setFormData] = useState({
     title: '',
@@ -335,9 +339,40 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
 
               {/* Description */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Description
-                </label>
+                <div className="flex items-center justify-start mb-2">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Description
+                  </label>
+                  <Button
+                    size="sm"
+                    variant="flat"
+                    onPress={async () => {
+                      if (!formData.title.trim()) { toast.error('Please enter a meeting title first'); return }
+                      setGeneratingDescription(true)
+                      startAILoading('MIRA is writing meeting description...')
+                      try {
+                        const token = localStorage.getItem('token')
+                        const res = await fetch('/api/ai/generate-text', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                          body: JSON.stringify({ type: 'meeting_description', context: { meetingTitle: formData.title, type: formData.type } })
+                        })
+                        const data = await res.json()
+                        if (data.success && data.text) {
+                          handleInputChange('description', data.text)
+                          toast.success('Description generated!')
+                        } else { toast.error(data.message || 'Failed to generate description') }
+                      } catch (err) { console.error('AI generate error:', err); toast.error('Failed to generate description') }
+                      finally { setGeneratingDescription(false); stopAILoading() }
+                    }}
+                    isDisabled={generatingDescription || !formData.title.trim()}
+                    isLoading={generatingDescription}
+                    startContent={!generatingDescription && <HiOutlineSparkles className="w-3.5 h-3.5" />}
+                    className="ml-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white"
+                  >
+                    {generatingDescription ? 'Writing...' : 'AI Write'}
+                  </Button>
+                </div>
                 <textarea
                   value={formData.description}
                   onChange={(e) => handleInputChange('description', e.target.value)}
@@ -474,14 +509,14 @@ export default function CreateMeetingModal({ isOpen, onClose, onSuccess }) {
           {step === 2 && (
             <div className="space-y-4">
               {/* Search */}
-              <div className="relative">
-                <HiOutlineMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <div className="input-with-icon">
+                <HiOutlineMagnifyingGlass className="input-icon w-5 h-5" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search employees..."
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg bg-white text-gray-900 focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="input input-search"
                 />
               </div>
 

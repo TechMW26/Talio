@@ -4,13 +4,17 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
 import { FaArrowLeft, FaSave, FaTimes, FaPlus } from 'react-icons/fa'
+import { HiOutlineSparkles } from 'react-icons/hi2'
 import { Select, SelectItem, Input, Textarea, Button } from '@heroui/react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
+import { useAILoading } from '@/contexts/AILoadingContext'
 
 export default function CreateGoalPage() {
   const router = useRouter()
+  const [generatingDescription, setGeneratingDescription] = useState(false)
+  const { startAILoading, stopAILoading } = useAILoading()
   const [formData, setFormData] = useState({
     employeeId: '',
     title: '',
@@ -203,9 +207,40 @@ export default function CreateGoalPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Description
-              </label>
+              <div className="flex items-center justify-start mb-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  Description
+                </label>
+                <Button
+                  size="sm"
+                  variant="flat"
+                  onPress={async () => {
+                    if (!formData.title.trim()) { toast.error('Please enter a goal title first'); return }
+                    setGeneratingDescription(true)
+                    startAILoading('MIRA is writing goal description...')
+                    try {
+                      const token = localStorage.getItem('token')
+                      const res = await fetch('/api/ai/generate-text', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ type: 'goal_description', context: { goalTitle: formData.title, category: formData.category } })
+                      })
+                      const data = await res.json()
+                      if (data.success && data.text) {
+                        setFormData(prev => ({ ...prev, description: data.text }))
+                        toast.success('Description generated!')
+                      } else { toast.error(data.message || 'Failed to generate description') }
+                    } catch (err) { console.error('AI generate error:', err); toast.error('Failed to generate description') }
+                    finally { setGeneratingDescription(false); stopAILoading() }
+                  }}
+                  isDisabled={generatingDescription || !formData.title.trim()}
+                  isLoading={generatingDescription}
+                  startContent={!generatingDescription && <HiOutlineSparkles className="w-3.5 h-3.5" />}
+                  className="ml-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white"
+                >
+                  {generatingDescription ? 'Writing...' : 'AI Write'}
+                </Button>
+              </div>
               <textarea
                 name="description"
                 value={formData.description}

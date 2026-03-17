@@ -222,14 +222,14 @@ export default function ProjectsPage() {
         <CardBody>
           <div className="flex flex-col md:flex-row gap-4">
             {/* Search */}
-            <div className="relative flex-1">
-              <HiOutlineMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-default-400" />
+            <div className="input-with-icon flex-1">
+              <HiOutlineMagnifyingGlass className="input-icon w-5 h-5" />
               <input
                 type="text"
                 placeholder="Search projects..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 border border-default-300 rounded-lg bg-content1 text-default-800 focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="input input-search"
               />
             </div>
 

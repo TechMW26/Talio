@@ -8,6 +8,7 @@ const PageTransitionContext = createContext()
 /**
  * PageTransitionProvider - Provides page transition loading state
  * Exposes targetPath for optimistic active-state highlighting in sidebar/bottomnav
+ * Automatically intercepts all internal link clicks for global coverage
  */
 export function PageTransitionProvider({ children }) {
   const [isNavigating, setIsNavigating] = useState(false)
@@ -18,14 +19,11 @@ export function PageTransitionProvider({ children }) {
   // When pathname changes, navigation is complete
   useEffect(() => {
     if (prevPathnameRef.current !== pathname) {
-      // Route actually changed — navigation complete
+      // Route actually changed — clear immediately so spinner doesn't linger
       prevPathnameRef.current = pathname
-      // Small delay to let the page render before clearing the loading state
-      const timer = setTimeout(() => {
-        setIsNavigating(false)
-        setTargetPath(null)
-      }, 80)
-      return () => clearTimeout(timer)
+      setIsNavigating(false)
+      setTargetPath(null)
+      return
     }
     // Safety: if navigating but pathname hasn't changed after 5s, clear stuck state
     if (isNavigating) {
@@ -36,6 +34,85 @@ export function PageTransitionProvider({ children }) {
       return () => clearTimeout(maxTimeout)
     }
   }, [pathname, isNavigating])
+
+  // Intercept all internal link clicks globally so every navigation shows the spinner
+  useEffect(() => {
+    const handleClick = (e) => {
+      // Find the closest anchor tag
+      const anchor = e.target.closest('a')
+      if (!anchor) return
+
+      const href = anchor.getAttribute('href')
+      if (!href) return
+
+      // Skip external links, hash links, mailto, tel, blob, download links
+      if (
+        href.startsWith('http') ||
+        href.startsWith('//') ||
+        href.startsWith('#') ||
+        href.startsWith('mailto:') ||
+        href.startsWith('tel:') ||
+        href.startsWith('blob:') ||
+        anchor.hasAttribute('download') ||
+        anchor.target === '_blank'
+      ) return
+
+      // Skip same-page navigation
+      const path = href.split('?')[0].split('#')[0]
+      if (path === pathname) return
+
+      // Skip non-dashboard links (login, etc.) — they leave this layout
+      if (!path.startsWith('/dashboard')) return
+
+      setTargetPath(path)
+      setIsNavigating(true)
+    }
+
+    document.addEventListener('click', handleClick, true)
+    return () => document.removeEventListener('click', handleClick, true)
+  }, [pathname])
+
+  // Intercept programmatic router.push / router.replace via history.pushState
+  useEffect(() => {
+    const originalPushState = history.pushState.bind(history)
+    const originalReplaceState = history.replaceState.bind(history)
+
+    const handleStateChange = (url) => {
+      if (!url || typeof url !== 'string') return
+      const path = url.split('?')[0].split('#')[0]
+      if (path === pathname) return
+      if (!path.startsWith('/dashboard')) return
+      setTargetPath(path)
+      setIsNavigating(true)
+    }
+
+    history.pushState = function (state, title, url) {
+      handleStateChange(url)
+      return originalPushState(state, title, url)
+    }
+
+    history.replaceState = function (state, title, url) {
+      handleStateChange(url)
+      return originalReplaceState(state, title, url)
+    }
+
+    // Also handle browser back/forward
+    const handlePopState = () => {
+      const path = window.location.pathname
+      if (path !== pathname && path.startsWith('/dashboard')) {
+        setTargetPath(path)
+        setIsNavigating(true)
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState)
+
+    return () => {
+      history.pushState = originalPushState
+      history.replaceState = originalReplaceState
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [pathname])
 
   // Call this when starting navigation
   const startNavigation = useCallback((path) => {

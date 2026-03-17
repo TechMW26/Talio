@@ -37,7 +37,7 @@ import {
 import WebAccessRestriction, { shouldRestrictWebAccess } from '@/components/WebAccessRestriction'
 import CallAlertReceiver from '@/components/CallAlertReceiver'
 
-// Page transition skeleton overlay — renders target page's skeleton instead of a blur spinner
+// Page transition skeleton overlay — renders target page's skeleton with a spinner
 function PageTransitionOverlay() {
   const { isNavigating, targetPath } = usePageTransition()
 
@@ -48,6 +48,10 @@ function PageTransitionOverlay() {
   return (
     <div className="absolute inset-0 z-[50] bg-background overflow-y-auto">
       <SkeletonComponent />
+      {/* Centered spinner overlay with radial vignette */}
+      <div className="fixed inset-0 z-[51] flex items-center justify-center pointer-events-none" style={{ background: 'radial-gradient(circle, rgba(0,0,0,0.45) 0%, rgba(0,0,0,0.15) 40%, transparent 70%)' }}>
+        <div className="page-transition-spinner" />
+      </div>
     </div>
   )
 }
@@ -63,16 +67,15 @@ function PageContentWrapper({ children }) {
       setShow(false)
       prevPathRef.current = pathname
     }
-    // Small delay so the skeleton is visible for at least ~150ms (anti-flash)
-    const t = setTimeout(() => setShow(true), 60)
-    return () => clearTimeout(t)
+    // Show content immediately once the route has landed
+    requestAnimationFrame(() => setShow(true))
   }, [pathname])
 
   return (
     <div
       style={{
         opacity: show ? 1 : 0,
-        transition: 'opacity 200ms ease-in',
+        transition: 'opacity 150ms ease-in',
       }}
     >
       {children}
@@ -101,6 +104,14 @@ export default function DashboardLayout({ children }) {
   const [profileCompletionStatus, setProfileCompletionStatus] = useState(null)
   const pathname = usePathname()
   const router = useRouter()
+  const mainRef = useRef(null)
+
+  // Scroll main content area to top on route change
+  useEffect(() => {
+    if (mainRef.current) {
+      mainRef.current.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }, [pathname])
 
   // Check if non-admin user is accessing via web browser
   useEffect(() => {
@@ -411,7 +422,7 @@ export default function DashboardLayout({ children }) {
                     <Header toggleSidebar={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
 
                     {/* Main Content Area - Scrollable */}
-                    <main className={`z-0 flex-1 overflow-y-auto relative ${isChatPage ? 'bg-white dark:bg-slate-800 md:bg-transparent' : ''}`}>
+                    <main ref={mainRef} className={`z-0 flex-1 overflow-y-auto relative ${isChatPage ? 'bg-white dark:bg-slate-800 md:bg-transparent' : ''}`}>
                       {/* Navigation skeleton overlay */}
                       <PageTransitionOverlay />
 

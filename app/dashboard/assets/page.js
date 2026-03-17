@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
 import { FaPlus, FaLaptop, FaCheckCircle, FaClock, FaTools, FaTimes, FaBox } from 'react-icons/fa'
+import { HiOutlineSparkles } from 'react-icons/hi2'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
@@ -11,9 +12,12 @@ import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 import ModalPortal from '@/components/ui/ModalPortal'
 import { Select, SelectItem, Input, Textarea, Button, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Skeleton } from '@heroui/react'
+import { useAILoading } from '@/contexts/AILoadingContext'
 
 export default function AssetsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [generatingDescription, setGeneratingDescription] = useState(false)
+  const { startAILoading, stopAILoading } = useAILoading()
   const [formData, setFormData] = useState({
     name: '',
     assetCode: '',
@@ -354,7 +358,38 @@ export default function AssetsPage() {
                   </Select>
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700">Description</label>
+                  <div className="flex items-center justify-start mb-1">
+                    <label className="block text-sm font-medium text-gray-700">Description</label>
+                    <Button
+                      size="sm"
+                      variant="flat"
+                      onPress={async () => {
+                        if (!formData.name.trim()) { toast.error('Please enter an asset name first'); return }
+                        setGeneratingDescription(true)
+                        startAILoading('MIRA is writing asset description...')
+                        try {
+                          const token = localStorage.getItem('token')
+                          const res = await fetch('/api/ai/generate-text', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                            body: JSON.stringify({ type: 'asset_description', context: { assetName: formData.name, category: formData.category } })
+                          })
+                          const data = await res.json()
+                          if (data.success && data.text) {
+                            setFormData(prev => ({ ...prev, description: data.text }))
+                            toast.success('Description generated!')
+                          } else { toast.error(data.message || 'Failed to generate description') }
+                        } catch (err) { console.error('AI generate error:', err); toast.error('Failed to generate description') }
+                        finally { setGeneratingDescription(false); stopAILoading() }
+                      }}
+                      isDisabled={generatingDescription || !formData.name.trim()}
+                      isLoading={generatingDescription}
+                      startContent={!generatingDescription && <HiOutlineSparkles className="w-3.5 h-3.5" />}
+                      className="ml-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white"
+                    >
+                      {generatingDescription ? 'Writing...' : 'AI Write'}
+                    </Button>
+                  </div>
                   <textarea
                     name="description"
                     value={formData.description}

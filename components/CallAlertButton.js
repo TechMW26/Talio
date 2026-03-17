@@ -395,14 +395,14 @@ export default function CallAlertButton({ user }) {
                 <div className="space-y-4">
                   {/* Search and Filter */}
                   <div className="flex flex-col sm:flex-row gap-3">
-                    <div className="relative flex-1">
-                      <HiOutlineMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                    <div className="input-with-icon flex-1">
+                      <HiOutlineMagnifyingGlass className="input-icon w-5 h-5" />
                       <input
                         type="text"
                         placeholder="Search by name or employee code..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl bg-white text-black placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                        className="input input-search"
                       />
                     </div>
                     

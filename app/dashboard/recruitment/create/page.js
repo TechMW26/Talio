@@ -8,11 +8,15 @@ import {
 } from '@heroui/react';
 import toast from '@/utils/toast';
 import { FaArrowLeft, FaSave, FaPlus, FaTimes } from 'react-icons/fa';
+import { HiOutlineSparkles } from 'react-icons/hi2';
 import useAuthedSWR from '@/hooks/useAuthedSWR';
 import useApiMutation from '@/hooks/useApiMutation';
+import { useAILoading } from '@/contexts/AILoadingContext';
 
 export default function CreateJobPage() {
   const router = useRouter();
+  const [generatingDescription, setGeneratingDescription] = useState(false);
+  const { startAILoading, stopAILoading } = useAILoading();
   const [formData, setFormData] = useState({
     jobTitle: '',
     jobCode: '',
@@ -241,8 +245,37 @@ export default function CreateJobPage() {
 
         {/* Description */}
         <Card shadow="sm">
-          <CardHeader className="border-b border-default-200 px-4 sm:px-5 py-3">
+          <CardHeader className="border-b border-default-200 px-4 sm:px-5 py-3 flex justify-between items-center">
             <h2 className="text-base font-semibold text-default-800">Job Description</h2>
+            <Button
+              size="sm"
+              variant="flat"
+              onPress={async () => {
+                if (!formData.jobTitle.trim()) { toast.error('Please enter a job title first'); return }
+                setGeneratingDescription(true)
+                startAILoading('MIRA is writing job description...')
+                try {
+                  const token = localStorage.getItem('token')
+                  const res = await fetch('/api/ai/generate-text', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ type: 'job_description', context: { jobTitle: formData.jobTitle, department: formData.department, employmentType: formData.employmentType } })
+                  })
+                  const data = await res.json()
+                  if (data.success && data.text) {
+                    updateField('jobDescription', data.text)
+                    toast.success('Description generated!')
+                  } else { toast.error(data.message || 'Failed to generate description') }
+                } catch (err) { console.error('AI generate error:', err); toast.error('Failed to generate description') }
+                finally { setGeneratingDescription(false); stopAILoading() }
+              }}
+              isDisabled={generatingDescription || !formData.jobTitle.trim()}
+              isLoading={generatingDescription}
+              startContent={!generatingDescription && <HiOutlineSparkles className="w-3.5 h-3.5" />}
+              className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white"
+            >
+              {generatingDescription ? 'Writing...' : 'AI Write'}
+            </Button>
           </CardHeader>
           <CardBody className="p-4 sm:p-5">
             <Textarea isRequired size="sm" minRows={4}

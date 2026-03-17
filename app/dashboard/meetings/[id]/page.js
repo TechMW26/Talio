@@ -638,7 +638,7 @@ export default function MeetingDetailPage({ params }) {
                 <Button
                   variant="light"
                   onPress={onClose}
-                  isDisabled={deleting}
+                  isDisabled={deleteMutation.isLoading}
                 >
                   Cancel
                 </Button>

@@ -422,14 +422,14 @@ export default function OnboardingEmailsPage() {
       {/* Actions Bar */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         {/* Search */}
-        <div className="relative flex-1">
-          <HiOutlineMagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-default-400" />
+        <div className="input-with-icon flex-1">
+          <HiOutlineMagnifyingGlass className="input-icon w-5 h-5" />
           <input
             type="text"
             placeholder="Search by name, email, or employee code..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-content1 border border-default-200 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-default-800 placeholder:text-default-400 transition-all"
+            className="input input-search"
           />
         </div>
 

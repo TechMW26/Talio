@@ -3,11 +3,13 @@
 import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import { Button, Select, SelectItem } from '@heroui/react'
 import { FaTimes, FaPlus, FaProjectDiagram } from 'react-icons/fa'
+import { HiOutlineSparkles } from 'react-icons/hi2'
 import toast from '@/utils/toast'
 import ModalPortal from '@/components/ui/ModalPortal'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { playNotificationSound, NotificationSoundTypes } from '@/lib/notificationSounds'
 import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
+import { useAILoading } from '@/contexts/AILoadingContext'
 
 /**
  * CreateTaskModal — Standalone task creation modal.
@@ -25,6 +27,8 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated }) {
     const user = getCurrentUser()
     return getEmployeeId(user) || user?.employeeId?._id || user?.employeeId
   }, [])
+  const [generatingDescription, setGeneratingDescription] = useState(false)
+  const { startAILoading, stopAILoading } = useAILoading()
   const [taskForm, setTaskForm] = useState({
     title: '',
     description: '',
@@ -280,7 +284,38 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated }) {
 
               {/* Description */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <div className="flex items-center justify-start mb-1">
+                  <label className="block text-sm font-medium text-gray-700">Description</label>
+                  <Button
+                    size="sm"
+                    variant="flat"
+                    onPress={async () => {
+                      if (!taskForm.title.trim()) { toast.error('Please enter a task title first'); return }
+                      setGeneratingDescription(true)
+                      startAILoading('MIRA is writing task description...')
+                      try {
+                        const token = localStorage.getItem('token')
+                        const res = await fetch('/api/ai/generate-text', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                          body: JSON.stringify({ type: 'task_description', context: { taskName: taskForm.title, priority: taskForm.priority } })
+                        })
+                        const data = await res.json()
+                        if (data.success && data.text) {
+                          setTaskForm(prev => ({ ...prev, description: data.text }))
+                          toast.success('Description generated!')
+                        } else { toast.error(data.message || 'Failed to generate description') }
+                      } catch (err) { console.error('AI generate error:', err); toast.error('Failed to generate description') }
+                      finally { setGeneratingDescription(false); stopAILoading() }
+                    }}
+                    isDisabled={generatingDescription || !taskForm.title.trim()}
+                    isLoading={generatingDescription}
+                    startContent={!generatingDescription && <HiOutlineSparkles className="w-3.5 h-3.5" />}
+                    className="ml-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white"
+                  >
+                    {generatingDescription ? 'Writing...' : 'AI Write'}
+                  </Button>
+                </div>
                 <textarea
                   value={taskForm.description}
                   onChange={(e) => setTaskForm(prev => ({ ...prev, description: e.target.value }))}

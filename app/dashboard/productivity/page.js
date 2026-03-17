@@ -889,14 +889,14 @@ export default function ProductivityPage() {
             <>
               {/* Search Box */}
               <div className="mb-6">
-                <div className="relative max-w-md">
-                  <HiOutlineMagnifyingGlass className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <div className="input-with-icon max-w-md">
+                  <HiOutlineMagnifyingGlass className="input-icon w-5 h-5" />
                   <input
                     type="text"
                     placeholder="Search employees by name, email, or department..."
                     value={teamSearchQuery}
                     onChange={(e) => setTeamSearchQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition placeholder:text-gray-400"
+                    className="input input-search"
                   />
                   {teamSearchQuery && (
                     <button

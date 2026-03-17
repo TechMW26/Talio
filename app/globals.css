@@ -3,6 +3,105 @@
 @tailwind utilities;
 
 /* ============================================
+   FORCED INPUT BORDERS — Light & Dark Mode
+   ============================================ */
+
+/* Light mode: dark border for contrast on native inputs */
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="tel"],
+input[type="number"],
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"],
+input[type="month"],
+input[type="week"],
+input[type="url"],
+input[type="search"],
+select,
+textarea {
+  border: 1px solid #CBD5E1 !important;
+  border-radius: 0.5rem;
+}
+
+/* Dark mode: lighter border for contrast on native inputs */
+html.dark input[type="text"],
+html.dark input[type="email"],
+html.dark input[type="password"],
+html.dark input[type="tel"],
+html.dark input[type="number"],
+html.dark input[type="date"],
+html.dark input[type="time"],
+html.dark input[type="datetime-local"],
+html.dark input[type="month"],
+html.dark input[type="week"],
+html.dark input[type="url"],
+html.dark input[type="search"],
+html.dark select,
+html.dark textarea {
+  border: 1px solid #3E5166 !important;
+}
+
+/* HeroUI component wrappers — Light mode (high specificity to override .border-default-200) */
+div[data-slot="input-wrapper"],
+button[data-slot="trigger"],
+div[data-slot="input-wrapper"].border-default-200,
+button[data-slot="trigger"].border-default-200 {
+  border: 1px solid #CBD5E1 !important;
+}
+
+/* HeroUI component wrappers — Dark mode (high specificity) */
+html.dark div[data-slot="input-wrapper"],
+html.dark button[data-slot="trigger"],
+html.dark div[data-slot="input-wrapper"].border-default-200,
+html.dark button[data-slot="trigger"].border-default-200 {
+  border: 1px solid #3E5166 !important;
+}
+
+/* HeroUI inner input elements should NOT have their own border (wrapper handles it) */
+[data-slot="input-wrapper"] input,
+[data-slot="input-wrapper"] textarea {
+  border: none !important;
+}
+
+/* Search overlay input — no borders at all */
+.search-overlay-input div[data-slot="input-wrapper"],
+html.dark .search-overlay-input div[data-slot="input-wrapper"],
+.search-overlay-input div[data-slot="input-wrapper"].border-default-200,
+html.dark .search-overlay-input div[data-slot="input-wrapper"].border-default-200 {
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+.search-overlay-input div[data-slot="input-wrapper"] input {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}
+
+/* Page transition spinner */
+@keyframes page-spin {
+  to { transform: rotate(360deg); }
+}
+.page-transition-spinner {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  border: 3px solid rgba(148, 163, 184, 0.3);
+  border-top-color: var(--color-primary-500, #3B82F6);
+  animation: page-spin 0.75s linear infinite;
+}
+
+/* MIRA pill animated gradient */
+@keyframes mira-gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* ============================================
    GLOBAL FONT FAMILY - Montserrat
    ============================================ */
 :root {
@@ -868,16 +967,16 @@ html.dark .border-slate-100 {
   border-color: transparent !important;
 }
 
-html.dark .border-default-100,
-html.dark .border-default-200,
-html.dark .border-default-50 {
+html.dark .border-default-100:not([data-slot="input-wrapper"]):not([data-slot="trigger"]),
+html.dark .border-default-200:not([data-slot="input-wrapper"]):not([data-slot="trigger"]),
+html.dark .border-default-50:not([data-slot="input-wrapper"]):not([data-slot="trigger"]) {
   border-color: transparent !important;
 }
 
 /* Remove borders from card-like containers in dark mode — rely on bg elevation */
-html.dark .bg-white.border,
-html.dark .bg-content1.border,
-html.dark [class*="bg-white"].border {
+html.dark .bg-white.border:not(input):not(select):not(textarea),
+html.dark .bg-content1.border:not(input):not(select):not(textarea),
+html.dark [class*="bg-white"].border:not(input):not(select):not(textarea) {
   border-color: transparent !important;
 }
 
@@ -954,7 +1053,6 @@ html.dark select,
 html.dark textarea {
   color: #E2E8F0 !important;
   background-color: #1E293B !important;
-  border-color: #475569 !important;
 }
 
 html.dark input::placeholder,
@@ -1059,7 +1157,7 @@ html.dark .modal-input,
 html.dark .modal-select,
 html.dark .modal-textarea {
   background-color: #0F172A !important;
-  border-color: #475569 !important;
+  border: 1px solid #3E5166 !important;
   color: #E2E8F0 !important;
 }
 
@@ -1071,7 +1169,7 @@ html.dark .modal-textarea::placeholder {
 html.dark .modal-btn-secondary {
   background-color: #334155 !important;
   color: #E2E8F0 !important;
-  border-color: #475569 !important;
+  border-color: #273549 !important;
 }
 
 html.dark .modal-btn-secondary:hover {
@@ -1414,7 +1512,7 @@ button[disabled],
 
 /* Input Styles */
 .input-field {
-  @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+  @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500;
 }
 
 /* Fix for input text color - ONLY for inputs with white backgrounds */

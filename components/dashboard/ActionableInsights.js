@@ -91,15 +91,15 @@ function TicTacToeCard() {
             <HiOutlineXMark className="w-4 h-4 text-gray-400" />
           </button>
         </div>
-        <div className="relative mb-2">
-          <HiOutlineMagnifyingGlass className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+        <div className="input-with-icon mb-2">
+          <HiOutlineMagnifyingGlass className="input-icon w-3.5 h-3.5" />
           <input
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search by name..."
             autoFocus
-            className="w-full pl-8 pr-3 py-1.5 rounded-lg text-xs bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-400 text-gray-800 dark:text-gray-200"
+            className="input input-search text-xs"
           />
         </div>
         <div className="flex-1 overflow-y-auto space-y-1">

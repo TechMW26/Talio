@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { FaSearch, FaTimes, FaSyncAlt } from 'react-icons/fa'
+import { FaSearch, FaTimes, FaSyncAlt, FaSun, FaMoon } from 'react-icons/fa'
 import Loader from '@/components/ui/Loader'
 import MiraSphere from '@/components/ui/MiraSphere'
 import { handleSessionExpired } from '@/utils/userHelper'
@@ -12,7 +12,7 @@ import { useFocusTimer } from '@/contexts/FocusTimerContext'
 import { Button, Input, ScrollShadow } from '@heroui/react'
 
 export default function Header({ toggleSidebar, sidebarCollapsed }) {
-  const { theme, isDarkMode } = useTheme()
+  const { theme, isDarkMode, setDarkModePreference } = useTheme()
   const router = useRouter()
   const pathname = usePathname()
   const { openWidget } = useChatWidget()
@@ -93,7 +93,6 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
 
     if (searchQuery.trim().length < 2) {
       setSearchResults(null)
-      setShowSearchResults(false)
       return
     }
 
@@ -210,6 +209,47 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
             />
           </Button>
 
+          {/* MIRA Cloud Pill Button - Desktop Only */}
+          <div
+            className="hidden md:flex items-center cursor-pointer relative group -ml-3"
+            data-mira-sphere="true"
+            onClick={() => setShowMiraModal(true)}
+            onMouseEnter={() => setIsMiraHovered(true)}
+            onMouseLeave={() => setIsMiraHovered(false)}
+            style={{
+              background: `linear-gradient(135deg, ${theme.primary[600]}, ${theme.primary[400]}, ${theme.primary[700]}, ${theme.primary[500]})`,
+              backgroundSize: '300% 300%',
+              animation: 'mira-gradient-shift 6s ease infinite',
+              borderRadius: '9999px',
+              padding: '3px 14px 3px 3px',
+              position: 'relative',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Grain texture overlay */}
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                borderRadius: '9999px',
+                opacity: 0.12,
+                backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
+                backgroundSize: '128px 128px',
+                pointerEvents: 'none',
+              }}
+            />
+            {/* White circular background behind globe */}
+            <div className="relative z-10 flex items-center justify-center rounded-full bg-white dark:bg-white/90" style={{ width: 34, height: 34 }}>
+              <MiraSphere size={32} isHovered={isMiraHovered} />
+            </div>
+            <span className="text-white text-sm font-semibold whitespace-nowrap relative z-10 ml-1.5" style={{ textShadow: '0 1px 2px rgba(0,0,0,0.2)' }}>
+              Ask Mira
+            </span>
+          </div>
+
+          {/* Separator */}
+          <div className="hidden md:block w-px h-7 bg-slate-400 dark:bg-slate-300/40 mx-1" />
+
           {/* Search Pill Button — opens floating search overlay */}
           <div ref={searchRef}>
             <button
@@ -220,13 +260,50 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                   setShowSearchResults(true)
                 }
               }}
-              className="flex items-center gap-2 px-4 py-2 rounded-full border border-default-200 dark:border-default-100 bg-default-50 dark:bg-default-100 hover:bg-default-100 dark:hover:bg-default-200 transition-all duration-200 cursor-pointer group"
+              className="hidden md:flex items-center cursor-pointer relative group"
+              style={{
+                background: isDarkMode
+                  ? `linear-gradient(160deg, rgba(148,163,184,0.25) 0%, rgba(100,116,139,0.18) 50%, rgba(71,85,105,0.22) 100%)`
+                  : `linear-gradient(160deg, rgba(51,65,85,0.12) 0%, rgba(100,116,139,0.08) 50%, rgba(148,163,184,0.14) 100%)`,
+                backgroundSize: '200% 200%',
+                animation: 'mira-gradient-shift 8s ease infinite',
+                borderRadius: '9999px',
+                padding: '3px 14px 3px 3px',
+                position: 'relative',
+                overflow: 'hidden',
+                backdropFilter: 'blur(8px)',
+                border: isDarkMode ? '1px solid rgba(148,163,184,0.15)' : '1px solid rgba(100,116,139,0.12)',
+              }}
+            >
+              {/* Grain texture overlay */}
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  borderRadius: '9999px',
+                  opacity: 0.12,
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E")`,
+                  backgroundSize: '128px 128px',
+                  pointerEvents: 'none',
+                }}
+              />
+              <div className="relative z-10 flex items-center justify-center rounded-full bg-default-200 dark:bg-white/15" style={{ width: 34, height: 34 }}>
+                <FaSearch className="w-3.5 h-3.5 text-default-600 dark:text-slate-300" />
+              </div>
+              <span className="text-default-700 dark:text-slate-200 text-sm font-semibold whitespace-nowrap relative z-10 ml-1.5">
+                AI Search
+              </span>
+              <kbd className="hidden md:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-default-300/50 dark:bg-white/10 text-[10px] text-default-600 dark:text-slate-300 font-mono relative z-10 ml-2">
+                ⌘K
+              </kbd>
+            </button>
+            {/* Mobile/Tablet fallback search button (unchanged) */}
+            <button
+              onClick={() => setShowMobileSearch(true)}
+              className="md:hidden flex items-center gap-2 px-4 py-2 rounded-full bg-default-50 dark:bg-default-100 hover:bg-default-100 dark:hover:bg-default-200 transition-all duration-200 cursor-pointer group"
             >
               <FaSearch className="w-3.5 h-3.5 text-default-400 group-hover:text-default-500 transition-colors" />
               <span className="text-sm text-default-400 group-hover:text-default-500 transition-colors hidden sm:inline">Search...</span>
-              <kbd className="hidden md:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-default-200 dark:bg-default-50 text-[10px] text-default-500 font-mono">
-                ⌘K
-              </kbd>
             </button>
 
             {/* Floating Search Overlay (Desktop) */}
@@ -239,35 +316,35 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                     setShowSearchResults(false)
                   }}
                 />
-                <div className="fixed left-1/2 -translate-x-1/2 top-4 w-[90%] max-w-xl bg-content1 rounded-xl shadow-2xl border border-divider overflow-hidden z-[101]">
-                  <div className="relative flex items-center">
-                    <Input
-                      value={searchQuery}
-                      onValueChange={setSearchQuery}
-                      placeholder="Search everything..."
-                      startContent={<FaSearch className="text-default-400 w-4 h-4" />}
-                      endContent={
-                        searching ? <Loader size="xs" /> :
-                          searchQuery ? (
-                            <Button
-                              isIconOnly
-                              size="sm"
-                              variant="light"
-                              onPress={() => {
-                                setSearchQuery('')
-                                setShowSearchResults(false)
-                              }}
-                            >
-                              <FaTimes className="w-4 h-4" />
-                            </Button>
-                          ) : null
-                      }
-                      classNames={{
-                        inputWrapper: 'bg-transparent border-b border-divider rounded-none'
-                      }}
-                      autoFocus
-                    />
-                  </div>
+                <div className="fixed left-1/2 -translate-x-1/2 top-4 w-[90%] max-w-xl bg-content1 overflow-hidden z-[101] search-overlay-input" style={{ border: 'none', borderRadius: '1rem', outline: 'none', boxShadow: 'none' }}>
+                  <Input
+                    size="lg"
+                    value={searchQuery}
+                    onValueChange={setSearchQuery}
+                    placeholder="Search everything..."
+                    startContent={<FaSearch className="text-default-400 w-5 h-5" />}
+                    endContent={
+                      searching ? <Loader size="xs" /> :
+                        searchQuery ? (
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="light"
+                            onPress={() => {
+                              setSearchQuery('')
+                              setShowSearchResults(false)
+                            }}
+                          >
+                            <FaTimes className="w-4 h-4" />
+                          </Button>
+                        ) : null
+                    }
+                    classNames={{
+                      inputWrapper: 'bg-transparent shadow-none rounded-none',
+                      input: 'text-base'
+                    }}
+                    autoFocus
+                  />
 
                   {/* Search Results */}
                   {showSearchResults && searchResults && (
@@ -276,9 +353,6 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                         if (items.length === 0) return null
                         return (
                           <div key={category} className="border-b border-divider last:border-b-0">
-                            <div className="px-4 py-2 bg-default-50 font-semibold text-xs text-default-600 uppercase sticky top-0">
-                              {getCategoryLabel(category)} <span className="text-default-400">({items.length})</span>
-                            </div>
                             {items.map((item, index) => (
                               <div
                                 key={item._id || index}
@@ -320,20 +394,6 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
 
         {/* Right side — MIRA + Focus Timer + Refresh */}
         <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
-          {/* MIRA Cloud Button - Desktop Only */}
-          <div
-            className="hidden md:flex items-center justify-center cursor-pointer relative group"
-            data-mira-sphere="true"
-            onClick={() => setShowMiraModal(true)}
-            onMouseEnter={() => setIsMiraHovered(true)}
-            onMouseLeave={() => setIsMiraHovered(false)}
-          >
-            <MiraSphere size={55} isHovered={isMiraHovered} />
-            <span className="absolute top-full left-1/2 -translate-x-1/2 mt-1 px-2 py-1 text-xs font-medium text-white bg-gray-900 dark:bg-gray-800 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
-              MIRA Cloud
-            </span>
-          </div>
-
           {/* Focus Timer Pill */}
           <FocusTimerPill />
 
@@ -346,6 +406,20 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
           >
             <FaSyncAlt className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
           </Button>
+
+          {/* Theme Toggle — Sun/Moon pill */}
+          <button
+            onClick={() => setDarkModePreference(isDarkMode ? 'light' : 'dark')}
+            className={`hidden md:flex items-center w-[52px] h-7 rounded-full p-[3px] transition-colors duration-400 relative cursor-pointer ${isDarkMode ? 'bg-slate-700' : 'bg-amber-100'}`}
+            aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            <span
+              className={`flex items-center justify-center w-[22px] h-[22px] rounded-full shadow-md transition-all duration-400 ${isDarkMode ? 'translate-x-[23px] bg-slate-900' : 'translate-x-0 bg-white'}`}
+            >
+              <FaSun className={`w-3.5 h-3.5 text-amber-400 absolute transition-all duration-400 ${!isDarkMode ? 'rotate-0 scale-100 opacity-100' : 'rotate-90 scale-0 opacity-0'}`} />
+              <FaMoon className={`w-3 h-3 text-blue-300 absolute transition-all duration-400 ${isDarkMode ? 'rotate-0 scale-100 opacity-100' : '-rotate-90 scale-0 opacity-0'}`} />
+            </span>
+          </button>
 
           {/* Mobile/Tablet Search Button */}
           <Button

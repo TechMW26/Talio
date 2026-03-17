@@ -80,14 +80,14 @@ export default function AddWidgetModal({
         {/* Search and Filter */}
         <div className="px-6 py-4 border-b border-gray-100 space-y-3">
           {/* Search Input */}
-          <div className="relative">
-            <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <div className="input-with-icon">
+            <FaSearch className="input-icon w-4 h-4" />
             <input
               type="text"
               placeholder="Search widgets..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="modal-input pl-10"
+              className="input input-search"
             />
           </div>
 

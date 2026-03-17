@@ -148,6 +148,115 @@ The email should:
 Write the complete email including greeting and sign-off.`;
         break;
 
+      case 'goal_description':
+        if (!context?.goalTitle) {
+          return NextResponse.json(
+            { success: false, message: 'Goal title is required' },
+            { status: 400 }
+          );
+        }
+
+        systemInstruction = `You are a professional HR and performance management assistant. Write clear, measurable goal descriptions using SMART criteria.`;
+
+        prompt = `Write a short professional goal description for: "${context.goalTitle}".
+${context.category ? `Category: ${context.category}` : ''}
+
+The description should:
+- Be clear and actionable
+- Focus on measurable outcomes
+- Be concise (2-3 sentences, around 40-60 words)
+
+Write only the description, no headers or labels.`;
+        break;
+
+      case 'ticket_description':
+        if (!context?.ticketTitle) {
+          return NextResponse.json(
+            { success: false, message: 'Ticket title is required' },
+            { status: 400 }
+          );
+        }
+
+        systemInstruction = `You are a professional IT helpdesk assistant. Write clear issue descriptions that help support teams understand and resolve issues quickly.`;
+
+        prompt = `Write a short helpdesk ticket description for: "${context.ticketTitle}".
+${context.priority ? `Priority: ${context.priority}` : ''}
+${context.category ? `Category: ${context.category}` : ''}
+
+The description should:
+- Describe the issue or request clearly
+- Include relevant context
+- Be concise (2-3 sentences, around 40-60 words)
+
+Write only the description, no headers or labels.`;
+        break;
+
+      case 'job_description':
+        if (!context?.jobTitle) {
+          return NextResponse.json(
+            { success: false, message: 'Job title is required' },
+            { status: 400 }
+          );
+        }
+
+        systemInstruction = `You are a professional recruitment and HR assistant. Write compelling, clear job descriptions.`;
+
+        prompt = `Write a professional job description for the position: "${context.jobTitle}".
+${context.department ? `Department: ${context.department}` : ''}
+${context.employmentType ? `Employment type: ${context.employmentType}` : ''}
+
+The description should:
+- Outline key responsibilities
+- Mention required skills briefly
+- Be professional and engaging
+- Be concise (2-3 paragraphs, around 100-150 words)
+
+Write only the description, no headers or labels.`;
+        break;
+
+      case 'asset_description':
+        if (!context?.assetName) {
+          return NextResponse.json(
+            { success: false, message: 'Asset name is required' },
+            { status: 400 }
+          );
+        }
+
+        systemInstruction = `You are a professional asset management assistant. Write clear, informative asset descriptions.`;
+
+        prompt = `Write a short asset description for: "${context.assetName}".
+${context.category ? `Category: ${context.category}` : ''}
+${context.type ? `Type: ${context.type}` : ''}
+
+The description should:
+- Describe the asset briefly
+- Mention its purpose or usage context
+- Be concise (1-2 sentences, around 20-40 words)
+
+Write only the description, no headers or labels.`;
+        break;
+
+      case 'meeting_description':
+        if (!context?.meetingTitle) {
+          return NextResponse.json(
+            { success: false, message: 'Meeting title is required' },
+            { status: 400 }
+          );
+        }
+
+        systemInstruction = `You are a professional meeting coordinator. Write clear, concise meeting descriptions.`;
+
+        prompt = `Write a short meeting description for: "${context.meetingTitle}".
+${context.type ? `Meeting type: ${context.type}` : ''}
+
+The description should:
+- Summarize the meeting objectives
+- Be concise (1-2 sentences, around 20-40 words)
+- Sound professional
+
+Write only the description, no headers or labels.`;
+        break;
+
       default:
         return NextResponse.json(
           { success: false, message: `Unknown type: ${type}` },

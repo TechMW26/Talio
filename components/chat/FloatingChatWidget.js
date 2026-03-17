@@ -411,12 +411,7 @@ export default function FloatingChatWidget() {
                   placeholder={showNewChat ? "Search people..." : "Search conversations..."}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm focus:outline-none focus:ring-2 transition-all"
-                  style={{ 
-                    background: isDarkMode ? 'rgba(15, 23, 42, 0.7)' : 'rgba(255, 255, 255, 0.7)',
-                    border: isDarkMode ? '1px solid rgba(71, 85, 105, 0.3)' : '1px solid rgba(255, 255, 255, 0.3)',
-                    focusRing: primaryColor
-                  }}
+                  className="input input-search text-sm"
                 />
               </div>
             </div>
