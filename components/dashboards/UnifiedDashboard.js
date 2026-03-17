@@ -485,6 +485,7 @@ export default function UnifiedDashboard({ user: userProp }) {
             let latitude = null
             let longitude = null
             let accuracy = null
+            let locationSource = 'gps'
 
             if (navigator.geolocation) {
                 try {
@@ -503,7 +504,27 @@ export default function UnifiedDashboard({ user: userProp }) {
                     console.log(`📍 Location captured: ${latitude}, ${longitude} (accuracy: ${accuracy}m)`)
                 } catch (geoError) {
                     console.warn('Geolocation error:', geoError)
-                    toast.error('Location access denied. Please enable location services.')
+                }
+            }
+
+            // IP-based location fallback if GPS failed
+            if (latitude === null || longitude === null) {
+                try {
+                    console.log('📍 GPS unavailable, attempting IP-based location fallback...')
+                    const ipRes = await fetch('/api/attendance/ip-location', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    })
+                    const ipData = await ipRes.json()
+                    if (ipData.success && ipData.latitude && ipData.longitude) {
+                        latitude = ipData.latitude
+                        longitude = ipData.longitude
+                        accuracy = null // IP location has no meaningful accuracy in meters
+                        locationSource = 'ip'
+                        console.log(`📍 IP-based location captured: ${latitude}, ${longitude} (${ipData.city}, ${ipData.region})`)
+                        toast.info('Using approximate location (IP-based). Enable GPS for precise location.')
+                    }
+                } catch (ipError) {
+                    console.warn('IP location fallback failed:', ipError)
                 }
             }
 
@@ -519,7 +540,8 @@ export default function UnifiedDashboard({ user: userProp }) {
                     type: 'clock-in',
                     latitude,
                     longitude,
-                    accuracy
+                    accuracy,
+                    locationSource
                 })
             })
 
@@ -548,6 +570,7 @@ export default function UnifiedDashboard({ user: userProp }) {
             let latitude = null
             let longitude = null
             let accuracy = null
+            let locationSource = 'gps'
 
             if (navigator.geolocation) {
                 try {
@@ -569,6 +592,27 @@ export default function UnifiedDashboard({ user: userProp }) {
                 }
             }
 
+            // IP-based location fallback if GPS failed
+            if (latitude === null || longitude === null) {
+                try {
+                    console.log('📍 GPS unavailable, attempting IP-based location fallback...')
+                    const ipRes = await fetch('/api/attendance/ip-location', {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    })
+                    const ipData = await ipRes.json()
+                    if (ipData.success && ipData.latitude && ipData.longitude) {
+                        latitude = ipData.latitude
+                        longitude = ipData.longitude
+                        accuracy = null
+                        locationSource = 'ip'
+                        console.log(`📍 IP-based location captured: ${latitude}, ${longitude} (${ipData.city}, ${ipData.region})`)
+                        toast.info('Using approximate location (IP-based). Enable GPS for precise location.')
+                    }
+                } catch (ipError) {
+                    console.warn('IP location fallback failed:', ipError)
+                }
+            }
+
             // Send coordinates to backend - it will handle geocoding with Google Maps
             const response = await fetch('/api/attendance', {
                 method: 'POST',
@@ -581,7 +625,8 @@ export default function UnifiedDashboard({ user: userProp }) {
                     type: 'clock-out',
                     latitude,
                     longitude,
-                    accuracy
+                    accuracy,
+                    locationSource
                 })
             })
 

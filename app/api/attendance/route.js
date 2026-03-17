@@ -390,15 +390,18 @@ export async function POST(request) {
     const TenantCompanySettings = models.CompanySettings;
 
     const data = await request.json()
-    const { employeeId, type, latitude, longitude, address, accuracy, date, checkIn, checkOut, status, workHours, remarks } = data // type: 'clock-in' or 'clock-out' or 'manual'
+    const { employeeId, type, latitude, longitude, address, accuracy, date, checkIn, checkOut, status, workHours, remarks, locationSource } = data // type: 'clock-in' or 'clock-out' or 'manual'
 
     // LOCATION VALIDATION - Optional but log warnings if not provided
     const locationValidation = validateLocationData({ latitude, longitude })
     const hasValidLocation = locationValidation.valid
+    const isIPBasedLocation = locationSource === 'ip'
 
     // Log warning if location is missing (for backend monitoring)
     if (!hasValidLocation) {
       console.warn(`⚠️ [Attendance] Location NOT captured for ${type} - Employee: ${employeeId} - Reason: ${locationValidation.message}`)
+    } else if (isIPBasedLocation) {
+      console.log(`📍 [Attendance] IP-based location used for ${type} - Employee: ${employeeId} - Coords: ${latitude}, ${longitude}`)
     }
 
     const today = new Date()
@@ -667,10 +670,16 @@ export async function POST(request) {
       let locationWarning = null
 
       if (hasValidLocation) {
+        if (isIPBasedLocation) {
+          locationWarning = 'Approximate location from IP - GPS was unavailable'
+        }
         try {
           const geocodeResult = await reverseGeocode(latitude, longitude)
           if (geocodeResult.success) {
             resolvedAddress = geocodeResult.address
+            if (isIPBasedLocation) {
+              resolvedAddress = `${resolvedAddress} (approx.)`
+            }
             addressDetails = geocodeResult.details
             console.log(`📍 Check-in location resolved: ${resolvedAddress}`)
           } else {
@@ -714,6 +723,7 @@ export async function POST(request) {
           } : null,
           capturedAt: checkInTime,
           accuracy: accuracy || null,
+          source: isIPBasedLocation ? 'ip' : 'gps',
           geofenceLocation,
           geofenceLocationName
         }
@@ -960,10 +970,16 @@ export async function POST(request) {
       let addressDetails = null
 
       if (hasValidLocation) {
+        if (isIPBasedLocation) {
+          checkOutLocationWarning = 'Approximate location from IP - GPS was unavailable'
+        }
         try {
           const geocodeResult = await reverseGeocode(latitude, longitude)
           if (geocodeResult.success) {
             resolvedAddress = geocodeResult.address
+            if (isIPBasedLocation) {
+              resolvedAddress = `${resolvedAddress} (approx.)`
+            }
             addressDetails = geocodeResult.details
             console.log(`📍 Check-out location resolved: ${resolvedAddress}`)
           } else {
@@ -1000,6 +1016,7 @@ export async function POST(request) {
           } : null,
           capturedAt: checkOutTime,
           accuracy: accuracy || null,
+          source: isIPBasedLocation ? 'ip' : 'gps',
           geofenceLocation,
           geofenceLocationName
         }
