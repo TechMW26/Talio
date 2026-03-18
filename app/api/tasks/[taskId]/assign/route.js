@@ -97,10 +97,15 @@ export async function POST(request, { params }) {
           const assigneeUser = await User.findOne({ employeeId: id }).select('_id')
           if (assigneeUser) {
             createTaskAssignmentNotification(models, {
-              task,
-              assignee: employee,
-              assignedBy: assigner,
-              assigneeUserId: assigneeUser._id
+              targetUserId: assigneeUser._id,
+              taskId: task._id,
+              taskTitle: task.title,
+              projectId: null,
+              projectName: null,
+              assignedBy: userRecord.employeeId,
+              assignedByName: assigner ? `${assigner.firstName} ${assigner.lastName}` : 'Someone',
+              dueDate: task.dueDate,
+              priority: task.priority || 'medium'
             }).catch(console.error)
           }
         } catch (notifyErr) {

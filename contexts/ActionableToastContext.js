@@ -178,7 +178,8 @@ export function ActionableToastProvider({ children }) {
   }, [fetchPendingNotifications])
 
   // Execute an action on a notification
-  const executeAction = useCallback(async (notificationId, actionId, reason = null) => {
+  // skipEndpoint: when true, the endpoint was already called client-side — just mark as actioned
+  const executeAction = useCallback(async (notificationId, actionId, reason = null, skipEndpoint = false) => {
     try {
       const token = localStorage.getItem('token')
       if (!token) return { success: false, message: 'Not authenticated' }
@@ -189,10 +190,17 @@ export function ActionableToastProvider({ children }) {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ actionId, reason })
+        body: JSON.stringify({ actionId, reason, skipEndpoint })
       })
 
-      const result = await response.json()
+      // Handle non-JSON responses gracefully
+      let result
+      const contentType = response.headers.get('content-type') || ''
+      if (contentType.includes('application/json')) {
+        result = await response.json()
+      } else {
+        result = { success: false, message: `Server error (${response.status})` }
+      }
 
       if (response.ok && result.success) {
         // Remove from local state
@@ -238,7 +246,7 @@ export function ActionableToastProvider({ children }) {
               key={notification._id}
               notification={notification}
               onDismiss={() => dismissNotification(notification._id)}
-              onAction={(actionId, reason) => executeAction(notification._id, actionId, reason)}
+              onAction={(actionId, reason, skipEndpoint) => executeAction(notification._id, actionId, reason, skipEndpoint)}
             />
           ))}
         </div>

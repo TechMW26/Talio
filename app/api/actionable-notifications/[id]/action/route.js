@@ -28,7 +28,7 @@ export async function POST(request, { params }) {
     const { ActionableNotification } = models
 
     const body = await request.json()
-    const { actionId, reason } = body
+    const { actionId, reason, skipEndpoint } = body
 
     if (!actionId) {
       return NextResponse.json(
@@ -104,9 +104,9 @@ export async function POST(request, { params }) {
       })
     }
 
-    // If action has an endpoint, call it
+    // If action has an endpoint, call it server-side (unless client already handled it)
     let actionResult = null
-    if (action.endpoint) {
+    if (action.endpoint && !skipEndpoint) {
       try {
         // Build the full URL
         const baseUrl = new URL(request.url).origin

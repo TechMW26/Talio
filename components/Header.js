@@ -9,6 +9,7 @@ import { handleSessionExpired } from '@/utils/userHelper'
 import { useTheme } from '@/contexts/ThemeContext'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
 import { useFocusTimer } from '@/contexts/FocusTimerContext'
+import { useMiraChat } from '@/contexts/MiraChatContext'
 import { Button, Input, ScrollShadow } from '@heroui/react'
 
 export default function Header({ toggleSidebar, sidebarCollapsed }) {
@@ -24,9 +25,8 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
   const [showMobileSearch, setShowMobileSearch] = useState(false)
   const [searching, setSearching] = useState(false)
   const [isDesktop, setIsDesktop] = useState(false)
-  const [showMiraModal, setShowMiraModal] = useState(false)
-  const [miraModalClosing, setMiraModalClosing] = useState(false)
   const [isMiraHovered, setIsMiraHovered] = useState(false)
+  const { openChat } = useMiraChat()
   const searchRef = useRef(null)
   const searchTimeoutRef = useRef(null)
 
@@ -39,20 +39,6 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
     window.addEventListener('resize', checkDesktop)
     return () => window.removeEventListener('resize', checkDesktop)
   }, [])
-
-  // Handle Escape key to close MIRA modal
-  useEffect(() => {
-    const handleEscape = (e) => {
-      if (e.key === 'Escape' && showMiraModal && !miraModalClosing) {
-        setMiraModalClosing(true)
-      }
-    }
-
-    if (showMiraModal) {
-      window.addEventListener('keydown', handleEscape)
-      return () => window.removeEventListener('keydown', handleEscape)
-    }
-  }, [showMiraModal, miraModalClosing])
 
   // Keyboard shortcut: Cmd/Ctrl+K to open search
   useEffect(() => {
@@ -213,7 +199,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
           <div
             className="hidden md:flex items-center cursor-pointer relative group -ml-3"
             data-mira-sphere="true"
-            onClick={() => setShowMiraModal(true)}
+            onClick={() => openChat()}
             onMouseEnter={() => setIsMiraHovered(true)}
             onMouseLeave={() => setIsMiraHovered(false)}
             style={{
@@ -539,52 +525,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
         </div>
       )}
 
-      {/* MIRA Cloud Fullscreen Modal */}
-      {/* Backdrop overlay with blur animation - renders below iframe */}
-      {(showMiraModal || miraModalClosing) && (
-        <div
-          className={`fixed inset-0 bg-black/60 backdrop-blur-[10px] ${miraModalClosing ? 'animate-mira-backdrop-out' : 'animate-mira-backdrop-in'}`}
-          style={{ zIndex: 99998, pointerEvents: 'none' }}
-          onAnimationEnd={() => {
-            if (miraModalClosing) {
-              setMiraModalClosing(false)
-              setShowMiraModal(false)
-            }
-          }}
-        />
-      )}
 
-      {/* Iframe container - only mounted when modal is open */}
-      {(showMiraModal || miraModalClosing) && (
-        <div
-          className={`fixed inset-0 ${miraModalClosing ? 'animate-mira-iframe-out' : 'animate-mira-iframe-in'}`}
-          style={{
-            zIndex: 99999,
-            pointerEvents: 'auto'
-          }}
-        >
-          <iframe
-            src="https://itsmira.cloud"
-            className="w-full h-full border-0"
-            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
-            allow="microphone; camera; clipboard-read; clipboard-write"
-            title="MIRA Cloud"
-          />
-        </div>
-      )}
-
-      {/* Close button - separate from backdrop for proper click handling */}
-      {(showMiraModal || miraModalClosing) && (
-        <Button
-          isIconOnly
-          variant="solid"
-          className="fixed top-4 right-4 bg-default-900/80 hover:bg-default-900"
-          style={{ zIndex: 100000 }}
-          onPress={() => setMiraModalClosing(true)}
-        >
-          <FaTimes className="w-6 h-6 text-white" />
-        </Button>
-      )}
     </header>
   )
 }

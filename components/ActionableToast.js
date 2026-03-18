@@ -86,21 +86,66 @@ export default function ActionableToast({ notification, onDismiss, onAction }) {
     setShowConfirmation(false)
 
     try {
-      const result = await onAction?.(action.id, reason || null)
-      
-      if (result?.success) {
-        // Show success feedback
-        toast.success(result.message || 'Action completed successfully')
-        
-        // Navigate if URL is returned
-        if (result.url) {
-          router.push(result.url)
+      // If the action has an endpoint, call it directly from the client
+      // This avoids the unreliable server-to-self fetch proxy pattern
+      if (action.endpoint) {
+        const token = localStorage.getItem('token')
+        const payload = { ...(action.payload || {}) }
+        if (reason) {
+          payload.reason = reason
+          payload.rejectionReason = reason
         }
-        
+
+        const method = (action.method || 'POST').toUpperCase()
+        const fetchOptions = {
+          method,
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        }
+        // Only include body for methods that support it
+        if (['POST', 'PUT', 'PATCH'].includes(method)) {
+          fetchOptions.body = JSON.stringify(payload)
+        }
+
+        const endpointResponse = await fetch(action.endpoint, fetchOptions)
+
+        // Handle non-JSON responses gracefully (e.g. 404 HTML pages)
+        let endpointResult
+        const contentType = endpointResponse.headers.get('content-type') || ''
+        if (contentType.includes('application/json')) {
+          endpointResult = await endpointResponse.json()
+        } else {
+          endpointResult = { message: `Request failed with status ${endpointResponse.status}` }
+        }
+
+        if (!endpointResponse.ok) {
+          toast.error(endpointResult?.message || 'Action failed')
+          if (isMountedRef.current) {
+            setLoadingAction(null)
+            setReason('')
+            setShowReasonInput(false)
+            setSelectedAction(null)
+          }
+          return
+        }
+
+        // Endpoint succeeded — mark notification as actioned (skip server-side proxy)
+        await onAction?.(action.id, reason || null, true)
+        toast.success(endpointResult?.message || 'Action completed successfully')
         handleDismiss()
       } else {
-        // Show error
-        toast.error(result?.message || 'Action failed')
+        // No endpoint — just mark as actioned via the backend
+        const result = await onAction?.(action.id, reason || null, false)
+
+        if (result?.success) {
+          toast.success(result.message || 'Action completed successfully')
+          if (result.url) router.push(result.url)
+          handleDismiss()
+        } else {
+          toast.error(result?.message || 'Action failed')
+        }
       }
     } catch (error) {
       console.error('[ActionableToast] Action error:', error)

@@ -1,0 +1,659 @@
+import { NextResponse } from 'next/server'
+import { getAuthAndModels } from '@/lib/auth'
+import { generateContent } from '@/lib/gemini'
+
+// Get current month key in "YYYY-MM" format
+function getCurrentMonth() {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
+// Check token balance and deduct one token
+async function checkAndDeductToken(MiraTokenUsage, userId) {
+  const month = getCurrentMonth()
+
+  // Upsert: create record if missing, then return it
+  let usage = await MiraTokenUsage.findOneAndUpdate(
+    { user: userId, month },
+    { $setOnInsert: { tokensUsed: 0, tokenLimit: 100 } },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  )
+
+  if (usage.tokensUsed >= usage.tokenLimit) {
+    return { allowed: false, tokensUsed: usage.tokensUsed, tokenLimit: usage.tokenLimit, tokensRemaining: 0 }
+  }
+
+  // Deduct one token atomically
+  usage = await MiraTokenUsage.findOneAndUpdate(
+    { user: userId, month, tokensUsed: { $lt: usage.tokenLimit } },
+    { $inc: { tokensUsed: 1 } },
+    { new: true }
+  )
+
+  if (!usage) {
+    return { allowed: false, tokensUsed: usage?.tokensUsed ?? 0, tokenLimit: 100, tokensRemaining: 0 }
+  }
+
+  return {
+    allowed: true,
+    tokensUsed: usage.tokensUsed,
+    tokenLimit: usage.tokenLimit,
+    tokensRemaining: usage.tokenLimit - usage.tokensUsed
+  }
+}
+
+// Generate content with Google Search grounding via Gemini API
+async function generateContentWithSearch(prompt, systemInstruction) {
+  const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY
+  if (!apiKey) throw new Error('No Gemini API key')
+
+  const models = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash']
+  for (const model of models) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: systemInstruction ? `${systemInstruction}\n\n${prompt}` : prompt }] }],
+          tools: [{ google_search: {} }],
+          generationConfig: { temperature: 0.7 }
+        })
+      })
+      if (res.ok) {
+        const data = await res.json()
+        return data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+      }
+      if (res.status === 404 || res.status === 503) continue
+      if (res.status === 429) break
+    } catch { continue }
+  }
+  throw new Error('Search-grounded generation failed')
+}
+
+// Build role-aware system prompt with user context
+function buildSystemPrompt(user, role, employeeData, contextData) {
+  const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+
+  let roleInstructions = ''
+  if (['admin', 'hr'].includes(role)) {
+    roleInstructions = `The user is an ADMIN/HR with FULL access. You can share any data from the organization — employee details, attendance records, leave balances, project statuses, performance data, policies, announcements, and more.`
+  } else if (['manager', 'department_head', 'department_manager', 'team_leader'].includes(role)) {
+    roleInstructions = `The user is a MANAGER/LEAD. You can share data about their direct reports, their team members, projects they manage, and their own personal data. Do NOT share data about employees outside their reporting hierarchy.`
+  } else {
+    roleInstructions = `The user is an EMPLOYEE. You can ONLY share their own personal data — their tasks, attendance, leaves, performance, and general company policies/announcements. Do NOT share other employees' data.`
+  }
+
+  return `You are MIRA, the AI assistant for Talio — an HR & productivity management platform.
+Today is ${today}.
+
+## User Context
+- Name: ${employeeData?.firstName || 'User'} ${employeeData?.lastName || ''}
+- Role: ${role}
+- Employee ID: ${employeeData?.employeeCode || 'N/A'}
+- Department: ${employeeData?.department?.name || 'N/A'}
+- Designation: ${employeeData?.designation?.name || 'N/A'}
+
+## Access Rules
+${roleInstructions}
+
+## Available Data Context
+${contextData && Object.keys(contextData).length > 0 ? JSON.stringify(contextData, null, 0) : 'No specific data loaded for this query. Answer based on general knowledge or suggest what the user can ask about.'}
+
+## Response Format
+You MUST respond in valid JSON with this exact structure:
+{
+  "message": "Your natural language response here",
+  "cards": [
+    {
+      "type": "info|stat|list|table|action|alert|progress",
+      "title": "Card title",
+      "data": {}
+    }
+  ],
+  "suggestedQuestions": ["Follow-up question 1", "Follow-up question 2"]
+}
+
+### Card Types & Data Structures:
+
+**"info"** — Simple information card
+{ "text": "Description text", "icon": "info|success|warning" }
+
+**"stat"** — Numeric stats
+{ "stats": [{ "label": "Label", "value": "42", "change": "+5%", "trend": "up|down|neutral" }] }
+
+**"list"** — List of items
+{ "items": [{ "title": "Item title", "subtitle": "Details", "status": "active|pending|completed|overdue", "link": "/dashboard/..." }] }
+
+**"table"** — Tabular data
+{ "headers": ["Col1", "Col2"], "rows": [["val1", "val2"]] }
+
+**"action"** — Actionable buttons/links
+{ "text": "Description", "actions": [{ "label": "Button text", "link": "/dashboard/...", "variant": "primary|secondary" }] }
+
+**"alert"** — Important notice
+{ "text": "Alert message", "severity": "info|warning|error|success" }
+
+**"progress"** — Progress indicator
+{ "items": [{ "label": "Task name", "value": 75, "max": 100, "status": "on-track|at-risk|overdue" }] }
+
+## Important Rules
+- Always respond in the JSON format above. Never respond with plain text outside JSON.
+- Keep messages concise and helpful.
+- Use cards to present structured data beautifully.
+- Include 2-3 suggested follow-up questions.
+- If you don't have data to answer, say so and suggest what the user can ask.
+- Be warm, professional, and helpful.
+- For actionable items, always include links to relevant dashboard pages.
+- Never reveal sensitive security data (passwords, tokens, etc.).
+- If the query is outside Talio scope but is a general knowledge question, you may answer it using your knowledge. You have internet access for up-to-date information.
+- For questions about current events, weather, news, or external topics, provide helpful answers.
+- Politely redirect only if the question is inappropriate or harmful.`
+}
+
+// Fetch relevant data based on user query intent
+async function fetchContextData(models, user, role, query) {
+  const context = {}
+  const queryLower = query.toLowerCase()
+
+  const isAdmin = ['admin', 'hr'].includes(role)
+  const isManager = ['manager', 'department_head', 'department_manager', 'team_leader'].includes(role)
+
+  try {
+    // Attendance queries
+    if (/attend|check.?in|check.?out|present|absent|late|punch|working hours/i.test(queryLower)) {
+      if (isAdmin && models.Attendance) {
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        const todayAttendance = await models.Attendance.find({ date: { $gte: today } })
+          .populate('employee', 'firstName lastName employeeCode')
+          .lean().limit(50)
+        context.todayAttendance = todayAttendance.map(a => ({
+          employee: a.employee ? `${a.employee.firstName} ${a.employee.lastName}` : 'Unknown',
+          code: a.employee?.employeeCode,
+          checkIn: a.checkInTime, checkOut: a.checkOutTime,
+          status: a.status, workingHours: a.totalWorkingHours
+        }))
+      } else if (models.Attendance) {
+        const myAttendance = await models.Attendance.find({ employee: user.employeeId })
+          .sort({ date: -1 }).lean().limit(14)
+        context.myAttendance = myAttendance.map(a => ({
+          date: a.date, checkIn: a.checkInTime, checkOut: a.checkOutTime,
+          status: a.status, workingHours: a.totalWorkingHours
+        }))
+      }
+    }
+
+    // Task queries — assignments stored in TaskAssignee join table
+    if (/task|todo|assign|work|backlog|deadline|overdue|pending task/i.test(queryLower)) {
+      if (isAdmin && models.Task) {
+        const tasks = await models.Task.find({})
+          .populate('createdBy', 'firstName lastName')
+          .populate('project', 'name')
+          .sort({ updatedAt: -1 }).lean().limit(30)
+        // Attach assignee names from TaskAssignee
+        if (models.TaskAssignee && tasks.length > 0) {
+          const taskIds = tasks.map(t => t._id)
+          const assignments = await models.TaskAssignee.find({ task: { $in: taskIds } })
+            .populate('user', 'firstName lastName').lean()
+          const assigneeMap = {}
+          for (const a of assignments) {
+            const name = a.user ? `${a.user.firstName} ${a.user.lastName}` : 'Unknown'
+            if (!assigneeMap[a.task.toString()]) assigneeMap[a.task.toString()] = []
+            assigneeMap[a.task.toString()].push(name)
+          }
+          context.tasks = tasks.map(t => ({
+            title: t.title, status: t.status, priority: t.priority,
+            assignees: (assigneeMap[t._id.toString()] || []).join(', ') || 'Unassigned',
+            project: t.project?.name, dueDate: t.dueDate, progress: t.progressPercentage
+          }))
+        } else {
+          context.tasks = tasks.map(t => ({
+            title: t.title, status: t.status, priority: t.priority,
+            project: t.project?.name, dueDate: t.dueDate, progress: t.progressPercentage
+          }))
+        }
+      } else if (models.Task && models.TaskAssignee) {
+        // Find tasks assigned to this user via TaskAssignee join table
+        const myAssignments = await models.TaskAssignee.find({
+          user: user.employeeId,
+          assignmentStatus: { $in: ['pending', 'accepted'] }
+        }).select('task').lean()
+        const myTaskIds = myAssignments.map(a => a.task)
+        // Also include tasks created by this user
+        const myTasks = await models.Task.find({
+          $or: [{ _id: { $in: myTaskIds } }, { createdBy: user.employeeId }]
+        }).populate('project', 'name').sort({ updatedAt: -1 }).lean().limit(20)
+        context.myTasks = myTasks.map(t => ({
+          title: t.title, status: t.status, priority: t.priority,
+          project: t.project?.name, dueDate: t.dueDate, progress: t.progressPercentage
+        }))
+      }
+    }
+
+    // Leave queries
+    if (/leave|vacation|day.?off|sick|holiday|time.?off|pto|balance/i.test(queryLower)) {
+      if (models.Leave) {
+        const filter = isAdmin ? {} : { employee: user.employeeId }
+        const leaves = await models.Leave.find(filter)
+          .populate('employee', 'firstName lastName')
+          .sort({ createdAt: -1 }).lean().limit(20)
+        context.leaves = leaves.map(l => ({
+          employee: l.employee ? `${l.employee.firstName} ${l.employee.lastName}` : 'Unknown',
+          type: l.leaveType, startDate: l.startDate, endDate: l.endDate,
+          status: l.status, reason: l.reason
+        }))
+      }
+      if (models.LeaveBalance) {
+        const balFilter = isAdmin ? {} : { employee: user.employeeId }
+        const balances = await models.LeaveBalance.find(balFilter)
+          .populate('employee', 'firstName lastName').lean().limit(20)
+        context.leaveBalances = balances.map(b => ({
+          employee: b.employee ? `${b.employee.firstName} ${b.employee.lastName}` : 'Unknown',
+          type: b.leaveType, total: b.totalAllotted, used: b.used, remaining: b.remaining
+        }))
+      }
+    }
+
+    // Project queries
+    if (/project|milestone|progress|team|sprint/i.test(queryLower)) {
+      if (models.Project) {
+        const projFilter = isAdmin ? {} : { $or: [{ projectHead: user.employeeId }, { createdBy: user._id }] }
+        const projects = await models.Project.find(projFilter)
+          .populate('projectHead', 'firstName lastName')
+          .sort({ updatedAt: -1 }).lean().limit(15)
+        context.projects = projects.map(p => ({
+          name: p.name, status: p.status, completion: p.completionPercentage,
+          head: p.projectHead ? `${p.projectHead.firstName} ${p.projectHead.lastName}` : 'N/A',
+          deadline: p.deadline, startDate: p.startDate
+        }))
+      }
+    }
+
+    // Employee queries (admin/manager only)
+    if (/employee|staff|team member|headcount|people|roster/i.test(queryLower)) {
+      if ((isAdmin || isManager) && models.Employee) {
+        const empFilter = isAdmin ? { status: 'active' } : { reportingManager: user.employeeId, status: 'active' }
+        const employees = await models.Employee.find(empFilter)
+          .populate('department designation')
+          .lean().limit(50)
+        context.employees = employees.map(e => ({
+          name: `${e.firstName} ${e.lastName}`, code: e.employeeCode,
+          department: e.department?.name, designation: e.designation?.name,
+          email: e.email, status: e.status
+        }))
+      }
+    }
+
+    // Announcement/policy queries
+    if (/announce|policy|notice|update|news|circular/i.test(queryLower)) {
+      if (models.Announcement) {
+        const announcements = await models.Announcement.find({ status: 'published' })
+          .sort({ createdAt: -1 }).lean().limit(10)
+        context.announcements = announcements.map(a => ({
+          title: a.title, content: a.content?.substring(0, 200),
+          priority: a.priority, createdAt: a.createdAt, category: a.category
+        }))
+      }
+      if (models.Policy) {
+        const policies = await models.Policy.find({ isActive: true }).lean().limit(10)
+        context.policies = policies.map(p => ({
+          title: p.title, category: p.category, description: p.description?.substring(0, 200)
+        }))
+      }
+    }
+
+    // Performance queries
+    if (/performance|review|rating|goal|kpi|appraisal|feedback/i.test(queryLower)) {
+      if (models.PerformanceGoal) {
+        const goalFilter = isAdmin ? {} : { employee: user.employeeId }
+        const goals = await models.PerformanceGoal.find(goalFilter)
+          .populate('employee', 'firstName lastName')
+          .sort({ createdAt: -1 }).lean().limit(15)
+        context.goals = goals.map(g => ({
+          title: g.title, employee: g.employee ? `${g.employee.firstName} ${g.employee.lastName}` : 'Unknown',
+          status: g.status, progress: g.progress, dueDate: g.dueDate
+        }))
+      }
+    }
+
+    // Meeting queries
+    if (/meeting|calendar|schedule|call|standup|sync/i.test(queryLower)) {
+      if (models.Meeting) {
+        const meetFilter = isAdmin ? {} : { $or: [{ organizer: user._id }, { 'participants.user': user._id }] }
+        const meetings = await models.Meeting.find(meetFilter)
+          .populate('organizer', 'firstName lastName')
+          .sort({ scheduledAt: -1 }).lean().limit(10)
+        context.meetings = meetings.map(m => ({
+          title: m.title, date: m.scheduledAt, status: m.status,
+          organizer: m.organizer ? `${m.organizer.firstName} ${m.organizer.lastName}` : 'Unknown'
+        }))
+      }
+    }
+
+    // General/dashboard overview
+    if (/dashboard|overview|summary|today|what.*happening|status|hello|hi|hey/i.test(queryLower)) {
+      if (models.Attendance) {
+        const today = new Date()
+        today.setHours(0, 0, 0, 0)
+        if (isAdmin) {
+          const presentCount = await models.Attendance.countDocuments({ date: { $gte: today }, status: { $in: ['present', 'late'] } })
+          const totalEmp = models.Employee ? await models.Employee.countDocuments({ status: 'active' }) : 0
+          context.overview = { presentToday: presentCount, totalEmployees: totalEmp }
+        }
+        const myToday = await models.Attendance.findOne({ employee: user.employeeId, date: { $gte: today } }).lean()
+        context.myTodayAttendance = myToday ? {
+          checkIn: myToday.checkInTime, checkOut: myToday.checkOutTime,
+          status: myToday.status, workingHours: myToday.totalWorkingHours
+        } : null
+      }
+      if (models.Task && models.TaskAssignee) {
+        const myAssignments = await models.TaskAssignee.find({
+          user: user.employeeId,
+          assignmentStatus: { $in: ['pending', 'accepted'] }
+        }).select('task').lean()
+        const myTaskIds = myAssignments.map(a => a.task)
+        const myPending = await models.Task.countDocuments({ _id: { $in: myTaskIds }, status: { $in: ['todo', 'in-progress'] } })
+        context.myPendingTasks = myPending
+      }
+    }
+
+  } catch (err) {
+    console.error('[Mira Chat] Context fetch error:', err.message)
+  }
+
+  return context
+}
+
+// Build reliable data cards directly from fetched context (bypasses AI formatting)
+function generateDataCards(ctx) {
+  const cards = []
+  const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : null
+
+  const mapTaskStatus = (s) => {
+    if (s === 'completed' || s === 'completed-pending-approval') return 'completed'
+    if (s === 'in-progress' || s === 'review') return 'active'
+    if (s === 'blocked' || s === 'rejected') return 'overdue'
+    return 'pending'
+  }
+
+  // Tasks (admin view)
+  if (ctx.tasks?.length > 0) {
+    cards.push({
+      type: 'list', title: 'Tasks',
+      data: {
+        items: ctx.tasks.slice(0, 12).map(t => ({
+          title: t.title,
+          subtitle: [t.priority, t.project, t.assignees !== 'Unassigned' ? t.assignees : null, fmtDate(t.dueDate)].filter(Boolean).join(' · '),
+          status: mapTaskStatus(t.status),
+          link: '/dashboard/todo'
+        }))
+      }
+    })
+  }
+
+  // My tasks (employee view)
+  if (ctx.myTasks?.length > 0) {
+    cards.push({
+      type: 'list', title: 'Your Tasks',
+      data: {
+        items: ctx.myTasks.slice(0, 12).map(t => ({
+          title: t.title,
+          subtitle: [t.priority, t.project, fmtDate(t.dueDate)].filter(Boolean).join(' · '),
+          status: mapTaskStatus(t.status),
+          link: '/dashboard/todo'
+        }))
+      }
+    })
+  }
+
+  // Today attendance (admin view)
+  if (ctx.todayAttendance?.length > 0) {
+    cards.push({
+      type: 'table', title: 'Today\'s Attendance',
+      data: {
+        headers: ['Employee', 'Check In', 'Check Out', 'Status', 'Hours'],
+        rows: ctx.todayAttendance.slice(0, 15).map(a => [
+          a.employee, a.checkIn || '—', a.checkOut || '—', a.status || '—',
+          a.workingHours ? `${a.workingHours}h` : '—'
+        ])
+      }
+    })
+  }
+
+  // My attendance
+  if (ctx.myAttendance?.length > 0) {
+    cards.push({
+      type: 'table', title: 'Your Recent Attendance',
+      data: {
+        headers: ['Date', 'Check In', 'Check Out', 'Status', 'Hours'],
+        rows: ctx.myAttendance.slice(0, 10).map(a => [
+          fmtDate(a.date) || '—', a.checkIn || '—', a.checkOut || '—', a.status || '—',
+          a.workingHours ? `${a.workingHours}h` : '—'
+        ])
+      }
+    })
+  }
+
+  // Leaves
+  if (ctx.leaves?.length > 0) {
+    cards.push({
+      type: 'list', title: 'Leave Requests',
+      data: {
+        items: ctx.leaves.slice(0, 10).map(l => ({
+          title: `${l.employee} — ${l.type}`,
+          subtitle: `${fmtDate(l.startDate)} to ${fmtDate(l.endDate)}${l.reason ? ` · ${l.reason}` : ''}`,
+          status: l.status === 'approved' ? 'completed' : l.status === 'rejected' ? 'overdue' : 'pending',
+          link: '/dashboard/leave'
+        }))
+      }
+    })
+  }
+
+  // Leave balances
+  if (ctx.leaveBalances?.length > 0) {
+    cards.push({
+      type: 'table', title: 'Leave Balances',
+      data: {
+        headers: ['Employee', 'Type', 'Total', 'Used', 'Remaining'],
+        rows: ctx.leaveBalances.slice(0, 12).map(b => [
+          b.employee, b.type, b.total ?? '—', b.used ?? '—', b.remaining ?? '—'
+        ])
+      }
+    })
+  }
+
+  // Projects
+  if (ctx.projects?.length > 0) {
+    cards.push({
+      type: 'list', title: 'Projects',
+      data: {
+        items: ctx.projects.slice(0, 10).map(p => ({
+          title: p.name,
+          subtitle: [p.head !== 'N/A' ? p.head : null, fmtDate(p.deadline), p.completion != null ? `${p.completion}%` : null].filter(Boolean).join(' · '),
+          status: p.status === 'completed' ? 'completed' : p.status === 'active' ? 'active' : 'pending',
+          link: '/dashboard/projects'
+        }))
+      }
+    })
+  }
+
+  // Employees
+  if (ctx.employees?.length > 0) {
+    cards.push({
+      type: 'table', title: 'Employees',
+      data: {
+        headers: ['Name', 'Code', 'Department', 'Designation'],
+        rows: ctx.employees.slice(0, 15).map(e => [
+          e.name, e.code || '—', e.department || '—', e.designation || '—'
+        ])
+      }
+    })
+  }
+
+  // Announcements
+  if (ctx.announcements?.length > 0) {
+    cards.push({
+      type: 'list', title: 'Announcements',
+      data: {
+        items: ctx.announcements.slice(0, 8).map(a => ({
+          title: a.title,
+          subtitle: [a.category, fmtDate(a.createdAt)].filter(Boolean).join(' · '),
+          status: a.priority === 'high' ? 'overdue' : a.priority === 'medium' ? 'pending' : 'active'
+        }))
+      }
+    })
+  }
+
+  // Performance goals
+  if (ctx.goals?.length > 0) {
+    cards.push({
+      type: 'progress', title: 'Performance Goals',
+      data: {
+        items: ctx.goals.slice(0, 8).map(g => ({
+          label: `${g.title}${g.employee ? ` — ${g.employee}` : ''}`,
+          value: g.progress || 0, max: 100,
+          status: g.status === 'completed' ? 'on-track' : g.status === 'overdue' ? 'overdue' : 'at-risk'
+        }))
+      }
+    })
+  }
+
+  // Meetings
+  if (ctx.meetings?.length > 0) {
+    cards.push({
+      type: 'list', title: 'Meetings',
+      data: {
+        items: ctx.meetings.slice(0, 8).map(m => ({
+          title: m.title,
+          subtitle: [m.organizer, fmtDate(m.date)].filter(Boolean).join(' · '),
+          status: m.status === 'completed' ? 'completed' : m.status === 'cancelled' ? 'overdue' : 'active'
+        }))
+      }
+    })
+  }
+
+  // Overview stats
+  if (ctx.overview || ctx.myPendingTasks != null || ctx.myTodayAttendance) {
+    const stats = []
+    if (ctx.overview) {
+      stats.push({ label: 'Present Today', value: String(ctx.overview.presentToday), trend: 'neutral' })
+      stats.push({ label: 'Total Employees', value: String(ctx.overview.totalEmployees), trend: 'neutral' })
+    }
+    if (ctx.myPendingTasks != null) {
+      stats.push({ label: 'Your Pending Tasks', value: String(ctx.myPendingTasks), trend: ctx.myPendingTasks > 5 ? 'up' : 'neutral' })
+    }
+    if (ctx.myTodayAttendance) {
+      stats.push({ label: 'Today Status', value: ctx.myTodayAttendance.status || 'Not checked in', trend: 'neutral' })
+    }
+    if (stats.length > 0) {
+      cards.push({ type: 'stat', title: 'Overview', data: { stats } })
+    }
+  }
+
+  return cards
+}
+
+export async function POST(request) {
+  try {
+    const { success, user, models, message: authMsg } = await getAuthAndModels(request, [
+      'Employee', 'Attendance', 'Leave', 'LeaveBalance', 'LeaveType',
+      'Task', 'TaskAssignee', 'Project', 'Announcement', 'Policy', 'Meeting',
+      'PerformanceGoal', 'Department', 'Designation', 'MiraTokenUsage'
+    ])
+
+    if (!success) {
+      return NextResponse.json({ success: false, message: authMsg }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const { message: userMessage, conversationHistory = [] } = body
+
+    if (!userMessage?.trim()) {
+      return NextResponse.json({ success: false, message: 'Message is required' }, { status: 400 })
+    }
+
+    // Check and deduct token
+    const tokenResult = await checkAndDeductToken(models.MiraTokenUsage, user._id)
+    if (!tokenResult.allowed) {
+      return NextResponse.json({
+        success: false,
+        message: 'You have used all your Mira tokens for this month. Tokens reset on the 1st of each month.',
+        tokens: tokenResult
+      }, { status: 429 })
+    }
+
+    // Fetch employee data for context
+    let employeeData = null
+    if (user.employeeId && models.Employee) {
+      employeeData = await models.Employee.findById(user.employeeId)
+        .populate('department designation reportingManager')
+        .lean()
+    }
+
+    const role = user.role || 'employee'
+
+    // Fetch relevant context data based on the query
+    const contextData = await fetchContextData(models, user, role, userMessage)
+
+    // Build conversation for AI
+    const systemPrompt = buildSystemPrompt(user, role, employeeData, contextData)
+
+    // Build full conversation prompt
+    let fullPrompt = ''
+    if (conversationHistory.length > 0) {
+      const recentHistory = conversationHistory.slice(-10) // Keep last 10 messages
+      fullPrompt = recentHistory.map(msg =>
+        `${msg.role === 'user' ? 'User' : 'MIRA'}: ${msg.content}`
+      ).join('\n\n')
+      fullPrompt += `\n\nUser: ${userMessage}`
+    } else {
+      fullPrompt = `User: ${userMessage}`
+    }
+
+    // Try Gemini with Google Search grounding first, fallback to standard generateContent
+    let aiResponse
+    try {
+      aiResponse = await generateContentWithSearch(fullPrompt, systemPrompt)
+    } catch {
+      aiResponse = await generateContent(fullPrompt, systemPrompt)
+    }
+
+    // Parse JSON response
+    let parsed
+    try {
+      // Extract JSON from potential markdown code blocks
+      const jsonMatch = aiResponse.match(/```(?:json)?\s*([\s\S]*?)```/)
+      const jsonStr = jsonMatch ? jsonMatch[1].trim() : aiResponse.trim()
+      parsed = JSON.parse(jsonStr)
+    } catch {
+      // If AI didn't return valid JSON, wrap it
+      parsed = {
+        message: aiResponse,
+        cards: [],
+        suggestedQuestions: []
+      }
+    }
+
+    // Auto-generate reliable data cards from context data (don't depend on AI formatting)
+    const dataCards = generateDataCards(contextData)
+    if (dataCards.length > 0) {
+      // Keep any AI-generated alert/info/action cards but replace data cards
+      const aiOnlyCards = (parsed.cards || []).filter(c => ['alert', 'action', 'info'].includes(c.type))
+      parsed.cards = [...dataCards, ...aiOnlyCards]
+    }
+
+    return NextResponse.json({
+      success: true,
+      response: parsed,
+      tokens: tokenResult
+    })
+
+  } catch (error) {
+    console.error('[Mira Chat] Error:', error)
+    return NextResponse.json(
+      { success: false, message: 'MIRA is temporarily unavailable. Please try again.' },
+      { status: 500 }
+    )
+  }
+}
