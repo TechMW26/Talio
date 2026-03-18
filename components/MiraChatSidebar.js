@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useMiraChat } from '@/contexts/MiraChatContext'
 import { useTheme } from '@/contexts/ThemeContext'
 import MiraSphere from '@/components/ui/MiraSphere'
+import ReactMarkdown from 'react-markdown'
 
 // ─── Card Renderers ─────────────────────────────────────────────────
 
@@ -225,7 +226,37 @@ function MessageBubble({ message, onSuggestionClick }) {
       <div className="flex-1 min-w-0">
         {/* Message text */}
         <div className="bg-default-50 dark:bg-default-100 rounded-2xl rounded-tl-md px-4 py-2.5 shadow-sm">
-          <p className="text-sm text-default-800 leading-relaxed whitespace-pre-wrap">{data.message}</p>
+          <div className="text-sm text-default-800 leading-relaxed mira-markdown">
+            <ReactMarkdown
+              components={{
+                code({ inline, className, children, ...props }) {
+                  const match = /language-(\w+)/.exec(className || '')
+                  if (!inline && (match || String(children).includes('\n'))) {
+                    return (
+                      <div className="relative my-2 rounded-lg overflow-hidden">
+                        {match && <div className="bg-default-200 dark:bg-default-300 px-3 py-1 text-[10px] font-semibold text-default-600 uppercase tracking-wider">{match[1]}</div>}
+                        <pre className="bg-default-100 dark:bg-default-200 p-3 overflow-x-auto text-xs leading-relaxed">
+                          <code className={className} {...props}>{children}</code>
+                        </pre>
+                      </div>
+                    )
+                  }
+                  return <code className="bg-default-200 dark:bg-default-300 px-1.5 py-0.5 rounded text-xs font-mono text-primary-600 dark:text-primary-400" {...props}>{children}</code>
+                },
+                p({ children }) { return <p className="mb-2 last:mb-0">{children}</p> },
+                ul({ children }) { return <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul> },
+                ol({ children }) { return <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol> },
+                h1({ children }) { return <h1 className="text-base font-bold mb-2 mt-3">{children}</h1> },
+                h2({ children }) { return <h2 className="text-sm font-bold mb-1.5 mt-2">{children}</h2> },
+                h3({ children }) { return <h3 className="text-sm font-semibold mb-1 mt-2">{children}</h3> },
+                strong({ children }) { return <strong className="font-semibold">{children}</strong> },
+                a({ href, children }) { return <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary-500 underline hover:text-primary-600">{children}</a> },
+                blockquote({ children }) { return <blockquote className="border-l-2 border-primary-300 pl-3 my-2 text-default-600 italic">{children}</blockquote> },
+              }}
+            >
+              {data.message}
+            </ReactMarkdown>
+          </div>
         </div>
 
         {/* Cards */}
@@ -326,10 +357,10 @@ export default function MiraChatSidebar() {
   }, [sendMessage])
 
   const welcomeSuggestions = [
-    "What's my attendance this week?",
     "Show my pending tasks",
-    "Any new announcements?",
+    "Write a Python script to sort a list",
     "Give me a dashboard overview",
+    "Explain how async/await works",
   ]
 
   return (
@@ -494,7 +525,7 @@ export default function MiraChatSidebar() {
                 <MiraSphere size={64} enableRandomPulse={true} />
               </div>
               <h3 className="text-lg font-bold text-default-800 mb-1">Hi! I&apos;m MIRA</h3>
-              <p className="text-sm text-default-500 mb-6">Your personal AI assistant for Talio. Ask me anything about your tasks, attendance, projects, and more.</p>
+              <p className="text-sm text-default-500 mb-6">Your all-rounder AI assistant. Ask me anything — code, research, math, writing, or your Talio data.</p>
               <div className="w-full space-y-2">
                 {welcomeSuggestions.map((q, i) => (
                   <button
