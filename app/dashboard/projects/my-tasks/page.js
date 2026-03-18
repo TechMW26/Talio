@@ -705,6 +705,47 @@ export default function MyTasksPage() {
       {/* Kanban View */}
       {viewMode === 'kanban' && (
         <div className="mb-6">
+          {/* Pending acceptance tasks above kanban for quick action */}
+          {pendingAcceptance.length > 0 && (
+            <div className="mb-6">
+              <h2 className="text-lg font-semibold text-default-800 mb-3 flex items-center gap-2">
+                <HiOutlineClock className="w-5 h-5 text-warning" />
+                Pending Acceptance ({pendingAcceptance.length})
+              </h2>
+              <div className="grid gap-4">
+                {pendingAcceptance.map(task => (
+                  <TaskCard
+                    key={task._id}
+                    task={task}
+                    onAccept={() => {
+                      setTaskForEta(task)
+                      if (task.subtasks && task.subtasks.length > 0) {
+                        const initialEtas = {}
+                        task.subtasks.forEach(st => {
+                          initialEtas[st._id] = {
+                            days: st.estimatedDays || '',
+                            hours: st.estimatedHours || ''
+                          }
+                        })
+                        setSubtaskEtas(initialEtas)
+                      } else {
+                        setSubtaskEtas({})
+                      }
+                      setShowEtaModal(true)
+                    }}
+                    onReject={() => { setSelectedTask(task); setShowRejectModal(true) }}
+                    onStatusChange={handleUpdateStatus}
+                    onViewProject={task.project?._id ? () => router.push(`/dashboard/projects/${task.project._id}`) : undefined}
+                    onDelete={() => { setTaskToDelete(task); setShowDeleteModal(true) }}
+                    respondingTo={respondingTo}
+                    isPendingAcceptance
+                    currentEmployeeId={currentEmployeeId}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
           <KanbanBoard
             tasks={filteredTasks.filter(t => t.assignmentStatus !== 'pending')}
             onTaskClick={(task) => setSelectedTask(task)}
@@ -713,22 +754,6 @@ export default function MyTasksPage() {
             enableDragDrop={true}
             onProjectClick={(projectId) => router.push(`/dashboard/projects/${projectId}`)}
           />
-
-          {/* Show pending acceptance tasks above kanban for quick action */}
-          {pendingAcceptance.length > 0 && (
-            <div className="mt-6 p-4 bg-warning-50 border border-warning-200 rounded-lg">
-              <h3 className="text-sm font-medium text-warning-700 mb-2 flex items-center gap-2">
-                <HiOutlineClock className="w-4 h-4" />
-                {pendingAcceptance.length} task(s) pending your acceptance
-              </h3>
-              <button
-                onClick={() => setViewMode('list')}
-                className="text-sm text-warning-600 hover:text-warning-800 underline"
-              >
-                Switch to list view to accept
-              </button>
-            </div>
-          )}
         </div>
       )}
 
