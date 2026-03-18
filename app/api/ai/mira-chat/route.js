@@ -620,22 +620,65 @@ export async function POST(request) {
     try {
       aiResponse = await generateContentWithSearch(fullPrompt, systemPrompt)
     } catch {
-      aiResponse = await generateContent(fullPrompt, systemPrompt)
+      // Fallback: direct Gemini call with JSON response mode
+      try {
+        const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY
+        const models = ['gemini-2.5-flash', 'gemini-2.5-pro', 'gemini-2.0-flash']
+        let success = false
+        for (const model of models) {
+          if (success) break
+          try {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+            const res = await fetch(url, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: `${systemPrompt}\n\n${fullPrompt}` }] }],
+                generationConfig: { temperature: 0.7, responseMimeType: 'application/json' }
+              })
+            })
+            if (res.ok) {
+              const data = await res.json()
+              aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+              success = true
+            }
+          } catch { continue }
+        }
+        if (!success) aiResponse = await generateContent(fullPrompt, systemPrompt)
+      } catch {
+        aiResponse = await generateContent(fullPrompt, systemPrompt)
+      }
     }
 
-    // Parse JSON response
+    // Parse JSON response — robust extraction
     let parsed
     try {
-      // Extract JSON from potential markdown code blocks
-      const jsonMatch = aiResponse.match(/```(?:json)?\s*([\s\S]*?)```/)
-      const jsonStr = jsonMatch ? jsonMatch[1].trim() : aiResponse.trim()
+      let jsonStr = aiResponse.trim()
+      // Strip outermost markdown code fence if present (greedy to match the last ```)
+      const fenceMatch = jsonStr.match(/^```(?:json)?\s*\n?([\s\S]*)\n?\s*```\s*$/)
+      if (fenceMatch) {
+        jsonStr = fenceMatch[1].trim()
+      }
+      // Try parsing directly
       parsed = JSON.parse(jsonStr)
     } catch {
-      // If AI didn't return valid JSON, wrap it
-      parsed = {
-        message: aiResponse,
-        cards: [],
-        suggestedQuestions: []
+      // Second attempt: find the first { ... } that parses as valid JSON containing "message"
+      try {
+        const braceStart = aiResponse.indexOf('{')
+        const braceEnd = aiResponse.lastIndexOf('}')
+        if (braceStart !== -1 && braceEnd > braceStart) {
+          const candidate = aiResponse.substring(braceStart, braceEnd + 1)
+          parsed = JSON.parse(candidate)
+        }
+      } catch { /* ignore */ }
+
+      // If still not parsed, wrap raw text
+      if (!parsed) {
+        parsed = {
+          message: aiResponse.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?\s*```\s*$/, ''),
+          cards: [],
+          suggestedQuestions: []
+        }
       }
     }
 

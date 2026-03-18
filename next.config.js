@@ -8,6 +8,9 @@ const nextConfig = {
 
   reactStrictMode: false,
 
+  // Transpile ESM packages
+  transpilePackages: ['react-markdown'],
+
   // Increase body size limit for file uploads (10MB)
   experimental: {
     serverActions: {
