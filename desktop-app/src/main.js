@@ -43,7 +43,7 @@ if (forceDisableGPU) {
   if (process.platform === 'win32') {
     // Use D3D11 on Windows for best compatibility
     app.commandLine.appendSwitch('use-angle', 'd3d11');
-    // DO NOT disable direct composition — it breaks input handling on modern Windows
+    // DO NOT disable direct composition - it breaks input handling on modern Windows
   } else if (process.platform === 'darwin') {
     // macOS-specific: use Metal for best performance
     app.commandLine.appendSwitch('enable-features', 'Metal');
@@ -71,7 +71,7 @@ const APP_URL = 'https://app.talio.in';
 const LOADER_TIMEOUT_MS = 30000; // 30 seconds max loading time
 const RETRY_DELAY_MS = 5000;
 const MAX_LOAD_RETRIES = 3;
-const MAX_CRASH_RECOVERY = 3; // Max crash recovery attempts
+const MAX_CRASH_RECOVERY = 10; // Max crash recovery attempts (generous to survive network flaps)
 const MIN_VERSION_CHECK_URL = APP_URL + '/api/desktop/min-version';
 const UPDATE_CHECK_INTERVAL = 60 * 60 * 1000; // Check for updates every hour
 
@@ -90,7 +90,8 @@ let windowRecreateTimer = null;
 let isUpdating = false;
 let updateCheckTimer = null;
 let updateCheckDialog = null;
-let inAppUpdateMode = false; // When true, don't navigate to update.html — send IPC status instead
+let inAppUpdateMode = false; // When true, don't navigate to update.html - send IPC status instead
+let isLoadingApp = false; // Prevents concurrent loadApp() calls
 
 // Persistent store
 const store = new Store({ name: 'app-data' });
@@ -191,7 +192,7 @@ async function requestPermissions() {
       logger.log('info', 'Main', 'Screen recording permission already granted');
     }
 
-    // macOS notification permission — trigger via test notification
+    // macOS notification permission - trigger via test notification
     // macOS shows a system permission dialog on the first Notification()
     try {
       var testNotif = new Notification({
@@ -318,7 +319,7 @@ function createWindow() {
   mainWindow.webContents.on('render-process-gone', function (event, details) {
     // Don't attempt recovery during update installation
     if (isUpdating) {
-      logger.log('info', 'Main', 'Renderer crash during update — not recovering (update in progress)');
+      logger.log('info', 'Main', 'Renderer crash during update - not recovering (update in progress)');
       return;
     }
 
@@ -334,10 +335,11 @@ function createWindow() {
 
     if (crashCount <= MAX_CRASH_RECOVERY && mainWindow && !mainWindow.isDestroyed()) {
       logger.log('warn', 'Main', 'Attempting crash recovery (' + crashCount + '/' + MAX_CRASH_RECOVERY + ')');
-      // Wait a bit before reloading to let things settle
+      // Wait a bit before showing offline page to let things settle
+      // Show offline page instead of loading APP_URL directly — prevents cascade when offline
       setTimeout(function () {
         if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.loadURL(APP_URL);
+          showOfflinePage('crash', null, 'Renderer crashed: ' + details.reason);
         }
       }, 2000);
     } else {
@@ -405,7 +407,7 @@ function injectTitleBarAdaptations() {
 
   mainWindow.webContents.insertCSS(css).catch(function () { });
 
-  // Inject theme color detection — watches for dark mode / theme changes and syncs title bar
+  // Inject theme color detection - watches for dark mode / theme changes and syncs title bar
   var themeScript =
     '(function() {\n' +
     '  function syncTitleBar() {\n' +
@@ -483,6 +485,16 @@ function showLoader() {
  * Load the main application
  */
 function loadApp() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    logger.log('warn', 'Main', 'loadApp skipped - window not available');
+    isLoadingApp = false;
+    return;
+  }
+  if (isLoadingApp) {
+    logger.log('info', 'Main', 'loadApp debounced - already loading');
+    return;
+  }
+  isLoadingApp = true;
   loadRetries++;
   logger.log('info', 'Main', 'Loading app (attempt ' + loadRetries + '/' + MAX_LOAD_RETRIES + ')');
 
@@ -492,20 +504,29 @@ function loadApp() {
     handleLoadTimeout();
   }, LOADER_TIMEOUT_MS);
 
-  mainWindow.loadURL(APP_URL).then(function () {
-    clearTimeout(loadTimeout);
-    loadRetries = 0;
-    logger.log('info', 'Main', 'App loaded successfully');
-  }).catch(function (error) {
-    logger.log('error', 'Main', 'Load failed: ' + error.message);
-    handleLoadError(error);
-  });
+  try {
+    mainWindow.loadURL(APP_URL).then(function () {
+      clearTimeout(loadTimeout);
+      loadRetries = 0;
+      isLoadingApp = false;
+      logger.log('info', 'Main', 'App loaded successfully');
+    }).catch(function (error) {
+      isLoadingApp = false;
+      logger.log('error', 'Main', 'Load failed: ' + error.message);
+      handleLoadError(error);
+    });
+  } catch (e) {
+    isLoadingApp = false;
+    logger.log('error', 'Main', 'loadApp exception: ' + e.message);
+    showOfflinePage('offline', null, e.message);
+  }
 }
 
 /**
  * Handle load timeout
  */
 function handleLoadTimeout() {
+  isLoadingApp = false;
   logger.log('warn', 'Main', 'Load timeout reached');
   showOfflinePage('timeout', null, 'Connection timed out');
 }
@@ -515,6 +536,7 @@ function handleLoadTimeout() {
  */
 function handleLoadError(error) {
   clearTimeout(loadTimeout);
+  isLoadingApp = false;
   logger.log('error', 'Main', 'Load error: ' + error.message);
 
   // Determine error type from error message/code
@@ -550,17 +572,21 @@ function handleLoadError(error) {
 function showOfflinePage(errorType, errorCode, errorDesc) {
   if (!mainWindow || mainWindow.isDestroyed()) return;
 
+  isLoadingApp = false;
+  clearTimeout(loadTimeout);
+
   var offlinePath = path.join(__dirname, 'offline.html');
-  var params = new URLSearchParams();
-
-  if (errorType) params.append('type', errorType);
-  if (errorCode) params.append('code', errorCode);
-  if (errorDesc) params.append('desc', encodeURIComponent(errorDesc));
-
-  var offlineUrl = 'file://' + offlinePath + '?' + params.toString();
+  var query = {};
+  if (errorType) query.type = errorType;
+  if (errorCode) query.code = String(errorCode);
+  if (errorDesc) query.desc = encodeURIComponent(errorDesc);
 
   logger.log('info', 'Main', 'Showing offline page: type=' + errorType + ', code=' + errorCode);
-  mainWindow.loadURL(offlineUrl);
+
+  // Use loadFile instead of loadURL for local files — more reliable and avoids file:// protocol issues
+  mainWindow.loadFile(offlinePath, { query: query }).catch(function (e) {
+    logger.log('error', 'Main', 'Failed to load offline page: ' + e.message);
+  });
 }
 
 /**
@@ -579,7 +605,7 @@ function setupWindowEvents() {
   mainWindow.on('close', function (event) {
     // CRITICAL: Let the window close during update installation
     if (isUpdating) {
-      logger.log('info', 'Main', 'Window close allowed — update installing');
+      logger.log('info', 'Main', 'Window close allowed - update installing');
       return; // Don't prevent default
     }
 
@@ -634,6 +660,11 @@ function setupWindowEvents() {
   // Handle page load failures - show offline page for network/server errors
   mainWindow.webContents.on('did-fail-load', function (event, errorCode, errorDescription, validatedURL, isMainFrame) {
     if (isMainFrame) {
+      // If loadApp() is handling this failure via its catch handler, skip to avoid double-navigation
+      if (isLoadingApp) {
+        logger.log('info', 'Main', 'did-fail-load while loadApp active — deferring to loadApp handler');
+        return;
+      }
       logger.log('error', 'Main', 'Page failed to load: ' + errorDescription + ' (' + errorCode + ') - ' + validatedURL);
 
       // Map error codes to error types
@@ -726,7 +757,7 @@ function setupWindowEvents() {
 function scheduleWindowRecreation() {
   // CRITICAL: Never recreate while an update is being installed
   if (isUpdating) {
-    logger.log('info', 'Main', 'Watchdog: Skipping window recreation — update in progress');
+    logger.log('info', 'Main', 'Watchdog: Skipping window recreation - update in progress');
     return;
   }
 
@@ -737,7 +768,7 @@ function scheduleWindowRecreation() {
   windowRecreateTimer = setTimeout(function () {
     // Double-check: update may have started while timer was pending
     if (isUpdating) {
-      logger.log('info', 'Main', 'Watchdog: Aborting recreation — update started during delay');
+      logger.log('info', 'Main', 'Watchdog: Aborting recreation - update started during delay');
       return;
     }
     if (!mainWindow || mainWindow.isDestroyed()) {
@@ -997,7 +1028,7 @@ function setupIPCHandlers() {
 
   // App info (full details for App Info page)
   ipcMain.handle('get-app-info', function () {
-    // Detect native architecture — on Apple Silicon running x64 under Rosetta, report arm64
+    // Detect native architecture - on Apple Silicon running x64 under Rosetta, report arm64
     const nativeArch = (process.platform === 'darwin' && process.arch === 'x64' && app.runningUnderARM64Translation)
       ? 'arm64'
       : process.arch;
@@ -1333,7 +1364,7 @@ function setupIPCHandlers() {
   ipcMain.handle('check-for-update', function (event, options) {
     logger.log('info', 'Updater', 'Manual update check requested');
     var silent = options && options.silent;
-    // When called from App Info page (silent), stay in-app — don't navigate to update.html
+    // When called from App Info page (silent), stay in-app - don't navigate to update.html
     inAppUpdateMode = !!silent;
     checkForUpdates(silent);
     return { success: true };
@@ -1633,7 +1664,7 @@ function setupAutoUpdater() {
   autoUpdater.allowDowngrade = false;
 
   // Detailed provider config logging
-  logger.log('info', 'Updater', 'Auto-updater configured — provider: GitHub Releases, version: ' + app.getVersion() + ', platform: ' + process.platform + ', arch: ' + process.arch);
+  logger.log('info', 'Updater', 'Auto-updater configured - provider: GitHub Releases, version: ' + app.getVersion() + ', platform: ' + process.platform + ', arch: ' + process.arch);
 
   autoUpdater.on('checking-for-update', function () {
     logger.log('info', 'Updater', '[LIFECYCLE] Checking for update...');
@@ -1642,7 +1673,7 @@ function setupAutoUpdater() {
 
   autoUpdater.on('update-available', function (info) {
     logger.log('info', 'Updater', '[LIFECYCLE] Update available: v' + info.version + ' (releaseDate: ' + (info.releaseDate || 'unknown') + ', files: ' + JSON.stringify((info.files || []).map(function (f) { return f.url; })) + ')');
-    // Dismiss the "checking" dialog — update screen will take over
+    // Dismiss the "checking" dialog - update screen will take over
     dismissUpdateCheckDialog();
     sendUpdateStatus('available', { version: info.version });
 
@@ -1786,7 +1817,7 @@ function sendUpdateStatus(status, data) {
  */
 function checkForUpdates(silent) {
   if (isUpdating) {
-    logger.log('info', 'Updater', 'checkForUpdates skipped — update already in progress');
+    logger.log('info', 'Updater', 'checkForUpdates skipped - update already in progress');
     return;
   }
 
@@ -1859,11 +1890,11 @@ function dismissUpdateCheckDialog() {
 }
 
 /**
- * Handle update available — show update screen and start download
+ * Handle update available - show update screen and start download
  */
 function handleUpdateAvailable(info) {
   isUpdating = true;
-  logger.log('info', 'Updater', 'handleUpdateAvailable — loading update screen for v' + info.version);
+  logger.log('info', 'Updater', 'handleUpdateAvailable - loading update screen for v' + info.version);
 
   // Show update page
   if (mainWindow && !mainWindow.isDestroyed()) {
@@ -1937,11 +1968,11 @@ async function checkForceUpdate() {
     if (compareVersions(currentVersion, minVersion) < 0) {
       logger.log('warn', 'Updater', 'App version is below minimum! Triggering auto-update before blocking UI.');
 
-      // Try to start the auto-update FIRST — only block the UI if we can't update silently
+      // Try to start the auto-update FIRST - only block the UI if we can't update silently
       try {
         var result = await autoUpdater.checkForUpdates();
         if (result && result.updateInfo && compareVersions(result.updateInfo.version, currentVersion) > 0) {
-          logger.log('info', 'Updater', 'Update available (v' + result.updateInfo.version + ') — update screen will take over');
+          logger.log('info', 'Updater', 'Update available (v' + result.updateInfo.version + ') - update screen will take over');
           // handleUpdateAvailable is triggered by the 'update-available' event
           // Don't show the blocking screen since the update UI handles it
           return true;
@@ -1951,7 +1982,7 @@ async function checkForceUpdate() {
       }
 
       // Only show the blocking screen if auto-update couldn't start
-      logger.log('warn', 'Updater', 'No update found or update check failed — showing blocking screen');
+      logger.log('warn', 'Updater', 'No update found or update check failed - showing blocking screen');
       showUpdateRequiredScreen(currentVersion, minVersion, data.message);
       return true;
     }
@@ -2568,7 +2599,7 @@ app.whenReady().then(async function () {
 
   var isCrashLoop = startHistory.length >= 5;
   if (isCrashLoop) {
-    logger.log('error', 'Main', 'CRASH LOOP DETECTED — ' + startHistory.length + ' starts in 60s. Entering safe mode: skipping auto-update and min-version enforcement.');
+    logger.log('error', 'Main', 'CRASH LOOP DETECTED - ' + startHistory.length + ' starts in 60s. Entering safe mode: skipping auto-update and min-version enforcement.');
   }
 
   // Setup session permissions for screen sharing
@@ -2584,14 +2615,14 @@ app.whenReady().then(async function () {
   // Request permissions on macOS (camera, mic, screen recording)
   await requestPermissions();
 
-  // Setup auto-updater (registers event listeners — safe even in crash loop)
+  // Setup auto-updater (registers event listeners - safe even in crash loop)
   setupAutoUpdater();
 
   if (!isCrashLoop) {
     // Check for forced updates (min version)
     var isForced = await checkForceUpdate();
     if (!isForced) {
-      // Check for updates on fresh launch — SILENT so no dialog blocks startup
+      // Check for updates on fresh launch - SILENT so no dialog blocks startup
       setTimeout(function () { checkForUpdates(true); }, 5000);
     }
   } else {
@@ -2630,7 +2661,7 @@ app.whenReady().then(async function () {
 app.on('window-all-closed', function () {
   // If an update is installing, let the app quit cleanly
   if (isUpdating) {
-    logger.log('info', 'Main', 'All windows closed during update — allowing quit');
+    logger.log('info', 'Main', 'All windows closed during update - allowing quit');
     return;
   }
   // FORCE PERSISTENT: Never quit when windows are closed
@@ -2642,7 +2673,7 @@ app.on('window-all-closed', function () {
 app.on('before-quit', function (event) {
   // Always allow quit when an update is installing
   if (isUpdating) {
-    logger.log('info', 'Main', 'Allowing quit — update is installing');
+    logger.log('info', 'Main', 'Allowing quit - update is installing');
     isQuitting = true;
     screenshotService.stop();
     socketHandler.disconnect();
@@ -2687,4 +2718,14 @@ process.on('uncaughtException', function (error) {
 process.on('unhandledRejection', function (reason) {
   logger.log('error', 'Main', 'Unhandled rejection: ' + reason);
   // Don't crash - just log
+});
+
+// Handle child process crashes (GPU, utility, etc.) — prevents app from dying on GPU crash
+app.on('child-process-gone', function (event, details) {
+  logger.log('error', 'Main', 'Child process gone: type=' + details.type + ', reason=' + details.reason + ', name=' + (details.name || '') + ', exitCode=' + details.exitCode);
+  // If the GPU process crashed, the renderer may follow — don't exit
+  if (details.type === 'GPU') {
+    logger.log('warn', 'Main', 'GPU process crashed — renderer may recover automatically');
+  }
+  // Never exit the app because of a child process crash
 });

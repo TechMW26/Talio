@@ -7,9 +7,9 @@ const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
 const port = process.env.PORT || 3000;
 
-// Minimum desktop app version — when bumped, all connected desktop clients
+// Minimum desktop app version - when bumped, all connected desktop clients
 // running an older version will be told to check for updates automatically.
-const LATEST_DESKTOP_VERSION = '4.8.1';
+const LATEST_DESKTOP_VERSION = '4.9.0';
 
 function compareVersions(a, b) {
   const pa = a.split('.').map(Number);

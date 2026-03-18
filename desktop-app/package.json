@@ -1,6 +1,6 @@
 {
   "name": "talio-desktop",
-  "version": "4.8.1",
+  "version": "4.9.0",
   "description": "Talio HRMS Desktop - Productivity Monitoring with Screen Capture",
   "main": "src/main.js",
   "author": "MW FutureTech <support@talio.in>",
@@ -54,6 +54,7 @@
     ],
     "mac": {
       "category": "public.app-category.productivity",
+      "identity": null,
       "target": [
         {
           "target": "dmg",
@@ -97,6 +98,9 @@
       "publisherName": "MW FutureTech",
       "legalTrademarks": "Talio is a registered trademark of MW FutureTech.",
       "requestedExecutionLevel": "asInvoker",
+      "signingHashAlgorithms": ["sha256"],
+      "signDlls": true,
+      "verifyUpdateCodeSignature": false,
       "artifactName": "${productName}.Setup.${version}.${ext}"
     },
     "nsis": {
