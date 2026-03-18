@@ -158,6 +158,7 @@ async function fetchContextData(models, user, role, query) {
 
   const isAdmin = ['admin', 'hr'].includes(role)
   const isManager = ['manager', 'department_head', 'department_manager', 'team_leader'].includes(role)
+  const isPersonalQuery = /\b(my|mine|assigned to me|i have|i am|my own)\b/i.test(queryLower)
 
   try {
     // Attendance queries
@@ -186,7 +187,8 @@ async function fetchContextData(models, user, role, query) {
 
     // Task queries — assignments stored in TaskAssignee join table
     if (/task|todo|assign|work|backlog|deadline|overdue|pending task/i.test(queryLower)) {
-      if (isAdmin && models.Task) {
+      if (isAdmin && !isPersonalQuery && models.Task) {
+        // Admin asking about all tasks (not personal)
         const tasks = await models.Task.find({})
           .populate('createdBy', 'firstName lastName')
           .populate('project', 'name')
@@ -203,18 +205,18 @@ async function fetchContextData(models, user, role, query) {
             assigneeMap[a.task.toString()].push(name)
           }
           context.tasks = tasks.map(t => ({
-            title: t.title, status: t.status, priority: t.priority,
+            id: t._id.toString(), title: t.title, status: t.status, priority: t.priority,
             assignees: (assigneeMap[t._id.toString()] || []).join(', ') || 'Unassigned',
-            project: t.project?.name, dueDate: t.dueDate, progress: t.progressPercentage
+            project: t.project?.name, projectId: t.project?._id?.toString(), dueDate: t.dueDate, progress: t.progressPercentage
           }))
         } else {
           context.tasks = tasks.map(t => ({
-            title: t.title, status: t.status, priority: t.priority,
-            project: t.project?.name, dueDate: t.dueDate, progress: t.progressPercentage
+            id: t._id.toString(), title: t.title, status: t.status, priority: t.priority,
+            project: t.project?.name, projectId: t.project?._id?.toString(), dueDate: t.dueDate, progress: t.progressPercentage
           }))
         }
       } else if (models.Task && models.TaskAssignee) {
-        // Find tasks assigned to this user via TaskAssignee join table
+        // Personal tasks — for any role (including admin when asking "my tasks")
         const myAssignments = await models.TaskAssignee.find({
           user: user.employeeId,
           assignmentStatus: { $in: ['pending', 'accepted'] }
@@ -225,8 +227,8 @@ async function fetchContextData(models, user, role, query) {
           $or: [{ _id: { $in: myTaskIds } }, { createdBy: user.employeeId }]
         }).populate('project', 'name').sort({ updatedAt: -1 }).lean().limit(20)
         context.myTasks = myTasks.map(t => ({
-          title: t.title, status: t.status, priority: t.priority,
-          project: t.project?.name, dueDate: t.dueDate, progress: t.progressPercentage
+          id: t._id.toString(), title: t.title, status: t.status, priority: t.priority,
+          project: t.project?.name, projectId: t.project?._id?.toString(), dueDate: t.dueDate, progress: t.progressPercentage
         }))
       }
     }
@@ -377,7 +379,9 @@ function generateDataCards(ctx) {
     return 'pending'
   }
 
-  // Tasks (admin view)
+  const taskLink = (t) => t.projectId ? `/dashboard/projects/${t.projectId}?task=${t.id}` : '/dashboard/projects/my-tasks'
+
+  // Tasks (admin view — all company tasks)
   if (ctx.tasks?.length > 0) {
     cards.push({
       type: 'list', title: 'Tasks',
@@ -386,13 +390,13 @@ function generateDataCards(ctx) {
           title: t.title,
           subtitle: [t.priority, t.project, t.assignees !== 'Unassigned' ? t.assignees : null, fmtDate(t.dueDate)].filter(Boolean).join(' · '),
           status: mapTaskStatus(t.status),
-          link: '/dashboard/todo'
+          link: taskLink(t)
         }))
       }
     })
   }
 
-  // My tasks (employee view)
+  // My tasks (personal view)
   if (ctx.myTasks?.length > 0) {
     cards.push({
       type: 'list', title: 'Your Tasks',
@@ -401,7 +405,7 @@ function generateDataCards(ctx) {
           title: t.title,
           subtitle: [t.priority, t.project, fmtDate(t.dueDate)].filter(Boolean).join(' · '),
           status: mapTaskStatus(t.status),
-          link: '/dashboard/todo'
+          link: taskLink(t)
         }))
       }
     })
