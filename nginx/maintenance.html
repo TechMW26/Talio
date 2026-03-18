@@ -5,88 +5,702 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Talio HRMS — Maintenance</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,300;1,400&display=swap"
+        rel="stylesheet">
     <style>
-        * {
+        :root {
+            --blue: #0066FF;
+            --blue-dim: #0044bb;
+            --cyan: #00d4ff;
+            --bg: #060b14;
+            --surface: #0d1625;
+            --border: rgba(0, 102, 255, 0.18);
+            --text: #e2eaf7;
+            --muted: #5a7090;
+            --glow: rgba(0, 102, 255, 0.35);
+        }
+
+        *,
+        *::before,
+        *::after {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, sans-serif;
-            background: #f0f4f8;
-            color: #334155;
+            font-family: 'Montserrat', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            min-height: 100vh;
-            padding: 1rem;
+            overflow: hidden;
+            position: relative;
         }
 
+        /* ── Animated mesh background ── */
+        .bg-mesh {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            background:
+                radial-gradient(ellipse 80% 60% at 10% 10%, rgba(0, 102, 255, 0.12) 0%, transparent 60%),
+                radial-gradient(ellipse 60% 50% at 90% 80%, rgba(0, 212, 255, 0.08) 0%, transparent 55%),
+                radial-gradient(ellipse 40% 40% at 50% 50%, rgba(0, 102, 255, 0.04) 0%, transparent 70%),
+                var(--bg);
+        }
+
+        /* ── Grid overlay ── */
+        .bg-grid {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            background-image:
+                linear-gradient(rgba(0, 102, 255, 0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 102, 255, 0.04) 1px, transparent 1px);
+            background-size: 48px 48px;
+            mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 0%, transparent 100%);
+        }
+
+        /* ── Animated orbs ── */
+        .orb {
+            position: fixed;
+            z-index: 0;
+            border-radius: 50%;
+            filter: blur(80px);
+            pointer-events: none;
+            animation: drift 18s ease-in-out infinite alternate;
+        }
+
+        .orb-1 {
+            width: 500px;
+            height: 500px;
+            background: rgba(0, 102, 255, 0.10);
+            top: -120px;
+            left: -100px;
+            animation-duration: 20s;
+        }
+
+        .orb-2 {
+            width: 380px;
+            height: 380px;
+            background: rgba(0, 212, 255, 0.07);
+            bottom: -80px;
+            right: -80px;
+            animation-duration: 25s;
+            animation-delay: -8s;
+        }
+
+        .orb-3 {
+            width: 260px;
+            height: 260px;
+            background: rgba(0, 102, 255, 0.08);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            animation-duration: 15s;
+            animation-delay: -4s;
+        }
+
+        @keyframes drift {
+            from {
+                transform: translate(0, 0) scale(1);
+            }
+
+            to {
+                transform: translate(40px, 30px) scale(1.08);
+            }
+        }
+
+        /* ── Scanline effect ── */
+        .scanlines {
+            position: fixed;
+            inset: 0;
+            z-index: 1;
+            pointer-events: none;
+            background: repeating-linear-gradient(0deg,
+                    transparent,
+                    transparent 2px,
+                    rgba(0, 0, 0, 0.03) 2px,
+                    rgba(0, 0, 0, 0.03) 4px);
+        }
+
+        /* ── Main card ── */
         .card {
-            background: #fff;
-            border-radius: 16px;
-            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
-            padding: 3rem 2.5rem;
-            max-width: 480px;
-            text-align: center;
+            position: relative;
+            z-index: 10;
+            width: min(520px, calc(100vw - 2rem));
+            background: rgba(13, 22, 37, 0.80);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 3rem 2.5rem 2.5rem;
+            backdrop-filter: blur(24px);
+            box-shadow:
+                0 0 0 1px rgba(0, 102, 255, 0.08),
+                0 32px 80px rgba(0, 0, 0, 0.55),
+                0 0 120px rgba(0, 102, 255, 0.06) inset;
+            animation: cardIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) both;
         }
 
-        .icon {
-            font-size: 3rem;
-            margin-bottom: 1rem;
+        @keyframes cardIn {
+            from {
+                opacity: 0;
+                transform: translateY(32px) scale(0.97);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
         }
 
+        /* ── Top accent bar ── */
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 10%;
+            right: 10%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--blue), var(--cyan), var(--blue), transparent);
+            border-radius: 0 0 4px 4px;
+            animation: shimmer 3s ease-in-out infinite;
+        }
+
+        @keyframes shimmer {
+
+            0%,
+            100% {
+                opacity: 0.6;
+            }
+
+            50% {
+                opacity: 1;
+            }
+        }
+
+        /* ── Logo row ── */
+        .logo-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 2.5rem;
+            animation: fadeUp 0.7s 0.1s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        .logo-icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--blue), var(--cyan));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            box-shadow: 0 0 20px rgba(0, 102, 255, 0.4);
+        }
+
+        .logo-text {
+            font-family: 'Montserrat', sans-serif;
+            letter-spacing: 0.04em;
+            background: linear-gradient(135deg, #fff 40%, var(--cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo-badge {
+            margin-left: auto;
+            font-size: 0.68rem;
+            font-weight: 500;
+            letter-spacing: 0.08em;
+            color: var(--cyan);
+            background: rgba(0, 212, 255, 0.08);
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            padding: 3px 10px;
+            border-radius: 20px;
+            text-transform: uppercase;
+        }
+
+        /* ── Status indicator ── */
+        .status-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 1.75rem;
+            animation: fadeUp 0.7s 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #f59e0b;
+            box-shadow: 0 0 12px rgba(245, 158, 11, 0.7);
+            animation: pulse-amber 2s ease-in-out infinite;
+            flex-shrink: 0;
+        }
+
+        @keyframes pulse-amber {
+
+            0%,
+            100% {
+                box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+            }
+
+            50% {
+                box-shadow: 0 0 20px rgba(245, 158, 11, 0.9);
+            }
+        }
+
+        .status-label {
+            font-size: 0.78rem;
+            font-weight: 500;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: #f59e0b;
+        }
+
+        .status-divider {
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(90deg, rgba(245, 158, 11, 0.2), transparent);
+        }
+
+        /* ── Gear icon ── */
+        .gear-wrap {
+            margin-bottom: 1.5rem;
+            animation: fadeUp 0.7s 0.25s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        .gear-ring {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            background: rgba(0, 102, 255, 0.07);
+            border: 1px solid rgba(0, 102, 255, 0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            position: relative;
+        }
+
+        .gear-ring::before {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border-radius: 50%;
+            border: 1px solid transparent;
+            border-top-color: var(--blue);
+            border-right-color: rgba(0, 102, 255, 0.3);
+            animation: spin 3s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* ── Headings ── */
         h1 {
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-            color: #0f172a;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 800;
+            line-height: 1.15;
+            margin-bottom: 0.75rem;
+            background: linear-gradient(135deg, #ffffff 30%, #a8c4f0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: fadeUp 0.7s 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
         }
 
         p {
-            font-size: 1rem;
-            line-height: 1.6;
-            color: #64748b;
-            margin-bottom: 1.5rem;
+            font-size: 0.95rem;
+            line-height: 1.7;
+            color: var(--muted);
+            margin-bottom: 2rem;
+            font-weight: 300;
+            animation: fadeUp 0.7s 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
         }
 
-        .retry-btn {
-            display: inline-block;
-            padding: 0.65rem 1.75rem;
-            background: #0066FF;
-            color: #fff;
+        p strong {
+            color: #8ab4f8;
+            font-weight: 400;
+        }
+
+        /* ── Progress bar ── */
+        .progress-wrap {
+            margin-bottom: 2rem;
+            animation: fadeUp 0.7s 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        .progress-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.73rem;
+            color: var(--muted);
+            margin-bottom: 8px;
+            letter-spacing: 0.03em;
+        }
+
+        .progress-meta span:last-child {
+            color: var(--cyan);
+        }
+
+        .progress-track {
+            height: 4px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--blue), var(--cyan));
+            border-radius: 4px;
+            width: 0%;
+            animation: fillBar 4s 1s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+            box-shadow: 0 0 12px rgba(0, 212, 255, 0.6);
+        }
+
+        @keyframes fillBar {
+            to {
+                width: 72%;
+            }
+        }
+
+        /* ── Info pills ── */
+        .pills {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 2rem;
+            animation: fadeUp 0.7s 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        .pill {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.75rem;
+            color: var(--muted);
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            padding: 6px 12px;
+            border-radius: 20px;
+        }
+
+        .pill-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+        }
+
+        .pill-dot.green {
+            background: #22c55e;
+            box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+        }
+
+        .pill-dot.amber {
+            background: #f59e0b;
+            box-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+        }
+
+        .pill-dot.blue {
+            background: var(--blue);
+            box-shadow: 0 0 8px rgba(0, 102, 255, 0.6);
+        }
+
+        /* ── Action row ── */
+        .actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            animation: fadeUp 0.7s 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        .btn-primary {
+            flex: 1;
+            min-width: 140px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 0.75rem 1.5rem;
+            background: var(--blue);
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 500;
             border: none;
-            border-radius: 8px;
-            font-size: 0.95rem;
-            font-weight: 600;
+            border-radius: 12px;
             cursor: pointer;
             text-decoration: none;
+            position: relative;
+            overflow: hidden;
+            transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+            box-shadow: 0 0 24px rgba(0, 102, 255, 0.35);
         }
 
-        .retry-btn:hover {
-            background: #0052cc;
+        .btn-primary::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.12), transparent);
         }
 
-        .meta {
-            margin-top: 1.5rem;
-            font-size: 0.8rem;
-            color: #94a3b8;
+        .btn-primary:hover {
+            background: var(--blue-dim);
+            transform: translateY(-1px);
+            box-shadow: 0 0 32px rgba(0, 102, 255, 0.5);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            flex: 1;
+            min-width: 140px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 0.75rem 1.5rem;
+            background: transparent;
+            font-family: 'Montserrat', sans-serif;
+            font-size: 0.9rem;
+            font-weight: 400;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: border-color 0.2s, color 0.2s, transform 0.15s;
+        }
+
+        .btn-secondary:hover {
+            border-color: rgba(0, 102, 255, 0.3);
+            color: #8ab4f8;
+            transform: translateY(-1px);
+        }
+
+        /* ── Footer ── */
+        .footer {
+            margin-top: 2rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            flex-wrap: wrap;
+            animation: fadeUp 0.7s 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        .footer-left {
+            font-size: 0.73rem;
+            color: var(--muted);
+            line-height: 1.5;
+        }
+
+        .footer-right {
+            font-size: 0.73rem;
+            color: rgba(90, 112, 144, 0.6);
+            white-space: nowrap;
+        }
+
+        .footer a {
+            color: #8ab4f8;
+            text-decoration: none;
+            border-bottom: 1px solid rgba(138, 180, 248, 0.3);
+            transition: border-color 0.2s;
+        }
+
+        .footer a:hover {
+            border-color: #8ab4f8;
+        }
+
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(16px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* ── Live clock ── */
+        #clock {
+            font-variant-numeric: tabular-nums;
+            color: var(--cyan);
+        }
+
+        /* ── Floating particles ── */
+        .particles {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .particle {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            background: var(--blue);
+            border-radius: 50%;
+            opacity: 0;
+            animation: floatUp var(--dur) var(--delay) ease-in infinite;
+        }
+
+        @keyframes floatUp {
+            0% {
+                opacity: 0;
+                transform: translateY(0) scale(1);
+            }
+
+            10% {
+                opacity: 0.6;
+            }
+
+            90% {
+                opacity: 0.2;
+            }
+
+            100% {
+                opacity: 0;
+                transform: translateY(-100vh) scale(0.5);
+            }
         }
     </style>
 </head>
 
 <body>
+
+    <!-- Background layers -->
+    <div class="bg-mesh"></div>
+    <div class="bg-grid"></div>
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+    <div class="scanlines"></div>
+    <div class="particles" id="particles"></div>
+
+    <!-- Main card -->
     <div class="card">
-        <div class="icon">🔧</div>
-        <h1>We'll be right back</h1>
+
+        <!-- Status -->
+        <div class="status-row">
+            <div class="status-dot"></div>
+            <span class="status-label">Maintenance in progress</span>
+            <div class="status-divider"></div>
+        </div>
+
+        <!-- Gear -->
+        <div class="gear-wrap">
+            <div class="gear-ring">🧰</div>
+        </div>
+
+        <!-- Copy -->
+        <h1>We'll be right<br>back shortly.</h1>
         <p>
-            Talio HRMS is currently undergoing scheduled maintenance or a deployment update.
-            This usually takes less than a minute.
+            Talio HRMS is undergoing a <strong>scheduled deployment update</strong>.
+            Our engineering team is working quickly — this typically resolves
+            in under a minute.
         </p>
-        <a class="retry-btn" href="javascript:location.reload()">Try Again</a>
-        <div class="meta">If this persists for more than 5 minutes, contact your administrator.</div>
+
+        <!-- Progress -->
+        <div class="progress-wrap">
+            <div class="progress-meta">
+                <span>Deployment progress</span>
+                <span id="clock">--:--:--</span>
+            </div>
+            <div class="progress-track">
+                <div class="progress-fill"></div>
+            </div>
+        </div>
+
+        <!-- Pills -->
+        <div class="pills">
+            <div class="pill">
+                <span class="pill-dot green"></span>
+                Database — Online
+            </div>
+            <div class="pill">
+                <span class="pill-dot amber"></span>
+                App Server — Updating
+            </div>
+            <div class="pill">
+                <span class="pill-dot blue"></span>
+                CDN — Active
+            </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="actions">
+            <a class="btn-primary" href="javascript:location.reload()">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="23 4 23 10 17 10" />
+                    <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+                </svg>
+                Try Again
+            </a>
+            <a class="btn-secondary" href="mailto:support@talio.in">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                    <polyline points="22,6 12,13 2,6" />
+                </svg>
+                Contact Support (support@talio.in)
+            </a>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <div class="footer-left">
+                If this persists beyond 5 minutes,<br>
+                contact Talio Support at <a href="mailto:support@talio.in">support@talio.in</a><br>
+                or our team at <a href="mailto:info@talio.in">info@talio.in</a>.
+            </div>
+            <div class="footer-right">
+                &copy; 2026 Talio Inc.
+            </div>
+        </div>
+
     </div>
+
+    <script>
+        // Live clock
+        const clock = document.getElementById('clock');
+        const tick = () => {
+            clock.textContent = new Date().toLocaleTimeString('en-IN', { hour12: false });
+        };
+        tick(); setInterval(tick, 1000);
+
+        // Auto-refresh every 45 seconds
+        setTimeout(() => location.reload(), 45000);
+
+        // Floating particles
+        const container = document.getElementById('particles');
+        for (let i = 0; i < 30; i++) {
+            const p = document.createElement('div');
+            p.className = 'particle';
+            p.style.left = Math.random() * 100 + 'vw';
+            p.style.bottom = '-10px';
+            p.style.setProperty('--dur', (8 + Math.random() * 16) + 's');
+            p.style.setProperty('--delay', (Math.random() * 12) + 's');
+            // alternate cyan/blue
+            if (Math.random() > 0.5) p.style.background = '#00d4ff';
+            container.appendChild(p);
+        }
+    </script>
 </body>
 
 </html>
