@@ -1768,6 +1768,8 @@ function setupAutoUpdater() {
       // Quit and install after showing completion screen
       setTimeout(function () {
         logger.log('info', 'Updater', '[LIFECYCLE] quitAndInstall() called (isSilent=false, isForceRunAfter=true)');
+        // Track this install attempt so we can detect failed installs on next startup
+        store.set('updateInstallAttempt', { version: info.version, timestamp: Date.now() });
         // CRITICAL: Set flags BEFORE quitAndInstall so before-quit/close handlers allow it
         isQuitting = true;
         isUpdating = true; // Tells window-all-closed & scheduleWindowRecreation to stand down
@@ -1832,6 +1834,7 @@ function checkForUpdates(silent) {
   autoUpdater.checkForUpdates().catch(function (error) {
     logger.log('warn', 'Updater', 'Update check failed: ' + error.message);
     dismissUpdateCheckDialog();
+    sendUpdateStatus('error', { message: error.message });
   });
 }
 
@@ -2620,9 +2623,42 @@ app.whenReady().then(async function () {
   setupAutoUpdater();
 
   if (!isCrashLoop) {
+    // Detect failed update install loops:
+    // If we recently tried to quitAndInstall but we're still on the old version,
+    // the install failed (e.g. macOS code signature mismatch). Don't auto-check again.
+    var updateAttempt = store.get('updateInstallAttempt');
+    var skipAutoUpdate = false;
+    if (updateAttempt && updateAttempt.version && updateAttempt.timestamp) {
+      var attemptAge = Date.now() - updateAttempt.timestamp;
+      if (updateAttempt.version === app.getVersion()) {
+        // We're now on the version we tried to install - update succeeded!
+        logger.log('info', 'Updater', 'Update to v' + updateAttempt.version + ' succeeded');
+        store.delete('updateInstallAttempt');
+      } else if (attemptAge < 10 * 60 * 1000) {
+        // Tried to install a different version within last 10 minutes but still on old version = failed
+        logger.log('warn', 'Updater', 'Previous update to v' + updateAttempt.version + ' failed (still on v' + app.getVersion() + '). Skipping auto-update to prevent loop.');
+        skipAutoUpdate = true;
+        // Show one-time notification about failed update
+        setTimeout(function () {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            dialog.showMessageBox(mainWindow, {
+              type: 'warning',
+              title: 'Update Failed',
+              message: 'Auto-update to v' + updateAttempt.version + ' could not be installed.',
+              detail: 'This is typically caused by a code signature mismatch. Please download the latest version manually from the releases page.',
+              buttons: ['OK']
+            }).catch(function () { });
+          }
+        }, 5000);
+      } else {
+        // Attempt is old (>10 min), clear it and allow retry
+        store.delete('updateInstallAttempt');
+      }
+    }
+
     // Check for forced updates (min version)
     var isForced = await checkForceUpdate();
-    if (!isForced) {
+    if (!isForced && !skipAutoUpdate) {
       // Check for updates on fresh launch - SILENT so no dialog blocks startup
       setTimeout(function () { checkForUpdates(true); }, 5000);
     }
