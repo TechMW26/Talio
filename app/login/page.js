@@ -527,17 +527,17 @@ export default function LoginPage() {
                     </div>
                   </div>
 
-                  {/* Title — big and bold */}
+                  {/* Title - big and bold */}
                   <h2 className="text-center text-2xl font-bold text-red-600 dark:text-red-400 mb-3">
                     {details.title}
                   </h2>
 
-                  {/* Main message — large and clear */}
+                  {/* Main message - large and clear */}
                   <p className="text-center text-base font-medium text-gray-800 dark:text-gray-100 leading-relaxed mb-2">
                     {details.description}
                   </p>
 
-                  {/* Suggestion — visible in both modes */}
+                  {/* Suggestion - visible in both modes */}
                   <p className="text-center text-sm text-gray-600 dark:text-gray-300 leading-relaxed">
                     {details.suggestion}
                   </p>

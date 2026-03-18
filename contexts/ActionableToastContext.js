@@ -178,7 +178,7 @@ export function ActionableToastProvider({ children }) {
   }, [fetchPendingNotifications])
 
   // Execute an action on a notification
-  // skipEndpoint: when true, the endpoint was already called client-side — just mark as actioned
+  // skipEndpoint: when true, the endpoint was already called client-side - just mark as actioned
   const executeAction = useCallback(async (notificationId, actionId, reason = null, skipEndpoint = false) => {
     try {
       const token = localStorage.getItem('token')

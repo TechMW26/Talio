@@ -12,15 +12,15 @@ import { getCurrentUser, getEmployeeId } from '@/utils/userHelper'
 import { useAILoading } from '@/contexts/AILoadingContext'
 
 /**
- * CreateTaskModal — Standalone task creation modal.
+ * CreateTaskModal - Standalone task creation modal.
  * Allows creating tasks with optional project association.
  * Includes: title, description, priority, due date, assignees (employee search),
  * optional project dropdown, subtasks, and attachments.
  * 
  * Props:
- *   isOpen — controls visibility
- *   onClose — called when modal is closed
- *   onTaskCreated — called after successful task creation (for SWR mutate, etc.)
+ *   isOpen - controls visibility
+ *   onClose - called when modal is closed
+ *   onTaskCreated - called after successful task creation (for SWR mutate, etc.)
  */
 export default function CreateTaskModal({ isOpen, onClose, onTaskCreated }) {
   const currentEmployeeId = useMemo(() => {

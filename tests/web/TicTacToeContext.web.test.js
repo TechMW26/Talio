@@ -31,7 +31,7 @@ beforeAll(() => {
 // ════════════════════════════════════════════════════════════════
 // CRITICAL: Zero Polling Enforcement
 // ════════════════════════════════════════════════════════════════
-describe('CRITICAL — Zero Polling Enforcement (Web)', () => {
+describe('CRITICAL - Zero Polling Enforcement (Web)', () => {
     test('source code contains zero setInterval calls', () => {
         const setIntervalUsages = nonCommentLines.filter(line =>
             line.includes('setInterval')

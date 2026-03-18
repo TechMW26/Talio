@@ -1,4 +1,4 @@
-## Talio Desktop v4.5.1 — Auto-Update Stability Fix
+## Talio Desktop v4.5.1 - Auto-Update Stability Fix
 
 ### Critical Bug Fixes
 

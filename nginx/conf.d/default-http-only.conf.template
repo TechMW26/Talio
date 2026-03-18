@@ -1,4 +1,4 @@
-# HTTP-only config — used during initial SSL provisioning.
+# HTTP-only config - used during initial SSL provisioning.
 # Once the certificate is obtained, the deploy script swaps in default.conf (HTTPS).
 
 upstream talio_backend {

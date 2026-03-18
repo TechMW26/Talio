@@ -131,12 +131,12 @@ export default function ActionableToast({ notification, onDismiss, onAction }) {
           return
         }
 
-        // Endpoint succeeded — mark notification as actioned (skip server-side proxy)
+        // Endpoint succeeded - mark notification as actioned (skip server-side proxy)
         await onAction?.(action.id, reason || null, true)
         toast.success(endpointResult?.message || 'Action completed successfully')
         handleDismiss()
       } else {
-        // No endpoint — just mark as actioned via the backend
+        // No endpoint - just mark as actioned via the backend
         const result = await onAction?.(action.id, reason || null, false)
 
         if (result?.success) {

@@ -53,7 +53,7 @@ export default function TeamAttendancePage() {
   const { data: deptsRes } = useAuthedSWR(isAdmin ? '/api/departments' : null)
   const departments = deptsRes?.data || []
 
-  // Fetch employees when head-check resolves (dependent effect — branching fetch logic)
+  // Fetch employees when head-check resolves (dependent effect - branching fetch logic)
   useEffect(() => {
     if (!headCheckRes) return
 
@@ -131,7 +131,7 @@ export default function TeamAttendancePage() {
     }
   }
 
-  // Calendar navigation — just update state, SWR auto-refetches
+  // Calendar navigation - just update state, SWR auto-refetches
   const goToPreviousMonth = () => {
     setCurrentMonth(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))
   }

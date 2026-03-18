@@ -125,7 +125,7 @@ export default function DesktopNotificationPrompt() {
                 Enable Desktop Notifications
               </h3>
               <p className="text-sm mb-4" style={{ color: 'var(--color-text-secondary)' }}>
-                Get notified about new messages, task assignments, announcements, and more — even when the app is minimized.
+                Get notified about new messages, task assignments, announcements, and more - even when the app is minimized.
               </p>
               <div className="flex items-center gap-2">
                 <button

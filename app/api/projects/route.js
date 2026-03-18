@@ -218,8 +218,8 @@ export async function POST(request) {
       department,
       tags,
       status,
-      assignedTeamIds, // NEW — array of Team IDs to assign
-      projectManagerId // NEW — employee ID for project manager
+      assignedTeamIds, // NEW - array of Team IDs to assign
+      projectManagerId // NEW - employee ID for project manager
     } = body
 
     // Support both single and multiple heads

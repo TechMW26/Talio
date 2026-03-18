@@ -264,7 +264,7 @@ export async function POST(request, { params }) {
           invitationStatus: 'accepted'
         })
         if (!isMember && assigneeIdStr !== userRecord.employeeId.toString()) {
-          continue // Skip — no hierarchy authority and not a member
+          continue // Skip - no hierarchy authority and not a member
         }
       }
 

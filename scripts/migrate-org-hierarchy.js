@@ -106,7 +106,7 @@ async function migrateTenantDatabase(uri, dbName) {
 
             let teamId;
             if (existingTeam) {
-                log('info', `  Team "${teamCode}" already exists for dept "${dept.name}" — skipping creation`);
+                log('info', `  Team "${teamCode}" already exists for dept "${dept.name}" - skipping creation`);
                 stats.teamsAlreadyExist++;
                 teamId = existingTeam._id;
             } else {
@@ -306,7 +306,7 @@ async function migrateTenantDatabase(uri, dbName) {
 async function main() {
     log('info', '═══════════════════════════════════════════════════════════');
     log('info', '  Organizational Hierarchy Migration');
-    log('info', `  Mode: ${DRY_RUN ? 'DRY RUN (no changes will be made)' : '⚠️  LIVE — changes will be written!'}`);
+    log('info', `  Mode: ${DRY_RUN ? 'DRY RUN (no changes will be made)' : '⚠️  LIVE - changes will be written!'}`);
     log('info', '═══════════════════════════════════════════════════════════');
 
     const mongoUri = process.env.MONGODB_URI;

@@ -1,5 +1,5 @@
 /**
- * @deprecated — Use getAuthAndModels(request, ['Interview']) from lib/auth.js
+ * @deprecated - Use getAuthAndModels(request, ['Interview']) from lib/auth.js
  * The canonical schema lives in lib/tenantModels.js as InterviewSchema.
  */
 import mongoose from 'mongoose';

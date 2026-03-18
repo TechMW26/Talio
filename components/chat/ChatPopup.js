@@ -451,7 +451,7 @@ export default function ChatPopup({ chat, index }) {
         messages: msgs,
         lastTimestamp,
       }))
-    } catch { /* sessionStorage full — silently ignore */ }
+    } catch { /* sessionStorage full - silently ignore */ }
   }, [])
 
   const appendCachedMessage = useCallback((chatId, msg) => {
@@ -497,7 +497,7 @@ export default function ChatPopup({ chat, index }) {
           }
         }
       } else {
-        // 3. No cache — full fetch with loading spinner
+        // 3. No cache - full fetch with loading spinner
         setLoading(true)
         const response = await fetch(`/api/chat/${chat._id}/messages`, {
           headers: { 'Authorization': `Bearer ${token}` }

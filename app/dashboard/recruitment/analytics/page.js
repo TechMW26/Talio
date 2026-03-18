@@ -210,7 +210,7 @@ export default function RecruitmentAnalyticsPage() {
                   </div>
                   <div className="p-3 bg-secondary-50 rounded-lg text-center">
                     <p className="text-2xl font-bold text-secondary">
-                      {interviewStats.avgRating ? interviewStats.avgRating.toFixed(1) : '—'}
+                      {interviewStats.avgRating ? interviewStats.avgRating.toFixed(1) : '-'}
                     </p>
                     <p className="text-xs text-default-500 mt-0.5">Avg Rating</p>
                   </div>

@@ -9,7 +9,7 @@ if (!global.__tokenCache) {
   global.__tokenCache = TOKEN_CACHE
 }
 
-// Cache the encoded JWT secret globally — avoids re-encoding on every request
+// Cache the encoded JWT secret globally - avoids re-encoding on every request
 let _cachedJwtSecret = null
 function getJwtSecret() {
   if (!_cachedJwtSecret) {

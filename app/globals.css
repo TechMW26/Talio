@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* ============================================
-   FORCED INPUT BORDERS — Light & Dark Mode
+   FORCED INPUT BORDERS - Light & Dark Mode
    ============================================ */
 
 /* Light mode: dark border for contrast on native inputs */
@@ -43,7 +43,7 @@ html.dark textarea {
   border: 1px solid #3E5166 !important;
 }
 
-/* HeroUI component wrappers — Light mode (high specificity to override .border-default-200) */
+/* HeroUI component wrappers - Light mode (high specificity to override .border-default-200) */
 div[data-slot="input-wrapper"],
 button[data-slot="trigger"],
 div[data-slot="input-wrapper"].border-default-200,
@@ -51,7 +51,7 @@ button[data-slot="trigger"].border-default-200 {
   border: 1px solid #CBD5E1 !important;
 }
 
-/* HeroUI component wrappers — Dark mode (high specificity) */
+/* HeroUI component wrappers - Dark mode (high specificity) */
 html.dark div[data-slot="input-wrapper"],
 html.dark button[data-slot="trigger"],
 html.dark div[data-slot="input-wrapper"].border-default-200,
@@ -65,7 +65,7 @@ html.dark button[data-slot="trigger"].border-default-200 {
   border: none !important;
 }
 
-/* Search overlay input — no borders at all */
+/* Search overlay input - no borders at all */
 .search-overlay-input div[data-slot="input-wrapper"],
 html.dark .search-overlay-input div[data-slot="input-wrapper"],
 .search-overlay-input div[data-slot="input-wrapper"].border-default-200,
@@ -950,7 +950,7 @@ html.dark .text-black {
   color: #F1F5F9 !important;
 }
 
-/* ---- Borders — make subtle/invisible in dark mode ---- */
+/* ---- Borders - make subtle/invisible in dark mode ---- */
 html.dark .border-gray-200,
 html.dark .border-slate-200 {
   border-color: rgba(51, 65, 85, 0.5) !important;
@@ -973,7 +973,7 @@ html.dark .border-default-50:not([data-slot="input-wrapper"]):not([data-slot="tr
   border-color: transparent !important;
 }
 
-/* Remove borders from card-like containers in dark mode — rely on bg elevation */
+/* Remove borders from card-like containers in dark mode - rely on bg elevation */
 html.dark .bg-white.border:not(input):not(select):not(textarea),
 html.dark .bg-content1.border:not(input):not(select):not(textarea),
 html.dark [class*="bg-white"].border:not(input):not(select):not(textarea) {
@@ -1388,7 +1388,7 @@ html.dark .animate-mira-backdrop-in {
 }
 
 /* ============================================
-   HEROUI MODAL OVERRIDES — Global
+   HEROUI MODAL OVERRIDES - Global
    Ensures all HeroUI modals have 30px radius,
    blur backdrop, and smooth animation
    ============================================ */

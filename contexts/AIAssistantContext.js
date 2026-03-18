@@ -32,7 +32,7 @@ const QUICK_TIPS = {
     'Use "Forgot Password" to reset your credentials',
   ],
   session: [
-    'Log in again — your session refreshes automatically',
+    'Log in again - your session refreshes automatically',
     'This is normal after a period of inactivity',
     'Your data is safe, just sign back in',
   ],

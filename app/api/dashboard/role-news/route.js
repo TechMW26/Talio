@@ -39,7 +39,7 @@ export async function GET(request) {
         // Build search query from designation and role
         const searchQuery = buildSearchQuery(designation, department, role);
 
-        // Check Redis cache first — always serve from cache even for fresh=true
+        // Check Redis cache first - always serve from cache even for fresh=true
         // (fresh=true only uses a shorter write-TTL, not a cache bypass)
         const newsCacheKey = buildCacheKey({
             tenantId: tenant?.databaseName,

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Talio HRMS — Production Deployment Script for Hostinger VPS (Ubuntu)
+# Talio HRMS - Production Deployment Script for Hostinger VPS (Ubuntu)
 # =============================================================================
 # Usage:
 #   chmod +x deploy-production.sh
@@ -71,7 +71,7 @@ if [[ -z "$DOMAIN" ]]; then
   exit 1
 fi
 
-# Email for Let's Encrypt — reads EMAIL_USER from .env
+# Email for Let's Encrypt - reads EMAIL_USER from .env
 SSL_EMAIL=$(grep -E '^EMAIL_USER=' .env | head -1 | cut -d'=' -f2- | tr -d '"' | tr -d "'")
 if [[ -z "$SSL_EMAIL" ]]; then
   err "EMAIL_USER not found in .env. Certbot needs an email for certificate notifications."
@@ -90,7 +90,7 @@ ssl_certs_exist() {
 }
 
 # =============================================================================
-#  PHASE 1 — FRESH INSTALL (system dependencies)
+#  PHASE 1 - FRESH INSTALL (system dependencies)
 # =============================================================================
 if $FRESH; then
   header "Phase 1: Installing System Dependencies"
@@ -184,7 +184,7 @@ SYSCTL
 fi
 
 # =============================================================================
-#  PHASE 2 — PREPARE NGINX CONFIG
+#  PHASE 2 - PREPARE NGINX CONFIG
 # =============================================================================
 header "Phase 2: Configuring Nginx"
 
@@ -194,15 +194,15 @@ NEED_SSL_PROVISION=false
 if $SSL; then
   docker compose pull certbot 2>/dev/null || true
   if ssl_certs_exist; then
-    info "SSL certificates already exist for $DOMAIN — will renew if needed."
+    info "SSL certificates already exist for $DOMAIN - will renew if needed."
   else
     NEED_SSL_PROVISION=true
-    info "No SSL certificates found — will provision new ones."
+    info "No SSL certificates found - will provision new ones."
   fi
 fi
 
 # Write the correct nginx config BEFORE starting containers.
-# Only ONE file should ever exist as *.conf — templates are *.conf.template
+# Only ONE file should ever exist as *.conf - templates are *.conf.template
 # and are ignored by nginx's `include *.conf` directive.
 write_http_only_config() {
   # Inline the HTTP-only config directly (no separate file needed)
@@ -297,7 +297,7 @@ fi
 log "Nginx config ready for $DOMAIN"
 
 # =============================================================================
-#  PHASE 3 — BUILD & START CONTAINERS
+#  PHASE 3 - BUILD & START CONTAINERS
 # =============================================================================
 header "Phase 3: Building & Starting Docker Containers"
 
@@ -311,7 +311,7 @@ if $CLEAN || $FRESH; then
   info "Building Docker image (full rebuild, no cache)..."
   DOCKER_BUILDKIT=1 docker compose build --no-cache talio-app
 else
-  info "Building Docker image (cached — use --clean for full rebuild)..."
+  info "Building Docker image (cached - use --clean for full rebuild)..."
   DOCKER_BUILDKIT=1 docker compose build talio-app
 fi
 
@@ -352,9 +352,9 @@ while [[ $ELAPSED -lt $HEALTH_TIMEOUT ]]; do
   fi
 
   if [[ "$HEALTH" == "unhealthy" ]]; then
-    warn "Health check reports unhealthy at ${ELAPSED}s — checking logs..."
+    warn "Health check reports unhealthy at ${ELAPSED}s - checking logs..."
     docker logs talio-app --tail 20
-    # Don't exit yet — the app may just be slow to start
+    # Don't exit yet - the app may just be slow to start
   fi
 
   sleep $HEALTH_INTERVAL
@@ -373,12 +373,12 @@ fi
 
 # Also verify nginx is running (not crash-looping)
 if ! docker compose exec -T nginx nginx -t 2>/dev/null; then
-  warn "Nginx config test failed — checking logs..."
+  warn "Nginx config test failed - checking logs..."
   docker compose logs nginx --tail 20
 fi
 
 # =============================================================================
-#  PHASE 4 — SSL CERTIFICATE (Let's Encrypt via Certbot)
+#  PHASE 4 - SSL CERTIFICATE (Let's Encrypt via Certbot)
 # =============================================================================
 if $SSL; then
   header "Phase 4: SSL Certificate (Let's Encrypt)"
@@ -437,7 +437,7 @@ if $SSL; then
 fi
 
 # =============================================================================
-#  PHASE 5 — SETUP CRON JOBS
+#  PHASE 5 - SETUP CRON JOBS
 # =============================================================================
 header "Phase 5: Setting Up Cron Jobs"
 
@@ -454,7 +454,7 @@ CRON_NOTIF="*/5 * * * * curl -s -H 'x-cron-secret: ${CRON_SECRET}' '${NEXTAUTH_U
 CRON_PROFILE="0 6 * * * curl -s -H 'x-cron-secret: ${CRON_SECRET}' '${NEXTAUTH_URL_VAL}/api/cron/check-profile-deadlines' >/dev/null 2>&1"
 CRON_CLEANUP="0 2 * * 0 docker image prune -af --filter 'until=168h' && docker builder prune -af --keep-storage=2GB 2>/dev/null >/dev/null 2>&1"
 
-# Install cron jobs (idempotent — removes old talio entries first)
+# Install cron jobs (idempotent - removes old talio entries first)
 ( crontab -l 2>/dev/null | grep -v '# talio-' || true
   echo "$CRON_RENEW   # talio-ssl-renew"
   echo "$CRON_ABSENT   # talio-mark-absent"
@@ -465,13 +465,13 @@ CRON_CLEANUP="0 2 * * 0 docker image prune -af --filter 'until=168h' && docker b
 log "Cron jobs installed"
 
 # =============================================================================
-#  PHASE 6 — HEALTH CHECK & SUMMARY
+#  PHASE 6 - HEALTH CHECK & SUMMARY
 # =============================================================================
 header "Phase 6: Deployment Summary"
 
 echo ""
 echo -e "${GREEN}┌─────────────────────────────────────────────────┐${NC}"
-echo -e "${GREEN}│         Talio HRMS — Deployed!                  │${NC}"
+echo -e "${GREEN}│         Talio HRMS - Deployed!                  │${NC}"
 echo -e "${GREEN}├─────────────────────────────────────────────────┤${NC}"
 echo -e "${GREEN}│${NC}  Domain:    ${BOLD}$DOMAIN${NC}"
 if $SSL; then

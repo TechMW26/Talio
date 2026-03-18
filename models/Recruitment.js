@@ -1,5 +1,5 @@
 /**
- * @deprecated — Use getAuthAndModels(request, ['JobPosting']) from lib/auth.js
+ * @deprecated - Use getAuthAndModels(request, ['JobPosting']) from lib/auth.js
  * This standalone model exists only for backward compatibility and seed scripts.
  * The canonical schema lives in lib/tenantModels.js as JobPostingSchema.
  */

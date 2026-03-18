@@ -413,7 +413,7 @@ let timerAlarmNodes = null
 /**
  * Start a looping alarm tone for the focus timer.
  * Uses two detuned oscillators for a classic alarm sound.
- * Returns immediately — call stopTimerAlarm() to silence it.
+ * Returns immediately - call stopTimerAlarm() to silence it.
  */
 export const startTimerAlarm = () => {
   stopTimerAlarm() // clear any previous alarm

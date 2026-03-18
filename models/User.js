@@ -175,7 +175,7 @@ UserSchema.pre('save', async function (next) {
   // Audit log: track isActive changes on save
   if (this.isModified('isActive')) {
     console.log(
-      `[USER AUDIT] isActive changed via save() — email: ${this.email}, ` +
+      `[USER AUDIT] isActive changed via save() - email: ${this.email}, ` +
       `isActive: ${this.isActive}, reason: ${this.suspensionReason || 'none'}, ` +
       `at: ${new Date().toISOString()}`
     );
@@ -195,7 +195,7 @@ UserSchema.pre('updateMany', function (next) {
   if (flatUpdate.isActive === false) {
     const filter = this.getFilter();
     console.error(
-      `[USER AUDIT][CRITICAL] updateMany setting isActive=false — ` +
+      `[USER AUDIT][CRITICAL] updateMany setting isActive=false - ` +
       `filter: ${JSON.stringify(filter)}, at: ${new Date().toISOString()}, ` +
       `stack: ${new Error().stack}`
     );
@@ -209,7 +209,7 @@ UserSchema.pre('updateOne', function (next) {
   if (flatUpdate.isActive === false) {
     const filter = this.getFilter();
     console.warn(
-      `[USER AUDIT] updateOne setting isActive=false — ` +
+      `[USER AUDIT] updateOne setting isActive=false - ` +
       `filter: ${JSON.stringify(filter)}, at: ${new Date().toISOString()}`
     );
   }
@@ -222,7 +222,7 @@ UserSchema.pre('findOneAndUpdate', function (next) {
   if (flatUpdate.isActive === false) {
     const filter = this.getFilter();
     console.warn(
-      `[USER AUDIT] findOneAndUpdate setting isActive=false — ` +
+      `[USER AUDIT] findOneAndUpdate setting isActive=false - ` +
       `filter: ${JSON.stringify(filter)}, at: ${new Date().toISOString()}`
     );
   }

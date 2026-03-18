@@ -1,4 +1,4 @@
-# Talio — AI Coding Instructions
+# Talio - AI Coding Instructions
 
 ## Repo layout (two apps)
 - Web/Server: `talio-web/Talio` (Next.js 15 + React 19, custom Node server).

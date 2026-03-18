@@ -210,7 +210,7 @@ export default function JobDetailPage() {
 
         {/* Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-          {/* Main Content — 2/3 */}
+          {/* Main Content - 2/3 */}
           <div className="lg:col-span-2 space-y-4 sm:space-y-6">
             {/* Pipeline Stats */}
             {job.pipeline && Object.keys(job.pipeline).length > 0 && (
@@ -251,7 +251,7 @@ export default function JobDetailPage() {
               </Card>
             )}
 
-            {/* Requirements & Responsibilities — side by side on desktop */}
+            {/* Requirements & Responsibilities - side by side on desktop */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
               {job.requirements?.length > 0 && (
                 <Card shadow="sm">
@@ -327,7 +327,7 @@ export default function JobDetailPage() {
             )}
           </div>
 
-          {/* Sidebar — 1/3 */}
+          {/* Sidebar - 1/3 */}
           <div className="space-y-4 sm:space-y-6">
             {/* Status Actions */}
             {canManage && (

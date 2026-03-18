@@ -390,7 +390,7 @@ class SocketHandler {
       notify('Policy Update', data, 'A company policy has been updated');
     });
 
-    // ── Employee events (silent — no notification popup) ──
+    // ── Employee events (silent - no notification popup) ──
     this.socket.on('employee-created', function(data) {
       silentEvent('EmployeeCreated', data);
     });

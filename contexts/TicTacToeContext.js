@@ -199,10 +199,10 @@ export function TicTacToeProvider({ children }) {
     }
   }, [])
 
-  // Make a move — server handles win detection + end event
+  // Make a move - server handles win detection + end event
   const makeMove = useCallback((idx) => {
     if (!isMyTurn || board[idx] || result) return
-    // Optimistic update — instant UI response
+    // Optimistic update - instant UI response
     const newBoard = [...board]
     newBoard[idx] = mySymbol
     setBoard(newBoard)
@@ -212,7 +212,7 @@ export function TicTacToeProvider({ children }) {
     // Safety net: if Socket.IO event doesn't arrive in 4s, do one GET
     clearTimeout(moveTimeoutRef.current)
     moveTimeoutRef.current = setTimeout(() => {
-      console.warn('[TicTacToe] Move ack timeout (4s) — running single sync GET')
+      console.warn('[TicTacToe] Move ack timeout (4s) - running single sync GET')
       fetchGameState()
     }, 4000)
 
@@ -225,7 +225,7 @@ export function TicTacToeProvider({ children }) {
     }
   }, [isMyTurn, board, result, mySymbol, opponent, gameId, sendAction, fetchGameState])
 
-  // Close / reset — also notifies the other player
+  // Close / reset - also notifies the other player
   const closeGame = useCallback(() => {
     // If in an active game, notify the opponent
     if (opponent?.userId && gameId && (phase === 'waiting' || phase === 'playing' || phase === 'result')) {

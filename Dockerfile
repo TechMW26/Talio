@@ -12,7 +12,7 @@ COPY package.json package-lock.json* ./
 # Install from lockfile. We use `npm install` (not `npm ci`) because the
 # lockfile was generated on macOS and ci would skip Linux optional deps.
 # Then forcibly add the Alpine-specific native binaries that macOS lockfile
-# omits — sharp needs both the binding AND libvips for linuxmusl.
+# omits - sharp needs both the binding AND libvips for linuxmusl.
 RUN --mount=type=cache,target=/root/.npm \
     ARCH=$(node -p "process.arch") && \
     npm install --prefer-offline && \
@@ -35,7 +35,7 @@ ENV NEXT_TELEMETRY_DISABLED=1 \
 
 RUN npm run build
 
-# Strip devDependencies — runner only needs production deps
+# Strip devDependencies - runner only needs production deps
 RUN npm prune --omit=dev
 
 # ── Stage 3: runner ── Minimal production image ─────────────────────────────

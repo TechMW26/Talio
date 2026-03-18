@@ -293,7 +293,7 @@ export default function UnifiedDashboard({ user: userProp }) {
                 statsEndpoint = '/api/dashboard/manager-stats'
             }
 
-            // Only fetch the stats endpoint — departments, leave requests,
+            // Only fetch the stats endpoint - departments, leave requests,
             // attendance summary, and employee data all come from the unified endpoint
             const response = await fetch(statsEndpoint, {
                 headers: { 'Authorization': `Bearer ${token}` }
@@ -330,7 +330,7 @@ export default function UnifiedDashboard({ user: userProp }) {
         }
     }, [employeeIdStr])
 
-    // Fetch unified widget data — single API call for holidays, announcements, assets, expenses, helpdesk, policies
+    // Fetch unified widget data - single API call for holidays, announcements, assets, expenses, helpdesk, policies
     // ALSO populates: departments, leave requests, attendance summary, employee data, and today's attendance
     // This eliminates 5+ separate API calls that were causing browser connection queue stalling
     const fetchUnifiedWidgetData = useCallback(async () => {
@@ -377,7 +377,7 @@ export default function UnifiedDashboard({ user: userProp }) {
         } catch (error) {
             console.error('Error fetching unified widget data:', error)
         }
-    }, []) // eslint-disable-line react-hooks/exhaustive-deps — uses employeeDataRef to avoid re-fetch cycle
+    }, []) // eslint-disable-line react-hooks/exhaustive-deps - uses employeeDataRef to avoid re-fetch cycle
 
     // Real-time update handlers - MUST come after fetch functions
     const handleRealtimeUpdate = useCallback((data) => {
@@ -435,10 +435,10 @@ export default function UnifiedDashboard({ user: userProp }) {
         // Show dashboard immediately - widgets will show their own loading states
         setLoading(false)
 
-        // Fetch data in parallel (non-blocking) — only 2 API calls from UnifiedDashboard
+        // Fetch data in parallel (non-blocking) - only 2 API calls from UnifiedDashboard
         fetchUnifiedWidgetData()  // Single aggregated call (replaces 6+ separate calls, includes company settings)
         fetchDashboardData()       // KPI stats only
-    }, [user, employeeIdStr]) // eslint-disable-line react-hooks/exhaustive-deps — callbacks are stable or use refs
+    }, [user, employeeIdStr]) // eslint-disable-line react-hooks/exhaustive-deps - callbacks are stable or use refs
 
     // Countdown timer effect
     useEffect(() => {

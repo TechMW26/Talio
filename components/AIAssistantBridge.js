@@ -13,7 +13,7 @@ export function getInterceptor() {
 
 /**
  * Bridge component that connects toast.error() messages to the AI assistant.
- * Renders nothing — just patches the toast system on mount.
+ * Renders nothing - just patches the toast system on mount.
  */
 export default function AIAssistantBridge() {
   const { interceptError } = useAIAssistant()

@@ -115,7 +115,7 @@ export function SocketProvider({ children }) {
       const token = localStorage.getItem('token')
       if (!token) return
 
-      console.log('🔄 [Socket.IO Client] Socket.IO unavailable — starting refresh polling fallback')
+      console.log('🔄 [Socket.IO Client] Socket.IO unavailable - starting refresh polling fallback')
       refreshPollTimer = setInterval(async () => {
         try {
           const res = await fetch('/api/user/check-refresh', {
@@ -273,7 +273,7 @@ export function SocketProvider({ children }) {
     socketInstance.on('connect_error', (error) => {
       // Only log once, not on every retry to avoid console spam
       if (!socketInstance._hasLoggedError) {
-        console.warn('⚠️ [Socket.IO Client] Connection error — real-time features will use polling fallback.')
+        console.warn('⚠️ [Socket.IO Client] Connection error - real-time features will use polling fallback.')
         socketInstance._hasLoggedError = true
         // Proactively start heartbeat and polling fallback
         startRefreshPolling()
@@ -284,7 +284,7 @@ export function SocketProvider({ children }) {
 
     // When all reconnection attempts are exhausted, start DB polling fallback
     socketInstance.on('reconnect_failed', () => {
-      console.warn('⚠️ [Socket.IO Client] All reconnection attempts failed — switching to polling fallback.')
+      console.warn('⚠️ [Socket.IO Client] All reconnection attempts failed - switching to polling fallback.')
       startRefreshPolling()
       startHeartbeat() // Start DB-backed presence heartbeat
     })

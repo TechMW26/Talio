@@ -265,7 +265,7 @@ export default function CustomizableDashboard({
               </div>
             )}
 
-            {/* Actionable Insights — AI-powered dashboard section */}
+            {/* Actionable Insights - AI-powered dashboard section */}
             <div className="mt-5">
               <ActionableInsights />
             </div>

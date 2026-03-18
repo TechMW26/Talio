@@ -20,7 +20,7 @@ beforeAll(() => {
     source = fs.readFileSync(MOBILE_CONTEXT_PATH, 'utf8');
 });
 
-describe('TicTacToeContext — Mobile: Source Code Validation', () => {
+describe('TicTacToeContext - Mobile: Source Code Validation', () => {
 
     // ════════════════════════════════════════════════════════════════
     // CRITICAL: Zero Polling

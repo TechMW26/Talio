@@ -114,7 +114,7 @@ export async function POST(request) {
     // Update password and set forcePasswordChange to false
     user.password = newPassword // Will be hashed by pre-save hook
     user.forcePasswordChange = false
-    // Clear the encrypted onboarding password — user has set their own password
+    // Clear the encrypted onboarding password - user has set their own password
     user.encryptedOnboardingPassword = null
     await user.save()
 

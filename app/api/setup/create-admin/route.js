@@ -150,7 +150,7 @@ export async function POST(request) {
       }
     } catch (err) {
       console.error('[Setup] Failed generating JWT:', err);
-      // proceed without failing — return user created but no token
+      // proceed without failing - return user created but no token
     }
 
     console.log('[Setup] Initial admin account created successfully:', email);

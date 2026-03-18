@@ -92,8 +92,8 @@
 
 <div class="card">
   <div class="q-marks">"</div>
-  <div id="facts" class="fact active">Lead from the back — and let others believe they are in front.</div>
-  <div id="author" class="author">— Nelson Mandela</div>
+  <div id="facts" class="fact active">Lead from the back - and let others believe they are in front.</div>
+  <div id="author" class="author">- Nelson Mandela</div>
 </div>
 
 <p class="prompt">What's one area where you can empower your team more?</p>
@@ -106,12 +106,12 @@
 
 <script>
   const slides=[
-    {text:"Honey never spoils — jars found in ancient tombs are still edible.",by:"Did you know?"},
+    {text:"Honey never spoils - jars found in ancient tombs are still edible.",by:"Did you know?"},
     {text:"Octopuses have three hearts and blue blood.",by:"Ocean fact"},
     {text:"Bananas are berries, but strawberries are not.",by:"Food quirk"},
     {text:"A day on Venus is longer than its year.",by:"Space fact"},
     {text:"Wombat poop is cube-shaped.",by:"Nature oddity"},
-    {text:"Lead from the back — and let others believe they are in front.",by:"Nelson Mandela"}
+    {text:"Lead from the back - and let others believe they are in front.",by:"Nelson Mandela"}
   ];
 
   const factEl=document.getElementById('facts');
@@ -131,7 +131,7 @@
     factEl.classList.remove('active');
     setTimeout(()=>{
       factEl.textContent=slides[i].text;
-      authorEl.textContent=`— ${slides[i].by}`;
+      authorEl.textContent=`- ${slides[i].by}`;
       factEl.classList.add('active');
       DOTS.forEach((d,k)=>d.classList.toggle('active',k===i));
     },180);

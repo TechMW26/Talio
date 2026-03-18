@@ -1,5 +1,5 @@
 /**
- * Backend API Route Tests — POST /api/tictactoe
+ * Backend API Route Tests - POST /api/tictactoe
  *
  * Tests the game logic functions (emitToUser, checkWinner) and
  * the TicTacToeGame Mongoose model independently of the Next.js
@@ -13,7 +13,7 @@
 const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 
-// ─── Win detection — same as in route.js ───
+// ─── Win detection - same as in route.js ───
 const WIN_LINES = [
     [0, 1, 2], [3, 4, 5], [6, 7, 8],
     [0, 3, 6], [1, 4, 7], [2, 5, 8],
@@ -66,7 +66,7 @@ afterEach(async () => {
 });
 
 // ════════════════════════════════════════════════════════════════
-// checkWinner — server-side win detection
+// checkWinner - server-side win detection
 // ════════════════════════════════════════════════════════════════
 describe('checkWinner()', () => {
     test('detects top row win for X', () => {
@@ -126,9 +126,9 @@ describe('checkWinner()', () => {
 });
 
 // ════════════════════════════════════════════════════════════════
-// Invite action — DB operations
+// Invite action - DB operations
 // ════════════════════════════════════════════════════════════════
-describe('action: invite — DB operations', () => {
+describe('action: invite - DB operations', () => {
     test('creates a pending game document with correct fields', async () => {
         const gameId = `ttt_${HOST_ID}_${GUEST_ID}_${Date.now()}`;
         const game = await TicTacToeGame.create({
@@ -203,9 +203,9 @@ describe('action: invite — DB operations', () => {
 });
 
 // ════════════════════════════════════════════════════════════════
-// Accept action — DB operations
+// Accept action - DB operations
 // ════════════════════════════════════════════════════════════════
-describe('action: accept — DB operations', () => {
+describe('action: accept - DB operations', () => {
     let gameId;
 
     beforeEach(async () => {
@@ -244,9 +244,9 @@ describe('action: accept — DB operations', () => {
 });
 
 // ════════════════════════════════════════════════════════════════
-// Decline action — DB operations
+// Decline action - DB operations
 // ════════════════════════════════════════════════════════════════
-describe('action: decline — DB operations', () => {
+describe('action: decline - DB operations', () => {
     test('transitions game from pending to declined', async () => {
         const gameId = `ttt_${HOST_ID}_${GUEST_ID}_${Date.now()}`;
         await TicTacToeGame.create({
@@ -285,9 +285,9 @@ describe('action: decline — DB operations', () => {
 });
 
 // ════════════════════════════════════════════════════════════════
-// Move action — DB operations + win detection
+// Move action - DB operations + win detection
 // ════════════════════════════════════════════════════════════════
-describe('action: move — DB operations', () => {
+describe('action: move - DB operations', () => {
     let gameId;
 
     beforeEach(async () => {
@@ -377,7 +377,7 @@ describe('action: move — DB operations', () => {
         const game = await TicTacToeGame.findOne({ gameId });
         const board = [...game.board];
 
-        // Cell 0 is already occupied — guard logic mirrors route.js
+        // Cell 0 is already occupied - guard logic mirrors route.js
         expect(board[0]).toBe('X');
         const isOccupied = board[0] != null;
         expect(isOccupied).toBe(true);
@@ -385,9 +385,9 @@ describe('action: move — DB operations', () => {
 });
 
 // ════════════════════════════════════════════════════════════════
-// Close action — DB operations
+// Close action - DB operations
 // ════════════════════════════════════════════════════════════════
-describe('action: close — DB operations', () => {
+describe('action: close - DB operations', () => {
     test('marks a playing game as ended', async () => {
         const gameId = `ttt_${HOST_ID}_${GUEST_ID}_${Date.now()}`;
         await TicTacToeGame.create({
@@ -444,9 +444,9 @@ describe('action: close — DB operations', () => {
 });
 
 // ════════════════════════════════════════════════════════════════
-// GET endpoints — DB queries
+// GET endpoints - DB queries
 // ════════════════════════════════════════════════════════════════
-describe('GET operations — DB queries', () => {
+describe('GET operations - DB queries', () => {
     test('check=pending returns the most recent pending invite for user', async () => {
         // Create a pending invite for GUEST_ID
         const gameId = `ttt_${HOST_ID}_${GUEST_ID}_${Date.now()}`;
@@ -532,7 +532,7 @@ describe('GET operations — DB queries', () => {
 });
 
 // ════════════════════════════════════════════════════════════════
-// emitToUser — helper function
+// emitToUser - helper function
 // ════════════════════════════════════════════════════════════════
 describe('emitToUser()', () => {
     test('does not throw when global.io is null', () => {

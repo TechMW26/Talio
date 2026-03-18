@@ -6,4 +6,4 @@
 // outside of the repository or coordinate with the devops team. Do NOT re-add a
 // repository-scoped CLI that manipulates production data without review.
 
-console.log('scripts/create-initial-admin.js is removed — use /setup page instead.');
+console.log('scripts/create-initial-admin.js is removed - use /setup page instead.');

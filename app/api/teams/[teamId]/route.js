@@ -94,7 +94,7 @@ export async function PUT(request, context) {
 
         await team.save()
 
-        // Sync user references — remove old, add new
+        // Sync user references - remove old, add new
         await syncTeamUserChanges(teamId, oldLeaders, team.teamLeaders.map(String), oldMembers, team.members.map(String), User)
 
         const populated = await Team.findById(teamId)

@@ -53,7 +53,7 @@ export async function POST(request, context) {
             }, { status: 400 })
         }
 
-        // Update department — backward compatible (set legacy field + array)
+        // Update department - backward compatible (set legacy field + array)
         dept.departmentManager = employeeIds[0]
         dept.departmentManagers = employeeIds
         await dept.save()

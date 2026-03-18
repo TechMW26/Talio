@@ -58,7 +58,7 @@ export async function GET(request) {
 
 /**
  * POST /api/auth/session
- * Refresh the JWT token — issues a new token with a fresh 7-day expiry.
+ * Refresh the JWT token - issues a new token with a fresh 7-day expiry.
  * The current token must still be valid (not expired).
  * Mobile apps should call this proactively when the token is nearing expiry.
  */

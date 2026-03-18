@@ -17,7 +17,7 @@ function isDesktopApp() {
 }
 
 /**
- * Perform fast synchronous redirect — called immediately on mount.
+ * Perform fast synchronous redirect - called immediately on mount.
  * Returns true if a redirect was initiated (caller should stop).
  */
 function fastRedirect() {
@@ -37,7 +37,7 @@ function fastRedirect() {
       return true
     }
   } catch {
-    // localStorage blocked — fall through to async check
+    // localStorage blocked - fall through to async check
   }
   return false
 }
@@ -49,7 +49,7 @@ export default function Home() {
     // 1. Instant redirect for the common cases (token present OR setup already done)
     if (fastRedirect()) return
 
-    // 2. Only first-time visitors reach here — check if setup is needed (fast timeout)
+    // 2. Only first-time visitors reach here - check if setup is needed (fast timeout)
     let cancelled = false
     const controller = new AbortController()
 
@@ -66,7 +66,7 @@ export default function Home() {
           return
         }
       } catch {
-        // timeout or network error — just proceed to login
+        // timeout or network error - just proceed to login
       }
 
       if (cancelled) return

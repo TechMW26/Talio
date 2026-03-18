@@ -67,7 +67,7 @@ export default function AttendanceReportPage() {
     return { startDate, endDate }
   }, [dateRange, customStartDate, customEndDate])
 
-  // SWR hooks — keys auto-change when filters change, triggering refetches
+  // SWR hooks - keys auto-change when filters change, triggering refetches
   const deptParam = selectedDepartment !== 'all' ? `&department=${selectedDepartment}` : ''
 
   const { data: deptsRes } = useAuthedSWR(isAuthorized ? '/api/departments' : null)

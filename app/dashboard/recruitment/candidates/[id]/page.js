@@ -238,7 +238,7 @@ export default function CandidateDetailPage() {
         <BackgroundRefreshIndicator isValidating={isValidating && !isLoading} position="inline" />
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-          {/* Main content — 2/3 */}
+          {/* Main content - 2/3 */}
           <div className="lg:col-span-2 space-y-4 sm:space-y-6">
             {/* Applied For */}
             {candidate.jobPosting && (
@@ -325,7 +325,7 @@ export default function CandidateDetailPage() {
                             {interview.feedback.map((fb, i) => (
                               <div key={i} className="text-xs text-default-600 mt-1">
                                 <span className="font-medium">{fb.interviewer?.firstName || 'Interviewer'}:</span>
-                                {' '}Rating {fb.rating}/5 — {fb.recommendation}
+                                {' '}Rating {fb.rating}/5 - {fb.recommendation}
                               </div>
                             ))}
                           </div>
@@ -366,7 +366,7 @@ export default function CandidateDetailPage() {
             </Card>
           </div>
 
-          {/* Sidebar — 1/3 */}
+          {/* Sidebar - 1/3 */}
           <div className="space-y-4 sm:space-y-6">
             {/* Profile Info */}
             <Card shadow="sm">

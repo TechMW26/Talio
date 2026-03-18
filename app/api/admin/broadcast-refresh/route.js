@@ -157,7 +157,7 @@ export async function POST(request) {
       }));
       await ForceRefresh.insertMany(docs);
       sentCount = docs.length;
-      console.log(`[Broadcast Refresh] ${user.email} stored refresh in DB for ${sentCount} users (${targetDescription}) — Socket.IO unavailable`);
+      console.log(`[Broadcast Refresh] ${user.email} stored refresh in DB for ${sentCount} users (${targetDescription}) - Socket.IO unavailable`);
     }
 
     return NextResponse.json({

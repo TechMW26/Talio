@@ -22,7 +22,7 @@ export async function GET(request) {
     const limit = searchParams.get('limit')
     const type = searchParams.get('type')
 
-    // Check Redis cache first (holidays change infrequently — 1 hour TTL)
+    // Check Redis cache first (holidays change infrequently - 1 hour TTL)
     const cacheKey = buildCacheKey({
       tenantId: tenant?.databaseName,
       role: 'any',

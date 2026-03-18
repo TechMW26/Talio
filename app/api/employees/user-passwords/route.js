@@ -12,7 +12,7 @@ import { decryptPassword, maskPassword } from '@/lib/passwordEncryption'
  * - Full password reveal requires a separate POST call to /api/employees/user-passwords/reveal
  * - Every access is logged to PasswordAuditLog
  * - Users who have changed their password (forcePasswordChange: false) have their
- *   encrypted password wiped — admin sees "Password changed by user" instead
+ *   encrypted password wiped - admin sees "Password changed by user" instead
  */
 export async function GET(request) {
   try {
@@ -66,7 +66,7 @@ export async function GET(request) {
       .sort({ createdAt: -1 })
       .lean()
 
-    // Map results — decrypt and MASK passwords for list view
+    // Map results - decrypt and MASK passwords for list view
     let results = users.map(u => {
       const employee = u.employeeId
 
@@ -76,7 +76,7 @@ export async function GET(request) {
       let passwordStatus = 'unknown'
 
       if (!u.forcePasswordChange && !u.encryptedOnboardingPassword) {
-        // User has changed their password — encrypted value should be wiped
+        // User has changed their password - encrypted value should be wiped
         passwordStatus = 'changed_by_user'
         hasPassword = false
       } else if (u.encryptedOnboardingPassword) {
@@ -105,7 +105,7 @@ export async function GET(request) {
         designation: employee?.designation?.title || '',
         role: u.role,
         isActive: u.isActive,
-        password: passwordMasked, // MASKED — never the real password in list responses
+        password: passwordMasked, // MASKED - never the real password in list responses
         hasPassword,
         passwordStatus,
         forcePasswordChange: u.forcePasswordChange,

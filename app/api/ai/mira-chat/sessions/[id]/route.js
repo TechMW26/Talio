@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 
-// GET — load a session with all messages
+// GET - load a session with all messages
 export async function GET(request, { params }) {
   try {
     const { id } = await params
@@ -18,7 +18,7 @@ export async function GET(request, { params }) {
   }
 }
 
-// PATCH — update session (add messages, rename)
+// PATCH - update session (add messages, rename)
 export async function PATCH(request, { params }) {
   try {
     const { id } = await params
@@ -68,7 +68,7 @@ export async function PATCH(request, { params }) {
   }
 }
 
-// DELETE — delete a session
+// DELETE - delete a session
 export async function DELETE(request, { params }) {
   try {
     const { id } = await params

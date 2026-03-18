@@ -15,7 +15,7 @@ export async function GET(request) {
     const { models, tenant } = auth
     const { Department, Employee } = models
 
-    // Check Redis cache first (departments rarely change — 5 min TTL)
+    // Check Redis cache first (departments rarely change - 5 min TTL)
     const cacheKey = buildCacheKey({
       tenantId: tenant?.databaseName,
       role: 'any',

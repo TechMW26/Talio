@@ -69,7 +69,7 @@ export function WebPushPrompt({ onClose }) {
 
     // Don't show if not supported, already subscribed, permission denied, or dismissed
     // Wait for initialization before deciding to show
-    // Don't show in Electron desktop app — it uses native notifications via DesktopNotificationPrompt
+    // Don't show in Electron desktop app - it uses native notifications via DesktopNotificationPrompt
     const isElectronApp = typeof window !== 'undefined' && (window.isElectron === true || window.electronAPI !== undefined);
     if (isElectronApp || !isInitialized || !isSupported || isSubscribed || permission === 'denied' || dismissed || subscribeSuccess) {
         // Show success message briefly before disappearing
@@ -132,7 +132,7 @@ export function WebPushPrompt({ onClose }) {
 
                     {/* Description */}
                     <p className="text-sm text-slate-500 dark:text-gray-400 mb-8 leading-relaxed max-w-sm mx-auto">
-                        Get instant alerts for leave approvals, attendance updates, tasks and more — even when you're not on this page.
+                        Get instant alerts for leave approvals, attendance updates, tasks and more - even when you're not on this page.
                     </p>
 
                     {/* Error message */}

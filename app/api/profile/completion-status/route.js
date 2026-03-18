@@ -17,7 +17,7 @@ export async function GET(request) {
     const { user: authUser, models, tenant } = auth
     const { User, Employee } = models
 
-    // Check Redis cache (5 min TTL — profile completion rarely changes mid-session)
+    // Check Redis cache (5 min TTL - profile completion rarely changes mid-session)
     const profileCacheKey = buildCacheKey({
       tenantId: tenant?.databaseName,
       role: 'any',

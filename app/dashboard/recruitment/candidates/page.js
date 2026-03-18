@@ -289,14 +289,14 @@ export default function CandidatesPage() {
                                   <p className="text-xs text-default-400">{candidate.email}</p>
                                 </td>
                                 <td className="px-4 py-3.5">
-                                  <p className="text-sm text-default-600 truncate max-w-[200px]">{candidate.jobPosting?.jobTitle || '—'}</p>
+                                  <p className="text-sm text-default-600 truncate max-w-[200px]">{candidate.jobPosting?.jobTitle || '-'}</p>
                                 </td>
                                 <td className="px-4 py-3.5">
-                                  <Chip size="sm" variant="flat" className="capitalize">{candidate.source || '—'}</Chip>
+                                  <Chip size="sm" variant="flat" className="capitalize">{candidate.source || '-'}</Chip>
                                 </td>
                                 <td className="px-4 py-3.5 text-center">
                                   <span className="text-sm text-default-600">
-                                    {candidate.totalExperience ? `${candidate.totalExperience} yr` : '—'}
+                                    {candidate.totalExperience ? `${candidate.totalExperience} yr` : '-'}
                                   </span>
                                 </td>
                                 <td className="px-4 py-3.5 text-center">
@@ -306,7 +306,7 @@ export default function CandidatesPage() {
                                       {candidate.rating}
                                     </span>
                                   ) : (
-                                    <span className="text-sm text-default-400">—</span>
+                                    <span className="text-sm text-default-400">-</span>
                                   )}
                                 </td>
                                 <td className="px-4 py-3.5 text-center">
@@ -314,7 +314,7 @@ export default function CandidatesPage() {
                                 </td>
                                 <td className="px-4 py-3.5 text-right">
                                   <span className="text-xs text-default-400">
-                                    {candidate.createdAt ? new Date(candidate.createdAt).toLocaleDateString() : '—'}
+                                    {candidate.createdAt ? new Date(candidate.createdAt).toLocaleDateString() : '-'}
                                   </span>
                                 </td>
                               </tr>

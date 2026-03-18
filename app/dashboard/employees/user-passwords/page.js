@@ -93,7 +93,7 @@ export default function UserPasswordsPage() {
   // Reveal a password (calls secure API)
   const handleRevealPassword = useCallback(async (userId) => {
     if (revealedPasswords[userId]) {
-      // Toggle off — hide the revealed password
+      // Toggle off - hide the revealed password
       setRevealedPasswords(prev => {
         const next = { ...prev }
         delete next[userId]
@@ -156,7 +156,7 @@ export default function UserPasswordsPage() {
     })
   }
 
-  // Get display password — either revealed (full) or masked from API
+  // Get display password - either revealed (full) or masked from API
   const getDisplayPassword = (user) => {
     if (revealedPasswords[user._id]) {
       return revealedPasswords[user._id]

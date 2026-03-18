@@ -25,7 +25,7 @@ export async function GET(request) {
     // Include today's date in cache key so it auto-refreshes daily
     const todayKey = new Date().toISOString().slice(0, 10)
 
-    // Check Redis cache (30s TTL — task list is user-specific and changes moderately)
+    // Check Redis cache (30s TTL - task list is user-specific and changes moderately)
     const cacheKey = buildCacheKey({
       tenantId: tenant?.databaseName,
       role: user.role || 'employee',

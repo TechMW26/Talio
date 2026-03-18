@@ -17,7 +17,7 @@ export default function RouteProgressBar() {
 
   useEffect(() => {
     if (isNavigating) {
-      // Start — show immediately
+      // Start - show immediately
       clearTimeout(hideTimerRef.current)
       setIsVisible(true)
       setProgress(0)
@@ -37,7 +37,7 @@ export default function RouteProgressBar() {
         })
       }, 250)
     } else if (isVisible) {
-      // Navigation complete — finish the bar
+      // Navigation complete - finish the bar
       clearInterval(timerRef.current)
       setProgress(100)
 

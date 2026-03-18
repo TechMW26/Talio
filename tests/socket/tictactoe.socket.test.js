@@ -12,14 +12,14 @@
 
 const { createTestSocketServer, createTestClient } = require('../helpers/socketHelper');
 
-// ─── emitToUser — mirrors the API route's helper exactly ───
+// ─── emitToUser - mirrors the API route's helper exactly ───
 function emitToUser(userId, event, payload) {
     const io = global.io;
     if (!io) return;
     io.to(`user:${userId}`).emit(event, payload);
 }
 
-describe('Socket.IO — Tic-Tac-Toe Real-Time Events', () => {
+describe('Socket.IO - Tic-Tac-Toe Real-Time Events', () => {
     let io, httpServer, port;
     let hostSocket, guestSocket;
 

@@ -6,14 +6,14 @@ import { sendPushToUser } from '@/lib/pushNotification'
 function emitToUser(userId, event, payload) {
   const io = global.io
   if (!io) {
-    console.error(`[TicTacToe:Emit] ❌ global.io is NULL — cannot emit ${event} to user ${userId}`);
+    console.error(`[TicTacToe:Emit] ❌ global.io is NULL - cannot emit ${event} to user ${userId}`);
     return
   }
   const room = `user:${userId}`
   const roomSize = io.sockets?.adapter?.rooms?.get(room)?.size ?? 0;
   console.log(`[TicTacToe:Emit] Emitting ${event} to room "${room}" (size: ${roomSize})`);
   if (roomSize === 0) {
-    console.warn(`[TicTacToe:Emit] ⚠️ Room "${room}" has 0 connected sockets — event will be lost!`);
+    console.warn(`[TicTacToe:Emit] ⚠️ Room "${room}" has 0 connected sockets - event will be lost!`);
   }
   io.to(room).emit(event, payload)
 }
@@ -34,12 +34,12 @@ function checkWinner(board) {
 /**
  * GET /api/tictactoe
  *
- * Smart-polling compatible — clients poll during active game phases only.
+ * Smart-polling compatible - clients poll during active game phases only.
  *
  * Endpoints:
- *   1. ?check=history  — Load game history on widget mount (one-time)
- *   2. ?check=pending  — Check for pending invites (polled every ~5s when idle)
- *   3. ?gameId=xxx     — Poll game state (every ~1.5s during active game)
+ *   1. ?check=history  - Load game history on widget mount (one-time)
+ *   2. ?check=pending  - Check for pending invites (polled every ~5s when idle)
+ *   3. ?gameId=xxx     - Poll game state (every ~1.5s during active game)
  */
 export async function GET(request) {
   try {
@@ -64,7 +64,7 @@ export async function GET(request) {
       return NextResponse.json({ success: true, invite: pending || null })
     }
 
-    // Game history — last 10 finished games for this user
+    // Game history - last 10 finished games for this user
     if (check === 'history') {
       const games = await TicTacToeGame.find({
         $or: [{ hostUserId: userId }, { guestUserId: userId }],
@@ -105,7 +105,7 @@ export async function GET(request) {
 }
 
 /**
- * POST /api/tictactoe — DB-first game actions. Clients poll for state changes.
+ * POST /api/tictactoe - DB-first game actions. Clients poll for state changes.
  * Body: { action, targetUserId, ...payload }
  * Actions: invite | accept | decline | move | end
  */
@@ -193,7 +193,7 @@ export async function POST(request) {
         console.log(`[TicTacToe] Push target: userId=${targetUserId} email=${guestUser?.email ?? 'NOT_FOUND'} fcmTokens=${tokenCount}`)
 
         if (tokenCount === 0) {
-          console.warn(`[TicTacToe] ⚠️ Guest ${targetUserId} has 0 FCM tokens — push delivery impossible`)
+          console.warn(`[TicTacToe] ⚠️ Guest ${targetUserId} has 0 FCM tokens - push delivery impossible`)
         }
 
         const pushResult = await sendPushToUser(targetUserId, {
@@ -224,7 +224,7 @@ export async function POST(request) {
         hostAvatar: senderAvatar,
         createdAt: game.createdAt,
       })
-      console.log('Invite emit fired. Guest was in room:', guestInviteRoomSize > 0 ? 'YES' : 'NO — event dropped silently');
+      console.log('Invite emit fired. Guest was in room:', guestInviteRoomSize > 0 ? 'YES' : 'NO - event dropped silently');
       console.log('=== END TICTACTOE:INVITE ===\n');
     }
 
@@ -252,7 +252,7 @@ export async function POST(request) {
       if (!game) {
         console.error('[TicTacToe:Accept] ❌ Game NOT found in DB for gameId:', gameId);
       } else {
-        console.log('[TicTacToe:Accept] ✅ DB updated — status now:', game.status);
+        console.log('[TicTacToe:Accept] ✅ DB updated - status now:', game.status);
         console.log('[TicTacToe:Accept] hostUserId:', game.hostUserId);
         console.log('[TicTacToe:Accept] guestUserId:', game.guestUserId);
         console.log('[TicTacToe:Accept] senderId (guest accepting):', senderId);
@@ -288,8 +288,8 @@ export async function POST(request) {
         console.log('[TicTacToe:Accept] Emitting to guest (sender):', senderId);
         emitToUser(senderId, 'tictactoe:accept', acceptPayload)
         console.log('[TicTacToe:Accept] ✅ Socket.IO emit completed for both players');
-        console.log('Accept emit fired. Host in room:', hostRoomSize > 0 ? 'YES' : 'NO — event dropped');
-        console.log('Accept emit fired. Guest in room:', guestRoomSize > 0 ? 'YES' : 'NO — event dropped');
+        console.log('Accept emit fired. Host in room:', hostRoomSize > 0 ? 'YES' : 'NO - event dropped');
+        console.log('Accept emit fired. Guest in room:', guestRoomSize > 0 ? 'YES' : 'NO - event dropped');
         console.log('=== END TICTACTOE:ACCEPT ===\n');
       }
       console.log('[TicTacToe:Accept] ──────────────────────────────────');
@@ -357,7 +357,7 @@ export async function POST(request) {
         { new: true }
       )
       if (!game) {
-        // Already ended by move handler — just fetch current state
+        // Already ended by move handler - just fetch current state
         game = await TicTacToeGame.findOne({ gameId }).lean()
       }
     }

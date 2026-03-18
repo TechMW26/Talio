@@ -179,7 +179,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
       className="h-[60.5px] bg-content1 w-full z-[40] shadow-[0_2px_6px_rgba(15,23,42,0.08)] dark:shadow-[0_2px_6px_rgba(0,0,0,0.3)] transition-all duration-300 flex-shrink-0"
     >
       <div className="flex items-center justify-between px-1 sm:px-4 lg:px-6 h-[60.5px] lg:h-[60px]">
-        {/* Left side — Hamburger (mobile/tablet) + Search pill */}
+        {/* Left side - Hamburger (mobile/tablet) + Search pill */}
         <div className="flex items-center space-x-2 sm:space-x-3 flex-1">
           <Button
             isIconOnly
@@ -236,7 +236,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
           {/* Separator */}
           <div className="hidden md:block w-px h-7 bg-slate-400 dark:bg-slate-300/40 mx-1" />
 
-          {/* Search Pill Button — opens floating search overlay */}
+          {/* Search Pill Button - opens floating search overlay */}
           <div ref={searchRef}>
             <button
               onClick={() => {
@@ -378,7 +378,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
           </div>
         </div>
 
-        {/* Right side — MIRA + Focus Timer + Refresh */}
+        {/* Right side - MIRA + Focus Timer + Refresh */}
         <div className="flex items-center space-x-1 sm:space-x-2 flex-shrink-0">
           {/* Focus Timer Pill */}
           <FocusTimerPill />
@@ -393,7 +393,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
             <FaSyncAlt className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
           </Button>
 
-          {/* Theme Toggle — Sun/Moon pill */}
+          {/* Theme Toggle - Sun/Moon pill */}
           <button
             onClick={() => setDarkModePreference(isDarkMode ? 'light' : 'dark')}
             className={`hidden md:flex items-center w-[52px] h-7 rounded-full p-[3px] transition-colors duration-400 relative cursor-pointer ${isDarkMode ? 'bg-slate-700' : 'bg-amber-100'}`}
@@ -530,7 +530,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
   )
 }
 
-// Focus Timer Pill — persists in header when timer is active
+// Focus Timer Pill - persists in header when timer is active
 function FocusTimerPill() {
   const { running, done, mins, secs, pct, toggle, reset } = useFocusTimer()
   const pathname = usePathname()

@@ -173,7 +173,7 @@ export function UnreadMessagesProvider({ children }) {
     return unsubscribe
   }, [onNewMessage])
 
-  // Debounced fetch — prevents rapid-fire API calls when multiple socket events arrive
+  // Debounced fetch - prevents rapid-fire API calls when multiple socket events arrive
   const debouncedFetchUnread = useCallback(() => {
     if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
     debounceTimerRef.current = setTimeout(() => {
@@ -203,7 +203,7 @@ export function UnreadMessagesProvider({ children }) {
   // false→true (reconnect): re-fetch to sync missed events
   useEffect(() => {
     if (isConnected && wasConnectedRef.current === false) {
-      console.log('[UnreadMessages] Socket reconnected — syncing unread count')
+      console.log('[UnreadMessages] Socket reconnected - syncing unread count')
       fetchUnreadCount()
     }
     wasConnectedRef.current = isConnected

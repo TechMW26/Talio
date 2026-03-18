@@ -25,7 +25,7 @@ export function PageTransitionProvider({ children }) {
   // When pathname changes, navigation is complete
   useEffect(() => {
     if (prevPathnameRef.current !== pathname) {
-      // Route actually changed — clear immediately so spinner doesn't linger
+      // Route actually changed - clear immediately so spinner doesn't linger
       prevPathnameRef.current = pathname
       setIsNavigating(false)
       setTargetPath(null)
@@ -67,7 +67,7 @@ export function PageTransitionProvider({ children }) {
       const path = href.split('?')[0].split('#')[0]
       if (path === pathnameRef.current) return
 
-      // Skip non-dashboard links (login, etc.) — they leave this layout
+      // Skip non-dashboard links (login, etc.) - they leave this layout
       if (!path.startsWith('/dashboard')) return
 
       setTargetPath(path)
@@ -132,7 +132,7 @@ export function PageTransitionProvider({ children }) {
       history.replaceState = originalReplaceState
       window.removeEventListener('popstate', handlePopState)
     }
-  }, []) // Run once — uses refs for current pathname
+  }, []) // Run once - uses refs for current pathname
 
   // Call this when starting navigation
   const startNavigation = useCallback((path) => {

@@ -674,7 +674,7 @@ export async function PATCH(request, { params }) {
     await employee.save()
 
     // If status changed to terminated or resigned, deactivate the user account
-    // Admins cannot be deactivated this way — only superadmin can deactivate admins
+    // Admins cannot be deactivated this way - only superadmin can deactivate admins
     if (updateData.status && ['terminated', 'resigned'].includes(updateData.status)) {
       await User.findOneAndUpdate(
         { employeeId: id, role: { $ne: 'admin' } },

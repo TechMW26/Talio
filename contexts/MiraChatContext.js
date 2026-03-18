@@ -126,7 +126,7 @@ export function MiraChatProvider({ children }) {
           })
         }
       }
-    } catch { /* ignore — saving is best-effort */ }
+    } catch { /* ignore - saving is best-effort */ }
   }, [activeSessionId])
 
   const openChat = useCallback(() => {

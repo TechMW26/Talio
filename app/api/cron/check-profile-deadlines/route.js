@@ -19,7 +19,7 @@ export const maxDuration = 60
 
 /**
  * Process profile deadline checks for a single tenant
- * NOTE: This now only reports overdue users — it does NOT deactivate them.
+ * NOTE: This now only reports overdue users - it does NOT deactivate them.
  */
 async function checkProfileDeadlinesForTenant(tenant, now) {
   const results = {

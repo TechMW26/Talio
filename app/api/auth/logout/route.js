@@ -11,7 +11,7 @@ import { enqueueAnalysis, getQueueStatus } from '@/lib/productivityQueue';
  */
 export async function POST(request) {
     try {
-        // Auth + models — need ProductivitySession to find un-analyzed sessions
+        // Auth + models - need ProductivitySession to find un-analyzed sessions
         const auth = await getAuthAndModels(request, ['ProductivitySession']);
         if (!auth.success) {
             // Even if auth fails, the client should still clear local state
@@ -70,7 +70,7 @@ export async function POST(request) {
         });
     } catch (error) {
         console.error('Logout error:', error);
-        // Always return success for logout — client should clear state regardless
+        // Always return success for logout - client should clear state regardless
         return NextResponse.json({ success: true, message: 'Logged out' });
     }
 }

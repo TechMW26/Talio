@@ -77,7 +77,7 @@ export async function GET(request) {
       })
     }
 
-    // 🔥 BLOCKING cache warming — populates Redis for dashboard APIs
+    // 🔥 BLOCKING cache warming - populates Redis for dashboard APIs
     // Awaits warming BEFORE returning validate response so the browser's
     // dashboard API calls (fired after validate returns) all hit warm cache.
     // Net effect: validate takes ~3-5s, but total page load is FASTER
@@ -88,7 +88,7 @@ export async function GET(request) {
       employeeId: user.employeeId?.toString() || '',
       userId: payload.userId,
       blocking: true,
-      maxWaitMs: 10000, // Safety timeout — don't block more than 10s
+      maxWaitMs: 10000, // Safety timeout - don't block more than 10s
     })
 
     return response

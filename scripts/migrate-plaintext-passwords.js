@@ -156,7 +156,7 @@ async function migrateTenantDatabase(uri, dbName) {
                 const encrypted = encryptPassword(doc.plaintextPassword);
 
                 if (!encrypted) {
-                    log('warn', `  Skipping user ${doc.email} — encryption returned null`);
+                    log('warn', `  Skipping user ${doc.email} - encryption returned null`);
                     continue;
                 }
 

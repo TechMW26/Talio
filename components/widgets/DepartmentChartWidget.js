@@ -133,7 +133,7 @@ export default function DepartmentChartWidget({ departmentStats = [] }) {
                 onMouseEnter={() => setHoveredIndex(index)}
                 onMouseLeave={() => setHoveredIndex(null)}
               >
-                {/* Bar — fills full slot width */}
+                {/* Bar - fills full slot width */}
                 <div
                   className="w-full cursor-pointer transition-all duration-200 rounded-t"
                   style={{

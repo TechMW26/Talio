@@ -24,7 +24,7 @@ function isElectronApp() {
  * 
  * PERFORMANCE FIX: Previously used a 936KB Lottie animation (splash-animation.json)
  * containing 83 embedded base64 webp images, causing 166+ network requests on page load.
- * Now uses a pure CSS animation with the existing app icon — zero extra requests.
+ * Now uses a pure CSS animation with the existing app icon - zero extra requests.
  * 
  * NON-BLOCKING: Children always render immediately, splash is just an overlay on top.
  */

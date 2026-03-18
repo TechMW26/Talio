@@ -152,7 +152,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
     }
   }, [])
 
-  // Debounced sidebar fetch — prevents rapid-fire API calls
+  // Debounced sidebar fetch - prevents rapid-fire API calls
   const debouncedFetchSidebarCounts = useCallback(() => {
     if (sidebarDebounceRef.current) clearTimeout(sidebarDebounceRef.current)
     sidebarDebounceRef.current = setTimeout(() => {
@@ -184,7 +184,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
   // false→true (reconnect): re-fetch to sync missed events
   useEffect(() => {
     if (mounted && user && isConnected && wasConnectedRef.current === false) {
-      console.log('[Sidebar] Socket reconnected — syncing sidebar counts')
+      console.log('[Sidebar] Socket reconnected - syncing sidebar counts')
       fetchSidebarCounts()
     }
     wasConnectedRef.current = isConnected

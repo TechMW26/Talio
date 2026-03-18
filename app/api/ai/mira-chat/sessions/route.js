@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 
-// GET — list all sessions for the user (titles + ids, sorted by recent)
+// GET - list all sessions for the user (titles + ids, sorted by recent)
 export async function GET(request) {
   try {
     const { success, user, models, message } = await getAuthAndModels(request, ['MiraChatSession'])
@@ -20,7 +20,7 @@ export async function GET(request) {
   }
 }
 
-// POST — create a new session
+// POST - create a new session
 export async function POST(request) {
   try {
     const { success, user, models, message } = await getAuthAndModels(request, ['MiraChatSession'])

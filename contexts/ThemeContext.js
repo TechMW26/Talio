@@ -239,7 +239,7 @@ export function ThemeProvider({ children }) {
   const resolveDarkMode = useCallback((pref) => {
     if (pref === 'dark') return true
     if (pref === 'light') return false
-    // 'auto' — follow system
+    // 'auto' - follow system
     if (typeof window !== 'undefined') {
       return window.matchMedia('(prefers-color-scheme: dark)').matches
     }
@@ -330,7 +330,7 @@ export function ThemeProvider({ children }) {
     }
   }
 
-  // Legacy toggle — cycles auto → dark → light → auto
+  // Legacy toggle - cycles auto → dark → light → auto
   const toggleDarkMode = () => {
     const next = darkModePref === 'auto' ? 'dark' : darkModePref === 'dark' ? 'light' : 'auto'
     setDarkModePreference(next)

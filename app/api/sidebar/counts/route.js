@@ -34,7 +34,7 @@ export async function GET(request) {
       Expense, Helpdesk, Notification, Task, TaskAssignee
     } = models
 
-    // Check Redis cache first (30s TTL — badge counts are near-real-time)
+    // Check Redis cache first (30s TTL - badge counts are near-real-time)
     const cacheKey = buildCacheKey({
       tenantId: tenant?.databaseName,
       role: user.role || 'employee',
@@ -209,7 +209,7 @@ export async function GET(request) {
     }
 
     const responseData = { success: true, data: counts }
-    // Cache for 30s — short enough to reflect real changes, long enough to reduce DB hits
+    // Cache for 30s - short enough to reflect real changes, long enough to reduce DB hits
     await setCache(cacheKey, responseData, 60).catch(() => { }) // 60s TTL
 
     return NextResponse.json(responseData)

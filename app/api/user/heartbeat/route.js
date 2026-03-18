@@ -43,7 +43,7 @@ export async function POST(request) {
 
 /**
  * DELETE /api/user/heartbeat
- * Called when user logs out or closes the tab — removes their presence entry.
+ * Called when user logs out or closes the tab - removes their presence entry.
  */
 export async function DELETE(request) {
   try {

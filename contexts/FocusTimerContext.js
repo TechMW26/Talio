@@ -85,7 +85,7 @@ export function FocusTimerProvider({ children }) {
 
   const toggle = useCallback(() => {
     if (left === 0) {
-      // Reset when done — also stop alarm
+      // Reset when done - also stop alarm
       dismissAlarm()
       setTotal(duration * 60)
       setLeft(duration * 60)

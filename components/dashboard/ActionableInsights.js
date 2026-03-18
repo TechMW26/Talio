@@ -19,7 +19,7 @@ import {
   HiOutlineTrophy,
 } from 'react-icons/hi2'
 
-// ─── Tic-Tac-Toe Card (invite trigger only — game plays in popup) ───
+// ─── Tic-Tac-Toe Card (invite trigger only - game plays in popup) ───
 function TicTacToeCard() {
   const { openInvite, hasIncomingInvite } = useTicTacToe()
   const [phase, setPhase] = useState('idle') // idle | searching
@@ -544,7 +544,7 @@ export default function ActionableInsights() {
         <LocationMapCard />
       </div>
 
-      {/* Sticky Note — full width */}
+      {/* Sticky Note - full width */}
       <StickyNoteCard />
     </div>
   )

@@ -71,7 +71,7 @@ export async function GET(request) {
 
 /**
  * POST /api/redis-status
- * Body: { action: 'reset' } — resets the Redis connection state and forces a reconnect.
+ * Body: { action: 'reset' } - resets the Redis connection state and forces a reconnect.
  */
 export async function POST(request) {
     try {

@@ -53,7 +53,7 @@ export async function POST(request) {
         const { user, models } = auth
         const { Team, Department, User } = models
 
-        // Role check — admin, hr, department_head, department_manager
+        // Role check - admin, hr, department_head, department_manager
         if (!hasRole(user, ['admin', 'hr', 'department_head', 'department_manager'])) {
             return NextResponse.json({ success: false, message: 'Insufficient permissions' }, { status: 403 })
         }

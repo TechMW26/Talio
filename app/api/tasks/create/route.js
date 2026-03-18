@@ -43,7 +43,7 @@ export async function POST(request) {
       estimatedHours,
       subtasks = [],
       attachments: rawAttachments,
-      projectId // Optional — if provided, task is linked to this project
+      projectId // Optional - if provided, task is linked to this project
     } = body
 
     if (!title || !title.trim()) {

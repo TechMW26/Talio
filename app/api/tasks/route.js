@@ -25,7 +25,7 @@ export async function GET(request) {
     const view = searchParams.get('view')
     const dueDate = searchParams.get('dueDate')
 
-    // Check Redis cache (60s TTL — project list changes infrequently)
+    // Check Redis cache (60s TTL - project list changes infrequently)
     const cacheKey = buildCacheKey({
       tenantId: tenant?.databaseName,
       role: user.role || 'employee',

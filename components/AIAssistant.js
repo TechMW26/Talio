@@ -167,7 +167,7 @@ export default function AIAssistant() {
             </ModalHeader>
 
             <ModalBody>
-              {/* Guidance Context Banner — friendly, non-alarming */}
+              {/* Guidance Context Banner - friendly, non-alarming */}
               {errorContext && (
                 <div className="bg-primary-50 dark:bg-primary-900/15 border border-primary-200 dark:border-primary-700/40 rounded-xl p-4 mb-4">
                   <div className="flex items-start gap-3">

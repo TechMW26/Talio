@@ -1,5 +1,5 @@
 /**
- * E2E — Complete Tic-Tac-Toe Game Flow via Socket.IO
+ * E2E - Complete Tic-Tac-Toe Game Flow via Socket.IO
  *
  * Full game flows using a real in-process Socket.IO server + MongoDB.
  * These tests verify the entire event chain:
@@ -13,7 +13,7 @@ const mongoose = require('mongoose');
 const { MongoMemoryServer } = require('mongodb-memory-server');
 const { createTestSocketServer, createTestClient } = require('../helpers/socketHelper');
 
-// ─── checkWinner — mirrors route.js ───
+// ─── checkWinner - mirrors route.js ───
 const WIN_LINES = [
     [0, 1, 2], [3, 4, 5], [6, 7, 8],
     [0, 3, 6], [1, 4, 7], [2, 5, 8],
@@ -26,7 +26,7 @@ function checkWinner(board) {
     return board.every(c => c) ? { winner: 'draw', line: null } : null;
 }
 
-// ─── emitToUser — mirrors route.js ───
+// ─── emitToUser - mirrors route.js ───
 function emitToUser(userId, event, payload) {
     const io = global.io;
     if (!io) return;
@@ -205,7 +205,7 @@ async function simulateAction(senderId, action, targetUserId, payload = {}) {
 // ════════════════════════════════════════════════════════════════
 // Full Game: Invite → Accept → Win
 // ════════════════════════════════════════════════════════════════
-describe('E2E — Full Game Flow', () => {
+describe('E2E - Full Game Flow', () => {
 
     test('Invite → Accept → Moves → Win: all via Socket.IO', (done) => {
         const gameId = `ttt_e2e_win_${Date.now()}`;
@@ -228,7 +228,7 @@ describe('E2E — Full Game Flow', () => {
             events.push(`accept:${acceptCount}`);
 
             if (acceptCount === 2) {
-                // Step 4: Play a winning sequence — top row for X
+                // Step 4: Play a winning sequence - top row for X
                 // Host (X) plays 0, Guest (O) plays 3, Host plays 1, Guest plays 4, Host plays 2 → WIN
                 await simulateAction(HOST_ID, 'move', GUEST_ID, { gameId, index: 0, symbol: 'X' });
             }
@@ -250,7 +250,7 @@ describe('E2E — Full Game Flow', () => {
                 // Guest responds to move 1
                 await simulateAction(GUEST_ID, 'move', HOST_ID, { gameId, index: 4, symbol: 'O' });
             }
-            // moveCount 3 is the winning move — guest also gets tictactoe:end
+            // moveCount 3 is the winning move - guest also gets tictactoe:end
         });
 
         hostSocket.on('tictactoe:move', async (data) => {

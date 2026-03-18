@@ -73,7 +73,7 @@ export async function PUT(request, { params }) {
 
     const employeeId = user.employeeId?._id || user.employeeId
 
-    // Handle stage change — push to stageHistory
+    // Handle stage change - push to stageHistory
     if (data.stage && data.stage !== existing.stage) {
       if (!existing.stageHistory) existing.stageHistory = []
       existing.stageHistory.push({

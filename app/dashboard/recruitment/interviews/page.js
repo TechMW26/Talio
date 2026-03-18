@@ -281,7 +281,7 @@ export default function InterviewsPage() {
                                 </p>
                                 <p className="text-xs text-default-500 mt-0.5">
                                   {interview.candidate?.firstName} {interview.candidate?.lastName}
-                                  {interview.jobPosting?.jobTitle ? ` — ${interview.jobPosting.jobTitle}` : ''}
+                                  {interview.jobPosting?.jobTitle ? ` - ${interview.jobPosting.jobTitle}` : ''}
                                 </p>
                                 <div className="flex flex-wrap items-center gap-2 mt-2 text-xs text-default-400">
                                   <span>

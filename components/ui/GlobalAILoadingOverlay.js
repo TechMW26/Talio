@@ -293,7 +293,7 @@ export default function GlobalAILoadingOverlay() {
     let phaseStartTime = Date.now()
     let lastFrameTime = performance.now()
     
-    // Pulsating blur state — synced with particle motion speed
+    // Pulsating blur state - synced with particle motion speed
     let smoothedBlur = 2
     const BLUR_MIN = 2
     const BLUR_MAX = 12

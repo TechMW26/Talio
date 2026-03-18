@@ -234,7 +234,7 @@ export async function POST(request, { params }) {
 
         return NextResponse.json({
             success: true,
-            message: 'Webhook secret rotated. Save the new secret — it will not be shown again.',
+            message: 'Webhook secret rotated. Save the new secret - it will not be shown again.',
             data: {
                 _id: webhook._id,
                 secret: newSecret,

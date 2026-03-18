@@ -322,7 +322,7 @@ export default function SlidingSidebar({
 
         {/* Scrollable Menu Section */}
         <ScrollShadow ref={scrollContainerRef} className="pt-4 pb-8 flex-1 scrollbar-hide px-3 space-y-1">
-          {/* Profile — top of menu */}
+          {/* Profile - top of menu */}
           <Link
             href="/dashboard/profile"
             onClick={() => handleLinkClick('/dashboard/profile')}
@@ -488,7 +488,7 @@ export default function SlidingSidebar({
             )
           })}
 
-          {/* Divider + Settings / Logout — bottom of menu */}
+          {/* Divider + Settings / Logout - bottom of menu */}
           <div className="my-2 mx-2 border-t" style={{ borderColor: 'var(--color-primary-200)' }} />
 
           <Link

@@ -75,7 +75,7 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ success: false, message: 'Task not found' }, { status: 404 })
     }
 
-    // For standalone tasks, if it has a project, reject — use project route instead
+    // For standalone tasks, if it has a project, reject - use project route instead
     if (task.project) {
       return NextResponse.json({
         success: false,

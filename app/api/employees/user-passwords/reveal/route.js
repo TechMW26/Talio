@@ -60,7 +60,7 @@ export async function POST(request) {
         if (!targetUser.forcePasswordChange && !targetUser.encryptedOnboardingPassword) {
             return NextResponse.json({
                 success: false,
-                message: 'Password changed by user — onboarding password is no longer available',
+                message: 'Password changed by user - onboarding password is no longer available',
                 passwordStatus: 'changed_by_user',
             }, { status: 410 })
         }
@@ -79,7 +79,7 @@ export async function POST(request) {
         if (!decrypted) {
             return NextResponse.json({
                 success: false,
-                message: 'Failed to decrypt password — encryption key may have changed',
+                message: 'Failed to decrypt password - encryption key may have changed',
                 passwordStatus: 'decryption_failed',
             }, { status: 500 })
         }

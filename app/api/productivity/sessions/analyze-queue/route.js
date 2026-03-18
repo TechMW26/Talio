@@ -24,7 +24,7 @@ export async function POST(request) {
         try {
             body = await request.json();
         } catch {
-            // No body — will find all un-analyzed sessions
+            // No body - will find all un-analyzed sessions
         }
 
         let sessionIds = body.sessionIds || [];

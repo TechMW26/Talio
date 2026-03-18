@@ -60,7 +60,7 @@ services:
       - certbot_etc:/etc/letsencrypt
       - certbot_var:/var/lib/letsencrypt
       - webroot:/var/www/certbot
-    # No entrypoint override — the deploy script and cron call
+    # No entrypoint override - the deploy script and cron call
     # `docker compose run --rm certbot certonly ...` or `certbot renew` directly.
     networks:
       - talio-network

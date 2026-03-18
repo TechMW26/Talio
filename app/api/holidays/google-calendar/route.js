@@ -8,8 +8,8 @@ import { getAuthAndModels } from '@/lib/auth'
  * Uses the Google Calendar API v3 with a simple API key (no OAuth needed for public calendars).
  * 
  * Required env variables:
- *   GOOGLE_CALENDAR_API_KEY   — API key from Google Cloud Console
- *   GOOGLE_CALENDAR_COUNTRY   — Country code for holiday calendar (e.g. 'indian', 'usa', 'uk')
+ *   GOOGLE_CALENDAR_API_KEY   - API key from Google Cloud Console
+ *   GOOGLE_CALENDAR_COUNTRY   - Country code for holiday calendar (e.g. 'indian', 'usa', 'uk')
  * 
  * Calendar ID format: en.{country}#holiday@group.v.calendar.google.com
  * 
@@ -84,7 +84,7 @@ function resolveCalendarId(country) {
     return `en.${slug}%23holiday%40group.v.calendar.google.com`
 }
 
-// POST — Fetch holidays from Google Calendar and save to DB
+// POST - Fetch holidays from Google Calendar and save to DB
 export async function POST(request) {
     try {
         const auth = await getAuthAndModels(request, ['Holiday'])
@@ -206,7 +206,7 @@ export async function POST(request) {
             }
 
             if (existing) {
-                // Only update google-calendar sourced holidays — never overwrite manual ones
+                // Only update google-calendar sourced holidays - never overwrite manual ones
                 existing.description = holidayData.description
                 existing.type = holidayData.type
                 existing.googleEventId = event.id || existing.googleEventId
@@ -249,7 +249,7 @@ export async function POST(request) {
     }
 }
 
-// GET — Check Google Calendar integration status
+// GET - Check Google Calendar integration status
 export async function GET(request) {
     try {
         const auth = await getAuthAndModels(request, ['Holiday'])

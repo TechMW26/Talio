@@ -95,7 +95,7 @@ export async function POST(request) {
         // Return the secret ONLY on creation (it won't be shown again)
         return NextResponse.json({
             success: true,
-            message: 'Webhook created successfully. Save the secret — it will not be shown again.',
+            message: 'Webhook created successfully. Save the secret - it will not be shown again.',
             data: {
                 _id: webhook._id,
                 url: webhook.url,

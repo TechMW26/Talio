@@ -3,7 +3,7 @@
    Comprehensive dark theme support for Talio
    ============================================ */
 
-/* Global ring-offset fix — default offset color is white, override to dark bg */
+/* Global ring-offset fix - default offset color is white, override to dark bg */
 html.dark * {
   --tw-ring-offset-color: #0F172A;
 }
@@ -68,7 +68,7 @@ html.dark [data-slot="base"].skeleton {
   background-color: #334155 !important;
 }
 
-/* Animate-pulse skeleton blocks — override light gray backgrounds */
+/* Animate-pulse skeleton blocks - override light gray backgrounds */
 html.dark .animate-pulse .bg-gray-200,
 html.dark .animate-pulse .bg-gray-100,
 html.dark .animate-pulse .bg-slate-200,
@@ -457,7 +457,7 @@ html.dark [data-focus="true"] {
   --tw-ring-color: transparent !important;
 }
 
-/* HeroUI Select trigger — dark background */
+/* HeroUI Select trigger - dark background */
 html.dark [data-slot="trigger"] {
   background-color: #273548 !important;
   border-color: #334155 !important;
@@ -731,7 +731,7 @@ html.dark .border-white\/20 {
   border-color: transparent !important;
 }
 
-/* HeroUI semantic borders — transparent in dark */
+/* HeroUI semantic borders - transparent in dark */
 html.dark .border-default-100,
 html.dark .border-default-200,
 html.dark .border-default-50,
@@ -770,7 +770,7 @@ html.dark tbody tr {
   border-color: rgba(51, 65, 85, 0.4) !important;
 }
 
-/* Calendar / grid borders — subtle */
+/* Calendar / grid borders - subtle */
 html.dark .border-gray-200,
 html.dark .border-slate-200 {
   border-color: rgba(51, 65, 85, 0.4) !important;
@@ -783,7 +783,7 @@ html.dark textarea {
   border-color: #334155 !important;
 }
 
-/* Native form inputs in modals — dark background + subtle border */
+/* Native form inputs in modals - dark background + subtle border */
 html.dark input[type="date"],
 html.dark input[type="time"],
 html.dark input[type="text"],
@@ -805,7 +805,7 @@ html.dark textarea::placeholder {
   color: #64748B !important;
 }
 
-/* Native input focus ring in dark mode — clean, no inner outline */
+/* Native input focus ring in dark mode - clean, no inner outline */
 html.dark input:focus,
 html.dark select:focus,
 html.dark textarea:focus {
@@ -831,14 +831,14 @@ html.dark textarea:focus-visible {
 /* Level 2 (hover):   #273548 */
 /* Level 3 (active):  #334155 */
 
-/* HeroUI Card component — elevated background, no border */
+/* HeroUI Card component - elevated background, no border */
 html.dark [data-slot="base"].bg-content1,
 html.dark .bg-content1 {
   background-color: #1E293B !important;
   border-color: transparent !important;
 }
 
-/* Nested cards / inner cards — slightly elevated */
+/* Nested cards / inner cards - slightly elevated */
 html.dark .bg-content1 .bg-content1,
 html.dark .bg-content1 [data-slot="base"] {
   background-color: #273548 !important;
@@ -898,7 +898,7 @@ html.dark .border-dashed {
   border-color: rgba(51, 65, 85, 0.5) !important;
 }
 
-/* Shadow overrides — cards get very subtle dark glow instead of white shadow */
+/* Shadow overrides - cards get very subtle dark glow instead of white shadow */
 /* Exclude input-wrapper and trigger so their box-shadow: none is respected */
 html.dark .shadow-xs:not([data-slot="input-wrapper"]):not([data-slot="trigger"]) {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25) !important;
@@ -929,7 +929,7 @@ html.dark textarea:focus {
 }
 
 /* ============================================
-   PROFILE PAGE — Pastel Gradient Card Overrides
+   PROFILE PAGE - Pastel Gradient Card Overrides
    These use from-{color}-50 to-{color}-100 gradients
    ============================================ */
 
@@ -1076,7 +1076,7 @@ html.dark .border-lime-200\/70 {
   border-color: transparent !important;
 }
 
-/* Profile page colored input borders — subtle in dark */
+/* Profile page colored input borders - subtle in dark */
 html.dark .border-emerald-300,
 html.dark .border-purple-300,
 html.dark .border-pink-300,
@@ -1093,7 +1093,7 @@ html.dark .border-slate-300 {
   border-color: rgba(51, 65, 85, 0.5) !important;
 }
 
-/* Colored text in profile card labels — lighter in dark mode */
+/* Colored text in profile card labels - lighter in dark mode */
 html.dark .text-blue-700\/70,
 html.dark .text-emerald-700\/70,
 html.dark .text-purple-700\/70,
@@ -1104,10 +1104,10 @@ html.dark .text-amber-700\/70 {
 }
 
 /* ============================================
-   LANYARD ID CARD — Dark Mode Overrides
+   LANYARD ID CARD - Dark Mode Overrides
    ============================================ */
 
-/* Card face — dark background + dark shadow */
+/* Card face - dark background + dark shadow */
 html.dark .card-face {
   box-shadow:
     0 25px 50px -12px rgba(0, 0, 0, 0.5),
@@ -1122,14 +1122,14 @@ html.dark .card-face.back {
   background-image: linear-gradient(165deg, #1E293B 0%, #1a2536 40%, #162032 100%) !important;
 }
 
-/* Decorative overlay — darker */
+/* Decorative overlay - darker */
 html.dark .card-face::before {
   background:
     radial-gradient(circle at 0% 0%, rgba(51, 65, 85, 0.3) 0%, transparent 50%),
     radial-gradient(circle at 100% 100%, rgba(51, 65, 85, 0.2) 0%, transparent 50%) !important;
 }
 
-/* Top accent line — subtle in dark */
+/* Top accent line - subtle in dark */
 html.dark .card-face::after {
   background: linear-gradient(90deg,
     transparent 0%,
@@ -1139,7 +1139,7 @@ html.dark .card-face::after {
     transparent 100%) !important;
 }
 
-/* Card clip — dark metal */
+/* Card clip - dark metal */
 html.dark .card-clip {
   background: linear-gradient(180deg, #334155 0%, #1E293B 50%, #0F172A 100%) !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5) !important;
@@ -1149,7 +1149,7 @@ html.dark .card-clip::before {
   background: linear-gradient(135deg, #475569 0%, #334155 100%) !important;
 }
 
-/* Lanyard ribbon — darker */
+/* Lanyard ribbon - darker */
 html.dark .lanyard-path {
   stroke: #475569 !important;
 }
@@ -1178,7 +1178,7 @@ html.dark .company-tagline {
   color: #64748B !important;
 }
 
-/* Divider — dark */
+/* Divider - dark */
 html.dark .lanyard-scene .divider {
   background: linear-gradient(90deg, transparent 0%, #334155 20%, #334155 80%, transparent 100%) !important;
 }
@@ -1201,7 +1201,7 @@ html.dark .avatar-placeholder {
   color: #64748B !important;
 }
 
-/* Camera button border — dark */
+/* Camera button border - dark */
 html.dark .avatar-camera-btn {
   border-color: #1E293B !important;
 }
@@ -1220,7 +1220,7 @@ html.dark .emp-id {
   color: #94A3B8 !important;
 }
 
-/* Info section — dark panel */
+/* Info section - dark panel */
 html.dark .info-section {
   background: linear-gradient(135deg, #0F172A 0%, #162032 100%) !important;
   border-color: rgba(51, 65, 85, 0.4) !important;
@@ -1238,14 +1238,14 @@ html.dark .lanyard-scene .value {
   color: #CBD5E1 !important;
 }
 
-/* Blood badge — dark */
+/* Blood badge - dark */
 html.dark .blood-badge {
   background: #0F172A !important;
   border-color: rgba(51, 65, 85, 0.5) !important;
   color: #ef4444 !important;
 }
 
-/* Footer — dark */
+/* Footer - dark */
 html.dark .footer-row {
   background: linear-gradient(to top, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.5) 100%) !important;
   color: #64748B !important;
@@ -1299,7 +1299,7 @@ html.dark .helper-text strong {
   color: #94A3B8 !important;
 }
 
-/* Card shine overlay — subtle in dark */
+/* Card shine overlay - subtle in dark */
 html.dark .card-shine {
   background: linear-gradient(105deg,
     transparent 40%,

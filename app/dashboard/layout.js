@@ -38,7 +38,7 @@ import WebAccessRestriction, { shouldRestrictWebAccess } from '@/components/WebA
 import CallAlertReceiver from '@/components/CallAlertReceiver'
 import MiraChatSidebar from '@/components/MiraChatSidebar'
 
-// Page transition skeleton overlay — renders target page's skeleton with a spinner
+// Page transition skeleton overlay - renders target page's skeleton with a spinner
 function PageTransitionOverlay() {
   const { isNavigating, targetPath } = usePageTransition()
 

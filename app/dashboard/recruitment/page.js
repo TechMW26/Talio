@@ -232,9 +232,9 @@ export default function RecruitmentPage() {
                               <p className="text-sm font-semibold text-default-800">{job.jobTitle}</p>
                               {job.jobCode && <p className="text-xs text-default-400 mt-0.5">{job.jobCode}</p>}
                             </td>
-                            <td className="px-4 py-3.5 text-sm text-default-600">{job.department?.name || '—'}</td>
+                            <td className="px-4 py-3.5 text-sm text-default-600">{job.department?.name || '-'}</td>
                             <td className="px-4 py-3.5 text-sm text-default-600">{EMPLOYMENT_TYPE_LABELS[job.employmentType] || job.employmentType}</td>
-                            <td className="px-4 py-3.5 text-sm text-default-600">{job.location || '—'}</td>
+                            <td className="px-4 py-3.5 text-sm text-default-600">{job.location || '-'}</td>
                             <td className="px-4 py-3.5 text-center text-sm font-medium text-default-800">{job.candidateCount ?? 0}</td>
                             <td className="px-4 py-3.5 text-center">
                               <Chip size="sm" variant="flat" color={STATUS_COLOR_MAP[job.status] || 'default'} className="capitalize">{job.status}</Chip>

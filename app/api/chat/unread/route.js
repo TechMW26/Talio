@@ -17,7 +17,7 @@ export async function GET(request) {
     const { user, models, tenant } = auth
     const { Chat, Employee, User } = models
 
-    // Check Redis cache (15s TTL — unread counts update via socket; cache just avoids cold-start hammering)
+    // Check Redis cache (15s TTL - unread counts update via socket; cache just avoids cold-start hammering)
     const chatCacheKey = buildCacheKey({
       tenantId: tenant?.databaseName,
       role: 'any',

@@ -190,7 +190,7 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
 
         {/* Menu Icons */}
         <div ref={menuContainerRef} className="flex-1 overflow-y-auto scrollbar-hide py-4 px-2 space-y-1">
-          {/* Expand sidebar — styled like a menu item */}
+          {/* Expand sidebar - styled like a menu item */}
           <Tooltip content="Expand Menu" placement="right" delay={200} closeDelay={0}>
             <button
               onClick={() => onExpandClick(null)}
@@ -321,7 +321,7 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
             )
           })}
 
-          {/* Divider + Settings / Logout — bottom of menu */}
+          {/* Divider + Settings / Logout - bottom of menu */}
           <div className="my-2 mx-2 border-t" style={{ borderColor: 'var(--color-primary-200)' }} />
 
           <Tooltip content="Settings" placement="right" delay={200} closeDelay={0}>

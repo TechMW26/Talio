@@ -38,7 +38,7 @@ const SLASH_COMMANDS = [
   { cmd: '/tasks', label: 'My Tasks', desc: 'Show my pending tasks', icon: FaTasks, prompt: 'Show my pending tasks' },
   { cmd: '/attendance', label: 'Attendance', desc: 'Check my attendance', icon: FaCalendarAlt, prompt: "What's my attendance this week?" },
   { cmd: '/projects', label: 'Projects', desc: 'Show my projects', icon: FaProjectDiagram, prompt: 'Show my projects and their status' },
-  { cmd: '/briefing', label: 'Daily Briefing', desc: 'Get your morning briefing', icon: FaBriefcase, prompt: 'Give me my daily briefing — tasks, attendance, upcoming deadlines, and anything I should know today' },
+  { cmd: '/briefing', label: 'Daily Briefing', desc: 'Get your morning briefing', icon: FaBriefcase, prompt: 'Give me my daily briefing - tasks, attendance, upcoming deadlines, and anything I should know today' },
   { cmd: '/leaves', label: 'Leave Balance', desc: 'Check leave balance', icon: FaUserClock, prompt: 'Show my leave balance' },
   { cmd: '/idea', label: 'Brainstorm', desc: 'Brainstorm ideas', icon: FaLightbulb, prompt: 'Help me brainstorm ideas for ' },
 ]
@@ -46,7 +46,7 @@ const SLASH_COMMANDS = [
 // ─── Quick Action Chips ─────────────────────────────────────────────
 
 const QUICK_ACTIONS = [
-  { label: 'Daily Briefing', icon: FaBriefcase, prompt: 'Give me my daily briefing — tasks, attendance, upcoming deadlines, and anything I should know today' },
+  { label: 'Daily Briefing', icon: FaBriefcase, prompt: 'Give me my daily briefing - tasks, attendance, upcoming deadlines, and anything I should know today' },
   { label: 'My Tasks', icon: FaTasks, prompt: 'Show my pending tasks' },
   { label: 'Attendance', icon: FaCalendarAlt, prompt: "What's my attendance this week?" },
 ]
@@ -524,7 +524,7 @@ export default function MiraChatSidebar() {
         />
       )}
 
-      {/* Floating Sidebar panel — glassmorphism */}
+      {/* Floating Sidebar panel - glassmorphism */}
       <div
         className={`fixed top-3 left-3 bottom-3 w-[calc(100%-1.5rem)] max-w-[420px] flex flex-col z-[99999] transition-all duration-300 ease-out rounded-2xl overflow-hidden shadow-2xl ${isOpen ? 'translate-x-0 opacity-100 scale-100' : '-translate-x-[110%] opacity-0 scale-95'}`}
         style={{
@@ -539,7 +539,7 @@ export default function MiraChatSidebar() {
             : `0 8px 60px -12px ${theme.primary[300]}60, 0 0 0 1px ${theme.primary[200]}40, inset 0 1px 0 rgba(255,255,255,0.6)`,
         }}
       >
-        {/* Header — gradient with theme tint */}
+        {/* Header - gradient with theme tint */}
         <div
           className="flex items-center justify-between px-4 h-[58px] flex-shrink-0"
           style={{
@@ -676,7 +676,7 @@ export default function MiraChatSidebar() {
                 <MiraSphere size={64} enableRandomPulse={true} />
               </div>
               <h3 className="text-lg font-bold text-default-800 mb-1">Hi! I&apos;m MIRA</h3>
-              <p className="text-sm text-default-500 mb-6">Your all-rounder AI assistant. Ask me anything — code, research, math, writing, or your Talio data.</p>
+              <p className="text-sm text-default-500 mb-6">Your all-rounder AI assistant. Ask me anything - code, research, math, writing, or your Talio data.</p>
               <div className="w-full space-y-2">
                 {welcomeSuggestions.map((q, i) => (
                   <button
@@ -705,7 +705,7 @@ export default function MiraChatSidebar() {
         </div>
         )}
 
-        {/* Input area — frosted bottom bar */}
+        {/* Input area - frosted bottom bar */}
         {!showHistory && (
         <div
           className="flex-shrink-0"
@@ -714,7 +714,7 @@ export default function MiraChatSidebar() {
             background: isDarkMode ? 'rgba(10,14,28,0.5)' : 'rgba(255,255,255,0.4)',
           }}
         >
-          {/* Quick Actions — show when no messages */}
+          {/* Quick Actions - show when no messages */}
           {messages.length === 0 && !isThinking ? null : (
             <div className="flex items-center gap-1.5 px-3 pt-2.5 pb-0 overflow-x-auto scrollbar-hide">
               <FaBolt className="w-2.5 h-2.5 text-default-400 flex-shrink-0" />
@@ -752,7 +752,7 @@ export default function MiraChatSidebar() {
                   >
                     <Icon className={`w-3.5 h-3.5 ${i === slashIdx ? 'text-primary-500' : 'text-default-400'}`} />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-default-800">{cmd.cmd} <span className="text-default-400 font-normal">— {cmd.label}</span></p>
+                      <p className="text-sm font-medium text-default-800">{cmd.cmd} <span className="text-default-400 font-normal">- {cmd.label}</span></p>
                       <p className="text-[10px] text-default-400 truncate">{cmd.desc}</p>
                     </div>
                   </button>

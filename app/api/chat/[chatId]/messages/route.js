@@ -371,7 +371,7 @@ export async function POST(request, context) {
         const recipientUserIds = recipientUsers.map(u => u._id.toString())
 
         if (recipientUserIds.length > 0) {
-          // Push a lightweight signal — the frontend will use its local state + this hint
+          // Push a lightweight signal - the frontend will use its local state + this hint
           emitChatUnreadUpdated(
             { chatId, action: 'new_message', senderId: employeeIdStr },
             recipientUserIds,

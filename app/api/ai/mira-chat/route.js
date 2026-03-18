@@ -77,14 +77,14 @@ function buildSystemPrompt(user, role, employeeData, contextData) {
 
   let roleInstructions = ''
   if (['admin', 'hr'].includes(role)) {
-    roleInstructions = `The user is an ADMIN/HR with FULL access. You can share any data from the organization — employee details, attendance records, leave balances, project statuses, performance data, policies, announcements, and more.`
+    roleInstructions = `The user is an ADMIN/HR with FULL access. You can share any data from the organization - employee details, attendance records, leave balances, project statuses, performance data, policies, announcements, and more.`
   } else if (['manager', 'department_head', 'department_manager', 'team_leader'].includes(role)) {
     roleInstructions = `The user is a MANAGER/LEAD. You can share data about their direct reports, their team members, projects they manage, and their own personal data. Do NOT share data about employees outside their reporting hierarchy.`
   } else {
-    roleInstructions = `The user is an EMPLOYEE. You can ONLY share their own personal data — their tasks, attendance, leaves, performance, and general company policies/announcements. Do NOT share other employees' data.`
+    roleInstructions = `The user is an EMPLOYEE. You can ONLY share their own personal data - their tasks, attendance, leaves, performance, and general company policies/announcements. Do NOT share other employees' data.`
   }
 
-  return `You are MIRA — a powerful, all-rounder AI assistant built into Talio. You can help with ANYTHING: coding, writing, research, math, science, general knowledge, creative tasks, business strategy, technical questions, and of course all HR & productivity data within Talio.
+  return `You are MIRA - a powerful, all-rounder AI assistant built into Talio. You can help with ANYTHING: coding, writing, research, math, science, general knowledge, creative tasks, business strategy, technical questions, and of course all HR & productivity data within Talio.
 Today is ${today}.
 
 ## User Context
@@ -116,30 +116,30 @@ You MUST respond in valid JSON with this exact structure:
 
 ### Card Types & Data Structures:
 
-**"info"** — Simple information card
+**"info"** - Simple information card
 { "text": "Description text", "icon": "info|success|warning" }
 
-**"stat"** — Numeric stats
+**"stat"** - Numeric stats
 { "stats": [{ "label": "Label", "value": "42", "change": "+5%", "trend": "up|down|neutral" }] }
 
-**"list"** — List of items
+**"list"** - List of items
 { "items": [{ "title": "Item title", "subtitle": "Details", "status": "active|pending|completed|overdue", "link": "/dashboard/..." }] }
 
-**"table"** — Tabular data
+**"table"** - Tabular data
 { "headers": ["Col1", "Col2"], "rows": [["val1", "val2"]] }
 
-**"action"** — Actionable buttons/links
+**"action"** - Actionable buttons/links
 { "text": "Description", "actions": [{ "label": "Button text", "link": "/dashboard/...", "variant": "primary|secondary" }] }
 
-**"alert"** — Important notice
+**"alert"** - Important notice
 { "text": "Alert message", "severity": "info|warning|error|success" }
 
-**"progress"** — Progress indicator
+**"progress"** - Progress indicator
 { "items": [{ "label": "Task name", "value": 75, "max": 100, "status": "on-track|at-risk|overdue" }] }
 
 ## Important Rules
 - Always respond in the JSON format above. Never respond with plain text outside JSON.
-- You are an ALL-ROUNDER AI. You can help with ANY topic — programming, math, science, writing, research, business, creative work, anything. NEVER refuse or redirect a question just because it's not HR-related.
+- You are an ALL-ROUNDER AI. You can help with ANY topic - programming, math, science, writing, research, business, creative work, anything. NEVER refuse or redirect a question just because it's not HR-related.
 - When providing code, ALWAYS use proper Markdown code blocks with language identifiers in the "message" field. Example: \`\`\`python\\nprint("hello")\\n\`\`\`. For inline code use single backticks.
 - Keep messages concise and helpful.
 - Use cards to present structured data beautifully.
@@ -185,7 +185,7 @@ async function fetchContextData(models, user, role, query) {
       }
     }
 
-    // Task queries — assignments stored in TaskAssignee join table
+    // Task queries - assignments stored in TaskAssignee join table
     if (/task|todo|assign|work|backlog|deadline|overdue|pending task/i.test(queryLower)) {
       if (isAdmin && !isPersonalQuery && models.Task) {
         // Admin asking about all tasks (not personal)
@@ -216,7 +216,7 @@ async function fetchContextData(models, user, role, query) {
           }))
         }
       } else if (models.Task && models.TaskAssignee) {
-        // Personal tasks — for any role (including admin when asking "my tasks")
+        // Personal tasks - for any role (including admin when asking "my tasks")
         const myAssignments = await models.TaskAssignee.find({
           user: user.employeeId,
           assignmentStatus: { $in: ['pending', 'accepted'] }
@@ -381,7 +381,7 @@ function generateDataCards(ctx) {
 
   const taskLink = (t) => t.projectId ? `/dashboard/projects/${t.projectId}?task=${t.id}` : '/dashboard/projects/my-tasks'
 
-  // Tasks (admin view — all company tasks)
+  // Tasks (admin view - all company tasks)
   if (ctx.tasks?.length > 0) {
     cards.push({
       type: 'list', title: 'Tasks',
@@ -418,8 +418,8 @@ function generateDataCards(ctx) {
       data: {
         headers: ['Employee', 'Check In', 'Check Out', 'Status', 'Hours'],
         rows: ctx.todayAttendance.slice(0, 15).map(a => [
-          a.employee, a.checkIn || '—', a.checkOut || '—', a.status || '—',
-          a.workingHours ? `${a.workingHours}h` : '—'
+          a.employee, a.checkIn || '-', a.checkOut || '-', a.status || '-',
+          a.workingHours ? `${a.workingHours}h` : '-'
         ])
       }
     })
@@ -432,8 +432,8 @@ function generateDataCards(ctx) {
       data: {
         headers: ['Date', 'Check In', 'Check Out', 'Status', 'Hours'],
         rows: ctx.myAttendance.slice(0, 10).map(a => [
-          fmtDate(a.date) || '—', a.checkIn || '—', a.checkOut || '—', a.status || '—',
-          a.workingHours ? `${a.workingHours}h` : '—'
+          fmtDate(a.date) || '-', a.checkIn || '-', a.checkOut || '-', a.status || '-',
+          a.workingHours ? `${a.workingHours}h` : '-'
         ])
       }
     })
@@ -445,7 +445,7 @@ function generateDataCards(ctx) {
       type: 'list', title: 'Leave Requests',
       data: {
         items: ctx.leaves.slice(0, 10).map(l => ({
-          title: `${l.employee} — ${l.type}`,
+          title: `${l.employee} - ${l.type}`,
           subtitle: `${fmtDate(l.startDate)} to ${fmtDate(l.endDate)}${l.reason ? ` · ${l.reason}` : ''}`,
           status: l.status === 'approved' ? 'completed' : l.status === 'rejected' ? 'overdue' : 'pending',
           link: '/dashboard/leave'
@@ -461,7 +461,7 @@ function generateDataCards(ctx) {
       data: {
         headers: ['Employee', 'Type', 'Total', 'Used', 'Remaining'],
         rows: ctx.leaveBalances.slice(0, 12).map(b => [
-          b.employee, b.type, b.total ?? '—', b.used ?? '—', b.remaining ?? '—'
+          b.employee, b.type, b.total ?? '-', b.used ?? '-', b.remaining ?? '-'
         ])
       }
     })
@@ -489,7 +489,7 @@ function generateDataCards(ctx) {
       data: {
         headers: ['Name', 'Code', 'Department', 'Designation'],
         rows: ctx.employees.slice(0, 15).map(e => [
-          e.name, e.code || '—', e.department || '—', e.designation || '—'
+          e.name, e.code || '-', e.department || '-', e.designation || '-'
         ])
       }
     })
@@ -515,7 +515,7 @@ function generateDataCards(ctx) {
       type: 'progress', title: 'Performance Goals',
       data: {
         items: ctx.goals.slice(0, 8).map(g => ({
-          label: `${g.title}${g.employee ? ` — ${g.employee}` : ''}`,
+          label: `${g.title}${g.employee ? ` - ${g.employee}` : ''}`,
           value: g.progress || 0, max: 100,
           status: g.status === 'completed' ? 'on-track' : g.status === 'overdue' ? 'overdue' : 'at-risk'
         }))
@@ -650,7 +650,7 @@ export async function POST(request) {
       }
     }
 
-    // Parse JSON response — robust extraction
+    // Parse JSON response - robust extraction
     let parsed
     try {
       let jsonStr = aiResponse.trim()
