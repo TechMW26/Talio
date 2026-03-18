@@ -11,7 +11,6 @@ import {
   Card, 
   CardBody, 
   CardFooter,
-  Input, 
   Button, 
   Checkbox,
   Spinner,
@@ -379,67 +378,54 @@ export default function LoginPage() {
               <form className="space-y-5" onSubmit={handleSubmit}>
                 {/* Email Field */}
                 <div>
-                  <Input
-                    label="Email Address"
-                    labelPlacement="outside"
-                    type="email"
-                    name="email"
-                    placeholder="name@company.com"
-                    value={formData.email}
-                    onChange={handleChange}
-                    autoComplete="email"
-                    isRequired
-                    variant="bordered"
-                    radius="lg"
-                    size="lg"
-                    startContent={
-                      <FaEnvelope className="text-default-400 pointer-events-none flex-shrink-0" />
-                    }
-                    classNames={{
-                      label: "text-default-700 font-semibold",
-                      input: "text-default-900",
-                      inputWrapper: "bg-default-50 hover:bg-default-100 border-default-200 hover:border-primary-300 transition-colors",
-                    }}
-                  />
+                  <label className="block text-sm font-semibold text-default-700 mb-1.5">
+                    Email Address<span className="text-danger-500">*</span>
+                  </label>
+                  <div className="input-with-icon">
+                    <FaEnvelope className="input-icon" />
+                    <input
+                      type="email"
+                      name="email"
+                      placeholder="name@company.com"
+                      value={formData.email}
+                      onChange={handleChange}
+                      autoComplete="email"
+                      required
+                      className="input input-search"
+                    />
+                  </div>
                 </div>
 
                 {/* Password Field */}
                 <div className="pt-2">
-                  <Input
-                    label="Password"
-                    labelPlacement="outside"
-                    type={showPassword ? 'text' : 'password'}
-                    name="password"
-                    placeholder="Enter your password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    autoComplete="current-password"
-                    isRequired
-                    variant="bordered"
-                    radius="lg"
-                    size="lg"
-                    startContent={
-                      <FaLock className="text-default-400 pointer-events-none flex-shrink-0" />
-                    }
-                    endContent={
-                      <button
-                        type="button"
-                        className="focus:outline-none"
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? (
-                          <FaEyeSlash className="text-default-400 hover:text-default-600 transition-colors" />
-                        ) : (
-                          <FaEye className="text-default-400 hover:text-default-600 transition-colors" />
-                        )}
-                      </button>
-                    }
-                    classNames={{
-                      label: "text-default-700 font-semibold",
-                      input: "text-default-900",
-                      inputWrapper: "bg-default-50 hover:bg-default-100 border-default-200 hover:border-primary-300 transition-colors",
-                    }}
-                  />
+                  <label className="block text-sm font-semibold text-default-700 mb-1.5">
+                    Password<span className="text-danger-500">*</span>
+                  </label>
+                  <div className="input-with-icon" style={{ position: 'relative' }}>
+                    <FaLock className="input-icon" />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      name="password"
+                      placeholder="Enter your password"
+                      value={formData.password}
+                      onChange={handleChange}
+                      autoComplete="current-password"
+                      required
+                      className="input input-search"
+                      style={{ paddingRight: '2.5rem' }}
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 focus:outline-none z-10"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? (
+                        <FaEyeSlash className="text-default-400 hover:text-default-600 transition-colors" />
+                      ) : (
+                        <FaEye className="text-default-400 hover:text-default-600 transition-colors" />
+                      )}
+                    </button>
+                  </div>
                 </div>
 
                 {/* Remember & Forgot */}

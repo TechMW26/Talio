@@ -1662,6 +1662,7 @@ function setupAutoUpdater() {
   autoUpdater.autoDownload = false; // We control download manually
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.allowDowngrade = false;
+  autoUpdater.forceCodeSigning = false; // Allow updates from unsigned builds
 
   // Detailed provider config logging
   logger.log('info', 'Updater', 'Auto-updater configured - provider: GitHub Releases, version: ' + app.getVersion() + ', platform: ' + process.platform + ', arch: ' + process.arch);

@@ -399,17 +399,17 @@ export default function AppInfoPage() {
           >
             <div className="relative z-10 text-center">
               <span className="text-[10px] font-bold uppercase tracking-wider block mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>Latest Available</span>
-              <strong className="text-2xl font-extrabold tracking-tighter leading-none" style={{ color: 'var(--color-text-primary)' }}>
+              <strong className="text-2xl font-extrabold tracking-tighter leading-none block" style={{ color: 'var(--color-text-primary)' }}>
                 {latestVersion ? `v${latestVersion}` : '...'}
               </strong>
               {isOutdated && (
-                <span className="inline-block mt-2 px-2 py-0.5 rounded text-[10px] font-bold text-amber-600 dark:text-amber-400"
+                <span className="block mt-2 px-2 py-0.5 rounded text-[10px] font-bold text-amber-600 dark:text-amber-400"
                   style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)' }}>
                   Newer version available
                 </span>
               )}
               {!isOutdated && currentVersion && latestVersion && (
-                <span className="inline-block mt-2 px-2 py-0.5 rounded text-[10px] font-bold text-emerald-600 dark:text-emerald-400"
+                <span className="block mt-2 px-2 py-0.5 rounded text-[10px] font-bold text-emerald-600 dark:text-emerald-400"
                   style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)' }}>
                   You&apos;re on the latest
                 </span>
