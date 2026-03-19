@@ -99,6 +99,19 @@ function DetailItem({ icon: Icon, label, value, colorClass }) {
   )
 }
 
+/* ── Semver compare: returns -1, 0, or 1 ── */
+function compareVersions(a, b) {
+  const pa = a.split('.').map(Number)
+  const pb = b.split('.').map(Number)
+  for (let i = 0; i < 3; i++) {
+    const na = pa[i] || 0
+    const nb = pb[i] || 0
+    if (na < nb) return -1
+    if (na > nb) return 1
+  }
+  return 0
+}
+
 /* ── Main page ── */
 export default function AppInfoPage() {
   const [appInfo, setAppInfo] = useState(null)
@@ -136,6 +149,21 @@ export default function AppInfoPage() {
 
       if (window.electronAPI.onUpdateStatus) {
         window.electronAPI.onUpdateStatus((data) => {
+          // Ignore 'available' if reported version is not newer than current
+          if (data.status === 'available' && data.version) {
+            window.electronAPI.getAppVersion?.().then(cv => {
+              if (cv && compareVersions(cv, data.version) >= 0) {
+                setUpdateStatus('up-to-date')
+                return
+              }
+              setUpdateStatus(data.status)
+              setUpdateVersion(data.version)
+            }).catch(() => {
+              setUpdateStatus(data.status)
+              if (data.version) setUpdateVersion(data.version)
+            })
+            return
+          }
           setUpdateStatus(data.status)
           if (data.version) setUpdateVersion(data.version)
           if (data.message) setUpdateError(data.message)
@@ -195,8 +223,8 @@ export default function AppInfoPage() {
 
   const platformLabel = { darwin: 'macOS', win32: 'Windows', linux: 'Linux' }
   const archLabel = { arm64: 'Apple Silicon (ARM64)', x64: 'Intel (x64)', ia32: 'x86 (32-bit)' }
-  const isOutdated = currentVersion && latestVersion && currentVersion !== latestVersion
-  const isUpToDate = updateStatus === 'up-to-date' && !isOutdated
+  const isOutdated = currentVersion && latestVersion && compareVersions(currentVersion, latestVersion) < 0
+  const isUpToDate = (updateStatus === 'up-to-date' || (updateStatus === 'available' && updateVersion && currentVersion && compareVersions(currentVersion, updateVersion) >= 0)) && !isOutdated
 
   return (
     <div className="h-[calc(100vh-120px)] overflow-hidden flex flex-col items-center justify-center px-4 sm:px-6 lg:px-10">

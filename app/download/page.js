@@ -24,11 +24,11 @@ export default function DownloadPage() {
     setTimeout(() => setDownloadStarted(false), 3000)
   }
 
-  // GitHub release URLs
+  // Dynamic download routes — always redirect to the latest GitHub release
   const downloadLinks = {
-    macIntel: 'https://github.com/avirajsharma-ops/Talio/releases/download/v1.2.0/Talio-macOS-Intel.dmg',
-    macArm: 'https://github.com/avirajsharma-ops/Talio/releases/download/v1.2.0/Talio-macOS-ARM.dmg',
-    windows: 'https://github.com/avirajsharma-ops/Talio/releases/download/v1.2.0/Talio-Windows.exe',
+    macIntel: '/download/mac-intel',
+    macArm: '/download/mac-arm64',
+    windows: '/download/windows',
   }
 
   return (
@@ -50,8 +50,8 @@ export default function DownloadPage() {
             <div className="flex items-start gap-3">
               <CheckCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
               <div>
-                <h3 className="font-semibold text-blue-900 mb-1">Latest Version: 1.1.0</h3>
-                <p className="text-sm text-blue-700">Released: December 2024</p>
+                <h3 className="font-semibold text-blue-900 mb-1">Download links always point to the latest release</h3>
+                <p className="text-sm text-blue-700">Auto-updates are built in — the app stays current automatically</p>
               </div>
             </div>
           </div>
