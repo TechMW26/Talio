@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 const MIN_DESKTOP_VERSION = '4.2.0';
 
 // Fallback if GitHub API is unreachable
-const FALLBACK_LATEST_VERSION = '5.0.3';
+const FALLBACK_LATEST_VERSION = '5.0.4';
 
 const GITHUB_REPO = 'avirajsharma-ops/Talio';
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes

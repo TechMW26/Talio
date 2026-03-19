@@ -1,6 +1,6 @@
 {
   "name": "talio-desktop",
-  "version": "5.0.3",
+  "version": "5.0.4",
   "description": "Talio HRMS Desktop - Productivity Monitoring with Screen Capture",
   "main": "src/main.js",
   "author": "MW FutureTech <support@talio.in>",

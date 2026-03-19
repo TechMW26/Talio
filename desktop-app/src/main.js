@@ -1,5 +1,5 @@
 /**
- * Talio Desktop App v5.0.3
+ * Talio Desktop App v5.0.4
  * Main Electron process
  * 
  * Performance optimized for smooth rendering
@@ -328,7 +328,9 @@ function createWindow() {
     // Cancel any pending load
     clearTimeout(loaderTimer);
     clearTimeout(loadTimeout);
+    clearTimeout(navigationSafetyTimer);
     isLoadingApp = false;
+    isNavigating = false;
 
     // Reset crash count if more than 30 seconds since last crash
     if (now - lastCrashTime > 30000) {
@@ -548,6 +550,7 @@ function loadApp() {
       // Ignore intentionally aborted navigations (e.g. offline page took over)
       if (error.message && error.message.includes('ERR_ABORTED')) {
         logger.log('info', 'Main', 'Load aborted (intentional) — skipping error handler');
+        clearTimeout(loadTimeout);
         return;
       }
       logger.log('error', 'Main', 'Load failed: ' + error.message);
@@ -769,6 +772,11 @@ function setupWindowEvents() {
   // Handle HTTP errors (4xx, 5xx) - intercept responses
   mainWindow.webContents.on('did-navigate', function (event, url, httpResponseCode) {
     if (httpResponseCode >= 500) {
+      // Skip if loadApp() is already handling this navigation
+      if (isLoadingApp || isNavigating) {
+        logger.log('info', 'Main', 'did-navigate 500 while loadApp active — letting loadApp handle it');
+        return;
+      }
       logger.log('error', 'Main', 'HTTP error ' + httpResponseCode + ' for ' + url);
       showOfflinePage('server-error', httpResponseCode.toString(), 'HTTP ' + httpResponseCode);
     } else if (httpResponseCode >= 400 && httpResponseCode !== 401 && httpResponseCode !== 404) {
@@ -782,6 +790,11 @@ function setupWindowEvents() {
     function (details) {
       // Check for server errors on main frame navigation
       if (details.resourceType === 'mainFrame' && details.statusCode >= 500) {
+        // Skip if loadApp() is already handling this navigation
+        if (isLoadingApp || isNavigating) {
+          logger.log('info', 'Main', 'webRequest 500 while loadApp active — letting loadApp handle it');
+          return;
+        }
         logger.log('error', 'Main', 'Server error ' + details.statusCode + ' for ' + details.url);
         showOfflinePage('server-error', details.statusCode.toString(), 'Server returned ' + details.statusCode);
       }
@@ -1281,9 +1294,36 @@ function setupIPCHandlers() {
   // Load app (for offline page retry)
   ipcMain.handle('load-app', function () {
     logger.log('info', 'Main', 'Load app requested from offline page');
+    if (isLoadingApp || isNavigating) {
+      logger.log('info', 'Main', 'load-app debounced — already loading/navigating');
+      return { success: false, reason: 'debounced' };
+    }
     loadRetries = 0;
     loadApp();
     return { success: true };
+  });
+
+  // Check connectivity from renderer (avoids CORS issues on file:// pages)
+  ipcMain.handle('check-connectivity', async function () {
+    try {
+      const https = require('https');
+      return await new Promise(function (resolve) {
+        const req = https.request({
+          hostname: 'app.talio.in',
+          port: 443,
+          path: '/api/health',
+          method: 'HEAD',
+          timeout: 10000
+        }, function (res) {
+          resolve(res.statusCode < 500);
+        });
+        req.on('error', function () { resolve(false); });
+        req.on('timeout', function () { req.destroy(); resolve(false); });
+        req.end();
+      });
+    } catch (e) {
+      return false;
+    }
   });
 
   // Get all connected displays for multi-monitor screen sharing

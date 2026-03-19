@@ -528,22 +528,29 @@
     }
     
     async function checkConnection() {
+      // Use main process IPC for connectivity check (avoids CORS issues on file:// pages)
+      try {
+        if (window.electronAPI && window.electronAPI.checkConnectivity) {
+          return await window.electronAPI.checkConnectivity();
+        }
+      } catch (e) {
+        // IPC failed, fall through to fetch fallback
+      }
+      // Fallback: direct fetch (may fail from file:// origin)
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 10000);
         
-        // Try multiple endpoints for more reliable detection
-        const response = await fetch('https://app.talio.in/api/health', {
+        await fetch('https://app.talio.in/api/health', {
           method: 'HEAD',
           signal: controller.signal,
           cache: 'no-store',
-          mode: 'no-cors' // Allow cross-origin for health check
+          mode: 'no-cors'
         });
         
         clearTimeout(timeout);
-        return true; // If we get here without error, we're online
+        return true;
       } catch (e) {
-        // Try a simple connectivity check as fallback
         try {
           const img = new Image();
           const imgPromise = new Promise((resolve, reject) => {
@@ -584,11 +591,43 @@
         retryStatus.textContent = '✓ Connection restored! Redirecting...';
         retryStatus.className = 'retry-status success';
         
-        setTimeout(() => {
+        setTimeout(async () => {
           if (window.electronAPI && window.electronAPI.loadApp) {
-            window.electronAPI.loadApp();
+            try {
+              const result = await window.electronAPI.loadApp();
+              if (result && !result.success) {
+                // loadApp was debounced — reset UI so user can retry
+                isRetrying = false;
+                btn.disabled = false;
+                retryText.textContent = 'Retry Connection';
+                container.classList.remove('checking');
+                retryStatus.textContent = 'Waiting for navigation to complete...';
+                retryStatus.className = 'retry-status';
+                if (retryCount < MAX_AUTO_RETRIES) startAutoRetry();
+                return;
+              }
+            } catch (e) {
+              // IPC error — reset UI
+              isRetrying = false;
+              btn.disabled = false;
+              retryText.textContent = 'Retry Connection';
+              container.classList.remove('checking');
+              if (retryCount < MAX_AUTO_RETRIES) startAutoRetry();
+              return;
+            }
           }
-          // isRetrying stays true — we're navigating away
+          // Safety: if still on this page after 8s, reset state
+          setTimeout(() => {
+            if (isRetrying) {
+              isRetrying = false;
+              btn.disabled = false;
+              retryText.textContent = 'Retry Connection';
+              container.classList.remove('checking');
+              retryStatus.textContent = 'Redirect timed out. Retrying...';
+              retryStatus.className = 'retry-status error';
+              if (retryCount < MAX_AUTO_RETRIES) startAutoRetry();
+            }
+          }, 8000);
         }, 1000);
       } else {
         retryCount++;

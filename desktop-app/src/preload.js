@@ -1,5 +1,5 @@
 /**
- * Preload Script v5.0.3
+ * Preload Script v5.0.4
  * Exposes secure IPC channels to the renderer process
  * With enhanced screen sharing support for Windows multi-display
  */
@@ -201,6 +201,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Load main app (for offline page retry)
   loadApp: function() {
     return ipcRenderer.invoke('load-app');
+  },
+
+  // Check connectivity via main process (avoids CORS issues on file:// pages)
+  checkConnectivity: function() {
+    return ipcRenderer.invoke('check-connectivity');
   },
 
   // ── Update Check ──────────────────────────────────────────────────────
