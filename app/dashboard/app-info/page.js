@@ -194,7 +194,13 @@ export default function AppInfoPage() {
   }, [checkForUpdates])
 
   const handleDownloadUpdate = useCallback(() => {
-    // Determine correct download URL based on platform
+    const version = updateVersion || latestVersion
+    // Use in-app update if available (Electron IPC)
+    if (window.electronAPI?.startUpdate && version) {
+      window.electronAPI.startUpdate(version)
+      return
+    }
+    // Fallback: open download page in browser
     const platform = appInfo?.platform
     const arch = appInfo?.arch
     let downloadPath = '/download/mac-arm64'
@@ -204,7 +210,7 @@ export default function AppInfoPage() {
       downloadPath = '/download/mac-intel'
     }
     window.open('https://app.talio.in' + downloadPath, '_blank')
-  }, [appInfo])
+  }, [appInfo, updateVersion, latestVersion])
 
   /* ── Not desktop ── */
   if (!isElectron) {
@@ -352,7 +358,7 @@ export default function AppInfoPage() {
                   size="sm"
                   radius="lg"
                 >
-                  Download v{updateVersion || latestVersion}
+                  Update to v{updateVersion || latestVersion}
                 </Button>
               )}
               {(!updateStatus || updateStatus === 'up-to-date' || updateStatus === 'error') && !isOutdated && (

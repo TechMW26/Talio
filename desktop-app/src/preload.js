@@ -208,9 +208,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return ipcRenderer.invoke('check-connectivity');
   },
 
-  // ── Update Check ──────────────────────────────────────────────────────
+  // ── Update ──────────────────────────────────────────────────────
   checkForUpdate: function(options) {
     return ipcRenderer.invoke('check-for-update', options);
+  },
+
+  startUpdate: function(version) {
+    return ipcRenderer.invoke('start-update', version);
+  },
+
+  retryUpdate: function() {
+    return ipcRenderer.invoke('retry-update');
   },
 
   // ── App Info ──────────────────────────────────────────────────────
