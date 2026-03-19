@@ -25,12 +25,15 @@ import { getAuthAndModels } from '@/lib/auth'
  *   Returns current sync config status (whether API key is set, etc.)
  */
 
-// Map Google Calendar event types to our holiday types
-function mapEventType(description = '') {
+/**
+ * Check if a Google Calendar event is a public holiday.
+ * Returns true only for public holidays; observances, optional, and restricted holidays are discarded.
+ */
+function isPublicHoliday(description = '') {
     const lower = description.toLowerCase()
-    if (lower.includes('optional') || lower.includes('restricted')) return 'optional'
-    if (lower.includes('observance')) return 'optional'
-    return 'public'
+    if (lower.includes('optional') || lower.includes('restricted')) return false
+    if (lower.includes('observance')) return false
+    return true
 }
 
 // Common country calendar ID mappings
@@ -174,13 +177,17 @@ export async function POST(request) {
                 }
             }
 
-            const holidayType = mapEventType(event.description || '')
+            // Only keep public holidays — skip optional, restricted, observances
+            if (!isPublicHoliday(event.description || '')) {
+                skippedCount++
+                continue
+            }
 
             const holidayData = {
                 name,
                 date: holidayDate,
                 endDate,
-                type: holidayType,
+                type: 'public',
                 description: event.description || `${name} - Public Holiday`,
                 year: parseInt(year),
                 applicableTo: 'all',
@@ -221,7 +228,7 @@ export async function POST(request) {
             processedHolidays.push({
                 name,
                 date: holidayDate.toISOString().split('T')[0],
-                type: holidayType,
+                type: 'public',
             })
 
             skippedCount = events.length - addedCount - updatedCount

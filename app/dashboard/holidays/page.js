@@ -140,8 +140,7 @@ export default function HolidaysPage() {
   const getHolidayColor = (type) => {
     switch (type) {
       case 'public': return 'bg-green-100 text-green-800 border-green-200'
-      case 'optional': return 'bg-blue-100 text-blue-800 border-blue-200'
-      case 'restricted': return 'bg-orange-100 text-orange-800 border-orange-200'
+      case 'company': return 'bg-blue-100 text-blue-800 border-blue-200'
       default: return 'bg-gray-100 text-gray-800 border-gray-200'
     }
   }
@@ -320,11 +319,11 @@ export default function HolidaysPage() {
 
         <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 border-l-4 border-blue-500">
           <div className="flex items-center justify-start mb-2">
-            <h3 className="text-xs sm:text-sm font-medium text-gray-600">Optional Holidays</h3>
+            <h3 className="text-xs sm:text-sm font-medium text-gray-600">Upcoming Holidays</h3>
             <FaCalendarAlt className="text-blue-500 text-sm sm:text-base" />
           </div>
           <div className="text-2xl sm:text-3xl font-bold text-gray-800">
-            {holidays.filter(h => h.type === 'optional').length}
+            {holidays.filter(h => new Date(h.date) >= new Date(new Date().setHours(0, 0, 0, 0))).length}
           </div>
         </div>
       </div>
@@ -380,7 +379,7 @@ export default function HolidaysPage() {
                                 )}
                                 <div className="mt-1 flex flex-wrap gap-2">
                                   <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${holiday.type === 'public' ? 'bg-green-100 text-green-800' :
-                                    holiday.type === 'optional' ? 'bg-blue-100 text-blue-800' :
+                                    holiday.type === 'company' ? 'bg-blue-100 text-blue-800' :
                                       'bg-gray-100 text-gray-800'
                                     }`}>
                                     {holiday.type}
@@ -453,8 +452,7 @@ export default function HolidaysPage() {
                     onSelectionChange={(keys) => setFormData({ ...formData, type: Array.from(keys)[0] || 'public' })}
                   >
                     <SelectItem key="public">Public Holiday</SelectItem>
-                    <SelectItem key="optional">Optional Holiday</SelectItem>
-                    <SelectItem key="restricted">Restricted Holiday</SelectItem>
+                    <SelectItem key="company">Company Holiday</SelectItem>
                   </Select>
 
                   <Select

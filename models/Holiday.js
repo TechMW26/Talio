@@ -11,7 +11,7 @@ const HolidaySchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['public', 'optional', 'restricted', 'company'],
+    enum: ['public', 'company'],
     default: 'public',
   },
   source: {
