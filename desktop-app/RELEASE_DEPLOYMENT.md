@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Talio desktop app uses **electron-updater** with **GitHub Releases** for auto-updates. Each release requires artifacts for macOS (DMG + ZIP) and Windows (NSIS installer), plus YAML manifests that electron-updater reads to detect and download updates.
+The Talio desktop app uses **GitHub Releases** for distribution. The app checks for updates via the `/api/desktop/min-version` API endpoint and directs users to the **App Info page** where they can download the latest installer (DMG/EXE) manually. Download links at `/download/[platform]` automatically redirect to the latest GitHub Release assets.
 
 ---
 
@@ -14,13 +14,16 @@ The Talio desktop app uses **electron-updater** with **GitHub Releases** for aut
 
 ---
 
-## Step 1: Bump Version (3 files)
+## Step 1: Bump Version (6 files)
 
-Update the version in **all three** locations:
+Update the version in **all six** locations:
 
 | File | Constant / Field | Purpose |
 |------|-----------------|---------|
-| `desktop-app/package.json` | `"version"` | Electron app version; used by electron-builder for artifact naming and auto-updater comparison |
+| `desktop-app/package.json` | `"version"` | Electron app version; used by electron-builder for artifact naming |
+| `desktop-app/src/main.js` | Header comment `v*.*.*` | Version reference in file header |
+| `desktop-app/src/preload.js` | Header comment `v*.*.*` | Version reference in file header |
+| `desktop-app/src/screenshotService.js` | Header comment `v*.*.*` | Version reference in file header |
 | `server.js` | `LATEST_DESKTOP_VERSION` | Triggers connected desktop clients to check for updates via Socket.IO |
 | `app/api/desktop/min-version/route.js` | `LATEST_DESKTOP_VERSION` | REST endpoint the app polls for latest version info |
 
@@ -70,15 +73,11 @@ npm run build:signed
 
 | File | Purpose |
 |------|---------|
-| `Talio-{version}-x64.dmg` | macOS Intel installer (manual install) |
-| `Talio-{version}-arm64.dmg` | macOS Apple Silicon installer (manual install) |
-| `Talio-{version}-x64.zip` | macOS Intel update package (**required for auto-update**) |
-| `Talio-{version}-arm64.zip` | macOS Apple Silicon update package (**required for auto-update**) |
+| `Talio-{version}-x64.dmg` | macOS Intel installer |
+| `Talio-{version}-arm64.dmg` | macOS Apple Silicon installer |
+| `Talio-{version}-x64.zip` | macOS Intel archive (optional) |
+| `Talio-{version}-arm64.zip` | macOS Apple Silicon archive (optional) |
 | `Talio.Setup.{version}.exe` | Windows NSIS installer |
-| `latest-mac.yml` | macOS auto-update manifest (references ZIP files) |
-| `latest.yml` | Windows auto-update manifest |
-
-> **Critical:** macOS auto-update requires the `.zip` files. The `mac.target` in `package.json` must include both `"dmg"` and `"zip"`. Without ZIPs, users get "ZIP file not provided" error.
 
 ---
 
@@ -248,18 +247,16 @@ git push origin main
 ```bash
 GH="/path/to/gh"   # or just "gh" if installed globally
 
-cd desktop-app/dist
+cd desktop-app
 
 $GH release create vX.Y.Z \
   --title "Talio Desktop vX.Y.Z" \
   --notes "Release notes here" \
-  "Talio-X.Y.Z-x64.dmg#Talio macOS (Intel)" \
-  "Talio-X.Y.Z-arm64.dmg#Talio macOS (Apple Silicon)" \
-  "Talio-X.Y.Z-x64.zip#Talio macOS Update (Intel)" \
-  "Talio-X.Y.Z-arm64.zip#Talio macOS Update (Apple Silicon)" \
-  "Talio.Setup.X.Y.Z.exe#Talio Windows Installer" \
-  "latest-mac.yml#macOS Auto-Update Manifest" \
-  "latest.yml#Windows Auto-Update Manifest"
+  dist/Talio-X.Y.Z-x64.dmg \
+  dist/Talio-X.Y.Z-arm64.dmg \
+  dist/Talio-X.Y.Z-x64.zip \
+  dist/Talio-X.Y.Z-arm64.zip \
+  dist/Talio.Setup.X.Y.Z.exe
 ```
 
 ### Using GitHub Web UI
@@ -267,9 +264,11 @@ $GH release create vX.Y.Z \
 1. Go to https://github.com/avirajsharma-ops/Talio/releases/new
 2. Tag: `vX.Y.Z` (create new tag)
 3. Title: `Talio Desktop vX.Y.Z`
-4. Upload all 7 files from `desktop-app/dist/` listed above
+4. Upload the 5 files from `desktop-app/dist/` listed above
 5. Write release notes
-6. Publish release (do **not** leave as draft - drafts are invisible to auto-updater)
+6. Publish release
+
+> **Important:** The release must be marked as **"Latest"** (not Draft/Pre-release). The download links at `/download/[platform]` always redirect to the **latest** GitHub release.
 
 ---
 
@@ -283,31 +282,54 @@ $GH release list --limit 3
 $GH release view vX.Y.Z --json assets --jq '.assets[].name'
 ```
 
-Expected assets (7 files):
+Expected assets (5 files):
 ```
 Talio-X.Y.Z-arm64.dmg
 Talio-X.Y.Z-arm64.zip
 Talio-X.Y.Z-x64.dmg
 Talio-X.Y.Z-x64.zip
 Talio.Setup.X.Y.Z.exe
-latest-mac.yml
-latest.yml
 ```
 
 ---
 
-## How Auto-Update Works
+## Step 7: Verify Download Links
+
+The download routes at `/download/[platform]` fetch the **latest** GitHub release in real-time (no caching) and redirect to the matching asset. After publishing a release, the download links update **immediately**.
+
+Verify each platform link redirects to the new version:
+
+```bash
+# Should redirect to the new arm64 DMG
+curl -sI https://app.talio.in/download/mac-arm64 | grep -i location
+
+# Should redirect to the new x64 DMG
+curl -sI https://app.talio.in/download/mac-intel | grep -i location
+
+# Should redirect to the new Windows EXE
+curl -sI https://app.talio.in/download/windows | grep -i location
+```
+
+Each `Location:` header should contain the new version number (e.g., `Talio-X.Y.Z-arm64.dmg`).
+
+> **Note:** The download route (`app/download/[platform]/route.js`) uses `cache: 'no-store'` to always hit the GitHub API for the latest release. This ensures new versions are reflected in download links the moment the GitHub release is published.
+
+---
+
+## How Update Checking Works
 
 ```
-App starts → setupAutoUpdater()
-  → electron-updater reads latest-mac.yml (macOS) or latest.yml (Windows)
-    from the latest GitHub Release
-  → Compares version in YAML with app's package.json version
-  → If newer version found:
-    → Emits 'update-available' → UI shows "Software Update" card
-    → User clicks "Update Now" → downloads ZIP (macOS) or EXE (Windows)
-    → Emits 'update-downloaded' → UI shows "Install & Restart"
-    → autoUpdater.quitAndInstall()
+App starts → setupAutoUpdater() sets up periodic check (every 2 hours)
+  → checkForUpdates() fetches /api/desktop/min-version
+    → Compares latestVersion with app's package.json version
+    → If newer version found:
+      → Sends 'available' status to renderer via IPC
+      → Shows native OS notification: "Update Available"
+      → Notification click navigates to App Info page
+  → User visits App Info page → auto-checks on mount
+    → Shows "Download vX.Y.Z" button
+    → Button opens /download/[platform] → redirects to GitHub Release asset
+    → User installs the downloaded DMG/EXE manually
 ```
 
 Additionally, when a desktop app connects via Socket.IO, `server.js` compares its version against `LATEST_DESKTOP_VERSION` and emits `trigger-update-check` if outdated.
@@ -316,23 +338,16 @@ Additionally, when a desktop app connects via Socket.IO, `server.js` compares it
 
 ## Troubleshooting
 
-### "ZIP file not provided" error on macOS
-The `latest-mac.yml` in the release doesn't reference a ZIP, or the ZIP wasn't uploaded. Ensure:
-1. `mac.target` in `package.json` includes `"zip"` alongside `"dmg"`
-2. Both `.zip` files are uploaded to the GitHub release
-3. `latest-mac.yml` is uploaded and references the ZIP files
-
-### Release shows as "Draft"
-Draft releases are invisible to electron-updater. Publish it:
-```bash
-$GH release edit vX.Y.Z --draft=false --latest
-```
-
-### App sees wrong version
-The app reads from the **latest** GitHub release. Ensure the new release is marked as "Latest":
+### Download links show old version
+The download route fetches the **latest** GitHub release. Ensure the new release is marked as "Latest" (not Draft or Pre-release):
 ```bash
 $GH release edit vX.Y.Z --latest
 ```
+
+### App doesn't detect new version
+- Verify `LATEST_DESKTOP_VERSION` is bumped in both `server.js` and `app/api/desktop/min-version/route.js`
+- Verify the web app is deployed with the updated version constants
+- The app checks every 2 hours; users can also check manually from the App Info page
 
 ### Uploading assets to an existing release
 ```bash

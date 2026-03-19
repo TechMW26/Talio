@@ -29,7 +29,7 @@ export async function GET(request, { params }) {
         'Accept': 'application/vnd.github.v3+json',
         'User-Agent': 'Talio-Download-Redirect',
       },
-      next: { revalidate: 300 }, // Cache for 5 minutes
+      cache: 'no-store', // Always fetch latest release so new versions reflect immediately
     })
 
     if (!res.ok) {
