@@ -1,6 +1,6 @@
 # Talio Desktop App
 
-Electron desktop application for Talio HRMS with screen capture and activity monitoring.
+Electron desktop application for Talio HRMS — productivity insights and team collaboration.
 
 ## Features
 

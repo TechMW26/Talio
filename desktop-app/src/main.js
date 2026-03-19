@@ -131,7 +131,7 @@ async function requestPermissions() {
     try {
       var testNotif = new Notification({
         title: 'Talio',
-        body: 'Talio is running in the background and monitoring your activity.',
+        body: 'Talio is ready to help you stay productive and connected with your team.',
         icon: getAppIcon(),
         silent: true
       });
@@ -187,7 +187,7 @@ async function requestPermissions() {
       var result = await dialog.showMessageBox(mainWindow, {
         type: 'info',
         title: 'Screen Recording Permission Required',
-        message: 'Talio needs screen recording permission for productivity monitoring and screen sharing in meetings.',
+        message: 'Talio needs screen recording permission to enable AI-powered work insights and screen sharing in meetings.',
         detail: 'Please grant Screen Recording permission in System Preferences → Privacy & Security → Screen Recording, then restart the app.',
         buttons: ['Open System Preferences', 'Later'],
         defaultId: 0,

@@ -1,7 +1,7 @@
 {
   "name": "talio-desktop",
   "version": "5.0.4",
-  "description": "Talio HRMS Desktop - Productivity Monitoring with Screen Capture",
+  "description": "Talio HRMS Desktop - Productivity & Collaboration Hub",
   "main": "src/main.js",
   "author": "MW FutureTech <support@talio.in>",
   "homepage": "https://app.talio.in",
@@ -133,7 +133,7 @@
       "maintainer": "MW FutureTech <support@talio.in>",
       "vendor": "MW FutureTech",
       "synopsis": "Talio HRMS Desktop App",
-      "description": "Talio HRMS Desktop - Productivity Monitoring with Screen Capture",
+      "description": "Talio HRMS Desktop - Productivity & Collaboration Hub",
       "executableName": "talio-desktop",
       "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
