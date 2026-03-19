@@ -1411,10 +1411,10 @@ function setupIPCHandlers() {
       var latest = data.latestVersion;
       var current = app.getVersion();
       if (latest && compareVersions(current, latest) < 0) {
-        sendUpdateStatus('available', { version: latest });
+        sendUpdateStatus('available', { version: latest, latestVersion: latest });
         return { success: true, updateAvailable: true, latestVersion: latest };
       } else {
-        sendUpdateStatus('up-to-date', { version: current });
+        sendUpdateStatus('up-to-date', { version: current, latestVersion: latest || current });
         return { success: true, updateAvailable: false, latestVersion: latest || current };
       }
     } catch (err) {
@@ -1722,7 +1722,7 @@ async function checkForUpdates() {
 
     if (latest && compareVersions(current, latest) < 0) {
       logger.log('info', 'Updater', 'Update available: v' + latest + ' (current: v' + current + ')');
-      sendUpdateStatus('available', { version: latest });
+      sendUpdateStatus('available', { version: latest, latestVersion: latest });
 
       // Show native notification directing user to download
       showNotification(
@@ -1732,7 +1732,7 @@ async function checkForUpdates() {
       );
     } else {
       logger.log('info', 'Updater', 'Up to date (current: v' + current + ', latest: v' + (latest || current) + ')');
-      sendUpdateStatus('up-to-date', { version: latest || current });
+      sendUpdateStatus('up-to-date', { version: current, latestVersion: latest || current });
     }
   } catch (error) {
     logger.log('warn', 'Updater', 'Update check failed: ' + error.message);

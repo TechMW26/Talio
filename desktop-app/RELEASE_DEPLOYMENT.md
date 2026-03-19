@@ -14,19 +14,19 @@ The Talio desktop app uses **GitHub Releases** for distribution. The app checks 
 
 ---
 
-## Step 1: Bump Version (6 files)
+## Step 1: Bump Version (4 files)
 
-Update the version in **all six** locations:
+Update the version in **these four** locations:
 
 | File | Constant / Field | Purpose |
-|------|-----------------|---------|
+|------|-----------------|--------|
 | `desktop-app/package.json` | `"version"` | Electron app version; used by electron-builder for artifact naming |
 | `desktop-app/src/main.js` | Header comment `v*.*.*` | Version reference in file header |
 | `desktop-app/src/preload.js` | Header comment `v*.*.*` | Version reference in file header |
 | `desktop-app/src/screenshotService.js` | Header comment `v*.*.*` | Version reference in file header |
-| `server.js` | `LATEST_DESKTOP_VERSION` | Triggers connected desktop clients to check for updates via Socket.IO |
-| `app/api/desktop/min-version/route.js` | `LATEST_DESKTOP_VERSION` | REST endpoint the app polls for latest version info |
 
+> **Latest version detection is automatic.** Both `server.js` and `/api/desktop/min-version` fetch the latest release tag from the GitHub Releases API (cached for 5 minutes). No manual version bump needed on the server side.
+>
 > **Note:** Only bump `MIN_DESKTOP_VERSION` in `min-version/route.js` when a release contains breaking changes that require all older apps to force-update.
 
 ---
@@ -332,7 +332,7 @@ App starts → setupAutoUpdater() sets up periodic check (every 2 hours)
     → User installs the downloaded DMG/EXE manually
 ```
 
-Additionally, when a desktop app connects via Socket.IO, `server.js` compares its version against `LATEST_DESKTOP_VERSION` and emits `trigger-update-check` if outdated.
+Additionally, when a desktop app connects via Socket.IO, `server.js` compares its version against the latest release fetched from the GitHub API and emits `trigger-update-check` if outdated. The version is refreshed automatically every 5 minutes.
 
 ---
 
@@ -345,9 +345,9 @@ $GH release edit vX.Y.Z --latest
 ```
 
 ### App doesn't detect new version
-- Verify `LATEST_DESKTOP_VERSION` is bumped in both `server.js` and `app/api/desktop/min-version/route.js`
-- Verify the web app is deployed with the updated version constants
-- The app checks every 2 hours; users can also check manually from the App Info page
+- The latest version is fetched automatically from GitHub Releases (cached for 5 min). Ensure the release is marked as "Latest" — not Draft or Pre-release.
+- If GitHub API rate-limits are hit, the server falls back to a hardcoded `FALLBACK_LATEST_DESKTOP` constant.
+- The app checks every 2 hours; users can also check manually from the App Info page.
 
 ### Uploading assets to an existing release
 ```bash

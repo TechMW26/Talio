@@ -153,6 +153,9 @@ export default function AppInfoPage() {
 
       if (window.electronAPI.onUpdateStatus) {
         window.electronAPI.onUpdateStatus((data) => {
+          // Always update latestVersion from IPC (single source of truth)
+          if (data.latestVersion) setLatestVersion(data.latestVersion)
+
           // Ignore 'available' if reported version is not newer than current
           if (data.status === 'available' && data.version) {
             window.electronAPI.getAppVersion?.().then(cv => {

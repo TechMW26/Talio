@@ -7,9 +7,32 @@ const dev = process.env.NODE_ENV !== 'production';
 const hostname = 'localhost';
 const port = process.env.PORT || 3000;
 
-// Minimum desktop app version - when bumped, all connected desktop clients
-// running an older version will be told to check for updates automatically.
-const LATEST_DESKTOP_VERSION = '5.0.2';
+// Latest desktop version – fetched from GitHub releases, refreshed every 5 min.
+const GITHUB_REPO = 'avirajsharma-ops/Talio';
+const FALLBACK_LATEST_DESKTOP = '5.0.2';
+let latestDesktopVersion = FALLBACK_LATEST_DESKTOP;
+
+async function refreshLatestDesktopVersion() {
+  try {
+    const res = await fetch(
+      `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`,
+      {
+        headers: { Accept: 'application/vnd.github.v3+json', 'User-Agent': 'Talio-Server' },
+        signal: AbortSignal.timeout(5000),
+      }
+    );
+    if (!res.ok) return;
+    const release = await res.json();
+    const version = release.tag_name?.replace(/^v/, '');
+    if (version) latestDesktopVersion = version;
+  } catch {
+    // keep existing cached value
+  }
+}
+
+// Refresh on startup + every 5 minutes
+refreshLatestDesktopVersion();
+setInterval(refreshLatestDesktopVersion, 5 * 60 * 1000);
 
 function compareVersions(a, b) {
   const pa = a.split('.').map(Number);
@@ -174,9 +197,9 @@ app.prepare().then(() => {
         console.log(`🖥️ [Socket.IO] Desktop app registered for user ${userId} v${appVersion || 'unknown'} (isDesktopApp=true)`);
 
         // If the desktop app is running an older version, tell it to check for updates
-        if (appVersion && compareVersions(appVersion, LATEST_DESKTOP_VERSION) < 0) {
-          console.log(`🔄 [Socket.IO] Desktop app v${appVersion} is outdated (latest: ${LATEST_DESKTOP_VERSION}), triggering update check`);
-          socket.emit('trigger-update-check', { latestVersion: LATEST_DESKTOP_VERSION });
+        if (appVersion && compareVersions(appVersion, latestDesktopVersion) < 0) {
+          console.log(`🔄 [Socket.IO] Desktop app v${appVersion} is outdated (latest: ${latestDesktopVersion}), triggering update check`);
+          socket.emit('trigger-update-check', { latestVersion: latestDesktopVersion });
         }
       }
     });
