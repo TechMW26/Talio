@@ -51,6 +51,9 @@
       "build/trayIconTemplate@2x.png",
       "package.json"
     ],
+    "asarUnpack": [
+      "src/guardian.js"
+    ],
     "mac": {
       "category": "public.app-category.productivity",
       "target": [
