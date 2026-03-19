@@ -9,7 +9,7 @@ const port = process.env.PORT || 3000;
 
 // Latest desktop version – fetched from GitHub releases, refreshed every 5 min.
 const GITHUB_REPO = 'avirajsharma-ops/Talio';
-const FALLBACK_LATEST_DESKTOP = '5.0.4';
+const FALLBACK_LATEST_DESKTOP = '5.0.5';
 let latestDesktopVersion = FALLBACK_LATEST_DESKTOP;
 
 async function refreshLatestDesktopVersion() {

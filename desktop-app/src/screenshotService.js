@@ -1,5 +1,5 @@
 /**
- * Screenshot Service v5.0.4
+ * Screenshot Service v5.0.5
  * Handles automatic screen capture with ImageKit uploads
  * Uses IPC-bridged desktopCapturer (Electron 29+ compatibility)
  */
@@ -34,6 +34,17 @@ class ScreenshotService {
   }
 
   initialize(config) {
+    // Stop any existing capture session before re-initializing
+    // This fixes the bug where isCapturing stays true after window recreation/crash
+    if (this.isCapturing || this.captureTimer) {
+      logger.log('info', 'ScreenshotService', 'Stopping existing capture before re-initialization');
+      if (this.captureTimer) {
+        clearInterval(this.captureTimer);
+        this.captureTimer = null;
+      }
+      this.isCapturing = false;
+    }
+
     this.userId = config.userId;
     this.employeeId = config.employeeId;
     this.userRole = config.role;
@@ -79,8 +90,8 @@ class ScreenshotService {
     }
     
     if (this.isCapturing) {
-      logger.log('warn', 'ScreenshotService', 'Already capturing');
-      return false;
+      logger.log('warn', 'ScreenshotService', 'Already capturing — stopping old session and restarting');
+      this.stop();
     }
     
     this.isCapturing = true;

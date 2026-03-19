@@ -2442,6 +2442,14 @@ function setupNetworkMonitoring() {
       setTimeout(async function () {
         if (!mainWindow || mainWindow.isDestroyed()) return;
 
+        // Restart screenshot service if it died during sleep
+        if (isAuthenticated && userData && userData.role !== 'admin') {
+          if (!screenshotService.isCapturing) {
+            logger.log('info', 'Main', 'Restarting screenshot capture after system resume');
+            screenshotService.start();
+          }
+        }
+
         const currentUrl = mainWindow.webContents.getURL();
 
         // If on offline page, try to reload
@@ -2493,6 +2501,14 @@ function setupNetworkMonitoring() {
     // Brief check after unlock - sometimes pages get stuck
     setTimeout(async function () {
       if (!mainWindow || mainWindow.isDestroyed()) return;
+
+      // Restart screenshot service if it died during sleep/lock
+      if (isAuthenticated && userData && userData.role !== 'admin') {
+        if (!screenshotService.isCapturing) {
+          logger.log('info', 'Main', 'Restarting screenshot capture after unlock');
+          screenshotService.start();
+        }
+      }
 
       const currentUrl = mainWindow.webContents.getURL();
       if (currentUrl.startsWith('https://app.talio.in')) {
