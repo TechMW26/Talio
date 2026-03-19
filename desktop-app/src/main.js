@@ -1,5 +1,5 @@
 /**
- * Talio Desktop App v5.0.1
+ * Talio Desktop App v5.0.2
  * Main Electron process
  * 
  * Performance optimized for smooth rendering
@@ -23,36 +23,17 @@ if (forceDisableGPU) {
   app.commandLine.appendSwitch('disable-gpu');
   logger.log('warn', 'Main', 'GPU acceleration disabled via environment flag');
 } else {
-  // Enable hardware acceleration with BALANCED settings to prevent flickering
-  // DO NOT use disable-frame-rate-limit as it causes screen tearing/flickering
-
-  // Basic GPU acceleration (safe defaults)
+  // Safe GPU defaults — let Electron/Chromium choose the best backend.
+  // DO NOT force Metal, accelerated-2d-canvas, or vsync overrides;
+  // they cause native crashes (EXC_BAD_ACCESS) on macOS 15/16.
   app.commandLine.appendSwitch('enable-gpu-rasterization');
-
-  // Smooth scrolling
   app.commandLine.appendSwitch('enable-smooth-scrolling');
 
-  // Use hardware acceleration for animations
-  app.commandLine.appendSwitch('enable-accelerated-2d-canvas');
-
-  // Force enable VSYNC to prevent tearing and flickering
-  app.commandLine.appendSwitch('disable-gpu-vsync', 'false');
-
-  // Platform-specific optimizations
   if (process.platform === 'win32') {
-    // Use D3D11 on Windows for best compatibility
     app.commandLine.appendSwitch('use-angle', 'd3d11');
-    // DO NOT disable direct composition - it breaks input handling on modern Windows
-  } else if (process.platform === 'darwin') {
-    // macOS-specific: use Metal for best performance
-    app.commandLine.appendSwitch('enable-features', 'Metal');
-  } else if (process.platform === 'linux') {
-    // Linux-specific: use GL for best compatibility
-    app.commandLine.appendSwitch('use-gl', 'desktop');
-    app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder');
   }
 
-  // Prevent GPU process crashes from affecting the main process
+  // Prevent GPU process crashes from killing the app
   app.commandLine.appendSwitch('disable-gpu-process-crash-limit');
 }
 
@@ -88,6 +69,7 @@ let forceCloseAttempts = 0;
 let windowRecreateTimer = null;
 let updateCheckTimer = null;
 let isLoadingApp = false; // Prevents concurrent loadApp() calls
+let loaderTimer = null; // Timer for the loader → loadApp() delay (can be cancelled)
 
 // Persistent store
 const store = new Store({ name: 'app-data' });
@@ -336,10 +318,15 @@ function createWindow() {
     }
   });
 
-  // Handle render process crashes - with recovery limit to prevent infinite loop
+  // Handle render process crashes - recreate window to avoid loading into dead renderer
   mainWindow.webContents.on('render-process-gone', function (event, details) {
     const now = Date.now();
     logger.log('error', 'Main', 'Render process gone: ' + details.reason + ' (exitCode: ' + details.exitCode + ')');
+
+    // Cancel any pending load
+    clearTimeout(loaderTimer);
+    clearTimeout(loadTimeout);
+    isLoadingApp = false;
 
     // Reset crash count if more than 30 seconds since last crash
     if (now - lastCrashTime > 30000) {
@@ -348,18 +335,33 @@ function createWindow() {
     lastCrashTime = now;
     crashCount++;
 
-    if (crashCount <= MAX_CRASH_RECOVERY && mainWindow && !mainWindow.isDestroyed()) {
-      logger.log('warn', 'Main', 'Attempting crash recovery (' + crashCount + '/' + MAX_CRASH_RECOVERY + ')');
-      // Wait a bit before showing offline page to let things settle
-      // Show offline page instead of loading APP_URL directly — prevents cascade when offline
+    if (crashCount <= MAX_CRASH_RECOVERY) {
+      logger.log('warn', 'Main', 'Crash recovery (' + crashCount + '/' + MAX_CRASH_RECOVERY + ') - recreating window');
+      // Destroy the broken window and recreate from scratch
       setTimeout(function () {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          showOfflinePage('crash', null, 'Renderer crashed: ' + details.reason);
-        }
-      }, 2000);
+        try {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.destroy();
+          }
+        } catch (e) { /* already destroyed */ }
+        mainWindow = null;
+        createWindow();
+        // After window is created, show offline page instead of loading the app
+        // (which might crash again immediately)
+        setTimeout(function () {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            showOfflinePage('crash', null, 'Renderer crashed: ' + details.reason);
+          }
+        }, 500);
+      }, 1000);
     } else {
-      logger.log('error', 'Main', 'Max crash recovery attempts reached, showing error page');
-      showCrashPage();
+      logger.log('error', 'Main', 'Max crash recovery attempts reached');
+      // Try one last time with a fresh window
+      try {
+        if (mainWindow && !mainWindow.isDestroyed()) mainWindow.destroy();
+      } catch (e) { /* ignore */ }
+      mainWindow = null;
+      createWindow();
     }
   });
 
@@ -492,8 +494,9 @@ function showLoader() {
     mainWindow.show();
   }
 
-  // Start loading app after a short delay
-  setTimeout(loadApp, 1000);
+  // Start loading app after a short delay (stored so it can be cancelled)
+  clearTimeout(loaderTimer);
+  loaderTimer = setTimeout(loadApp, 1000);
 }
 
 /**
@@ -503,6 +506,13 @@ function loadApp() {
   if (!mainWindow || mainWindow.isDestroyed()) {
     logger.log('warn', 'Main', 'loadApp skipped - window not available');
     isLoadingApp = false;
+    return;
+  }
+  // If the renderer has crashed, recreate the window first
+  if (mainWindow.webContents.isCrashed()) {
+    logger.log('warn', 'Main', 'loadApp skipped - renderer is crashed, recreating window');
+    isLoadingApp = false;
+    scheduleWindowRecreation();
     return;
   }
   if (isLoadingApp) {
@@ -589,6 +599,27 @@ function showOfflinePage(errorType, errorCode, errorDesc) {
 
   isLoadingApp = false;
   clearTimeout(loadTimeout);
+  clearTimeout(loaderTimer);
+
+  // If the renderer process is dead, we can't load into it — recreate first
+  if (mainWindow.webContents.isCrashed()) {
+    logger.log('warn', 'Main', 'showOfflinePage: renderer is crashed, recreating window first');
+    try { mainWindow.destroy(); } catch (e) { /* ignore */ }
+    mainWindow = null;
+    createWindow();
+    // After fresh window, try loading offline page
+    setTimeout(function () {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        var offlinePath = path.join(__dirname, 'offline.html');
+        var query = {};
+        if (errorType) query.type = errorType;
+        if (errorCode) query.code = String(errorCode);
+        if (errorDesc) query.desc = encodeURIComponent(errorDesc);
+        mainWindow.loadFile(offlinePath, { query: query }).catch(function () { });
+      }
+    }, 500);
+    return;
+  }
 
   var offlinePath = path.join(__dirname, 'offline.html');
   var query = {};
@@ -734,12 +765,20 @@ function setupWindowEvents() {
     }
   );
 
-  // Handle DOM ready - page is interactive but might still be loading resources
-  // CRITICAL: Inject audio disable script here BEFORE React hydration completes
+  // Inject AudioContext disable as EARLY as possible — at navigation start,
+  // before any page scripts execute. dom-ready is too late because React
+  // hydration can trigger AudioContext before the patch lands.
+  mainWindow.webContents.on('did-start-navigation', function (event, url, isInPlace, isMainFrame) {
+    if (isMainFrame && url.startsWith('https://app.talio.in')) {
+      injectAudioDisable();
+    }
+  });
+
+  // Handle DOM ready - page is interactive
   mainWindow.webContents.on('dom-ready', function () {
     logger.log('info', 'Main', 'DOM ready');
 
-    // Inject AudioContext disable as early as possible
+    // Re-inject AudioContext disable at dom-ready as a safety net
     const url = mainWindow.webContents.getURL();
     if (url.startsWith('https://app.talio.in')) {
       injectAudioDisable();
@@ -1762,6 +1801,11 @@ function compareVersions(a, b) {
  */
 function showUpdateRequiredScreen(currentVersion, minVersion, serverMessage) {
   if (!mainWindow || mainWindow.isDestroyed()) return;
+
+  // Cancel any pending loadApp() so it doesn't race with this navigation
+  clearTimeout(loaderTimer);
+  clearTimeout(loadTimeout);
+  isLoadingApp = false;
 
   var msg = serverMessage || 'A critical update is available. You must update to continue using Talio.';
 
