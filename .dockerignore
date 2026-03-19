@@ -29,3 +29,9 @@ android
 release
 scripts/desktop*
 memories
+tests
+jest.config.js
+**/*.test.js
+**/*.spec.js
+**/*.test.ts
+**/*.spec.ts
