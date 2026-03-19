@@ -87,9 +87,14 @@ export default function ProductivityPage() {
   }, [deptHeadRes])
 
   // Check if user can view team (admin, hr, manager, dept_head, or actual department head)
+  // Admins default to team tab since screenshots are not captured for admin accounts
   useEffect(() => {
     const teamRoles = ['admin', 'hr', 'manager', 'department_head']
-    setCanViewTeam(teamRoles.includes(userRole) || isDepartmentHead)
+    const canView = teamRoles.includes(userRole) || isDepartmentHead
+    setCanViewTeam(canView)
+    if (userRole === 'admin') {
+      setActiveTab('team')
+    }
   }, [userRole, isDepartmentHead])
 
   // Fetch departments for admin/HR filter
@@ -123,7 +128,7 @@ export default function ProductivityPage() {
   }, [canViewTeam, selectedDate, isAdminOrHR, isDepartmentHead, selectedDepartment, selectedTeam])
 
   const { data: sessionsRes, isLoading: sessionsLoading, isValidating: sessionsValidating, mutate: mutateSessions } = useAuthedSWR(`/api/productivity/sessions?date=${selectedDate}`)
-  const { data: teamRes, isValidating: teamValidating, mutate: mutateTeam } = useAuthedSWR(teamUrl)
+  const { data: teamRes, isLoading: teamLoading, isValidating: teamValidating, mutate: mutateTeam } = useAuthedSWR(teamUrl)
 
   // Sync sessions from SWR to local state (needed for inline optimistic updates like analyzeSession)
   useEffect(() => {
@@ -450,25 +455,27 @@ export default function ProductivityPage() {
         <div className="bg-white rounded-lg shadow-md p-4 mb-6">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="flex gap-2 flex-1">
-              <button
-                onClick={() => {
-                  setActiveTab('my')
-                  // Reset viewMode if on manual capture (only available in team tab)
-                  if (viewMode === 'manual') setViewMode('sessions')
-                  // Reset selected team member
-                  setSelectedTeamMember(null)
-                  // Reset selected employee (sessions view)
-                  setSelectedEmployee(null)
-                  setEmployeeSessions([])
-                }}
-                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium transition ${activeTab === 'my'
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-              >
-                <HiOutlineUser className="w-5 h-5" />
-                My Activity
-              </button>
+              {userRole !== 'admin' && (
+                <button
+                  onClick={() => {
+                    setActiveTab('my')
+                    // Reset viewMode if on manual capture (only available in team tab)
+                    if (viewMode === 'manual') setViewMode('sessions')
+                    // Reset selected team member
+                    setSelectedTeamMember(null)
+                    // Reset selected employee (sessions view)
+                    setSelectedEmployee(null)
+                    setEmployeeSessions([])
+                  }}
+                  className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium transition ${activeTab === 'my'
+                      ? 'bg-primary-600 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                >
+                  <HiOutlineUser className="w-5 h-5" />
+                  My Activity
+                </button>
+              )}
               <button
                 onClick={() => {
                   setActiveTab('team')
@@ -919,6 +926,20 @@ export default function ProductivityPage() {
                 </div>
               )}
             </>
+          ) : teamLoading ? (
+            /* Loading skeleton for team grid */
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {[...Array(8)].map((_, i) => (
+                <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                  <Skeleton className="h-32 w-full" />
+                  <div className="p-4 space-y-3">
+                    <Skeleton className="h-4 w-3/4 rounded-lg" />
+                    <Skeleton className="h-3 w-1/2 rounded-lg" />
+                    <Skeleton className="h-8 w-full rounded-lg" />
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
             /* Team Grid View */
             <>
