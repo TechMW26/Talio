@@ -1,5 +1,5 @@
 /**
- * Talio Desktop App v5.0.2
+ * Talio Desktop App v5.0.3
  * Main Electron process
  * 
  * Performance optimized for smooth rendering
@@ -70,6 +70,8 @@ let windowRecreateTimer = null;
 let updateCheckTimer = null;
 let isLoadingApp = false; // Prevents concurrent loadApp() calls
 let loaderTimer = null; // Timer for the loader → loadApp() delay (can be cancelled)
+let isNavigating = false; // Single lock preventing concurrent page navigations
+let navigationSafetyTimer = null; // Fallback to unlock navigation after timeout
 
 // Persistent store
 const store = new Store({ name: 'app-data' });
@@ -494,9 +496,8 @@ function showLoader() {
     mainWindow.show();
   }
 
-  // Start loading app after a short delay (stored so it can be cancelled)
-  clearTimeout(loaderTimer);
-  loaderTimer = setTimeout(loadApp, 1000);
+  // Don't auto-call loadApp() — the startup sequence (app.whenReady) or the
+  // caller (welcome-complete IPC) will trigger loadApp() after safety checks.
 }
 
 /**
@@ -515,11 +516,14 @@ function loadApp() {
     scheduleWindowRecreation();
     return;
   }
-  if (isLoadingApp) {
-    logger.log('info', 'Main', 'loadApp debounced - already loading');
+  if (isLoadingApp || isNavigating) {
+    logger.log('info', 'Main', 'loadApp debounced - already ' + (isLoadingApp ? 'loading' : 'navigating'));
     return;
   }
   isLoadingApp = true;
+  isNavigating = true;
+  clearTimeout(navigationSafetyTimer);
+  navigationSafetyTimer = setTimeout(function () { isNavigating = false; }, 20000);
   loadRetries++;
   logger.log('info', 'Main', 'Loading app (attempt ' + loadRetries + '/' + MAX_LOAD_RETRIES + ')');
 
@@ -532,16 +536,27 @@ function loadApp() {
   try {
     mainWindow.loadURL(APP_URL).then(function () {
       clearTimeout(loadTimeout);
+      clearTimeout(navigationSafetyTimer);
       loadRetries = 0;
       isLoadingApp = false;
+      isNavigating = false;
       logger.log('info', 'Main', 'App loaded successfully');
     }).catch(function (error) {
       isLoadingApp = false;
+      isNavigating = false;
+      clearTimeout(navigationSafetyTimer);
+      // Ignore intentionally aborted navigations (e.g. offline page took over)
+      if (error.message && error.message.includes('ERR_ABORTED')) {
+        logger.log('info', 'Main', 'Load aborted (intentional) — skipping error handler');
+        return;
+      }
       logger.log('error', 'Main', 'Load failed: ' + error.message);
       handleLoadError(error);
     });
   } catch (e) {
     isLoadingApp = false;
+    isNavigating = false;
+    clearTimeout(navigationSafetyTimer);
     logger.log('error', 'Main', 'loadApp exception: ' + e.message);
     showOfflinePage('offline', null, e.message);
   }
@@ -552,6 +567,8 @@ function loadApp() {
  */
 function handleLoadTimeout() {
   isLoadingApp = false;
+  isNavigating = false;
+  clearTimeout(navigationSafetyTimer);
   logger.log('warn', 'Main', 'Load timeout reached');
   showOfflinePage('timeout', null, 'Connection timed out');
 }
@@ -561,7 +578,9 @@ function handleLoadTimeout() {
  */
 function handleLoadError(error) {
   clearTimeout(loadTimeout);
+  clearTimeout(navigationSafetyTimer);
   isLoadingApp = false;
+  isNavigating = false;
   logger.log('error', 'Main', 'Load error: ' + error.message);
 
   // Determine error type from error message/code
@@ -597,9 +616,15 @@ function handleLoadError(error) {
 function showOfflinePage(errorType, errorCode, errorDesc) {
   if (!mainWindow || mainWindow.isDestroyed()) return;
 
+  // Stop any in-progress navigation to prevent concurrent loads
+  try { mainWindow.webContents.stop(); } catch (e) { /* ignore */ }
+
   isLoadingApp = false;
+  isNavigating = false;
+  clearTimeout(navigationSafetyTimer);
   clearTimeout(loadTimeout);
   clearTimeout(loaderTimer);
+  clearTimeout(pendingReloadTimeout);
 
   // If the renderer process is dead, we can't load into it — recreate first
   if (mainWindow.webContents.isCrashed()) {
@@ -700,9 +725,9 @@ function setupWindowEvents() {
   // Handle page load failures - show offline page for network/server errors
   mainWindow.webContents.on('did-fail-load', function (event, errorCode, errorDescription, validatedURL, isMainFrame) {
     if (isMainFrame) {
-      // If loadApp() is handling this failure via its catch handler, skip to avoid double-navigation
-      if (isLoadingApp) {
-        logger.log('info', 'Main', 'did-fail-load while loadApp active — deferring to loadApp handler');
+      // If another navigation or loadApp is handling this, skip to avoid double-navigation
+      if (isLoadingApp || isNavigating) {
+        logger.log('info', 'Main', 'did-fail-load while ' + (isLoadingApp ? 'loadApp' : 'navigation') + ' active — skipping');
         return;
       }
       logger.log('error', 'Main', 'Page failed to load: ' + errorDescription + ' (' + errorCode + ') - ' + validatedURL);
@@ -723,10 +748,8 @@ function setupWindowEvents() {
       } else if (errorCode === -200 || errorCode === -201 || errorCode === -202) { // SSL errors
         errorType = 'ssl';
       } else if (errorCode === -21) { // ERR_NETWORK_CHANGED
-        // Network changed - don't show offline page, try to reload instead
-        logger.log('warn', 'Main', 'Network changed, will retry loading...');
-        scheduleReload(2000);
-        return;
+        // Network interface changed — treat as offline; auto-retry will reconnect
+        errorType = 'offline';
       } else if (errorCode === -100 || errorCode === -101) { // ERR_CONNECTION_CLOSED, ERR_CONNECTION_RESET
         errorType = 'server-error';
       } else if (errorCode === -3) { // ERR_ABORTED - usually navigation was cancelled
@@ -1122,27 +1145,24 @@ function setupIPCHandlers() {
   ipcMain.handle('set-online-status', function (event, online) {
     screenshotService.setOnlineStatus(online);
 
-    // If network went offline and we're not already on the offline page, show it
-    if (!online && mainWindow && !mainWindow.isDestroyed()) {
-      const currentUrl = mainWindow.webContents.getURL();
-      const isAlreadyOnOfflinePage = currentUrl.includes('offline.html') || currentUrl.startsWith('file://');
+    if (!mainWindow || mainWindow.isDestroyed()) return { success: true };
 
-      if (!isAlreadyOnOfflinePage) {
-        logger.log('info', 'Main', 'Network went offline, showing offline page');
-        showOfflinePage('offline', null, 'Network connection lost');
-      }
+    var currentUrl = '';
+    try { currentUrl = mainWindow.webContents.getURL(); } catch (e) { /* ignore */ }
+    var isOnOfflinePage = currentUrl.includes('offline.html') || currentUrl.startsWith('file://');
+    var isOnDataUrl = currentUrl.startsWith('data:');
+
+    // If network went offline and we're on the app, show offline page
+    if (!online && !isOnOfflinePage && !isOnDataUrl && !isNavigating) {
+      logger.log('info', 'Main', 'Network went offline, showing offline page');
+      showOfflinePage('offline', null, 'Network connection lost');
     }
 
     // If network came back online and we're on the offline page, reload the app
-    if (online && mainWindow && !mainWindow.isDestroyed()) {
-      const currentUrl = mainWindow.webContents.getURL();
-      const isOnOfflinePage = currentUrl.includes('offline.html') || currentUrl.startsWith('file://');
-
-      if (isOnOfflinePage) {
-        logger.log('info', 'Main', 'Network restored, reloading app');
-        loadRetries = 0;
-        loadApp();
-      }
+    if (online && isOnOfflinePage && !isNavigating && !isLoadingApp) {
+      logger.log('info', 'Main', 'Network restored, reloading app');
+      loadRetries = 0;
+      loadApp();
     }
 
     return { success: true };
@@ -1252,6 +1272,9 @@ function setupIPCHandlers() {
     logger.log('info', 'Main', 'Welcome screen completed');
     store.set('hasSeenWelcome', true);
     showLoader();
+    // After showing loader, start loading the app
+    clearTimeout(loaderTimer);
+    loaderTimer = setTimeout(loadApp, 1000);
     return { success: true };
   });
 
@@ -1802,10 +1825,14 @@ function compareVersions(a, b) {
 function showUpdateRequiredScreen(currentVersion, minVersion, serverMessage) {
   if (!mainWindow || mainWindow.isDestroyed()) return;
 
-  // Cancel any pending loadApp() so it doesn't race with this navigation
+  // Stop any in-progress navigation and cancel pending timers
+  try { mainWindow.webContents.stop(); } catch (e) { /* ignore */ }
   clearTimeout(loaderTimer);
   clearTimeout(loadTimeout);
+  clearTimeout(navigationSafetyTimer);
+  clearTimeout(pendingReloadTimeout);
   isLoadingApp = false;
+  isNavigating = false;
 
   var msg = serverMessage || 'A critical update is available. You must update to continue using Talio.';
 
@@ -2095,6 +2122,11 @@ let lastReloadAttempt = 0;
 const MIN_RELOAD_INTERVAL = 3000; // Minimum 3 seconds between reload attempts
 
 function scheduleReload(delayMs) {
+  if (isNavigating || isLoadingApp) {
+    logger.log('info', 'Main', 'scheduleReload skipped — navigation in progress');
+    return;
+  }
+
   const now = Date.now();
 
   // Debounce - don't reload too frequently
@@ -2169,6 +2201,38 @@ async function checkForWhitescreen() {
 }
 
 /**
+ * Clear HTTP cache and service workers if the app version changed.
+ * Prevents stale bundles and old data from causing crashes after updates.
+ */
+async function checkAndClearCacheOnUpdate() {
+  try {
+    var lastVersion = store.get('lastRunVersion', null);
+    var currentVersion = app.getVersion();
+
+    if (lastVersion && lastVersion !== currentVersion) {
+      logger.log('info', 'Main', 'Version changed (' + lastVersion + ' \u2192 ' + currentVersion + ') \u2014 clearing cache');
+      try {
+        await session.defaultSession.clearCache();
+      } catch (e) {
+        logger.log('warn', 'Main', 'clearCache failed: ' + e.message);
+      }
+      try {
+        await session.defaultSession.clearStorageData({
+          storages: ['cachestorage', 'serviceworkers']
+        });
+      } catch (e) {
+        logger.log('warn', 'Main', 'clearStorageData failed: ' + e.message);
+      }
+      logger.log('info', 'Main', 'Cache cleared after update');
+    }
+
+    store.set('lastRunVersion', currentVersion);
+  } catch (e) {
+    logger.log('warn', 'Main', 'checkAndClearCacheOnUpdate error: ' + e.message);
+  }
+}
+
+/**
  * Setup network connectivity monitoring
  * Automatically reloads the app when internet connection is restored
  * Also handles system sleep/wake events
@@ -2182,8 +2246,10 @@ function setupNetworkMonitoring() {
   // Check network connectivity
   const checkNetworkAndReload = async function () {
     if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (isNavigating || isLoadingApp) return; // Another navigation is already handling things
 
-    const currentUrl = mainWindow.webContents.getURL();
+    var currentUrl = '';
+    try { currentUrl = mainWindow.webContents.getURL(); } catch (e) { return; }
     isOnOfflinePage = currentUrl.includes('offline.html') || currentUrl.startsWith('file://');
 
     if (isOnOfflinePage) {
@@ -2207,7 +2273,8 @@ function setupNetworkMonitoring() {
 
         const isOnline = await checkPromise;
 
-        if (isOnline && isOnOfflinePage) {
+        // Re-check guards after awaiting — state may have changed
+        if (isOnline && isOnOfflinePage && !isNavigating && !isLoadingApp) {
           logger.log('info', 'Main', 'Network restored, reloading app...');
           loadRetries = 0;
           loadApp();
@@ -2390,6 +2457,9 @@ app.whenReady().then(async function () {
   // Setup periodic update version checker
   setupAutoUpdater();
 
+  // Clear old cache/data if the app version changed (prevents stale files after updates)
+  await checkAndClearCacheOnUpdate();
+
   if (!isCrashLoop) {
     // Clean up any legacy updateInstallAttempt data from previous versions
     store.delete('updateInstallAttempt');
@@ -2397,10 +2467,14 @@ app.whenReady().then(async function () {
     // Check for forced updates (min version)
     var isForced = await checkForceUpdate();
     if (!isForced) {
-      // Check for updates on fresh launch
-      setTimeout(function () { checkForUpdates(); }, 5000);
+      // All checks passed — now load the app
+      loadApp();
+      // Check for updates after app loads
+      setTimeout(function () { checkForUpdates(); }, 10000);
     }
   } else {
+    // Safe mode — just load the app
+    loadApp();
     // In crash-loop safe mode: notify user
     setTimeout(function () {
       if (mainWindow && !mainWindow.isDestroyed()) {

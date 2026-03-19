@@ -503,6 +503,7 @@
     let retryCount = 0;
     let autoRetryInterval = null;
     let countdownValue = 0;
+    let isRetrying = false;
     
     // Auto-retry configuration
     const AUTO_RETRY_INTERVAL = 15;
@@ -559,6 +560,9 @@
     }
     
     async function retryConnection() {
+      if (isRetrying) return;
+      isRetrying = true;
+
       const btn = document.getElementById('retryBtn');
       const retryText = document.getElementById('retryText');
       const retryStatus = document.getElementById('retryStatus');
@@ -583,12 +587,12 @@
         setTimeout(() => {
           if (window.electronAPI && window.electronAPI.loadApp) {
             window.electronAPI.loadApp();
-          } else {
-            window.location.href = 'https://app.talio.in';
           }
+          // isRetrying stays true — we're navigating away
         }, 1000);
       } else {
         retryCount++;
+        isRetrying = false;
         updateIndicator('offline');
         retryStatus.textContent = `✗ Still unable to connect (attempt ${retryCount})`;
         retryStatus.className = 'retry-status error';
@@ -643,12 +647,8 @@
     }
     
     function goToTalio() {
-      // Navigate to Talio within the app (not external browser)
       if (window.electronAPI && window.electronAPI.loadApp) {
         window.electronAPI.loadApp();
-      } else {
-        // Fallback for non-Electron environment - navigate in same window
-        window.location.href = 'https://app.talio.in';
       }
     }
     
