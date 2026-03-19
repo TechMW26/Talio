@@ -5,7 +5,7 @@ import useAuthedSWR from '@/hooks/useAuthedSWR'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 import toast from '@/utils/toast'
-import { FaUsers, FaBuilding, FaArrowLeft, FaCalendarAlt, FaClock, FaChevronLeft, FaChevronRight, FaSearch, FaUserCircle, FaMapMarkerAlt, FaFilter } from 'react-icons/fa'
+import { FaUsers, FaBuilding, FaArrowLeft, FaCalendarAlt, FaClock, FaChevronLeft, FaChevronRight, FaSearch, FaUserCircle, FaMapMarkerAlt, FaFilter, FaUserFriends } from 'react-icons/fa'
 import { Card, CardBody, Button, Chip, Skeleton, Input, Select, SelectItem } from '@heroui/react'
 
 // Department color palette
@@ -26,6 +26,7 @@ export default function TeamAttendancePage() {
   const [view, setView] = useState('initial') // 'initial', 'employees', 'calendar'
   const [employees, setEmployees] = useState([])
   const [selectedDepartmentFilter, setSelectedDepartmentFilter] = useState('all')
+  const [selectedTeamFilter, setSelectedTeamFilter] = useState('all')
   const [selectedEmployee, setSelectedEmployee] = useState(null)
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [searchTerm, setSearchTerm] = useState('')
@@ -52,6 +53,15 @@ export default function TeamAttendancePage() {
   // SWR: Departments list (admin filter dropdown)
   const { data: deptsRes } = useAuthedSWR(isAdmin ? '/api/departments' : null)
   const departments = deptsRes?.data || []
+
+  // SWR: Fetch teams for selected department
+  const teamsFetchKey = (() => {
+    if (selectedDepartmentFilter && selectedDepartmentFilter !== 'all') return `/api/teams?department=${selectedDepartmentFilter}`
+    if (!isAdmin && headedDepartments.length === 1) return `/api/teams?department=${headedDepartments[0]?._id}`
+    return null
+  })()
+  const { data: teamsRes } = useAuthedSWR(teamsFetchKey)
+  const availableTeams = teamsRes?.data || []
 
   // Fetch employees when head-check resolves (dependent effect - branching fetch logic)
   useEffect(() => {
@@ -233,7 +243,19 @@ export default function TeamAttendancePage() {
       // Apply department filter
       if (selectedDepartmentFilter !== 'all') {
         const empDeptId = emp.department?._id || emp.department
-        return matchesSearch && empDeptId?.toString() === selectedDepartmentFilter
+        if (empDeptId?.toString() !== selectedDepartmentFilter) return false
+      }
+
+      // Apply team filter
+      if (selectedTeamFilter !== 'all' && availableTeams.length > 0) {
+        const team = availableTeams.find(t => t._id === selectedTeamFilter)
+        if (team) {
+          const teamMemberIds = new Set([
+            ...(team.members || []).map(m => (m._id || m).toString()),
+            ...(team.teamLeaders || []).map(l => (l._id || l).toString())
+          ])
+          if (!teamMemberIds.has(emp._id?.toString())) return false
+        }
       }
 
       return matchesSearch
@@ -266,7 +288,7 @@ export default function TeamAttendancePage() {
     }
 
     return result
-  }, [employees, searchTerm, selectedDepartmentFilter, isAdmin, isDepartmentHead, headedDepartments])
+  }, [employees, searchTerm, selectedDepartmentFilter, selectedTeamFilter, availableTeams, isAdmin, isDepartmentHead, headedDepartments])
 
   // Get unique departments from employees for filter dropdown
   const availableDepartments = useMemo(() => {
@@ -352,7 +374,7 @@ export default function TeamAttendancePage() {
               <div className="sm:w-72">
                 <Select
                   selectedKeys={[selectedDepartmentFilter]}
-                  onChange={(e) => setSelectedDepartmentFilter(e.target.value)}
+                  onChange={(e) => { setSelectedDepartmentFilter(e.target.value); setSelectedTeamFilter('all') }}
                   aria-label="Department Filter"
                   placeholder="Filter by department"
                   startContent={<FaFilter className="text-default-400" />}
@@ -373,6 +395,27 @@ export default function TeamAttendancePage() {
                       </SelectItem>
                     )
                   })}
+                </Select>
+              </div>
+            )}
+
+            {/* Team Filter */}
+            {availableTeams.length > 0 && (
+              <div className="sm:w-60">
+                <Select
+                  selectedKeys={[selectedTeamFilter]}
+                  onChange={(e) => setSelectedTeamFilter(e.target.value)}
+                  aria-label="Team Filter"
+                  placeholder="Filter by team"
+                  startContent={<FaUserFriends className="text-default-400" />}
+                  classNames={{ trigger: "bg-content1" }}
+                >
+                  <SelectItem key="all">All Teams</SelectItem>
+                  {availableTeams.map((team) => (
+                    <SelectItem key={team._id}>
+                      {team.teamName}
+                    </SelectItem>
+                  ))}
                 </Select>
               </div>
             )}

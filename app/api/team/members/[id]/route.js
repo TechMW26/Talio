@@ -5,12 +5,12 @@ import { getAuthAndModels } from '@/lib/auth'
 export async function GET(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Employee', 'Department', 'Designation', 'User', 'Task', 'TaskAssignee', 'Project'])
+    const auth = await getAuthAndModels(request, ['Employee', 'Department', 'Designation', 'User', 'Task', 'TaskAssignee', 'Project', 'Team'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Employee, Department, Designation, User, Task, TaskAssignee, Project } = models
+    const { Employee, Department, Designation, User, Task, TaskAssignee, Project, Team } = models
 
     // Await params in Next.js 15
     const { id } = await params
@@ -47,11 +47,35 @@ export async function GET(request, { params }) {
       departmentIds = headDepartments.map(d => d._id.toString())
     }
 
+    // Track if user is accessing as a team leader (for different access logic)
+    let isTeamLeaderAccess = false
+
     if (departmentIds.length === 0) {
-      return NextResponse.json(
-        { success: false, message: 'Access denied. Only department heads can view team member details.' },
-        { status: 403 }
-      )
+      // Check if user is a team leader who has access to this member
+      if (Team) {
+        const userFull = await User.findById(user._id || user.userId).select('teamLeaderOf').lean()
+        if (userFull?.teamLeaderOf?.length > 0) {
+          const leaderTeams = await Team.find({
+            _id: { $in: userFull.teamLeaderOf },
+            isActive: true,
+            $or: [
+              { members: id },
+              { teamLeaders: id }
+            ]
+          }).select('_id').lean()
+
+          if (leaderTeams.length > 0) {
+            isTeamLeaderAccess = true
+          }
+        }
+      }
+
+      if (!isTeamLeaderAccess) {
+        return NextResponse.json(
+          { success: false, message: 'Access denied. Only department heads and team leaders can view team member details.' },
+          { status: 403 }
+        )
+      }
     }
 
     // Get team member details
@@ -68,9 +92,9 @@ export async function GET(request, { params }) {
       )
     }
 
-    // Check if team member is in one of the departments user heads
+    // Check if team member is in one of the departments user heads (skip for team leader access)
     const memberDeptId = teamMember.department?._id?.toString()
-    let hasAccess = departmentIds.includes(memberDeptId)
+    let hasAccess = isTeamLeaderAccess || departmentIds.includes(memberDeptId)
 
     // Also allow access if the team member is a head of one of the departments the user heads
     if (!hasAccess) {

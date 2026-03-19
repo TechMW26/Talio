@@ -6,7 +6,7 @@ import toast from '@/utils/toast'
 import {
   FaPlus, FaEye, FaEdit, FaTrash, FaBullseye, FaSearch, FaFilter,
   FaCalendarAlt, FaClock, FaChartLine, FaCheckCircle, FaExclamationTriangle,
-  FaFlag, FaTasks, FaUserClock, FaSync
+  FaFlag, FaTasks, FaUserClock, FaSync, FaUserFriends
 } from 'react-icons/fa'
 import { Select, SelectItem, Input, Button, Skeleton } from '@heroui/react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
@@ -20,6 +20,8 @@ export default function PerformanceGoalsPage() {
   const [filterStatus, setFilterStatus] = useState('all')
   const [filterPriority, setFilterPriority] = useState('all')
   const [viewMode, setViewMode] = useState('all')
+  const [selectedDepartment, setSelectedDepartment] = useState('all')
+  const [selectedTeam, setSelectedTeam] = useState('all')
 
   const user = useMemo(() => {
     try { return JSON.parse(localStorage.getItem('user')) } catch { return null }
@@ -32,8 +34,45 @@ export default function PerformanceGoalsPage() {
       : user.employeeId
   }, [user])
 
+  const isAdminOrHR = user && ['admin', 'hr'].includes(user.role)
+
+  // Check department head status
+  const { data: headCheckRes } = useAuthedSWR(user ? '/api/team/check-head' : null)
+  const isDepartmentHead = headCheckRes?.success && headCheckRes?.isDepartmentHead
+  const headedDepartments = headCheckRes?.departments || []
+
+  // Fetch all departments for admin/HR
+  const { data: deptsRes } = useAuthedSWR(isAdminOrHR ? '/api/departments' : null)
+  const allDepartments = deptsRes?.data || []
+  const departments = isAdminOrHR ? allDepartments : headedDepartments
+
+  // Fetch teams for selected department
+  const teamsFetchKey = (() => {
+    if (selectedDepartment && selectedDepartment !== 'all') return `/api/teams?department=${selectedDepartment}`
+    if (!isAdminOrHR && headedDepartments.length === 1) return `/api/teams?department=${headedDepartments[0]?._id}`
+    return null
+  })()
+  const { data: teamsRes } = useAuthedSWR(teamsFetchKey)
+  const availableTeams = teamsRes?.data || []
+
+  // Build SWR key with department + team filters
+  const goalsSwrKey = useMemo(() => {
+    let url = '/api/performance/goals'
+    const params = []
+    if (isDepartmentHead && headedDepartments.length > 0 && selectedDepartment === 'all') {
+      params.push(`departments=${headedDepartments.map(d => d._id).join(',')}`)
+    } else if (selectedDepartment && selectedDepartment !== 'all') {
+      params.push(`department=${selectedDepartment}`)
+    }
+    if (selectedTeam && selectedTeam !== 'all') {
+      params.push(`team=${selectedTeam}`)
+    }
+    if (params.length > 0) url += '?' + params.join('&')
+    return url
+  }, [selectedDepartment, selectedTeam, isDepartmentHead, headedDepartments])
+
   // SWR: fetch goals
-  const { data: goalsRes, error: goalsError, isLoading: goalsLoading, isValidating: goalsValidating, mutate: refreshGoals } = useAuthedSWR('/api/performance/goals')
+  const { data: goalsRes, error: goalsError, isLoading: goalsLoading, isValidating: goalsValidating, mutate: refreshGoals } = useAuthedSWR(goalsSwrKey)
   const goals = goalsRes?.data || []
 
   // SWR: fetch projects (tasks)
@@ -346,6 +385,41 @@ export default function PerformanceGoalsPage() {
               <SelectItem key="medium">Medium</SelectItem>
               <SelectItem key="low">Low</SelectItem>
             </Select>
+
+            {/* Department Filter */}
+            {departments.length > 1 && (
+              <Select
+                selectedKeys={[selectedDepartment]}
+                onSelectionChange={(keys) => { setSelectedDepartment(Array.from(keys)[0] || 'all'); setSelectedTeam('all') }}
+                className="w-44"
+                size="sm"
+                aria-label="Filter by department"
+              >
+                <SelectItem key="all">{isDepartmentHead ? 'All My Depts' : 'All Departments'}</SelectItem>
+                {departments.map((dept) => (
+                  <SelectItem key={dept._id}>{dept.name}</SelectItem>
+                ))}
+              </Select>
+            )}
+
+            {/* Team Filter */}
+            {availableTeams.length > 0 && (
+              <div className="flex items-center gap-1">
+                <FaUserFriends className="text-gray-400 w-4 h-4" />
+                <Select
+                  selectedKeys={[selectedTeam]}
+                  onSelectionChange={(keys) => setSelectedTeam(Array.from(keys)[0] || 'all')}
+                  className="w-40"
+                  size="sm"
+                  aria-label="Filter by team"
+                >
+                  <SelectItem key="all">All Teams</SelectItem>
+                  {availableTeams.map((team) => (
+                    <SelectItem key={team._id}>{team.teamName}</SelectItem>
+                  ))}
+                </Select>
+              </div>
+            )}
           </div>
 
           <div className="text-sm text-gray-500">

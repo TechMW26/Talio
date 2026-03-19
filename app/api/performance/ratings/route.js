@@ -7,16 +7,17 @@ export const dynamic = 'force-dynamic'
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Employee'])
+    const auth = await getAuthAndModels(request, ['Employee', 'Team'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Employee } = models
+    const { Employee, Team } = models
 
     const { searchParams } = new URL(request.url)
     const department = searchParams.get('department')
     const departments = searchParams.get('departments') // Comma-separated list
+    const teamFilter = searchParams.get('team')
 
     // Build query based on role
     let query = { status: 'active' }
@@ -47,6 +48,22 @@ export async function GET(request) {
       }
     } else if (department && department !== 'all') {
       query.department = department
+    }
+
+    // Apply team filter
+    if (teamFilter && teamFilter !== 'all' && Team) {
+      const team = await Team.findById(teamFilter).select('members teamLeaders').lean()
+      if (team) {
+        const teamMemberIds = [
+          ...(team.members || []).map(id => id),
+          ...(team.teamLeaders || []).map(id => id)
+        ]
+        query._id = query._id ? { $in: teamMemberIds.filter(id => {
+          const idStr = id.toString()
+          if (query._id.$in) return query._id.$in.some(qid => qid.toString() === idStr)
+          return query._id.toString() === idStr
+        })} : { $in: teamMemberIds }
+      }
     }
 
     // Fetch employees with reviews

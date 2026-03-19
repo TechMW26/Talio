@@ -22,7 +22,8 @@ import {
   HiOutlineBuildingOffice2,
   HiOutlineClipboardDocumentList,
   HiOutlineEye,
-  HiOutlineMagnifyingGlass
+  HiOutlineMagnifyingGlass,
+  HiOutlineUserGroup
 } from 'react-icons/hi2'
 import RawCaptureViewer from '@/components/productivity/RawCaptureViewer'
 import ManualCapturePanel from '@/components/productivity/ManualCapturePanel'
@@ -55,6 +56,7 @@ export default function ProductivityPage() {
   const [loadingEmployeeSessions, setLoadingEmployeeSessions] = useState(false)
   const [departments, setDepartments] = useState([])
   const [selectedDepartment, setSelectedDepartment] = useState('all')
+  const [selectedTeam, setSelectedTeam] = useState('all')
   const [teamSearchQuery, setTeamSearchQuery] = useState('')
 
   // Global AI loading animation
@@ -98,6 +100,15 @@ export default function ProductivityPage() {
     }
   }, [departmentsRes])
 
+  // Fetch teams for selected department
+  const teamsFetchKey = (() => {
+    if (selectedDepartment && selectedDepartment !== 'all') return `/api/teams?department=${selectedDepartment}`
+    if (!isAdminOrHR && isDepartmentHead && departments.length === 1) return `/api/teams?department=${departments[0]?._id}`
+    return null
+  })()
+  const { data: teamsRes } = useAuthedSWR(teamsFetchKey)
+  const availableTeams = teamsRes?.data || []
+
   // Fetch sessions for selected date (SWR)
   const teamUrl = useMemo(() => {
     if (!canViewTeam) return null
@@ -105,8 +116,11 @@ export default function ProductivityPage() {
     if ((isAdminOrHR || isDepartmentHead) && selectedDepartment && selectedDepartment !== 'all') {
       url += `&department=${selectedDepartment}`
     }
+    if (selectedTeam && selectedTeam !== 'all') {
+      url += `&team=${selectedTeam}`
+    }
     return url
-  }, [canViewTeam, selectedDate, isAdminOrHR, isDepartmentHead, selectedDepartment])
+  }, [canViewTeam, selectedDate, isAdminOrHR, isDepartmentHead, selectedDepartment, selectedTeam])
 
   const { data: sessionsRes, isLoading: sessionsLoading, isValidating: sessionsValidating, mutate: mutateSessions } = useAuthedSWR(`/api/productivity/sessions?date=${selectedDate}`)
   const { data: teamRes, isValidating: teamValidating, mutate: mutateTeam } = useAuthedSWR(teamUrl)
@@ -478,7 +492,7 @@ export default function ProductivityPage() {
                 <HiOutlineBuildingOffice2 className="w-5 h-5 text-gray-400" />
                 <Select
                   selectedKeys={[selectedDepartment]}
-                  onSelectionChange={(keys) => setSelectedDepartment(Array.from(keys)[0])}
+                  onSelectionChange={(keys) => { setSelectedDepartment(Array.from(keys)[0]); setSelectedTeam('all') }}
                   className="min-w-[150px]"
                   size="sm"
                   aria-label="Filter by Department"
@@ -487,6 +501,27 @@ export default function ProductivityPage() {
                   {departments.map((dept) => (
                     <SelectItem key={dept._id}>
                       {dept.name}
+                    </SelectItem>
+                  ))}
+                </Select>
+              </div>
+            )}
+
+            {/* Team Filter */}
+            {activeTab === 'team' && availableTeams.length > 0 && (
+              <div className="flex items-center gap-2">
+                <HiOutlineUserGroup className="w-5 h-5 text-gray-400" />
+                <Select
+                  selectedKeys={[selectedTeam]}
+                  onSelectionChange={(keys) => setSelectedTeam(Array.from(keys)[0])}
+                  className="min-w-[150px]"
+                  size="sm"
+                  aria-label="Filter by Team"
+                >
+                  <SelectItem key="all">All Teams</SelectItem>
+                  {availableTeams.map((team) => (
+                    <SelectItem key={team._id}>
+                      {team.teamName}
                     </SelectItem>
                   ))}
                 </Select>

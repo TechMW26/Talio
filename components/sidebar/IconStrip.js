@@ -29,7 +29,7 @@ function SidebarBadge({ count }) {
   )
 }
 
-export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartmentHead = false }) {
+export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartmentHead = false, isTeamLeader = false }) {
   const pathname = usePathname()
   const router = useRouter()
   const [user, setUser] = useState(null)
@@ -64,18 +64,23 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
     let baseMenuItems = getMenuItemsForRole(effectiveRole)
 
     if (isDepartmentHead) {
+      const teamSubmenu = [
+        { name: 'Team Members', path: '/dashboard/team/members' },
+        { name: 'Team Ratings', path: '/dashboard/performance/ratings' },
+        { name: 'Team Goals', path: '/dashboard/performance/goals' },
+        { name: 'Performance Reports', path: '/dashboard/performance/reports' },
+        { name: 'Geofencing', path: '/dashboard/team/geofencing' }
+      ]
+      // If also a team leader, add My Teams
+      if (isTeamLeader) {
+        teamSubmenu.splice(1, 0, { name: 'My Teams', path: '/dashboard/team/my-teams' })
+      }
       const teamMenuItem = {
         name: 'Team',
         icon: require('react-icons/hi2').HiOutlineUsers,
         path: '/dashboard/team/members',
         group: 'Main',
-        submenu: [
-          { name: 'Team Members', path: '/dashboard/team/members' },
-          { name: 'Team Ratings', path: '/dashboard/performance/ratings' },
-          { name: 'Team Goals', path: '/dashboard/performance/goals' },
-          { name: 'Performance Reports', path: '/dashboard/performance/reports' },
-          { name: 'Geofencing', path: '/dashboard/team/geofencing' }
-        ]
+        submenu: teamSubmenu
       }
 
       const attendanceMenuIndex = baseMenuItems.findIndex(item => item.name === 'Attendance & Leaves')
@@ -104,8 +109,24 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
       ]
     }
 
+    // Team leader (not dept head) gets a My Teams section
+    if (isTeamLeader) {
+      const myTeamsMenuItem = {
+        name: 'My Teams',
+        icon: require('react-icons/hi2').HiOutlineUsers,
+        path: '/dashboard/team/my-teams',
+        group: 'Main',
+      }
+
+      return [
+        baseMenuItems[0],
+        myTeamsMenuItem,
+        ...baseMenuItems.slice(1)
+      ]
+    }
+
     return baseMenuItems
-  }, [user, isDepartmentHead])
+  }, [user, isDepartmentHead, isTeamLeader])
 
   const handleLinkClick = (path) => {
     if (path && path !== pathname) {

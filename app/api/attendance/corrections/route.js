@@ -98,18 +98,19 @@ async function canApproveCorrections(userId, targetEmployeeId, models) {
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['AttendanceCorrection', 'Attendance', 'Employee', 'Department', 'User', 'CompanySettings'])
+    const auth = await getAuthAndModels(request, ['AttendanceCorrection', 'Attendance', 'Employee', 'Department', 'User', 'CompanySettings', 'Team'])
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { AttendanceCorrection, Attendance, Employee, Department, User, CompanySettings } = models
+    const { AttendanceCorrection, Attendance, Employee, Department, User, CompanySettings, Team } = models
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const employeeId = searchParams.get('employeeId')
     const type = searchParams.get('type') // 'my' for own requests, 'pending' for requests to approve
     const departmentFilter = searchParams.get('department') // Department filter for admin/HR
+    const teamFilter = searchParams.get('team') // Team filter
 
     if (employeeId && !isValidObjectId(employeeId)) {
       return NextResponse.json(
@@ -192,6 +193,22 @@ export async function GET(request) {
       }
     } else if (employeeId) {
       query.employee = employeeId
+    }
+
+    // Apply team filter if specified
+    if (teamFilter && teamFilter !== 'all' && Team) {
+      const team = await Team.findById(teamFilter).select('members teamLeaders').lean()
+      if (team) {
+        const teamMemberIds = new Set([
+          ...team.members.map(id => id.toString()),
+          ...team.teamLeaders.map(id => id.toString())
+        ])
+        if (query.employee?.$in) {
+          query.employee = { $in: query.employee.$in.filter(id => teamMemberIds.has(id.toString())) }
+        } else if (!query.employee || typeof query.employee === 'string') {
+          query.employee = { $in: [...teamMemberIds].map(id => new mongoose.Types.ObjectId(id)) }
+        }
+      }
     }
 
     if (status && status !== 'all') {

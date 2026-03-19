@@ -6,7 +6,7 @@ import toast from '@/utils/toast'
 import { Select, SelectItem, Skeleton } from '@heroui/react'
 import {
   FaUsers, FaSearch, FaUser, FaEnvelope, FaPhone, FaCalendarAlt,
-  FaBriefcase, FaStar, FaChartLine, FaFilter, FaCrown
+  FaBriefcase, FaStar, FaChartLine, FaFilter, FaCrown, FaUserFriends
 } from 'react-icons/fa'
 import { formatDesignation } from '@/lib/formatters'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
@@ -16,16 +16,30 @@ import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicat
 export default function TeamMembersPage() {
   const router = useRouter()
   const [selectedDepartment, setSelectedDepartment] = useState('all')
+  const [selectedTeam, setSelectedTeam] = useState('all')
   const [searchTerm, setSearchTerm] = useState('')
 
   // --- SWR data fetching ---
-  const swrKey = selectedDepartment && selectedDepartment !== 'all'
-    ? `/api/team/members?department=${selectedDepartment}`
-    : '/api/team/members'
+  const swrKey = (() => {
+    let url = '/api/team/members'
+    const params = []
+    if (selectedDepartment && selectedDepartment !== 'all') params.push(`department=${selectedDepartment}`)
+    if (selectedTeam && selectedTeam !== 'all') params.push(`team=${selectedTeam}`)
+    if (params.length > 0) url += '?' + params.join('&')
+    return url
+  })()
   const { data: teamRes, error, isLoading, isValidating, mutate: refreshTeam } = useAuthedSWR(swrKey)
   const teamMembers = teamRes?.data || []
   const department = teamRes?.meta?.department || null
   const departments = teamRes?.meta?.departments || []
+
+  // Fetch teams for selected department
+  const teamsSwrKey = selectedDepartment && selectedDepartment !== 'all'
+    ? `/api/teams?department=${selectedDepartment}`
+    : departments.length === 1 ? `/api/teams?department=${departments[0]?._id}` : null
+  const { data: teamsRes } = useAuthedSWR(teamsSwrKey)
+  const teams = teamsRes?.data || []
+
   const filteredMembers = teamMembers.filter(member => {
     if (!searchTerm) return true
     const searchLower = searchTerm.toLowerCase()
@@ -85,7 +99,7 @@ export default function TeamMembersPage() {
             <div className="sm:w-64">
               <Select
                 selectedKeys={[selectedDepartment]}
-                onChange={(e) => setSelectedDepartment(e.target.value)}
+                onChange={(e) => { setSelectedDepartment(e.target.value); setSelectedTeam('all') }}
                 aria-label="Department Filter"
                 startContent={<FaFilter className="text-gray-400" />}
                 classNames={{ trigger: "bg-white" }}
@@ -94,6 +108,26 @@ export default function TeamMembersPage() {
                 {departments.map((dept) => (
                   <SelectItem key={dept._id}>
                     {dept.name}
+                  </SelectItem>
+                ))}
+              </Select>
+            </div>
+          )}
+
+          {/* Team Filter - show when teams are available */}
+          {teams.length > 0 && (
+            <div className="sm:w-64">
+              <Select
+                selectedKeys={[selectedTeam]}
+                onChange={(e) => setSelectedTeam(e.target.value)}
+                aria-label="Team Filter"
+                startContent={<FaUserFriends className="text-gray-400" />}
+                classNames={{ trigger: "bg-white" }}
+              >
+                <SelectItem key="all">All Teams</SelectItem>
+                {teams.map((team) => (
+                  <SelectItem key={team._id}>
+                    {team.teamName}
                   </SelectItem>
                 ))}
               </Select>

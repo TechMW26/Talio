@@ -38,7 +38,8 @@ export default function SlidingSidebar({
   setActiveSubmenu,
   activeMenuIndex,
   sidebarCounts = {},
-  isDepartmentHead = false
+  isDepartmentHead = false,
+  isTeamLeader = false
 }) {
   const pathname = usePathname()
   const router = useRouter()
@@ -145,18 +146,23 @@ export default function SlidingSidebar({
     let baseMenuItems = getMenuItemsForRole(effectiveRole)
 
     if (isDepartmentHead) {
+      const teamSubmenu = [
+        { name: 'Team Members', path: '/dashboard/team/members' },
+        { name: 'Team Ratings', path: '/dashboard/performance/ratings' },
+        { name: 'Team Goals', path: '/dashboard/performance/goals' },
+        { name: 'Performance Reports', path: '/dashboard/performance/reports' },
+        { name: 'Geofencing', path: '/dashboard/team/geofencing' }
+      ]
+      // If also a team leader, add My Teams
+      if (isTeamLeader) {
+        teamSubmenu.splice(1, 0, { name: 'My Teams', path: '/dashboard/team/my-teams' })
+      }
       const teamMenuItem = {
         name: 'Team',
         icon: HiOutlineUsers,
         path: '/dashboard/team/members',
         group: 'Main',
-        submenu: [
-          { name: 'Team Members', path: '/dashboard/team/members' },
-          { name: 'Team Ratings', path: '/dashboard/performance/ratings' },
-          { name: 'Team Goals', path: '/dashboard/performance/goals' },
-          { name: 'Performance Reports', path: '/dashboard/performance/reports' },
-          { name: 'Geofencing', path: '/dashboard/team/geofencing' }
-        ]
+        submenu: teamSubmenu
       }
 
       const attendanceMenuIndex = baseMenuItems.findIndex(item => item.name === 'Attendance & Leaves')
@@ -185,8 +191,24 @@ export default function SlidingSidebar({
       ]
     }
 
+    // Team leader (not dept head) gets a My Teams section
+    if (isTeamLeader) {
+      const myTeamsMenuItem = {
+        name: 'My Teams',
+        icon: HiOutlineUsers,
+        path: '/dashboard/team/my-teams',
+        group: 'Main',
+      }
+
+      return [
+        baseMenuItems[0],
+        myTeamsMenuItem,
+        ...baseMenuItems.slice(1)
+      ]
+    }
+
     return baseMenuItems
-  }, [user, isDepartmentHead])
+  }, [user, isDepartmentHead, isTeamLeader])
 
   const toggleSubmenu = (menuName) => {
     setExpandedMenus(prev => ({

@@ -1,3 +1,15 @@
+## Talio Desktop v4.9.2 - Windows Update Fix
+
+### Bug Fixes
+
+**1. Fixed: Windows auto-update failing with "not digitally signed" error**
+- Added runtime override to skip code signature verification on Windows during auto-update
+- Previously, unsigned Windows builds would fail the Authenticode signature check during update download/install
+- The `verifyUpdateCodeSignature` setting in electron-builder config only applies to new installations; this fix applies to all existing installations via runtime override in `setupAutoUpdater()`
+- macOS was unaffected as it uses a different verification mechanism
+
+---
+
 ## Talio Desktop v4.5.1 - Auto-Update Stability Fix
 
 ### Critical Bug Fixes

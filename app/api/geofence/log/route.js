@@ -280,17 +280,19 @@ export async function POST(request) {
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['GeofenceLog', 'Employee', 'User']);
+    const auth = await getAuthAndModels(request, ['GeofenceLog', 'Employee', 'User', 'Department', 'Team']);
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 });
     }
     const { user, models } = auth;
-    const { GeofenceLog, Employee, User } = models;
+    const { GeofenceLog, Employee, User, Department, Team } = models;
 
     const { searchParams } = new URL(request.url);
     const employeeId = searchParams.get('employeeId');
     const status = searchParams.get('status');
     const limit = parseInt(searchParams.get('limit')) || 50;
+    const departmentFilter = searchParams.get('department');
+    const teamFilter = searchParams.get('team');
 
     // Get user and employee data
     const userId = user._id || user.userId;
@@ -312,12 +314,43 @@ export async function GET(request) {
       if (employeeId) {
         query.employee = employeeId
       }
+      // Apply department filter
+      if (departmentFilter && departmentFilter !== 'all') {
+        query.department = departmentFilter
+      }
     } else if (user.role === 'manager') {
       // Managers can only see their department's logs
       query.department = employee.department
-    } else {
-      // Employees can only see their own logs
-      query.employee = employee._id
+    } else if (employee) {
+      // Check if department head
+      const userRecord2 = await User.findById(userId).select('isDepartmentHead headOfDepartments').lean()
+      if (userRecord2?.isDepartmentHead && userRecord2?.headOfDepartments?.length > 0) {
+        // Department head: see their departments' logs
+        if (departmentFilter && departmentFilter !== 'all') {
+          query.department = departmentFilter
+        } else {
+          query.department = { $in: userRecord2.headOfDepartments }
+        }
+      } else {
+        // Employees can only see their own logs
+        query.employee = employee._id
+      }
+    }
+
+    // Apply team filter
+    if (teamFilter && teamFilter !== 'all' && Team) {
+      const team = await Team.findById(teamFilter).select('members teamLeaders').lean()
+      if (team) {
+        const teamMemberIds = [
+          ...team.members.map(id => id.toString()),
+          ...team.teamLeaders.map(id => id.toString())
+        ]
+        if (query.employee?.$in) {
+          query.employee = { $in: query.employee.$in.filter(id => teamMemberIds.includes(id.toString())) }
+        } else if (!query.employee) {
+          query.employee = { $in: teamMemberIds }
+        }
+      }
     }
 
     // Filter by status if provided

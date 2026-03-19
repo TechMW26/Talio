@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Skeleton } from '@heroui/react'
-import { FaMapMarkerAlt, FaCheck, FaTimes, FaClock, FaUser, FaFilter } from 'react-icons/fa'
+import { Skeleton, Select, SelectItem } from '@heroui/react'
+import { FaMapMarkerAlt, FaCheck, FaTimes, FaClock, FaUser, FaFilter, FaBuilding, FaUserFriends } from 'react-icons/fa'
 import { toast } from '@/utils/toast'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
@@ -12,15 +12,51 @@ import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicat
 
 export default function GeofencingPage() {
   const [filter, setFilter] = useState('all')
+  const [selectedDepartment, setSelectedDepartment] = useState('all')
+  const [selectedTeam, setSelectedTeam] = useState('all')
   const [processingId, setProcessingId] = useState(null)
 
-  const userRole = useMemo(() => {
-    if (typeof window === 'undefined') return ''
-    try { return JSON.parse(localStorage.getItem('user'))?.role || '' } catch { return '' }
+  const user = useMemo(() => {
+    if (typeof window === 'undefined') return null
+    try { return JSON.parse(localStorage.getItem('user')) } catch { return null }
   }, [])
 
+  const isAdminOrHR = ['admin', 'hr'].includes(user?.role)
+
+  // Check department head access
+  const { data: headCheck } = useAuthedSWR(
+    user && !isAdminOrHR ? '/api/team/check-head' : null
+  )
+  const isDepartmentHead = headCheck?.isDepartmentHead
+  const headedDepartments = headCheck?.departments || []
+
+  // Fetch departments (admin/HR)
+  const { data: deptsRes } = useAuthedSWR(isAdminOrHR ? '/api/departments' : null)
+  const departments = deptsRes?.data || []
+
+  // Fetch teams for selected department
+  const teamsSwrKey = (() => {
+    if (isAdminOrHR) {
+      return selectedDepartment !== 'all' ? `/api/teams?department=${selectedDepartment}` : null
+    }
+    if (isDepartmentHead) {
+      if (selectedDepartment !== 'all') return `/api/teams?department=${selectedDepartment}`
+      if (headedDepartments.length === 1) return `/api/teams?department=${headedDepartments[0]._id}`
+      return null
+    }
+    return null
+  })()
+  const { data: teamsRes } = useAuthedSWR(teamsSwrKey)
+  const availableTeams = teamsRes?.data || teamsRes?.teams || []
+
   // --- SWR data fetching (replaces manual fetch + 30s interval) ---
-  const params = filter !== 'all' ? `?status=${filter}` : ''
+  const params = (() => {
+    const p = []
+    if (filter !== 'all') p.push(`status=${filter}`)
+    if (selectedDepartment !== 'all') p.push(`department=${selectedDepartment}`)
+    if (selectedTeam !== 'all') p.push(`team=${selectedTeam}`)
+    return p.length > 0 ? `?${p.join('&')}` : ''
+  })()
   const { data: logsRes, error, isLoading, isValidating, mutate: refreshLogs } = useAuthedSWR(
     `/api/geofence/log${params}`,
     { refreshInterval: 30000 }
@@ -115,6 +151,64 @@ export default function GeofencingPage() {
 
       {/* Filter Tabs */}
       <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+        {/* Department & Team Filters */}
+        <div className="flex flex-wrap items-end gap-3 mb-4">
+          {/* Department filter - admin/HR */}
+          {isAdminOrHR && departments.length > 0 && (
+            <Select
+              label="Department"
+              placeholder="All Departments"
+              selectedKeys={selectedDepartment ? [selectedDepartment] : []}
+              onChange={(e) => { setSelectedDepartment(e.target.value); setSelectedTeam('all') }}
+              className="w-48"
+              size="sm"
+              startContent={<FaBuilding className="text-default-400" />}
+            >
+              <SelectItem key="all" value="all">All Departments</SelectItem>
+              {departments.map(dept => (
+                <SelectItem key={dept._id} value={dept._id}>{dept.name}</SelectItem>
+              ))}
+            </Select>
+          )}
+
+          {/* Department filter - department heads with multiple departments */}
+          {!isAdminOrHR && isDepartmentHead && headedDepartments.length > 1 && (
+            <Select
+              label="Department"
+              placeholder="All My Departments"
+              selectedKeys={selectedDepartment ? [selectedDepartment] : []}
+              onChange={(e) => { setSelectedDepartment(e.target.value); setSelectedTeam('all') }}
+              className="w-48"
+              size="sm"
+              startContent={<FaBuilding className="text-default-400" />}
+            >
+              <SelectItem key="all" value="all">All My Departments</SelectItem>
+              {headedDepartments.map(dept => (
+                <SelectItem key={dept._id} value={dept._id}>{dept.name}</SelectItem>
+              ))}
+            </Select>
+          )}
+
+          {/* Team filter */}
+          {availableTeams.length > 0 && (
+            <Select
+              label="Team"
+              placeholder="All Teams"
+              selectedKeys={selectedTeam ? [selectedTeam] : []}
+              onChange={(e) => setSelectedTeam(e.target.value)}
+              className="w-48"
+              size="sm"
+              startContent={<FaUserFriends className="text-default-400" />}
+            >
+              <SelectItem key="all" value="all">All Teams</SelectItem>
+              {availableTeams.map(team => (
+                <SelectItem key={team._id} value={team._id}>{team.teamName}</SelectItem>
+              ))}
+            </Select>
+          )}
+        </div>
+
+        {/* Status filter tabs */}
         <div className="flex items-center gap-2 mb-3">
           <FaFilter className="text-gray-500" />
           <span className="text-sm font-medium text-gray-700">Filter by Status:</span>

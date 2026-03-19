@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import toast from '@/utils/toast'
 import * as XLSX from 'xlsx'
-import { FaDownload, FaChartBar, FaUsers, FaTrophy, FaCalendarAlt, FaFilter, FaRobot, FaFileExcel, FaChevronDown, FaChevronUp, FaBrain, FaStar, FaAward, FaTasks, FaBullseye, FaSearch, FaClock, FaCheckCircle, FaExclamationTriangle, FaArrowUp, FaArrowDown, FaMinus, FaUserCheck, FaClipboardCheck, FaFire, FaLightbulb, FaExclamationCircle, FaRocket } from 'react-icons/fa'
+import { FaDownload, FaChartBar, FaUsers, FaTrophy, FaCalendarAlt, FaFilter, FaRobot, FaFileExcel, FaChevronDown, FaChevronUp, FaBrain, FaStar, FaAward, FaTasks, FaBullseye, FaSearch, FaClock, FaCheckCircle, FaExclamationTriangle, FaArrowUp, FaArrowDown, FaMinus, FaUserCheck, FaClipboardCheck, FaFire, FaLightbulb, FaExclamationCircle, FaRocket, FaUserFriends } from 'react-icons/fa'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Area, AreaChart, ComposedChart } from 'recharts'
 import CustomTooltip from '@/components/charts/CustomTooltip'
 import { useAILoading } from '@/contexts/AILoadingContext'
@@ -144,6 +144,7 @@ export default function PerformanceReportsPage() {
   const [taskStats, setTaskStats] = useState(null)
   const [dateRange, setDateRange] = useState(getDefaultDateRange())
   const [selectedDepartment, setSelectedDepartment] = useState('all')
+  const [selectedTeam, setSelectedTeam] = useState('all')
   const [aiInsights, setAiInsights] = useState(null)
   const [expandedSections, setExpandedSections] = useState({
     executive: true,
@@ -175,6 +176,15 @@ export default function PerformanceReportsPage() {
   const { data: deptsRes } = useAuthedSWR('/api/departments')
   const departments = deptsRes?.data || []
 
+  // SWR: fetch teams for selected department
+  const teamsFetchKey = (() => {
+    if (selectedDepartment && selectedDepartment !== 'all') return `/api/teams?department=${selectedDepartment}`
+    if (headedDepartments.length === 1) return `/api/teams?department=${headedDepartments[0]?._id}`
+    return null
+  })()
+  const { data: teamsRes } = useAuthedSWR(teamsFetchKey)
+  const availableTeams = teamsRes?.data || []
+
   // Process head check result
   const headCheckComplete = !headCheckLoading && !!headCheckRes
 
@@ -195,7 +205,7 @@ export default function PerformanceReportsPage() {
     if (user && headCheckComplete) {
       fetchReportData()
     }
-  }, [user, headCheckComplete, dateRange.startDate, dateRange.endDate, selectedDepartment])
+  }, [user, headCheckComplete, dateRange.startDate, dateRange.endDate, selectedDepartment, selectedTeam])
 
   const fetchReportData = async () => {
     try {
@@ -219,18 +229,24 @@ export default function PerformanceReportsPage() {
         deptFilter = `&department=${selectedDepartment}`
       }
 
+      // Build team filter
+      let teamFilterParam = ''
+      if (selectedTeam && selectedTeam !== 'all') {
+        teamFilterParam = `&team=${selectedTeam}`
+      }
+
       // Fetch all necessary data including company settings, holidays, productivity scores, attendance stats, and task stats
       const [performanceRes, reviewsRes, goalsRes, projectsRes, employeesRes, companyRes, holidaysRes, productivityRes, attendanceStatsRes, taskStatsRes] = await Promise.all([
-        fetch(`/api/performance/calculate?populate=true${deptFilter}`, {
+        fetch(`/api/performance/calculate?populate=true${deptFilter}${teamFilterParam}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
-        fetch(`/api/performance/ratings?populate=true${deptFilter}`, {
+        fetch(`/api/performance/ratings?populate=true${deptFilter}${teamFilterParam}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
-        fetch(`/api/performance/goals?populate=true${deptFilter}`, {
+        fetch(`/api/performance/goals?populate=true${deptFilter}${teamFilterParam}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
-        fetch(`/api/projects?limit=1000&populate=true${deptFilter}`, {
+        fetch(`/api/projects?limit=1000&populate=true${deptFilter}${teamFilterParam}`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
         fetch(`/api/employees?limit=1000&status=active&populate=true${deptFilter}`, {
@@ -319,6 +335,33 @@ export default function PerformanceReportsPage() {
           const projDeptId = String(project.department?._id || project.department)
           return deptIdsToFilter.has(projDeptId)
         })
+      }
+
+      // Client-side team filter (for when team filter is applied)
+      if (selectedTeam && selectedTeam !== 'all' && availableTeams.length > 0) {
+        const team = availableTeams.find(t => t._id === selectedTeam)
+        if (team) {
+          const teamMemberIds = new Set([
+            ...(team.members || []).map(m => String(m._id || m)),
+            ...(team.teamLeaders || []).map(l => String(l._id || l))
+          ])
+          filteredEmployees = filteredEmployees.filter(emp => teamMemberIds.has(String(emp._id)))
+          const employeeIds = new Set(filteredEmployees.map(e => String(e._id)))
+          filteredPerformanceMetrics = filteredPerformanceMetrics.filter(metric =>
+            employeeIds.has(String(metric.employee?._id || metric.employee))
+          )
+          filteredReviews = filteredReviews.filter(review =>
+            employeeIds.has(String(review.employee?._id || review.employee))
+          )
+          filteredGoals = filteredGoals.filter(goal =>
+            employeeIds.has(String(goal.employee?._id || goal.employee))
+          )
+          filteredProjects = filteredProjects.filter(project => {
+            // Filter projects by team member assignment
+            const assignedTo = String(project.assignedTo?._id || project.assignedTo)
+            return employeeIds.has(assignedTo)
+          })
+        }
       }
 
       // Calculate comprehensive KPIs with company settings, holidays, and productivity scores for proper working day calculations
@@ -904,7 +947,7 @@ export default function PerformanceReportsPage() {
             <label className="block text-sm font-medium text-gray-700 mb-2">Department</label>
             <Select
               selectedKeys={[selectedDepartment]}
-              onSelectionChange={(keys) => setSelectedDepartment(Array.from(keys)[0] || 'all')}
+              onSelectionChange={(keys) => { setSelectedDepartment(Array.from(keys)[0] || 'all'); setSelectedTeam('all') }}
               isDisabled={isDepartmentHead && headedDepartments.length === 1}
               aria-label="Select department"
             >
@@ -926,6 +969,25 @@ export default function PerformanceReportsPage() {
               <p className="text-xs text-gray-500 mt-1">You can only view your department's performance</p>
             )}
           </div>
+          {/* Team Filter */}
+          {availableTeams.length > 0 && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                <FaUserFriends className="inline mr-2" />
+                Team
+              </label>
+              <Select
+                selectedKeys={[selectedTeam]}
+                onSelectionChange={(keys) => setSelectedTeam(Array.from(keys)[0] || 'all')}
+                aria-label="Select team"
+              >
+                <SelectItem key="all">All Teams</SelectItem>
+                {availableTeams.map(team => (
+                  <SelectItem key={team._id}>{team.teamName}</SelectItem>
+                ))}
+              </Select>
+            </div>
+          )}
         </div>
       </div>
 

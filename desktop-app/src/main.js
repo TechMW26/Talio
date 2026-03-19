@@ -1664,6 +1664,15 @@ function setupAutoUpdater() {
   autoUpdater.allowDowngrade = false;
   autoUpdater.forceCodeSigning = false; // Allow updates from unsigned builds
 
+  // Skip code signature verification on Windows (fixes update failures for unsigned builds)
+  // This overrides the app-update.yml setting at runtime, ensuring even older installed
+  // versions that lack verifyUpdateCodeSignature: false in their yml can still update.
+  if (process.platform === 'win32') {
+    autoUpdater.verifyUpdateCodeSignature = function () {
+      return Promise.resolve(null);
+    };
+  }
+
   // Detailed provider config logging
   logger.log('info', 'Updater', 'Auto-updater configured - provider: GitHub Releases, version: ' + app.getVersion() + ', platform: ' + process.platform + ', arch: ' + process.arch);
 

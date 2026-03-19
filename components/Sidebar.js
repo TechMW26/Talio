@@ -52,6 +52,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
   const [user, setUser] = useState(null)
   const [mounted, setMounted] = useState(false)
   const [isDepartmentHead, setIsDepartmentHead] = useState(false)
+  const [isTeamLeader, setIsTeamLeader] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
   const [isDesktop, setIsDesktop] = useState(false)
   const { unreadCount } = useUnreadMessages()
@@ -119,6 +120,9 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
       const data = await response.json()
       if (data.success && data.isDepartmentHead) {
         setIsDepartmentHead(true)
+      }
+      if (data.success && data.isTeamLeader) {
+        setIsTeamLeader(true)
       }
     } catch (error) {
       console.error('Error checking department head:', error)
@@ -200,18 +204,23 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
     let baseMenuItems = getMenuItemsForRole(effectiveRole)
 
     if (isDepartmentHead) {
+      const teamSubmenu = [
+        { name: 'Team Members', path: '/dashboard/team/members' },
+        { name: 'Team Ratings', path: '/dashboard/performance/ratings' },
+        { name: 'Team Goals', path: '/dashboard/performance/goals' },
+        { name: 'Performance Reports', path: '/dashboard/performance/reports' },
+        { name: 'Geofencing', path: '/dashboard/team/geofencing' }
+      ]
+      // If also a team leader, add My Teams
+      if (isTeamLeader) {
+        teamSubmenu.splice(1, 0, { name: 'My Teams', path: '/dashboard/team/my-teams' })
+      }
       const teamMenuItem = {
         name: 'Team',
         icon: HiOutlineUsers,
         path: '/dashboard/team/members',
         group: 'Main',
-        submenu: [
-          { name: 'Team Members', path: '/dashboard/team/members' },
-          { name: 'Team Ratings', path: '/dashboard/performance/ratings' },
-          { name: 'Team Goals', path: '/dashboard/performance/goals' },
-          { name: 'Performance Reports', path: '/dashboard/performance/reports' },
-          { name: 'Geofencing', path: '/dashboard/team/geofencing' }
-        ]
+        submenu: teamSubmenu
       }
 
       const attendanceMenuIndex = baseMenuItems.findIndex(item => item.name === 'Attendance & Leaves')
@@ -240,8 +249,24 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
       ]
     }
 
+    // Team leader (not dept head) gets a My Teams section
+    if (isTeamLeader) {
+      const myTeamsMenuItem = {
+        name: 'My Teams',
+        icon: HiOutlineUsers,
+        path: '/dashboard/team/my-teams',
+        group: 'Main',
+      }
+
+      return [
+        baseMenuItems[0],
+        myTeamsMenuItem,
+        ...baseMenuItems.slice(1)
+      ]
+    }
+
     return baseMenuItems
-  }, [user, isDepartmentHead])
+  }, [user, isDepartmentHead, isTeamLeader])
 
   const toggleSubmenu = (menuName) => {
     setExpandedMenus(prev => ({
@@ -341,6 +366,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
             onExpandClick={handleIconStripExpand}
             sidebarCounts={sidebarCounts}
             isDepartmentHead={isDepartmentHead}
+            isTeamLeader={isTeamLeader}
           />
           <SlidingSidebar
             isOpen={slidingSidebarOpen}
@@ -350,6 +376,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
             activeMenuIndex={activeMenuIndex}
             sidebarCounts={sidebarCounts}
             isDepartmentHead={isDepartmentHead}
+            isTeamLeader={isTeamLeader}
           />
           {/* Spacer for icon strip width */}
           <div className="hidden lg:block w-[4.5rem] flex-shrink-0" />

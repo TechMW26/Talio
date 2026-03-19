@@ -10,12 +10,12 @@ const SCREENSHOTS_PER_SESSION = 30;
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['ProductivitySession', 'User', 'Employee', 'Department', 'Screenshot']);
+    const auth = await getAuthAndModels(request, ['ProductivitySession', 'User', 'Employee', 'Department', 'Screenshot', 'Team']);
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 });
     }
     const { user, models } = auth;
-    const { ProductivitySession, User, Employee, Department, Screenshot } = models;
+    const { ProductivitySession, User, Employee, Department, Screenshot, Team } = models;
 
     const currentUserId = (user._id || user.userId).toString();
     const currentUserRole = user.role;
@@ -23,6 +23,7 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const dateParam = searchParams.get('date') || new Date().toISOString().split('T')[0];
     const departmentFilter = searchParams.get('department'); // Department filter for admin/HR
+    const teamFilter = searchParams.get('team'); // Team filter
     const date = new Date(dateParam);
     const dateEnd = new Date(date.getTime() + 24 * 60 * 60 * 1000);
     
@@ -144,6 +145,18 @@ export async function GET(request) {
       }));
       
       console.log(`[Team API] ${teamMembers.length} employees have userId linked`);
+    }
+
+    // Apply team filter if specified
+    if (teamFilter && teamFilter !== 'all' && Team) {
+      const team = await Team.findById(teamFilter).select('members teamLeaders').lean();
+      if (team) {
+        const teamMemberIds = new Set([
+          ...(team.members || []).map(id => id.toString()),
+          ...(team.teamLeaders || []).map(id => id.toString())
+        ]);
+        teamMembers = teamMembers.filter(m => teamMemberIds.has(m._id.toString()));
+      }
     }
     
     // === OPTIMIZED: Batch fetch all sessions in ONE query instead of N queries ===

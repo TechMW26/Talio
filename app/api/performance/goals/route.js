@@ -5,12 +5,12 @@ import { getAuthAndModels } from '@/lib/auth'
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['PerformanceGoal', 'Employee'])
+    const auth = await getAuthAndModels(request, ['PerformanceGoal', 'Employee', 'Team'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { PerformanceGoal, Employee } = models
+    const { PerformanceGoal, Employee, Team } = models
 
     const { searchParams } = new URL(request.url)
     const goalId = searchParams.get('goalId')
@@ -41,6 +41,7 @@ export async function GET(request) {
     const status = searchParams.get('status')
     const department = searchParams.get('department')
     const departments = searchParams.get('departments') // Comma-separated list of department IDs
+    const teamFilter = searchParams.get('team')
     const page = parseInt(searchParams.get('page')) || 1
     const limit = parseInt(searchParams.get('limit')) || 50
 
@@ -86,6 +87,24 @@ export async function GET(request) {
       }
     } else if (department && department !== 'all') {
       query.department = department
+    }
+
+    // Apply team filter
+    if (teamFilter && teamFilter !== 'all' && Team) {
+      const team = await Team.findById(teamFilter).select('members teamLeaders').lean()
+      if (team) {
+        const teamMemberIds = [
+          ...(team.members || []),
+          ...(team.teamLeaders || [])
+        ]
+        // Intersect with existing employee filter if present
+        if (query.employee?.$in) {
+          const teamIdSet = new Set(teamMemberIds.map(id => id.toString()))
+          query.employee = { $in: query.employee.$in.filter(id => teamIdSet.has(id.toString())) }
+        } else if (!query.employee) {
+          query.employee = { $in: teamMemberIds }
+        }
+      }
     }
 
     // Build the query

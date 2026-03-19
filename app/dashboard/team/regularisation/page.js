@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import toast from '@/utils/toast'
-import { FaCheck, FaTimes, FaCalendarCheck, FaExclamationCircle, FaChevronDown, FaChevronUp, FaFilter, FaBuilding } from 'react-icons/fa'
+import { FaCheck, FaTimes, FaCalendarCheck, FaExclamationCircle, FaChevronDown, FaChevronUp, FaFilter, FaBuilding, FaUserFriends } from 'react-icons/fa'
 import { Card, CardBody, Chip, Skeleton, Select, SelectItem, Avatar, Accordion, AccordionItem } from '@heroui/react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
@@ -16,6 +16,7 @@ export default function TeamRegularisationPage() {
   const [expandedCards, setExpandedCards] = useState({})
   const [statusFilter, setStatusFilter] = useState('pending')
   const [selectedDepartment, setSelectedDepartment] = useState('all')
+  const [selectedTeam, setSelectedTeam] = useState('all')
   const [processingCorrection, setProcessingCorrection] = useState(null)
 
   const user = useMemo(() => {
@@ -36,8 +37,28 @@ export default function TeamRegularisationPage() {
   const { data: deptsRes } = useAuthedSWR(isAdminOrHR ? '/api/departments' : null)
   const departments = deptsRes?.data || []
 
+  // Headed departments for department heads
+  const headedDepartments = accessRes?.departments || []
+  const isDepartmentHead = accessRes?.isDepartmentHead
+
+  // Fetch teams for the selected department
+  const teamsSwrKey = (() => {
+    if (isAdminOrHR) {
+      return selectedDepartment !== 'all' ? `/api/teams?department=${selectedDepartment}` : null
+    }
+    if (isDepartmentHead) {
+      if (selectedDepartment !== 'all') return `/api/teams?department=${selectedDepartment}`
+      if (headedDepartments.length === 1) return `/api/teams?department=${headedDepartments[0]._id}`
+      return null
+    }
+    return null
+  })()
+  const { data: teamsRes } = useAuthedSWR(teamsSwrKey)
+  const availableTeams = teamsRes?.data || teamsRes?.teams || []
+
   // Build query params for corrections
   const deptParam = selectedDepartment && selectedDepartment !== 'all' ? `&department=${selectedDepartment}` : ''
+  const teamParam = selectedTeam && selectedTeam !== 'all' ? `&team=${selectedTeam}` : ''
 
   // Fetch pending corrections
   const {
@@ -46,7 +67,7 @@ export default function TeamRegularisationPage() {
     isLoading: pendingLoading,
     isValidating: pendingValidating,
     mutate: refreshPending,
-  } = useAuthedSWR(hasAccess ? `/api/attendance/corrections?type=pending${deptParam}` : null)
+  } = useAuthedSWR(hasAccess ? `/api/attendance/corrections?type=pending${deptParam}${teamParam}` : null)
   const pendingCorrections = pendingRes?.data || []
 
   // Fetch all corrections (history)
@@ -56,7 +77,7 @@ export default function TeamRegularisationPage() {
     isLoading: allLoading,
     isValidating: allValidating,
     mutate: refreshAll,
-  } = useAuthedSWR(hasAccess ? `/api/attendance/corrections?type=all${deptParam}` : null)
+  } = useAuthedSWR(hasAccess ? `/api/attendance/corrections?type=all${deptParam}${teamParam}` : null)
   const allCorrections = allRes?.data || []
 
   const isLoading = !accessResolved || (hasAccess && (pendingLoading || allLoading))
@@ -201,12 +222,13 @@ export default function TeamRegularisationPage() {
         {/* Filters */}
         <div className="flex flex-wrap items-center gap-3">
           {/* Department filter - only for admin/HR */}
+          {/* Department filter - admin/HR */}
           {isAdminOrHR && departments.length > 0 && (
             <Select
               label="Department"
               placeholder="All Departments"
               selectedKeys={selectedDepartment ? [selectedDepartment] : []}
-              onChange={(e) => setSelectedDepartment(e.target.value)}
+              onChange={(e) => { setSelectedDepartment(e.target.value); setSelectedTeam('all') }}
               className="w-48"
               size="sm"
               startContent={<FaBuilding className="text-default-400" />}
@@ -214,6 +236,42 @@ export default function TeamRegularisationPage() {
               <SelectItem key="all" value="all">All Departments</SelectItem>
               {departments.map(dept => (
                 <SelectItem key={dept._id} value={dept._id}>{dept.name}</SelectItem>
+              ))}
+            </Select>
+          )}
+
+          {/* Department filter - department heads with multiple departments */}
+          {!isAdminOrHR && isDepartmentHead && headedDepartments.length > 1 && (
+            <Select
+              label="Department"
+              placeholder="All My Departments"
+              selectedKeys={selectedDepartment ? [selectedDepartment] : []}
+              onChange={(e) => { setSelectedDepartment(e.target.value); setSelectedTeam('all') }}
+              className="w-48"
+              size="sm"
+              startContent={<FaBuilding className="text-default-400" />}
+            >
+              <SelectItem key="all" value="all">All My Departments</SelectItem>
+              {headedDepartments.map(dept => (
+                <SelectItem key={dept._id} value={dept._id}>{dept.name}</SelectItem>
+              ))}
+            </Select>
+          )}
+
+          {/* Team filter */}
+          {availableTeams.length > 0 && (
+            <Select
+              label="Team"
+              placeholder="All Teams"
+              selectedKeys={selectedTeam ? [selectedTeam] : []}
+              onChange={(e) => setSelectedTeam(e.target.value)}
+              className="w-48"
+              size="sm"
+              startContent={<FaUserFriends className="text-default-400" />}
+            >
+              <SelectItem key="all" value="all">All Teams</SelectItem>
+              {availableTeams.map(team => (
+                <SelectItem key={team._id} value={team._id}>{team.teamName}</SelectItem>
               ))}
             </Select>
           )}

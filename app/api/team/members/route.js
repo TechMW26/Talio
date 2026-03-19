@@ -8,16 +8,17 @@ export const dynamic = 'force-dynamic'
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Employee', 'Department', 'Designation', 'User'])
+    const auth = await getAuthAndModels(request, ['Employee', 'Department', 'Designation', 'User', 'Team'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Employee, Department, Designation, User } = models
+    const { Employee, Department, Designation, User, Team } = models
 
-    // Parse query params for department filter
+    // Parse query params for department and team filter
     const { searchParams } = new URL(request.url)
     const departmentFilter = searchParams.get('department')
+    const teamFilter = searchParams.get('team')
 
     // Get user to find employee ID and department head/manager info
     const userRecord = await User.findById(user._id || user.userId)
@@ -292,6 +293,18 @@ export async function GET(request) {
     }
 
     if (isDepartmentHead) {
+      // Apply team filter if specified
+      if (teamFilter && teamFilter !== 'all' && Team) {
+        const team = await Team.findById(teamFilter).select('members teamLeaders').lean()
+        if (team) {
+          const teamMemberIds = new Set([
+            ...(team.members || []).map(id => id.toString()),
+            ...(team.teamLeaders || []).map(id => id.toString())
+          ])
+          teamMembers = teamMembers.filter(m => teamMemberIds.has(m._id.toString()))
+        }
+      }
+
       return NextResponse.json({
         success: true,
         data: teamMembers,
@@ -318,8 +331,63 @@ export async function GET(request) {
       const managerEmployee = await Employee.findById(userRecord.employeeId).select('department').populate('department', 'name').lean()
       department = managerEmployee?.department
     } else {
+      // Check if user is a team leader
+      const userFull = await User.findById(user._id || user.userId).select('teamLeaderOf').lean()
+      if (userFull?.teamLeaderOf?.length > 0 && Team) {
+        // Team leader: return members of the specific requested team, or all their teams
+        const leaderTeams = await Team.find({
+          _id: { $in: userFull.teamLeaderOf },
+          isActive: true
+        })
+          .populate('members', 'firstName lastName employeeCode email phone dateOfJoining designation designationLevel designationLevelName department reportingManager profilePicture skills')
+          .populate('teamLeaders', 'firstName lastName employeeCode email phone dateOfJoining designation designationLevel designationLevelName department reportingManager profilePicture skills')
+          .populate('department', 'name code')
+          .lean()
+
+        let filteredTeams = leaderTeams
+        if (teamFilter && teamFilter !== 'all') {
+          filteredTeams = leaderTeams.filter(t => t._id.toString() === teamFilter)
+        }
+
+        // Collect unique members across the filtered teams
+        const memberMap = new Map()
+        for (const team of filteredTeams) {
+          for (const member of (team.members || [])) {
+            if (member && !memberMap.has(member._id.toString())) {
+              memberMap.set(member._id.toString(), member)
+            }
+          }
+          for (const leader of (team.teamLeaders || [])) {
+            if (leader && !memberMap.has(leader._id.toString())) {
+              memberMap.set(leader._id.toString(), { ...leader, isTeamLeader: true })
+            }
+          }
+        }
+
+        // Populate designation and department for each member
+        const memberIds = [...memberMap.keys()]
+        teamMembers = await Employee.find({ _id: { $in: memberIds }, status: 'active' })
+          .populate('designation', 'title level levelName')
+          .populate('department', 'name code')
+          .populate('reportingManager', 'firstName lastName employeeCode')
+          .select('firstName lastName employeeCode email phone dateOfJoining designation designationLevel designationLevelName department reportingManager profilePicture skills')
+          .sort({ firstName: 1 })
+          .lean()
+
+        return NextResponse.json({
+          success: true,
+          data: teamMembers,
+          meta: {
+            total: teamMembers.length,
+            teams: leaderTeams.map(t => ({ _id: t._id, teamName: t.teamName, teamCode: t.teamCode, department: t.department })),
+            role: 'team_leader',
+            isTeamLeader: true
+          }
+        })
+      }
+
       return NextResponse.json(
-        { success: false, message: 'Access denied. Only department heads and managers can view team members.' },
+        { success: false, message: 'Access denied. Only department heads, managers, and team leaders can view team members.' },
         { status: 403 }
       )
     }
