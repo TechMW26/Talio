@@ -1,3 +1,31 @@
+## Talio Desktop v5.0.0 - Major Update: macOS 26 Compatibility
+
+### Breaking Changes
+- **Electron upgraded from 28 to 35** for macOS 26 (Sequoia 2) compatibility
+- **electron-builder upgraded from 24 to 26** for compatibility with Electron 35
+
+### Bug Fixes
+
+**1. Fixed: App crashing on macOS 26 with SIGSEGV (pointer authentication failure)**
+- Electron 28's Chromium V8 engine was incompatible with macOS 26's ARM64 PAC implementation
+- Upgraded to Electron 35.x which fully supports macOS 26
+
+**2. Fixed: desktopCapturer API migration (Electron 29+ breaking change)**
+- `desktopCapturer` was removed from the main process in Electron 29
+- Screen capture now routes through the preload/renderer via IPC bridge
+- New `getDesktopSourcesForCapture()` preload method returns base64 JPEG data for screenshot service
+- `setDisplayMediaRequestHandler` and `request-screen-share` updated to use IPC
+
+**3. Windows code signing verification bypass preserved**
+- Runtime `verifyUpdateCodeSignature` override still in place for Windows auto-updates
+- Note: Users on v4.5.1 or earlier cannot auto-update (must manually download v5.0.0)
+
+### Internal Changes
+- Removed deprecated `mediaStreamShareSecurityOrigin` webPreference
+- Screenshot service now receives `getDesktopSources` function via dependency injection
+
+---
+
 ## Talio Desktop v4.9.2 - Windows Update Fix
 
 ### Bug Fixes

@@ -1,6 +1,6 @@
 {
   "name": "talio-desktop",
-  "version": "4.9.2",
+  "version": "5.0.0",
   "description": "Talio HRMS Desktop - Productivity Monitoring with Screen Capture",
   "main": "src/main.js",
   "author": "MW FutureTech <support@talio.in>",
@@ -31,8 +31,8 @@
   "devDependencies": {
     "@electron/notarize": "^2.5.0",
     "cross-env": "^7.0.3",
-    "electron": "^28.1.0",
-    "electron-builder": "^24.9.1"
+    "electron": "^35.0.0",
+    "electron-builder": "^26.0.0"
   },
   "build": {
     "appId": "in.talio.desktop",
@@ -94,11 +94,8 @@
         }
       ],
       "icon": "build/icon.ico",
-      "publisherName": "MW FutureTech",
       "legalTrademarks": "Talio is a registered trademark of MW FutureTech.",
       "requestedExecutionLevel": "asInvoker",
-      "signingHashAlgorithms": ["sha256"],
-      "signDlls": true,
       "verifyUpdateCodeSignature": false,
       "artifactName": "${productName}.Setup.${version}.${ext}"
     },
@@ -135,12 +132,7 @@
       "vendor": "MW FutureTech",
       "synopsis": "Talio HRMS Desktop App",
       "description": "Talio HRMS Desktop - Productivity Monitoring with Screen Capture",
-      "desktop": {
-        "Name": "Talio",
-        "Comment": "Talio HRMS Desktop App",
-        "Categories": "Office;ProjectManagement;",
-        "StartupWMClass": "talio-desktop"
-      },
+      "executableName": "talio-desktop",
       "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "deb": {

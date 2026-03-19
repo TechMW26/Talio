@@ -1,9 +1,10 @@
 /**
- * Screenshot Service v4.0.0
+ * Screenshot Service v5.0.0
  * Handles automatic screen capture with ImageKit uploads
+ * Uses IPC-bridged desktopCapturer (Electron 29+ compatibility)
  */
 
-const { desktopCapturer, screen, nativeImage } = require('electron');
+const { screen } = require('electron');
 const fetch = require('node-fetch');
 const FormData = require('form-data');
 const logger = require('./logger');
@@ -29,6 +30,7 @@ class ScreenshotService {
     this.lastCaptureTime = null;
     this.onPermissionError = null; // Callback for permission errors
     this.permissionErrorShown = false; // Only show once per session
+    this.getDesktopSources = null; // IPC function to get desktop sources from renderer
   }
 
   initialize(config) {
@@ -37,6 +39,7 @@ class ScreenshotService {
     this.userRole = config.role;
     this.token = config.token;
     this.mainWindow = config.mainWindow;
+    this.getDesktopSources = config.getDesktopSources || null;
     this.onPermissionError = config.onPermissionError || null;
     this.permissionErrorShown = false;
     
@@ -127,8 +130,12 @@ class ScreenshotService {
     try {
       logger.log('info', 'ScreenshotService', 'Capturing screen (' + captureType + ')');
       
-      // Get all screens
-      const sources = await desktopCapturer.getSources({
+      if (!this.getDesktopSources) {
+        throw new Error('Desktop sources function not available - window may not be loaded');
+      }
+
+      // Get all screens via IPC (desktopCapturer runs in renderer in Electron 29+)
+      const sources = await this.getDesktopSources({
         types: ['screen'],
         thumbnailSize: this.getOptimalSize()
       });
@@ -147,15 +154,14 @@ class ScreenshotService {
       }) || sources[0];
       
       // Check if thumbnail is empty (permission denied often results in blank thumbnail)
-      const thumbnail = primarySource.thumbnail;
-      if (thumbnail.isEmpty()) {
+      if (primarySource.isEmpty) {
         logger.log('error', 'ScreenshotService', 'Screenshot is empty - Screen Recording permission likely not granted');
         this.showPermissionError('Screenshots are blank. Please grant Screen Recording permission in System Preferences');
         throw new Error('Screenshot is empty - Screen Recording permission not granted');
       }
       
-      // Get thumbnail as NativeImage and convert to JPEG buffer
-      const buffer = thumbnail.toJPEG(JPEG_QUALITY);
+      // Convert base64 JPEG data back to a Buffer
+      const buffer = Buffer.from(primarySource.thumbnailJPEG, 'base64');
       
       // Additional check for buffer size (very small = likely failed capture)
       if (buffer.length < 1000) {

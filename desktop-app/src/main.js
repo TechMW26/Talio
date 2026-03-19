@@ -1,5 +1,5 @@
 /**
- * Talio Desktop App v4.8.0
+ * Talio Desktop App v5.0.0
  * Main Electron process
  * 
  * Performance optimized for smooth rendering
@@ -7,7 +7,7 @@
  * Force-persistent mode: app cannot be closed by users, auto-restarts if killed
  */
 
-const { app, BrowserWindow, ipcMain, Tray, Menu, Notification, shell, nativeImage, session, systemPreferences, dialog, desktopCapturer, screen, powerMonitor } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, Notification, shell, nativeImage, session, systemPreferences, dialog, screen, powerMonitor } = require('electron');
 const path = require('path');
 const Store = require('electron-store');
 const AutoLaunch = require('auto-launch');
@@ -95,6 +95,33 @@ let isLoadingApp = false; // Prevents concurrent loadApp() calls
 
 // Persistent store
 const store = new Store({ name: 'app-data' });
+
+/**
+ * Get desktop sources via the renderer's desktopCapturer (required for Electron 29+).
+ * In Electron 29+, desktopCapturer is only available in renderer/preload processes.
+ * This helper calls the preload-exposed getDesktopSources through executeJavaScript.
+ */
+async function getDesktopSources(options) {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    throw new Error('Main window not available for desktop capture');
+  }
+  return await mainWindow.webContents.executeJavaScript(
+    'window.electronAPI.getDesktopSources(' + JSON.stringify(options) + ')'
+  );
+}
+
+/**
+ * Get desktop sources with JPEG buffer data for screenshot service.
+ * Returns base64-encoded JPEG thumbnails instead of dataURLs.
+ */
+async function getDesktopSourcesWithJPEG(options) {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    throw new Error('Main window not available for desktop capture');
+  }
+  return await mainWindow.webContents.executeJavaScript(
+    'window.electronAPI.getDesktopSourcesForCapture(' + JSON.stringify(options) + ')'
+  );
+}
 
 // Auto-launch configuration
 const autoLauncher = new AutoLaunch({
@@ -253,8 +280,6 @@ function createWindow() {
       backgroundThrottling: false,
       // PERFORMANCE: Enable hardware acceleration in renderer
       enablePreferredSizeMode: false,
-      // Media features for screen sharing
-      mediaStreamShareSecurityOrigin: true,
       // Spellcheck can cause jank - disable if not needed
       spellcheck: false,
       // Enable WebGL for smooth rendering
@@ -1250,8 +1275,8 @@ function setupIPCHandlers() {
     try {
       logger.log('info', 'Main', 'Screen share requested');
 
-      // Get all available sources (screens and windows)
-      const sources = await desktopCapturer.getSources({
+      // Get all available sources via renderer IPC (desktopCapturer removed from main in Electron 29+)
+      const sources = await getDesktopSources({
         types: ['screen', 'window'],
         thumbnailSize: { width: 320, height: 180 },
         fetchWindowIcons: true
@@ -1272,8 +1297,8 @@ function setupIPCHandlers() {
             return {
               id: source.id,
               name: source.name,
-              thumbnail: source.thumbnail.toDataURL(),
-              appIcon: source.appIcon ? source.appIcon.toDataURL() : null,
+              thumbnail: source.thumbnail,
+              appIcon: source.appIcon || null,
               display_id: source.display_id,
               isScreen: source.id.startsWith('screen:')
             };
@@ -1289,8 +1314,8 @@ function setupIPCHandlers() {
           return {
             id: source.id,
             name: source.name,
-            thumbnail: source.thumbnail.toDataURL(),
-            appIcon: source.appIcon ? source.appIcon.toDataURL() : null,
+            thumbnail: source.thumbnail,
+            appIcon: source.appIcon || null,
             display_id: source.display_id,
             isScreen: source.id.startsWith('screen:')
           };
@@ -1425,6 +1450,7 @@ function handleAuthentication(data) {
     role: userData.role,
     token: data.token,
     mainWindow: mainWindow,
+    getDesktopSources: getDesktopSourcesWithJPEG,
     onPermissionError: function (message) {
       showNotification('Screen Recording Permission Required', message);
       // Also open system preferences on macOS
@@ -2247,13 +2273,13 @@ function setupSessionPermissions() {
   });
 
   // Handle desktop capturer permission for screen sharing
-  // IMPROVED: Better handling for Windows multi-display and proper source selection
+  // Uses IPC to get sources from renderer (desktopCapturer removed from main in Electron 29+)
   session.defaultSession.setDisplayMediaRequestHandler(async function (request, callback) {
     logger.log('info', 'Main', 'Display media request from: ' + request.frame.url);
 
     try {
-      // Get all available sources
-      const sources = await desktopCapturer.getSources({
+      // Get all available sources via renderer IPC
+      const sources = await getDesktopSources({
         types: ['screen', 'window'],
         thumbnailSize: { width: 320, height: 180 }
       });

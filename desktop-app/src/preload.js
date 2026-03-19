@@ -1,5 +1,5 @@
 /**
- * Preload Script v4.8.0
+ * Preload Script v5.0.0
  * Exposes secure IPC channels to the renderer process
  * With enhanced screen sharing support for Windows multi-display
  */
@@ -69,6 +69,29 @@ contextBridge.exposeInMainWorld('electronAPI', {
       });
     } catch (error) {
       console.error('[Preload] Error getting desktop sources:', error);
+      return [];
+    }
+  },
+  
+  // Get desktop sources with JPEG buffer data for screenshot service (main process capture)
+  // Returns base64-encoded JPEG thumbnails for efficient IPC transfer
+  getDesktopSourcesForCapture: async function(options) {
+    try {
+      const sources = await desktopCapturer.getSources(options || {
+        types: ['screen'],
+        thumbnailSize: { width: 1920, height: 1080 }
+      });
+      return sources.map(function(source) {
+        return {
+          id: source.id,
+          name: source.name,
+          display_id: source.display_id,
+          thumbnailJPEG: source.thumbnail.toJPEG(80).toString('base64'),
+          isEmpty: source.thumbnail.isEmpty()
+        };
+      });
+    } catch (error) {
+      console.error('[Preload] Error getting desktop sources for capture:', error);
       return [];
     }
   },
