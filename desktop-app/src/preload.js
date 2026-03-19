@@ -1,5 +1,5 @@
 /**
- * Preload Script v5.0.0
+ * Preload Script v5.0.1
  * Exposes secure IPC channels to the renderer process
  * With enhanced screen sharing support for Windows multi-display
  */
@@ -203,21 +203,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return ipcRenderer.invoke('load-app');
   },
 
-  // ── Auto-Update ──────────────────────────────────────────────────────
+  // ── Update Check ──────────────────────────────────────────────────────
   checkForUpdate: function(options) {
     return ipcRenderer.invoke('check-for-update', options);
-  },
-
-  startUpdate: function() {
-    return ipcRenderer.invoke('start-update');
-  },
-
-  retryUpdate: function() {
-    return ipcRenderer.invoke('retry-update');
-  },
-
-  installUpdate: function() {
-    return ipcRenderer.invoke('install-update');
   },
 
   // ── App Info ──────────────────────────────────────────────────────

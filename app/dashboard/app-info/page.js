@@ -5,17 +5,12 @@ import { Button, Spinner } from '@heroui/react'
 import {
   HiOutlineComputerDesktop,
   HiOutlineArrowPath,
-  HiOutlineCheckCircle,
-  HiOutlineExclamationTriangle,
   HiOutlineArrowDownTray,
-  HiOutlineArrowPathRoundedSquare,
   HiOutlineCpuChip,
   HiOutlineFolder,
-  HiOutlineInformationCircle,
   HiOutlineClipboardDocument,
   HiOutlineCheck,
   HiOutlineShieldCheck,
-  HiOutlineClock,
   HiOutlineHashtag,
 } from 'react-icons/hi2'
 
@@ -120,8 +115,17 @@ export default function AppInfoPage() {
   const [updateStatus, setUpdateStatus] = useState(null)
   const [updateVersion, setUpdateVersion] = useState(null)
   const [updateError, setUpdateError] = useState(null)
-  const [downloadPercent, setDownloadPercent] = useState(0)
   const [isElectron, setIsElectron] = useState(false)
+
+  // Auto-check for updates on every page visit
+  const checkForUpdates = useCallback(() => {
+    if (window.electronAPI?.checkForUpdate) {
+      setUpdateStatus('checking')
+      setUpdateError(null)
+      setUpdateVersion(null)
+      window.electronAPI.checkForUpdate({ silent: true })
+    }
+  }, [])
 
   useEffect(() => {
     const hasElectron = typeof window !== 'undefined' && (window.electronAPI !== undefined || window.isElectron === true)
@@ -167,11 +171,11 @@ export default function AppInfoPage() {
           setUpdateStatus(data.status)
           if (data.version) setUpdateVersion(data.version)
           if (data.message) setUpdateError(data.message)
-          if (data.status === 'downloading' && typeof data.percent === 'number') {
-            setDownloadPercent(data.percent)
-          }
         })
       }
+
+      // Auto-check for updates on page visit
+      checkForUpdates()
     }
 
     fetch('/api/desktop/min-version')
@@ -184,27 +188,20 @@ export default function AppInfoPage() {
         window.electronAPI.removeAllListeners('update-status')
       }
     }
-  }, [])
+  }, [checkForUpdates])
 
-  const handleCheckUpdate = useCallback(() => {
-    if (window.electronAPI?.checkForUpdate) {
-      setUpdateStatus('checking')
-      setUpdateError(null)
-      setUpdateVersion(null)
-      setDownloadPercent(0)
-      window.electronAPI.checkForUpdate({ silent: true })
-    } else if (window.electronAPI?.startUpdate) {
-      setUpdateStatus('checking')
-      window.electronAPI.startUpdate()
+  const handleDownloadUpdate = useCallback(() => {
+    // Determine correct download URL based on platform
+    const platform = appInfo?.platform
+    const arch = appInfo?.arch
+    let downloadPath = '/download/mac-arm64'
+    if (platform === 'win32') {
+      downloadPath = '/download/windows'
+    } else if (platform === 'darwin' && arch === 'x64') {
+      downloadPath = '/download/mac-intel'
     }
-  }, [])
-
-  const handleInstallUpdate = useCallback(() => {
-    if (window.electronAPI?.installUpdate) {
-      setUpdateStatus('installing')
-      window.electronAPI.installUpdate()
-    }
-  }, [])
+    window.open('https://app.talio.in' + downloadPath, '_blank')
+  }, [appInfo])
 
   /* ── Not desktop ── */
   if (!isElectron) {
@@ -311,7 +308,7 @@ export default function AppInfoPage() {
                 </div>
               )}
 
-              {(updateStatus === 'available' || (isOutdated && !updateStatus)) && (
+              {(updateStatus === 'available' || (isOutdated && updateStatus !== 'checking')) && (
                 <>
                   <span className="text-3xl font-extrabold tracking-tighter leading-none block mt-3" style={{ color: 'var(--color-text-primary)' }}>v{updateVersion || latestVersion}</span>
                   <span className="inline-block mt-2 px-2 py-0.5 rounded-md text-[11px] font-bold text-amber-600 dark:text-amber-400"
@@ -319,23 +316,6 @@ export default function AppInfoPage() {
                     Update Available
                   </span>
                 </>
-              )}
-
-              {updateStatus === 'downloaded' && (
-                <>
-                  <span className="text-3xl font-extrabold tracking-tighter leading-none block mt-3" style={{ color: 'var(--color-text-primary)' }}>Ready</span>
-                  <span className="inline-block mt-2 px-2 py-0.5 rounded-md text-[11px] font-bold text-emerald-600 dark:text-emerald-400"
-                    style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)' }}>
-                    v{updateVersion || latestVersion} downloaded
-                  </span>
-                </>
-              )}
-
-              {updateStatus === 'installing' && (
-                <div className="flex items-center gap-3 mt-4">
-                  <Spinner size="sm" />
-                  <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>Installing and restarting...</span>
-                </div>
               )}
 
               {updateStatus === 'error' && (
@@ -351,57 +331,39 @@ export default function AppInfoPage() {
                     {currentVersion ? `v${currentVersion}` : '...'}
                   </span>
                   <span className="inline-block mt-2 px-2 py-0.5 rounded-md text-[11px] font-bold" style={{ color: 'var(--color-text-secondary)', background: 'var(--color-primary-50)', border: '1px solid var(--color-primary-100)' }}>
-                    Tap to check
+                    Checking...
                   </span>
                 </>
               )}
             </div>
 
-            {/* Progress bar (only during download) */}
+            {/* Action buttons */}
             <div className="relative z-10 mt-6 space-y-3">
-              {updateStatus === 'downloading' && (
-                <div>
-                  <div className="flex justify-between mb-1.5">
-                    <span className="text-[12px] font-bold" style={{ color: 'var(--color-text-secondary)' }}>Downloading{updateVersion ? ` v${updateVersion}` : ''}</span>
-                    <span className="font-mono text-[11px] font-bold" style={{ color: 'var(--color-text-secondary)' }}>{Math.round(downloadPercent)}%</span>
-                  </div>
-                  <div className="h-2 w-full rounded-full overflow-hidden" style={{ background: 'var(--color-primary-100)' }}>
-                    <div
-                      className="h-full rounded-full transition-all duration-300 relative overflow-hidden"
-                      style={{ width: `${downloadPercent}%`, background: 'var(--color-primary-500)' }}
-                    >
-                      <div className="absolute top-0 bottom-0 w-16 animate-[shimmer_3s_linear_infinite]"
-                        style={{ background: 'rgba(255,255,255,0.4)', transform: 'skewX(12deg)', filter: 'blur(2px)' }} />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {updateStatus === 'downloaded' && (
+              {(updateStatus === 'available' || isOutdated) && updateStatus !== 'checking' && (
                 <Button
-                  onPress={handleInstallUpdate}
+                  onPress={handleDownloadUpdate}
                   className="w-full font-bold"
-                  color="success"
+                  color="warning"
                   variant="flat"
-                  startContent={<HiOutlineArrowPathRoundedSquare className="w-4 h-4" />}
+                  startContent={<HiOutlineArrowDownTray className="w-4 h-4" />}
                   size="sm"
                   radius="lg"
                 >
-                  Restart &amp; Update
+                  Download v{updateVersion || latestVersion}
                 </Button>
               )}
-              {(!updateStatus || updateStatus === 'up-to-date' || updateStatus === 'error' || (isOutdated && updateStatus !== 'available' && updateStatus !== 'downloading' && updateStatus !== 'downloaded' && updateStatus !== 'checking')) && (
+              {(!updateStatus || updateStatus === 'up-to-date' || updateStatus === 'error') && !isOutdated && (
                 <Button
-                  onPress={handleCheckUpdate}
+                  onPress={checkForUpdates}
                   className="w-full font-bold"
-                  color={isOutdated ? 'warning' : 'primary'}
+                  color="primary"
                   variant="flat"
                   startContent={<HiOutlineArrowPath className="w-4 h-4" />}
                   isLoading={updateStatus === 'checking'}
                   size="sm"
                   radius="lg"
                 >
-                  {isOutdated ? 'Update Now' : 'Check for Updates'}
+                  Check for Updates
                 </Button>
               )}
             </div>

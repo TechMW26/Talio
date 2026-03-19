@@ -1,5 +1,5 @@
 /**
- * Talio Desktop App v5.0.0
+ * Talio Desktop App v5.0.1
  * Main Electron process
  * 
  * Performance optimized for smooth rendering
@@ -11,7 +11,6 @@ const { app, BrowserWindow, ipcMain, Tray, Menu, Notification, shell, nativeImag
 const path = require('path');
 const Store = require('electron-store');
 const AutoLaunch = require('auto-launch');
-const { autoUpdater } = require('electron-updater');
 const logger = require('./logger');
 const screenshotService = require('./screenshotService');
 const socketHandler = require('./socketHandler');
@@ -73,7 +72,7 @@ const RETRY_DELAY_MS = 5000;
 const MAX_LOAD_RETRIES = 3;
 const MAX_CRASH_RECOVERY = 10; // Max crash recovery attempts (generous to survive network flaps)
 const MIN_VERSION_CHECK_URL = APP_URL + '/api/desktop/min-version';
-const UPDATE_CHECK_INTERVAL = 60 * 60 * 1000; // Check for updates every hour
+const UPDATE_CHECK_INTERVAL = 2 * 60 * 60 * 1000; // Check for updates every 2 hours
 
 // Global references
 let mainWindow = null;
@@ -87,10 +86,7 @@ let crashCount = 0;
 let lastCrashTime = 0;
 let forceCloseAttempts = 0;
 let windowRecreateTimer = null;
-let isUpdating = false;
 let updateCheckTimer = null;
-let updateCheckDialog = null;
-let inAppUpdateMode = false; // When true, don't navigate to update.html - send IPC status instead
 let isLoadingApp = false; // Prevents concurrent loadApp() calls
 
 // Persistent store
@@ -342,12 +338,6 @@ function createWindow() {
 
   // Handle render process crashes - with recovery limit to prevent infinite loop
   mainWindow.webContents.on('render-process-gone', function (event, details) {
-    // Don't attempt recovery during update installation
-    if (isUpdating) {
-      logger.log('info', 'Main', 'Renderer crash during update - not recovering (update in progress)');
-      return;
-    }
-
     const now = Date.now();
     logger.log('error', 'Main', 'Render process gone: ' + details.reason + ' (exitCode: ' + details.exitCode + ')');
 
@@ -628,12 +618,6 @@ function showCrashPage() {
  */
 function setupWindowEvents() {
   mainWindow.on('close', function (event) {
-    // CRITICAL: Let the window close during update installation
-    if (isUpdating) {
-      logger.log('info', 'Main', 'Window close allowed - update installing');
-      return; // Don't prevent default
-    }
-
     // FORCE PERSISTENT: Never let the window close
     event.preventDefault();
 
@@ -780,22 +764,11 @@ function setupWindowEvents() {
  * Acts as a watchdog to ensure the app stays running
  */
 function scheduleWindowRecreation() {
-  // CRITICAL: Never recreate while an update is being installed
-  if (isUpdating) {
-    logger.log('info', 'Main', 'Watchdog: Skipping window recreation - update in progress');
-    return;
-  }
-
   if (windowRecreateTimer) {
     clearTimeout(windowRecreateTimer);
   }
 
   windowRecreateTimer = setTimeout(function () {
-    // Double-check: update may have started while timer was pending
-    if (isUpdating) {
-      logger.log('info', 'Main', 'Watchdog: Aborting recreation - update started during delay');
-      return;
-    }
     if (!mainWindow || mainWindow.isDestroyed()) {
       logger.log('info', 'Main', 'Watchdog: Recreating destroyed window');
       createWindow();
@@ -1385,44 +1358,31 @@ function setupIPCHandlers() {
     }
   });
 
-  // ── Auto-Update IPC ──────────────────────────────────────────────────
-  ipcMain.handle('check-for-update', function (event, options) {
+  // ── Update Check IPC ──────────────────────────────────────────────────
+  // No auto-updater — just check version and notify user to download manually
+  ipcMain.handle('check-for-update', async function (event, options) {
     logger.log('info', 'Updater', 'Manual update check requested');
-    var silent = options && options.silent;
-    // When called from App Info page (silent), stay in-app - don't navigate to update.html
-    inAppUpdateMode = !!silent;
-    checkForUpdates(silent);
-    return { success: true };
-  });
-
-  ipcMain.handle('start-update', function () {
-    logger.log('info', 'Updater', 'Start update / download requested');
-    autoUpdater.checkForUpdates().then(function (result) {
-      if (result && result.updateInfo) {
-        autoUpdater.downloadUpdate().catch(function (err) {
-          logger.log('error', 'Updater', 'Download failed: ' + err.message);
-        });
+    sendUpdateStatus('checking');
+    try {
+      var response = await fetch(MIN_VERSION_CHECK_URL, {
+        headers: { 'x-app-version': app.getVersion() }
+      });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      var data = await response.json();
+      var latest = data.latestVersion;
+      var current = app.getVersion();
+      if (latest && compareVersions(current, latest) < 0) {
+        sendUpdateStatus('available', { version: latest });
+        return { success: true, updateAvailable: true, latestVersion: latest };
+      } else {
+        sendUpdateStatus('up-to-date', { version: current });
+        return { success: true, updateAvailable: false, latestVersion: latest || current };
       }
-    }).catch(function (err) {
-      logger.log('error', 'Updater', 'Check failed: ' + err.message);
-    });
-    return { success: true };
-  });
-
-  ipcMain.handle('retry-update', function () {
-    logger.log('info', 'Updater', 'Retry update download');
-    autoUpdater.downloadUpdate().catch(function (err) {
-      logger.log('error', 'Updater', 'Retry download failed: ' + err.message);
-    });
-    return { success: true };
-  });
-
-  ipcMain.handle('install-update', function () {
-    logger.log('info', 'Updater', 'Install update and restart');
-    isQuitting = true;
-    isUpdating = true;
-    forceCloseAttempts = 999;
-    autoUpdater.quitAndInstall(false, true);
+    } catch (err) {
+      logger.log('warn', 'Updater', 'Version check failed: ' + err.message);
+      sendUpdateStatus('error', { message: err.message });
+      return { success: false, error: err.message };
+    }
   });
 }
 
@@ -1501,7 +1461,7 @@ function handleAuthentication(data) {
 
   socketHandler.on('triggerUpdateCheck', function () {
     logger.log('info', 'Main', 'Server requested update check');
-    checkForUpdates(false);
+    checkForUpdates();
   });
 
   socketHandler.on('connect', function () {
@@ -1677,166 +1637,20 @@ function showNotification(title, body, options) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// AUTO-UPDATER SYSTEM
+// UPDATE CHECK SYSTEM (no auto-download — user downloads manually)
 // ═══════════════════════════════════════════════════════════════════════════
 
 /**
- * Setup electron-updater with GitHub Releases
+ * Setup periodic update version checks via the min-version API.
+ * When an update is found, sends IPC status + shows a native notification
+ * directing the user to the App Info page to download manually.
  */
 function setupAutoUpdater() {
-  // Configure updater
-  autoUpdater.autoDownload = false; // We control download manually
-  autoUpdater.autoInstallOnAppQuit = true;
-  autoUpdater.allowDowngrade = false;
-  autoUpdater.forceCodeSigning = false; // Allow updates from unsigned builds
+  logger.log('info', 'Updater', 'Update checker configured (manual download mode) - version: ' + app.getVersion() + ', platform: ' + process.platform + ', arch: ' + process.arch);
 
-  // Skip code signature verification on Windows (fixes update failures for unsigned builds)
-  // This overrides the app-update.yml setting at runtime, ensuring even older installed
-  // versions that lack verifyUpdateCodeSignature: false in their yml can still update.
-  if (process.platform === 'win32') {
-    autoUpdater.verifyUpdateCodeSignature = function () {
-      return Promise.resolve(null);
-    };
-  }
-
-  // Detailed provider config logging
-  logger.log('info', 'Updater', 'Auto-updater configured - provider: GitHub Releases, version: ' + app.getVersion() + ', platform: ' + process.platform + ', arch: ' + process.arch);
-
-  autoUpdater.on('checking-for-update', function () {
-    logger.log('info', 'Updater', '[LIFECYCLE] Checking for update...');
-    sendUpdateStatus('checking');
-  });
-
-  autoUpdater.on('update-available', function (info) {
-    logger.log('info', 'Updater', '[LIFECYCLE] Update available: v' + info.version + ' (releaseDate: ' + (info.releaseDate || 'unknown') + ', files: ' + JSON.stringify((info.files || []).map(function (f) { return f.url; })) + ')');
-    // Dismiss the "checking" dialog - update screen will take over
-    dismissUpdateCheckDialog();
-    sendUpdateStatus('available', { version: info.version });
-
-    if (inAppUpdateMode) {
-      // In-app mode: don't navigate away, just download in background
-      isUpdating = true;
-      sendUpdateStatus('downloading', { version: info.version, percent: 0 });
-      autoUpdater.downloadUpdate().catch(function (error) {
-        logger.log('error', 'Updater', 'Download failed: ' + error.message);
-        sendUpdateStatus('error', { message: error.message });
-      });
-    } else {
-      handleUpdateAvailable(info);
-    }
-  });
-
-  autoUpdater.on('update-not-available', function (info) {
-    logger.log('info', 'Updater', '[LIFECYCLE] No update available. Current: v' + app.getVersion() + ', Latest: v' + info.version);
-    sendUpdateStatus('up-to-date', { version: info.version });
-    // If a "checking for updates" dialog was shown, replace it with "up to date"
-    if (updateCheckDialog && !updateCheckDialog.isDestroyed()) {
-      dismissUpdateCheckDialog();
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        dialog.showMessageBox(mainWindow, {
-          type: 'info',
-          title: 'Talio Update',
-          message: 'You\'re up to date!',
-          detail: 'Talio Desktop v' + info.version + ' is the latest version.',
-          buttons: ['OK']
-        }).catch(function () { });
-      }
-    }
-  });
-
-  autoUpdater.on('download-progress', function (progress) {
-    var pct = Math.round(progress.percent || 0);
-    if (pct % 25 === 0 || pct === 100) {
-      logger.log('info', 'Updater', '[LIFECYCLE] Download progress: ' + pct + '% (' + Math.round((progress.transferred || 0) / 1048576) + '/' + Math.round((progress.total || 0) / 1048576) + ' MB)');
-    }
-    sendUpdateStatus('downloading', {
-      percent: pct,
-      bytesPerSecond: progress.bytesPerSecond,
-      transferred: progress.transferred,
-      total: progress.total
-    });
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.executeJavaScript(
-        'window.postMessage(' + JSON.stringify({
-          type: 'update-progress',
-          percent: progress.percent,
-          bytesPerSecond: progress.bytesPerSecond,
-          transferred: progress.transferred,
-          total: progress.total
-        }) + ', "*")'
-      ).catch(function () { });
-    }
-    // Update taskbar progress (Windows) / dock progress (macOS)
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.setProgressBar(progress.percent / 100);
-    }
-  });
-
-  autoUpdater.on('update-downloaded', function (info) {
-    logger.log('info', 'Updater', '[LIFECYCLE] Update downloaded. Preparing to install v' + info.version + '...');
-    sendUpdateStatus('downloaded', { version: info.version });
-
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.setProgressBar(-1); // Clear progress bar
-      mainWindow.webContents.executeJavaScript(
-        'window.postMessage({ type: "update-downloaded" }, "*")'
-      ).catch(function () { });
-    }
-
-    // Clear old cache before installing
-    clearAppCache();
-
-    // In-app mode: let the user click "Restart to Update" from the App Info page
-    if (inAppUpdateMode) {
-      inAppUpdateMode = false;
-      return;
-    }
-
-    // Non-in-app mode: auto-install after showing completion animation
-    setTimeout(function () {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.executeJavaScript(
-          'window.postMessage({ type: "update-complete" }, "*")'
-        ).catch(function () { });
-      }
-
-      // Quit and install after showing completion screen
-      setTimeout(function () {
-        logger.log('info', 'Updater', '[LIFECYCLE] quitAndInstall() called (isSilent=false, isForceRunAfter=true)');
-        // Track this install attempt so we can detect failed installs on next startup
-        store.set('updateInstallAttempt', { version: info.version, timestamp: Date.now() });
-        // CRITICAL: Set flags BEFORE quitAndInstall so before-quit/close handlers allow it
-        isQuitting = true;
-        isUpdating = true; // Tells window-all-closed & scheduleWindowRecreation to stand down
-        forceCloseAttempts = 999; // Bypass force-close protection for update
-        autoUpdater.quitAndInstall(false, true); // isSilent=false, isForceRunAfter=true
-      }, 2500);
-    }, 1500);
-  });
-
-  autoUpdater.on('error', function (error) {
-    logger.log('error', 'Updater', '[LIFECYCLE] Update error: ' + error.message + (error.stack ? '\n' + error.stack : ''));
-    dismissUpdateCheckDialog();
-
-    // CRITICAL: Reset isUpdating so future update checks are not blocked
-    isUpdating = false;
-
-    sendUpdateStatus('error', { message: error.message });
-
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.setProgressBar(-1);
-      mainWindow.webContents.executeJavaScript(
-        'window.postMessage(' + JSON.stringify({
-          type: 'update-error',
-          message: error.message
-        }) + ', "*")'
-      ).catch(function () { });
-    }
-  });
-
-  // Schedule periodic update checks (silent)
+  // Schedule periodic update checks
   updateCheckTimer = setInterval(function () {
-    checkForUpdates(true);
+    checkForUpdates();
   }, UPDATE_CHECK_INTERVAL);
 }
 
@@ -1850,137 +1664,46 @@ function sendUpdateStatus(status, data) {
 }
 
 /**
- * Check for updates (called on startup and periodically)
- * @param {boolean} silent - If true, don't show UI for "no update" case
+ * Check for updates by querying the min-version API.
+ * If outdated, show a notification directing user to App Info page.
  */
-function checkForUpdates(silent) {
-  if (isUpdating) {
-    logger.log('info', 'Updater', 'checkForUpdates skipped - update already in progress');
-    return;
-  }
+async function checkForUpdates() {
+  logger.log('info', 'Updater', 'checkForUpdates called');
+  sendUpdateStatus('checking');
 
-  logger.log('info', 'Updater', 'checkForUpdates called (silent=' + silent + ')');
-
-  // Show a "Checking for updates" dialog on non-silent checks
-  if (!silent && mainWindow && !mainWindow.isDestroyed()) {
-    showUpdateCheckDialog();
-  }
-
-  autoUpdater.checkForUpdates().catch(function (error) {
-    logger.log('warn', 'Updater', 'Update check failed: ' + error.message);
-    dismissUpdateCheckDialog();
-    sendUpdateStatus('error', { message: error.message });
-  });
-}
-
-/**
- * Show a small dialog window indicating we're checking for updates
- */
-function showUpdateCheckDialog() {
-  if (updateCheckDialog && !updateCheckDialog.isDestroyed()) return;
-
-  updateCheckDialog = new BrowserWindow({
-    width: 360,
-    height: 160,
-    resizable: false,
-    minimizable: false,
-    maximizable: false,
-    fullscreenable: false,
-    frame: false,
-    transparent: true,
-    alwaysOnTop: true,
-    skipTaskbar: true,
-    parent: mainWindow,
-    modal: true,
-    show: false,
-    webPreferences: { nodeIntegration: false, contextIsolation: true }
-  });
-
-  var html = '<!DOCTYPE html><html><head><style>'
-    + 'body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;background:transparent;}'
-    + '.card{background:#fff;border-radius:16px;padding:28px 32px;box-shadow:0 8px 32px rgba(0,0,0,0.18);text-align:center;min-width:280px;}'
-    + '@media(prefers-color-scheme:dark){.card{background:#1e1e2e;color:#e0e0e0}}'
-    + '.spinner{width:32px;height:32px;border:3px solid #e0e0e0;border-top:3px solid #6366f1;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 14px;}'
-    + '@keyframes spin{to{transform:rotate(360deg)}}'
-    + 'h3{margin:0 0 4px;font-size:15px;font-weight:600}'
-    + 'p{margin:0;font-size:12px;color:#888}'
-    + '</style></head><body><div class="card">'
-    + '<div class="spinner"></div>'
-    + '<h3>Checking for updates</h3>'
-    + '<p>Please wait...</p>'
-    + '</div></body></html>';
-
-  updateCheckDialog.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
-  updateCheckDialog.once('ready-to-show', function () {
-    if (updateCheckDialog && !updateCheckDialog.isDestroyed()) {
-      updateCheckDialog.show();
-    }
-  });
-}
-
-/**
- * Dismiss the "Checking for updates" dialog if open
- */
-function dismissUpdateCheckDialog() {
-  if (updateCheckDialog && !updateCheckDialog.isDestroyed()) {
-    updateCheckDialog.close();
-  }
-  updateCheckDialog = null;
-}
-
-/**
- * Handle update available - show update screen and start download
- */
-function handleUpdateAvailable(info) {
-  isUpdating = true;
-  logger.log('info', 'Updater', 'handleUpdateAvailable - loading update screen for v' + info.version);
-
-  // Show update page
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    var updatePath = path.join(__dirname, 'update.html');
-    mainWindow.loadFile(updatePath).then(function () {
-      // Send version info to the update page
-      mainWindow.webContents.executeJavaScript(
-        'window.postMessage(' + JSON.stringify({
-          type: 'update-versions',
-          current: app.getVersion(),
-          latest: info.version
-        }) + ', "*")'
-      ).catch(function () { });
-
-      mainWindow.show();
-      mainWindow.focus();
-    }).catch(function (err) {
-      logger.log('error', 'Updater', 'Failed to load update page: ' + err.message);
-    });
-
-    // Start downloading the update
-    autoUpdater.downloadUpdate().catch(function (error) {
-      logger.log('error', 'Updater', 'Download failed: ' + error.message);
-    });
-  }
-}
-
-/**
- * Clear app cache to ensure clean update
- */
-function clearAppCache() {
   try {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.session.clearCache();
-      mainWindow.webContents.session.clearStorageData({
-        storages: ['cachestorage', 'serviceworkers']
-      });
-      logger.log('info', 'Updater', 'App cache cleared for clean update');
+    var response = await fetch(MIN_VERSION_CHECK_URL, {
+      headers: { 'x-app-version': app.getVersion() }
+    });
+
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    var data = await response.json();
+    var latest = data.latestVersion;
+    var current = app.getVersion();
+
+    if (latest && compareVersions(current, latest) < 0) {
+      logger.log('info', 'Updater', 'Update available: v' + latest + ' (current: v' + current + ')');
+      sendUpdateStatus('available', { version: latest });
+
+      // Show native notification directing user to download
+      showNotification(
+        '🔄 Update Available',
+        'Talio Desktop v' + latest + ' is available. Go to App Info to download the update.',
+        { silent: true }
+      );
+    } else {
+      logger.log('info', 'Updater', 'Up to date (current: v' + current + ', latest: v' + (latest || current) + ')');
+      sendUpdateStatus('up-to-date', { version: latest || current });
     }
-  } catch (e) {
-    logger.log('warn', 'Updater', 'Cache clear failed: ' + e.message);
+  } catch (error) {
+    logger.log('warn', 'Updater', 'Update check failed: ' + error.message);
+    sendUpdateStatus('error', { message: error.message });
   }
 }
 
 /**
  * Check if the current version is below the minimum required version.
- * If so, block the app and force an update.
+ * If so, block the app and direct user to download the update.
  */
 async function checkForceUpdate() {
   try {
@@ -2005,23 +1728,7 @@ async function checkForceUpdate() {
     logger.log('info', 'Updater', 'Min version: ' + minVersion + ', Current: ' + currentVersion);
 
     if (compareVersions(currentVersion, minVersion) < 0) {
-      logger.log('warn', 'Updater', 'App version is below minimum! Triggering auto-update before blocking UI.');
-
-      // Try to start the auto-update FIRST - only block the UI if we can't update silently
-      try {
-        var result = await autoUpdater.checkForUpdates();
-        if (result && result.updateInfo && compareVersions(result.updateInfo.version, currentVersion) > 0) {
-          logger.log('info', 'Updater', 'Update available (v' + result.updateInfo.version + ') - update screen will take over');
-          // handleUpdateAvailable is triggered by the 'update-available' event
-          // Don't show the blocking screen since the update UI handles it
-          return true;
-        }
-      } catch (updateErr) {
-        logger.log('warn', 'Updater', 'Auto-update check failed during force-update: ' + updateErr.message);
-      }
-
-      // Only show the blocking screen if auto-update couldn't start
-      logger.log('warn', 'Updater', 'No update found or update check failed - showing blocking screen');
+      logger.log('warn', 'Updater', 'App version is below minimum! Showing update-required screen.');
       showUpdateRequiredScreen(currentVersion, minVersion, data.message);
       return true;
     }
@@ -2029,7 +1736,7 @@ async function checkForceUpdate() {
     return false;
   } catch (error) {
     logger.log('warn', 'Updater', 'Force update check failed: ' + error.message);
-    return false; // Don't block on network errors
+    return false;
   }
 }
 
@@ -2050,29 +1757,13 @@ function compareVersions(a, b) {
 }
 
 /**
- * Show the "Update Required" blocking screen
+ * Show the "Update Required" blocking screen.
+ * Directs user to the download page instead of auto-updating.
  */
 function showUpdateRequiredScreen(currentVersion, minVersion, serverMessage) {
   if (!mainWindow || mainWindow.isDestroyed()) return;
 
   var msg = serverMessage || 'A critical update is available. You must update to continue using Talio.';
-
-  // Use webContents.on('console-message') as a communication channel from data URL
-  // The page will console.log('TALIO_START_UPDATE') which we intercept
-  // (data URLs don't get preload.js, so electronAPI won't be available)
-  var updateListener = function (event, level, message) {
-    if (message === 'TALIO_START_UPDATE') {
-      logger.log('info', 'Updater', 'Update triggered from required-update screen');
-      mainWindow.webContents.removeListener('console-message', updateListener);
-      checkForUpdates(false);
-    }
-  };
-  // Remove any previous listener to prevent duplicates if called multiple times
-  if (mainWindow._updateRequiredListener) {
-    mainWindow.webContents.removeListener('console-message', mainWindow._updateRequiredListener);
-  }
-  mainWindow._updateRequiredListener = updateListener;
-  mainWindow.webContents.on('console-message', updateListener);
 
   var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Update Required - Talio</title>' +
     '<link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;500;600;700;800&display=swap" rel="stylesheet">' +
@@ -2101,14 +1792,12 @@ function showUpdateRequiredScreen(currentVersion, minVersion, serverMessage) {
     '<p>' + escapeHtml(msg) + '</p>' +
     '<div class="vr"><span class="vb vo">v' + escapeHtml(currentVersion) + '</span><span class="va">\u2192</span><span class="vb vn">v' + escapeHtml(minVersion) + '+</span></div>' +
     '<div class="blocked">\ud83d\udeab App access is blocked until you update to the latest version.</div>' +
-    '<button class="btn" onclick="doUpdate()">Update Now</button>' +
-    '<p class="note">The update will download and install automatically.</p>' +
+    '<button class="btn" onclick="goToAppInfo()">Download Update</button>' +
+    '<p class="note">You will be taken to the App Info page to download the latest version.</p>' +
     '</div>' +
     '<script>' +
-    'function doUpdate(){' +
-    'console.log("TALIO_START_UPDATE");' +
-    'document.querySelector(".btn").textContent="Checking for updates...";' +
-    'document.querySelector(".btn").disabled=true;' +
+    'function goToAppInfo(){' +
+    'window.location.href="https://app.talio.in/dashboard/app-info";' +
     '}' +
     '</script></body></html>';
 
@@ -2654,48 +2343,18 @@ app.whenReady().then(async function () {
   // Request permissions on macOS (camera, mic, screen recording)
   await requestPermissions();
 
-  // Setup auto-updater (registers event listeners - safe even in crash loop)
+  // Setup periodic update version checker
   setupAutoUpdater();
 
   if (!isCrashLoop) {
-    // Detect failed update install loops:
-    // If we recently tried to quitAndInstall but we're still on the old version,
-    // the install failed (e.g. macOS code signature mismatch). Don't auto-check again.
-    var updateAttempt = store.get('updateInstallAttempt');
-    var skipAutoUpdate = false;
-    if (updateAttempt && updateAttempt.version && updateAttempt.timestamp) {
-      var attemptAge = Date.now() - updateAttempt.timestamp;
-      if (updateAttempt.version === app.getVersion()) {
-        // We're now on the version we tried to install - update succeeded!
-        logger.log('info', 'Updater', 'Update to v' + updateAttempt.version + ' succeeded');
-        store.delete('updateInstallAttempt');
-      } else if (attemptAge < 10 * 60 * 1000) {
-        // Tried to install a different version within last 10 minutes but still on old version = failed
-        logger.log('warn', 'Updater', 'Previous update to v' + updateAttempt.version + ' failed (still on v' + app.getVersion() + '). Skipping auto-update to prevent loop.');
-        skipAutoUpdate = true;
-        // Show one-time notification about failed update
-        setTimeout(function () {
-          if (mainWindow && !mainWindow.isDestroyed()) {
-            dialog.showMessageBox(mainWindow, {
-              type: 'warning',
-              title: 'Update Failed',
-              message: 'Auto-update to v' + updateAttempt.version + ' could not be installed.',
-              detail: 'This is typically caused by a code signature mismatch. Please download the latest version manually from the releases page.',
-              buttons: ['OK']
-            }).catch(function () { });
-          }
-        }, 5000);
-      } else {
-        // Attempt is old (>10 min), clear it and allow retry
-        store.delete('updateInstallAttempt');
-      }
-    }
+    // Clean up any legacy updateInstallAttempt data from previous versions
+    store.delete('updateInstallAttempt');
 
     // Check for forced updates (min version)
     var isForced = await checkForceUpdate();
-    if (!isForced && !skipAutoUpdate) {
-      // Check for updates on fresh launch - SILENT so no dialog blocks startup
-      setTimeout(function () { checkForUpdates(true); }, 5000);
+    if (!isForced) {
+      // Check for updates on fresh launch
+      setTimeout(function () { checkForUpdates(); }, 5000);
     }
   } else {
     // In crash-loop safe mode: notify user
@@ -2705,7 +2364,7 @@ app.whenReady().then(async function () {
           type: 'warning',
           title: 'Safe Mode',
           message: 'Talio started in safe mode',
-          detail: 'The app detected multiple rapid restarts. Auto-update and minimum version checks have been temporarily disabled. If the problem persists, please reinstall the app or contact support.',
+          detail: 'The app detected multiple rapid restarts. Update checks have been temporarily disabled. If the problem persists, please reinstall the app or contact support.',
           buttons: ['OK']
         }).catch(function () { });
       }
@@ -2731,11 +2390,6 @@ app.whenReady().then(async function () {
 });
 
 app.on('window-all-closed', function () {
-  // If an update is installing, let the app quit cleanly
-  if (isUpdating) {
-    logger.log('info', 'Main', 'All windows closed during update - allowing quit');
-    return;
-  }
   // FORCE PERSISTENT: Never quit when windows are closed
   // Instead, recreate the window
   logger.log('warn', 'Main', 'All windows closed - recreating (force persistent mode)');
@@ -2743,15 +2397,6 @@ app.on('window-all-closed', function () {
 });
 
 app.on('before-quit', function (event) {
-  // Always allow quit when an update is installing
-  if (isUpdating) {
-    logger.log('info', 'Main', 'Allowing quit - update is installing');
-    isQuitting = true;
-    screenshotService.stop();
-    socketHandler.disconnect();
-    return;
-  }
-
   // Intercept quit attempts - only allow after multiple force-close attempts
   if (forceCloseAttempts < 3) {
     event.preventDefault();
