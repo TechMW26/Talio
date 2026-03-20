@@ -1,6 +1,7 @@
 /**
- * Offline Queue v4.0.0
+ * Offline Queue v5.1.0
  * Manages screenshot uploads when offline, syncs when back online
+ * Uses async file I/O to avoid blocking the main thread
  */
 
 const Store = require('electron-store');
@@ -78,7 +79,7 @@ class OfflineQueue {
     }
   }
 
-  add(screenshotData) {
+  async add(screenshotData) {
     if (this.queue.length >= MAX_QUEUE_SIZE) {
       // Remove oldest item
       const removed = this.queue.shift();
@@ -91,8 +92,12 @@ class OfflineQueue {
     const tempPath = path.join(this.tempDir, tempFileName);
     
     try {
-      // screenshotData.buffer should be a Buffer
-      fs.writeFileSync(tempPath, screenshotData.buffer);
+      // screenshotData.buffer should be a Buffer — write asynchronously
+      await new Promise(function(resolve, reject) {
+        fs.writeFile(tempPath, screenshotData.buffer, function(err) {
+          if (err) reject(err); else resolve();
+        });
+      });
       
       const queueItem = {
         id: 'queue_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
@@ -155,8 +160,12 @@ class OfflineQueue {
       }
       
       try {
-        // Read the temp file
-        const buffer = fs.readFileSync(item.tempPath);
+        // Read the temp file asynchronously
+        const buffer = await new Promise(function(resolve, reject) {
+          fs.readFile(item.tempPath, function(err, data) {
+            if (err) reject(err); else resolve(data);
+          });
+        });
         
         // Try to upload
         const result = await this.uploadFunction({

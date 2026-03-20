@@ -1,5 +1,5 @@
 /**
- * Talio Desktop App v5.0.4
+ * Talio Desktop App v5.1.0
  * Main Electron process
  * 
  * Performance optimized for smooth rendering
@@ -18,7 +18,7 @@ const logger = require('./logger');
 const screenshotService = require('./screenshotService');
 const socketHandler = require('./socketHandler');
 
-// PERFORMANCE: Balanced GPU settings for smooth rendering without flickering
+// PERFORMANCE: Optimized GPU and rendering settings
 const forceDisableGPU = process.env.TALIO_DISABLE_GPU === '1';
 
 if (forceDisableGPU) {
@@ -26,19 +26,37 @@ if (forceDisableGPU) {
   app.commandLine.appendSwitch('disable-gpu');
   logger.log('warn', 'Main', 'GPU acceleration disabled via environment flag');
 } else {
-  // Safe GPU defaults — let Electron/Chromium choose the best backend.
-  // DO NOT force Metal, accelerated-2d-canvas, or vsync overrides;
-  // they cause native crashes (EXC_BAD_ACCESS) on macOS 15/16.
+  // GPU rasterization — offloads tile rasterization from CPU to GPU
   app.commandLine.appendSwitch('enable-gpu-rasterization');
+  // Zero-copy GPU rasterization — avoids extra memcpy from GPU tiles
+  app.commandLine.appendSwitch('enable-zero-copy');
+  // Smooth scrolling via compositor
   app.commandLine.appendSwitch('enable-smooth-scrolling');
+  // Use GPU for 2D canvas operations
+  app.commandLine.appendSwitch('enable-accelerated-2d-canvas');
+  // Compositing on all pages (even ones without explicit compositing triggers)
+  app.commandLine.appendSwitch('force-gpu-rasterization');
 
   if (process.platform === 'win32') {
+    // Use D3D11 on Windows for best GPU interop
     app.commandLine.appendSwitch('use-angle', 'd3d11');
+  }
+
+  if (process.platform === 'linux') {
+    // Use GL on Linux for wider driver compatibility
+    app.commandLine.appendSwitch('use-gl', 'desktop');
   }
 
   // Prevent GPU process crashes from killing the app
   app.commandLine.appendSwitch('disable-gpu-process-crash-limit');
 }
+
+// PERFORMANCE: Reduce IPC serialisation overhead
+app.commandLine.appendSwitch('js-flags', '--max-old-space-size=256');
+// Disable background timer throttling — keeps intervals accurate when window is hidden
+app.commandLine.appendSwitch('disable-background-timer-throttling');
+// Disable renderer backgrounding to keep the UI responsive when minimised
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
 
 // Note: The actual fix for the "Checking session" crash loop requires
 // deploying the Providers.js fix to production (app.talio.in)
@@ -132,23 +150,111 @@ const autoLauncher = new AutoLaunch({
   isHidden: true
 });
 
+// Track screen recording permission state for periodic checks
+let screenPermissionGranted = false;
+let screenPermissionCheckInterval = null;
+
+/**
+ * Check screen recording permission status (macOS only)
+ * Returns: 'granted', 'denied', 'restricted', 'not-determined', or 'unsupported'
+ */
+function checkScreenRecordingPermission() {
+  if (process.platform === 'darwin') {
+    return systemPreferences.getMediaAccessStatus('screen');
+  }
+  // Windows/Linux: no system-level screen recording permission
+  return 'granted';
+}
+
+/**
+ * Show the screen recording permission dialog and open System Preferences (macOS)
+ */
+async function promptScreenRecordingPermission(parentWindow) {
+  if (process.platform !== 'darwin') return;
+
+  var win = parentWindow || mainWindow;
+  if (!win || win.isDestroyed()) return;
+
+  var result = await dialog.showMessageBox(win, {
+    type: 'warning',
+    title: 'Screen Recording Permission Required',
+    message: 'Talio needs Screen Recording permission to capture work activity and enable AI-powered insights.',
+    detail: 'Steps to enable:\n1. Click "Open System Preferences" below\n2. Find "Talio" in the list and check the box\n3. If Talio is already checked, uncheck it, then re-check it\n4. You may need to restart Talio after granting permission',
+    buttons: ['Open System Preferences', 'Remind Me Later'],
+    defaultId: 0,
+    cancelId: 1
+  });
+
+  if (result.response === 0) {
+    shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
+  }
+}
+
+/**
+ * Start periodic screen recording permission checker (macOS only).
+ * Checks every 15 seconds until permission is granted, then stops.
+ * When permission is newly granted, resets screenshot service error flags.
+ */
+function startScreenPermissionWatcher() {
+  if (process.platform !== 'darwin') return;
+  if (screenPermissionCheckInterval) return; // Already watching
+
+  var status = checkScreenRecordingPermission();
+  screenPermissionGranted = (status === 'granted');
+
+  if (screenPermissionGranted) {
+    logger.log('info', 'Main', 'Screen recording permission already granted — no watcher needed');
+    return;
+  }
+
+  logger.log('info', 'Main', 'Starting screen permission watcher (currently: ' + status + ')');
+
+  screenPermissionCheckInterval = setInterval(function () {
+    var currentStatus = checkScreenRecordingPermission();
+
+    if (currentStatus === 'granted' && !screenPermissionGranted) {
+      screenPermissionGranted = true;
+      logger.log('info', 'Main', 'Screen recording permission GRANTED — stopping watcher');
+
+      // Reset screenshot service permission error so it can retry captures
+      screenshotService.resetPermissionError();
+
+      // Notify user
+      showNotification('Permission Granted', 'Screen Recording permission has been enabled. Talio can now capture your work activity.');
+
+      // Stop watching
+      clearInterval(screenPermissionCheckInterval);
+      screenPermissionCheckInterval = null;
+    }
+  }, 15000);
+}
+
+/**
+ * Stop the screen permission watcher
+ */
+function stopScreenPermissionWatcher() {
+  if (screenPermissionCheckInterval) {
+    clearInterval(screenPermissionCheckInterval);
+    screenPermissionCheckInterval = null;
+  }
+}
+
 /**
  * Request all required permissions (notifications on all platforms, media on macOS)
  */
 async function requestPermissions() {
-  logger.log('info', 'Main', 'Checking permissions...');
+  logger.log('debug', 'Main', 'Checking permissions...');
 
   // ── Notification permissions (all platforms) ──
   if (Notification.isSupported()) {
-    logger.log('info', 'Main', 'Notifications supported');
+    logger.log('debug', 'Main', 'Notifications supported');
   } else {
     logger.log('warn', 'Main', 'Notifications not supported on this platform');
   }
 
   // Windows: Set up toast notifications via AppUserModelId
   if (process.platform === 'win32') {
-    logger.log('info', 'Main', 'Windows notification setup - AppUserModelId: in.talio.desktop');
-    // Show initial notification to verify the permission pipeline
+    logger.log('debug', 'Main', 'Windows notification setup - AppUserModelId: in.talio.desktop');
     try {
       var testNotif = new Notification({
         title: 'Talio',
@@ -166,7 +272,7 @@ async function requestPermissions() {
 
   // Linux: notifications via libnotify
   if (process.platform === 'linux') {
-    logger.log('info', 'Main', 'Linux notifications via libnotify');
+    logger.log('debug', 'Main', 'Linux notifications via libnotify');
     try {
       var testNotif = new Notification({
         title: 'Talio',
@@ -183,47 +289,56 @@ async function requestPermissions() {
 
   // macOS: Request media + notification permissions
   if (process.platform === 'darwin') {
-    logger.log('info', 'Main', 'Checking macOS permissions...');
+    logger.log('debug', 'Main', 'Checking macOS permissions...');
 
     // Camera permission
     var cameraStatus = systemPreferences.getMediaAccessStatus('camera');
     if (cameraStatus !== 'granted') {
       logger.log('info', 'Main', 'Requesting camera permission...');
-      var granted = await systemPreferences.askForMediaAccess('camera');
-      logger.log('info', 'Main', 'Camera permission: ' + (granted ? 'granted' : 'denied'));
+      try {
+        var camGranted = await systemPreferences.askForMediaAccess('camera');
+        logger.log('info', 'Main', 'Camera permission: ' + (camGranted ? 'granted' : 'denied'));
+      } catch (e) {
+        logger.log('warn', 'Main', 'Camera permission request failed: ' + e.message);
+      }
     }
 
     // Microphone permission
     var micStatus = systemPreferences.getMediaAccessStatus('microphone');
     if (micStatus !== 'granted') {
       logger.log('info', 'Main', 'Requesting microphone permission...');
-      var granted = await systemPreferences.askForMediaAccess('microphone');
-      logger.log('info', 'Main', 'Microphone permission: ' + (granted ? 'granted' : 'denied'));
+      try {
+        var micGranted = await systemPreferences.askForMediaAccess('microphone');
+        logger.log('info', 'Main', 'Microphone permission: ' + (micGranted ? 'granted' : 'denied'));
+      } catch (e) {
+        logger.log('warn', 'Main', 'Microphone permission request failed: ' + e.message);
+      }
+    }
+
+    // Accessibility permission check (needed for some screen capture features)
+    var accessibilityTrusted = systemPreferences.isTrustedAccessibilityClient(false);
+    if (!accessibilityTrusted) {
+      logger.log('info', 'Main', 'Accessibility permission not granted — prompting');
+      // Passing true shows the system prompt
+      systemPreferences.isTrustedAccessibilityClient(true);
+    } else {
+      logger.log('debug', 'Main', 'Accessibility permission already granted');
     }
 
     // Screen recording permission (can only check, not request programmatically)
-    var screenStatus = systemPreferences.getMediaAccessStatus('screen');
-    if (screenStatus !== 'granted') {
-      logger.log('info', 'Main', 'Screen recording permission not granted, showing dialog...');
-      var result = await dialog.showMessageBox(mainWindow, {
-        type: 'info',
-        title: 'Screen Recording Permission Required',
-        message: 'Talio needs screen recording permission to enable AI-powered work insights and screen sharing in meetings.',
-        detail: 'Please grant Screen Recording permission in System Preferences → Privacy & Security → Screen Recording, then restart the app.',
-        buttons: ['Open System Preferences', 'Later'],
-        defaultId: 0,
-        cancelId: 1
-      });
+    var screenStatus = checkScreenRecordingPermission();
+    screenPermissionGranted = (screenStatus === 'granted');
 
-      if (result.response === 0) {
-        shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
-      }
+    if (!screenPermissionGranted) {
+      logger.log('info', 'Main', 'Screen recording permission not granted (status: ' + screenStatus + ')');
+      await promptScreenRecordingPermission(mainWindow);
+      // Start watching for permission change
+      startScreenPermissionWatcher();
     } else {
       logger.log('info', 'Main', 'Screen recording permission already granted');
     }
 
     // macOS notification permission - trigger via test notification
-    // macOS shows a system permission dialog on the first Notification()
     try {
       var testNotif = new Notification({
         title: 'Talio',
@@ -279,16 +394,18 @@ function createWindow() {
       webSecurity: true,
       allowRunningInsecureContent: false,
       devTools: !app.isPackaged,
-      // PERFORMANCE: Disable background throttling for smooth animations
+      // PERFORMANCE: Keep timers accurate when window is hidden/minimized
       backgroundThrottling: false,
-      // PERFORMANCE: Enable hardware acceleration in renderer
-      enablePreferredSizeMode: false,
-      // Spellcheck can cause jank - disable if not needed
+      // PERFORMANCE: Spellcheck triggers heavy dictionary lookups, disable
       spellcheck: false,
-      // Enable WebGL for smooth rendering
+      // PERFORMANCE: WebGL for GPU-accelerated rendering
       webgl: true,
-      // V8 code caching for faster JS execution
-      v8CacheOptions: 'bypassHeatCheck'
+      // PERFORMANCE: V8 compiles JS to bytecode eagerly, eliminating re-parse costs
+      v8CacheOptions: 'code',
+      // PERFORMANCE: Enable preferred size mode for efficient layout
+      enablePreferredSizeMode: true,
+      // PERFORMANCE: Smooth font rendering
+      defaultFontFamily: { standard: 'system-ui' }
     },
     icon: getAppIcon(),
     show: false,
@@ -452,8 +569,12 @@ function injectTitleBarAdaptations() {
   mainWindow.webContents.insertCSS(css).catch(function () { });
 
   // Inject theme color detection - watches for dark mode / theme changes and syncs title bar
+  // Uses a guard flag to prevent accumulating observers/intervals across navigations
   var themeScript =
     '(function() {\n' +
+    '  if (window.__TALIO_TITLEBAR_INJECTED__) return;\n' +
+    '  window.__TALIO_TITLEBAR_INJECTED__ = true;\n' +
+    '  var _lastColor = "";\n' +
     '  function syncTitleBar() {\n' +
     '    var header = document.querySelector("header");\n' +
     '    var bgColor = "#ffffff";\n' +
@@ -462,15 +583,20 @@ function injectTitleBarAdaptations() {
     '    } else {\n' +
     '      bgColor = getComputedStyle(document.body).backgroundColor || "#ffffff";\n' +
     '    }\n' +
-    '    if (window.electronAPI && window.electronAPI.setTitleBarColor) {\n' +
-    '      window.electronAPI.setTitleBarColor(bgColor);\n' +
+    '    if (bgColor !== _lastColor) {\n' +
+    '      _lastColor = bgColor;\n' +
+    '      if (window.electronAPI && window.electronAPI.setTitleBarColor) {\n' +
+    '        window.electronAPI.setTitleBarColor(bgColor);\n' +
+    '      }\n' +
     '    }\n' +
     '  }\n' +
-    '  var obs = new MutationObserver(function() { setTimeout(syncTitleBar, 200); });\n' +
+    '  var _debounce = null;\n' +
+    '  var obs = new MutationObserver(function() {\n' +
+    '    clearTimeout(_debounce);\n' +
+    '    _debounce = setTimeout(syncTitleBar, 300);\n' +
+    '  });\n' +
     '  obs.observe(document.documentElement, { attributes: true, attributeFilter: ["class", "style", "data-theme"] });\n' +
     '  setTimeout(syncTitleBar, 800);\n' +
-    '  setTimeout(syncTitleBar, 2500);\n' +
-    '  setInterval(syncTitleBar, 5000);\n' +
     '})()';
 
   mainWindow.webContents.executeJavaScript(themeScript).catch(function () { });
@@ -1071,11 +1197,8 @@ function injectNetworkStatusListener() {
     if (window.__TALIO_NETWORK_LISTENER_INJECTED__) return;
     window.__TALIO_NETWORK_LISTENER_INJECTED__ = true;
 
-    console.log('[Talio Desktop] Network status listener injected');
-
     // Listen for offline event
     window.addEventListener('offline', function () {
-      console.log('[Talio Desktop] Browser detected offline');
       if (window.electronAPI && window.electronAPI.setOnlineStatus) {
         window.electronAPI.setOnlineStatus(false);
       }
@@ -1083,24 +1206,10 @@ function injectNetworkStatusListener() {
 
     // Listen for online event  
     window.addEventListener('online', function () {
-      console.log('[Talio Desktop] Browser detected online');
       if (window.electronAPI && window.electronAPI.setOnlineStatus) {
         window.electronAPI.setOnlineStatus(true);
       }
     });
-
-    // Also do periodic connectivity checks
-    var lastOnlineState = navigator.onLine;
-    setInterval(function () {
-      var currentState = navigator.onLine;
-      if (currentState !== lastOnlineState) {
-        lastOnlineState = currentState;
-        console.log('[Talio Desktop] Network state changed:', currentState ? 'online' : 'offline');
-        if (window.electronAPI && window.electronAPI.setOnlineStatus) {
-          window.electronAPI.setOnlineStatus(currentState);
-        }
-      }
-    }, 3000);
 
     // Report initial state
     if (window.electronAPI && window.electronAPI.setOnlineStatus) {
@@ -1148,6 +1257,43 @@ function setupIPCHandlers() {
   ipcMain.handle('logout', function () {
     handleLogout();
     return { success: true };
+  });
+
+  // Permission management
+  ipcMain.handle('check-screen-permission', function () {
+    return {
+      status: checkScreenRecordingPermission(),
+      platform: process.platform
+    };
+  });
+
+  ipcMain.handle('request-screen-permission', async function () {
+    if (process.platform === 'darwin') {
+      await promptScreenRecordingPermission(mainWindow);
+      startScreenPermissionWatcher();
+      return { prompted: true, status: checkScreenRecordingPermission() };
+    }
+    return { prompted: false, status: 'granted', platform: process.platform };
+  });
+
+  ipcMain.handle('get-all-permissions', function () {
+    var permissions = {
+      platform: process.platform,
+      screenRecording: checkScreenRecordingPermission(),
+      notifications: Notification.isSupported() ? 'granted' : 'unsupported'
+    };
+
+    if (process.platform === 'darwin') {
+      permissions.camera = systemPreferences.getMediaAccessStatus('camera');
+      permissions.microphone = systemPreferences.getMediaAccessStatus('microphone');
+      permissions.accessibility = systemPreferences.isTrustedAccessibilityClient(false) ? 'granted' : 'denied';
+    } else {
+      permissions.camera = 'granted';
+      permissions.microphone = 'granted';
+      permissions.accessibility = 'granted';
+    }
+
+    return permissions;
   });
 
   // Screenshot service
@@ -1576,11 +1722,23 @@ function handleAuthentication(data) {
     token: data.token,
     mainWindow: mainWindow,
     getDesktopSources: getDesktopSourcesWithJPEG,
+    checkPermission: checkScreenRecordingPermission,
     onPermissionError: function (message) {
       showNotification('Screen Recording Permission Required', message);
-      // Also open system preferences on macOS
       if (process.platform === 'darwin') {
-        shell.openExternal('x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture');
+        // Open System Preferences and start the watcher
+        promptScreenRecordingPermission(mainWindow);
+        startScreenPermissionWatcher();
+      } else if (process.platform === 'win32') {
+        // On Windows, show guidance dialog for capture failures
+        dialog.showMessageBox(mainWindow, {
+          type: 'warning',
+          title: 'Screen Capture Issue',
+          message: 'Talio is unable to capture your screen.',
+          detail: 'This can happen if:\n• An antivirus or security software is blocking screen capture\n• You are using Remote Desktop — try allowing clipboard/display capture in RDP settings\n• Try running Talio as Administrator (right-click → Run as administrator)\n\nIf the issue persists, please contact your IT administrator.',
+          buttons: ['OK'],
+          defaultId: 0
+        });
       }
     }
   });
@@ -2284,7 +2442,7 @@ async function initAutoLaunch() {
 
     if (!isEnabled) {
       await autoLauncher.enable();
-      logger.log('info', 'Main', 'Auto-launch enabled (company device policy)');
+      logger.log('debug', 'Main', 'Auto-launch enabled (company device policy)');
     }
     store.set('autoLaunch', true);
   } catch (error) {
@@ -2659,6 +2817,10 @@ let whitescreenCheckInterval = null;
 let systemWasAsleep = false;
 
 function setupNetworkMonitoring() {
+  // Clear any existing intervals to prevent accumulation
+  if (networkCheckInterval) { clearInterval(networkCheckInterval); networkCheckInterval = null; }
+  if (whitescreenCheckInterval) { clearInterval(whitescreenCheckInterval); whitescreenCheckInterval = null; }
+
   // Check network connectivity
   const checkNetworkAndReload = async function () {
     if (!mainWindow || mainWindow.isDestroyed()) return;
@@ -2718,11 +2880,11 @@ function setupNetworkMonitoring() {
     }
   };
 
-  // Start periodic network check (every 10 seconds)
-  networkCheckInterval = setInterval(checkNetworkAndReload, 10000);
+  // Start periodic network check (every 30 seconds — event-driven online/offline handles fast transitions)
+  networkCheckInterval = setInterval(checkNetworkAndReload, 30000);
 
-  // Start periodic whitescreen check (every 30 seconds, less aggressive)
-  whitescreenCheckInterval = setInterval(checkAndRecoverWhitescreen, 30000);
+  // Start periodic whitescreen check (every 60 seconds — only checks app pages)
+  whitescreenCheckInterval = setInterval(checkAndRecoverWhitescreen, 60000);
 
   // Handle system suspend (sleep)
   powerMonitor.on('suspend', function () {
@@ -2744,7 +2906,7 @@ function setupNetworkMonitoring() {
         // Restart screenshot service if it died during sleep
         if (isAuthenticated && userData && userData.role !== 'admin') {
           if (!screenshotService.isCapturing) {
-            logger.log('info', 'Main', 'Restarting screenshot capture after system resume');
+            logger.log('debug', 'Main', 'Restarting screenshot capture after system resume');
             screenshotService.start();
           }
         }
@@ -2790,12 +2952,12 @@ function setupNetworkMonitoring() {
 
   // Handle lock screen (user locked their screen)
   powerMonitor.on('lock-screen', function () {
-    logger.log('info', 'Main', 'Screen locked');
+    logger.log('debug', 'Main', 'Screen locked');
   });
 
   // Handle unlock screen
   powerMonitor.on('unlock-screen', function () {
-    logger.log('info', 'Main', 'Screen unlocked');
+    logger.log('debug', 'Main', 'Screen unlocked');
 
     // Brief check after unlock - sometimes pages get stuck
     setTimeout(async function () {
@@ -2804,7 +2966,7 @@ function setupNetworkMonitoring() {
       // Restart screenshot service if it died during sleep/lock
       if (isAuthenticated && userData && userData.role !== 'admin') {
         if (!screenshotService.isCapturing) {
-          logger.log('info', 'Main', 'Restarting screenshot capture after unlock');
+          logger.log('debug', 'Main', 'Restarting screenshot capture after unlock');
           screenshotService.start();
         }
       }
@@ -2851,7 +3013,7 @@ function setupNetworkMonitoring() {
     });
   }
 
-  logger.log('info', 'Main', 'Network and power monitoring setup complete');
+  logger.log('debug', 'Main', 'Network and power monitoring setup complete');
 }
 
 // App lifecycle events
@@ -2974,6 +3136,12 @@ app.on('before-quit', function (event) {
   stopGuardian();
   screenshotService.stop();
   socketHandler.disconnect();
+  // Clean up monitoring intervals
+  if (networkCheckInterval) { clearInterval(networkCheckInterval); networkCheckInterval = null; }
+  if (whitescreenCheckInterval) { clearInterval(whitescreenCheckInterval); whitescreenCheckInterval = null; }
+  stopScreenPermissionWatcher();
+  // Flush remaining log buffer to disk
+  logger.shutdown();
   logger.log('info', 'Main', 'App quitting after ' + forceCloseAttempts + ' force-close attempts');
 });
 

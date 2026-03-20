@@ -1,7 +1,7 @@
 /**
- * Screenshot Service v5.0.5
+ * Screenshot Service v5.1.0
  * Handles automatic screen capture with ImageKit uploads
- * Uses IPC-bridged desktopCapturer (Electron 29+ compatibility)
+ * Uses main-process desktopCapturer via IPC (Electron 35+ compatibility)
  */
 
 const { screen } = require('electron');
@@ -31,6 +31,8 @@ class ScreenshotService {
     this.onPermissionError = null; // Callback for permission errors
     this.permissionErrorShown = false; // Only show once per session
     this.getDesktopSources = null; // IPC function to get desktop sources from renderer
+    this.checkPermission = null; // Function to check screen recording permission
+    this.consecutiveFailures = 0; // Track consecutive capture failures
   }
 
   initialize(config) {
@@ -51,8 +53,10 @@ class ScreenshotService {
     this.token = config.token;
     this.mainWindow = config.mainWindow;
     this.getDesktopSources = config.getDesktopSources || null;
+    this.checkPermission = config.checkPermission || null;
     this.onPermissionError = config.onPermissionError || null;
     this.permissionErrorShown = false;
+    this.consecutiveFailures = 0;
     
     // Initialize offline queue with upload function
     var self = this;
@@ -66,12 +70,32 @@ class ScreenshotService {
     logger.log('info', 'ScreenshotService', 'Initialized for user ' + this.userId + ' (role: ' + this.userRole + ')');
   }
 
-  // Show permission error notification (only once per session)
+  /**
+   * Reset permission error flag so the error dialog can be shown again.
+   * Called when screen recording permission is newly granted.
+   */
+  resetPermissionError() {
+    this.permissionErrorShown = false;
+    this.consecutiveFailures = 0;
+    logger.log('info', 'ScreenshotService', 'Permission error state reset — captures will retry');
+  }
+
+  // Show permission error notification (only once per session until reset)
   showPermissionError(message) {
     if (!this.permissionErrorShown && this.onPermissionError) {
       this.onPermissionError(message);
       this.permissionErrorShown = true;
     }
+  }
+
+  /**
+   * Check if screen recording permission is available before attempting capture.
+   * Returns true if capture should proceed, false if permission is missing.
+   */
+  hasScreenPermission() {
+    if (!this.checkPermission) return true; // No checker = assume OK
+    var status = this.checkPermission();
+    return status === 'granted';
   }
 
   shouldCapture() {
@@ -137,25 +161,34 @@ class ScreenshotService {
       logger.log('warn', 'ScreenshotService', 'Blocked capture attempt for admin');
       return null;
     }
+
+    // Pre-capture permission check (avoids unnecessary IPC calls when permission is missing)
+    if (!this.hasScreenPermission()) {
+      logger.log('warn', 'ScreenshotService', 'Screen recording permission not granted — skipping capture');
+      this.showPermissionError('Screen Recording permission is required. Please grant permission in System Preferences → Privacy & Security → Screen Recording.');
+      return { success: false, error: 'Screen recording permission not granted' };
+    }
     
     try {
-      logger.log('info', 'ScreenshotService', 'Capturing screen (' + captureType + ')');
+      logger.log('debug', 'ScreenshotService', 'Capturing screen (' + captureType + ')');
       
       if (!this.getDesktopSources) {
         throw new Error('Desktop sources function not available - window may not be loaded');
       }
 
-      // Get all screens via IPC (desktopCapturer runs in renderer in Electron 29+)
+      // Get all screens via main process desktopCapturer
       const sources = await this.getDesktopSources({
         types: ['screen'],
         thumbnailSize: this.getOptimalSize()
       });
       
       if (!sources || sources.length === 0) {
-        logger.log('error', 'ScreenshotService', 'No screen sources available - check Screen Recording permission in System Preferences');
-        // Notify user about permission issue
-        this.showPermissionError('Screen Recording permission may be required. Please check System Preferences → Privacy & Security → Screen Recording');
-        throw new Error('No screen sources available - Screen Recording permission may not be granted');
+        this.consecutiveFailures++;
+        logger.log('error', 'ScreenshotService', 'No screen sources available (failure #' + this.consecutiveFailures + ')');
+        this.showPermissionError(process.platform === 'darwin'
+          ? 'Screen Recording permission may be required. Please check System Preferences → Privacy & Security → Screen Recording.'
+          : 'Screen capture is not working. Please check your security software or try running Talio as Administrator.');
+        throw new Error('No screen sources available');
       }
       
       // Get primary display
@@ -166,8 +199,11 @@ class ScreenshotService {
       
       // Check if thumbnail is empty (permission denied often results in blank thumbnail)
       if (primarySource.isEmpty) {
-        logger.log('error', 'ScreenshotService', 'Screenshot is empty - Screen Recording permission likely not granted');
-        this.showPermissionError('Screenshots are blank. Please grant Screen Recording permission in System Preferences');
+        this.consecutiveFailures++;
+        logger.log('error', 'ScreenshotService', 'Screenshot is empty (failure #' + this.consecutiveFailures + ')');
+        this.showPermissionError(process.platform === 'darwin'
+          ? 'Screenshots are blank. Please grant Screen Recording permission in System Preferences → Privacy & Security → Screen Recording.'
+          : 'Screenshots are blank. Please check your security software or try running Talio as Administrator.');
         throw new Error('Screenshot is empty - Screen Recording permission not granted');
       }
       
@@ -176,12 +212,15 @@ class ScreenshotService {
       
       // Additional check for buffer size (very small = likely failed capture)
       if (buffer.length < 1000) {
-        logger.log('error', 'ScreenshotService', 'Screenshot buffer too small (' + buffer.length + ' bytes) - capture likely failed');
+        this.consecutiveFailures++;
+        logger.log('error', 'ScreenshotService', 'Screenshot buffer too small (' + buffer.length + ' bytes, failure #' + this.consecutiveFailures + ')');
         throw new Error('Screenshot capture failed - buffer too small');
       }
       
-      logger.log('info', 'ScreenshotService', 'Screenshot captured successfully (' + buffer.length + ' bytes)');
+      logger.log('debug', 'ScreenshotService', 'Screenshot captured successfully (' + buffer.length + ' bytes)');
       
+      // Reset failure counter on success
+      this.consecutiveFailures = 0;
       this.captureCount++;
       this.lastCaptureTime = new Date().toISOString();
       

@@ -1,5 +1,5 @@
 /**
- * Talio Desktop Guardian Process v5.0.4
+ * Talio Desktop Guardian Process v5.1.0
  * 
  * Lightweight background watchdog that monitors the main Electron process.
  * If the Electron app exits (force-quit, crash, kill -9, Task Manager), 

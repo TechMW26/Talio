@@ -1,5 +1,5 @@
 /**
- * Preload Script v5.0.4
+ * Preload Script v5.1.0
  * Exposes secure IPC channels to the renderer process
  * With enhanced screen sharing support for Windows multi-display
  */
@@ -125,6 +125,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   testNotification: function() {
     return ipcRenderer.invoke('test-notification');
+  },
+
+  // Screen recording & permission management
+  checkScreenPermission: function() {
+    return ipcRenderer.invoke('check-screen-permission');
+  },
+
+  requestScreenPermission: function() {
+    return ipcRenderer.invoke('request-screen-permission');
+  },
+
+  getAllPermissions: function() {
+    return ipcRenderer.invoke('get-all-permissions');
   },
 
   // Event listeners

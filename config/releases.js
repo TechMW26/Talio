@@ -6,7 +6,7 @@
  */
 
 const RELEASE_CONFIG = {
-  version: '3.1.0',
+  version: '5.1.0',
   github: {
     owner: 'avirajsharma-ops',
     repo: 'Talio'
@@ -14,26 +14,21 @@ const RELEASE_CONFIG = {
   downloads: {
     mac: {
       arm64: {
-        filename: 'Talio-3.1.0-arm64.dmg',
-        size: '~87 MB',
+        filename: 'Talio-5.1.0-arm64.dmg',
+        size: '~105 MB',
         label: 'Apple Silicon (M1/M2/M3/M4)'
       },
       x64: {
-        filename: 'Talio-3.1.0.dmg',
-        size: '~91 MB',
+        filename: 'Talio-5.1.0-x64.dmg',
+        size: '~111 MB',
         label: 'Intel (x64)'
       }
     },
     windows: {
       x64: {
-        filename: 'Talio Setup 3.1.0.exe',
-        size: '~154 MB',
-        label: 'Windows (32-bit & 64-bit)'
-      },
-      ia32: {
-        filename: 'Talio Setup 3.1.0.exe',
-        size: '~154 MB',
-        label: 'Windows (32-bit & 64-bit)'
+        filename: 'Talio.Setup.5.1.0.exe',
+        size: '~84 MB',
+        label: 'Windows (64-bit)'
       }
     }
   }
