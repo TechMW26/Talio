@@ -33,6 +33,7 @@ class ScreenshotService {
     this.getDesktopSources = null; // IPC function to get desktop sources from renderer
     this.checkPermission = null; // Function to check screen recording permission
     this.consecutiveFailures = 0; // Track consecutive capture failures
+    this.lastStartTime = 0; // Debounce start() calls
   }
 
   initialize(config) {
@@ -112,6 +113,13 @@ class ScreenshotService {
       logger.log('info', 'ScreenshotService', 'Capture not allowed for this user');
       return false;
     }
+
+    // Debounce: if already capturing and start was called recently (within 30s), skip
+    var now = Date.now();
+    if (this.isCapturing && this.captureTimer && (now - this.lastStartTime) < 30000) {
+      logger.log('debug', 'ScreenshotService', 'start() debounced — already capturing (started ' + Math.round((now - this.lastStartTime) / 1000) + 's ago)');
+      return true;
+    }
     
     if (this.isCapturing) {
       logger.log('warn', 'ScreenshotService', 'Already capturing — stopping old session and restarting');
@@ -119,6 +127,7 @@ class ScreenshotService {
     }
     
     this.isCapturing = true;
+    this.lastStartTime = now;
     
     // Take first screenshot immediately
     this.captureScreen('session_start');

@@ -465,6 +465,14 @@ function createWindow() {
     const now = Date.now();
     logger.log('error', 'Main', 'Render process gone: ' + details.reason + ' (exitCode: ' + details.exitCode + ')');
 
+    // If an update download was in progress in main process, mark it as failed
+    // so it can be retried after window recreation
+    var wasDownloading = isDownloadingUpdate;
+    if (isDownloadingUpdate) {
+      logger.log('warn', 'Main', 'Renderer crashed during update download — will retry after recovery');
+      isDownloadingUpdate = false;
+    }
+
     // Cancel any pending load
     clearTimeout(loaderTimer);
     clearTimeout(loadTimeout);
@@ -671,6 +679,10 @@ function loadApp() {
     logger.log('info', 'Main', 'loadApp debounced - already ' + (isLoadingApp ? 'loading' : 'navigating'));
     return;
   }
+  if (isDownloadingUpdate) {
+    logger.log('info', 'Main', 'loadApp skipped — update download in progress');
+    return;
+  }
   isLoadingApp = true;
   isNavigating = true;
   clearTimeout(navigationSafetyTimer);
@@ -767,6 +779,10 @@ function handleLoadError(error) {
  */
 function showOfflinePage(errorType, errorCode, errorDesc) {
   if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (isDownloadingUpdate) {
+    logger.log('info', 'Main', 'showOfflinePage skipped — update download in progress');
+    return;
+  }
 
   // Stop any in-progress navigation to prevent concurrent loads
   try { mainWindow.webContents.stop(); } catch (e) { /* ignore */ }
@@ -880,6 +896,10 @@ function setupWindowEvents() {
       // If another navigation or loadApp is handling this, skip to avoid double-navigation
       if (isLoadingApp || isNavigating) {
         logger.log('info', 'Main', 'did-fail-load while ' + (isLoadingApp ? 'loadApp' : 'navigation') + ' active — skipping');
+        return;
+      }
+      if (isDownloadingUpdate) {
+        logger.log('info', 'Main', 'did-fail-load skipped — update download in progress');
         return;
       }
       logger.log('error', 'Main', 'Page failed to load: ' + errorDescription + ' (' + errorCode + ') - ' + validatedURL);
@@ -1650,7 +1670,14 @@ function setupIPCHandlers() {
   });
 
   // ── Update IPC ──────────────────────────────────────────────────────
+  var _updateCheckInProgress = false;
   ipcMain.handle('check-for-update', async function (event, options) {
+    // Prevent duplicate concurrent calls
+    if (_updateCheckInProgress) {
+      logger.log('info', 'Updater', 'Update check already in progress — skipping duplicate');
+      return { success: false, error: 'Check already in progress' };
+    }
+    _updateCheckInProgress = true;
     logger.log('info', 'Updater', 'Manual update check requested');
     sendUpdateStatus('checking');
     try {
@@ -1672,6 +1699,8 @@ function setupIPCHandlers() {
       logger.log('warn', 'Updater', 'Version check failed: ' + err.message);
       sendUpdateStatus('error', { message: err.message });
       return { success: false, error: err.message };
+    } finally {
+      _updateCheckInProgress = false;
     }
   });
 
@@ -1692,7 +1721,8 @@ function setupIPCHandlers() {
       return { success: false, error: 'No update version to retry' };
     }
     isDownloadingUpdate = false;
-    await performUpdateDownload(currentUpdateVersion);
+    // Re-show the update screen and start download
+    showUpdateScreenAndDownload(currentUpdateVersion, false);
     return { success: true };
   });
 }
@@ -1859,21 +1889,6 @@ function updateTrayMenu() {
 
   if (isAuthenticated && userData) {
     menuItems.push({ label: 'Logged in as: ' + (userData.email || 'Unknown'), enabled: false });
-
-    if (userData.role !== 'admin') {
-      var status = screenshotService.getStatus();
-      menuItems.push({
-        label: status.isCapturing ? 'Pause Capture' : 'Resume Capture',
-        click: function () {
-          if (status.isCapturing) {
-            screenshotService.stop();
-          } else {
-            screenshotService.start();
-          }
-          updateTrayMenu();
-        }
-      });
-    }
 
     menuItems.push({ type: 'separator' });
   }
@@ -2105,6 +2120,9 @@ async function showUpdateScreenAndDownload(latestVersion, isForced) {
 
   mainWindow.show();
   mainWindow.focus();
+
+  // Brief delay to ensure update.html script has initialized its message listener
+  await new Promise(function (resolve) { setTimeout(resolve, 300); });
 
   // Send version info to the page
   var current = app.getVersion();
@@ -2700,6 +2718,10 @@ function scheduleReload(delayMs) {
     logger.log('info', 'Main', 'scheduleReload skipped — navigation in progress');
     return;
   }
+  if (isDownloadingUpdate) {
+    logger.log('info', 'Main', 'scheduleReload skipped — update download in progress');
+    return;
+  }
 
   const now = Date.now();
 
@@ -2852,7 +2874,7 @@ function setupNetworkMonitoring() {
         const isOnline = await checkPromise;
 
         // Re-check guards after awaiting — state may have changed
-        if (isOnline && isOnOfflinePage && !isNavigating && !isLoadingApp) {
+        if (isOnline && isOnOfflinePage && !isNavigating && !isLoadingApp && !isDownloadingUpdate) {
           logger.log('info', 'Main', 'Network restored, reloading app...');
           loadRetries = 0;
           loadApp();
@@ -2866,6 +2888,7 @@ function setupNetworkMonitoring() {
   // Check for whitescreen and recover
   const checkAndRecoverWhitescreen = async function () {
     if (!mainWindow || mainWindow.isDestroyed()) return;
+    if (isDownloadingUpdate) return; // Don't interfere with update screen
 
     const currentUrl = mainWindow.webContents.getURL();
 
