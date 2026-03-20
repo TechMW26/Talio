@@ -316,17 +316,86 @@ export function ThemeProvider({ children }) {
   }
 
   // Set dark mode preference: 'auto' | 'light' | 'dark'
-  const setDarkModePreference = (pref) => {
-    setDarkModePref(pref)
-    const resolved = resolveDarkMode(pref)
-    setIsDarkMode(resolved)
-    applyTheme(currentTheme, resolved)
-    try {
-      localStorage.setItem('app-dark-mode-pref', pref)
-      // Keep legacy key in sync for flash-prevention script
-      localStorage.setItem('app-dark-mode', String(resolved))
-    } catch (err) {
-      console.warn('[ThemeProvider] Failed to save dark mode:', err)
+  // Pass a MouseEvent as second arg to trigger the wave transition
+  const setDarkModePreference = (pref, event) => {
+    const applyChange = () => {
+      setDarkModePref(pref)
+      const resolved = resolveDarkMode(pref)
+      setIsDarkMode(resolved)
+      applyTheme(currentTheme, resolved)
+      try {
+        localStorage.setItem('app-dark-mode-pref', pref)
+        // Keep legacy key in sync for flash-prevention script
+        localStorage.setItem('app-dark-mode', String(resolved))
+      } catch (err) {
+        console.warn('[ThemeProvider] Failed to save dark mode:', err)
+      }
+    }
+
+    // Wave transition using View Transitions API
+    // Circle expands from the toggle to reveal the new theme
+    if (event && typeof document !== 'undefined' && document.startViewTransition) {
+      // Use the center of the toggle button, not raw click coords
+      const toggle = event.currentTarget
+      const rect = toggle.getBoundingClientRect()
+      const x = Math.round(rect.left + rect.width / 2)
+      const y = Math.round(rect.top + rect.height / 2)
+      const maxX = Math.max(x, window.innerWidth - x)
+      const maxY = Math.max(y, window.innerHeight - y)
+      const radius = Math.ceil(Math.hypot(maxX, maxY))
+
+      // 1. Set clip-path origin as CSS vars so the CSS rule
+      //    pre-clips ::view-transition-new(root) at circle(0px) from frame 0
+      const root = document.documentElement
+      root.style.setProperty('--vt-x', `${x}px`)
+      root.style.setProperty('--vt-y', `${y}px`)
+
+      // 2. Kill CSS transitions + force fixed elements out of
+      //    separate GPU compositing layers (the root cause of the sidebar flicker)
+      root.classList.add('theme-switching')
+
+      // 3. Force style recalc so CSS vars + classes are applied
+      //    BEFORE startViewTransition captures the old snapshot
+      getComputedStyle(root).getPropertyValue('--vt-x')
+
+      const transition = document.startViewTransition(() => {
+        applyChange()
+      })
+
+      // 4. Expand circle from toggle center on BOTH root and sidebar snapshots
+      transition.ready.then(() => {
+        const keyframes = {
+          clipPath: [
+            `circle(0px at ${x}px ${y}px)`,
+            `circle(${radius}px at ${x}px ${y}px)`,
+          ],
+        }
+        const timing = {
+          duration: 500,
+          easing: 'ease-in-out',
+          fill: 'forwards',
+        }
+        // Animate the root (everything except sidebar)
+        root.animate(keyframes, { ...timing, pseudoElement: '::view-transition-new(root)' })
+        // Animate the sidebar snapshot with the same circle
+        // (may not exist if sidebar is not rendered, e.g. mobile)
+        try {
+          root.animate(keyframes, { ...timing, pseudoElement: '::view-transition-new(sidebar)' })
+        } catch (_) { /* sidebar not in DOM */ }
+      })
+
+      // 5. Clean up after transition finishes
+      transition.finished.then(() => {
+        root.classList.remove('theme-switching')
+        root.style.removeProperty('--vt-x')
+        root.style.removeProperty('--vt-y')
+      }).catch(() => {
+        root.classList.remove('theme-switching')
+        root.style.removeProperty('--vt-x')
+        root.style.removeProperty('--vt-y')
+      })
+    } else {
+      applyChange()
     }
   }
 

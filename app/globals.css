@@ -1890,3 +1890,38 @@ textarea::placeholder {
   0% { left: -100%; }
   100% { left: 200%; }
 }
+
+/* ── Theme wave transition (View Transitions API) ── */
+
+/* Disable default crossfade — JS drives the clip-path animation */
+::view-transition-old(root),
+::view-transition-new(root),
+::view-transition-old(sidebar),
+::view-transition-new(sidebar) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+/* Pre-clip new snapshots at 0px from frame 0.
+   JS vars --vt-x/--vt-y are set BEFORE startViewTransition so
+   the CSS is already computed when the pseudo-elements appear.
+   This prevents the 1-frame flash of the full new snapshot. */
+::view-transition-new(root),
+::view-transition-new(sidebar) {
+  clip-path: circle(0px at var(--vt-x, 50%) var(--vt-y, 50%));
+}
+
+/* During theme switch:
+   - Kill all CSS transitions so elements don't animate independently
+   - Give the sidebar its own view-transition-name so the VT API
+     captures it as a separate snapshot instead of it being a rogue
+     GPU compositing layer that paints above the VT overlay */
+html.theme-switching,
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  transition: none !important;
+}
+html.theme-switching [data-vt-sidebar] {
+  view-transition-name: sidebar;
+}

@@ -195,6 +195,7 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
     <>
       {/* Icon Strip - Always visible on desktop */}
       <aside
+        data-vt-sidebar
         className="hidden lg:flex fixed inset-y-0 left-0 z-[8] flex-col h-screen w-[4.5rem] shadow-[0_4px_16px_rgba(15,23,42,0.08)]"
         style={{
           backgroundColor: 'var(--color-bg-sidebar)'

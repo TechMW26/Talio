@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Skeleton } from '@heroui/react'
 import { useFocusTimer } from '@/contexts/FocusTimerContext'
 import { useTicTacToe } from '@/contexts/TicTacToeContext'
+import { useTheme } from '@/contexts/ThemeContext'
 import {
   HiOutlineSparkles,
   HiOutlineClock,
@@ -130,11 +131,11 @@ function TicTacToeCard() {
 
   // ── Idle state ──
   return (
-    <div className="rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/20 flex flex-col min-h-[140px] relative overflow-hidden">
+    <div className="rounded-2xl bg-white dark:bg-slate-800/60 border border-gray-100 dark:border-slate-700/50 shadow-sm flex flex-col min-h-[140px] relative overflow-hidden">
       {hasIncomingInvite && (
         <span className="absolute top-3 right-3 w-3 h-3 rounded-full bg-amber-400 animate-pulse" />
       )}
-      <div className="px-5 pt-4 pb-2 flex items-center gap-2 text-white/70 text-xs font-medium">
+      <div className="px-5 pt-4 pb-2 flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400">
         <HiOutlineTrophy className="w-4 h-4" />
         <span>Tic-Tac-Toe</span>
       </div>
@@ -144,22 +145,22 @@ function TicTacToeCard() {
         <div className="px-5 flex-1 overflow-hidden">
           {/* W/L/D summary */}
           <div className="flex items-center gap-3 mb-1.5">
-            <span className="text-[11px] font-semibold text-emerald-300">
+            <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
               {history.filter(g => g.outcome === 'win').length}W
             </span>
-            <span className="text-[11px] font-semibold text-red-300">
+            <span className="text-[11px] font-semibold text-red-500 dark:text-red-400">
               {history.filter(g => g.outcome === 'loss').length}L
             </span>
-            <span className="text-[11px] font-semibold text-white/60">
+            <span className="text-[11px] font-semibold text-gray-400 dark:text-gray-500">
               {history.filter(g => g.outcome === 'draw').length}D
             </span>
           </div>
           <div className="space-y-1">
             {history.slice(0, 3).map((g, i) => (
               <div key={i} className="flex items-center justify-between text-[11px]">
-                <span className="text-white/80 truncate max-w-[120px]">vs {g.opponentName || 'Unknown'}</span>
+                <span className="text-gray-600 dark:text-gray-300 truncate max-w-[120px]">vs {g.opponentName || 'Unknown'}</span>
                 <span className={`font-semibold ${
-                  g.outcome === 'win' ? 'text-emerald-300' : g.outcome === 'loss' ? 'text-red-300' : 'text-white/60'
+                  g.outcome === 'win' ? 'text-emerald-600 dark:text-emerald-400' : g.outcome === 'loss' ? 'text-red-500 dark:text-red-400' : 'text-gray-400 dark:text-gray-500'
                 }`}>
                   {g.outcome === 'win' ? '🏆 Won' : g.outcome === 'loss' ? '😔 Lost' : '🤝 Draw'}
                 </span>
@@ -169,14 +170,14 @@ function TicTacToeCard() {
         </div>
       ) : (
         <div className="px-5 flex-1 flex items-center">
-          <p className="text-sm text-white/80">Challenge a teammate!</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">Challenge a teammate!</p>
         </div>
       )}
 
       <div className="px-5 pb-4 pt-2">
         <button
           onClick={() => setPhase('searching')}
-          className="w-full py-2 rounded-xl bg-white/20 hover:bg-white/30 text-sm font-semibold transition-colors flex items-center justify-center gap-2"
+          className="w-full py-2 rounded-xl bg-indigo-50 dark:bg-indigo-900/20 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 text-sm font-semibold transition-colors flex items-center justify-center gap-2"
         >
           <HiOutlineUserPlus className="w-4 h-4" /> Invite to Play
         </button>
@@ -187,6 +188,7 @@ function TicTacToeCard() {
 
 // ─── Location Map Card ───
 function LocationMapCard() {
+  const { isDarkMode } = useTheme()
   const [coords, setCoords] = useState(null)
   const [location, setLocation] = useState(null)
   const [error, setError] = useState(false)
@@ -240,7 +242,13 @@ function LocationMapCard() {
             title="Your location"
             width="100%"
             height="100%"
-            style={{ border: 0, minHeight: 100 }}
+            style={{
+              border: 0,
+              minHeight: 100,
+              ...(isDarkMode && {
+                filter: 'invert(1) hue-rotate(180deg) contrast(0.9) brightness(0.8)',
+              }),
+            }}
             loading="lazy"
             referrerPolicy="no-referrer"
             src={`https://www.openstreetmap.org/export/embed.html?bbox=${coords.lon - 0.01},${coords.lat - 0.01},${coords.lon + 0.01},${coords.lat + 0.01}&layer=mapnik&marker=${coords.lat},${coords.lon}`}

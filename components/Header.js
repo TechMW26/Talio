@@ -395,7 +395,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
 
           {/* Theme Toggle - Sun/Moon pill */}
           <button
-            onClick={() => setDarkModePreference(isDarkMode ? 'light' : 'dark')}
+            onClick={(e) => setDarkModePreference(isDarkMode ? 'light' : 'dark', e)}
             className={`hidden md:flex items-center w-[52px] h-7 rounded-full p-[3px] transition-colors duration-400 relative cursor-pointer ${isDarkMode ? 'bg-slate-700' : 'bg-amber-100'}`}
             aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
           >

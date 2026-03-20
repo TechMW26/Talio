@@ -362,8 +362,8 @@ export function TicTacToeProvider({ children }) {
             {/* Header */}
             <div className="flex items-center justify-between px-8 pt-6 pb-4">
               <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
-                  <HiOutlineTrophy className="w-5 h-5 text-white" />
+                <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
+                  <HiOutlineTrophy className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-gray-900 dark:text-white">Tic-Tac-Toe</h3>
@@ -401,7 +401,7 @@ export function TicTacToeProvider({ children }) {
                     </button>
                     <button
                       onClick={acceptInvite}
-                      className="flex-1 py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-sm font-semibold text-white hover:opacity-90 transition-opacity shadow-lg shadow-indigo-500/30"
+                      className="flex-1 py-3 rounded-xl bg-indigo-500 dark:bg-indigo-600 text-sm font-semibold text-white hover:bg-indigo-600 dark:hover:bg-indigo-700 transition-colors shadow-sm"
                     >
                       Accept & Play
                     </button>
@@ -412,7 +412,7 @@ export function TicTacToeProvider({ children }) {
               {/* ── Waiting for opponent ── */}
               {phase === 'waiting' && (
                 <div className="text-center py-10">
-                  <div className="w-12 h-12 mx-auto mb-5 border-3 border-indigo-200 border-t-indigo-500 rounded-full animate-spin" />
+                  <div className="w-12 h-12 mx-auto mb-5 border-3 border-indigo-100 dark:border-indigo-900/30 border-t-indigo-500 dark:border-t-indigo-400 rounded-full animate-spin" />
                   <p className="text-sm font-semibold text-gray-700 dark:text-gray-300">
                     Waiting for {opponent?.name}...
                   </p>
@@ -505,7 +505,7 @@ export function TicTacToeProvider({ children }) {
                           setPhase('waiting')
                           sendAction('invite', opponent.userId, { gameId: newGameId })
                         }}
-                        className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-sm font-semibold text-white hover:opacity-90 transition-opacity shadow-lg shadow-indigo-500/30"
+                        className="flex-1 py-2.5 rounded-xl bg-indigo-500 dark:bg-indigo-600 text-sm font-semibold text-white hover:bg-indigo-600 dark:hover:bg-indigo-700 transition-colors shadow-sm"
                       >
                         Rematch
                       </button>
