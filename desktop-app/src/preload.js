@@ -4,7 +4,7 @@
  * With enhanced screen sharing support for Windows multi-display
  */
 
-const { contextBridge, ipcRenderer, desktopCapturer } = require('electron');
+const { contextBridge, ipcRenderer } = require('electron');
 
 // Expose protected methods to the renderer
 contextBridge.exposeInMainWorld('electronAPI', {
@@ -50,46 +50,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   
   // Desktop capture for screen sharing (used by meetings)
-  // Returns all available screens and windows with display info
+  // Routes through main process IPC since desktopCapturer is main-process-only in Electron 35+
   getDesktopSources: async function(options) {
     try {
-      const sources = await desktopCapturer.getSources(options || {
-        types: ['window', 'screen'],
-        thumbnailSize: { width: 320, height: 180 },
-        fetchWindowIcons: true
-      });
-      return sources.map(function(source) {
-        return {
-          id: source.id,
-          name: source.name,
-          thumbnail: source.thumbnail.toDataURL(),
-          appIcon: source.appIcon ? source.appIcon.toDataURL() : null,
-          display_id: source.display_id
-        };
-      });
+      return await ipcRenderer.invoke('get-desktop-sources', options);
     } catch (error) {
       console.error('[Preload] Error getting desktop sources:', error);
       return [];
     }
   },
   
-  // Get desktop sources with JPEG buffer data for screenshot service (main process capture)
-  // Returns base64-encoded JPEG thumbnails for efficient IPC transfer
+  // Get desktop sources with JPEG buffer data for screenshot service
+  // Routes through main process IPC since desktopCapturer is main-process-only in Electron 35+
   getDesktopSourcesForCapture: async function(options) {
     try {
-      const sources = await desktopCapturer.getSources(options || {
-        types: ['screen'],
-        thumbnailSize: { width: 1920, height: 1080 }
-      });
-      return sources.map(function(source) {
-        return {
-          id: source.id,
-          name: source.name,
-          display_id: source.display_id,
-          thumbnailJPEG: source.thumbnail.toJPEG(80).toString('base64'),
-          isEmpty: source.thumbnail.isEmpty()
-        };
-      });
+      return await ipcRenderer.invoke('get-desktop-sources-for-capture', options);
     } catch (error) {
       console.error('[Preload] Error getting desktop sources for capture:', error);
       return [];

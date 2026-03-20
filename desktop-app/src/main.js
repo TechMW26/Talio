@@ -7,7 +7,7 @@
  * Force-persistent mode: app cannot be closed by users, auto-restarts if killed
  */
 
-const { app, BrowserWindow, ipcMain, Tray, Menu, Notification, shell, nativeImage, session, systemPreferences, dialog, screen, powerMonitor } = require('electron');
+const { app, BrowserWindow, ipcMain, Tray, Menu, Notification, shell, nativeImage, session, systemPreferences, dialog, screen, powerMonitor, desktopCapturer } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const https = require('https');
@@ -84,30 +84,46 @@ let currentUpdateVersion = null; // Version being downloaded
 const store = new Store({ name: 'app-data' });
 
 /**
- * Get desktop sources via the renderer's desktopCapturer (required for Electron 29+).
- * In Electron 29+, desktopCapturer is only available in renderer/preload processes.
- * This helper calls the preload-exposed getDesktopSources through executeJavaScript.
+ * Get desktop sources directly from main process desktopCapturer.
+ * In Electron 35+, desktopCapturer is only available in the main process.
+ * Returns dataURL thumbnails for screen sharing UI.
  */
 async function getDesktopSources(options) {
-  if (!mainWindow || mainWindow.isDestroyed()) {
-    throw new Error('Main window not available for desktop capture');
-  }
-  return await mainWindow.webContents.executeJavaScript(
-    'window.electronAPI.getDesktopSources(' + JSON.stringify(options) + ')'
-  );
+  const sources = await desktopCapturer.getSources(options || {
+    types: ['window', 'screen'],
+    thumbnailSize: { width: 320, height: 180 },
+    fetchWindowIcons: true
+  });
+  return sources.map(function(source) {
+    return {
+      id: source.id,
+      name: source.name,
+      thumbnail: source.thumbnail.toDataURL(),
+      appIcon: source.appIcon ? source.appIcon.toDataURL() : null,
+      display_id: source.display_id
+    };
+  });
 }
 
 /**
  * Get desktop sources with JPEG buffer data for screenshot service.
- * Returns base64-encoded JPEG thumbnails instead of dataURLs.
+ * Calls desktopCapturer.getSources() directly in the main process.
+ * Returns base64-encoded JPEG thumbnails for efficient transfer.
  */
 async function getDesktopSourcesWithJPEG(options) {
-  if (!mainWindow || mainWindow.isDestroyed()) {
-    throw new Error('Main window not available for desktop capture');
-  }
-  return await mainWindow.webContents.executeJavaScript(
-    'window.electronAPI.getDesktopSourcesForCapture(' + JSON.stringify(options) + ')'
-  );
+  const sources = await desktopCapturer.getSources(options || {
+    types: ['screen'],
+    thumbnailSize: { width: 1920, height: 1080 }
+  });
+  return sources.map(function(source) {
+    return {
+      id: source.id,
+      name: source.name,
+      display_id: source.display_id,
+      thumbnailJPEG: source.thumbnail.toJPEG(80).toString('base64'),
+      isEmpty: source.thumbnail.isEmpty()
+    };
+  });
 }
 
 // Auto-launch configuration
@@ -1352,12 +1368,32 @@ function setupIPCHandlers() {
     });
   });
 
+  // Get desktop sources via main process desktopCapturer (for renderer IPC)
+  ipcMain.handle('get-desktop-sources', async function (event, options) {
+    try {
+      return await getDesktopSources(options);
+    } catch (error) {
+      logger.log('error', 'Main', 'IPC get-desktop-sources failed: ' + error.message);
+      return [];
+    }
+  });
+
+  // Get desktop sources with JPEG data via main process desktopCapturer (for renderer IPC)
+  ipcMain.handle('get-desktop-sources-for-capture', async function (event, options) {
+    try {
+      return await getDesktopSourcesWithJPEG(options);
+    } catch (error) {
+      logger.log('error', 'Main', 'IPC get-desktop-sources-for-capture failed: ' + error.message);
+      return [];
+    }
+  });
+
   // Request screen share with source picker (Windows compatibility)
   ipcMain.handle('request-screen-share', async function () {
     try {
       logger.log('info', 'Main', 'Screen share requested');
 
-      // Get all available sources via renderer IPC (desktopCapturer removed from main in Electron 29+)
+      // Get all available sources via main process desktopCapturer
       const sources = await getDesktopSources({
         types: ['screen', 'window'],
         thumbnailSize: { width: 320, height: 180 },
