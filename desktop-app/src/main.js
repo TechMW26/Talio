@@ -1,5 +1,5 @@
 /**
- * Talio Desktop App v5.1.0
+ * Talio Desktop App v5.2.0
  * Main Electron process
  * 
  * Performance optimized for smooth rendering
@@ -52,7 +52,7 @@ if (forceDisableGPU) {
 }
 
 // PERFORMANCE: Reduce IPC serialisation overhead
-app.commandLine.appendSwitch('js-flags', '--max-old-space-size=256');
+app.commandLine.appendSwitch('js-flags', '--max-old-space-size=512');
 // Disable background timer throttling — keeps intervals accurate when window is hidden
 app.commandLine.appendSwitch('disable-background-timer-throttling');
 // Disable renderer backgrounding to keep the UI responsive when minimised
@@ -453,10 +453,10 @@ function createWindow() {
     }
   });
 
-  // Log renderer console messages for debugging
+  // Log renderer console errors for debugging (skip warnings to reduce overhead)
   mainWindow.webContents.on('console-message', function (event, level, message, line, sourceId) {
-    if (level >= 2) { // warnings and errors
-      logger.log('warn', 'Renderer', message);
+    if (level >= 3) { // errors only
+      logger.log('error', 'Renderer', message);
     }
   });
 
@@ -1804,11 +1804,10 @@ function handleAuthentication(data) {
 
   socketHandler.on('forceRefresh', function () {
     if (mainWindow && !mainWindow.isDestroyed()) {
-      logger.log('info', 'Main', 'Force refresh - reloading app');
+      logger.log('info', 'Main', 'Force refresh - soft reload');
       setTimeout(function () {
-        loadRetries = 0;
-        loadApp();
-      }, 2000);
+        try { mainWindow.webContents.reload(); } catch (e) { /* ignore */ }
+      }, 1000);
     }
   });
 
@@ -1996,7 +1995,7 @@ function sendUpdatePageMessage(data) {
 function getUpdateAssetName(version) {
   if (process.platform === 'darwin') {
     var arch = process.arch === 'x64' ? 'x64' : 'arm64';
-    return 'Talio-' + version + '-' + arch + '.dmg';
+    return 'Talio-' + version + '-' + arch + '.zip';
   } else if (process.platform === 'win32') {
     return 'Talio.Setup.' + version + '.exe';
   }
@@ -2183,18 +2182,60 @@ async function performUpdateDownload(latestVersion) {
 
     // Install the update
     sendUpdatePageMessage({ type: 'update-installing' });
-    logger.log('info', 'Updater', 'Opening installer: ' + destPath);
+    logger.log('info', 'Updater', 'Installing update: ' + destPath);
 
     if (process.platform === 'darwin') {
-      // macOS: Open the DMG file — user mounts and drags to Applications
-      await shell.openPath(destPath);
-      // Show completion — the user will handle the DMG themselves
+      // macOS: Extract ZIP, replace app, and relaunch automatically
+      var appPath = app.getPath('exe'); // e.g. /Applications/Talio.app/Contents/MacOS/Talio
+      var appBundlePath = path.resolve(appPath, '..', '..', '..'); // /Applications/Talio.app
+      var extractDir = path.join(app.getPath('temp'), 'talio-update-extract');
+
+      logger.log('info', 'Updater', 'Current app bundle: ' + appBundlePath);
+      logger.log('info', 'Updater', 'Extracting to: ' + extractDir);
+
+      // Clean extract directory
+      try { fs.rmSync(extractDir, { recursive: true, force: true }); } catch (e) { /* ok */ }
+      fs.mkdirSync(extractDir, { recursive: true });
+
+      // Extract ZIP
+      await new Promise(function (resolve, reject) {
+        var unzip = spawn('/usr/bin/ditto', ['-xk', destPath, extractDir]);
+        unzip.on('close', function (code) {
+          if (code === 0) resolve();
+          else reject(new Error('ditto extract failed with code ' + code));
+        });
+        unzip.on('error', reject);
+      });
+
+      // Find the .app in the extracted directory
+      var extracted = fs.readdirSync(extractDir);
+      var newApp = extracted.find(function (f) { return f.endsWith('.app'); });
+      if (!newApp) {
+        throw new Error('No .app found in extracted ZIP');
+      }
+      var newAppPath = path.join(extractDir, newApp);
+      logger.log('info', 'Updater', 'Extracted app: ' + newAppPath);
+
       sendUpdatePageMessage({ type: 'update-complete' });
-      // Quit the running app after a short delay so the user can install the new version
+
+      // Create a shell script that waits for the app to exit, replaces it, and relaunches
+      var scriptPath = path.join(app.getPath('temp'), 'talio-update.sh');
+      var script = '#!/bin/bash\n' +
+        'sleep 2\n' +
+        'rm -rf "' + appBundlePath + '"\n' +
+        'cp -R "' + newAppPath + '" "' + appBundlePath + '"\n' +
+        'open "' + appBundlePath + '"\n' +
+        'rm -rf "' + extractDir + '"\n' +
+        'rm -f "' + scriptPath + '"\n';
+
+      fs.writeFileSync(scriptPath, script, { mode: 0o755 });
+      spawn('/bin/bash', [scriptPath], { detached: true, stdio: 'ignore' }).unref();
+
+      logger.log('info', 'Updater', 'Update script launched, quitting app for replacement...');
       setTimeout(function () {
         isQuitting = true;
         app.quit();
-      }, 3000);
+      }, 1000);
     } else if (process.platform === 'win32') {
       // Windows: Launch the installer silently and quit
       spawn(destPath, ['/S'], { detached: true, stdio: 'ignore' }).unref();
@@ -2703,6 +2744,31 @@ function setupSessionPermissions() {
     }
   });
 
+  // PERFORMANCE: Override cache headers for app pages to enable stale-while-revalidate.
+  // Next.js sends no-cache on dashboard pages, which forces a full network round-trip
+  // before showing anything. By adding stale-while-revalidate, Chromium shows the
+  // cached page instantly while revalidating in the background.
+  session.defaultSession.webRequest.onHeadersReceived(
+    { urls: ['https://app.talio.in/*'] },
+    function (details, callback) {
+      var headers = details.responseHeaders;
+      if (!headers) { callback({ responseHeaders: headers }); return; }
+
+      // Only modify main frame (HTML page) responses, not subresources or API calls
+      if (details.resourceType === 'mainFrame') {
+        var url = details.url || '';
+        // Don't touch API responses
+        if (!url.includes('/api/')) {
+          // Replace no-cache with a quick stale-while-revalidate for HTML pages
+          headers['Cache-Control'] = ['private, max-age=0, stale-while-revalidate=86400'];
+          delete headers['Pragma'];
+        }
+      }
+
+      callback({ responseHeaders: headers });
+    }
+  );
+
   logger.log('info', 'Main', 'Session permissions configured');
 }
 
@@ -2711,7 +2777,7 @@ function setupSessionPermissions() {
  */
 let pendingReloadTimeout = null;
 let lastReloadAttempt = 0;
-const MIN_RELOAD_INTERVAL = 3000; // Minimum 3 seconds between reload attempts
+const MIN_RELOAD_INTERVAL = 30000; // Minimum 30 seconds between reload attempts
 
 function scheduleReload(delayMs) {
   if (isNavigating || isLoadingApp) {
@@ -2740,9 +2806,15 @@ function scheduleReload(delayMs) {
     if (!mainWindow || mainWindow.isDestroyed()) return;
 
     lastReloadAttempt = Date.now();
-    logger.log('info', 'Main', 'Executing scheduled reload');
-    loadRetries = 0;
-    loadApp();
+    logger.log('info', 'Main', 'Executing scheduled soft reload');
+    // Use webContents.reload() to leverage cached resources instead of full navigation
+    try {
+      mainWindow.webContents.reload();
+    } catch (e) {
+      logger.log('warn', 'Main', 'Soft reload failed, falling back to loadApp: ' + e.message);
+      loadRetries = 0;
+      loadApp();
+    }
   }, delayMs || 1000);
 }
 
@@ -2862,7 +2934,7 @@ function setupNetworkMonitoring() {
             port: 443,
             path: '/api/health',
             method: 'HEAD',
-            timeout: 10000
+            timeout: 5000
           }, function (res) {
             resolve(res.statusCode < 500);
           });
@@ -2906,8 +2978,8 @@ function setupNetworkMonitoring() {
   // Start periodic network check (every 30 seconds — event-driven online/offline handles fast transitions)
   networkCheckInterval = setInterval(checkNetworkAndReload, 30000);
 
-  // Start periodic whitescreen check (every 60 seconds — only checks app pages)
-  whitescreenCheckInterval = setInterval(checkAndRecoverWhitescreen, 60000);
+  // Start periodic whitescreen check (every 5 minutes — only checks app pages)
+  whitescreenCheckInterval = setInterval(checkAndRecoverWhitescreen, 300000);
 
   // Handle system suspend (sleep)
   powerMonitor.on('suspend', function () {
@@ -2922,8 +2994,8 @@ function setupNetworkMonitoring() {
     if (systemWasAsleep) {
       systemWasAsleep = false;
 
-      // Wait a bit for network to reconnect, then check and reload if needed
-      setTimeout(async function () {
+      // Wait a bit for network to reconnect
+      setTimeout(function () {
         if (!mainWindow || mainWindow.isDestroyed()) return;
 
         // Restart screenshot service if it died during sleep
@@ -2934,42 +3006,15 @@ function setupNetworkMonitoring() {
           }
         }
 
-        const currentUrl = mainWindow.webContents.getURL();
+        var currentUrl = '';
+        try { currentUrl = mainWindow.webContents.getURL(); } catch (e) { return; }
 
-        // If on offline page, try to reload
+        // Only reload if on offline page — don't disrupt live app page
         if (currentUrl.includes('offline.html') || currentUrl.startsWith('file://')) {
           logger.log('info', 'Main', 'On offline page after wake, checking network...');
           checkNetworkAndReload();
-          return;
         }
-
-        // Check for whitescreen after resume
-        const isBlank = await checkForWhitescreen();
-        if (isBlank) {
-          logger.log('warn', 'Main', 'Whitescreen detected after system resume, reloading...');
-          scheduleReload(500);
-          return;
-        }
-
-        // Even if not blank, do a soft check by injecting a heartbeat
-        try {
-          const isAlive = await mainWindow.webContents.executeJavaScript(`
-            (function() {
-              // Check if the app is responsive
-              return typeof window !== 'undefined' && document.readyState === 'complete';
-            })()
-          `);
-
-          if (!isAlive) {
-            logger.log('warn', 'Main', 'Page unresponsive after resume, reloading...');
-            scheduleReload(500);
-          }
-        } catch (e) {
-          // Page might be in a bad state
-          logger.log('warn', 'Main', 'Could not check page health after resume: ' + e.message);
-          scheduleReload(1000);
-        }
-      }, 3000); // Wait 3 seconds for network to stabilize
+      }, 3000);
     }
   });
 
@@ -2982,57 +3027,29 @@ function setupNetworkMonitoring() {
   powerMonitor.on('unlock-screen', function () {
     logger.log('debug', 'Main', 'Screen unlocked');
 
-    // Brief check after unlock - sometimes pages get stuck
-    setTimeout(async function () {
+    // Only restart screenshot service — don't reload the app
+    setTimeout(function () {
       if (!mainWindow || mainWindow.isDestroyed()) return;
 
-      // Restart screenshot service if it died during sleep/lock
       if (isAuthenticated && userData && userData.role !== 'admin') {
         if (!screenshotService.isCapturing) {
           logger.log('debug', 'Main', 'Restarting screenshot capture after unlock');
           screenshotService.start();
         }
       }
-
-      const currentUrl = mainWindow.webContents.getURL();
-      if (currentUrl.startsWith('https://app.talio.in')) {
-        const isBlank = await checkForWhitescreen();
-        if (isBlank) {
-          logger.log('warn', 'Main', 'Whitescreen detected after unlock, reloading...');
-          scheduleReload(500);
-        }
-      }
     }, 2000);
   });
 
-  // Handle window focus - check for issues when user returns to app
+  // Handle window focus — only check network if on offline page
   if (mainWindow) {
     mainWindow.on('focus', function () {
-      const currentUrl = mainWindow.webContents.getURL();
+      var currentUrl = '';
+      try { currentUrl = mainWindow.webContents.getURL(); } catch (e) { return; }
 
       if (currentUrl.includes('offline.html') || currentUrl.startsWith('file://')) {
         logger.log('info', 'Main', 'Window focused while on offline page, checking network...');
         setTimeout(checkNetworkAndReload, 1000);
-      } else if (currentUrl.startsWith('https://app.talio.in')) {
-        // Check for whitescreen when window regains focus
-        setTimeout(checkAndRecoverWhitescreen, 500);
       }
-    });
-
-    // Also handle window show (might be restored from minimized/hidden state)
-    mainWindow.on('show', function () {
-      setTimeout(async function () {
-        if (!mainWindow || mainWindow.isDestroyed()) return;
-
-        const currentUrl = mainWindow.webContents.getURL();
-        if (currentUrl.startsWith('https://app.talio.in')) {
-          const isBlank = await checkForWhitescreen();
-          if (isBlank) {
-            logger.log('warn', 'Main', 'Whitescreen detected on window show, reloading...');
-            scheduleReload(500);
-          }
-        }
-      }, 1000);
     });
   }
 
