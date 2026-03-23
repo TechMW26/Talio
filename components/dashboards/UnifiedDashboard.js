@@ -249,6 +249,12 @@ export default function UnifiedDashboard({ user: userProp }) {
     const employeeDataRef = useRef(employeeData)
     employeeDataRef.current = employeeData
 
+    // Version counter to prevent stale fetchUnifiedWidgetData responses from
+    // overwriting attendance state set directly by check-in/check-out/socket handlers.
+    // Incremented on every direct setTodayAttendance call; fetchUnifiedWidgetData
+    // captures it before fetching and skips the update if it changed during the request.
+    const attendanceVersionRef = useRef(0)
+
     // Get employee ID and role
     const employeeIdStr = getEmployeeId(user)
     const userRole = user?.role || 'employee'
@@ -321,6 +327,7 @@ export default function UnifiedDashboard({ user: userProp }) {
 
             const data = await response.json()
             if (data.success && data.data.length > 0) {
+                attendanceVersionRef.current++
                 setTodayAttendance(data.data[0])
             }
         } catch (error) {
@@ -334,6 +341,7 @@ export default function UnifiedDashboard({ user: userProp }) {
     // ALSO populates: departments, leave requests, attendance summary, employee data, and today's attendance
     // This eliminates 5+ separate API calls that were causing browser connection queue stalling
     const fetchUnifiedWidgetData = useCallback(async () => {
+        const versionBeforeFetch = attendanceVersionRef.current
         try {
             const token = localStorage.getItem('token')
             const response = await fetch('/api/dashboard/unified', {
@@ -365,7 +373,8 @@ export default function UnifiedDashboard({ user: userProp }) {
                 }
 
                 // Populate today's attendance from unified response (eliminates /api/attendance?employeeId=... call)
-                if (data.todayAttendance !== undefined) {
+                // Only apply if no direct attendance update (check-in/check-out/socket) happened during this fetch
+                if (data.todayAttendance !== undefined && attendanceVersionRef.current === versionBeforeFetch) {
                     setTodayAttendance(data.todayAttendance)
                 }
 
@@ -390,6 +399,7 @@ export default function UnifiedDashboard({ user: userProp }) {
         console.log('🔄 [Unified Dashboard] Attendance update received', data)
         // If the socket event carries the full attendance object, apply it directly
         if (data?.attendance) {
+            attendanceVersionRef.current++
             setTodayAttendance(data.attendance)
         } else if (employeeIdStr) {
             fetchTodayAttendance()
@@ -422,6 +432,7 @@ export default function UnifiedDashboard({ user: userProp }) {
             const { type, attendance } = event.data || {}
             if ((type === 'check-in' || type === 'check-out') && attendance) {
                 console.log(`📡 [CrossTab] Received ${type} from another tab`)
+                attendanceVersionRef.current++
                 setTodayAttendance(attendance)
                 if (isManagementRole(userRole)) {
                     fetchDashboardData()
@@ -511,6 +522,7 @@ export default function UnifiedDashboard({ user: userProp }) {
             checkIn: new Date().toISOString(),
             status: 'in-progress',
         }
+        attendanceVersionRef.current++
         setTodayAttendance(optimisticAttendance)
         setAttendanceLoading(true)
 
@@ -585,17 +597,20 @@ export default function UnifiedDashboard({ user: userProp }) {
             if (data.success) {
                 toast.success('Checked in successfully!')
                 // Replace optimistic data with real server data
+                attendanceVersionRef.current++
                 setTodayAttendance(data.data)
                 // Notify other tabs via BroadcastChannel
                 broadcastChannelRef.current?.postMessage({ type: 'check-in', attendance: data.data })
             } else {
                 // Rollback optimistic update
+                attendanceVersionRef.current++
                 setTodayAttendance(previousAttendance)
                 toast.error(data.message || 'Failed to check in')
             }
         } catch (error) {
             console.error('Check in error:', error)
             // Rollback optimistic update
+            attendanceVersionRef.current++
             setTodayAttendance(previousAttendance)
             toast.error('Failed to check in')
         } finally {
@@ -618,6 +633,7 @@ export default function UnifiedDashboard({ user: userProp }) {
             status: 'present',
             workHours,
         }
+        attendanceVersionRef.current++
         setTodayAttendance(optimisticAttendance)
         setAttendanceLoading(true)
 
@@ -692,17 +708,20 @@ export default function UnifiedDashboard({ user: userProp }) {
             if (data.success) {
                 toast.success('Checked out successfully!')
                 // Replace optimistic data with real server data
+                attendanceVersionRef.current++
                 setTodayAttendance(data.data)
                 // Notify other tabs via BroadcastChannel
                 broadcastChannelRef.current?.postMessage({ type: 'check-out', attendance: data.data })
             } else {
                 // Rollback optimistic update
+                attendanceVersionRef.current++
                 setTodayAttendance(previousAttendance)
                 toast.error(data.message || 'Failed to check out')
             }
         } catch (error) {
             console.error('Check out error:', error)
             // Rollback optimistic update
+            attendanceVersionRef.current++
             setTodayAttendance(previousAttendance)
             toast.error('Failed to check out')
         } finally {
