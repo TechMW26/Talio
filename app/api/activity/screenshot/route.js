@@ -107,6 +107,28 @@ export async function POST(request) {
     const employeeCode = employee?.employeeCode || 'UNKNOWN';
     const filename = `screenshot_${employeeCode}_${timestamp}.webp`;
 
+    // === DEDUPLICATION: Skip if a screenshot already exists for this user in the same minute ===
+    const minuteStart = new Date(now);
+    minuteStart.setSeconds(0, 0);
+    const minuteEnd = new Date(minuteStart);
+    minuteEnd.setMinutes(minuteEnd.getMinutes() + 1);
+
+    const existingInSameMinute = await Screenshot.findOne({
+      user: userId,
+      capturedAt: { $gte: minuteStart, $lt: minuteEnd }
+    }).select('_id capturedAt').lean();
+
+    if (existingInSameMinute) {
+      console.log(`[Screenshot] ⏭️ Duplicate skipped for user ${userId} - already captured at ${existingInSameMinute.capturedAt.toISOString()} (same minute window)`);
+      return NextResponse.json({
+        success: true,
+        deduplicated: true,
+        message: 'Screenshot already exists for this minute, skipped to save storage',
+        existingScreenshotId: existingInSameMinute._id.toString(),
+        timestamp: now.toISOString()
+      });
+    }
+
     // Get the appropriate ImageKit folder with employee subfolder
     const imagekitFolder = getImageKitFolder('screenshot', { employee, dateString });
     const employeeFolderName = generateEmployeeFolderName(employee);

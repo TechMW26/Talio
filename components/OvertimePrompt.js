@@ -177,14 +177,23 @@ export default function OvertimePrompt({ userId, onClose, onResponse }) {
       <div className="bg-white rounded-[30px] shadow-2xl max-w-md w-full mx-4 overflow-hidden animate-modal-enter" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="bg-gradient-to-r from-orange-500 to-red-500 px-6 py-4 text-white">
-          <div className="flex items-center space-x-3">
-            <div className="bg-white/20 p-2 rounded-full animate-pulse">
-              <FaBell className="w-6 h-6" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="bg-white/20 p-2 rounded-full animate-pulse">
+                <FaBell className="w-6 h-6" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">Overtime Check</h2>
+                <p className="text-orange-100 text-sm">Response Required</p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-xl font-bold">Overtime Check</h2>
-              <p className="text-orange-100 text-sm">Response Required</p>
-            </div>
+            <button
+              onClick={() => onClose && onClose()}
+              className="text-white/80 hover:text-white transition-colors"
+              aria-label="Close"
+            >
+              <FaTimes className="w-5 h-5" />
+            </button>
           </div>
         </div>
 

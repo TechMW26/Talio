@@ -84,7 +84,7 @@ export default function ProfileCompletionModal({
   }
 
   return (
-    <ModalPortal show={true}>
+    <ModalPortal show={isOpen}>
       <div 
         className={`modal-overlay transition-opacity duration-200 ${
           isClosing ? 'opacity-0' : 'opacity-100'
