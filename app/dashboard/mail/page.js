@@ -148,6 +148,7 @@ export default function MailPage() {
   const fileInputRef = useRef(null);
   const bodyEditorRef = useRef(null);
   const loadMoreRef = useRef(null);
+  const bodySetByCodeRef = useRef(false);
 
   // --- SWR: Labels/folder counts (only when connected) ---
   const { data: labelsData, mutate: refreshLabels } = useAuthedSWR(isConnected ? '/api/mail/labels' : null);
@@ -333,10 +334,9 @@ export default function MailPage() {
 
       const data = await response.json();
       if (data.success) {
-        setComposeData(prev => ({
-          ...prev,
-          body: prev.body ? prev.body + '<br><br>' + data.content : data.content
-        }));
+        const newBody = composeData.body ? composeData.body + '<br><br>' + data.content : data.content;
+        setComposeData(prev => ({ ...prev, body: newBody }));
+        if (bodyEditorRef.current) bodyEditorRef.current.innerHTML = newBody;
         setShowAiCompose(false);
         setAiPrompt('');
       } else {
@@ -994,6 +994,13 @@ export default function MailPage() {
       refreshLabels(); // Refresh label counts
     }
   }, [isConnected, connectionLoading, selectedFolder, showAllAccounts, activeAccountId, refreshLabels]);
+
+  // Sync pre-filled body (Forward/AI) into contentEditable when compose opens
+  useEffect(() => {
+    if (showCompose && composeData.body && bodyEditorRef.current && bodyEditorRef.current.innerHTML !== composeData.body) {
+      bodyEditorRef.current.innerHTML = composeData.body;
+    }
+  }, [showCompose]);
 
   // Infinite scroll: auto-load next chunk when sentinel is visible
   useEffect(() => {
@@ -2275,15 +2282,15 @@ export default function MailPage() {
       {/* Compose Modal - Gmail Style with Full Functionality */}
       {showCompose && (
         <div className={`fixed ${composeFullscreen ? 'inset-0 p-4' : 'bottom-0 right-0 sm:right-8 left-0 sm:left-auto'} z-[99999]`}>
-          <div className={`bg-white dark:bg-slate-800 rounded-t-[30px] sm:rounded-[30px] shadow-2xl flex flex-col ${composeFullscreen
-            ? 'w-full h-full rounded-[30px]'
+          <div className={`bg-white dark:bg-slate-800 rounded-t-xl sm:rounded-xl shadow-2xl flex flex-col ${composeFullscreen
+            ? 'w-full h-full rounded-xl'
             : composeMinimized
               ? 'w-72 h-10 hidden sm:flex rounded-lg'
               : 'w-full sm:w-[600px] h-[80vh] sm:h-[520px]'
             }`}>
             {/* Header */}
             <div
-              className={`flex items-center justify-between px-3 py-2 bg-[#404040] text-white rounded-t-[30px] cursor-pointer ${composeMinimized ? 'rounded-b-[30px]' : ''}`}
+              className={`flex items-center justify-between px-4 py-2.5 bg-[#404040] text-white rounded-t-xl cursor-pointer ${composeMinimized ? 'rounded-b-xl' : ''}`}
               onClick={() => composeMinimized && setComposeMinimized(false)}
             >
               <span className="font-medium text-sm truncate">{composeData.subject || 'New Message'}</span>
@@ -2334,18 +2341,18 @@ export default function MailPage() {
                   )}
                   {/* To */}
                   <div className="flex items-center border-b border-gray-200 dark:border-slate-700">
-                    <span className="px-3 text-sm text-gray-500 dark:text-slate-400 w-12">To</span>
+                    <span className="pl-4 pr-1 text-sm text-gray-500 dark:text-slate-400 w-14">To</span>
                     <input
                       type="text"
                       value={composeData.to}
                       onChange={(e) => setComposeData(prev => ({ ...prev, to: e.target.value }))}
-                      className="flex-1 px-2 py-2.5 bg-transparent focus:outline-none text-gray-900 dark:text-slate-100 text-sm dark:placeholder:text-slate-400"
+                      className="flex-1 px-2 py-3 bg-transparent focus:outline-none text-gray-900 dark:text-slate-100 text-sm dark:placeholder:text-slate-400"
                       placeholder="Recipients"
                     />
                     {!showCcBcc && (
                       <button
                         onClick={() => setShowCcBcc(true)}
-                        className="px-3 text-sm text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300"
+                        className="px-4 text-sm text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300"
                       >
                         Cc Bcc
                       </button>
@@ -2355,12 +2362,12 @@ export default function MailPage() {
                   {/* Cc */}
                   {showCcBcc && (
                     <div className="flex items-center border-b border-gray-200 dark:border-slate-700">
-                      <span className="px-3 text-sm text-gray-500 dark:text-slate-400 w-12">Cc</span>
+                      <span className="pl-4 pr-1 text-sm text-gray-500 dark:text-slate-400 w-14">Cc</span>
                       <input
                         type="text"
                         value={composeData.cc}
                         onChange={(e) => setComposeData(prev => ({ ...prev, cc: e.target.value }))}
-                        className="flex-1 px-2 py-2.5 bg-transparent focus:outline-none text-gray-900 dark:text-slate-100 text-sm"
+                        className="flex-1 px-2 py-3 bg-transparent focus:outline-none text-gray-900 dark:text-slate-100 text-sm"
                       />
                     </div>
                   )}
@@ -2368,12 +2375,12 @@ export default function MailPage() {
                   {/* Bcc */}
                   {showCcBcc && (
                     <div className="flex items-center border-b border-gray-200 dark:border-slate-700">
-                      <span className="px-3 text-sm text-gray-500 dark:text-slate-400 w-12">Bcc</span>
+                      <span className="pl-4 pr-1 text-sm text-gray-500 dark:text-slate-400 w-14">Bcc</span>
                       <input
                         type="text"
                         value={composeData.bcc}
                         onChange={(e) => setComposeData(prev => ({ ...prev, bcc: e.target.value }))}
-                        className="flex-1 px-2 py-2.5 bg-transparent focus:outline-none text-gray-900 dark:text-slate-100 text-sm"
+                        className="flex-1 px-2 py-3 bg-transparent focus:outline-none text-gray-900 dark:text-slate-100 text-sm"
                       />
                     </div>
                   )}
@@ -2385,77 +2392,77 @@ export default function MailPage() {
                       value={composeData.subject}
                       onChange={(e) => setComposeData(prev => ({ ...prev, subject: e.target.value }))}
                       placeholder="Subject"
-                      className="flex-1 px-3 py-2.5 bg-transparent focus:outline-none text-gray-900 dark:text-slate-100 text-sm dark:placeholder:text-slate-400"
+                      className="flex-1 px-4 py-3 bg-transparent focus:outline-none text-gray-900 dark:text-slate-100 text-sm dark:placeholder:text-slate-400"
                     />
                   </div>
 
                   {/* Formatting Toolbar (shown when enabled) */}
                   {showFormattingToolbar && (
-                    <div className="flex items-center gap-1 px-2 py-1.5 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-700/50 flex-wrap">
+                    <div className="flex items-center gap-1 px-3 py-1.5 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-700/50 flex-wrap">
                       <button
                         onClick={() => applyFormatting('bold')}
-                        className="p-2 hover:bg-gray-200 rounded"
+                        className="p-2 hover:bg-gray-200 dark:hover:bg-slate-600 rounded"
                         title="Bold (Ctrl+B)"
                       >
-                        <FaBold className="text-sm text-gray-600" />
+                        <FaBold className="text-sm text-gray-600 dark:text-slate-300" />
                       </button>
                       <button
                         onClick={() => applyFormatting('italic')}
-                        className="p-2 hover:bg-gray-200 rounded"
+                        className="p-2 hover:bg-gray-200 dark:hover:bg-slate-600 rounded"
                         title="Italic (Ctrl+I)"
                       >
-                        <FaItalic className="text-sm text-gray-600" />
+                        <FaItalic className="text-sm text-gray-600 dark:text-slate-300" />
                       </button>
                       <button
                         onClick={() => applyFormatting('underline')}
-                        className="p-2 hover:bg-gray-200 rounded"
+                        className="p-2 hover:bg-gray-200 dark:hover:bg-slate-600 rounded"
                         title="Underline (Ctrl+U)"
                       >
-                        <FaUnderline className="text-sm text-gray-600" />
+                        <FaUnderline className="text-sm text-gray-600 dark:text-slate-300" />
                       </button>
                       <button
                         onClick={() => applyFormatting('strikeThrough')}
-                        className="p-2 hover:bg-gray-200 rounded"
+                        className="p-2 hover:bg-gray-200 dark:hover:bg-slate-600 rounded"
                         title="Strikethrough"
                       >
-                        <FaStrikethrough className="text-sm text-gray-600" />
+                        <FaStrikethrough className="text-sm text-gray-600 dark:text-slate-300" />
                       </button>
-                      <div className="h-5 w-px bg-gray-300 mx-1"></div>
+                      <div className="h-5 w-px bg-gray-300 dark:bg-slate-600 mx-1"></div>
                       <button
                         onClick={() => applyFormatting('insertUnorderedList')}
-                        className="p-2 hover:bg-gray-200 rounded"
+                        className="p-2 hover:bg-gray-200 dark:hover:bg-slate-600 rounded"
                         title="Bulleted list"
                       >
-                        <FaListUl className="text-sm text-gray-600" />
+                        <FaListUl className="text-sm text-gray-600 dark:text-slate-300" />
                       </button>
                       <button
                         onClick={() => applyFormatting('insertOrderedList')}
-                        className="p-2 hover:bg-gray-200 rounded"
+                        className="p-2 hover:bg-gray-200 dark:hover:bg-slate-600 rounded"
                         title="Numbered list"
                       >
-                        <FaListOl className="text-sm text-gray-600" />
+                        <FaListOl className="text-sm text-gray-600 dark:text-slate-300" />
                       </button>
                       <button
                         onClick={() => applyFormatting('formatBlock', 'blockquote')}
-                        className="p-2 hover:bg-gray-200 rounded"
+                        className="p-2 hover:bg-gray-200 dark:hover:bg-slate-600 rounded"
                         title="Quote"
                       >
-                        <FaQuoteRight className="text-sm text-gray-600" />
+                        <FaQuoteRight className="text-sm text-gray-600 dark:text-slate-300" />
                       </button>
-                      <div className="h-5 w-px bg-gray-300 mx-1"></div>
+                      <div className="h-5 w-px bg-gray-300 dark:bg-slate-600 mx-1"></div>
                       <button
                         onClick={insertLink}
-                        className="p-2 hover:bg-gray-200 rounded"
+                        className="p-2 hover:bg-gray-200 dark:hover:bg-slate-600 rounded"
                         title="Insert link"
                       >
-                        <FaLink className="text-sm text-gray-600" />
+                        <FaLink className="text-sm text-gray-600 dark:text-slate-300" />
                       </button>
                       <button
                         onClick={() => applyFormatting('removeFormat')}
-                        className="p-2 hover:bg-gray-200 rounded"
+                        className="p-2 hover:bg-gray-200 dark:hover:bg-slate-600 rounded"
                         title="Remove formatting"
                       >
-                        <FaTimes className="text-sm text-gray-600" />
+                        <FaTimes className="text-sm text-gray-600 dark:text-slate-300" />
                       </button>
                     </div>
                   )}
@@ -2464,17 +2471,20 @@ export default function MailPage() {
                   <div
                     ref={bodyEditorRef}
                     contentEditable
-                    className="flex-1 px-3 py-2 bg-transparent focus:outline-none resize-none text-gray-900 dark:text-slate-100 text-sm overflow-y-auto"
+                    className="compose-body-editor flex-1 px-4 py-3 bg-transparent focus:outline-none resize-none text-gray-900 dark:text-slate-100 text-sm overflow-y-auto"
                     style={{ minHeight: '150px' }}
-                    placeholder="Write your message here..."
-                    onInput={(e) => setComposeData(prev => ({ ...prev, body: e.target.innerHTML }))}
+                    data-placeholder="Write your message here..."
+                    onInput={(e) => {
+                      bodySetByCodeRef.current = false;
+                      setComposeData(prev => ({ ...prev, body: e.target.innerHTML }));
+                    }}
                     suppressContentEditableWarning={true}
                   >
                   </div>
 
                   {/* Attachments List */}
                   {attachments.length > 0 && (
-                    <div className="px-3 py-2 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-700/50">
+                    <div className="px-4 py-2.5 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-700/50">
                       <div className="text-xs text-gray-500 dark:text-slate-400 mb-2">Attachments ({attachments.length})</div>
                       <div className="flex flex-wrap gap-2">
                         {attachments.map((file, idx) => (
@@ -2500,7 +2510,7 @@ export default function MailPage() {
                   {/* Emoji Picker */}
                   {showEmojiPicker && (
                     <div className="absolute bottom-16 left-3 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-xl p-3 z-10 w-80">
-                      <div className="flex items-center justify-start mb-2">
+                      <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium text-gray-700 dark:text-slate-300">Emojis</span>
                         <button onClick={() => setShowEmojiPicker(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded">
                           <FaTimes className="text-xs text-gray-500" />
@@ -2522,7 +2532,7 @@ export default function MailPage() {
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center justify-between px-3 py-2 border-t border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+                <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-b-xl">
                   <div className="flex items-center gap-0.5">
                     <button
                       onClick={sendEmail}

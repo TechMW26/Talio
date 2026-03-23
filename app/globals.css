@@ -1074,6 +1074,18 @@ html.dark ::-webkit-scrollbar-thumb:hover {
 }
 
 /* ---- Email HTML body dark mode ---- */
+
+/* Compose body editor placeholder */
+.compose-body-editor:empty:before {
+  content: attr(data-placeholder);
+  color: #9CA3AF;
+  pointer-events: none;
+}
+
+html.dark .compose-body-editor:empty:before {
+  color: #64748B;
+}
+
 html.dark .prose {
   color: #E2E8F0 !important;
 }
