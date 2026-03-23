@@ -71,6 +71,9 @@ export default function EmployeeDirectoryWidget() {
         startContent={<FaSearch className="text-default-400" />}
         size="sm"
         variant="bordered"
+        classNames={{
+          inputWrapper: "bg-default-50 dark:bg-[#1E293B] shadow-none",
+        }}
         className="mb-4"
       />
 

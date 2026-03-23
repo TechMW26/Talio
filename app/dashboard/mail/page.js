@@ -1175,9 +1175,9 @@ export default function MailPage() {
     <div className="h-[calc(100vh-80px)] flex flex-col bg-white -m-4 md:-m-6">
       {/* Gmail Style Header/Search Bar */}
       <div className="flex items-center gap-2 px-4 py-2 border-b border-gray-200 dark:border-slate-700 bg-transparent dark:bg-transparent">
-        <div className={`flex-1 max-w-3xl mx-auto transition-all ${showSearchFocused ? 'shadow-lg' : ''}`}>
-          <div className={`flex items-center px-4 py-2.5 transition-all ${showSearchFocused ? 'shadow-md' : 'hover:shadow-sm'}`} style={{ background: 'transparent', borderRadius: 0 }}>
-            <FaSearch className="text-gray-500 mr-3" />
+        <div className="flex-1 max-w-3xl mx-auto">
+          <div className="input-with-icon" style={{ position: 'relative' }}>
+            <FaSearch className="input-icon" />
             <input
               type="text"
               placeholder="Search mail"
@@ -1185,11 +1185,11 @@ export default function MailPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
               onFocus={() => setShowSearchFocused(true)}
               onBlur={() => setShowSearchFocused(false)}
-              className="flex-1 bg-transparent focus:outline-none text-gray-800 dark:text-gray-200 placeholder-gray-500 text-base"
-              style={{ border: 'none' }}
+              className="input input-search"
+              style={searchQuery ? { paddingRight: '2.5rem' } : undefined}
             />
             {searchQuery && (
-              <button onClick={() => setSearchQuery('')} className="text-gray-500 hover:text-gray-700">
+              <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-default-400 hover:text-default-600">
                 <FaTimes />
               </button>
             )}

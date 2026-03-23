@@ -664,8 +664,8 @@ export default function DepartmentsPage() {
 
                   {/* Search and add heads */}
                   <div className="relative" ref={dropdownRef}>
-                    <div className="relative">
-                      <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                    <div className="input-with-icon">
+                      <FaSearch className="input-icon" />
                       <input
                         type="text"
                         value={headSearch}
@@ -675,7 +675,7 @@ export default function DepartmentsPage() {
                         }}
                         onFocus={() => setShowHeadDropdown(true)}
                         placeholder="Search and add department heads..."
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        className="input input-search"
                       />
                     </div>
 
@@ -806,7 +806,7 @@ export default function DepartmentsPage() {
                       onChange={(e) => handleTeamSearchChange(e.target.value, 'leaders')}
                       onFocus={() => { setShowTeamDropdown(true); setTeamSearchType('leaders') }}
                       placeholder="Search leaders..."
-                      className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      className="input input-search text-sm"
                     />
                     {showTeamDropdown && teamSearchType === 'leaders' && (
                       <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-36 overflow-y-auto">
@@ -857,7 +857,7 @@ export default function DepartmentsPage() {
                       onChange={(e) => handleTeamSearchChange(e.target.value, 'members')}
                       onFocus={() => { setShowTeamDropdown(true); setTeamSearchType('members') }}
                       placeholder="Search members..."
-                      className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      className="input input-search text-sm"
                     />
                     {showTeamDropdown && teamSearchType === 'members' && (
                       <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-36 overflow-y-auto">

@@ -987,6 +987,10 @@ export default function GeneratePayrollPage() {
                           <FaTimes className="w-3 h-3" />
                         </button>
                       )}
+                      variant="bordered"
+                      classNames={{
+                        inputWrapper: "bg-default-50 dark:bg-[#1E293B] shadow-none",
+                      }}
                     />
                   </div>
 

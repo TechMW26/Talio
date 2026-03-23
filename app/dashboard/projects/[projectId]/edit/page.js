@@ -687,7 +687,7 @@ export default function EditProjectPage() {
                   value={searchHead}
                   onChange={(e) => setSearchHead(e.target.value)}
                   placeholder="Search by name..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="input input-search"
                   autoFocus
                 />
               </div>

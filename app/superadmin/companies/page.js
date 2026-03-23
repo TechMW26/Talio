@@ -117,8 +117,8 @@ export default function CompaniesPage() {
         <div className="flex flex-col md:flex-row gap-4">
           {/* Search */}
           <form onSubmit={handleSearch} className="flex-1">
-            <div className="relative">
-              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="input-with-icon">
+              <svg className="input-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <input
@@ -126,7 +126,7 @@ export default function CompaniesPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search companies..."
-                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:bg-white"
+                className="input input-search"
               />
             </div>
           </form>

@@ -542,9 +542,10 @@ export default function TodoPage() {
                   placeholder="Search to-dos..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  startContent={<HiOutlineMagnifyingGlass className="w-5 h-5 text-gray-400" />}
+                  startContent={<HiOutlineMagnifyingGlass className="w-5 h-5 text-default-400" />}
+                  variant="bordered"
                   classNames={{
-                    inputWrapper: "bg-white"
+                    inputWrapper: "bg-default-50 dark:bg-[#1E293B] shadow-none",
                   }}
                 />
               </div>

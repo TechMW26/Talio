@@ -935,9 +935,9 @@ export default function AttendanceReportPage() {
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       startContent={<FaSearch className="text-default-400" />}
+                      variant="bordered"
                       classNames={{
-                        input: "bg-transparent",
-                        inputWrapper: "bg-default-100"
+                        inputWrapper: "bg-default-50 dark:bg-[#1E293B] shadow-none",
                       }}
                     />
                   </div>

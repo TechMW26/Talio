@@ -37,6 +37,7 @@ import {
 import WebAccessRestriction, { shouldRestrictWebAccess } from '@/components/WebAccessRestriction'
 import CallAlertReceiver from '@/components/CallAlertReceiver'
 import MiraChatSidebar from '@/components/MiraChatSidebar'
+import CelebrationPopup from '@/components/CelebrationPopup'
 
 // Page transition skeleton overlay - renders target page's skeleton with a spinner
 function PageTransitionOverlay() {
@@ -482,6 +483,9 @@ export default function DashboardLayout({ children }) {
 
                   {/* MIRA AI Chat Sidebar */}
                   <MiraChatSidebar />
+
+                  {/* Birthday & Work Anniversary Celebrations */}
+                  <CelebrationPopup />
                 </div>
               </ActionableToastProvider>
             </InAppNotificationProvider>

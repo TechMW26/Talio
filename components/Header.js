@@ -326,7 +326,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                         ) : null
                     }
                     classNames={{
-                      inputWrapper: 'bg-transparent shadow-none rounded-none',
+                      inputWrapper: 'bg-transparent shadow-none rounded-none border-none',
                       input: 'text-base'
                     }}
                     autoFocus
@@ -454,6 +454,10 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                         </Button>
                       ) : null
                   }
+                  variant="bordered"
+                  classNames={{
+                    inputWrapper: "bg-default-50 dark:bg-[#1E293B] shadow-none",
+                  }}
                   autoFocus
                 />
               </div>

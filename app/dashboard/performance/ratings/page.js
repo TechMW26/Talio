@@ -222,8 +222,12 @@ export default function EmployeeRatingsPage() {
                 placeholder="Search employees..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                startContent={<FaSearch className="text-gray-400 w-4 h-4" />}
+                startContent={<FaSearch className="text-default-400 w-4 h-4" />}
                 size="sm"
+                variant="bordered"
+                classNames={{
+                  inputWrapper: "bg-default-50 dark:bg-[#1E293B] shadow-none",
+                }}
               />
             </div>
             <div className="flex items-center space-x-2">

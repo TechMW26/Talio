@@ -393,7 +393,7 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated }) {
                     value={employeeSearch}
                     onChange={(e) => setEmployeeSearch(e.target.value)}
                     placeholder="Search employees..."
-                    className="w-full px-3 py-2 mb-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    className="input input-search text-sm mb-2"
                   />
                 )}
                 <div className="space-y-1 max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2">
