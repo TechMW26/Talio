@@ -17,15 +17,32 @@ module.exports = {
             displayName: 'web',
             testEnvironment: 'jsdom',
             testMatch: ['<rootDir>/tests/web/**/*.test.js'],
-            setupFilesAfterEnv: [],
+            setupFilesAfterEnv: ['<rootDir>/tests/setup.web.js'],
             moduleNameMapper: {
                 '^@/(.*)$': '<rootDir>/$1',
             },
+            transform: {
+                '^.+\\.(js|jsx)$': ['@swc/jest', {
+                    jsc: {
+                        parser: { syntax: 'ecmascript', jsx: true },
+                        transform: { react: { runtime: 'automatic' } },
+                    },
+                }],
+            },
+            transformIgnorePatterns: [
+                '/node_modules/(?!(@heroui|swr|react-hot-toast)/)',
+            ],
         },
     ],
     collectCoverageFrom: [
         'app/api/tictactoe/**/*.js',
         'contexts/TicTacToeContext.js',
+        'components/dashboards/UnifiedDashboard.js',
+        'components/widgets/CheckInOutWidget.js',
+        'components/widgets/QuickGlanceWidget.js',
+        'hooks/useRealtimeDashboard.js',
+        'hooks/useApiMutation.js',
+        'contexts/SocketContext.js',
     ],
     coverageThreshold: {
         global: {

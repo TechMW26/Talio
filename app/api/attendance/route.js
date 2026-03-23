@@ -6,7 +6,7 @@ import { sendEmail } from '@/lib/mailer'
 import { sendPushToUser } from '@/lib/pushNotification'
 import { calculateEffectiveWorkHours, determineAttendanceStatus } from '@/lib/attendanceShrinkage'
 import { reverseGeocode, validateLocationData } from '@/lib/geocoding'
-import { emitAttendanceUpdate, emitDashboardRefresh } from '@/lib/realtimeEvents'
+import { emitAttendanceUpdate, emitDashboardRefresh, emitRealtimeEvent, REALTIME_EVENTS } from '@/lib/realtimeEvents'
 import { getAuthAndModels } from '@/lib/auth'
 import { buildSearchQuery, fetchRoleNews } from '@/lib/roleNews'
 import mongoose from 'mongoose'
@@ -908,6 +908,24 @@ export async function POST(request) {
       await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:manager-stats', userId: '*' }))
       await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:employee-stats', userId: user._id || user.userId }))
 
+      // Emit real-time Socket.IO events for cross-tab/cross-window/desktop sync
+      try {
+        const userId = (user._id || user.userId)?.toString()
+        if (userId) {
+          emitAttendanceUpdate(attendance, [userId], { action: 'check-in' })
+          emitRealtimeEvent(REALTIME_EVENTS.ATTENDANCE_CHECK_IN, {
+            attendance,
+            employeeId: attendance.employee?.toString(),
+          }, { userIds: [userId] })
+          emitRealtimeEvent(REALTIME_EVENTS.DASHBOARD_REFRESH, {
+            dataTypes: ['attendance'],
+            refreshAll: false,
+          }, { broadcast: true })
+        }
+      } catch (socketError) {
+        console.error('Failed to emit attendance socket events:', socketError)
+      }
+
       // Build response with optional warning
       const responseData = {
         success: true,
@@ -1247,6 +1265,24 @@ export async function POST(request) {
       await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:hr-stats', userId: '*' }))
       await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:manager-stats', userId: '*' }))
       await clearCachePattern(buildCachePattern({ tenantId, namespace: 'dashboard:employee-stats', userId: user._id || user.userId }))
+
+      // Emit real-time Socket.IO events for cross-tab/cross-window/desktop sync
+      try {
+        const userId = (user._id || user.userId)?.toString()
+        if (userId) {
+          emitAttendanceUpdate(attendance, [userId], { action: 'check-out' })
+          emitRealtimeEvent(REALTIME_EVENTS.ATTENDANCE_CHECK_OUT, {
+            attendance,
+            employeeId: attendance.employee?.toString(),
+          }, { userIds: [userId] })
+          emitRealtimeEvent(REALTIME_EVENTS.DASHBOARD_REFRESH, {
+            dataTypes: ['attendance'],
+            refreshAll: false,
+          }, { broadcast: true })
+        }
+      } catch (socketError) {
+        console.error('Failed to emit attendance socket events:', socketError)
+      }
 
       // Build response with optional warning
       const checkOutResponse = {

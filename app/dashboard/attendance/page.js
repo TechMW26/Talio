@@ -196,11 +196,26 @@ export default function AttendancePage() {
       }
     }
 
+    // Listen for real-time attendance-update events (check-in/check-out from other tabs/desktop)
+    const handleRealtimeAttendanceSync = (data) => {
+      try {
+        if (data?.attendance) {
+          console.log('📡 Real-time attendance sync (check-in/out):', data)
+          mutateTodayAttendance()
+          mutateAttendance()
+        }
+      } catch (error) {
+        console.error('[Attendance] Error handling realtime attendance sync:', error)
+      }
+    }
+
     socket.on('attendance-updated', handleAttendanceUpdate)
-    console.log('📡 Listening for attendance-updated events')
+    socket.on('attendance-update', handleRealtimeAttendanceSync)
+    console.log('📡 Listening for attendance-updated and attendance-update events')
 
     return () => {
       socket.off('attendance-updated', handleAttendanceUpdate)
+      socket.off('attendance-update', handleRealtimeAttendanceSync)
     }
   }, [socket, isConnected, user])
 
@@ -560,8 +575,20 @@ export default function AttendancePage() {
   }
 
   const handleClockIn = async () => {
-    if (!user) return
+    if (!user || loading) return
     setLoading(true)
+
+    // Optimistic update: immediately show checked-in state in SWR cache
+    const previousData = todayAttendanceRes
+    const optimisticRecord = {
+      ...(todayAttendance || {}),
+      checkIn: new Date().toISOString(),
+      status: 'in-progress',
+    }
+    mutateTodayAttendance(
+      { ...todayAttendanceRes, data: [optimisticRecord] },
+      false // don't revalidate yet
+    )
 
     try {
       // Capture location with high accuracy - preferred but not blocking
@@ -597,9 +624,12 @@ export default function AttendancePage() {
       if (data.success) {
         const address = data.data?.location?.checkIn?.address || 'Location captured'
         toast.success(`Clocked in successfully\n📍 ${address}`, { duration: 4000 })
-        mutateTodayAttendance()
+        // Replace optimistic data with real server data, then revalidate
+        mutateTodayAttendance({ ...todayAttendanceRes, data: [data.data] }, true)
         mutateAttendance()
       } else {
+        // Rollback optimistic update
+        mutateTodayAttendance(previousData, false)
         if (data.requiresLocation) {
           toast.error('Location is required for attendance. Please enable location services.')
         } else {
@@ -608,6 +638,8 @@ export default function AttendancePage() {
       }
     } catch (error) {
       console.error('Clock in error:', error)
+      // Rollback optimistic update
+      mutateTodayAttendance(previousData, false)
       toast.error('An error occurred while clocking in')
     } finally {
       setLoading(false)
@@ -615,8 +647,24 @@ export default function AttendancePage() {
   }
 
   const handleClockOut = async () => {
-    if (!user) return
+    if (!user || loading) return
     setLoading(true)
+
+    // Optimistic update: immediately show checked-out state in SWR cache
+    const previousData = todayAttendanceRes
+    const now = new Date()
+    const checkInTime = todayAttendance?.checkIn ? new Date(todayAttendance.checkIn) : now
+    const workHours = Math.round(((now - checkInTime) / (1000 * 60 * 60)) * 100) / 100
+    const optimisticRecord = {
+      ...(todayAttendance || {}),
+      checkOut: now.toISOString(),
+      status: 'present',
+      workHours,
+    }
+    mutateTodayAttendance(
+      { ...todayAttendanceRes, data: [optimisticRecord] },
+      false // don't revalidate yet
+    )
 
     try {
       // Capture location with high accuracy - preferred but not blocking
@@ -652,9 +700,12 @@ export default function AttendancePage() {
       if (data.success) {
         const address = data.data?.location?.checkOut?.address || 'Location captured'
         toast.success(`Clocked out successfully\n📍 ${address}`, { duration: 4000 })
-        mutateTodayAttendance()
+        // Replace optimistic data with real server data, then revalidate
+        mutateTodayAttendance({ ...todayAttendanceRes, data: [data.data] }, true)
         mutateAttendance()
       } else {
+        // Rollback optimistic update
+        mutateTodayAttendance(previousData, false)
         if (data.requiresLocation) {
           toast.error('Location is required for attendance. Please enable location services.')
         } else {
@@ -663,6 +714,8 @@ export default function AttendancePage() {
       }
     } catch (error) {
       console.error('Clock out error:', error)
+      // Rollback optimistic update
+      mutateTodayAttendance(previousData, false)
       toast.error('An error occurred while clocking out')
     } finally {
       setLoading(false)

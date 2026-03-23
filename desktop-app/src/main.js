@@ -1802,6 +1802,14 @@ function handleAuthentication(data) {
     }
   });
 
+  // Forward attendance updates to the renderer so the webview refreshes its UI
+  socketHandler.on('attendanceUpdate', function (data) {
+    logger.log('debug', 'Main', 'Attendance update received, forwarding to renderer');
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('attendance-update', data);
+    }
+  });
+
   socketHandler.on('forceRefresh', function () {
     if (mainWindow && !mainWindow.isDestroyed()) {
       logger.log('info', 'Main', 'Force refresh - soft reload');

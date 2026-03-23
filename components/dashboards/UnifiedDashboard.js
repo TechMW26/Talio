@@ -387,8 +387,11 @@ export default function UnifiedDashboard({ user: userProp }) {
     }, [fetchDashboardData, fetchUnifiedWidgetData])
 
     const handleAttendanceUpdate = useCallback((data) => {
-        console.log('🔄 [Unified Dashboard] Attendance update received')
-        if (employeeIdStr) {
+        console.log('🔄 [Unified Dashboard] Attendance update received', data)
+        // If the socket event carries the full attendance object, apply it directly
+        if (data?.attendance) {
+            setTodayAttendance(data.attendance)
+        } else if (employeeIdStr) {
             fetchTodayAttendance()
         }
         if (isManagementRole(userRole)) {
@@ -408,6 +411,28 @@ export default function UnifiedDashboard({ user: userProp }) {
         onHolidayUpdate: handleRealtimeUpdate,
         onDashboardRefresh: handleRealtimeUpdate
     })
+
+    // Cross-tab sync via BroadcastChannel — updates all open tabs when attendance changes
+    const broadcastChannelRef = useRef(null)
+    useEffect(() => {
+        if (typeof BroadcastChannel === 'undefined') return
+        const channel = new BroadcastChannel('talio-attendance-sync')
+        broadcastChannelRef.current = channel
+        channel.onmessage = (event) => {
+            const { type, attendance } = event.data || {}
+            if ((type === 'check-in' || type === 'check-out') && attendance) {
+                console.log(`📡 [CrossTab] Received ${type} from another tab`)
+                setTodayAttendance(attendance)
+                if (isManagementRole(userRole)) {
+                    fetchDashboardData()
+                }
+            }
+        }
+        return () => {
+            channel.close()
+            broadcastChannelRef.current = null
+        }
+    }, [userRole, fetchDashboardData])
 
     // Load user from localStorage if not provided via props
     useEffect(() => {
@@ -477,8 +502,19 @@ export default function UnifiedDashboard({ user: userProp }) {
 
     // Handle check-in
     const handleCheckIn = useCallback(async () => {
+        if (attendanceLoading) return // Prevent double submission
+        const previousAttendance = todayAttendance
+
+        // Optimistic UI: show checked-in state immediately
+        const optimisticAttendance = {
+            ...previousAttendance,
+            checkIn: new Date().toISOString(),
+            status: 'in-progress',
+        }
+        setTodayAttendance(optimisticAttendance)
+        setAttendanceLoading(true)
+
         try {
-            setAttendanceLoading(true)
             const token = localStorage.getItem('token')
 
             // Get user's location
@@ -548,22 +584,44 @@ export default function UnifiedDashboard({ user: userProp }) {
             const data = await response.json()
             if (data.success) {
                 toast.success('Checked in successfully!')
+                // Replace optimistic data with real server data
                 setTodayAttendance(data.data)
+                // Notify other tabs via BroadcastChannel
+                broadcastChannelRef.current?.postMessage({ type: 'check-in', attendance: data.data })
             } else {
+                // Rollback optimistic update
+                setTodayAttendance(previousAttendance)
                 toast.error(data.message || 'Failed to check in')
             }
         } catch (error) {
             console.error('Check in error:', error)
+            // Rollback optimistic update
+            setTodayAttendance(previousAttendance)
             toast.error('Failed to check in')
         } finally {
             setAttendanceLoading(false)
         }
-    }, [employeeIdStr])
+    }, [employeeIdStr, attendanceLoading, todayAttendance])
 
     // Handle check-out
     const handleCheckOut = useCallback(async () => {
+        if (attendanceLoading) return // Prevent double submission
+        const previousAttendance = todayAttendance
+
+        // Optimistic UI: show checked-out state immediately
+        const now = new Date()
+        const checkInTime = previousAttendance?.checkIn ? new Date(previousAttendance.checkIn) : now
+        const workHours = Math.round(((now - checkInTime) / (1000 * 60 * 60)) * 100) / 100
+        const optimisticAttendance = {
+            ...previousAttendance,
+            checkOut: now.toISOString(),
+            status: 'present',
+            workHours,
+        }
+        setTodayAttendance(optimisticAttendance)
+        setAttendanceLoading(true)
+
         try {
-            setAttendanceLoading(true)
             const token = localStorage.getItem('token')
 
             // Get user's location
@@ -633,17 +691,24 @@ export default function UnifiedDashboard({ user: userProp }) {
             const data = await response.json()
             if (data.success) {
                 toast.success('Checked out successfully!')
+                // Replace optimistic data with real server data
                 setTodayAttendance(data.data)
+                // Notify other tabs via BroadcastChannel
+                broadcastChannelRef.current?.postMessage({ type: 'check-out', attendance: data.data })
             } else {
+                // Rollback optimistic update
+                setTodayAttendance(previousAttendance)
                 toast.error(data.message || 'Failed to check out')
             }
         } catch (error) {
             console.error('Check out error:', error)
+            // Rollback optimistic update
+            setTodayAttendance(previousAttendance)
             toast.error('Failed to check out')
         } finally {
             setAttendanceLoading(false)
         }
-    }, [employeeIdStr])
+    }, [employeeIdStr, attendanceLoading, todayAttendance])
 
     // Build widget components object based on role permissions
     // CustomizableDashboard expects an object mapping widget IDs to rendered components

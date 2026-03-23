@@ -158,6 +158,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       callback(data);
     });
   },
+
+  onAttendanceUpdate: function(callback) {
+    ipcRenderer.on('attendance-update', function(event, data) {
+      callback(data);
+    });
+  },
   
   onSocketStatus: function(callback) {
     ipcRenderer.on('socket-status', function(event, data) {
