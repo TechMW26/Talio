@@ -60,6 +60,35 @@ const rolePermissions = {
     '/dashboard/announcements',
   ],
   
+  // Team Leader has access to team monitoring + personal functions
+  team_leader: [
+    '/dashboard',
+    '/dashboard/productivity',
+    '/dashboard/profile',
+    '/dashboard/attendance',
+    '/dashboard/attendance/report',
+    '/dashboard/attendance/team',
+    '/dashboard/team/members',
+    '/dashboard/team/my-teams',
+    '/dashboard/team/regularisation',
+    '/dashboard/leave/apply',
+    '/dashboard/leave/requests',
+    '/dashboard/leave/approvals',
+    '/dashboard/leave/balance',
+    '/dashboard/performance/ratings',
+    '/dashboard/performance/goals',
+    '/dashboard/performance/reports',
+    '/dashboard/performance/my-performance',
+    '/dashboard/payroll/payslips',
+    '/dashboard/documents',
+    '/dashboard/expenses',
+    '/dashboard/travel',
+    '/dashboard/learning/trainings',
+    '/dashboard/learning/certificates',
+    '/dashboard/announcements',
+    '/dashboard/helpdesk',
+  ],
+
   // Employee has access to personal functions only
   employee: [
     '/dashboard',

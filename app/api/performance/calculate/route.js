@@ -43,12 +43,12 @@ function getEmployeeWorkingDays(employeeJoiningDate, periodStart, periodEnd, wor
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Employee', 'ProjectMember', 'TaskAssignee', 'Attendance', 'PerformanceGoal', 'DailyGoal', 'CompanySettings', 'Holiday'])
+    const auth = await getAuthAndModels(request, ['Employee', 'ProjectMember', 'TaskAssignee', 'Attendance', 'PerformanceGoal', 'DailyGoal', 'CompanySettings', 'Holiday', 'User', 'Team'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Employee, ProjectMember, TaskAssignee, Attendance, PerformanceGoal, DailyGoal, CompanySettings, Holiday } = models
+    const { Employee, ProjectMember, TaskAssignee, Attendance, PerformanceGoal, DailyGoal, CompanySettings, Holiday, User, Team } = models
 
     const { searchParams } = new URL(request.url)
     const employeeIdParam = searchParams.get('employeeId')
@@ -77,8 +77,20 @@ export async function GET(request) {
     // Build query based on role
     let employeeQuery = { status: 'active' }
     
-    if (user.role === 'employee') {
-      employeeQuery._id = currentEmployeeId
+    if (user.role === 'employee' || user.role === 'team_leader') {
+      // Check if this employee is a team leader
+      const tlUser = await User.findById(user._id || user.userId).select('teamLeaderOf').lean()
+      if (tlUser?.teamLeaderOf?.length > 0) {
+        const ledTeams = await Team.find({ _id: { $in: tlUser.teamLeaderOf }, isActive: true }).select('members teamLeaders').lean()
+        const teamMemberIds = new Set()
+        for (const team of ledTeams) {
+          for (const m of (team.members || [])) teamMemberIds.add(m.toString())
+          for (const l of (team.teamLeaders || [])) teamMemberIds.add(l.toString())
+        }
+        employeeQuery._id = { $in: [...teamMemberIds] }
+      } else {
+        employeeQuery._id = currentEmployeeId
+      }
     } else if (user.role === 'manager') {
       const teamMembers = await Employee.find({ 
         reportingManager: currentEmployeeId,

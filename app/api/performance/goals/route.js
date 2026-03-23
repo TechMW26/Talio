@@ -5,12 +5,12 @@ import { getAuthAndModels } from '@/lib/auth'
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['PerformanceGoal', 'Employee', 'Team'])
+    const auth = await getAuthAndModels(request, ['PerformanceGoal', 'Employee', 'Team', 'User'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { PerformanceGoal, Employee, Team } = models
+    const { PerformanceGoal, Employee, Team, User } = models
 
     const { searchParams } = new URL(request.url)
     const goalId = searchParams.get('goalId')
@@ -50,13 +50,26 @@ export async function GET(request) {
 
     // Role-based filtering
     const userId = user._id || user.userId
-    if (user.role === 'employee') {
-      // Employees can only see their own goals
-      const employee = await Employee.findOne({ userId }).select('_id')
-      if (employee) {
-        query.employee = employee._id
+    if (user.role === 'employee' || user.role === 'team_leader') {
+      // Check if this employee is a team leader
+      const teamLeaderUser = await User.findById(userId).select('teamLeaderOf').lean()
+      if (teamLeaderUser?.teamLeaderOf?.length > 0) {
+        // Team leader: can see goals for their team members
+        const ledTeams = await Team.find({ _id: { $in: teamLeaderUser.teamLeaderOf }, isActive: true }).select('members teamLeaders').lean()
+        const teamMemberIds = new Set()
+        for (const team of ledTeams) {
+          for (const m of (team.members || [])) teamMemberIds.add(m.toString())
+          for (const l of (team.teamLeaders || [])) teamMemberIds.add(l.toString())
+        }
+        query.employee = { $in: [...teamMemberIds] }
       } else {
-        return NextResponse.json({ success: true, data: [], pagination: { currentPage: 1, totalPages: 0, totalItems: 0 } })
+        // Regular employees can only see their own goals
+        const employee = await Employee.findOne({ userId }).select('_id')
+        if (employee) {
+          query.employee = employee._id
+        } else {
+          return NextResponse.json({ success: true, data: [], pagination: { currentPage: 1, totalPages: 0, totalItems: 0 } })
+        }
       }
     } else if (user.role === 'manager' || user.role === 'department_head') {
       // Managers can see goals for their team members
@@ -152,15 +165,23 @@ export async function GET(request) {
 export async function POST(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['PerformanceGoal', 'Employee'])
+    const auth = await getAuthAndModels(request, ['PerformanceGoal', 'Employee', 'User'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { PerformanceGoal, Employee } = models
+    const { PerformanceGoal, Employee, User } = models
 
-    if (!['admin', 'hr', 'manager', 'department_head'].includes(user.role)) {
-      return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
+    if (!['admin', 'hr', 'manager', 'department_head', 'team_leader'].includes(user.role)) {
+      // Also allow employees who are team leaders
+      if (user.role === 'employee') {
+        const tlUser = await User.findById(user._id || user.userId).select('teamLeaderOf').lean()
+        if (!tlUser?.teamLeaderOf?.length) {
+          return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
+        }
+      } else {
+        return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
+      }
     }
 
     const body = await request.json()
@@ -279,12 +300,12 @@ export async function POST(request) {
 export async function PUT(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['PerformanceGoal', 'Employee'])
+    const auth = await getAuthAndModels(request, ['PerformanceGoal', 'Employee', 'User'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { PerformanceGoal, Employee } = models
+    const { PerformanceGoal, Employee, User } = models
 
     const body = await request.json()
     const { goalId, ...updateData } = body
@@ -313,7 +334,11 @@ export async function PUT(request) {
       )
     }
 
-    const canUpdateAll = ['admin', 'hr', 'manager', 'department_head'].includes(user.role)
+    let canUpdateAll = ['admin', 'hr', 'manager', 'department_head', 'team_leader'].includes(user.role)
+    if (!canUpdateAll && user.role === 'employee') {
+      const tlUser = await User.findById(user._id || user.userId).select('teamLeaderOf').lean()
+      if (tlUser?.teamLeaderOf?.length > 0) canUpdateAll = true
+    }
     const employee = await Employee.findOne({ userId: user._id }).select('_id')
 
     if (!canUpdateAll) {
@@ -382,15 +407,22 @@ export async function PUT(request) {
 export async function DELETE(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['PerformanceGoal'])
+    const auth = await getAuthAndModels(request, ['PerformanceGoal', 'User'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { PerformanceGoal } = models
+    const { PerformanceGoal, User } = models
 
-    if (!['admin', 'hr', 'manager', 'department_head'].includes(user.role)) {
-      return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
+    if (!['admin', 'hr', 'manager', 'department_head', 'team_leader'].includes(user.role)) {
+      if (user.role === 'employee') {
+        const tlUser = await User.findById(user._id || user.userId).select('teamLeaderOf').lean()
+        if (!tlUser?.teamLeaderOf?.length) {
+          return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
+        }
+      } else {
+        return NextResponse.json({ success: false, message: 'Access denied' }, { status: 403 })
+      }
     }
 
     const { searchParams } = new URL(request.url)

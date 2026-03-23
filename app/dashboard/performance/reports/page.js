@@ -159,8 +159,10 @@ export default function PerformanceReportsPage() {
   })
   const [searchTerm, setSearchTerm] = useState('')
   const [isDepartmentHead, setIsDepartmentHead] = useState(false)
+  const [isTeamLeader, setIsTeamLeader] = useState(false)
   const [userDepartmentId, setUserDepartmentId] = useState(null)
   const [headedDepartments, setHeadedDepartments] = useState([])
+  const [teamLeaderTeams, setTeamLeaderTeams] = useState([])
 
   // Global AI loading animation
   const { startAILoading, stopAILoading } = useAILoading()
@@ -176,14 +178,17 @@ export default function PerformanceReportsPage() {
   const { data: deptsRes } = useAuthedSWR('/api/departments')
   const departments = deptsRes?.data || []
 
-  // SWR: fetch teams for selected department
+  // SWR: fetch teams for selected department (or team leader's teams)
   const teamsFetchKey = (() => {
+    if (isTeamLeader && !isDepartmentHead) return null // Team leaders use teamLeaderTeams directly
     if (selectedDepartment && selectedDepartment !== 'all') return `/api/teams?department=${selectedDepartment}`
     if (headedDepartments.length === 1) return `/api/teams?department=${headedDepartments[0]?._id}`
     return null
   })()
   const { data: teamsRes } = useAuthedSWR(teamsFetchKey)
-  const availableTeams = teamsRes?.data || []
+  const availableTeams = isTeamLeader && !isDepartmentHead
+    ? teamLeaderTeams
+    : (teamsRes?.data || [])
 
   // Process head check result
   const headCheckComplete = !headCheckLoading && !!headCheckRes
@@ -191,9 +196,11 @@ export default function PerformanceReportsPage() {
   useEffect(() => {
     if (headCheckRes?.success) {
       setIsDepartmentHead(headCheckRes.isDepartmentHead)
+      setIsTeamLeader(headCheckRes.isTeamLeader || false)
       const depts = headCheckRes.departments || []
       setHeadedDepartments(depts)
       setUserDepartmentId(headCheckRes.departmentId)
+      setTeamLeaderTeams(headCheckRes.teamLeaderTeams || [])
       if (headCheckRes.isDepartmentHead && depts.length > 0) {
         setSelectedDepartment(depts.length > 1 ? 'all' : depts[0]._id)
       }
@@ -337,8 +344,8 @@ export default function PerformanceReportsPage() {
         })
       }
 
-      // Client-side team filter (for when team filter is applied)
-      if (selectedTeam && selectedTeam !== 'all' && availableTeams.length > 0) {
+      // Client-side team filter (for when team filter is applied, skip for team leaders as API handles scoping)
+      if (selectedTeam && selectedTeam !== 'all' && availableTeams.length > 0 && !isTeamLeader) {
         const team = availableTeams.find(t => t._id === selectedTeam)
         if (team) {
           const teamMemberIds = new Set([

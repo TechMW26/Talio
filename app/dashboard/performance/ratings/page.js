@@ -26,6 +26,7 @@ export default function EmployeeRatingsPage() {
   // Check department head status
   const { data: headCheckRes } = useAuthedSWR(user ? '/api/team/check-head' : null)
   const isDepartmentHead = headCheckRes?.success && headCheckRes?.isDepartmentHead
+  const isTeamLeader = headCheckRes?.success && headCheckRes?.isTeamLeader
   const headedDepartments = headCheckRes?.departments || []
 
   // Fetch all departments for admin/HR
@@ -77,7 +78,7 @@ export default function EmployeeRatingsPage() {
   }
 
   const canManageRatings = () => {
-    return user && ['admin', 'hr', 'manager', 'department_head'].includes(user.role)
+    return user && (['admin', 'hr', 'manager', 'department_head', 'team_leader'].includes(user.role) || isDepartmentHead || isTeamLeader)
   }
 
   const getRatingStars = (rating) => {

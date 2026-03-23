@@ -30,7 +30,7 @@ export default function TeamRegularisationPage() {
   const { data: accessRes, isLoading: accessLoading } = useAuthedSWR(
     user && !isAdminOrHR ? '/api/team/check-head' : null
   )
-  const hasAccess = isAdminOrHR || (accessRes?.success && accessRes?.isDepartmentHead)
+  const hasAccess = isAdminOrHR || (accessRes?.success && (accessRes?.isDepartmentHead || accessRes?.isTeamLeader))
   const accessResolved = isAdminOrHR || (!accessLoading && accessRes !== undefined)
 
   // Fetch departments (admin/HR only)
@@ -40,6 +40,8 @@ export default function TeamRegularisationPage() {
   // Headed departments for department heads
   const headedDepartments = accessRes?.departments || []
   const isDepartmentHead = accessRes?.isDepartmentHead
+  const isTeamLeader = accessRes?.isTeamLeader
+  const teamLeaderTeams = accessRes?.teamLeaderTeams || []
 
   // Fetch teams for the selected department
   const teamsSwrKey = (() => {
@@ -51,10 +53,13 @@ export default function TeamRegularisationPage() {
       if (headedDepartments.length === 1) return `/api/teams?department=${headedDepartments[0]._id}`
       return null
     }
+    if (isTeamLeader) return null // Use teamLeaderTeams directly
     return null
   })()
   const { data: teamsRes } = useAuthedSWR(teamsSwrKey)
-  const availableTeams = teamsRes?.data || teamsRes?.teams || []
+  const availableTeams = isTeamLeader && !isDepartmentHead && !isAdminOrHR
+    ? teamLeaderTeams
+    : (teamsRes?.data || teamsRes?.teams || [])
 
   // Build query params for corrections
   const deptParam = selectedDepartment && selectedDepartment !== 'all' ? `&department=${selectedDepartment}` : ''

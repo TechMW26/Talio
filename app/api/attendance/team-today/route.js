@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Attendance', 'Employee', 'User', 'Leave', 'CompanySettings', 'Department'])
+    const auth = await getAuthAndModels(request, ['Attendance', 'Employee', 'User', 'Leave', 'CompanySettings', 'Department', 'Team'])
     if (!auth.success) {
       return NextResponse.json({ success: false, message: auth.message }, { status: 401 })
     }
@@ -15,7 +15,7 @@ export async function GET(request) {
       return NextResponse.json({ success: false, message: 'Failed to load database models' }, { status: 500 })
     }
     const { user, models } = auth
-    const { Attendance, Employee, User, Leave, CompanySettings, Department } = models
+    const { Attendance, Employee, User, Leave, CompanySettings, Department, Team } = models
 
     if (!Attendance || !Employee || !User || !Leave || !CompanySettings) {
       return NextResponse.json({ success: false, message: 'Failed to load required models' }, { status: 500 })
@@ -27,7 +27,7 @@ export async function GET(request) {
         path: 'employeeId',
         options: { strictPopulate: false }
       })
-      .select('role employeeId isDepartmentHead headOfDepartments')
+      .select('role employeeId isDepartmentHead headOfDepartments teamLeaderOf')
       .lean()
     if (!requestingUser) {
       return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 })
@@ -99,6 +99,26 @@ export async function GET(request) {
         })
           .select('firstName lastName profilePicture department')
           .lean()
+      } else if (requestingUser.teamLeaderOf?.length > 0 && Team) {
+        // Check if user is a team leader
+        const ledTeams = await Team.find({
+          _id: { $in: requestingUser.teamLeaderOf },
+          isActive: true
+        }).select('members teamLeaders').lean()
+
+        if (ledTeams.length > 0) {
+          const teamEmployeeIds = new Set()
+          for (const team of ledTeams) {
+            for (const m of (team.members || [])) teamEmployeeIds.add(m.toString())
+            for (const l of (team.teamLeaders || [])) teamEmployeeIds.add(l.toString())
+          }
+          employees = await Employee.find({
+            _id: { $in: [...teamEmployeeIds] },
+            status: 'active'
+          })
+            .select('firstName lastName profilePicture department')
+            .lean()
+        }
       } else {
         // Fallback for managers: get direct reports and same department
         employees = await Employee.find({

@@ -86,16 +86,18 @@ export default function ProductivityPage() {
     }
   }, [deptHeadRes])
 
-  // Check if user can view team (admin, hr, manager, dept_head, or actual department head)
+  const isTeamLeader = deptHeadRes?.success && deptHeadRes?.isTeamLeader
+
+  // Check if user can view team (admin, hr, manager, dept_head, team_leader, or actual department head)
   // Admins default to team tab since screenshots are not captured for admin accounts
   useEffect(() => {
     const teamRoles = ['admin', 'hr', 'manager', 'department_head']
-    const canView = teamRoles.includes(userRole) || isDepartmentHead
+    const canView = teamRoles.includes(userRole) || isDepartmentHead || isTeamLeader
     setCanViewTeam(canView)
     if (userRole === 'admin') {
       setActiveTab('team')
     }
-  }, [userRole, isDepartmentHead])
+  }, [userRole, isDepartmentHead, isTeamLeader])
 
   // Fetch departments for admin/HR filter
   const { data: departmentsRes } = useAuthedSWR(isAdminOrHR ? '/api/departments' : null)

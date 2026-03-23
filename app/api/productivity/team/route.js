@@ -95,56 +95,101 @@ export async function GET(request) {
         }).lean();
         departmentIds = departments.map(d => d._id.toString());
       }
-      
+
+      // If not a department head, check if user is a team leader
       if (departmentIds.length === 0) {
+        const teamLeaderUser = await User.findById(currentUserId)
+          .select('teamLeaderOf')
+          .lean();
+
+        if (teamLeaderUser?.teamLeaderOf?.length > 0) {
+          // Get teams this user leads
+          const ledTeams = await Team.find({
+            _id: { $in: teamLeaderUser.teamLeaderOf },
+            isActive: true
+          }).select('teamName members teamLeaders').lean();
+
+          if (ledTeams.length > 0) {
+            // Collect all team member + leader employee IDs
+            const teamEmployeeIds = new Set();
+            for (const team of ledTeams) {
+              for (const m of (team.members || [])) teamEmployeeIds.add(m.toString());
+              for (const l of (team.teamLeaders || [])) teamEmployeeIds.add(l.toString());
+            }
+
+            const employees = await Employee.find({
+              _id: { $in: [...teamEmployeeIds] },
+              status: 'active'
+            })
+              .select('firstName lastName email profilePicture department designation userId')
+              .populate('department', 'name')
+              .populate('designation', 'title')
+              .lean();
+
+            teamMembers = employees.filter(e => e.userId).map(e => ({
+              ...e,
+              user: e.userId
+            }));
+
+            departmentName = ledTeams.map(t => t.teamName).join(', ');
+            console.log(`[Team API] Team leader viewing ${teamMembers.length} members from ${ledTeams.length} team(s)`);
+          }
+        }
+      }
+      
+      if (departmentIds.length === 0 && teamMembers.length === 0) {
         return NextResponse.json({
           success: true,
           data: [],
           departments: [],
-          message: 'You are not a department head'
+          message: 'You are not a department head or team leader'
         });
       }
       
-      // Apply department filter if specified and user is authorized for that department
-      if (departmentFilter && departmentFilter !== 'all') {
-        if (departmentIds.includes(departmentFilter)) {
-          departmentIds = [departmentFilter];
-          const filteredDept = departments.find(d => d._id.toString() === departmentFilter);
-          departmentName = filteredDept?.name || 'Filtered Department';
+      // Department head flow: filter by department
+      if (departmentIds.length > 0) {
+        // Apply department filter if specified and user is authorized for that department
+        if (departmentFilter && departmentFilter !== 'all') {
+          if (departmentIds.includes(departmentFilter)) {
+            departmentIds = [departmentFilter];
+            const filteredDept = departments.find(d => d._id.toString() === departmentFilter);
+            departmentName = filteredDept?.name || 'Filtered Department';
+          } else {
+            return NextResponse.json({
+              success: false,
+              message: 'Not authorized to view this department'
+            }, { status: 403 });
+          }
         } else {
-          return NextResponse.json({
-            success: false,
-            message: 'Not authorized to view this department'
-          }, { status: 403 });
+          departmentName = departments.length > 1 
+            ? departments.map(d => d.name).join(', ') 
+            : departments[0]?.name || 'Department';
         }
-      } else {
-        departmentName = departments.length > 1 
-          ? departments.map(d => d.name).join(', ') 
-          : departments[0]?.name || 'Department';
+        
+        // Get all employees in filtered/all departments user heads
+        const employees = await Employee.find({ 
+          status: 'active',
+          $or: [
+            { department: { $in: departmentIds } },
+            { departments: { $in: departmentIds } }
+          ]
+        })
+          .select('firstName lastName email profilePicture department designation userId')
+          .populate('department', 'name')
+          .populate('designation', 'title')
+          .lean();
+        
+        console.log(`[Team API] Found ${employees.length} employees in department(s) ${departmentName}`);
+        
+        // Filter only employees with userId and map for consistency
+        teamMembers = employees.filter(e => e.userId).map(e => ({
+          ...e,
+          user: e.userId // Map userId to user for consistency
+        }));
+        
+        console.log(`[Team API] ${teamMembers.length} employees have userId linked`);
       }
-      
-      // Get all employees in filtered/all departments user heads
-      const employees = await Employee.find({ 
-        status: 'active',
-        $or: [
-          { department: { $in: departmentIds } },
-          { departments: { $in: departmentIds } }
-        ]
-      })
-        .select('firstName lastName email profilePicture department designation userId')
-        .populate('department', 'name')
-        .populate('designation', 'title')
-        .lean();
-      
-      console.log(`[Team API] Found ${employees.length} employees in department(s) ${departmentName}`);
-      
-      // Filter only employees with userId and map for consistency
-      teamMembers = employees.filter(e => e.userId).map(e => ({
-        ...e,
-        user: e.userId // Map userId to user for consistency
-      }));
-      
-      console.log(`[Team API] ${teamMembers.length} employees have userId linked`);
+      // Team leader flow: teamMembers already populated above
     }
 
     // Apply team filter if specified

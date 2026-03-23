@@ -36,24 +36,29 @@ export default function PerformanceGoalsPage() {
 
   const isAdminOrHR = user && ['admin', 'hr'].includes(user.role)
 
-  // Check department head status
+  // Check department head / team leader status
   const { data: headCheckRes } = useAuthedSWR(user ? '/api/team/check-head' : null)
   const isDepartmentHead = headCheckRes?.success && headCheckRes?.isDepartmentHead
+  const isTeamLeader = headCheckRes?.success && headCheckRes?.isTeamLeader
   const headedDepartments = headCheckRes?.departments || []
+  const teamLeaderTeams = headCheckRes?.teamLeaderTeams || []
 
   // Fetch all departments for admin/HR
   const { data: deptsRes } = useAuthedSWR(isAdminOrHR ? '/api/departments' : null)
   const allDepartments = deptsRes?.data || []
   const departments = isAdminOrHR ? allDepartments : headedDepartments
 
-  // Fetch teams for selected department
+  // Fetch teams for selected department (or team leader's teams)
   const teamsFetchKey = (() => {
+    if (isTeamLeader && !isDepartmentHead && !isAdminOrHR) return null // Team leaders use teamLeaderTeams directly
     if (selectedDepartment && selectedDepartment !== 'all') return `/api/teams?department=${selectedDepartment}`
     if (!isAdminOrHR && headedDepartments.length === 1) return `/api/teams?department=${headedDepartments[0]?._id}`
     return null
   })()
   const { data: teamsRes } = useAuthedSWR(teamsFetchKey)
-  const availableTeams = teamsRes?.data || []
+  const availableTeams = isTeamLeader && !isDepartmentHead && !isAdminOrHR
+    ? teamLeaderTeams
+    : (teamsRes?.data || [])
 
   // Build SWR key with department + team filters
   const goalsSwrKey = useMemo(() => {
@@ -130,7 +135,7 @@ export default function PerformanceGoalsPage() {
   }
 
   const canManageGoals = () => {
-    return user && ['admin', 'hr', 'manager', 'department_head'].includes(user.role)
+    return user && (['admin', 'hr', 'manager', 'department_head', 'team_leader'].includes(user.role) || isDepartmentHead || isTeamLeader)
   }
 
   const getStatusConfig = (status) => {

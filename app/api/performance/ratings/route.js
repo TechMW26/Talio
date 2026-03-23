@@ -7,12 +7,12 @@ export const dynamic = 'force-dynamic'
 export async function GET(request) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Employee', 'Team'])
+    const auth = await getAuthAndModels(request, ['Employee', 'Team', 'User'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Employee, Team } = models
+    const { Employee, Team, User } = models
 
     const { searchParams } = new URL(request.url)
     const department = searchParams.get('department')
@@ -25,9 +25,32 @@ export async function GET(request) {
     // Get employeeId - could be object or string
     const employeeId = user.employeeId?._id || user.employeeId
     
-    if (user.role === 'employee') {
-      // Employees can only see their own reviews
-      query._id = employeeId
+    if (user.role === 'employee' || user.role === 'team_leader') {
+      // Check if user is a team leader first (team leaders may have role 'employee' or 'team_leader')
+      const userRecord = await User.findById(user._id || user.userId).select('teamLeaderOf').lean()
+      if (userRecord?.teamLeaderOf?.length > 0 && Team) {
+        const ledTeams = await Team.find({
+          _id: { $in: userRecord.teamLeaderOf },
+          isActive: true
+        }).select('members teamLeaders').lean()
+
+        if (ledTeams.length > 0) {
+          const teamEmployeeIds = new Set()
+          for (const team of ledTeams) {
+            for (const m of (team.members || [])) teamEmployeeIds.add(m.toString())
+            for (const l of (team.teamLeaders || [])) teamEmployeeIds.add(l.toString())
+          }
+          // Include self
+          if (employeeId) teamEmployeeIds.add(employeeId.toString())
+          query._id = { $in: [...teamEmployeeIds] }
+        } else {
+          // No active teams, restrict to own
+          query._id = employeeId
+        }
+      } else {
+        // Regular employee - own reviews only
+        query._id = employeeId
+      }
     } else if (user.role === 'manager') {
       // Managers can see reviews for their team members
       const teamMembers = await Employee.find({ 

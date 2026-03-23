@@ -42,7 +42,7 @@ const isValidDateString = (value) => {
 
 // Helper to check if user can approve corrections (tenant-aware version)
 async function canApproveCorrections(userId, targetEmployeeId, models) {
-  const { User, Employee, Department } = models
+  const { User, Employee, Department, Team } = models
 
   const user = await User.findById(userId).populate({
     path: 'employeeId',
@@ -88,6 +88,19 @@ async function canApproveCorrections(userId, targetEmployeeId, models) {
     // Check if user is reporting manager of target
     if (targetEmployee.reportingManager?.toString() === user.employeeId._id.toString()) {
       return { canApprove: true, role: 'manager' }
+    }
+
+    // Check if user is a team leader of a team containing the target employee
+    if (user.teamLeaderOf?.length > 0 && Team) {
+      const ledTeams = await Team.find({ _id: { $in: user.teamLeaderOf }, isActive: true }).select('members teamLeaders').lean()
+      const teamMemberIds = new Set()
+      for (const team of ledTeams) {
+        for (const m of (team.members || [])) teamMemberIds.add(m.toString())
+        for (const l of (team.teamLeaders || [])) teamMemberIds.add(l.toString())
+      }
+      if (teamMemberIds.has(targetEmployee._id.toString())) {
+        return { canApprove: true, role: 'team_leader' }
+      }
     }
   }
 
@@ -173,7 +186,7 @@ export async function GET(request) {
           query.employee = userEmployeeId
         }
       } else if (user?.employeeId) {
-        // Department head - get corrections for their department
+        // Department head / team leader - get corrections for their department/team
         const userEmpId = user.employeeId._id || user.employeeId
         const departments = await Department.find({
           $or: [
@@ -183,10 +196,29 @@ export async function GET(request) {
         }).lean()
 
         const deptIds = departments.map(d => d._id)
-        const deptEmployees = await Employee.find({ department: { $in: deptIds } }).select('_id').lean()
-        const empIds = deptEmployees.map(e => e._id)
 
-        query.employee = { $in: empIds }
+        if (deptIds.length > 0) {
+          // Department head: see department members' corrections
+          const deptEmployees = await Employee.find({ department: { $in: deptIds } }).select('_id').lean()
+          const empIds = deptEmployees.map(e => e._id)
+          query.employee = { $in: empIds }
+        } else {
+          // Check if user is a team leader
+          const tlUser = await User.findById(user._id || user.userId).select('teamLeaderOf').lean()
+          if (tlUser?.teamLeaderOf?.length > 0 && Team) {
+            const ledTeams = await Team.find({ _id: { $in: tlUser.teamLeaderOf }, isActive: true }).select('members teamLeaders').lean()
+            const teamMemberIds = []
+            for (const team of ledTeams) {
+              for (const m of (team.members || [])) teamMemberIds.push(m)
+              for (const l of (team.teamLeaders || [])) teamMemberIds.push(l)
+            }
+            query.employee = { $in: teamMemberIds }
+          } else {
+            // Fallback: only own corrections
+            query.employee = userEmployeeId
+          }
+        }
+
         if (type === 'pending') {
           query.status = 'pending'
         }

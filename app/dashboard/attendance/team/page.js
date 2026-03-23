@@ -41,6 +41,7 @@ export default function TeamAttendancePage() {
     user ? '/api/team/check-head' : null
   )
   const isDepartmentHead = headCheckRes?.success && headCheckRes?.isDepartmentHead
+  const isTeamLeader = headCheckRes?.success && headCheckRes?.isTeamLeader
   const headedDepartments = headCheckRes?.departments || []
   const departmentInfo = useMemo(() => {
     if (!isDepartmentHead || headedDepartments.length === 0) return null
@@ -91,6 +92,14 @@ export default function TeamAttendancePage() {
           const uniqueEmployees = allEmployees.filter((emp, i, self) => i === self.findIndex(e => e._id === emp._id))
           setEmployees(uniqueEmployees)
           buildDepartmentColorMap(uniqueEmployees)
+        } else if (isTeamLeader) {
+          // Team leader: fetch team members via team/members API
+          const response = await fetch('/api/team/members', { headers })
+          const data = await response.json()
+          if (data.success) {
+            setEmployees(data.data || [])
+            buildDepartmentColorMap(data.data || [])
+          }
         } else {
           toast.error('You do not have permission to view team attendance')
         }
@@ -104,7 +113,7 @@ export default function TeamAttendancePage() {
     }
 
     fetchEmployees()
-  }, [headCheckRes, isAdmin, isDepartmentHead, headedDepartments])
+  }, [headCheckRes, isAdmin, isDepartmentHead, isTeamLeader, headedDepartments])
 
   const buildDepartmentColorMap = (employeeList) => {
     const uniqueDepts = [...new Set(employeeList.map(e => e.department?._id || e.department).filter(Boolean))]

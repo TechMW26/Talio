@@ -8,7 +8,8 @@ import {
   HiOutlineCog6Tooth,
   HiOutlineArrowRightOnRectangle,
   HiOutlineChatBubbleLeftRight,
-  HiOutlineUsers
+  HiOutlineUsers,
+  HiOutlineComputerDesktop
 } from 'react-icons/hi2'
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { getMenuItemsForRole } from '@/utils/roleBasedMenus'
@@ -249,20 +250,63 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
       ]
     }
 
-    // Team leader (not dept head) gets a My Teams section
+    // Team leader (not dept head) gets full team monitoring menu
     if (isTeamLeader) {
-      const myTeamsMenuItem = {
-        name: 'My Teams',
+      const teamSubmenu = [
+        { name: 'My Teams', path: '/dashboard/team/my-teams' },
+        { name: 'Team Members', path: '/dashboard/team/members' },
+        { name: 'Team Ratings', path: '/dashboard/performance/ratings' },
+        { name: 'Team Goals', path: '/dashboard/performance/goals' },
+        { name: 'Performance Reports', path: '/dashboard/performance/reports' },
+      ]
+      const teamMenuItem = {
+        name: 'Team',
         icon: HiOutlineUsers,
         path: '/dashboard/team/my-teams',
         group: 'Main',
+        submenu: teamSubmenu
       }
 
-      return [
-        baseMenuItems[0],
-        myTeamsMenuItem,
-        ...baseMenuItems.slice(1)
-      ]
+      // Add Team Attendance + Regularisation to attendance menu
+      baseMenuItems = [...baseMenuItems]
+      const attendanceMenuIndex = baseMenuItems.findIndex(item => item.name === 'Attendance & Leaves')
+      if (attendanceMenuIndex !== -1) {
+        const currentSubmenu = baseMenuItems[attendanceMenuIndex].submenu || []
+        const hasTeamAttendance = currentSubmenu.some(item => item.path === '/dashboard/attendance/team')
+        if (!hasTeamAttendance) {
+          const myAttendanceIndex = currentSubmenu.findIndex(item => item.path === '/dashboard/attendance')
+          const newSubmenu = [...currentSubmenu]
+          newSubmenu.splice(myAttendanceIndex + 1, 0,
+            { name: 'Team Attendance', path: '/dashboard/attendance/team' },
+            { name: 'Attendance Regularisation', path: '/dashboard/team/regularisation' }
+          )
+          // Add Leave Approvals if not present
+          if (!newSubmenu.some(item => item.path === '/dashboard/leave/approvals')) {
+            newSubmenu.push({ name: 'Leave Approvals', path: '/dashboard/leave/approvals' })
+          }
+          baseMenuItems[attendanceMenuIndex] = {
+            ...baseMenuItems[attendanceMenuIndex],
+            submenu: newSubmenu
+          }
+        }
+      }
+
+      // Add Productivity if not already present
+      const hasProductivity = baseMenuItems.some(item => item.name === 'Productivity')
+      const productivityItem = hasProductivity ? null : {
+        name: 'Productivity',
+        icon: HiOutlineComputerDesktop,
+        path: '/dashboard/productivity',
+        group: 'Work'
+      }
+
+      const result = [baseMenuItems[0], teamMenuItem, ...baseMenuItems.slice(1)]
+      if (productivityItem) {
+        // Insert after Team
+        result.splice(2, 0, productivityItem)
+      }
+
+      return result
     }
 
     return baseMenuItems
