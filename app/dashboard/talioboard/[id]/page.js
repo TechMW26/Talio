@@ -327,7 +327,7 @@ export default function WhiteboardEditorPage() {
 
   if (loading) {
     return (
-      <div className="h-screen flex flex-col bg-gray-50">
+      <div className="h-screen flex flex-col bg-gray-50 whiteboard-light-override">
         <div className="flex items-center gap-4 px-4 py-3 bg-white border-b border-gray-200">
           <Skeleton className="w-8 h-8 rounded-lg" />
           <Skeleton className="h-6 w-48 rounded-lg" />
@@ -350,10 +350,10 @@ export default function WhiteboardEditorPage() {
   }
 
   return (
-    <div ref={containerRef} className="h-screen flex flex-col bg-gray-50">
+    <div ref={containerRef} className="h-screen flex flex-col bg-gray-50 whiteboard-light-override">
       {/* Saving overlay */}
       <ModalPortal isOpen={isSaving}>
-        <div className="modal-overlay">
+        <div className="modal-overlay whiteboard-light-override">
           <div className="bg-white rounded-[30px] animate-modal-enter px-6 py-4 flex items-center gap-3 shadow-xl">
             <Skeleton className="w-5 h-5 rounded-full" />
             <span className="text-gray-700 font-medium">Saving...</span>
@@ -423,7 +423,7 @@ export default function WhiteboardEditorPage() {
 
       {/* Share Modal */}
       <ModalPortal isOpen={showShareModal}>
-        <div className="modal-overlay">
+        <div className="modal-overlay whiteboard-light-override">
           <div className="bg-white rounded-[30px] animate-modal-enter shadow-xl w-full max-w-md overflow-hidden">
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
@@ -551,7 +551,7 @@ export default function WhiteboardEditorPage() {
 
       {/* Rename Modal */}
       <ModalPortal isOpen={showRenameModal}>
-        <div className="modal-overlay">
+        <div className="modal-overlay whiteboard-light-override">
           <div className="bg-white rounded-[30px] animate-modal-enter shadow-xl w-full max-w-sm overflow-hidden">
             <div className="p-6">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Rename board</h2>

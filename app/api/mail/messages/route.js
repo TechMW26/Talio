@@ -317,13 +317,21 @@ export async function POST(request) {
     const { user, models } = auth
     const { EmailAccount } = models
 
-    const { to, cc, bcc, subject, body, isHtml, attachments } = await request.json();
+    const { to, cc, bcc, subject, body, isHtml, attachments, accountId, threadId } = await request.json();
 
     if (!to || !subject) {
       return NextResponse.json({ error: 'To and subject are required' }, { status: 400 });
     }
 
-    const emailAccount = await EmailAccount.findOne({ user: user._id }).select('+accessToken +refreshToken');
+    // Use specified accountId, fall back to primary, then first connected account
+    let emailAccount;
+    if (accountId) {
+      emailAccount = await EmailAccount.findOne({ _id: accountId, user: user._id, isConnected: true }).select('+accessToken +refreshToken');
+    }
+    if (!emailAccount) {
+      const accounts = await EmailAccount.find({ user: user._id, isConnected: true }).select('+accessToken +refreshToken');
+      emailAccount = accounts.find(a => a.isPrimary) || accounts[0];
+    }
 
     if (!emailAccount || !emailAccount.isConnected) {
       return NextResponse.json({ error: 'Email not connected' }, { status: 400 });
@@ -380,11 +388,13 @@ export async function POST(request) {
       .replace(/\//g, '_')
       .replace(/=+$/, '');
 
+    const sendBody = { raw: encodedMessage };
+    // If replying to a thread, include threadId so Gmail groups the messages
+    if (threadId) sendBody.threadId = threadId;
+
     const response = await gmail.users.messages.send({
       userId: 'me',
-      requestBody: {
-        raw: encodedMessage
-      }
+      requestBody: sendBody
     });
 
     return NextResponse.json({
@@ -409,13 +419,21 @@ export async function PATCH(request) {
     const { user, models } = auth
     const { EmailAccount } = models
 
-    const { messageId, action } = await request.json();
+    const { messageId, action, accountId } = await request.json();
 
     if (!messageId || !action) {
       return NextResponse.json({ error: 'Message ID and action are required' }, { status: 400 });
     }
 
-    const emailAccount = await EmailAccount.findOne({ user: user._id }).select('+accessToken +refreshToken');
+    // Use specified accountId, fall back to primary, then first account
+    let emailAccount;
+    if (accountId) {
+      emailAccount = await EmailAccount.findOne({ _id: accountId, user: user._id, isConnected: true }).select('+accessToken +refreshToken');
+    }
+    if (!emailAccount) {
+      const accounts = await EmailAccount.find({ user: user._id, isConnected: true }).select('+accessToken +refreshToken');
+      emailAccount = accounts.find(a => a.isPrimary) || accounts[0];
+    }
 
     if (!emailAccount || !emailAccount.isConnected) {
       return NextResponse.json({ error: 'Email not connected' }, { status: 400 });
