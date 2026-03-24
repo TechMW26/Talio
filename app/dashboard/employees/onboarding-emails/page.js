@@ -106,6 +106,7 @@ export default function OnboardingEmailsPage() {
       }
       setShowSendModal(false)
       setSendEmailAddress('')
+      refreshEmails()
     },
     onError: (err) => toast.error(err || 'Failed to send onboarding email'),
   })
@@ -122,6 +123,7 @@ export default function OnboardingEmailsPage() {
       toast.success(data.message)
       setSelectedEmails([])
       setSelectAll(false)
+      refreshEmails()
     },
     onError: (err) => toast.error(err || 'Failed to retry emails'),
   })
@@ -129,7 +131,10 @@ export default function OnboardingEmailsPage() {
   const queueFailedMutation = useApiMutation({
     method: 'POST',
     invalidateKeys: [/\/api\/employees\/onboarding-emails/],
-    onSuccess: (data) => toast.success(data.message),
+    onSuccess: (data) => {
+      toast.success(data.message)
+      refreshEmails()
+    },
     onError: (err) => toast.error(err || 'Failed to queue emails'),
   })
 
@@ -178,6 +183,7 @@ export default function OnboardingEmailsPage() {
     const result = await retryMutation.execute(`/api/employees/onboarding-emails/${emailId}`)
     if (result) {
       toast.success('Email sent successfully!')
+      refreshEmails()
     } else {
       toast.error('Failed to retry email')
     }
@@ -299,8 +305,8 @@ export default function OnboardingEmailsPage() {
 
           {/* Auto-send Toggle */}
           <div className={`flex items-center gap-3 p-3 rounded-xl border ${autoSendEnabled
-              ? 'bg-success-50 border-success/30'
-              : 'bg-default-100 border-default-300'
+            ? 'bg-success-50 border-success/30'
+            : 'bg-default-100 border-default-300'
             }`}>
             <div className="flex items-center gap-2">
               <HiOutlineBolt className={`w-5 h-5 ${autoSendEnabled ? 'text-success' : 'text-default-400'}`} />
@@ -351,8 +357,8 @@ export default function OnboardingEmailsPage() {
           isPressable
           onPress={() => setStatusFilter('')}
           className={`cursor-pointer transition-all ${statusFilter === ''
-              ? 'bg-secondary-50 border-secondary/30'
-              : 'border-default-200 hover:border-secondary/30'
+            ? 'bg-secondary-50 border-secondary/30'
+            : 'border-default-200 hover:border-secondary/30'
             }`}
         >
           <CardBody className="p-4">
@@ -369,8 +375,8 @@ export default function OnboardingEmailsPage() {
           isPressable
           onPress={() => setStatusFilter(statusFilter === 'sent' ? '' : 'sent')}
           className={`cursor-pointer transition-all ${statusFilter === 'sent'
-              ? 'bg-success-50 border-success/30'
-              : 'border-default-200 hover:border-success/30'
+            ? 'bg-success-50 border-success/30'
+            : 'border-default-200 hover:border-success/30'
             }`}
         >
           <CardBody className="p-4">
@@ -387,8 +393,8 @@ export default function OnboardingEmailsPage() {
           isPressable
           onPress={() => setStatusFilter(statusFilter === 'failed' ? '' : 'failed')}
           className={`cursor-pointer transition-all ${statusFilter === 'failed'
-              ? 'bg-danger-50 border-danger/30'
-              : 'border-default-200 hover:border-danger/30'
+            ? 'bg-danger-50 border-danger/30'
+            : 'border-default-200 hover:border-danger/30'
             }`}
         >
           <CardBody className="p-4">
@@ -405,8 +411,8 @@ export default function OnboardingEmailsPage() {
           isPressable
           onPress={() => setStatusFilter(statusFilter === 'pending' ? '' : 'pending')}
           className={`cursor-pointer transition-all ${statusFilter === 'pending'
-              ? 'bg-warning-50 border-warning/30'
-              : 'border-default-200 hover:border-warning/30'
+            ? 'bg-warning-50 border-warning/30'
+            : 'border-default-200 hover:border-warning/30'
             }`}
         >
           <CardBody className="p-4">
@@ -648,7 +654,7 @@ export default function OnboardingEmailsPage() {
                           color={email.status === 'sent' ? 'success' : email.status === 'failed' ? 'danger' : 'warning'}
                           onPress={() => handleRetry(email._id)}
                           isLoading={retrying[email._id]}
-                          isDisabled={retrying[email._id] || email.status === 'pending'}
+                          isDisabled={retrying[email._id] || (email.status === 'pending' && !email.queued)}
                           startContent={!retrying[email._id] && <HiOutlineArrowPath className="w-4 h-4" />}
                         >
                           {email.status === 'sent' ? 'Resend' : 'Retry'}
