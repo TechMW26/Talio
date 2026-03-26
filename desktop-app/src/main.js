@@ -1,9 +1,5 @@
 /**
-<<<<<<< Updated upstream
- * Talio Desktop App v5.2.0
-=======
- * Talio Desktop App v4.6.0
->>>>>>> Stashed changes
+ * Talio Desktop App v5.3.0
  * Main Electron process
  * 
  * Performance optimized for smooth rendering
@@ -95,16 +91,12 @@ let lastCrashTime = 0;
 let forceCloseAttempts = 0;
 let windowRecreateTimer = null;
 let updateCheckTimer = null;
-<<<<<<< Updated upstream
 let isLoadingApp = false; // Prevents concurrent loadApp() calls
 let loaderTimer = null; // Timer for the loader → loadApp() delay (can be cancelled)
 let isNavigating = false; // Single lock preventing concurrent page navigations
 let navigationSafetyTimer = null; // Fallback to unlock navigation after timeout
 let isDownloadingUpdate = false; // Prevents concurrent update downloads
 let currentUpdateVersion = null; // Version being downloaded
-=======
-let inAppUpdateMode = false; // When true, don't navigate to update.html — send IPC status instead
->>>>>>> Stashed changes
 
 // Persistent store
 const store = new Store({ name: 'app-data' });
@@ -388,11 +380,33 @@ if (!gotTheLock) {
 function createWindow() {
   const windowBounds = store.get('windowBounds', { width: 1280, height: 800 });
 
+  // Center window when no saved position or saved position is off-screen
+  let windowX = windowBounds.x;
+  let windowY = windowBounds.y;
+  if (windowX == null || windowY == null) {
+    const { width: screenW, height: screenH } = require('electron').screen.getPrimaryDisplay().workAreaSize;
+    windowX = Math.round((screenW - (windowBounds.width || 1280)) / 2);
+    windowY = Math.round((screenH - (windowBounds.height || 800)) / 2);
+  } else {
+    // Validate saved bounds are still on a visible display
+    const displays = require('electron').screen.getAllDisplays();
+    const isVisible = displays.some(function (d) {
+      const b = d.bounds;
+      return windowX >= b.x - 100 && windowX < b.x + b.width + 100 &&
+             windowY >= b.y - 100 && windowY < b.y + b.height + 100;
+    });
+    if (!isVisible) {
+      const { width: screenW, height: screenH } = require('electron').screen.getPrimaryDisplay().workAreaSize;
+      windowX = Math.round((screenW - (windowBounds.width || 1280)) / 2);
+      windowY = Math.round((screenH - (windowBounds.height || 800)) / 2);
+    }
+  }
+
   mainWindow = new BrowserWindow({
     width: windowBounds.width,
     height: windowBounds.height,
-    x: windowBounds.x,
-    y: windowBounds.y,
+    x: windowX,
+    y: windowY,
     minWidth: 800,
     minHeight: 600,
     webPreferences: {
@@ -430,7 +444,10 @@ function createWindow() {
       height: 40
     },
     trafficLightPosition: { x: 16, y: 13 },
-    hasShadow: true
+    hasShadow: true,
+    resizable: true,
+    movable: true,
+    fullscreenable: true
   });
 
   // Show window when ready to prevent white flash
@@ -1704,7 +1721,6 @@ function setupIPCHandlers() {
     }
     _updateCheckInProgress = true;
     logger.log('info', 'Updater', 'Manual update check requested');
-<<<<<<< Updated upstream
     sendUpdateStatus('checking');
     try {
       var response = await fetch(MIN_VERSION_CHECK_URL, {
@@ -1720,22 +1736,6 @@ function setupIPCHandlers() {
       } else {
         sendUpdateStatus('up-to-date', { version: current, latestVersion: latest || current });
         return { success: true, updateAvailable: false, latestVersion: latest || current };
-=======
-    var silent = options && options.silent;
-    // When called from App Info page (silent), stay in-app — don't navigate to update.html
-    inAppUpdateMode = !!silent;
-    checkForUpdates(silent);
-    return { success: true };
-  });
-
-  ipcMain.handle('start-update', function () {
-    logger.log('info', 'Updater', 'Start update / download requested');
-    autoUpdater.checkForUpdates().then(function (result) {
-      if (result && result.updateInfo) {
-        autoUpdater.downloadUpdate().catch(function (err) {
-          logger.log('error', 'Updater', 'Download failed: ' + err.message);
-        });
->>>>>>> Stashed changes
       }
     } catch (err) {
       logger.log('warn', 'Updater', 'Version check failed: ' + err.message);
@@ -2106,136 +2106,7 @@ function showNotification(title, body, options) {
  * When an update is found, sends IPC status + shows a native notification.
  */
 function setupAutoUpdater() {
-<<<<<<< Updated upstream
   logger.log('info', 'Updater', 'Update checker configured - version: ' + app.getVersion() + ', platform: ' + process.platform + ', arch: ' + process.arch);
-=======
-  // Configure updater
-  autoUpdater.autoDownload = false; // We control download manually
-  autoUpdater.autoInstallOnAppQuit = true;
-  autoUpdater.allowDowngrade = false;
-
-  // Log provider config
-  logger.log('info', 'Updater', 'Auto-updater configured for GitHub Releases');
-
-  autoUpdater.on('checking-for-update', function () {
-    logger.log('info', 'Updater', 'Checking for updates...');
-    sendUpdateStatus('checking');
-  });
-
-  autoUpdater.on('update-available', function (info) {
-    logger.log('info', 'Updater', 'Update available: v' + info.version);
-    // Dismiss the "checking" dialog — update screen will take over
-    dismissUpdateCheckDialog();
-    sendUpdateStatus('available', { version: info.version });
-
-    if (inAppUpdateMode) {
-      // In-app mode: don't navigate away, just download in background
-      isUpdating = true;
-      sendUpdateStatus('downloading', { version: info.version, percent: 0 });
-      autoUpdater.downloadUpdate().catch(function (error) {
-        logger.log('error', 'Updater', 'Download failed: ' + error.message);
-        sendUpdateStatus('error', { message: error.message });
-      });
-    } else {
-      handleUpdateAvailable(info);
-    }
-  });
-
-  autoUpdater.on('update-not-available', function (info) {
-    logger.log('info', 'Updater', 'App is up to date: v' + info.version);
-    sendUpdateStatus('up-to-date', { version: info.version });
-    // If a "checking for updates" dialog was shown, replace it with "up to date"
-    if (updateCheckDialog && !updateCheckDialog.isDestroyed()) {
-      dismissUpdateCheckDialog();
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        dialog.showMessageBox(mainWindow, {
-          type: 'info',
-          title: 'Talio Update',
-          message: 'You\'re up to date!',
-          detail: 'Talio Desktop v' + info.version + ' is the latest version.',
-          buttons: ['OK']
-        }).catch(function () {});
-      }
-    }
-  });
-
-  autoUpdater.on('download-progress', function (progress) {
-    sendUpdateStatus('downloading', {
-      percent: Math.round(progress.percent),
-      bytesPerSecond: progress.bytesPerSecond,
-      transferred: progress.transferred,
-      total: progress.total
-    });
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.executeJavaScript(
-        'window.postMessage(' + JSON.stringify({
-          type: 'update-progress',
-          percent: progress.percent,
-          bytesPerSecond: progress.bytesPerSecond,
-          transferred: progress.transferred,
-          total: progress.total
-        }) + ', "*")'
-      ).catch(function () {});
-    }
-    // Update taskbar progress (Windows) / dock progress (macOS)
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.setProgressBar(progress.percent / 100);
-    }
-  });
-
-  autoUpdater.on('update-downloaded', function (info) {
-    logger.log('info', 'Updater', 'Update downloaded: v' + info.version);
-    sendUpdateStatus('downloaded', { version: info.version });
-
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.setProgressBar(-1); // Clear progress bar
-      mainWindow.webContents.executeJavaScript(
-        'window.postMessage({ type: "update-downloaded" }, "*")'
-      ).catch(function () {});
-    }
-
-    // Clear old cache before installing
-    clearAppCache();
-
-    // In-app mode: let the user click "Restart to Update" from the App Info page
-    if (inAppUpdateMode) {
-      inAppUpdateMode = false;
-      return;
-    }
-
-    // Non-in-app mode: auto-install after showing completion animation
-    setTimeout(function () {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.executeJavaScript(
-          'window.postMessage({ type: "update-complete" }, "*")'
-        ).catch(function () {});
-      }
-
-      // Quit and install after showing completion screen
-      setTimeout(function () {
-        isQuitting = true;
-        forceCloseAttempts = 999; // Bypass force-close protection for update
-        autoUpdater.quitAndInstall(false, true); // isSilent=false, isForceRunAfter=true
-      }, 2500);
-    }, 1500);
-  });
-
-  autoUpdater.on('error', function (error) {
-    logger.log('error', 'Updater', 'Update error: ' + error.message);
-    dismissUpdateCheckDialog();
-    sendUpdateStatus('error', { message: error.message });
-
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.setProgressBar(-1);
-      mainWindow.webContents.executeJavaScript(
-        'window.postMessage(' + JSON.stringify({
-          type: 'update-error',
-          message: error.message
-        }) + ', "*")'
-      ).catch(function () {});
-    }
-  });
->>>>>>> Stashed changes
 
   // Schedule periodic update checks
   updateCheckTimer = setInterval(function () {

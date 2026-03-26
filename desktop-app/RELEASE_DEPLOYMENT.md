@@ -242,6 +242,29 @@ git push origin main
 
 ## Step 5: Create GitHub Release
 
+### GitHub CLI Authentication (one-time setup)
+
+The `gh` CLI must be authenticated to create releases. Use a **Personal Access Token (PAT)**:
+
+1. Go to [github.com/settings/tokens](https://github.com/settings/tokens) → **Generate new token (classic)**
+2. Select scopes: `repo` (full control of private repos)
+3. Copy the token
+
+**Option A — Login with token (persistent):**
+```bash
+echo "ghp_YOUR_TOKEN_HERE" | gh auth login --with-token
+```
+
+**Option B — Set as environment variable (per-session or add to `~/.zshrc`):**
+```bash
+export GH_TOKEN="ghp_YOUR_TOKEN_HERE"
+```
+
+Verify auth:
+```bash
+gh auth status
+```
+
 ### Using GitHub CLI
 
 ```bash
@@ -366,6 +389,10 @@ See the **Windows Code Signing** section above. You need an OV or EV code signin
 ## Quick Reference - Full Release Flow
 
 ```bash
+# 0. Ensure gh is authenticated (one-time)
+#    echo "ghp_YOUR_TOKEN" | gh auth login --with-token
+#    OR: export GH_TOKEN="ghp_YOUR_TOKEN"
+
 # 1. Bump version in 3 files (package.json, server.js, min-version/route.js)
 
 # 2. Build & verify web

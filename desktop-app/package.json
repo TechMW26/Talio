@@ -1,12 +1,7 @@
 {
   "name": "talio-desktop",
-<<<<<<< Updated upstream
-  "version": "5.2.0",
+  "version": "5.3.0",
   "description": "Talio HRMS Desktop - Productivity & Collaboration Hub",
-=======
-  "version": "4.6.0",
-  "description": "Talio HRMS Desktop - Productivity Monitoring with Screen Capture",
->>>>>>> Stashed changes
   "main": "src/main.js",
   "author": "MW FutureTech <support@talio.in>",
   "homepage": "https://app.talio.in",
