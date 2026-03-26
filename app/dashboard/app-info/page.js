@@ -8,16 +8,10 @@ import {
   HiOutlineArrowDownTray,
   HiOutlineCpuChip,
   HiOutlineFolder,
-<<<<<<< Updated upstream
   HiOutlineClipboardDocument,
   HiOutlineCheck,
   HiOutlineShieldCheck,
   HiOutlineHashtag,
-=======
-  HiOutlineGlobeAlt,
-  HiOutlineArrowDownTray,
-  HiOutlineArrowPathRoundedSquare,
->>>>>>> Stashed changes
 } from 'react-icons/hi2'
 
 /* ── Shared glass-card wrapper ── */
@@ -203,25 +197,12 @@ export default function AppInfoPage() {
     }
   }, [checkForUpdates])
 
-<<<<<<< Updated upstream
   const handleDownloadUpdate = useCallback(() => {
     const version = updateVersion || latestVersion
     // Use in-app update if available (Electron IPC)
     if (window.electronAPI?.startUpdate && version) {
       window.electronAPI.startUpdate(version)
       return
-=======
-  const handleCheckUpdate = useCallback(() => {
-    if (window.electronAPI?.checkForUpdate) {
-      setUpdateStatus('checking')
-      setUpdateError(null)
-      setUpdateVersion(null)
-      setDownloadPercent(0)
-      window.electronAPI.checkForUpdate({ silent: true })
-    } else if (window.electronAPI?.startUpdate) {
-      setUpdateStatus('checking')
-      window.electronAPI.startUpdate()
->>>>>>> Stashed changes
     }
     // Fallback: open download page in browser
     const platform = appInfo?.platform
@@ -235,17 +216,7 @@ export default function AppInfoPage() {
     window.open('https://app.talio.in' + downloadPath, '_blank')
   }, [appInfo, updateVersion, latestVersion])
 
-<<<<<<< Updated upstream
   /* ── Not desktop ── */
-=======
-  const handleInstallUpdate = useCallback(() => {
-    if (window.electronAPI?.installUpdate) {
-      setUpdateStatus('installing')
-      window.electronAPI.installUpdate()
-    }
-  }, [])
-
->>>>>>> Stashed changes
   if (!isElectron) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -294,7 +265,6 @@ export default function AppInfoPage() {
         </p>
       </div>
 
-<<<<<<< Updated upstream
       {/* ── Info Grid ── */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4 w-full max-w-[1100px]">
 
@@ -306,154 +276,8 @@ export default function AppInfoPage() {
               <div className="w-7 h-7 rounded-full flex items-center justify-center"
                 style={{ background: 'var(--color-primary-50)' }}>
                 <HiOutlineComputerDesktop className="w-3.5 h-3.5" style={{ color: 'var(--color-primary-500)' }} />
-=======
-      {/* Update Section */}
-      <div className="rounded-2xl border p-5 space-y-4" style={{ borderColor: 'var(--color-primary-200)', backgroundColor: 'var(--color-bg-card, white)' }}>
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>Software Update</h2>
-          {updateStatus === 'up-to-date' && !isOutdated && (
-            <Chip color="success" variant="flat" size="sm" startContent={<HiOutlineCheckCircle className="w-4 h-4" />}>
-              Up to date
-            </Chip>
-          )}
-          {(updateStatus === 'available' || isOutdated) && (
-            <Chip color="warning" variant="flat" size="sm" startContent={<HiOutlineArrowDownTray className="w-4 h-4" />}>
-              Update available{updateVersion ? ` — v${updateVersion}` : latestVersion ? ` — v${latestVersion}` : ''}
-            </Chip>
-          )}
-          {updateStatus === 'downloading' && (
-            <Chip color="primary" variant="flat" size="sm" startContent={<HiOutlineArrowDownTray className="w-4 h-4" />}>
-              Downloading{updateVersion ? ` v${updateVersion}` : ''} — {downloadPercent}%
-            </Chip>
-          )}
-          {updateStatus === 'downloaded' && (
-            <Chip color="success" variant="flat" size="sm" startContent={<HiOutlineCheckCircle className="w-4 h-4" />}>
-              Ready to install
-            </Chip>
-          )}
-          {updateStatus === 'installing' && (
-            <Chip color="primary" variant="flat" size="sm" startContent={<HiOutlineArrowPathRoundedSquare className="w-4 h-4" />}>
-              Installing...
-            </Chip>
-          )}
-          {updateStatus === 'error' && (
-            <Chip color="danger" variant="flat" size="sm" startContent={<HiOutlineExclamationTriangle className="w-4 h-4" />}>
-              Error
-            </Chip>
-          )}
-        </div>
-
-        {/* Version comparison */}
-        {currentVersion && latestVersion && (
-          <div className="flex items-center gap-3 text-sm">
-            <span style={{ color: 'var(--color-text-secondary, #6b7280)' }}>Installed: <strong>v{currentVersion}</strong></span>
-            <span style={{ color: 'var(--color-text-secondary, #6b7280)' }}>•</span>
-            <span style={{ color: 'var(--color-text-secondary, #6b7280)' }}>Latest: <strong style={{ color: isOutdated ? 'var(--color-warning-500, #f59e0b)' : 'var(--color-success-500, #22c55e)' }}>v{latestVersion}</strong></span>
-          </div>
-        )}
-
-        {updateStatus === 'checking' && (
-          <div className="flex items-center gap-3 text-sm" style={{ color: 'var(--color-text-secondary, #6b7280)' }}>
-            <Spinner size="sm" />
-            <span>Checking for updates...</span>
-          </div>
-        )}
-
-        {updateStatus === 'downloading' && (
-          <div className="space-y-3">
-            <p className="text-sm" style={{ color: 'var(--color-text-secondary, #6b7280)' }}>
-              Downloading update{updateVersion ? ` v${updateVersion}` : ''}...
-            </p>
-            <div className="w-full rounded-full h-2.5" style={{ backgroundColor: 'var(--color-primary-100, #e0e7ff)' }}>
-              <div
-                className="h-2.5 rounded-full transition-all duration-300"
-                style={{ width: `${downloadPercent}%`, backgroundColor: 'var(--color-primary-500, #6366f1)' }}
-              />
+              </div>
             </div>
-            <p className="text-xs" style={{ color: 'var(--color-text-secondary, #6b7280)' }}>{downloadPercent}% complete</p>
-          </div>
-        )}
-
-        {updateStatus === 'downloaded' && (
-          <div className="space-y-3">
-            <p className="text-sm" style={{ color: 'var(--color-text-secondary, #6b7280)' }}>
-              Update{updateVersion ? ` v${updateVersion}` : ''} has been downloaded and is ready to install. The app will restart.
-            </p>
-            <Button
-              onPress={handleInstallUpdate}
-              variant="flat"
-              color="success"
-              startContent={<HiOutlineArrowPathRoundedSquare className="w-4 h-4" />}
-              size="sm"
-            >
-              Restart &amp; Update
-            </Button>
-          </div>
-        )}
-
-        {updateStatus === 'installing' && (
-          <div className="flex items-center gap-3 text-sm" style={{ color: 'var(--color-text-secondary, #6b7280)' }}>
-            <Spinner size="sm" />
-            <span>Installing update and restarting...</span>
-          </div>
-        )}
-
-        {updateStatus === 'up-to-date' && !isOutdated && (
-          <p className="text-sm" style={{ color: 'var(--color-text-secondary, #6b7280)' }}>
-            You are running the latest version of Talio Desktop.
-          </p>
-        )}
-
-        {(updateStatus === 'available') && (
-          <p className="text-sm" style={{ color: 'var(--color-text-secondary, #6b7280)' }}>
-            A new version (v{updateVersion || latestVersion}) is being downloaded and will be installed automatically. The app will restart when ready.
-          </p>
-        )}
-
-        {isOutdated && updateStatus !== 'available' && updateStatus !== 'checking' && (
-          <p className="text-sm" style={{ color: 'var(--color-text-secondary, #6b7280)' }}>
-            A newer version (v{latestVersion}) is available. Click the button below to check and install the update.
-          </p>
-        )}
-
-        {updateStatus === 'error' && (
-          <p className="text-sm text-danger-500">
-            Update check failed: {updateError || 'Unknown error'}
-          </p>
-        )}
-
-        {(!updateStatus || updateStatus === 'up-to-date' || updateStatus === 'error' || (isOutdated && updateStatus !== 'available' && updateStatus !== 'downloading' && updateStatus !== 'downloaded' && updateStatus !== 'checking')) && (
-          <Button
-            onPress={handleCheckUpdate}
-            variant="flat"
-            color={isOutdated ? 'warning' : 'primary'}
-            startContent={<HiOutlineArrowPath className="w-4 h-4" />}
-            isLoading={updateStatus === 'checking'}
-            size="sm"
-          >
-            {isOutdated ? 'Update Now' : 'Check for Updates'}
-          </Button>
-        )}
-      </div>
-
-      {/* System Info */}
-      <div className="rounded-2xl border p-5 space-y-1" style={{ borderColor: 'var(--color-primary-200)', backgroundColor: 'var(--color-bg-card, white)' }}>
-        <h2 className="text-lg font-semibold mb-3" style={{ color: 'var(--color-text-primary)' }}>System Information</h2>
-        {!appInfo ? (
-          <div className="flex items-center gap-3 py-4">
-            <Spinner size="sm" />
-            <span className="text-sm" style={{ color: 'var(--color-text-secondary, #6b7280)' }}>Loading...</span>
-          </div>
-        ) : (
-          <div className="divide-y" style={{ borderColor: 'var(--color-primary-100)' }}>
-            {infoRows.map((row) => (
-              <div key={row.label} className="flex items-start gap-3 py-3">
-                <row.icon className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-primary-500)' }} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium uppercase tracking-wider" style={{ color: 'var(--color-text-secondary, #6b7280)' }}>{row.label}</p>
-                  <p className="text-sm font-mono break-all" style={{ color: 'var(--color-text-primary)' }}>{row.value}</p>
-                </div>
->>>>>>> Stashed changes
               </div>
             </div>
 

@@ -4,7 +4,6 @@ import { NextResponse } from 'next/server';
 // Bump this when a critical/breaking update is released.
 const MIN_DESKTOP_VERSION = '4.2.0';
 
-<<<<<<< Updated upstream
 // Fallback if GitHub API is unreachable
 const FALLBACK_LATEST_VERSION = '5.0.5';
 
@@ -43,11 +42,6 @@ async function getLatestVersion() {
   }
   return cachedLatestVersion || FALLBACK_LATEST_VERSION;
 }
-=======
-// Latest available desktop app version.
-// Bump this whenever a new release is published.
-const LATEST_DESKTOP_VERSION = '4.6.0';
->>>>>>> Stashed changes
 
 export async function GET(request) {
   const clientVersion = request.headers.get('x-app-version') || 'unknown';
