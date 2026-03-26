@@ -14,6 +14,21 @@ The Talio desktop app uses **GitHub Releases** for distribution. The app checks 
 
 ---
 
+## Step 0: Check Latest Release Version
+
+**IMPORTANT:** Before bumping the version, always check the latest release on GitHub to determine the next version number:
+
+1. Go to **https://github.com/avirajsharma-ops/Talio/releases** (or use `gh release list --limit 1`)
+2. Note the latest tag (e.g., `v5.2.0`)
+3. Decide the next version using semver:
+   - **Patch** (bug fixes): `5.2.0` → `5.2.1`
+   - **Minor** (new features): `5.2.0` → `5.3.0`
+   - **Major** (breaking changes): `5.2.0` → `6.0.0`
+
+> **Never guess the version from file headers or package.json — always verify against the latest GitHub Release tag.** The source files may contain stale or conflicted version numbers.
+
+---
+
 ## Step 1: Bump Version (4 files)
 
 Update the version in **these four** locations:
@@ -393,7 +408,12 @@ See the **Windows Code Signing** section above. You need an OV or EV code signin
 #    echo "ghp_YOUR_TOKEN" | gh auth login --with-token
 #    OR: export GH_TOKEN="ghp_YOUR_TOKEN"
 
-# 1. Bump version in 3 files (package.json, server.js, min-version/route.js)
+# 0.5 Check latest release version on GitHub
+#     Visit: https://github.com/avirajsharma-ops/Talio/releases
+#     OR: gh release list --limit 1
+#     Then decide next version (e.g., v5.2.0 → v5.3.0)
+
+# 1. Bump version in 4 files (package.json, main.js, preload.js, screenshotService.js)
 
 # 2. Build & verify web
 npm run build
