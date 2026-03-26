@@ -3,7 +3,7 @@ import { getAuthAndModels } from '@/lib/auth';
 import { readdir, stat } from 'fs/promises';
 import path from 'path';
 
-const SCREENSHOTS_PER_SESSION = 30;
+const SESSION_WINDOW_MS = 60 * 60 * 1000; // 60 minutes
 
 /**
  * Parse screenshot filename to get timestamp
@@ -92,11 +92,35 @@ async function syncScreenshotsToSessions(userId, date, models) {
   const user = await User.findById(userId).select('employeeId');
   const employeeId = user?.employeeId;
 
-  // Group into sessions of 30
+  // Group into sessions by 60-minute hourly windows
   const sessions = [];
-  for (let i = 0; i < screenshots.length; i += SCREENSHOTS_PER_SESSION) {
-    const sessionScreenshots = screenshots.slice(i, i + SCREENSHOTS_PER_SESSION);
-    const sessionNumber = Math.floor(i / SCREENSHOTS_PER_SESSION) + 1;
+  let currentGroup = [];
+  let windowStart = null;
+  
+  for (const ss of screenshots) {
+    const t = new Date(ss.timestamp).getTime();
+    if (windowStart === null) {
+      const d = new Date(t);
+      windowStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), 0, 0, 0).getTime();
+    }
+    if (t >= windowStart + SESSION_WINDOW_MS) {
+      if (currentGroup.length > 0) {
+        sessions.push(currentGroup);
+      }
+      const d = new Date(t);
+      windowStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), 0, 0, 0).getTime();
+      currentGroup = [];
+    }
+    currentGroup.push(ss);
+  }
+  if (currentGroup.length > 0) {
+    sessions.push(currentGroup);
+  }
+
+  const result = [];
+  for (let i = 0; i < sessions.length; i++) {
+    const sessionScreenshots = sessions[i];
+    const sessionNumber = i + 1;
 
     // Map screenshot data to match ProductivitySession schema
     const mappedScreenshots = sessionScreenshots.map(ss => ({
@@ -141,10 +165,10 @@ async function syncScreenshotsToSessions(userId, date, models) {
       await session.save();
     }
 
-    sessions.push(session);
+    result.push(session);
   }
 
-  return sessions;
+  return result;
 }
 
 /**

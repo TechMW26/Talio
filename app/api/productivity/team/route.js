@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
 
-const SCREENSHOTS_PER_SESSION = 30;
+const SCREENSHOTS_PER_SESSION_ESTIMATE = 20; // ~20 screenshots per 60-min session at 3-min intervals
 
 /**
  * GET /api/productivity/team
@@ -344,7 +344,7 @@ export async function GET(request) {
 
       const totalSessions = sessions.length > 0
         ? sessions.length
-        : Math.ceil(fallbackShots.count / SCREENSHOTS_PER_SESSION);
+        : Math.ceil(fallbackShots.count / SCREENSHOTS_PER_SESSION_ESTIMATE);
 
       const totalScreenshots = sessions.length > 0
         ? sessions.reduce((sum, s) => sum + (s.screenshotCount || 0), 0)

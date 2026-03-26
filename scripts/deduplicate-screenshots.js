@@ -287,12 +287,27 @@ async function deduplicateTenant(tenantConn, tenantName) {
           screenshotsDeleted: { $ne: true }
         }).sort({ sessionNumber: 1 });
 
-        // Regroup into sessions of 30
-        const SCREENSHOTS_PER_SESSION = 30;
+        // Regroup into sessions by 60-minute hourly windows
+        const SESSION_WINDOW_MS = 60 * 60 * 1000;
         const groups = [];
-        for (let i = 0; i < remaining.length; i += SCREENSHOTS_PER_SESSION) {
-          groups.push(remaining.slice(i, i + SCREENSHOTS_PER_SESSION));
+        let currentGroup = [];
+        let windowStart = null;
+        
+        for (const ss of remaining) {
+          const t = new Date(ss.capturedAt).getTime();
+          if (windowStart === null) {
+            const d = new Date(t);
+            windowStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), 0, 0, 0).getTime();
+          }
+          if (t >= windowStart + SESSION_WINDOW_MS) {
+            if (currentGroup.length > 0) groups.push(currentGroup);
+            const d = new Date(t);
+            windowStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), 0, 0, 0).getTime();
+            currentGroup = [];
+          }
+          currentGroup.push(ss);
         }
+        if (currentGroup.length > 0) groups.push(currentGroup);
 
         // Update or create sessions
         for (let sIdx = 0; sIdx < groups.length; sIdx++) {
