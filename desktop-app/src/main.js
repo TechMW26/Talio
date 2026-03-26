@@ -1334,6 +1334,23 @@ function setupIPCHandlers() {
     return { success: true };
   });
 
+  // Attendance clock-in/out gating for screenshot capture
+  ipcMain.handle('attendance-clock-in', function () {
+    logger.log('info', 'Main', 'IPC: attendance-clock-in received');
+    screenshotService.setClockedIn(true);
+    return { success: true, capturing: screenshotService.isCapturing };
+  });
+
+  ipcMain.handle('attendance-clock-out', function () {
+    logger.log('info', 'Main', 'IPC: attendance-clock-out received');
+    screenshotService.setClockedIn(false);
+    return { success: true, capturing: false };
+  });
+
+  ipcMain.handle('get-clock-in-status', function () {
+    return { isClockedIn: screenshotService.getClockedIn(), isCapturing: screenshotService.isCapturing };
+  });
+
   ipcMain.handle('manual-capture', async function () {
     return await screenshotService.manualCapture();
   });
@@ -1833,6 +1850,29 @@ function handleAuthentication(data) {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send('attendance-update', data);
     }
+
+    // Gate screenshot capture on clock-in/out status
+    if (data && userData && userData.role !== 'admin') {
+      var eventType = data.type || data.eventType || '';
+      if (eventType === 'check-in' || eventType === 'checkin') {
+        logger.log('info', 'Main', 'Attendance check-in detected — starting screenshot capture');
+        screenshotService.setClockedIn(true);
+      } else if (eventType === 'check-out' || eventType === 'checkout') {
+        logger.log('info', 'Main', 'Attendance check-out detected — stopping screenshot capture');
+        screenshotService.setClockedIn(false);
+      }
+    }
+  });
+
+  // Dedicated attendance check-in/out socket events for screenshot gating
+  socketHandler.on('attendanceCheckIn', function (data) {
+    logger.log('info', 'Main', 'Socket: attendance-check-in — starting screenshot capture');
+    screenshotService.setClockedIn(true);
+  });
+
+  socketHandler.on('attendanceCheckOut', function (data) {
+    logger.log('info', 'Main', 'Socket: attendance-check-out — stopping screenshot capture');
+    screenshotService.setClockedIn(false);
   });
 
   socketHandler.on('forceRefresh', function () {
@@ -1861,15 +1901,87 @@ function handleAuthentication(data) {
     }
   });
 
-  // Start capture (only for non-admin users)
+  // Start capture only if user is clocked in (non-admin)
   if (userData.role !== 'admin') {
-    screenshotService.start();
+    // Check attendance status via API to determine if user is currently clocked in
+    checkAttendanceAndStartCapture(data.token, userData.userId || userData._id);
   } else {
     logger.log('info', 'Main', 'Admin user - screen capture disabled');
   }
 
   // Update tray menu
   updateTrayMenu();
+}
+
+/**
+ * Check current attendance status and start capture if clocked in.
+ * Called on login/app reopen to determine initial capture state.
+ * Retries with increasing delay since attendance data may take time to reflect.
+ */
+async function checkAttendanceAndStartCapture(token, userId, attempt) {
+  attempt = attempt || 1;
+  var MAX_ATTEMPTS = 3;
+  // Delays: 1st attempt = 2s, 2nd = 8s, 3rd = 20s (gives attendance time to reflect)
+  var DELAYS = [2000, 8000, 20000];
+
+  // If a socket event already set clocked-in (e.g., between retries), skip the API check
+  if (attempt > 1 && screenshotService.getClockedIn()) {
+    logger.log('info', 'Main', 'Already clocked in (set by socket event), skipping retry');
+    return;
+  }
+
+  try {
+    logger.log('info', 'Main', 'Checking attendance status (attempt ' + attempt + '/' + MAX_ATTEMPTS + ')...');
+    var today = new Date().toISOString().split('T')[0];
+    var response = await require('node-fetch')(APP_URL + '/api/attendance?date=' + today + '&employeeId=' + userId, {
+      method: 'GET',
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (response.ok) {
+      var result = await response.json();
+      // The response contains an array of attendance records; check the first one for today
+      var records = result.data || result.attendance || [];
+      var todayRecord = Array.isArray(records) ? records[0] : records;
+      var isClockedIn = !!(todayRecord && todayRecord.checkIn && !todayRecord.checkOut);
+      logger.log('info', 'Main', 'Attendance status: clocked in = ' + isClockedIn + ' (attempt ' + attempt + ')');
+
+      if (isClockedIn) {
+        screenshotService.setClockedIn(true);
+      } else if (attempt < MAX_ATTEMPTS) {
+        // Not clocked in yet — retry after delay (state may be propagating)
+        logger.log('info', 'Main', 'Not clocked in yet, will retry in ' + (DELAYS[attempt] / 1000) + 's...');
+        setTimeout(function () {
+          checkAttendanceAndStartCapture(token, userId, attempt + 1);
+        }, DELAYS[attempt]);
+      } else {
+        // All retries exhausted — user is genuinely not clocked in
+        logger.log('info', 'Main', 'User not clocked in after ' + MAX_ATTEMPTS + ' checks — screenshots will start on clock-in');
+        screenshotService.setClockedIn(false);
+      }
+    } else if (attempt < MAX_ATTEMPTS) {
+      logger.log('warn', 'Main', 'Attendance status check failed (HTTP ' + response.status + '), retrying in ' + (DELAYS[attempt] / 1000) + 's...');
+      setTimeout(function () {
+        checkAttendanceAndStartCapture(token, userId, attempt + 1);
+      }, DELAYS[attempt]);
+    } else {
+      logger.log('warn', 'Main', 'Attendance status check failed after ' + MAX_ATTEMPTS + ' attempts, defaulting to not clocked in');
+      screenshotService.setClockedIn(false);
+    }
+  } catch (error) {
+    if (attempt < MAX_ATTEMPTS) {
+      logger.log('warn', 'Main', 'Attendance check error: ' + error.message + ', retrying in ' + (DELAYS[attempt] / 1000) + 's...');
+      setTimeout(function () {
+        checkAttendanceAndStartCapture(token, userId, attempt + 1);
+      }, DELAYS[attempt]);
+    } else {
+      logger.log('error', 'Main', 'Attendance status check failed after ' + MAX_ATTEMPTS + ' attempts: ' + error.message);
+      screenshotService.setClockedIn(false);
+    }
+  }
 }
 
 /**
@@ -3160,9 +3272,9 @@ function setupNetworkMonitoring() {
       setTimeout(function () {
         if (!mainWindow || mainWindow.isDestroyed()) return;
 
-        // Restart screenshot service if it died during sleep
+        // Restart screenshot service if it died during sleep (only if clocked in)
         if (isAuthenticated && userData && userData.role !== 'admin') {
-          if (!screenshotService.isCapturing) {
+          if (!screenshotService.isCapturing && screenshotService.getClockedIn()) {
             logger.log('debug', 'Main', 'Restarting screenshot capture after system resume');
             screenshotService.start();
           }
@@ -3194,7 +3306,7 @@ function setupNetworkMonitoring() {
       if (!mainWindow || mainWindow.isDestroyed()) return;
 
       if (isAuthenticated && userData && userData.role !== 'admin') {
-        if (!screenshotService.isCapturing) {
+        if (!screenshotService.isCapturing && screenshotService.getClockedIn()) {
           logger.log('debug', 'Main', 'Restarting screenshot capture after unlock');
           screenshotService.start();
         }

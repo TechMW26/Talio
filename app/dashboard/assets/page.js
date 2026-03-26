@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
-import { FaPlus, FaLaptop, FaCheckCircle, FaClock, FaTools, FaTimes, FaBox } from 'react-icons/fa'
+import { FaPlus, FaLaptop, FaCheckCircle, FaClock, FaTools, FaTimes, FaBox, FaFileUpload } from 'react-icons/fa'
 import { HiOutlineSparkles } from 'react-icons/hi2'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
@@ -16,6 +16,11 @@ import { useAILoading } from '@/contexts/AILoadingContext'
 
 export default function AssetsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false)
+  const [bulkFile, setBulkFile] = useState(null)
+  const [bulkPreview, setBulkPreview] = useState(null)
+  const [bulkImporting, setBulkImporting] = useState(false)
+  const [bulkPreviewing, setBulkPreviewing] = useState(false)
   const [generatingDescription, setGeneratingDescription] = useState(false)
   const { startAILoading, stopAILoading } = useAILoading()
   const [formData, setFormData] = useState({
@@ -106,6 +111,63 @@ export default function AssetsPage() {
     submitMutation.execute('/api/assets', formData)
   }
 
+  const handleBulkPreview = async () => {
+    if (!bulkFile) return toast.error('Please select a file')
+    setBulkPreviewing(true)
+    try {
+      const token = localStorage.getItem('token')
+      const fd = new FormData()
+      fd.append('file', bulkFile)
+      fd.append('mode', 'preview')
+      const res = await fetch('/api/assets/bulk-import', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      })
+      const data = await res.json()
+      if (data.success) {
+        setBulkPreview(data)
+      } else {
+        toast.error(data.message || 'Preview failed')
+      }
+    } catch (err) {
+      toast.error('Failed to preview file')
+    } finally {
+      setBulkPreviewing(false)
+    }
+  }
+
+  const handleBulkImport = async () => {
+    if (!bulkFile || !bulkPreview?.mapping) return
+    setBulkImporting(true)
+    try {
+      const token = localStorage.getItem('token')
+      const fd = new FormData()
+      fd.append('file', bulkFile)
+      fd.append('mode', 'import')
+      fd.append('mapping', JSON.stringify(bulkPreview.mapping))
+      const res = await fetch('/api/assets/bulk-import', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(data.message)
+        setIsBulkImportOpen(false)
+        setBulkFile(null)
+        setBulkPreview(null)
+        refreshAssets()
+      } else {
+        toast.error(data.message || 'Import failed')
+      }
+    } catch (err) {
+      toast.error('Failed to import assets')
+    } finally {
+      setBulkImporting(false)
+    }
+  }
+
   return (
     <div className="p-6 relative">
       <BackgroundRefreshIndicator isValidating={isValidating} position="bar" />
@@ -118,13 +180,22 @@ export default function AssetsPage() {
           </p>
         </div>
         {['admin', 'hr'].includes(userRole) && (
-          <Button
-            onPress={() => setIsModalOpen(true)}
-            color="primary"
-            startContent={<FaPlus />}
-          >
-            Add Asset
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              onPress={() => setIsBulkImportOpen(true)}
+              variant="flat"
+              startContent={<FaFileUpload />}
+            >
+              Bulk Import
+            </Button>
+            <Button
+              onPress={() => setIsModalOpen(true)}
+              color="primary"
+              startContent={<FaPlus />}
+            >
+              Add Asset
+            </Button>
+          </div>
         )}
       </div>
 
@@ -475,6 +546,97 @@ export default function AssetsPage() {
                 </LoadingButton>
               </div>
             </form>
+          </div>
+        </div>
+      </ModalPortal>
+
+      {/* Bulk Import Modal */}
+      <ModalPortal isOpen={isBulkImportOpen}>
+        <div className="modal-overlay">
+          <div className="bg-white rounded-[30px] animate-modal-enter w-full max-w-3xl p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold">Bulk Import Assets</h2>
+              <button onClick={() => { setIsBulkImportOpen(false); setBulkFile(null); setBulkPreview(null) }} className="text-gray-500 hover:text-gray-700">
+                <FaTimes />
+              </button>
+            </div>
+
+            {!bulkPreview ? (
+              <div className="space-y-4">
+                <p className="text-sm text-gray-600">
+                  Upload an Excel file (.xlsx) containing your asset data. Our AI will automatically detect and map columns.
+                </p>
+                <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center">
+                  <FaFileUpload className="mx-auto text-3xl text-gray-400 mb-3" />
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls"
+                    onChange={(e) => setBulkFile(e.target.files[0])}
+                    className="block mx-auto text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
+                  />
+                  {bulkFile && <p className="mt-2 text-sm text-gray-700 font-medium">{bulkFile.name}</p>}
+                </div>
+                <div className="flex justify-end gap-3">
+                  <Button variant="flat" onPress={() => { setIsBulkImportOpen(false); setBulkFile(null) }}>Cancel</Button>
+                  <Button
+                    color="primary"
+                    onPress={handleBulkPreview}
+                    isLoading={bulkPreviewing}
+                    isDisabled={!bulkFile}
+                  >
+                    {bulkPreviewing ? 'Analyzing...' : 'Preview'}
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 text-sm text-gray-600">
+                  <span className="font-semibold">{bulkPreview.totalRows}</span> rows detected
+                  <span className="text-gray-300">|</span>
+                  Showing first {bulkPreview.data?.length || 0} rows
+                </div>
+
+                <div className="overflow-x-auto max-h-[400px] overflow-y-auto border rounded-lg">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 sticky top-0">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Row</th>
+                        {bulkPreview.fields?.filter(f => {
+                          return Object.values(bulkPreview.mapping).includes(f.key)
+                        }).map(f => (
+                          <th key={f.key} className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">{f.label}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {bulkPreview.data?.map((row, i) => (
+                        <tr key={i} className="hover:bg-gray-50">
+                          <td className="px-3 py-2 text-gray-400">{row._rowNum}</td>
+                          {bulkPreview.fields?.filter(f => {
+                            return Object.values(bulkPreview.mapping).includes(f.key)
+                          }).map(f => (
+                            <td key={f.key} className="px-3 py-2 text-gray-700 max-w-[200px] truncate">
+                              {String(row[f.key] ?? '')}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="flex justify-end gap-3">
+                  <Button variant="flat" onPress={() => { setBulkPreview(null); setBulkFile(null) }}>Back</Button>
+                  <Button
+                    color="primary"
+                    onPress={handleBulkImport}
+                    isLoading={bulkImporting}
+                  >
+                    {bulkImporting ? 'Importing...' : `Import ${bulkPreview.totalRows} Assets`}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </ModalPortal>

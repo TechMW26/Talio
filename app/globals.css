@@ -65,6 +65,19 @@ html.dark button[data-slot="trigger"].border-default-200 {
   border: none !important;
 }
 
+/* Ensure HeroUI input wrappers forward clicks to the actual input */
+[data-slot="input-wrapper"] {
+  cursor: text;
+}
+[data-slot="input-wrapper"] [data-slot="inner-wrapper"] {
+  pointer-events: auto;
+}
+/* HeroUI label inside input should not block clicks on the input itself */
+[data-slot="input-wrapper"] label,
+[data-slot="input-wrapper"] [data-slot="label"] {
+  pointer-events: none;
+}
+
 /* Search overlay input - no borders at all */
 .search-overlay-input div[data-slot="input-wrapper"],
 html.dark .search-overlay-input div[data-slot="input-wrapper"],

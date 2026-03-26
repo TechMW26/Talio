@@ -1,8 +1,8 @@
 /**
  * Screenshot Deduplication Script
  * 
- * Removes duplicate screenshots that share the same minute-level timestamp for the same user.
- * Keeps the first (earliest) screenshot per user per minute, deletes the rest from DB + ImageKit.
+ * Removes duplicate screenshots that share the same 3-minute window for the same user.
+ * Keeps the first (earliest) screenshot per user per 3-minute window, deletes the rest from DB + ImageKit.
  * Also rebuilds ProductivitySession screenshot arrays after cleanup.
  * 
  * Run: node scripts/deduplicate-screenshots.js
@@ -134,17 +134,17 @@ async function deduplicateTenant(tenantConn, tenantName) {
   const Screenshot = tenantConn.model('Screenshot', ScreenshotSchema);
   const ProductivitySession = tenantConn.model('ProductivitySession', ProductivitySessionSchema);
 
-  // Aggregation: group by user + minute-truncated timestamp, find groups with count > 1
+  // Aggregation: group by user + 3-minute-window-truncated timestamp, find groups with count > 1
   const pipeline = [
     {
       $addFields: {
-        minuteKey: {
+        windowKey: {
           $dateFromParts: {
             year: { $year: '$capturedAt' },
             month: { $month: '$capturedAt' },
             day: { $dayOfMonth: '$capturedAt' },
             hour: { $hour: '$capturedAt' },
-            minute: { $minute: '$capturedAt' },
+            minute: { $subtract: [{ $minute: '$capturedAt' }, { $mod: [{ $minute: '$capturedAt' }, 3] }] },
             second: 0, millisecond: 0
           }
         }
@@ -153,7 +153,7 @@ async function deduplicateTenant(tenantConn, tenantName) {
     { $sort: { capturedAt: 1 } },
     {
       $group: {
-        _id: { user: '$user', minute: '$minuteKey' },
+        _id: { user: '$user', window: '$windowKey' },
         count: { $sum: 1 },
         keepId: { $first: '$_id' },
         allIds: { $push: '$_id' },
@@ -162,7 +162,7 @@ async function deduplicateTenant(tenantConn, tenantName) {
       }
     },
     { $match: { count: { $gt: 1 } } },
-    { $sort: { '_id.minute': -1 } }
+    { $sort: { '_id.window': -1 } }
   ];
 
   console.log(`\n[${tenantName}] Running dedup aggregation...`);
@@ -247,14 +247,14 @@ async function deduplicateTenant(tenantConn, tenantName) {
   }
 
   // 4. Force recompile all non-deleted sessions for today and recent dates
-  // This re-groups the remaining screenshots into sessions of 30
+  // This re-groups the remaining screenshots into sessions of 20
   console.log(`[${tenantName}] Recompiling recent sessions...`);
   let sessionsRecompiled = 0;
   try {
     // Get the date range from the duplicate groups
     const dates = new Set();
     for (const group of duplicateGroups) {
-      const d = new Date(group._id.minute);
+      const d = new Date(group._id.window);
       dates.add(d.toISOString().split('T')[0]);
     }
 
@@ -267,7 +267,7 @@ async function deduplicateTenant(tenantConn, tenantName) {
       const userIds = [...new Set(
         duplicateGroups
           .filter(g => {
-            const d = new Date(g._id.minute);
+            const d = new Date(g._id.window);
             return d.toISOString().split('T')[0] === dateStr;
           })
           .map(g => g._id.user.toString())

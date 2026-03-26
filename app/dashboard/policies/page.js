@@ -3,8 +3,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import toast from '@/utils/toast'
 import { useSocket, REALTIME_EVENTS } from '@/contexts/SocketContext'
-import { FaPlus, FaFileAlt, FaEdit, FaTrash, FaCheckCircle, FaExclamationCircle } from 'react-icons/fa'
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Select, SelectItem, Textarea, Checkbox, Skeleton } from '@heroui/react'
+import { FaPlus, FaFileAlt, FaEdit, FaTrash, FaCheckCircle, FaExclamationCircle, FaBuilding, FaSitemap } from 'react-icons/fa'
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Select, SelectItem, Textarea, Checkbox, Skeleton, Chip } from '@heroui/react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
@@ -69,11 +69,13 @@ export default function PoliciesPage() {
     description: '',
     effectiveDate: '',
     requiresAcknowledgment: true,
-    applicableTo: 'all'
+    applicableTo: 'all',
+    companies: [],
+    departments: [],
   })
 
   const resetForm = () => {
-    setFormData({ title: '', code: '', category: '', content: '', description: '', effectiveDate: '', requiresAcknowledgment: true, applicableTo: 'all' })
+    setFormData({ title: '', code: '', category: '', content: '', description: '', effectiveDate: '', requiresAcknowledgment: true, applicableTo: 'all', companies: [], departments: [] })
   }
 
   // Real-time updates
@@ -85,6 +87,13 @@ export default function PoliciesPage() {
   // --- SWR Data Fetching (replaces raw useEffect+fetch) ---
   const { data: policiesRes, error, isLoading, isValidating, mutate: refreshPolicies } = useAuthedSWR('/api/policies')
   const policies = policiesRes?.data || []
+
+  // Fetch companies and departments for targeting
+  const isAdminOrHR = ['admin', 'hr'].includes(currentUser?.role)
+  const { data: companiesRes } = useAuthedSWR(isAdminOrHR ? '/api/companies' : null)
+  const { data: deptsRes } = useAuthedSWR(isAdminOrHR ? '/api/departments' : null)
+  const companies = companiesRes?.data || companiesRes?.companies || []
+  const departments = deptsRes?.data || deptsRes?.departments || []
 
   // --- Pending acknowledgments (replaces checkPendingAcknowledgments + useEffect) ---
   const pendingPolicies = useMemo(() => {
@@ -168,7 +177,9 @@ export default function PoliciesPage() {
         ? new Date(policy.effectiveDate).toISOString().split('T')[0]
         : '',
       requiresAcknowledgment: policy.requiresAcknowledgment ?? true,
-      applicableTo: policy.applicableTo || 'all'
+      applicableTo: policy.applicableTo || 'all',
+      companies: (policy.companies || []).map(c => c._id || c),
+      departments: (policy.departments || []).map(d => d._id || d),
     })
     setShowModal(true)
   }
@@ -198,7 +209,7 @@ export default function PoliciesPage() {
           <h1 className="text-3xl font-bold text-gray-800">Company Policies</h1>
           <p className="text-gray-600 mt-1">View and manage company policies</p>
         </div>
-        {currentUser?.role === 'admin' && (
+        {['admin', 'hr'].includes(currentUser?.role) && (
           <Button
             onPress={() => setShowModal(true)}
             color="primary"
@@ -266,7 +277,7 @@ export default function PoliciesPage() {
                     {policy.content.substring(0, 200)}...
                   </p>
 
-                  <div className="flex items-center space-x-4 text-sm text-gray-500">
+                  <div className="flex items-center flex-wrap gap-2 text-sm text-gray-500">
                     {policy.effectiveDate && (
                       <span>
                         Effective: {new Date(policy.effectiveDate).toLocaleDateString()}
@@ -275,11 +286,23 @@ export default function PoliciesPage() {
                     {policy.code && (
                       <span>Code: {policy.code}</span>
                     )}
+                    {policy.applicableTo === 'company' && policy.companies?.length > 0 && (
+                      <span className="flex items-center gap-1">
+                        <FaBuilding className="text-primary-400" />
+                        {policy.companies.map(c => c.name || c).join(', ')}
+                      </span>
+                    )}
+                    {(policy.applicableTo === 'department' || policy.applicableTo === 'company') && policy.departments?.length > 0 && (
+                      <span className="flex items-center gap-1">
+                        <FaSitemap className="text-secondary-400" />
+                        {policy.departments.map(d => d.name || d).join(', ')}
+                      </span>
+                    )}
                   </div>
                 </div>
 
                 <div className="flex space-x-2 ml-4">
-                  {currentUser?.role === 'admin' && (
+                  {['admin', 'hr'].includes(currentUser?.role) && (
                     <>
                       <button
                         onClick={() => handleEdit(policy)}
@@ -378,6 +401,81 @@ export default function PoliciesPage() {
                   >
                     Requires Employee Acknowledgment
                   </Checkbox>
+
+                  <Select
+                    label="Applicable To"
+                    selectedKeys={formData.applicableTo ? [formData.applicableTo] : ['all']}
+                    onSelectionChange={(keys) => {
+                      const val = Array.from(keys)[0] || 'all'
+                      setFormData({ ...formData, applicableTo: val, companies: val === 'all' ? [] : formData.companies, departments: val === 'all' ? [] : formData.departments })
+                    }}
+                  >
+                    <SelectItem key="all">All Employees</SelectItem>
+                    <SelectItem key="company">Company Specific</SelectItem>
+                    <SelectItem key="department">Department Specific</SelectItem>
+                  </Select>
+
+                  {(formData.applicableTo === 'company' || formData.applicableTo === 'department') && (
+                    <div className="space-y-4 p-4 border border-default-200 rounded-lg bg-default-50">
+                      {(formData.applicableTo === 'company') && (
+                        <div>
+                          <Select
+                            label="Select Companies"
+                            selectionMode="multiple"
+                            selectedKeys={new Set(formData.companies.map(String))}
+                            onSelectionChange={(keys) => setFormData({ ...formData, companies: Array.from(keys) })}
+                            placeholder="Choose one or more companies"
+                            startContent={<FaBuilding className="text-default-400" />}
+                          >
+                            {companies.map(c => (
+                              <SelectItem key={c._id} textValue={c.name}>
+                                {c.name} {c.code ? `(${c.code})` : ''}
+                              </SelectItem>
+                            ))}
+                          </Select>
+                          {formData.companies.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {formData.companies.map(id => {
+                                const comp = companies.find(c => c._id === id)
+                                return comp ? <Chip key={id} size="sm" variant="flat" color="primary" onClose={() => setFormData({ ...formData, companies: formData.companies.filter(c => c !== id) })}>{comp.name}</Chip> : null
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <div>
+                        <Select
+                          label={formData.applicableTo === 'company' ? 'Filter by Departments (Optional)' : 'Select Departments'}
+                          selectionMode="multiple"
+                          selectedKeys={new Set(formData.departments.map(String))}
+                          onSelectionChange={(keys) => setFormData({ ...formData, departments: Array.from(keys) })}
+                          placeholder="Choose one or more departments"
+                          startContent={<FaSitemap className="text-default-400" />}
+                        >
+                          {departments.map(d => (
+                            <SelectItem key={d._id} textValue={d.name}>
+                              {d.name} {d.code ? `(${d.code})` : ''}
+                            </SelectItem>
+                          ))}
+                        </Select>
+                        {formData.departments.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {formData.departments.map(id => {
+                              const dept = departments.find(d => d._id === id)
+                              return dept ? <Chip key={id} size="sm" variant="flat" color="secondary" onClose={() => setFormData({ ...formData, departments: formData.departments.filter(d => d !== id) })}>{dept.name}</Chip> : null
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      {formData.applicableTo === 'company' && formData.companies.length > 0 && formData.departments.length > 0 && (
+                        <p className="text-xs text-warning-600">
+                          Only employees in the selected companies who belong to the selected departments will receive this policy.
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </ModalBody>
 
                 <ModalFooter>

@@ -12,7 +12,7 @@ const sessionManager = require('./sessionManager');
 const offlineQueue = require('./offlineQueue');
 
 // Configuration
-const CAPTURE_INTERVAL_MS = 60 * 1000; // 1 minute
+const CAPTURE_INTERVAL_MS = 3 * 60 * 1000; // 3 minutes
 const API_BASE_URL = 'https://app.talio.in';
 const JPEG_QUALITY = 80;
 
@@ -34,6 +34,7 @@ class ScreenshotService {
     this.checkPermission = null; // Function to check screen recording permission
     this.consecutiveFailures = 0; // Track consecutive capture failures
     this.lastStartTime = 0; // Debounce start() calls
+    this.isClockedIn = false; // Whether user has clocked in to attendance
   }
 
   initialize(config) {
@@ -108,9 +109,36 @@ class ScreenshotService {
     return true;
   }
 
+  /**
+   * Set clock-in status. Screenshots only captured while clocked in.
+   */
+  setClockedIn(status) {
+    var wasClockedIn = this.isClockedIn;
+    this.isClockedIn = !!status;
+    logger.log('info', 'ScreenshotService', 'Clock-in status changed: ' + wasClockedIn + ' -> ' + this.isClockedIn);
+
+    if (this.isClockedIn && !wasClockedIn) {
+      // User just clocked in — start capturing
+      this.start();
+    } else if (!this.isClockedIn && wasClockedIn) {
+      // User just clocked out — stop capturing
+      this.stop();
+      logger.log('info', 'ScreenshotService', 'Capture stopped: user clocked out');
+    }
+  }
+
+  getClockedIn() {
+    return this.isClockedIn;
+  }
+
   start() {
     if (!this.shouldCapture()) {
       logger.log('info', 'ScreenshotService', 'Capture not allowed for this user');
+      return false;
+    }
+
+    if (!this.isClockedIn) {
+      logger.log('info', 'ScreenshotService', 'Not clocked in - capture will not start until clock-in');
       return false;
     }
 
@@ -168,6 +196,13 @@ class ScreenshotService {
     // Double check admin restriction
     if (this.userRole === 'admin') {
       logger.log('warn', 'ScreenshotService', 'Blocked capture attempt for admin');
+      return null;
+    }
+
+    // Block captures if user is not clocked in
+    if (!this.isClockedIn) {
+      logger.log('info', 'ScreenshotService', 'Capture skipped - user not clocked in');
+      this.stop();
       return null;
     }
 
@@ -353,6 +388,7 @@ class ScreenshotService {
   getStatus() {
     return {
       isCapturing: this.isCapturing,
+      isClockedIn: this.isClockedIn,
       captureCount: this.captureCount,
       lastCaptureTime: this.lastCaptureTime,
       isOnline: this.isOnline,

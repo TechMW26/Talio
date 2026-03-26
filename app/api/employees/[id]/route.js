@@ -4,7 +4,7 @@ import queryCache from '@/lib/queryCache'
 import { buildCacheKey, buildCachePattern, getCache, setCache, clearCachePattern } from '@/lib/cache'
 import { logActivity } from '@/lib/activityLogger'
 import { deleteUserFromBackup } from '@/lib/backupDb'
-import { emitEmployeeUpdate, emitDashboardRefresh } from '@/lib/realtimeEvents'
+import { emitEmployeeUpdate, emitDashboardRefresh, emitAssetUpdate } from '@/lib/realtimeEvents'
 import mongoose from 'mongoose'
 
 // Check if ImageKit is configured
@@ -463,12 +463,12 @@ export async function DELETE(request, { params }) {
     }
 
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Employee', 'User'])
+    const auth = await getAuthAndModels(request, ['Employee', 'User', 'Asset'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { models, tenant } = auth
-    const { Employee, User } = models
+    const { Employee, User, Asset } = models
 
     if (!Employee || !User) {
       return NextResponse.json(
@@ -483,6 +483,22 @@ export async function DELETE(request, { params }) {
         { success: false, message: 'Employee not found' },
         { status: 404 }
       )
+    }
+
+    // Free all assets assigned to this employee
+    if (Asset) {
+      try {
+        const freedAssets = await Asset.updateMany(
+          { assignedTo: id },
+          { $set: { status: 'available', returnDate: new Date() }, $unset: { assignedTo: 1, assignedDate: 1 } }
+        )
+        if (freedAssets.modifiedCount > 0) {
+          console.log(`[Employee Delete] Freed ${freedAssets.modifiedCount} asset(s) for employee: ${id}`)
+          emitAssetUpdate({ action: 'bulk-freed', employeeId: id, count: freedAssets.modifiedCount })
+        }
+      } catch (assetErr) {
+        console.error('[Employee Delete] Failed to free assets:', assetErr)
+      }
     }
 
     // Find the associated user BEFORE deletion (needed for cache clearing)
@@ -585,12 +601,12 @@ export async function PATCH(request, { params }) {
     }
 
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Employee', 'User'])
+    const auth = await getAuthAndModels(request, ['Employee', 'User', 'Asset'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { models, tenant } = auth
-    const { Employee, User } = models
+    const { Employee, User, Asset } = models
 
     if (!Employee || !User) {
       return NextResponse.json(
@@ -675,11 +691,27 @@ export async function PATCH(request, { params }) {
 
     // If status changed to terminated or resigned, deactivate the user account
     // Admins cannot be deactivated this way - only superadmin can deactivate admins
-    if (updateData.status && ['terminated', 'resigned'].includes(updateData.status)) {
+    if (updateData.status && ['terminated', 'resigned', 'inactive'].includes(updateData.status)) {
       await User.findOneAndUpdate(
         { employeeId: id, role: { $ne: 'admin' } },
         { isActive: false }
       )
+
+      // Free all assets assigned to this employee
+      if (Asset) {
+        try {
+          const freedAssets = await Asset.updateMany(
+            { assignedTo: id },
+            { $set: { status: 'available', returnDate: new Date() }, $unset: { assignedTo: 1, assignedDate: 1 } }
+          )
+          if (freedAssets.modifiedCount > 0) {
+            console.log(`[Employee Status] Freed ${freedAssets.modifiedCount} asset(s) for employee ${id} (status: ${updateData.status})`)
+            emitAssetUpdate({ action: 'bulk-freed', employeeId: id, count: freedAssets.modifiedCount })
+          }
+        } catch (assetErr) {
+          console.error('[Employee Status] Failed to free assets:', assetErr)
+        }
+      }
     } else if (updateData.status === 'active' && oldStatus !== 'active') {
       // Reactivate user if status is set back to active
       await User.findOneAndUpdate(

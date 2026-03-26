@@ -37,9 +37,17 @@ const PolicySchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Department',
   },
+  companies: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Company',
+  }],
+  departments: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Department',
+  }],
   applicableTo: {
     type: String,
-    enum: ['all', 'department', 'specific'],
+    enum: ['all', 'department', 'company', 'specific'],
     default: 'all',
   },
   specificEmployees: [{
@@ -205,10 +213,24 @@ const PolicySchema = new mongoose.Schema({
 PolicySchema.methods.isApplicableTo = function (employee) {
   if (this.applicableTo === 'all') return true
   if (this.applicableTo === 'specific') {
-    return this.specificEmployees.includes(employee._id)
+    return this.specificEmployees.some(id => id.toString() === employee._id.toString())
+  }
+  if (this.applicableTo === 'company') {
+    const companyIds = (this.companies || []).map(id => id.toString())
+    const deptIds = (this.departments || []).map(id => id.toString())
+    const empCompany = employee.company?.toString()
+    const empDepts = [employee.department, ...(employee.departments || [])].filter(Boolean).map(d => d.toString())
+    const matchesCompany = companyIds.length === 0 || (empCompany && companyIds.includes(empCompany))
+    const matchesDept = deptIds.length === 0 || empDepts.some(d => deptIds.includes(d))
+    return matchesCompany && matchesDept
   }
   if (this.applicableTo === 'department') {
-    return this.department && this.department.toString() === employee.department.toString()
+    const deptIds = (this.departments || []).map(id => id.toString())
+    if (deptIds.length > 0) {
+      const empDepts = [employee.department, ...(employee.departments || [])].filter(Boolean).map(d => d.toString())
+      return empDepts.some(d => deptIds.includes(d))
+    }
+    return this.department && this.department.toString() === employee.department?.toString()
   }
   return false
 }

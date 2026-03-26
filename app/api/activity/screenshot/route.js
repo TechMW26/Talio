@@ -107,24 +107,27 @@ export async function POST(request) {
     const employeeCode = employee?.employeeCode || 'UNKNOWN';
     const filename = `screenshot_${employeeCode}_${timestamp}.webp`;
 
-    // === DEDUPLICATION: Skip if a screenshot already exists for this user in the same minute ===
-    const minuteStart = new Date(now);
-    minuteStart.setSeconds(0, 0);
-    const minuteEnd = new Date(minuteStart);
-    minuteEnd.setMinutes(minuteEnd.getMinutes() + 1);
+    // === DEDUPLICATION: Skip if a screenshot already exists for this user within the same 3-minute window ===
+    const windowStart = new Date(now);
+    // Align to 3-minute boundaries (0, 3, 6, 9, ... minutes)
+    const minuteOfHour = windowStart.getMinutes();
+    const windowMinute = minuteOfHour - (minuteOfHour % 3);
+    windowStart.setMinutes(windowMinute, 0, 0);
+    const windowEnd = new Date(windowStart);
+    windowEnd.setMinutes(windowEnd.getMinutes() + 3);
 
-    const existingInSameMinute = await Screenshot.findOne({
+    const existingInWindow = await Screenshot.findOne({
       user: userId,
-      capturedAt: { $gte: minuteStart, $lt: minuteEnd }
+      capturedAt: { $gte: windowStart, $lt: windowEnd }
     }).select('_id capturedAt').lean();
 
-    if (existingInSameMinute) {
-      console.log(`[Screenshot] ⏭️ Duplicate skipped for user ${userId} - already captured at ${existingInSameMinute.capturedAt.toISOString()} (same minute window)`);
+    if (existingInWindow) {
+      console.log(`[Screenshot] ⏭️ Duplicate skipped for user ${userId} - already captured at ${existingInWindow.capturedAt.toISOString()} (same 3-minute window)`);
       return NextResponse.json({
         success: true,
         deduplicated: true,
-        message: 'Screenshot already exists for this minute, skipped to save storage',
-        existingScreenshotId: existingInSameMinute._id.toString(),
+        message: 'Screenshot already exists for this 3-minute window, skipped to save storage',
+        existingScreenshotId: existingInWindow._id.toString(),
         timestamp: now.toISOString()
       });
     }

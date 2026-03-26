@@ -180,11 +180,17 @@ class SocketHandler {
     this.socket.on('attendance-check-in', function(data) {
       logger.log('debug', 'SocketHandler', 'Attendance check-in');
       notify('Checked In ✅', data, 'You have been checked in');
+      if (self.callbacks.onAttendanceCheckIn) {
+        self.callbacks.onAttendanceCheckIn(data);
+      }
     });
 
     this.socket.on('attendance-check-out', function(data) {
       logger.log('debug', 'SocketHandler', 'Attendance check-out');
       notify('Checked Out 👋', data, 'You have been checked out');
+      if (self.callbacks.onAttendanceCheckOut) {
+        self.callbacks.onAttendanceCheckOut(data);
+      }
     });
 
     // ── Leave events ──

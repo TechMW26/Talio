@@ -6,12 +6,17 @@ import { sendPushToUsers } from '@/lib/pushNotification'
 export async function PUT(request, { params }) {
   try {
     // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Policy', 'User', 'Employee'])
+    const auth = await getAuthAndModels(request, ['Policy', 'User', 'Employee', 'Company', 'Department'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
     const { user, models } = auth
-    const { Policy, User, Employee } = models
+    const { Policy, User, Employee, Company, Department } = models
+
+    // Only admin and HR can update policies
+    if (!['admin', 'hr'].includes(user.role)) {
+      return NextResponse.json({ success: false, message: 'Only admin and HR can update policies' }, { status: 403 })
+    }
 
     const data = await request.json()
 
@@ -35,18 +40,37 @@ export async function PUT(request, { params }) {
       if (policy.applicableTo === 'all') {
         const allUsers = await User.find({}).select('_id')
         targetUserIds = allUsers.map(u => u._id.toString())
-      } else if (policy.applicableTo === 'department' && policy.department) {
-        const deptEmployees = await Employee.find({
-          department: policy.department,
-          status: 'active'
-        }).select('_id')
-
-        const employeeIds = deptEmployees.map(e => e._id.toString())
-        const users = await User.find({
-          employeeId: { $in: employeeIds }
-        }).select('_id')
-
+      } else if (policy.applicableTo === 'company') {
+        const empQuery = { status: 'active' }
+        if (policy.companies && policy.companies.length > 0) {
+          empQuery.company = { $in: policy.companies }
+        }
+        if (policy.departments && policy.departments.length > 0) {
+          empQuery.$or = [
+            { department: { $in: policy.departments } },
+            { departments: { $elemMatch: { $in: policy.departments } } }
+          ]
+        }
+        const matchedEmployees = await Employee.find(empQuery).select('_id')
+        const employeeIds = matchedEmployees.map(e => e._id.toString())
+        const users = await User.find({ employeeId: { $in: employeeIds } }).select('_id')
         targetUserIds = users.map(u => u._id.toString())
+      } else if (policy.applicableTo === 'department') {
+        const deptIds = (policy.departments && policy.departments.length > 0)
+          ? policy.departments
+          : (policy.department ? [policy.department] : [])
+        if (deptIds.length > 0) {
+          const deptEmployees = await Employee.find({
+            $or: [
+              { department: { $in: deptIds } },
+              { departments: { $elemMatch: { $in: deptIds } } }
+            ],
+            status: 'active'
+          }).select('_id')
+          const employeeIds = deptEmployees.map(e => e._id.toString())
+          const users = await User.find({ employeeId: { $in: employeeIds } }).select('_id')
+          targetUserIds = users.map(u => u._id.toString())
+        }
       } else if (policy.applicableTo === 'specific' && policy.specificEmployees && policy.specificEmployees.length > 0) {
         const employeeIds = policy.specificEmployees.map(e => e.toString())
         const users = await User.find({
@@ -95,6 +119,18 @@ export async function PUT(request, { params }) {
 // DELETE - Delete policy
 export async function DELETE(request, { params }) {
   try {
+    const auth = await getAuthAndModels(request, ['Policy'])
+    if (!auth.success) {
+      return NextResponse.json({ message: auth.message }, { status: 401 })
+    }
+    const { user, models } = auth
+    const { Policy } = models
+
+    // Only admin and HR can delete policies
+    if (!['admin', 'hr'].includes(user.role)) {
+      return NextResponse.json({ success: false, message: 'Only admin and HR can delete policies' }, { status: 403 })
+    }
+
     const policy = await Policy.findByIdAndDelete(params.id)
 
     if (!policy) {

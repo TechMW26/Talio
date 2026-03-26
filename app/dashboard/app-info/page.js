@@ -278,8 +278,6 @@ export default function AppInfoPage() {
                 <HiOutlineComputerDesktop className="w-3.5 h-3.5" style={{ color: 'var(--color-primary-500)' }} />
               </div>
             </div>
-              </div>
-            </div>
 
             {!appInfo ? (
               <div className="flex items-center justify-center py-8 gap-3">
