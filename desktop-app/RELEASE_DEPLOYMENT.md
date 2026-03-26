@@ -297,6 +297,55 @@ $GH release create vX.Y.Z \
   dist/Talio.Setup.X.Y.Z.exe
 ```
 
+### Using Node.js Release Scripts (recommended — no `gh` CLI needed)
+
+Two scripts in `desktop-app/scripts/` handle release creation and asset upload using the GitHub REST API directly via Node.js `https`. No extra dependencies required.
+
+#### Prerequisites
+
+Set your GitHub Personal Access Token as an environment variable:
+```bash
+export GH_TOKEN="ghp_YOUR_TOKEN_HERE"
+```
+
+#### Option A: Create release + upload assets in one step
+
+```bash
+cd desktop-app
+
+# Create release with default notes and upload all 5 assets
+node scripts/create-release.js X.Y.Z
+
+# Create release with custom release notes
+node scripts/create-release.js X.Y.Z "Bug fixes and performance improvements"
+```
+
+This will:
+1. Create a new GitHub release tagged `vX.Y.Z` on `main`
+2. Upload all 5 assets from `dist/` (arm64.dmg, x64.dmg, arm64.zip, x64.zip, Setup.exe)
+
+#### Option B: Upload assets to an existing release
+
+If you already created the release (via Web UI or the create script failed mid-upload), use this to upload/re-upload assets:
+
+```bash
+cd desktop-app
+
+node scripts/upload-assets.js X.Y.Z
+```
+
+This will:
+1. Look up the release by tag `vX.Y.Z`
+2. Delete any existing assets with the same filenames (safe re-upload)
+3. Upload all 5 assets from `dist/`
+
+#### Script files
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/create-release.js` | Creates a GitHub release and uploads all assets |
+| `scripts/upload-assets.js` | Uploads assets to an *existing* release (by tag) |
+
 ### Using GitHub Web UI
 
 1. Go to https://github.com/avirajsharma-ops/Talio/releases/new
@@ -388,10 +437,19 @@ $GH release edit vX.Y.Z --latest
 - The app checks every 2 hours; users can also check manually from the App Info page.
 
 ### Uploading assets to an existing release
+
+**Using gh CLI:**
 ```bash
 $GH release upload vX.Y.Z "filename" --clobber
 ```
 The `--clobber` flag overwrites existing assets with the same name.
+
+**Using Node.js script:**
+```bash
+cd desktop-app
+node scripts/upload-assets.js X.Y.Z
+```
+The script automatically deletes and re-uploads matching assets.
 
 ### Code signing / notarization (macOS)
 See the **Code Signing** section above for full setup instructions.
@@ -404,9 +462,8 @@ See the **Windows Code Signing** section above. You need an OV or EV code signin
 ## Quick Reference - Full Release Flow
 
 ```bash
-# 0. Ensure gh is authenticated (one-time)
-#    echo "ghp_YOUR_TOKEN" | gh auth login --with-token
-#    OR: export GH_TOKEN="ghp_YOUR_TOKEN"
+# 0. Set GitHub token (one-time per session)
+export GH_TOKEN="ghp_YOUR_TOKEN"
 
 # 0.5 Check latest release version on GitHub
 #     Visit: https://github.com/avirajsharma-ops/Talio/releases
@@ -424,13 +481,14 @@ cd desktop-app && npm run build && cd ..
 # 4. Commit & push
 git add -A && git commit -m "release: desktop app vX.Y.Z" && git push
 
-# 5. Create release
-cd desktop-app/dist
-gh release create vX.Y.Z --title "Talio Desktop vX.Y.Z" --notes "..." \
-  Talio-X.Y.Z-x64.dmg Talio-X.Y.Z-arm64.dmg \
-  Talio-X.Y.Z-x64.zip Talio-X.Y.Z-arm64.zip \
-  Talio.Setup.X.Y.Z.exe latest-mac.yml latest.yml
+# 5. Create release + upload assets (using Node.js scripts — no gh CLI needed)
+cd desktop-app
+node scripts/create-release.js X.Y.Z "Release notes here"
+
+# OR if release already exists and you just need to upload/re-upload assets:
+node scripts/upload-assets.js X.Y.Z
 
 # 6. Verify
-gh release view vX.Y.Z --json assets --jq '.assets[].name'
+#    Visit: https://github.com/avirajsharma-ops/Talio/releases/tag/vX.Y.Z
+#    OR: gh release view vX.Y.Z --json assets --jq '.assets[].name'
 ```
