@@ -628,15 +628,15 @@ export async function PATCH(request, { params }) {
       )
     }
 
-    const employee = await Employee.findById(id)
-    if (!employee) {
+    const employeeDoc = await Employee.findById(id).select('status').lean()
+    if (!employeeDoc) {
       return NextResponse.json(
         { success: false, message: 'Employee not found' },
         { status: 404 }
       )
     }
 
-    const oldStatus = employee.status
+    const oldStatus = employeeDoc.status
     const updateData = {}
 
     // Handle status update
@@ -685,9 +685,20 @@ export async function PATCH(request, { params }) {
       updateData.reportingManager = body.reportingManager
     }
 
-    // Apply updates
-    Object.assign(employee, updateData)
-    await employee.save()
+    // Apply updates using findByIdAndUpdate to avoid full-document validation
+    // (some employees have legacy data like address stored as string instead of object)
+    const employee = await Employee.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      { new: true, runValidators: true, context: 'query' }
+    )
+
+    if (!employee) {
+      return NextResponse.json(
+        { success: false, message: 'Employee not found after update' },
+        { status: 404 }
+      )
+    }
 
     // If status changed to terminated or resigned, deactivate the user account
     // Admins cannot be deactivated this way - only superadmin can deactivate admins
