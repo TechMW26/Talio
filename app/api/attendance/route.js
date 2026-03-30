@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import queryCache from '@/lib/queryCache'
 import { buildCachePattern, clearCachePattern } from '@/lib/cache'
+
+export const dynamic = 'force-dynamic'
 import { logActivity } from '@/lib/activityLogger'
 import { sendEmail } from '@/lib/mailer'
 import { sendPushToUser } from '@/lib/pushNotification'
@@ -363,7 +365,9 @@ export async function GET(request) {
     // Cache for 30 seconds
     queryCache.set(cacheKey, response, 30000)
 
-    return NextResponse.json(response)
+    return NextResponse.json(response, {
+      headers: { 'Cache-Control': 'no-store, no-cache, must-revalidate' }
+    })
   } catch (error) {
     console.error('Get attendance error:', error.message, error.stack)
     return NextResponse.json(

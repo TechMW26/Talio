@@ -8,6 +8,8 @@ import { emitEmployeeUpdate, emitDashboardRefresh } from '@/lib/realtimeEvents'
 import { getAuthAndModels } from '@/lib/auth'
 import { checkUserLimit, registerUserTenantMapping, getTenantCompanyByDbName } from '@/lib/tenantContext'
 
+export const dynamic = 'force-dynamic'
+
 // GET - List all employees with filters
 export async function GET(request) {
   try {

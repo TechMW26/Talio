@@ -7,6 +7,8 @@ import { deleteUserFromBackup } from '@/lib/backupDb'
 import { emitEmployeeUpdate, emitDashboardRefresh, emitAssetUpdate } from '@/lib/realtimeEvents'
 import mongoose from 'mongoose'
 
+export const dynamic = 'force-dynamic'
+
 // Check if ImageKit is configured
 const isImageKitConfigured = () => {
   return !!(
@@ -396,6 +398,7 @@ export async function PUT(request, { params }) {
     // Clear cache for this employee and list
     queryCache.delete(queryCache.generateKey('employee', id))
     queryCache.clearPattern('employees')
+    await clearCachePattern(buildCachePattern({ tenantId: auth.tenant?.databaseName, namespace: 'employees:list' })).catch(() => { })
 
     // Log activity for profile update
     await logActivity({
@@ -533,7 +536,9 @@ export async function DELETE(request, { params }) {
 
     // Clear cache
     queryCache.delete(queryCache.generateKey('employee', id))
+    queryCache.clearPattern('employees')
 
+    await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'employees:list' })).catch(() => { })
     await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'auth:user', userId: deletedUserId }))
     await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'profile', userId: deletedUserId }))
     await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:employee-stats', userId: deletedUserId }))
@@ -731,12 +736,14 @@ export async function PATCH(request, { params }) {
       )
     }
 
-    // Clear cache
+    // Clear cache - individual employee + employee list caches
     queryCache.delete(queryCache.generateKey('employee', id))
+    queryCache.clearPattern('employees')
 
     const employeeUser = await User.findOne({ employeeId: id }).select('_id')
     const employeeUserId = employeeUser?._id?.toString() || '*'
 
+    await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'employees:list' })).catch(() => { })
     await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'auth:user', userId: employeeUserId }))
     await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'profile', userId: employeeUserId }))
     await clearCachePattern(buildCachePattern({ tenantId: tenant?.databaseName, namespace: 'dashboard:employee-stats', userId: employeeUserId }))

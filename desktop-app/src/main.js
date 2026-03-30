@@ -112,7 +112,7 @@ async function getDesktopSources(options) {
     thumbnailSize: { width: 320, height: 180 },
     fetchWindowIcons: true
   });
-  return sources.map(function(source) {
+  return sources.map(function (source) {
     return {
       id: source.id,
       name: source.name,
@@ -133,7 +133,7 @@ async function getDesktopSourcesWithJPEG(options) {
     types: ['screen'],
     thumbnailSize: { width: 1920, height: 1080 }
   });
-  return sources.map(function(source) {
+  return sources.map(function (source) {
     return {
       id: source.id,
       name: source.name,
@@ -393,7 +393,7 @@ function createWindow() {
     const isVisible = displays.some(function (d) {
       const b = d.bounds;
       return windowX >= b.x - 100 && windowX < b.x + b.width + 100 &&
-             windowY >= b.y - 100 && windowY < b.y + b.height + 100;
+        windowY >= b.y - 100 && windowY < b.y + b.height + 100;
     });
     if (!isVisible) {
       const { width: screenW, height: screenH } = require('electron').screen.getPrimaryDisplay().workAreaSize;
@@ -2140,7 +2140,7 @@ function sendUpdatePageMessage(data) {
 function getUpdateAssetName(version) {
   if (process.platform === 'darwin') {
     var arch = process.arch === 'x64' ? 'x64' : 'arm64';
-    return 'Talio-' + version + '-' + arch + '.zip';
+    return 'Talio-' + version + '-' + arch + '.dmg';
   } else if (process.platform === 'win32') {
     return 'Talio.Setup.' + version + '.exe';
   }
@@ -2176,7 +2176,7 @@ function downloadFile(url, destPath, onProgress) {
 
         if (response.statusCode !== 200) {
           file.close();
-          fs.unlink(destPath, function () {});
+          fs.unlink(destPath, function () { });
           reject(new Error('Download failed with HTTP ' + response.statusCode));
           return;
         }
@@ -2209,18 +2209,18 @@ function downloadFile(url, destPath, onProgress) {
 
         response.on('error', function (err) {
           file.close();
-          fs.unlink(destPath, function () {});
+          fs.unlink(destPath, function () { });
           reject(err);
         });
       }).on('error', function (err) {
         file.close();
-        fs.unlink(destPath, function () {});
+        fs.unlink(destPath, function () { });
         reject(err);
       });
     }
 
     file.on('error', function (err) {
-      fs.unlink(destPath, function () {});
+      fs.unlink(destPath, function () { });
       reject(err);
     });
 
@@ -2330,65 +2330,181 @@ async function performUpdateDownload(latestVersion) {
     logger.log('info', 'Updater', 'Installing update: ' + destPath);
 
     if (process.platform === 'darwin') {
-      // macOS: Extract ZIP, replace app, and relaunch automatically
-      var appPath = app.getPath('exe'); // e.g. /Applications/Talio.app/Contents/MacOS/Talio
-      var appBundlePath = path.resolve(appPath, '..', '..', '..'); // /Applications/Talio.app
-      var extractDir = path.join(app.getPath('temp'), 'talio-update-extract');
+      // ── macOS: Mount DMG, copy .app, unmount, relaunch ──────────────
+      var appExePath = app.getPath('exe'); // e.g. /Applications/Talio.app/Contents/MacOS/Talio
+      var appBundlePath = path.resolve(appExePath, '..', '..', '..'); // /Applications/Talio.app
+      var appBundleName = path.basename(appBundlePath); // Talio.app
+      var installDir = path.dirname(appBundlePath); // /Applications
+      var mountPoint = null;
 
       logger.log('info', 'Updater', 'Current app bundle: ' + appBundlePath);
-      logger.log('info', 'Updater', 'Extracting to: ' + extractDir);
+      logger.log('info', 'Updater', 'Install directory: ' + installDir);
 
-      // Clean extract directory
-      try { fs.rmSync(extractDir, { recursive: true, force: true }); } catch (e) { /* ok */ }
-      fs.mkdirSync(extractDir, { recursive: true });
-
-      // Extract ZIP
-      await new Promise(function (resolve, reject) {
-        var unzip = spawn('/usr/bin/ditto', ['-xk', destPath, extractDir]);
-        unzip.on('close', function (code) {
-          if (code === 0) resolve();
-          else reject(new Error('ditto extract failed with code ' + code));
+      try {
+        // Phase B: Mount the DMG programmatically
+        logger.log('info', 'Updater', 'Mounting DMG...');
+        mountPoint = await new Promise(function (resolve, reject) {
+          var child = spawn('/usr/bin/hdiutil', ['attach', destPath, '-nobrowse', '-noautoopen', '-mountrandom', '/tmp']);
+          var stdout = '';
+          var stderr = '';
+          child.stdout.on('data', function (d) { stdout += d.toString(); });
+          child.stderr.on('data', function (d) { stderr += d.toString(); });
+          child.on('close', function (code) {
+            if (code !== 0) {
+              reject(new Error('Failed to mount DMG (code ' + code + '): ' + stderr.trim()));
+              return;
+            }
+            // Parse mount point from hdiutil output (last tab-delimited column)
+            var lines = stdout.trim().split('\n');
+            for (var i = lines.length - 1; i >= 0; i--) {
+              var match = lines[i].match(/\t(\/(?:tmp|Volumes)\/[^\t]+)\s*$/);
+              if (match) { resolve(match[1].trim()); return; }
+            }
+            reject(new Error('Could not determine DMG mount point'));
+          });
+          child.on('error', reject);
         });
-        unzip.on('error', reject);
-      });
 
-      // Find the .app in the extracted directory
-      var extracted = fs.readdirSync(extractDir);
-      var newApp = extracted.find(function (f) { return f.endsWith('.app'); });
-      if (!newApp) {
-        throw new Error('No .app found in extracted ZIP');
+        logger.log('info', 'Updater', 'DMG mounted at: ' + mountPoint);
+
+        // Find the .app inside the mounted volume
+        var mountContents = fs.readdirSync(mountPoint);
+        var newApp = mountContents.find(function (f) { return f.endsWith('.app'); });
+        if (!newApp) {
+          throw new Error('No .app bundle found in mounted DMG');
+        }
+        var newAppPath = path.join(mountPoint, newApp);
+        logger.log('info', 'Updater', 'Found app in DMG: ' + newAppPath);
+
+        // Phase C & F: Copy the new .app to the install directory
+        var targetPath = path.join(installDir, appBundleName);
+        var hasWriteAccess = false;
+        try { fs.accessSync(installDir, fs.constants.W_OK); hasWriteAccess = true; } catch (e) { /* no access */ }
+
+        if (hasWriteAccess) {
+          // Direct copy — user has write access to install directory
+          logger.log('info', 'Updater', 'Copying app (direct write access)...');
+          await new Promise(function (resolve, reject) {
+            var rm = spawn('/bin/rm', ['-rf', targetPath]);
+            rm.on('close', function (rmCode) {
+              if (rmCode !== 0) { reject(new Error('Failed to remove old app (code ' + rmCode + ')')); return; }
+              var cp = spawn('/bin/cp', ['-R', newAppPath, targetPath]);
+              cp.on('close', function (cpCode) {
+                if (cpCode === 0) resolve();
+                else reject(new Error('Failed to copy new app (code ' + cpCode + ')'));
+              });
+              cp.on('error', reject);
+            });
+            rm.on('error', reject);
+          });
+        } else {
+          // Phase F: Request admin privileges via AppleScript authorization dialog
+          logger.log('info', 'Updater', 'Requesting admin privileges for installation...');
+          var shellCmd = "rm -rf '" + targetPath + "' && cp -R '" + newAppPath + "' '" + targetPath + "'";
+          await new Promise(function (resolve, reject) {
+            var child = spawn('/usr/bin/osascript', ['-e',
+              'do shell script ' + JSON.stringify(shellCmd) + ' with administrator privileges'
+            ]);
+            var stderr = '';
+            child.stderr.on('data', function (d) { stderr += d.toString(); });
+            child.on('close', function (code) {
+              if (code === 0) resolve();
+              else reject(new Error('Installation cancelled or failed' + (stderr ? ': ' + stderr.trim() : '')));
+            });
+            child.on('error', reject);
+          });
+        }
+
+        logger.log('info', 'Updater', 'App copied successfully to ' + targetPath);
+
+      } finally {
+        // Phase D: Unmount the DMG and clean up
+        if (mountPoint) {
+          logger.log('info', 'Updater', 'Unmounting DMG...');
+          try {
+            await new Promise(function (resolve) {
+              var child = spawn('/usr/bin/hdiutil', ['detach', mountPoint, '-quiet', '-force']);
+              child.on('close', resolve);
+              child.on('error', function () { resolve(); });
+            });
+          } catch (e) { logger.log('warn', 'Updater', 'DMG unmount warning: ' + e.message); }
+        }
+        // Clean up downloaded DMG
+        try { fs.unlinkSync(destPath); } catch (e) { /* ok */ }
       }
-      var newAppPath = path.join(extractDir, newApp);
-      logger.log('info', 'Updater', 'Extracted app: ' + newAppPath);
 
+      // Phase E: Relaunch using app.relaunch() + app.exit(0)
+      // app.relaunch() schedules the app to launch from the new binary after exit.
+      // app.exit(0) triggers immediate exit, bypassing force-persistent before-quit handler.
       sendUpdatePageMessage({ type: 'update-complete' });
+      logger.log('info', 'Updater', 'Update installed successfully. Relaunching...');
 
-      // Create a shell script that waits for the app to exit, replaces it, and relaunches
-      var scriptPath = path.join(app.getPath('temp'), 'talio-update.sh');
-      var script = '#!/bin/bash\n' +
-        'sleep 2\n' +
-        'rm -rf "' + appBundlePath + '"\n' +
-        'cp -R "' + newAppPath + '" "' + appBundlePath + '"\n' +
-        'open "' + appBundlePath + '"\n' +
-        'rm -rf "' + extractDir + '"\n' +
-        'rm -f "' + scriptPath + '"\n';
+      // Clean up all services before exit (before-quit is not fired by app.exit)
+      stopGuardian();
+      screenshotService.stop();
+      socketHandler.disconnect();
+      if (networkCheckInterval) { clearInterval(networkCheckInterval); networkCheckInterval = null; }
+      if (whitescreenCheckInterval) { clearInterval(whitescreenCheckInterval); whitescreenCheckInterval = null; }
+      stopScreenPermissionWatcher();
+      if (updateCheckTimer) { clearInterval(updateCheckTimer); updateCheckTimer = null; }
+      logger.shutdown();
 
-      fs.writeFileSync(scriptPath, script, { mode: 0o755 });
-      spawn('/bin/bash', [scriptPath], { detached: true, stdio: 'ignore' }).unref();
-
-      logger.log('info', 'Updater', 'Update script launched, quitting app for replacement...');
       setTimeout(function () {
-        isQuitting = true;
-        app.quit();
-      }, 1000);
+        app.relaunch();
+        app.exit(0);
+      }, 1500);
+
     } else if (process.platform === 'win32') {
-      // Windows: Launch the installer silently and quit
-      spawn(destPath, ['/S'], { detached: true, stdio: 'ignore' }).unref();
+      // ── Windows: Quit app, run NSIS installer silently, auto-relaunch ──
+      // The app uses force-persistent mode (before-quit blocks app.quit()),
+      // so we use app.exit(0) which bypasses the handler entirely.
+      // A batch script waits for this process to fully exit before running
+      // the installer, preventing NSIS file-lock errors.
       sendUpdatePageMessage({ type: 'update-complete' });
+      logger.log('info', 'Updater', 'Preparing Windows update...');
+
+      var appExePath = process.execPath;
+      var batchPath = path.join(app.getPath('temp'), 'talio-update.bat');
+      var batch = '@echo off\r\n' +
+        // Wait for the Electron process to fully exit (poll by PID)
+        ':wait\r\n' +
+        'tasklist /FI "PID eq ' + process.pid + '" 2>NUL | find /I "' + process.pid + '" >NUL\r\n' +
+        'if "%ERRORLEVEL%"=="0" (\r\n' +
+        '    timeout /t 1 /nobreak >NUL\r\n' +
+        '    goto wait\r\n' +
+        ')\r\n' +
+        // Extra delay for file handles to fully release
+        'timeout /t 2 /nobreak >NUL\r\n' +
+        // Run the NSIS installer silently (/S flag)
+        'start /wait "" "' + destPath + '" /S\r\n' +
+        // Launch the updated app from the same install path
+        'start "" "' + appExePath + '"\r\n' +
+        // Self-delete the batch file
+        'del "%~f0"\r\n';
+
+      fs.writeFileSync(batchPath, batch);
+      spawn('cmd.exe', ['/c', batchPath], {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: true
+      }).unref();
+
+      logger.log('info', 'Updater', 'Update script launched, exiting app for installation...');
+
+      // Clean up all services before exit (before-quit is not fired by app.exit)
+      stopGuardian();
+      screenshotService.stop();
+      socketHandler.disconnect();
+      if (networkCheckInterval) { clearInterval(networkCheckInterval); networkCheckInterval = null; }
+      if (whitescreenCheckInterval) { clearInterval(whitescreenCheckInterval); whitescreenCheckInterval = null; }
+      stopScreenPermissionWatcher();
+      if (updateCheckTimer) { clearInterval(updateCheckTimer); updateCheckTimer = null; }
+      logger.shutdown();
+
+      // Force exit — bypasses the before-quit handler (which blocks quit in persistent mode)
       setTimeout(function () {
-        isQuitting = true;
-        app.quit();
-      }, 2000);
+        app.exit(0);
+      }, 1500);
     }
   } catch (error) {
     logger.log('error', 'Updater', 'Update download/install failed: ' + error.message);

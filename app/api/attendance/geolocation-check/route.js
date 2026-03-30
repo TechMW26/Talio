@@ -3,6 +3,8 @@ import { getAuthAndModels } from '@/lib/auth'
 import { calculateEffectiveWorkHours, determineAttendanceStatus } from '@/lib/attendanceShrinkage'
 import { sendPushToUser } from '@/lib/pushNotification'
 
+export const dynamic = 'force-dynamic'
+
 // Calculate distance between two coordinates (Haversine formula)
 function calculateDistance(lat1, lon1, lat2, lon2) {
   const R = 6371e3 // Earth's radius in meters
@@ -87,7 +89,7 @@ export async function POST(request) {
 
     // Get company settings
     const settings = await CompanySettings.findOne().lean()
-    
+
     // Check if geofence is enabled
     if (!settings?.geofence?.enabled) {
       return NextResponse.json({
@@ -198,7 +200,7 @@ export async function POST(request) {
     // Update any pending overtime request
     await OvertimeRequest.findOneAndUpdate(
       { attendance: attendance._id, status: 'pending' },
-      { 
+      {
         status: 'auto-checkout',
         autoCheckoutAt: checkOutTime,
         autoCheckoutReason: 'User left office geofence area'

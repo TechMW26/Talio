@@ -170,12 +170,26 @@ export default function EmployeesPage() {
 
     setStatusUpdating(employeeId)
 
-    const result = await statusMutation.execute(`/api/employees/${employeeId}`, { status: newStatus }, {
-      invalidateKeys: [/^\/api\/employees/],
-    })
+    // Optimistic update - immediately reflect change in UI
+    const previousData = employeesRes
+    refreshEmployees(
+      prev => prev ? {
+        ...prev,
+        data: prev.data.map(emp =>
+          emp._id === employeeId ? { ...emp, status: newStatus } : emp
+        )
+      } : prev,
+      { revalidate: false }
+    )
+
+    const result = await statusMutation.execute(`/api/employees/${employeeId}`, { status: newStatus })
     if (result) {
       toast.success(result.message || 'Status updated successfully')
+      // Revalidate to sync with server
+      refreshEmployees()
     } else {
+      // Rollback optimistic update on failure
+      refreshEmployees(previousData, { revalidate: false })
       toast.error('Failed to update status')
     }
     setStatusUpdating(null)

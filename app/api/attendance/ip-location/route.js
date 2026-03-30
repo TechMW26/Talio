@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { getLocationFromIP, getClientIP } from '@/lib/ipGeolocation'
 import { getAuthAndModels } from '@/lib/auth'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/attendance/ip-location
  * 

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import mongoose from 'mongoose'
 
+export const dynamic = 'force-dynamic'
+
 // Helper to validate MongoDB ObjectId
 const isValidObjectId = (id) => {
   return mongoose.Types.ObjectId.isValid(id) &&

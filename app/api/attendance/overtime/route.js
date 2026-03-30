@@ -4,6 +4,8 @@ import { calculateEffectiveWorkHours, determineAttendanceStatus } from '@/lib/at
 import { sendPushToUser } from '@/lib/pushNotification'
 import mongoose from 'mongoose'
 
+export const dynamic = 'force-dynamic'
+
 // Helper to validate MongoDB ObjectId
 const isValidObjectId = (id) => {
   return mongoose.Types.ObjectId.isValid(id) &&
@@ -112,10 +114,10 @@ export async function POST(request) {
     if (isWorkingOvertime) {
       // Employee confirms they're working overtime
       overtimeRequest.status = 'overtime-confirmed'
-      
+
       // We'll calculate overtime hours when they actually check out
       // For now, just mark as confirmed
-      
+
       await overtimeRequest.save()
 
       return NextResponse.json({
@@ -126,14 +128,14 @@ export async function POST(request) {
     } else {
       // Employee says they're NOT working overtime - clock them out now
       overtimeRequest.status = 'manual-checkout'
-      
+
       const attendance = await Attendance.findById(overtimeRequest.attendance)
       if (attendance && !attendance.checkOut) {
         // Get company settings for shrinkage calculation
         const settings = await CompanySettings.findOne().lean()
-        
+
         attendance.checkOut = now
-        
+
         // Calculate work hours using shrinkage method
         if (attendance.checkIn && settings?.breakTimings) {
           const workCalc = calculateEffectiveWorkHours(
@@ -141,18 +143,18 @@ export async function POST(request) {
             now,
             settings.breakTimings
           )
-          
+
           attendance.workHours = workCalc.effectiveWorkHours
           attendance.totalLoggedHours = workCalc.totalLoggedHours
           attendance.breakMinutes = workCalc.breakMinutes
           attendance.shrinkagePercentage = workCalc.shrinkagePercentage
-          
+
           // Determine final status
           const statusResult = determineAttendanceStatus(workCalc.effectiveWorkHours, {
             fullDayHours: settings.fullDayHours || 8,
             halfDayHours: settings.halfDayHours || 4
           })
-          
+
           attendance.status = statusResult.status
           attendance.statusReason = statusResult.reason
         } else {
@@ -161,10 +163,10 @@ export async function POST(request) {
           attendance.workHours = parseFloat(hoursWorked.toFixed(2))
           attendance.status = hoursWorked >= 4 ? (hoursWorked >= 7 ? 'present' : 'half-day') : 'absent'
         }
-        
+
         await attendance.save()
       }
-      
+
       await overtimeRequest.save()
 
       return NextResponse.json({
@@ -222,7 +224,7 @@ export async function PATCH(request) {
     }
 
     const checkOut = checkOutTime ? new Date(checkOutTime) : new Date()
-    
+
     // Calculate overtime hours (time after scheduled checkout)
     const scheduledCheckout = new Date(overtimeRequest.scheduledCheckOut)
     const overtimeMs = checkOut - scheduledCheckout
