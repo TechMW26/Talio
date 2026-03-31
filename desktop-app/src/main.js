@@ -1,5 +1,5 @@
 /**
- * Talio Desktop App v5.3.0
+ * Talio Desktop App v5.4.0
  * Main Electron process
  * 
  * Performance optimized for smooth rendering
