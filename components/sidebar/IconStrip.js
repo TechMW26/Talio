@@ -12,6 +12,7 @@ import {
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { getMenuItemsForRole } from '@/utils/roleBasedMenus'
+import { getHiddenSidebarItems } from '@/lib/planFeatures'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
 import { usePageTransition } from '@/contexts/PageTransitionContext'
@@ -29,7 +30,7 @@ function SidebarBadge({ count }) {
   )
 }
 
-export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartmentHead = false, isTeamLeader = false }) {
+export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartmentHead = false, isTeamLeader = false, companyFeatures = null }) {
   const pathname = usePathname()
   const router = useRouter()
   const [user, setUser] = useState(null)
@@ -127,6 +128,14 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
 
     return baseMenuItems
   }, [user, isDepartmentHead, isTeamLeader])
+
+  // Filter menu items based on company feature flags
+  const filteredMenuItems = useMemo(() => {
+    if (!companyFeatures || !menuItems.length) return menuItems
+    const hidden = getHiddenSidebarItems(companyFeatures)
+    if (hidden.size === 0) return menuItems
+    return menuItems.filter((item) => !hidden.has(item.name))
+  }, [menuItems, companyFeatures])
 
   const handleLinkClick = (path) => {
     if (path && path !== pathname) {
@@ -248,10 +257,10 @@ export default function IconStrip({ onExpandClick, sidebarCounts = {}, isDepartm
 
           <div className="my-2 mx-2 border-t" style={{ borderColor: 'var(--color-primary-200)' }} />
 
-          {menuItems.map((item, index) => {
+          {filteredMenuItems.map((item, index) => {
             const isActive = isMenuItemActive(item)
             const badgeCount = getBadgeCount(item.name)
-            const showGroupDivider = item.group && index > 0 && menuItems[index - 1]?.group !== item.group
+            const showGroupDivider = item.group && index > 0 && filteredMenuItems[index - 1]?.group !== item.group
 
             let iconButton
 

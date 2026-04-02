@@ -14,6 +14,7 @@ import {
 } from 'react-icons/hi2'
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { getMenuItemsForRole } from '@/utils/roleBasedMenus'
+import { getHiddenSidebarItems } from '@/lib/planFeatures'
 import toast from '@/utils/toast'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
 import { useChatWidget } from '@/contexts/ChatWidgetContext'
@@ -39,7 +40,8 @@ export default function SlidingSidebar({
   activeMenuIndex,
   sidebarCounts = {},
   isDepartmentHead = false,
-  isTeamLeader = false
+  isTeamLeader = false,
+  companyFeatures = null
 }) {
   const pathname = usePathname()
   const router = useRouter()
@@ -210,6 +212,14 @@ export default function SlidingSidebar({
     return baseMenuItems
   }, [user, isDepartmentHead, isTeamLeader])
 
+  // Filter menu items based on company feature flags
+  const filteredMenuItems = useMemo(() => {
+    if (!companyFeatures || !menuItems.length) return menuItems
+    const hidden = getHiddenSidebarItems(companyFeatures)
+    if (hidden.size === 0) return menuItems
+    return menuItems.filter((item) => !hidden.has(item.name))
+  }, [menuItems, companyFeatures])
+
   const toggleSubmenu = (menuName) => {
     setExpandedMenus(prev => ({
       ...prev,
@@ -376,10 +386,10 @@ export default function SlidingSidebar({
 
           <div className="my-2 mx-2 border-t" style={{ borderColor: 'var(--color-primary-200)' }} />
 
-          {menuItems.map((item, index) => {
+          {filteredMenuItems.map((item, index) => {
             const isActive = isMenuItemActive(item)
             const isTargeted = activeSubmenu === item.name
-            const showGroupHeader = item.group && (index === 0 || menuItems[index - 1]?.group !== item.group)
+            const showGroupHeader = item.group && (index === 0 || filteredMenuItems[index - 1]?.group !== item.group)
             return (
               <div key={item.name} ref={el => menuItemRefs.current[index] = el} className="w-full">
                 {showGroupHeader && (

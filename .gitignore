@@ -83,3 +83,6 @@ uploads/aadhaar/
 
 # Sentry
 .env.sentry-build-plugin
+
+# Local pitch documents
+/Pitch Docs/

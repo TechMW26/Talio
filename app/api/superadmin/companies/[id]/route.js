@@ -112,13 +112,14 @@ export async function PATCH(request, { params }) {
       'name', 'description', 'logo', 'primaryContact', 'address',
       'billingAddress', 'registeredAddress', 'businessDetails',
       'subscription', 'onboarding', 'serviceStatus', 'servicePausedReason',
-      'technicalDetails', 'tags', 'notes',
+      'technicalDetails', 'tags', 'notes', 'features', 'miraTokens',
     ];
 
     // Nested object fields that should be merged
     const nestedFields = [
       'subscription', 'primaryContact', 'address', 'billingAddress',
-      'registeredAddress', 'businessDetails', 'technicalDetails', 'onboarding'
+      'registeredAddress', 'businessDetails', 'technicalDetails', 'onboarding',
+      'features', 'miraTokens',
     ];
 
     for (const field of allowedFields) {

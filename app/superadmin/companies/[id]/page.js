@@ -6,6 +6,7 @@ import { Select, SelectItem } from '@heroui/react'
 import toast from '@/utils/toast'
 import Loader from '@/components/ui/Loader'
 import ModalPortal from '@/components/ui/ModalPortal'
+import { FEATURE_DEFINITIONS, FEATURE_BUNDLES, ALL_BUNDLE_KEYS, ALL_FEATURE_KEYS, getFeaturesForPlan, PLAN_TEMPLATES, isBundleEnabled, toggleBundle } from '@/lib/planFeatures'
 
 export default function CompanyDetailPage({ params }) {
   const router = useRouter()
@@ -218,12 +219,22 @@ export default function CompanyDetailPage({ params }) {
       const startMs = new Date(subscriptionForm.startDate).getTime()
       const endDate = new Date(startMs + subscriptionForm.tenureDays * 24 * 60 * 60 * 1000).toISOString()
       
-      await updateCompany({
+      // If plan changed, also update features and mira tokens to match the new plan
+      const updates = {
         subscription: {
           ...subscriptionForm,
           endDate,
         }
-      })
+      }
+      if (subscriptionForm.plan !== company.subscription?.plan) {
+        const tpl = PLAN_TEMPLATES[subscriptionForm.plan]
+        if (tpl) {
+          updates.features = getFeaturesForPlan(subscriptionForm.plan)
+          updates.miraTokens = { perUserAllocation: tpl.miraTokensPerUser || 0, allocationNote: '' }
+        }
+      }
+      
+      await updateCompany(updates)
       setEditingSubscription(false)
     } finally {
       setSubmitting(false)
@@ -435,6 +446,7 @@ export default function CompanyDetailPage({ params }) {
   const tabs = [
     { id: 'overview', label: 'Overview' },
     { id: 'admins', label: 'Admins' },
+    { id: 'features', label: 'Features' },
     { id: 'business', label: 'Business Details' },
     { id: 'subscription', label: 'Subscription' },
     { id: 'payments', label: 'Payments' },
@@ -847,6 +859,11 @@ export default function CompanyDetailPage({ params }) {
           </div>
         )}
 
+        {/* Features Tab */}
+        {activeTab === 'features' && (
+          <FeaturesTab company={company} id={id} onUpdate={fetchCompany} />
+        )}
+
         {activeTab === 'business' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
@@ -855,21 +872,21 @@ export default function CompanyDetailPage({ params }) {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-gray-500">GST Number</p>
-                    <p className="text-gray-900 font-mono">{company.gstNumber || 'Not provided'}</p>
+                    <p className="text-gray-900 font-mono">{company.businessDetails?.gstNumber || company.gstNumber || 'Not provided'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">PAN Number</p>
-                    <p className="text-gray-900 font-mono">{company.panNumber || 'Not provided'}</p>
+                    <p className="text-gray-900 font-mono">{company.businessDetails?.panNumber || company.panNumber || 'Not provided'}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-gray-500">TAN Number</p>
-                    <p className="text-gray-900 font-mono">{company.tanNumber || 'Not provided'}</p>
+                    <p className="text-gray-900 font-mono">{company.businessDetails?.tanNumber || company.tanNumber || 'Not provided'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-500">CIN Number</p>
-                    <p className="text-gray-900 font-mono">{company.cinNumber || 'Not provided'}</p>
+                    <p className="text-gray-900 font-mono">{company.businessDetails?.cinNumber || company.cinNumber || 'Not provided'}</p>
                   </div>
                 </div>
               </div>
@@ -880,17 +897,17 @@ export default function CompanyDetailPage({ params }) {
               <div className="space-y-3">
                 <div>
                   <p className="text-sm text-gray-500">Business Type</p>
-                  <p className="text-gray-900 capitalize">{company.businessType?.replace('_', ' ') || 'Not specified'}</p>
+                  <p className="text-gray-900 capitalize">{(company.businessDetails?.businessType || company.businessType || 'Not specified').replace('_', ' ')}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Industry</p>
-                  <p className="text-gray-900">{company.industry || 'Not specified'}</p>
+                  <p className="text-gray-900">{company.businessDetails?.industry || company.industry || 'Not specified'}</p>
                 </div>
-                {company.website && (
+                {(company.businessDetails?.website || company.website) && (
                   <div>
                     <p className="text-sm text-gray-500">Website</p>
-                    <a href={company.website} target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline">
-                      {company.website}
+                    <a href={company.businessDetails?.website || company.website} target="_blank" rel="noopener noreferrer" className="text-purple-600 hover:underline">
+                      {company.businessDetails?.website || company.website}
                     </a>
                   </div>
                 )}
@@ -948,11 +965,26 @@ export default function CompanyDetailPage({ params }) {
                       <label className="block text-sm font-medium text-gray-700 mb-2">Plan</label>
                       <Select
                         selectedKeys={[subscriptionForm.plan]}
-                        onChange={(e) => setSubscriptionForm({ ...subscriptionForm, plan: e.target.value })}
+                        onChange={(e) => {
+                          const newPlan = e.target.value
+                          const tpl = PLAN_TEMPLATES[newPlan]
+                          if (tpl) {
+                            setSubscriptionForm({
+                              ...subscriptionForm,
+                              plan: newPlan,
+                              maxUsers: tpl.maxUsers,
+                              maxStorageGB: tpl.maxStorageGB,
+                              amount: tpl.price,
+                            })
+                          } else {
+                            setSubscriptionForm({ ...subscriptionForm, plan: newPlan })
+                          }
+                        }}
                         aria-label="Subscription Plan"
                         classNames={{ trigger: "bg-gray-50" }}
                       >
                         <SelectItem key="trial">Trial</SelectItem>
+                        <SelectItem key="budget">Budget</SelectItem>
                         <SelectItem key="starter">Starter</SelectItem>
                         <SelectItem key="professional">Professional</SelectItem>
                         <SelectItem key="enterprise">Enterprise</SelectItem>
@@ -1722,6 +1754,190 @@ export default function CompanyDetailPage({ params }) {
           </div>
         </div>
       </ModalPortal>
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────
+// Features Tab Component
+// ──────────────────────────────────────────────
+function FeaturesTab({ company, id, onUpdate }) {
+  const [features, setFeatures] = useState(() => {
+    // Initialize from company features or fallback to plan defaults
+    if (company.features && Object.keys(company.features).length > 0) {
+      const merged = { ...getFeaturesForPlan(company.subscription?.plan || 'custom') }
+      for (const key of ALL_FEATURE_KEYS) {
+        if (company.features[key] !== undefined) {
+          merged[key] = company.features[key]
+        }
+      }
+      return merged
+    }
+    return getFeaturesForPlan(company.subscription?.plan || 'custom')
+  })
+  const [miraTokensPerUser, setMiraTokensPerUser] = useState(company.miraTokens?.perUserAllocation || 0)
+  const [saving, setSaving] = useState(false)
+  const [hasChanges, setHasChanges] = useState(false)
+
+  const handleToggleBundle = (bundleKey) => {
+    const isOn = isBundleEnabled(features, bundleKey)
+    setFeatures((prev) => {
+      setHasChanges(true)
+      return toggleBundle(prev, bundleKey, !isOn)
+    })
+  }
+
+  const applyPlanDefaults = () => {
+    setFeatures(getFeaturesForPlan(company.subscription?.plan || 'custom'))
+    const tpl = PLAN_TEMPLATES[company.subscription?.plan]
+    if (tpl) setMiraTokensPerUser(tpl.miraTokensPerUser || 0)
+    setHasChanges(true)
+  }
+
+  const saveFeatures = async () => {
+    try {
+      setSaving(true)
+      const token = localStorage.getItem('superadmin_token')
+      const res = await fetch(`/api/superadmin/companies/${id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          features,
+          miraTokens: { perUserAllocation: miraTokensPerUser, allocationNote: '' },
+        }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success('Features updated successfully')
+        setHasChanges(false)
+        onUpdate()
+      } else {
+        toast.error(data.message || 'Failed to update features')
+      }
+    } catch (error) {
+      toast.error('Failed to update features')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const planLabel = PLAN_TEMPLATES[company.subscription?.plan]?.label || 'Custom'
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">Feature Sets</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Current plan: <span className="font-medium text-purple-600">{planLabel}</span>. Toggle feature sets this company can access.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => { setFeatures(Object.fromEntries(ALL_FEATURE_KEYS.map((k) => [k, true]))); setHasChanges(true) }}
+              className="px-3 py-1.5 text-xs font-medium bg-green-50 text-green-700 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
+            >
+              Enable All
+            </button>
+            <button
+              type="button"
+              onClick={() => { setFeatures(Object.fromEntries(ALL_FEATURE_KEYS.map((k) => [k, false]))); setHasChanges(true) }}
+              className="px-3 py-1.5 text-xs font-medium bg-red-50 text-red-700 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+            >
+              Disable All
+            </button>
+            <button
+              type="button"
+              onClick={applyPlanDefaults}
+              className="px-3 py-1.5 text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors"
+            >
+              Reset to Plan
+            </button>
+          </div>
+        </div>
+
+        {/* Bundle toggles */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {ALL_BUNDLE_KEYS.map((bk) => {
+            const bundle = FEATURE_BUNDLES[bk]
+            const isOn = isBundleEnabled(features, bk)
+            return (
+              <button
+                key={bk}
+                type="button"
+                onClick={() => handleToggleBundle(bk)}
+                className={`flex items-start gap-3 p-4 rounded-xl border-2 transition-all text-left ${
+                  isOn
+                    ? 'border-green-400 bg-green-50'
+                    : 'border-gray-200 bg-gray-50'
+                }`}
+              >
+                <div className={`w-10 h-6 rounded-full flex items-center transition-colors shrink-0 mt-0.5 ${
+                  isOn ? 'bg-green-500 justify-end' : 'bg-gray-300 justify-start'
+                }`}>
+                  <div className="w-5 h-5 bg-white rounded-full shadow-sm mx-0.5" />
+                </div>
+                <div className="min-w-0">
+                  <div className={`text-sm font-semibold ${isOn ? 'text-green-800' : 'text-gray-500'}`}>
+                    {bundle.icon} {bundle.label}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-0.5">{bundle.description}</div>
+                  <div className="text-xs text-gray-400 mt-1">
+                    {bundle.features.map((fk) => FEATURE_DEFINITIONS[fk].label).join(', ')}
+                  </div>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* MIRA Tokens Editing */}
+      <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
+        <h3 className="text-md font-semibold text-gray-900 mb-3">MIRA AI Token Allocation</h3>
+        <p className="text-sm text-gray-500 mb-4">Set the number of MIRA AI tokens each user receives. Set to 0 for no allocation.</p>
+        <div className="max-w-xs">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Tokens per user</label>
+          <input
+            type="number"
+            value={miraTokensPerUser}
+            onChange={(e) => { setMiraTokensPerUser(Number(e.target.value) || 0); setHasChanges(true) }}
+            min="0"
+            className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            placeholder="0"
+          />
+        </div>
+      </div>
+
+      {/* Summary + Save */}
+      <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm flex items-center justify-between">
+        <div className="flex gap-6 text-sm">
+          <div>
+            <span className="text-green-600 font-bold">{ALL_BUNDLE_KEYS.filter((bk) => isBundleEnabled(features, bk)).length}</span>
+            <span className="text-gray-500 ml-1">bundles enabled</span>
+          </div>
+          <div>
+            <span className="text-green-600 font-bold">{ALL_FEATURE_KEYS.filter((k) => features[k]).length}</span>
+            <span className="text-gray-500 ml-1">features</span>
+          </div>
+          <div>
+            <span className="text-gray-400 font-bold">{ALL_FEATURE_KEYS.filter((k) => !features[k]).length}</span>
+            <span className="text-gray-500 ml-1">disabled</span>
+          </div>
+        </div>
+        <button
+          onClick={saveFeatures}
+          disabled={!hasChanges || saving}
+          className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-purple-500/25"
+        >
+          {saving ? 'Saving...' : 'Save Features'}
+        </button>
+      </div>
     </div>
   )
 }

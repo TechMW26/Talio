@@ -13,6 +13,7 @@ import {
 } from 'react-icons/hi2'
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { getMenuItemsForRole } from '@/utils/roleBasedMenus'
+import { getHiddenSidebarItems } from '@/lib/planFeatures'
 import toast from '@/utils/toast'
 import { handleSessionExpired } from '@/utils/userHelper'
 import { useUnreadMessages } from '@/contexts/UnreadMessagesContext'
@@ -79,6 +80,9 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
     notifications: 0
   })
 
+  // Company feature flags for gating menu items
+  const [companyFeatures, setCompanyFeatures] = useState(null)
+
   // Check if desktop/tablet (matches Tailwind lg: breakpoint at 1024px)
   useEffect(() => {
     const checkDesktop = () => {
@@ -97,6 +101,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
       const parsedUser = JSON.parse(userData)
       setUser(parsedUser)
       checkDepartmentHead()
+      fetchCompanyFeatures()
     }
   }, [])
 
@@ -127,6 +132,25 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
       }
     } catch (error) {
       console.error('Error checking department head:', error)
+    }
+  }
+
+  // Fetch company feature flags for sidebar gating
+  const fetchCompanyFeatures = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      if (!token) return
+      const response = await fetch('/api/company/features', {
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.features) {
+          setCompanyFeatures(data.features)
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching company features:', error)
     }
   }
 
@@ -312,6 +336,14 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
     return baseMenuItems
   }, [user, isDepartmentHead, isTeamLeader])
 
+  // Filter menu items based on company feature flags
+  const filteredMenuItems = useMemo(() => {
+    if (!companyFeatures || !menuItems.length) return menuItems
+    const hidden = getHiddenSidebarItems(companyFeatures)
+    if (hidden.size === 0) return menuItems
+    return menuItems.filter((item) => !hidden.has(item.name))
+  }, [menuItems, companyFeatures])
+
   const toggleSubmenu = (menuName) => {
     setExpandedMenus(prev => ({
       ...prev,
@@ -411,6 +443,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
             sidebarCounts={sidebarCounts}
             isDepartmentHead={isDepartmentHead}
             isTeamLeader={isTeamLeader}
+            companyFeatures={companyFeatures}
           />
           <SlidingSidebar
             isOpen={slidingSidebarOpen}
@@ -421,6 +454,7 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
             sidebarCounts={sidebarCounts}
             isDepartmentHead={isDepartmentHead}
             isTeamLeader={isTeamLeader}
+            companyFeatures={companyFeatures}
           />
           {/* Spacer for icon strip width */}
           <div className="hidden lg:block w-[4.5rem] flex-shrink-0" />
@@ -471,9 +505,9 @@ export default function Sidebar({ isOpen, setIsOpen, isCollapsed, setIsCollapsed
 
             {/* Scrollable Menu Section */}
             <ScrollShadow className="pt-4 pb-8 flex-1 scrollbar-hide px-3 space-y-1">
-              {menuItems.map((item, index) => {
+              {filteredMenuItems.map((item, index) => {
                 const isActive = isMenuItemActive(item)
-                const showGroupHeader = item.group && (index === 0 || menuItems[index - 1]?.group !== item.group)
+                const showGroupHeader = item.group && (index === 0 || filteredMenuItems[index - 1]?.group !== item.group)
                 return (
                   <div key={item.name} className="w-full">
                     {showGroupHeader && (

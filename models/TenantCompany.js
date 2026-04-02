@@ -100,7 +100,7 @@ const TenantCompanySchema = new mongoose.Schema({
   subscription: {
     plan: {
       type: String,
-      enum: ['trial', 'starter', 'professional', 'enterprise', 'custom'],
+      enum: ['trial', 'budget', 'starter', 'professional', 'enterprise', 'custom'],
       default: 'custom',
     },
     status: {
@@ -138,6 +138,50 @@ const TenantCompanySchema = new mongoose.Schema({
     nextPaymentDate: Date,
   },
   
+  // Feature Flags (plan-gated capabilities)
+  features: {
+    gpsAttendance:      { type: Boolean, default: true },
+    geofencing:         { type: Boolean, default: false },
+    leaveManagement:    { type: Boolean, default: true },
+    teamChat:           { type: Boolean, default: true },
+    mail:               { type: Boolean, default: true },
+    meetings:           { type: Boolean, default: true },
+    announcements:      { type: Boolean, default: true },
+    projects:           { type: Boolean, default: false },
+    productivity:       { type: Boolean, default: false },
+    talioBoard:         { type: Boolean, default: false },
+    employees:          { type: Boolean, default: true },
+    liveUsers:          { type: Boolean, default: false },
+    performance:        { type: Boolean, default: false },
+    recruitment:        { type: Boolean, default: false },
+    payroll:            { type: Boolean, default: false },
+    expenses:           { type: Boolean, default: false },
+    documents:          { type: Boolean, default: true },
+    assets:             { type: Boolean, default: false },
+    helpdesk:           { type: Boolean, default: false },
+    policies:           { type: Boolean, default: true },
+    learning:           { type: Boolean, default: false },
+    ideas:              { type: Boolean, default: false },
+    holidays:           { type: Boolean, default: true },
+    calendar:           { type: Boolean, default: true },
+    mobileApp:          { type: Boolean, default: true },
+    basicReports:       { type: Boolean, default: true },
+    advancedReports:    { type: Boolean, default: false },
+    miraAI:             { type: Boolean, default: false },
+    strategicAI:        { type: Boolean, default: false },
+    customIntegrations: { type: Boolean, default: false },
+    apiAccess:          { type: Boolean, default: false },
+    customDomain:       { type: Boolean, default: false },
+    advancedControls:   { type: Boolean, default: false },
+    prioritySupport:    { type: Boolean, default: false },
+  },
+
+  // MIRA AI Token Allocation
+  miraTokens: {
+    perUserAllocation: { type: Number, default: 0 }, // tokens per user (e.g. 100 for Starter first month)
+    allocationNote:    { type: String, default: '' }, // e.g. "First month only"
+  },
+
   // Onboarding Payment (separate from recurring)
   onboarding: {
     amount: { type: Number, default: 0 },

@@ -1,14 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Select, SelectItem } from '@heroui/react'
 import toast from '@/utils/toast'
+import { PLAN_TEMPLATES, FEATURE_DEFINITIONS, FEATURE_BUNDLES, ALL_BUNDLE_KEYS, ALL_FEATURE_KEYS, getFeaturesForPlan, isBundleEnabled, toggleBundle } from '@/lib/planFeatures'
 
 export default function NewCompanyPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('basic')
+  const [features, setFeatures] = useState(getFeaturesForPlan('custom'))
+  const [miraTokensPerUser, setMiraTokensPerUser] = useState(0)
   const [formData, setFormData] = useState({
     // Basic Info
     name: '',
@@ -64,6 +67,29 @@ export default function NewCompanyPage() {
     
     tags: '',
   })
+
+  // When plan changes, auto-apply the plan template features and limits
+  const handlePlanChange = (plan) => {
+    const tpl = PLAN_TEMPLATES[plan]
+    if (!tpl) return
+    setFeatures(getFeaturesForPlan(plan))
+    setMiraTokensPerUser(tpl.miraTokensPerUser || 0)
+    setFormData((prev) => ({
+      ...prev,
+      subscription: {
+        ...prev.subscription,
+        plan,
+        maxUsers: tpl.maxUsers,
+        maxStorageGB: tpl.maxStorageGB,
+        amount: tpl.price,
+      },
+    }))
+  }
+
+  const handleToggleBundle = (bundleKey) => {
+    const isOn = isBundleEnabled(features, bundleKey)
+    setFeatures((prev) => toggleBundle(prev, bundleKey, !isOn))
+  }
 
   const handleChange = (e) => {
     const { name, value, type } = e.target
@@ -123,6 +149,11 @@ export default function NewCompanyPage() {
             endDate,
             status: 'active',
           },
+          features,
+          miraTokens: {
+            perUserAllocation: miraTokensPerUser,
+            allocationNote: '',
+          },
           tags: formData.tags.split(',').map((t) => t.trim()).filter(Boolean),
         }),
       })
@@ -152,7 +183,8 @@ export default function NewCompanyPage() {
     { id: 'basic', label: 'Basic Info' },
     { id: 'contact', label: 'Contact & Address' },
     { id: 'business', label: 'Business Details' },
-    { id: 'subscription', label: 'Subscription' },
+    { id: 'subscription', label: 'Plan & Subscription' },
+    { id: 'features', label: 'Features' },
     { id: 'payment', label: 'Onboarding Payment' },
   ]
 
@@ -505,48 +537,236 @@ export default function NewCompanyPage() {
           </div>
         )}
 
-        {/* Subscription Tab */}
+        {/* Plan & Subscription Tab */}
         {activeTab === 'subscription' && (
-          <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-4">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Subscription Details</h2>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Plan</label>
-                <Select
-                  selectedKeys={[formData.subscription.plan]}
-                  onChange={(e) => handleChange({ target: { name: 'subscription.plan', value: e.target.value } })}
-                  aria-label="Subscription Plan"
-                  classNames={{ trigger: "bg-gray-50" }}
-                >
-                  <SelectItem key="trial">Trial</SelectItem>
-                  <SelectItem key="starter">Starter</SelectItem>
-                  <SelectItem key="professional">Professional</SelectItem>
-                  <SelectItem key="enterprise">Enterprise</SelectItem>
-                  <SelectItem key="custom">Custom</SelectItem>
-                </Select>
+          <div className="space-y-6">
+            {/* Plan Selection Cards */}
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Select Plan</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {Object.entries(PLAN_TEMPLATES).map(([key, tpl]) => {
+                  const isSelected = formData.subscription.plan === key
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => handlePlanChange(key)}
+                      className={`relative text-left p-5 rounded-2xl border-2 transition-all ${
+                        isSelected
+                          ? 'border-purple-600 bg-purple-50 shadow-lg shadow-purple-500/10'
+                          : 'border-gray-200 bg-white hover:border-purple-300 hover:shadow-md'
+                      }`}
+                    >
+                      {isSelected && (
+                        <span className="absolute top-3 right-3 w-5 h-5 bg-purple-600 rounded-full flex items-center justify-center">
+                          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </span>
+                      )}
+                      <div className="font-bold text-gray-900 text-lg">{tpl.label}</div>
+                      <div className="text-purple-600 font-semibold text-xl mt-1">{tpl.priceLabel}</div>
+                      <div className="text-gray-500 text-xs mt-1">{tpl.tagline}</div>
+                      <div className="flex gap-3 mt-3 text-xs text-gray-500">
+                        <span>Up to {tpl.maxUsers} users</span>
+                        <span>{tpl.maxStorageGB} GB</span>
+                      </div>
+                      {key === 'starter' && (
+                        <div className="mt-2 px-2 py-1 bg-amber-100 text-amber-700 text-xs rounded-lg inline-block">
+                          100 MIRA tokens/user (1st month)
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Billing Cycle</label>
-                <Select
-                  selectedKeys={[formData.subscription.billingCycle]}
-                  onChange={(e) => handleChange({ target: { name: 'subscription.billingCycle', value: e.target.value } })}
-                  aria-label="Billing Cycle"
-                  classNames={{ trigger: "bg-gray-50" }}
-                >
-                  <SelectItem key="monthly">Monthly</SelectItem>
-                  <SelectItem key="quarterly">Quarterly</SelectItem>
-                  <SelectItem key="yearly">Yearly</SelectItem>
-                  <SelectItem key="custom">Custom</SelectItem>
-                </Select>
+            </div>
+
+            {/* Subscription Details */}
+            <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm space-y-4">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Subscription Details</h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Billing Cycle</label>
+                  <Select
+                    selectedKeys={[formData.subscription.billingCycle]}
+                    onChange={(e) => handleChange({ target: { name: 'subscription.billingCycle', value: e.target.value } })}
+                    aria-label="Billing Cycle"
+                    classNames={{ trigger: "bg-gray-50" }}
+                  >
+                    <SelectItem key="monthly">Monthly</SelectItem>
+                    <SelectItem key="quarterly">Quarterly</SelectItem>
+                    <SelectItem key="yearly">Yearly</SelectItem>
+                    <SelectItem key="custom">Custom</SelectItem>
+                  </Select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Amount (₹/user/month)</label>
+                  <input
+                    type="number"
+                    name="subscription.amount"
+                    value={formData.subscription.amount}
+                    onChange={handleChange}
+                    min="0"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+                  <input
+                    type="date"
+                    name="subscription.startDate"
+                    value={formData.subscription.startDate}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Amount (₹)</label>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Tenure (Days)</label>
+                  <input
+                    type="number"
+                    name="subscription.tenureDays"
+                    value={formData.subscription.tenureDays}
+                    onChange={handleChange}
+                    min="1"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    placeholder="30"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">End Date (Calculated)</label>
+                  <input
+                    type="date"
+                    value={calculateEndDate()}
+                    disabled
+                    className="w-full px-4 py-3 bg-gray-100 border border-gray-200 rounded-xl text-gray-600 cursor-not-allowed"
+                  />
+                </div>
+              </div>
+
+              <div className="border-t border-gray-100 pt-4 mt-4">
+                <h3 className="text-md font-medium text-gray-900 mb-4">Usage Limits</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Max Users</label>
+                    <input
+                      type="number"
+                      name="subscription.maxUsers"
+                      value={formData.subscription.maxUsers}
+                      onChange={handleChange}
+                      min="1"
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Company cannot add more users beyond this limit</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Max Storage (GB)</label>
+                    <input
+                      type="number"
+                      name="subscription.maxStorageGB"
+                      value={formData.subscription.maxStorageGB}
+                      onChange={handleChange}
+                      min="1"
+                      step="1"
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Storage limit for uploads and data</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Features Tab */}
+        {activeTab === 'features' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900">Feature Sets</h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {formData.subscription.plan === 'custom'
+                      ? 'Manually configure which feature sets this company can access.'
+                      : `Pre-filled from the ${PLAN_TEMPLATES[formData.subscription.plan]?.label || ''} plan. You can override below.`}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFeatures(Object.fromEntries(ALL_FEATURE_KEYS.map((k) => [k, true])))}
+                    className="px-3 py-1.5 text-xs font-medium bg-green-50 text-green-700 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
+                  >
+                    Enable All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFeatures(Object.fromEntries(ALL_FEATURE_KEYS.map((k) => [k, false])))}
+                    className="px-3 py-1.5 text-xs font-medium bg-red-50 text-red-700 border border-red-200 rounded-lg hover:bg-red-100 transition-colors"
+                  >
+                    Disable All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFeatures(getFeaturesForPlan(formData.subscription.plan))}
+                    className="px-3 py-1.5 text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-100 transition-colors"
+                  >
+                    Reset to Plan
+                  </button>
+                </div>
+              </div>
+
+              {/* Bundle toggles */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {ALL_BUNDLE_KEYS.map((bk) => {
+                  const bundle = FEATURE_BUNDLES[bk]
+                  const isOn = isBundleEnabled(features, bk)
+                  return (
+                    <button
+                      key={bk}
+                      type="button"
+                      onClick={() => handleToggleBundle(bk)}
+                      className={`flex items-start gap-3 p-4 rounded-xl border-2 transition-all text-left ${
+                        isOn
+                          ? 'border-green-400 bg-green-50'
+                          : 'border-gray-200 bg-gray-50'
+                      }`}
+                    >
+                      <div className={`w-10 h-6 rounded-full flex items-center transition-colors shrink-0 mt-0.5 ${
+                        isOn ? 'bg-green-500 justify-end' : 'bg-gray-300 justify-start'
+                      }`}>
+                        <div className="w-5 h-5 bg-white rounded-full shadow-sm mx-0.5" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className={`text-sm font-semibold ${isOn ? 'text-green-800' : 'text-gray-500'}`}>
+                          {bundle.icon} {bundle.label}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-0.5">{bundle.description}</div>
+                        <div className="text-xs text-gray-400 mt-1">
+                          {bundle.features.map((fk) => FEATURE_DEFINITIONS[fk].label).join(', ')}
+                        </div>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* MIRA Tokens Per User */}
+            <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
+              <h3 className="text-md font-semibold text-gray-900 mb-3">MIRA AI Token Allocation</h3>
+              <p className="text-sm text-gray-500 mb-4">Set the number of MIRA AI tokens each user receives. Set to 0 for no allocation.</p>
+              <div className="max-w-xs">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Tokens per user</label>
                 <input
                   type="number"
-                  name="subscription.amount"
-                  value={formData.subscription.amount}
-                  onChange={handleChange}
+                  value={miraTokensPerUser}
+                  onChange={(e) => setMiraTokensPerUser(Number(e.target.value) || 0)}
                   min="0"
                   className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
                   placeholder="0"
@@ -554,67 +774,21 @@ export default function NewCompanyPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
-                <input
-                  type="date"
-                  name="subscription.startDate"
-                  value={formData.subscription.startDate}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Tenure (Days)</label>
-                <input
-                  type="number"
-                  name="subscription.tenureDays"
-                  value={formData.subscription.tenureDays}
-                  onChange={handleChange}
-                  min="1"
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  placeholder="30"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">End Date (Calculated)</label>
-                <input
-                  type="date"
-                  value={calculateEndDate()}
-                  disabled
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-200 rounded-xl text-gray-600 cursor-not-allowed"
-                />
-              </div>
-            </div>
-
-            <div className="border-t border-gray-100 pt-4 mt-4">
-              <h3 className="text-md font-medium text-gray-900 mb-4">Usage Limits</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Feature summary */}
+            <div className="bg-white rounded-2xl p-6 border border-gray-200 shadow-sm">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Summary</h3>
+              <div className="flex gap-6 text-sm">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Max Users</label>
-                  <input
-                    type="number"
-                    name="subscription.maxUsers"
-                    value={formData.subscription.maxUsers}
-                    onChange={handleChange}
-                    min="1"
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Company cannot add more users beyond this limit</p>
+                  <span className="text-green-600 font-bold">{ALL_BUNDLE_KEYS.filter((bk) => isBundleEnabled(features, bk)).length}</span>
+                  <span className="text-gray-500 ml-1">bundles enabled</span>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Max Storage (GB)</label>
-                  <input
-                    type="number"
-                    name="subscription.maxStorageGB"
-                    value={formData.subscription.maxStorageGB}
-                    onChange={handleChange}
-                    min="1"
-                    step="1"
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Storage limit for uploads and data</p>
+                  <span className="text-green-600 font-bold">{ALL_FEATURE_KEYS.filter((k) => features[k]).length}</span>
+                  <span className="text-gray-500 ml-1">features enabled</span>
+                </div>
+                <div>
+                  <span className="text-gray-400 font-bold">{ALL_FEATURE_KEYS.filter((k) => !features[k]).length}</span>
+                  <span className="text-gray-500 ml-1">disabled</span>
                 </div>
               </div>
             </div>
@@ -700,22 +874,39 @@ export default function NewCompanyPage() {
           </div>
         )}
 
-        {/* Submit Buttons */}
+        {/* Navigation Buttons */}
         <div className="flex gap-4">
           <button
             type="button"
-            onClick={() => router.back()}
+            onClick={() => {
+              const idx = tabs.findIndex((t) => t.id === activeTab)
+              if (idx > 0) setActiveTab(tabs[idx - 1].id)
+              else router.back()
+            }}
             className="flex-1 py-3 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors"
           >
-            Cancel
+            {activeTab === tabs[0].id ? 'Cancel' : 'Back'}
           </button>
-          <button
-            type="submit"
-            disabled={loading}
-            className="flex-1 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-purple-500/25"
-          >
-            {loading ? 'Creating...' : 'Create Company'}
-          </button>
+          {activeTab === tabs[tabs.length - 1].id ? (
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex-1 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-purple-500/25"
+            >
+              {loading ? 'Creating...' : 'Create Company'}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                const idx = tabs.findIndex((t) => t.id === activeTab)
+                if (idx < tabs.length - 1) setActiveTab(tabs[idx + 1].id)
+              }}
+              className="flex-1 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all shadow-lg shadow-purple-500/25"
+            >
+              Next
+            </button>
+          )}
         </div>
       </form>
     </div>

@@ -8,6 +8,7 @@
 import { NextResponse } from 'next/server';
 import { verifySuperAdmin } from '@/lib/superadminAuth';
 import getTenantCompanyModel from '@/models/TenantCompany';
+import { getFeaturesForPlan, PLAN_TEMPLATES } from '@/lib/planFeatures';
 
 /**
  * GET - List all tenant companies
@@ -138,6 +139,7 @@ export async function POST(request) {
       businessDetails,
       subscription,
       onboarding,
+      features,
       tags,
     } = body;
 
@@ -176,6 +178,39 @@ export async function POST(request) {
       endDate = new Date(startMs + subscription.tenureDays * 24 * 60 * 60 * 1000);
     }
 
+    // Build onboarding object, only include paymentMethod if a valid value was provided
+    const onboardingData = {
+      amount: onboarding?.amount || 0,
+      transactionId: onboarding?.transactionId || '',
+      invoiceNumber: onboarding?.invoiceNumber || '',
+      notes: onboarding?.notes || '',
+      paidAt: onboarding?.amount > 0 ? new Date() : null,
+    };
+    if (onboarding?.paymentMethod) {
+      onboardingData.paymentMethod = onboarding.paymentMethod;
+    }
+
+    // Build businessDetails object, only include businessType if a valid value was provided
+    const businessDetailsData = {
+      gstNumber: businessDetails?.gstNumber || '',
+      panNumber: businessDetails?.panNumber || '',
+      tanNumber: businessDetails?.tanNumber || '',
+      cinNumber: businessDetails?.cinNumber || '',
+      industry: businessDetails?.industry || '',
+      website: businessDetails?.website || '',
+    };
+    if (businessDetails?.businessType) {
+      businessDetailsData.businessType = businessDetails.businessType;
+    }
+
+    // Resolve features: use provided features or fall back to plan template defaults
+    const plan = subscription?.plan || 'trial';
+    const resolvedFeatures = features || getFeaturesForPlan(plan);
+
+    // Resolve MIRA token allocation from plan template
+    const planTemplate = PLAN_TEMPLATES[plan];
+    const miraTokensPerUser = planTemplate?.miraTokensPerUser || 0;
+
     // Create company
     const company = new TenantCompany({
       name,
@@ -183,32 +218,24 @@ export async function POST(request) {
       description,
       primaryContact,
       billingAddress,
-      gstNumber: businessDetails?.gstNumber,
-      panNumber: businessDetails?.panNumber,
-      tanNumber: businessDetails?.tanNumber,
-      cinNumber: businessDetails?.cinNumber,
-      businessType: businessDetails?.businessType,
-      industry: businessDetails?.industry,
-      website: businessDetails?.website,
+      businessDetails: businessDetailsData,
       subscription: {
-        plan: subscription?.plan || 'trial',
+        plan,
         status: subscription?.status || 'active',
         startDate: subscription?.startDate || new Date(),
         endDate,
         tenureDays: subscription?.tenureDays || 30,
         billingCycle: subscription?.billingCycle || 'monthly',
         amount: subscription?.amount || 0,
-        maxUsers: subscription?.maxUsers || 10,
-        maxStorageGB: subscription?.maxStorageGB || 1,
+        maxUsers: subscription?.maxUsers || (planTemplate?.maxUsers || 10),
+        maxStorageGB: subscription?.maxStorageGB || (planTemplate?.maxStorageGB || 1),
       },
-      onboarding: {
-        amount: onboarding?.amount || 0,
-        paymentMethod: onboarding?.paymentMethod || '',
-        transactionId: onboarding?.transactionId || '',
-        invoiceNumber: onboarding?.invoiceNumber || '',
-        notes: onboarding?.notes || '',
-        paymentDate: onboarding?.amount > 0 ? new Date() : null,
+      features: resolvedFeatures,
+      miraTokens: {
+        perUserAllocation: miraTokensPerUser,
+        allocationNote: miraTokensPerUser > 0 ? 'First month allocation' : '',
       },
+      onboarding: onboardingData,
       tags,
       createdBy: auth.superadmin._id,
       isActive: true,
@@ -236,6 +263,7 @@ export async function POST(request) {
         setupUrl,
         primaryContact: company.primaryContact,
         subscription: company.subscription,
+        features: company.features,
         serviceStatus: company.serviceStatus,
       },
     });
