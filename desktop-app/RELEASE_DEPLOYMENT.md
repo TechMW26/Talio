@@ -122,7 +122,20 @@ macOS requires **two steps**: code signing (with an Apple Developer certificate)
 #    If you created it in Xcode, it's already there.
 #    If you downloaded a .p12 from the portal, double-click to import it.
 
-# 2. Set environment variables (add to ~/.zshrc or CI secrets)
+# 2. Store notarization credentials in the keychain (recommended)
+xcrun notarytool store-credentials "talio-notary" \
+  --apple-id "your-apple-id@email.com" \
+  --team-id "XXXXXXXXXX" \
+  --password "xxxx-xxxx-xxxx-xxxx"
+
+# 3. Export the keychain profile for builds
+export APPLE_KEYCHAIN_PROFILE="talio-notary"
+
+# Or use the helper script:
+cd desktop-app
+npm run setup:notary-profile
+
+# Alternative: set environment variables directly (add to ~/.zshrc or CI secrets)
 export APPLE_ID="your-apple-id@email.com"
 export APPLE_ID_PASSWORD="xxxx-xxxx-xxxx-xxxx"   # App-specific password
 export APPLE_TEAM_ID="XXXXXXXXXX"                 # 10-character Team ID
@@ -131,10 +144,16 @@ export APPLE_TEAM_ID="XXXXXXXXXX"                 # 10-character Team ID
 #### How it works in the build
 
 - `electron-builder` **automatically signs** the `.app` bundle using the Developer ID Application certificate found in your keychain (no extra env vars needed for signing itself).
-- After signing, the `afterSign` hook in `package.json` runs `scripts/notarize.js`, which:
+- After signing, the `afterSign` hook in `package.json` runs `scripts/notarize.js`, which accepts any of these credential sources:
+  1. `APPLE_KEYCHAIN_PROFILE`
+  2. `APPLE_API_KEY`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER`
+  3. `APPLE_ID`, `APPLE_ID_PASSWORD`, `APPLE_TEAM_ID`
+
+  Then it:
   1. Submits the signed app to Apple for notarization
   2. Waits for Apple to verify it (usually 1–5 minutes)
   3. Staples the notarization ticket to the app (allows offline Gatekeeper verification)
+- The DMG is also signed during packaging so Gatekeeper sees a signed installer container before the notarized app is opened.
 - **Entitlements** are defined in `build/entitlements.mac.plist` — they declare camera, microphone, screen recording, network, and file access capabilities.
 
 #### Build command
@@ -192,9 +211,11 @@ export CSC_KEY_PASSWORD="your-pfx-password"
 #### How it works in the build
 
 - `electron-builder` detects `CSC_LINK` and `CSC_KEY_PASSWORD` environment variables
-- It signs the `.exe` installer and all `.dll` files inside the app (`signDlls: true` in `package.json`)
-- Uses SHA-256 hash algorithm (`signingHashAlgorithms: ["sha256"]` in `package.json`)
-- The `publisherName: "MW FutureTech"` in `package.json` must match the name in the certificate
+- Windows signing options live under `build.win.signtoolOptions` in `package.json`
+- The installer signs the `.exe` files by default, and Talio explicitly includes `.dll` files via `build.win.signExts: [".dll"]`
+- Uses SHA-256 via `build.win.signtoolOptions.signingHashAlgorithms: ["sha256"]`
+- Uses DigiCert timestamping via `build.win.signtoolOptions.timeStampServer` and `build.win.signtoolOptions.rfc3161TimeStampServer`
+- The `publisherName: "MW FutureTech"` in `build.win.signtoolOptions` must match the name in the certificate
 
 #### Build command
 

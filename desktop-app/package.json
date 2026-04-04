@@ -1,6 +1,6 @@
 {
   "name": "talio-desktop",
-  "version": "5.4.1",
+  "version": "6.0.0",
   "description": "Talio HRMS Desktop - Productivity & Collaboration Hub",
   "main": "src/main.js",
   "author": "MW FutureTech <support@talio.in>",
@@ -18,6 +18,7 @@
     "build:linux": "electron-builder --linux --x64",
     "build:linux-arm64": "electron-builder --linux --arm64",
     "build:signed": "CSC_LINK=$CSC_LINK CSC_KEY_PASSWORD=$CSC_KEY_PASSWORD npm run build",
+    "setup:notary-profile": "bash ./scripts/setup-notary-profile.sh",
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
@@ -82,7 +83,7 @@
       "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "dmg": {
-      "sign": false,
+      "sign": true,
       "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "afterSign": "scripts/notarize.js",
@@ -98,6 +99,17 @@
       "icon": "build/icon.ico",
       "legalTrademarks": "Talio is a registered trademark of MW FutureTech.",
       "requestedExecutionLevel": "asInvoker",
+      "signExts": [
+        ".dll"
+      ],
+      "signtoolOptions": {
+        "publisherName": "MW FutureTech",
+        "signingHashAlgorithms": [
+          "sha256"
+        ],
+        "timeStampServer": "http://timestamp.digicert.com",
+        "rfc3161TimeStampServer": "http://timestamp.digicert.com"
+      },
       "verifyUpdateCodeSignature": false,
       "artifactName": "${productName}.Setup.${version}.${ext}"
     },

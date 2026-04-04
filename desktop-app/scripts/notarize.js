@@ -23,8 +23,60 @@
 const { notarize } = require('@electron/notarize');
 const path = require('path');
 
+function getNotarizeOptions(appPath) {
+  const keychainProfile = process.env.APPLE_KEYCHAIN_PROFILE;
+  if (keychainProfile) {
+    return {
+      appPath,
+      keychainProfile,
+    };
+  }
+
+  const apiKey = process.env.APPLE_API_KEY;
+  const apiKeyId = process.env.APPLE_API_KEY_ID;
+  const apiIssuer = process.env.APPLE_API_ISSUER;
+
+  if (apiKey && apiKeyId && apiIssuer) {
+    return {
+      appPath,
+      appleApiKey: apiKey,
+      appleApiKeyId: apiKeyId,
+      appleApiIssuer: apiIssuer,
+    };
+  }
+
+  const appleId = process.env.APPLE_ID;
+  const appleIdPassword = process.env.APPLE_ID_PASSWORD;
+  const teamId = process.env.APPLE_TEAM_ID;
+
+  if (appleId && appleIdPassword && teamId) {
+    return {
+      appPath,
+      appleId,
+      appleIdPassword,
+      teamId,
+    };
+  }
+
+  return null;
+}
+
+function logMissingCredentialHelp() {
+  console.log('Skipping notarization: missing credentials');
+  console.log('');
+  console.log('Supported notarization credential options:');
+  console.log('  1. APPLE_KEYCHAIN_PROFILE=<stored-notarytool-profile>');
+  console.log('  2. APPLE_API_KEY, APPLE_API_KEY_ID, APPLE_API_ISSUER');
+  console.log('  3. APPLE_ID, APPLE_ID_PASSWORD, APPLE_TEAM_ID');
+  console.log('');
+  console.log('To create a reusable keychain profile:');
+  console.log('  xcrun notarytool store-credentials "talio-notary" --apple-id "your-apple-id@email.com" --team-id "XXXXXXXXXX" --password "xxxx-xxxx-xxxx-xxxx"');
+}
+
 exports.default = async function notarizing(context) {
   const { electronPlatformName, appOutDir } = context;
+  const appName = context.packager.appInfo.productFilename;
+  const appPath = path.join(appOutDir, `${appName}.app`);
   
   // Only notarize macOS builds
   if (electronPlatformName !== 'darwin') {
@@ -32,37 +84,17 @@ exports.default = async function notarizing(context) {
     return;
   }
 
-  // Check if notarization credentials are available
-  const appleId = process.env.APPLE_ID;
-  const appleIdPassword = process.env.APPLE_ID_PASSWORD;
-  const teamId = process.env.APPLE_TEAM_ID;
-
-  if (!appleId || !appleIdPassword || !teamId) {
-    console.log('Skipping notarization: missing credentials');
-    console.log('  APPLE_ID:', appleId ? 'set' : 'not set');
-    console.log('  APPLE_ID_PASSWORD:', appleIdPassword ? 'set' : 'not set');
-    console.log('  APPLE_TEAM_ID:', teamId ? 'set' : 'not set');
-    console.log('');
-    console.log('To enable notarization, set these environment variables:');
-    console.log('  export APPLE_ID="your-apple-id@email.com"');
-    console.log('  export APPLE_ID_PASSWORD="xxxx-xxxx-xxxx-xxxx"');
-    console.log('  export APPLE_TEAM_ID="XXXXXXXXXX"');
+  const notarizeOptions = getNotarizeOptions(appPath);
+  if (!notarizeOptions) {
+    logMissingCredentialHelp();
     return;
   }
-
-  const appName = context.packager.appInfo.productFilename;
-  const appPath = path.join(appOutDir, `${appName}.app`);
 
   console.log(`Notarizing ${appPath}...`);
   console.log('This may take several minutes...');
 
   try {
-    await notarize({
-      appPath,
-      appleId,
-      appleIdPassword,
-      teamId,
-    });
+    await notarize(notarizeOptions);
     console.log('Notarization complete!');
   } catch (error) {
     console.error('Notarization failed:', error.message);
