@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { respondToInvitation } from '@/lib/projectService'
 import { dismissNotificationsForReference } from '@/lib/actionableNotifications'
+import { emitEvent, EVENTS } from '@/lib/eventBus'
 
 /**
  * POST /api/projects/[projectId]/members/respond
@@ -57,6 +58,18 @@ export async function POST(request, { params }) {
       } catch (dismissErr) {
         console.error('[ProjectMembersRespond] Error dismissing notifications:', dismissErr)
         // Don't fail the request
+      }
+
+      try {
+        await emitEvent(EVENTS.PROJECT_INVITATION_CHANGED, {
+          projectId,
+          action: accept ? 'accepted' : 'rejected',
+        }, {
+          userIds: [(user._id || user.userId).toString()],
+          databaseName: auth.tenant?.databaseName,
+        })
+      } catch (eventBusErr) {
+        console.error('[ProjectMembersRespond] Error emitting cache invalidation event:', eventBusErr)
       }
       
       // Emit socket event for real-time update

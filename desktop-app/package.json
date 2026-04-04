@@ -1,6 +1,6 @@
 {
   "name": "talio-desktop",
-  "version": "5.4.0",
+  "version": "5.4.1",
   "description": "Talio HRMS Desktop - Productivity & Collaboration Hub",
   "main": "src/main.js",
   "author": "MW FutureTech <support@talio.in>",

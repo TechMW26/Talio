@@ -109,8 +109,8 @@ export default function useAuthedSWR(key, options = {}) {
     // Stale-while-revalidate: show cached data immediately
     revalidateOnFocus: false,
     revalidateOnReconnect: true,
-    // Dedupe requests within 60 seconds
-    dedupingInterval: 60_000,
+    // Keep deduping short so post-mutation revalidation happens immediately.
+    dedupingInterval: 2000,
     // Don't retry on error by default (we have retry in fetcher)
     shouldRetryOnError: false,
     // Keep previous data while loading new data (prevents flashing)
@@ -149,7 +149,7 @@ export function useAuthedSWRRealtime(key, options = {}) {
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
     refreshInterval: options.refreshInterval || 30000, // 30 seconds default
-    dedupingInterval: 5000,
+    dedupingInterval: 1000,
     shouldRetryOnError: true,
     keepPreviousData: true,
     ...options,

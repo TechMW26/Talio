@@ -20,6 +20,8 @@ import Portal from '@/components/ui/Portal'
 import ModalPortal from '@/components/ui/ModalPortal'
 import KanbanBoard from '@/components/tasks/KanbanBoard'
 import CreateTaskModal from '@/components/tasks/CreateTaskModal'
+import SubtaskCompletionButton from '@/components/tasks/SubtaskCompletionButton'
+import { getTaskApiBase, getTaskSubtasksApiBase } from '@/lib/taskApiRoutes'
 
 const statusColors = {
   'todo': 'default',
@@ -152,13 +154,6 @@ export default function AssignedTasksPage() {
   const projects = tasksData?.projects || []
   const stats = tasksData?.stats || {}
 
-  // Helper: get the correct API base for a task (project-based or standalone)
-  const getTaskApiBase = (task) => {
-    const projectId = task?.project?._id || task?.project
-    if (projectId) return `/api/projects/${projectId}/tasks/${task._id}`
-    return `/api/tasks/${task._id}`
-  }
-
   // Fetch project members or all employees when a task is selected
   const fetchProjectMembers = async (projectId) => {
     try {
@@ -271,11 +266,7 @@ export default function AssignedTasksPage() {
     try {
       setSubmitting(true)
       const token = localStorage.getItem('token')
-      // Subtasks route works with either project-based or standalone task path
-      const subtaskUrl = projectId
-        ? `/api/projects/${projectId}/tasks/${selectedTask._id}/subtasks`
-        : `/api/projects/_/tasks/${selectedTask._id}/subtasks`
-      const response = await fetch(subtaskUrl, {
+      const response = await fetch(getTaskSubtasksApiBase(selectedTask), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1054,7 +1045,7 @@ export default function AssignedTasksPage() {
               <p className="text-gray-600 mb-4">Task: <strong>{pendingStatusChange.task.title}</strong></p>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Why are you changing this task's status? <span className="text-red-500">*</span>
+                  Why are you changing this task&apos;s status? <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   value={statusChangeReason}
@@ -1529,68 +1520,13 @@ export default function AssignedTasksPage() {
                       const canToggle = subtask.completed || !subtask.pendingAcceptance
 
                       return (
-                        <div key={subtask._id || idx} className={`flex items-center gap-3 p-3 rounded-lg transition-all ${subtask.completed ? 'bg-green-50' :
-                            subtask.pendingAcceptance ? 'bg-yellow-50' : 'bg-gray-50'
-                          } ${canToggle ? 'hover:bg-gray-100 cursor-pointer' : ''}`}
-                          onClick={async () => {
-                            if (!canToggle || modalUpdatingSubtask) return
-                            const subtaskId = subtask._id
-                            const projectId = selectedTask.project?._id || selectedTask.project
-
-                            try {
-                              setModalUpdatingSubtask(subtaskId)
-                              const token = localStorage.getItem('token')
-                              const response = await fetch(`/api/projects/${projectId || '_'}/tasks/${selectedTask._id}/subtasks`, {
-                                method: 'PUT',
-                                headers: {
-                                  'Content-Type': 'application/json',
-                                  'Authorization': `Bearer ${token}`
-                                },
-                                body: JSON.stringify({
-                                  subtaskId: subtaskId.toString(),
-                                  completed: !subtask.completed
-                                })
-                              })
-                              const data = await response.json()
-                              if (data.success) {
-                                // Update selectedTask subtasks
-                                setSelectedTask(prev => ({
-                                  ...prev,
-                                  subtasks: prev.subtasks.map(st =>
-                                    st._id === subtaskId
-                                      ? { ...st, completed: data.data?.subtask?.completed ?? !subtask.completed, pendingAcceptance: data.data?.subtask?.pendingAcceptance || false }
-                                      : st
-                                  ),
-                                  progressPercentage: data.data?.progressPercentage || prev.progressPercentage,
-                                  status: data.data?.taskStatus || prev.status
-                                }))
-                                // Also refresh main task list
-                                mutateTasks()
-                                toast.success(data.message || 'Subtask updated')
-                              } else {
-                                toast.error(data.message || 'Failed to update subtask')
-                              }
-                            } catch (error) {
-                              toast.error('Failed to update subtask')
-                            } finally {
-                              setModalUpdatingSubtask(null)
-                            }
-                          }}
+                        <div
+                          key={subtask._id || idx}
+                          className={`flex items-center gap-3 p-3 rounded-lg transition-all ${subtask.completed ? 'bg-green-50' :
+                              subtask.pendingAcceptance ? 'bg-yellow-50' : 'bg-gray-50'
+                            }`}
                         >
-                          <div className={`w-5 h-5 rounded-full flex items-center justify-center transition-all ${modalUpdatingSubtask === subtask._id ? 'bg-blue-500 animate-pulse' :
-                              subtask.completed ? 'bg-green-500 text-white' :
-                                subtask.pendingAcceptance ? 'bg-yellow-500 text-white' :
-                                  canToggle ? 'bg-gray-300 hover:bg-gray-400' : 'bg-gray-200'
-                            }`}>
-                            {modalUpdatingSubtask === subtask._id ? (
-                              <Loader size="xs" color="#ffffff" />
-                            ) : subtask.completed ? (
-                              <FaCheck className="w-3 h-3" />
-                            ) : subtask.pendingAcceptance ? (
-                              <FaClock className="w-3 h-3" />
-                            ) : null}
-                          </div>
-                          <div className="flex-1">
+                          <div className="flex-1 min-w-0">
                             <p className={`text-sm ${subtask.completed ? 'text-gray-500 line-through' : 'text-gray-800'}`}>
                               {subtask.title}
                             </p>
@@ -1600,9 +1536,53 @@ export default function AssignedTasksPage() {
                               </p>
                             )}
                           </div>
-                          {subtask.pendingAcceptance && (
-                            <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded">Pending Review</span>
-                          )}
+                          <SubtaskCompletionButton
+                            completed={subtask.completed}
+                            pendingAcceptance={subtask.pendingAcceptance}
+                            disabled={!canToggle}
+                            loading={modalUpdatingSubtask === subtask._id}
+                            onClick={async () => {
+                              if (!canToggle || modalUpdatingSubtask) return
+                              const subtaskId = subtask._id
+
+                              try {
+                                setModalUpdatingSubtask(subtaskId)
+                                const token = localStorage.getItem('token')
+                                const response = await fetch(getTaskSubtasksApiBase(selectedTask), {
+                                  method: 'PUT',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${token}`
+                                  },
+                                  body: JSON.stringify({
+                                    subtaskId: subtaskId.toString(),
+                                    completed: !subtask.completed
+                                  })
+                                })
+                                const data = await response.json()
+                                if (data.success) {
+                                  setSelectedTask(prev => ({
+                                    ...prev,
+                                    subtasks: prev.subtasks.map(st =>
+                                      st._id === subtaskId
+                                        ? { ...st, completed: data.data?.subtask?.completed ?? !subtask.completed, pendingAcceptance: data.data?.subtask?.pendingAcceptance || false }
+                                        : st
+                                    ),
+                                    progressPercentage: data.data?.progressPercentage || prev.progressPercentage,
+                                    status: data.data?.taskStatus || prev.status
+                                  }))
+                                  mutateTasks()
+                                  toast.success(data.message || 'Subtask updated')
+                                } else {
+                                  toast.error(data.message || 'Failed to update subtask')
+                                }
+                              } catch (error) {
+                                toast.error('Failed to update subtask')
+                              } finally {
+                                setModalUpdatingSubtask(null)
+                              }
+                            }}
+                          />
                         </div>
                       )
                     })}

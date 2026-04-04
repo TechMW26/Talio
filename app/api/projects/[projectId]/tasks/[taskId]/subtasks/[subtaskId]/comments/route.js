@@ -163,20 +163,22 @@ export async function POST(request, { params }) {
     const projectIdForTimeline = task.project?._id || task.project
     const subtaskTitle = task.subtasks[subtaskIndex]?.title || 'Subtask'
     
-    createTimelineEvent({
-      project: projectIdForTimeline,
-      type: 'subtask_comment_added',
-      createdBy: userDoc.employeeId,
-      relatedTask: taskId,
-      description: `${author?.firstName || 'User'} commented on subtask "${subtaskTitle}": "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`,
-      metadata: {
-        taskTitle: task.title,
-        subtaskTitle,
-        subtaskId,
-        commentText: text,
-        authorRole
-      }
-    }).catch(console.error)
+    if (projectIdForTimeline) {
+      createTimelineEvent({
+        project: projectIdForTimeline,
+        type: 'subtask_comment_added',
+        createdBy: userDoc.employeeId,
+        relatedTask: taskId,
+        description: `${author?.firstName || 'User'} commented on subtask "${subtaskTitle}": "${text.substring(0, 50)}${text.length > 50 ? '...' : ''}"`,
+        metadata: {
+          taskTitle: task.title,
+          subtaskTitle,
+          subtaskId,
+          commentText: text,
+          authorRole
+        }
+      }).catch(console.error)
+    }
 
     return NextResponse.json({
       success: true,

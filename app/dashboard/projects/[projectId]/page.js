@@ -32,6 +32,7 @@ import KanbanBoard from '@/components/tasks/KanbanBoard'
 import Portal from '@/components/ui/Portal'
 import ModalPortal from '@/components/ui/ModalPortal'
 import Loader from '@/components/ui/Loader'
+import SubtaskCompletionButton from '@/components/tasks/SubtaskCompletionButton'
 
 const statusColors = {
   planned: 'bg-blue-100 text-blue-800',
@@ -835,7 +836,8 @@ export default function ProjectDetailPage() {
           return {
             ...prev,
             subtasks: updatedSubtasks,
-            progressPercentage: data.data.progressPercentage
+            progressPercentage: data.data.progressPercentage,
+            status: data.data.taskStatus || prev.status
           }
         })
         mutateTasks()
@@ -885,7 +887,8 @@ export default function ProjectDetailPage() {
           return {
             ...prev,
             subtasks: updatedSubtasks,
-            progressPercentage: data.data.progressPercentage
+            progressPercentage: data.data.progressPercentage,
+            status: data.data.taskStatus || prev.status
           }
         })
         mutateTasks()
@@ -2487,7 +2490,7 @@ export default function ProjectDetailPage() {
             </div>
             <div className="p-6 overflow-y-auto flex-1">
               <p className="text-gray-600 mb-4">
-                You're assigning this task to yourself. {pendingTaskData.subtasks?.length > 0
+                You&apos;re assigning this task to yourself. {pendingTaskData.subtasks?.length > 0
                   ? 'Please provide an ETA for each subtask:'
                   : 'How long do you estimate it will take?'}
               </p>
@@ -2701,17 +2704,7 @@ export default function ProjectDetailPage() {
                     <div className="space-y-2 mb-3">
                       {editTaskForm.subtasks.map((subtask, index) => (
                         <div key={subtask._id || index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                          <div className="flex items-start gap-2">
-                            <input
-                              type="checkbox"
-                              checked={subtask.completed || false}
-                              onChange={(e) => {
-                                const updated = [...editTaskForm.subtasks]
-                                updated[index] = { ...updated[index], completed: e.target.checked }
-                                setEditTaskForm(prev => ({ ...prev, subtasks: updated }))
-                              }}
-                              className="mt-1 h-4 w-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                            />
+                          <div className="flex items-start gap-3">
                             <div className="flex-1">
                               <input
                                 type="text"
@@ -2768,6 +2761,15 @@ export default function ProjectDetailPage() {
                                 </button>
                               </div>
                             </div>
+                            <SubtaskCompletionButton
+                              completed={subtask.completed || false}
+                              onClick={() => {
+                                const updated = [...editTaskForm.subtasks]
+                                updated[index] = { ...updated[index], completed: !subtask.completed }
+                                setEditTaskForm(prev => ({ ...prev, subtasks: updated }))
+                              }}
+                              size="xs"
+                            />
                           </div>
                         </div>
                       ))}
@@ -3266,32 +3268,28 @@ export default function ProjectDetailPage() {
                             </div>
                           )}
 
-                          <div
-                            className={`flex items-center gap-3 ${canToggle && !subtask.pendingAcceptance ? 'cursor-pointer' : ''}`}
-                            onClick={() => canToggle && !subtask.pendingAcceptance && handleToggleSubtask(selectedTask._id, subtask._id, subtask.completed)}
-                          >
-                            <span className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${subtask.completed
-                                ? 'bg-green-500 border-green-500'
-                                : subtask.pendingAcceptance
-                                  ? 'bg-yellow-400 border-yellow-400'
-                                  : 'border-gray-300 bg-white'
-                              }`}>
-                              {subtask.completed && <FaCheck className="text-white text-xs" />}
-                              {subtask.pendingAcceptance && !subtask.completed && <HiOutlineClock className="text-white text-xs" />}
-                            </span>
-                            <span className={`flex-1 text-sm font-medium ${subtask.completed
-                                ? 'line-through text-gray-400'
-                                : subtask.pendingAcceptance
-                                  ? 'text-yellow-700'
-                                  : 'text-gray-700'
-                              }`}>
-                              {subtask.title}
-                            </span>
-                            {subtask.completed && subtask.completedAt && (
-                              <span className="text-xs text-gray-400">
-                                {new Date(subtask.completedAt).toLocaleDateString()}
+                          <div className="flex items-center gap-3">
+                            <div className="flex-1 min-w-0">
+                              <span className={`block text-sm font-medium ${subtask.completed
+                                  ? 'line-through text-gray-400'
+                                  : subtask.pendingAcceptance
+                                    ? 'text-yellow-700'
+                                    : 'text-gray-700'
+                                }`}>
+                                {subtask.title}
                               </span>
-                            )}
+                              {subtask.completed && subtask.completedAt && (
+                                <span className="mt-1 block text-xs text-gray-400">
+                                  {new Date(subtask.completedAt).toLocaleDateString()}
+                                </span>
+                              )}
+                            </div>
+                            <SubtaskCompletionButton
+                              completed={subtask.completed}
+                              pendingAcceptance={subtask.pendingAcceptance}
+                              disabled={!canToggle}
+                              onClick={() => canToggle && !subtask.pendingAcceptance && handleToggleSubtask(selectedTask._id, subtask._id, subtask.completed)}
+                            />
                           </div>
 
                           {/* Accept/Reject buttons for pending acceptance (only show to other assignees who haven't accepted) */}
@@ -3304,7 +3302,7 @@ export default function ProjectDetailPage() {
                                 return (
                                   <div className="mt-2 pl-8">
                                     <span className="text-xs text-green-600 flex items-center gap-1">
-                                      <FaCheck className="w-3 h-3" /> You've accepted this completion
+                                      <FaCheck className="w-3 h-3" /> You&apos;ve accepted this completion
                                     </span>
                                   </div>
                                 )
@@ -3496,7 +3494,7 @@ export default function ProjectDetailPage() {
                 }
               </p>
               <p className="font-medium text-gray-800 mb-4 p-3 bg-gray-50 rounded-lg">
-                "{taskToDelete.title}"
+                &quot;{taskToDelete.title}&quot;
               </p>
               {!isProjectHead && (
                 <textarea
@@ -3554,7 +3552,7 @@ export default function ProjectDetailPage() {
                 The assignee rejected this task. Select a new team member to reassign it to.
               </p>
               <p className="font-medium text-gray-800 mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
-                "{reassignTask.title}"
+                &quot;{reassignTask.title}&quot;
               </p>
 
               <div className="mb-4">

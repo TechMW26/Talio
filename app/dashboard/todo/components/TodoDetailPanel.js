@@ -19,6 +19,7 @@ import {
 } from 'react-icons/hi2'
 import Loader from '@/components/ui/Loader'
 import toast from '@/utils/toast'
+import SubtaskCompletionButton from '@/components/tasks/SubtaskCompletionButton'
 
 const PRIORITY_OPTIONS = [
   { value: '', label: 'No Priority', color: 'text-gray-400' },
@@ -352,25 +353,22 @@ export default function TodoDetailPanel({ todo, categories, onClose, onUpdate, o
             <div className="space-y-2">
               {todo.subtasks?.map(subtask => (
                 <div key={subtask._id} className="flex items-center gap-2 group">
-                  <button
-                    onClick={() => toggleSubtask(subtask._id, subtask.completed)}
-                    className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${
-                      subtask.completed
-                        ? 'bg-green-500 border-green-500 text-white'
-                        : 'border-gray-300 hover:border-green-500'
-                    }`}
-                  >
-                    {subtask.completed && <HiOutlineCheck className="w-3 h-3" />}
-                  </button>
                   <span className={`flex-1 text-sm ${subtask.completed ? 'text-gray-400 line-through' : 'text-gray-700'}`}>
                     {subtask.title}
                   </span>
-                  <button
-                    onClick={() => deleteSubtask(subtask._id)}
-                    className="p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                  >
-                    <HiOutlineTrash className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <SubtaskCompletionButton
+                      completed={subtask.completed}
+                      onClick={() => toggleSubtask(subtask._id, subtask.completed)}
+                      size="xs"
+                    />
+                    <button
+                      onClick={() => deleteSubtask(subtask._id)}
+                      className="p-1 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <HiOutlineTrash className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               ))}
               

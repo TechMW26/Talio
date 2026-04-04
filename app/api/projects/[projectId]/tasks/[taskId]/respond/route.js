@@ -6,6 +6,7 @@ import {
   notifyTaskAssignmentRejected
 } from '@/lib/projectNotifications'
 import { dismissNotificationsForReference } from '@/lib/actionableNotifications'
+import { emitEvent, EVENTS } from '@/lib/eventBus'
 
 // POST - Respond to task assignment (accept/reject)
 export async function POST(request, { params }) {
@@ -140,6 +141,21 @@ export async function POST(request, { params }) {
     } catch (dismissErr) {
       console.error('[TaskRespond] Error dismissing notifications:', dismissErr)
       // Don't fail the request
+    }
+
+    try {
+      await emitEvent(EVENTS.TASK_ASSIGNMENT_CHANGED, {
+        taskId,
+        taskTitle: task.title,
+        projectId,
+        projectName: project.name,
+        action: accept ? 'accepted' : 'rejected',
+      }, {
+        userIds: [(user._id || user.userId).toString()],
+        databaseName: auth.tenant?.databaseName,
+      })
+    } catch (eventBusErr) {
+      console.error('[TaskRespond] Error emitting cache invalidation event:', eventBusErr)
     }
 
     return NextResponse.json({

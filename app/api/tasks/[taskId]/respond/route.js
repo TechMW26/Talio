@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { dismissNotificationsForReference } from '@/lib/actionableNotifications'
+import { emitEvent, EVENTS } from '@/lib/eventBus'
 
 export const dynamic = 'force-dynamic'
 
@@ -84,6 +85,19 @@ export async function POST(request, { params }) {
       await dismissNotificationsForReference(models, 'Task', taskId)
     } catch (dismissErr) {
       console.error('[StandaloneTaskRespond] Error dismissing notifications:', dismissErr)
+    }
+
+    try {
+      await emitEvent(EVENTS.TASK_ASSIGNMENT_CHANGED, {
+        taskId,
+        taskTitle: task.title,
+        action: accept ? 'accepted' : 'rejected',
+      }, {
+        userIds: [(user._id || user.userId).toString()],
+        databaseName: auth.tenant?.databaseName,
+      })
+    } catch (eventBusErr) {
+      console.error('[StandaloneTaskRespond] Error emitting cache invalidation event:', eventBusErr)
     }
 
     return NextResponse.json({

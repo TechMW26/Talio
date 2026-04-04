@@ -15,6 +15,11 @@ import WebNetworkRecovery from '@/components/WebNetworkRecovery'
 import ScrollToTop from '@/components/ScrollToTop'
 import { FocusTimerProvider } from '@/contexts/FocusTimerContext'
 import { MiraChatProvider } from '@/contexts/MiraChatContext'
+import {
+    patchBrowserFetchForFreshness,
+    revalidateAllApiQueries,
+    subscribeToClientDataChanges
+} from '@/lib/clientDataSync'
 
 // Cache operations completely disabled - no imports needed
 // import { checkAndClearCaches } from '@/lib/cacheManager'
@@ -31,6 +36,18 @@ function isElectronApp() {
 }
 
 export function Providers({ children }) {
+    useEffect(() => {
+        const restoreFetch = patchBrowserFetchForFreshness()
+        const unsubscribe = subscribeToClientDataChanges(() => {
+            revalidateAllApiQueries()
+        })
+
+        return () => {
+            unsubscribe()
+            restoreFetch()
+        }
+    }, [])
+
     // Defer non-critical initialization (audio only)
     const initializeNonCritical = useCallback(async () => {
         // CRITICAL: Skip audio initialization for desktop apps
@@ -90,8 +107,8 @@ export function Providers({ children }) {
                             // Stale-while-revalidate: show cached data immediately
                             revalidateOnFocus: false,
                             revalidateOnReconnect: true,
-                            // Dedupe requests aggressively to reduce network calls
-                            dedupingInterval: 60_000,
+                            // Keep deduping short so mutation-triggered revalidations are not delayed.
+                            dedupingInterval: 2000,
                             // Retry on error with backoff
                             shouldRetryOnError: true,
                             errorRetryInterval: 5000,

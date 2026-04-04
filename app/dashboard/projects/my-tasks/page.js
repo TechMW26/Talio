@@ -37,6 +37,8 @@ import Portal from '@/components/ui/Portal'
 import ModalPortal from '@/components/ui/ModalPortal'
 import KanbanBoard from '@/components/tasks/KanbanBoard'
 import CreateTaskModal from '@/components/tasks/CreateTaskModal'
+import SubtaskCompletionButton from '@/components/tasks/SubtaskCompletionButton'
+import { getTaskApiBase, getTaskSubtasksApiBase, getTaskSubtaskCommentsApiBase } from '@/lib/taskApiRoutes'
 
 const statusColors = {
   'todo': 'default',
@@ -188,13 +190,6 @@ export default function MyTasksPage() {
     return uniqueProjects.sort((a, b) => a.name.localeCompare(b.name))
   }, [tasksData])
 
-  // Helper: get the correct API base for a task (project-based or standalone)
-  const getTaskApiBase = (task) => {
-    const projectId = task?.project?._id || task?.project
-    if (projectId) return `/api/projects/${projectId}/tasks/${task._id}`
-    return `/api/tasks/${task._id}`
-  }
-
   const handleRespondToAssignment = async (task, action, estimatedDays = null, estimatedHours = null) => {
     try {
       setRespondingTo(task._id)
@@ -281,7 +276,7 @@ export default function MyTasksPage() {
         // Update each subtask with its ETA
         for (const st of taskForEta.subtasks) {
           const stEta = subtaskEtas[st._id] || {}
-          await fetch(`/api/projects/${projectId}/tasks/${taskForEta._id}/subtasks`, {
+          await fetch(getTaskSubtasksApiBase(taskForEta), {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
@@ -1230,68 +1225,13 @@ export default function MyTasksPage() {
                       const canToggle = isTaskAccepted && (subtask.completed || !subtask.pendingAcceptance)
 
                       return (
-                        <div key={subtask._id || idx} className={`flex items-center gap-3 p-3 rounded-lg transition-all ${subtask.completed ? 'bg-success-50' :
-                            subtask.pendingAcceptance ? 'bg-warning-50' : 'bg-default-50'
-                          } ${canToggle ? 'hover:bg-default-100 cursor-pointer' : ''}`}
-                          onClick={async () => {
-                            if (!canToggle || modalUpdatingSubtask) return
-                            const subtaskId = subtask._id
-                            const projectId = selectedTask.project?._id || selectedTask.project
-
-                            try {
-                              setModalUpdatingSubtask(subtaskId)
-                              const token = localStorage.getItem('token')
-                              const response = await fetch(`/api/projects/${projectId || '_'}/tasks/${selectedTask._id}/subtasks`, {
-                                method: 'PUT',
-                                headers: {
-                                  'Content-Type': 'application/json',
-                                  'Authorization': `Bearer ${token}`
-                                },
-                                body: JSON.stringify({
-                                  subtaskId: subtaskId.toString(),
-                                  completed: !subtask.completed
-                                })
-                              })
-                              const data = await response.json()
-                              if (data.success) {
-                                // Update selectedTask subtasks
-                                setSelectedTask(prev => ({
-                                  ...prev,
-                                  subtasks: prev.subtasks.map(st =>
-                                    st._id === subtaskId
-                                      ? { ...st, completed: data.data?.subtask?.completed ?? !subtask.completed, pendingAcceptance: data.data?.subtask?.pendingAcceptance || false }
-                                      : st
-                                  ),
-                                  progressPercentage: data.data?.progressPercentage || prev.progressPercentage,
-                                  status: data.data?.taskStatus || prev.status
-                                }))
-                                // Also refresh main task list
-                                mutateTasks()
-                                toast.success(data.message || 'Subtask updated')
-                              } else {
-                                toast.error(data.message || 'Failed to update subtask')
-                              }
-                            } catch (error) {
-                              toast.error('Failed to update subtask')
-                            } finally {
-                              setModalUpdatingSubtask(null)
-                            }
-                          }}
+                        <div
+                          key={subtask._id || idx}
+                          className={`flex items-center gap-3 p-3 rounded-lg transition-all ${subtask.completed ? 'bg-success-50' :
+                              subtask.pendingAcceptance ? 'bg-warning-50' : 'bg-default-50'
+                            }`}
                         >
-                          <div className={`w-5 h-5 rounded-full flex items-center justify-center transition-all ${modalUpdatingSubtask === subtask._id ? 'bg-primary animate-pulse' :
-                              subtask.completed ? 'bg-success text-white' :
-                                subtask.pendingAcceptance ? 'bg-warning text-white' :
-                                  canToggle ? 'bg-default-300 hover:bg-default-400' : 'bg-default-200'
-                            }`}>
-                            {modalUpdatingSubtask === subtask._id ? (
-                              <Spinner size="sm" color="white" />
-                            ) : subtask.completed ? (
-                              <FaCheck className="w-3 h-3" />
-                            ) : subtask.pendingAcceptance ? (
-                              <FaClock className="w-3 h-3" />
-                            ) : null}
-                          </div>
-                          <div className="flex-1">
+                          <div className="flex-1 min-w-0">
                             <p className={`text-sm ${subtask.completed ? 'text-default-500 line-through' : 'text-default-800'}`}>
                               {subtask.title}
                             </p>
@@ -1301,12 +1241,53 @@ export default function MyTasksPage() {
                               </p>
                             )}
                           </div>
-                          {subtask.pendingAcceptance && (
-                            <span className="text-xs bg-warning-100 text-warning-700 px-2 py-0.5 rounded">Pending Review</span>
-                          )}
-                          {!isTaskAccepted && (
-                            <span className="text-xs bg-default-100 text-default-500 px-2 py-0.5 rounded">Accept task first</span>
-                          )}
+                          <SubtaskCompletionButton
+                            completed={subtask.completed}
+                            pendingAcceptance={subtask.pendingAcceptance}
+                            disabled={!isTaskAccepted}
+                            loading={modalUpdatingSubtask === subtask._id}
+                            onClick={async () => {
+                              if (!canToggle || modalUpdatingSubtask) return
+                              const subtaskId = subtask._id
+
+                              try {
+                                setModalUpdatingSubtask(subtaskId)
+                                const token = localStorage.getItem('token')
+                                const response = await fetch(getTaskSubtasksApiBase(selectedTask), {
+                                  method: 'PUT',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                    'Authorization': `Bearer ${token}`
+                                  },
+                                  body: JSON.stringify({
+                                    subtaskId: subtaskId.toString(),
+                                    completed: !subtask.completed
+                                  })
+                                })
+                                const data = await response.json()
+                                if (data.success) {
+                                  setSelectedTask(prev => ({
+                                    ...prev,
+                                    subtasks: prev.subtasks.map(st =>
+                                      st._id === subtaskId
+                                        ? { ...st, completed: data.data?.subtask?.completed ?? !subtask.completed, pendingAcceptance: data.data?.subtask?.pendingAcceptance || false }
+                                        : st
+                                    ),
+                                    progressPercentage: data.data?.progressPercentage || prev.progressPercentage,
+                                    status: data.data?.taskStatus || prev.status
+                                  }))
+                                  mutateTasks()
+                                  toast.success(data.message || 'Subtask updated')
+                                } else {
+                                  toast.error(data.message || 'Failed to update subtask')
+                                }
+                              } catch (error) {
+                                toast.error('Failed to update subtask')
+                              } finally {
+                                setModalUpdatingSubtask(null)
+                              }
+                            }}
+                          />
                         </div>
                       )
                     })}
@@ -1501,10 +1482,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
     try {
       setAddingSubtask(true)
       const token = localStorage.getItem('token')
-      const subtaskUrl = projectId
-        ? `/api/projects/${projectId}/tasks/${task._id}/subtasks`
-        : `/api/projects/_/tasks/${task._id}/subtasks`
-      const response = await fetch(subtaskUrl, {
+      const response = await fetch(getTaskSubtasksApiBase(task), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1570,7 +1548,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
       const idToSend = typeof subtaskId === 'object' && subtaskId._id ? subtaskId._id.toString() :
         subtaskId.toString ? subtaskId.toString() : String(subtaskId)
 
-      const response = await fetch(`/api/projects/${projectId || '_'}/tasks/${task._id}/subtasks`, {
+      const response = await fetch(getTaskSubtasksApiBase(task), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1631,7 +1609,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
       // Handle both populated and unpopulated project field
       const projectId = task.project?._id || task.project
 
-      const response = await fetch(`/api/projects/${projectId || '_'}/tasks/${task._id}/subtasks?subtaskId=${idToSend}`, {
+      const response = await fetch(`${getTaskSubtasksApiBase(task)}?subtaskId=${idToSend}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -1664,7 +1642,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
       const projectId = task.project?._id || task.project
       const idToSend = subtaskId?.toString() || subtaskId
 
-      const response = await fetch(`/api/projects/${projectId || '_'}/tasks/${task._id}/subtasks`, {
+      const response = await fetch(getTaskSubtasksApiBase(task), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1690,6 +1668,9 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
         ))
         if (task && data.data) {
           task.progressPercentage = data.data.progressPercentage
+          if (data.data.taskStatus) {
+            task.status = data.data.taskStatus
+          }
         }
         toast.success(data.message)
       } else {
@@ -1714,7 +1695,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
       const projectId = task.project?._id || task.project
       const idToSend = subtaskId?.toString() || subtaskId
 
-      const response = await fetch(`/api/projects/${projectId || '_'}/tasks/${task._id}/subtasks`, {
+      const response = await fetch(getTaskSubtasksApiBase(task), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -1741,6 +1722,9 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
         ))
         if (task && data.data) {
           task.progressPercentage = data.data.progressPercentage
+          if (data.data.taskStatus) {
+            task.status = data.data.taskStatus
+          }
         }
         toast.success(data.message)
       } else {
@@ -1765,7 +1749,7 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
 
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch(`/api/projects/${projectId || '_'}/tasks/${task._id}/subtasks/${subtaskId}/comments`, {
+      const response = await fetch(getTaskSubtaskCommentsApiBase(task, subtaskId), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2059,52 +2043,46 @@ function TaskCard({ task, onAccept, onReject, onStatusChange, onViewProject, onD
                   return (
                     <div key={subtask._id} className={`bg-white rounded-lg p-3 border ${subtask.pendingAcceptance ? 'border-yellow-300 bg-yellow-50' : 'border-gray-200'}`}>
                       <div className="flex items-center gap-3 group">
-                        {/* Checkbox - disabled if pending acceptance from others */}
-                        <input
-                          type="checkbox"
-                          checked={subtask.completed || subtask.pendingAcceptance}
-                          onChange={() => handleToggleSubtask(subtask._id, subtask.completed || subtask.pendingAcceptance)}
-                          disabled={updatingSubtaskId === subtask._id || isPendingAcceptance || subtask.pendingAcceptance}
-                          className={`w-4 h-4 border-gray-300 rounded focus:ring-primary-500 cursor-pointer disabled:opacity-50 ${subtask.pendingAcceptance ? 'text-yellow-500' : 'text-primary-600'
-                            }`}
-                        />
-                        <span
-                          className={`flex-1 text-sm ${subtask.completed
-                            ? 'line-through text-gray-400'
-                            : subtask.pendingAcceptance
-                              ? 'text-yellow-700'
-                              : 'text-gray-700'
-                            }`}
-                        >
-                          {subtask.title}
-                        </span>
-
-                        {/* Pending acceptance badge */}
-                        {subtask.pendingAcceptance && (
-                          <span className="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full border border-yellow-300 flex items-center gap-1">
-                            <FaClock className="text-xs" />
-                            Pending ({subtask.acceptedBy?.length || 1}/{task.assignees?.length || 2})
-                          </span>
-                        )}
-
-                        {/* Show subtask ETA if available */}
-                        {(subtask.estimatedDays > 0 || subtask.estimatedHours > 0) && !subtask.pendingAcceptance && (
-                          <span className="text-xs text-blue-600 flex items-center gap-1">
-                            <FaClock className="text-xs" />
-                            {subtask.estimatedDays > 0 && `${subtask.estimatedDays}d`}
-                            {subtask.estimatedDays > 0 && subtask.estimatedHours > 0 && ' '}
-                            {subtask.estimatedHours > 0 && `${subtask.estimatedHours}h`}
-                          </span>
-                        )}
-                        {!isPendingAcceptance && !subtask.pendingAcceptance && (
-                          <button
-                            onClick={() => handleDeleteSubtask(subtask._id)}
-                            className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition-opacity"
-                            title="Delete subtask"
+                        <div className="flex-1 min-w-0">
+                          <span
+                            className={`block text-sm ${subtask.completed
+                              ? 'line-through text-gray-400'
+                              : subtask.pendingAcceptance
+                                ? 'text-yellow-700'
+                                : 'text-gray-700'
+                              }`}
                           >
-                            <FaTrash className="text-xs" />
-                          </button>
-                        )}
+                            {subtask.title}
+                          </span>
+
+                          {(subtask.estimatedDays > 0 || subtask.estimatedHours > 0) && !subtask.pendingAcceptance && (
+                            <span className="mt-1 inline-flex text-xs text-blue-600 items-center gap-1">
+                              <FaClock className="text-xs" />
+                              {subtask.estimatedDays > 0 && `${subtask.estimatedDays}d`}
+                              {subtask.estimatedDays > 0 && subtask.estimatedHours > 0 && ' '}
+                              {subtask.estimatedHours > 0 && `${subtask.estimatedHours}h`}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <SubtaskCompletionButton
+                            completed={subtask.completed}
+                            pendingAcceptance={subtask.pendingAcceptance}
+                            disabled={isPendingAcceptance}
+                            loading={updatingSubtaskId === subtask._id}
+                            onClick={() => handleToggleSubtask(subtask._id, subtask.completed || subtask.pendingAcceptance)}
+                          />
+                          {!isPendingAcceptance && !subtask.pendingAcceptance && (
+                            <button
+                              onClick={() => handleDeleteSubtask(subtask._id)}
+                              className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition-opacity"
+                              title="Delete subtask"
+                            >
+                              <FaTrash className="text-xs" />
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       {/* Multi-assignee accept/reject buttons */}

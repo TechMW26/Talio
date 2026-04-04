@@ -3,6 +3,108 @@ import { getAuthAndModels } from '@/lib/auth'
 import mongoose from 'mongoose'
 import { calculateCompletionPercentage, createTimelineEvent } from '@/lib/projectService'
 
+async function applySubtaskTaskState({
+  task,
+  progressPercentage,
+  markingComplete = false,
+  markingIncomplete = false,
+  shouldAutoCompleteOnFullProgress = false,
+  setOperations,
+  ProjectApprovalRequest,
+  requesterEmployeeId
+}) {
+  let statusChanged = false
+  let newStatus = task.status
+  let approvalCreated = false
+
+  if (!task.subtasks || task.subtasks.length === 0) {
+    return { statusChanged, newStatus, approvalCreated }
+  }
+
+  if (markingComplete && task.status === 'todo') {
+    setOperations.status = 'in-progress'
+    setOperations.completedAt = null
+    statusChanged = true
+    newStatus = 'in-progress'
+  }
+
+  if (progressPercentage === 100 && !['completed', 'review', 'archived'].includes(task.status)) {
+    if (shouldAutoCompleteOnFullProgress) {
+      setOperations.status = 'completed'
+      setOperations.completedAt = new Date()
+      statusChanged = true
+      newStatus = 'completed'
+
+      await ProjectApprovalRequest.deleteMany({
+        relatedTask: task._id,
+        type: 'task_review',
+        status: 'pending'
+      })
+    } else {
+      setOperations.status = 'review'
+      setOperations.completedAt = null
+      statusChanged = true
+      newStatus = 'review'
+
+      const projectId = task.project?._id || task.project
+      if (projectId) {
+        const existingRequest = await ProjectApprovalRequest.findOne({
+          relatedTask: task._id,
+          type: 'task_review',
+          status: 'pending'
+        })
+
+        if (!existingRequest) {
+          await ProjectApprovalRequest.create({
+            project: projectId,
+            type: 'task_review',
+            status: 'pending',
+            requestedBy: requesterEmployeeId,
+            relatedTask: task._id,
+            reason: `Task "${task.title}" is 100% complete and ready for review`,
+            metadata: {
+              taskTitle: task.title,
+              taskPriority: task.priority,
+              completedBy: requesterEmployeeId,
+              progressPercentage: 100,
+              trigger: 'subtask_completion'
+            }
+          })
+          approvalCreated = true
+        }
+      }
+    }
+  }
+
+  if (markingIncomplete && ['completed', 'review'].includes(task.status) && progressPercentage < 100 && progressPercentage > 0) {
+    setOperations.status = 'in-progress'
+    setOperations.completedAt = null
+    statusChanged = true
+    newStatus = 'in-progress'
+
+    await ProjectApprovalRequest.deleteMany({
+      relatedTask: task._id,
+      type: 'task_review',
+      status: 'pending'
+    })
+  }
+
+  if (markingIncomplete && progressPercentage === 0 && !['todo', 'archived'].includes(task.status)) {
+    setOperations.status = 'todo'
+    setOperations.completedAt = null
+    statusChanged = true
+    newStatus = 'todo'
+
+    await ProjectApprovalRequest.deleteMany({
+      relatedTask: task._id,
+      type: 'task_review',
+      status: 'pending'
+    })
+  }
+
+  return { statusChanged, newStatus, approvalCreated }
+}
+
 // GET - Get all subtasks for a task
 export async function GET(request, { params }) {
   try {
@@ -257,6 +359,7 @@ export async function PUT(request, { params }) {
     }
 
     const currentSubtask = task.subtasks[subtaskIndex]
+    const shouldAutoCompleteOnFullProgress = !task.project || isProjectHead
 
     // Check how many assignees this task has (for multi-assignee flow)
     const allAssignees = await TaskAssignee.find({
@@ -305,21 +408,46 @@ export async function PUT(request, { params }) {
         setOperations[`subtasks.${subtaskIndex}.pendingAcceptance`] = false
       }
 
-      // Update task and return
+      const updatedSubtasks = [...task.subtasks]
+      updatedSubtasks[subtaskIndex] = {
+        ...updatedSubtasks[subtaskIndex].toObject(),
+        acceptedBy: newAcceptedBy,
+        completed: allAccepted,
+        pendingAcceptance: !allAccepted
+      }
+
+      const completedCount = updatedSubtasks.filter(st => st.completed && !st.pendingAcceptance).length
+      const progressPercentage = updatedSubtasks.length > 0
+        ? Math.round((completedCount / updatedSubtasks.length) * 100)
+        : 0
+      setOperations.progressPercentage = progressPercentage
+
+      const { statusChanged, newStatus, approvalCreated } = await applySubtaskTaskState({
+        task,
+        progressPercentage,
+        markingComplete: allAccepted,
+        shouldAutoCompleteOnFullProgress,
+        setOperations,
+        ProjectApprovalRequest,
+        requesterEmployeeId: userRecord.employeeId
+      })
+
       const updatedTask = await Task.findByIdAndUpdate(taskId, { $set: setOperations }, { new: true })
-      
-      // Recalculate progress
-      const completedCount = updatedTask.subtasks.filter(st => st.completed).length
-      const progressPercentage = Math.round((completedCount / updatedTask.subtasks.length) * 100)
-      await Task.findByIdAndUpdate(taskId, { $set: { progressPercentage } })
 
       return NextResponse.json({
         success: true,
-        message: allAccepted ? 'All assignees accepted. Subtask marked complete!' : 'Acceptance recorded',
+        message: allAccepted
+          ? statusChanged
+            ? `All assignees accepted. Task moved to ${newStatus === 'completed' ? 'Completed' : 'Review'}.`
+            : 'All assignees accepted. Subtask marked complete!'
+          : 'Acceptance recorded',
         data: {
           subtask: updatedTask.subtasks[subtaskIndex],
           allAccepted,
-          progressPercentage
+          progressPercentage,
+          taskStatus: updatedTask.status,
+          statusChanged,
+          approvalCreated
         }
       })
     }
@@ -348,20 +476,45 @@ export async function PUT(request, { params }) {
       const rejectedBy = currentSubtask.rejectedBy || []
       setOperations[`subtasks.${subtaskIndex}.rejectedBy`] = [...rejectedBy, newRejection]
 
-      // Update task
+      const updatedSubtasks = [...task.subtasks]
+      updatedSubtasks[subtaskIndex] = {
+        ...updatedSubtasks[subtaskIndex].toObject(),
+        completed: false,
+        pendingAcceptance: false,
+        completedAt: null,
+        acceptedBy: [],
+        rejectedBy: [...rejectedBy, newRejection]
+      }
+
+      const completedCount = updatedSubtasks.filter(st => st.completed && !st.pendingAcceptance).length
+      const progressPercentage = updatedSubtasks.length > 0
+        ? Math.round((completedCount / updatedSubtasks.length) * 100)
+        : 0
+      setOperations.progressPercentage = progressPercentage
+
+      const { statusChanged, newStatus, approvalCreated } = await applySubtaskTaskState({
+        task,
+        progressPercentage,
+        markingIncomplete: true,
+        shouldAutoCompleteOnFullProgress,
+        setOperations,
+        ProjectApprovalRequest,
+        requesterEmployeeId: userRecord.employeeId
+      })
+
       const updatedTask = await Task.findByIdAndUpdate(taskId, { $set: setOperations }, { new: true })
-      
-      // Recalculate progress
-      const completedCount = updatedTask.subtasks.filter(st => st.completed).length
-      const progressPercentage = Math.round((completedCount / updatedTask.subtasks.length) * 100)
-      await Task.findByIdAndUpdate(taskId, { $set: { progressPercentage } })
 
       return NextResponse.json({
         success: true,
-        message: 'Subtask completion rejected and reset',
+        message: statusChanged
+          ? `Subtask completion rejected. Task moved to ${newStatus === 'todo' ? 'To Do' : 'In Progress'}.`
+          : 'Subtask completion rejected and reset',
         data: {
           subtask: updatedTask.subtasks[subtaskIndex],
-          progressPercentage
+          progressPercentage,
+          taskStatus: updatedTask.status,
+          statusChanged,
+          approvalCreated
         }
       })
     }
@@ -435,98 +588,16 @@ export async function PUT(request, { params }) {
       : 0
     setOperations.progressPercentage = progressPercentage
 
-    // Auto-update task status based on subtask progress (only for tasks with subtasks)
-    let statusChanged = false
-    let newStatus = task.status
-    let approvalCreated = false
-    
-    if (updatedSubtasks.length > 0) {
-      // 1. If task is 'todo' and any subtask is marked done → move to 'in-progress'
-      if (completed === true && task.status === 'todo') {
-        setOperations.status = 'in-progress'
-        statusChanged = true
-        newStatus = 'in-progress'
-      }
-      
-      // 2. If progress reaches 100% → move to 'review' (or 'completed' if project head)
-      if (progressPercentage === 100 && !['completed', 'review', 'archived'].includes(task.status)) {
-        // Project head bypass: auto-complete directly without review/approval
-        if (isProjectHead) {
-          setOperations.status = 'completed'
-          setOperations.completedAt = new Date()
-          statusChanged = true
-          newStatus = 'completed'
-          
-          // Cancel any existing pending approval requests for this task
-          await ProjectApprovalRequest.deleteMany({
-            relatedTask: taskId,
-            type: 'task_review',
-            status: 'pending'
-          })
-        } else {
-          setOperations.status = 'review'
-          statusChanged = true
-          newStatus = 'review'
-          
-          // Create approval request for task review
-          const projectId = task.project?._id || task.project
-          
-          // Check if there's already a pending approval request for this task
-          const existingRequest = await ProjectApprovalRequest.findOne({
-            relatedTask: taskId,
-            type: 'task_review',
-            status: 'pending'
-          })
-          
-          if (!existingRequest) {
-            await ProjectApprovalRequest.create({
-              project: projectId,
-              type: 'task_review',
-              status: 'pending',
-              requestedBy: user.employeeId,
-              relatedTask: taskId,
-              reason: `Task "${task.title}" is 100% complete and ready for review`,
-              metadata: {
-                taskTitle: task.title,
-                taskPriority: task.priority,
-                completedBy: user.employeeId,
-                progressPercentage: 100,
-                trigger: 'subtask_completion'
-              }
-            })
-            approvalCreated = true
-          }
-        }
-      }
-      
-      // 3. If subtask is unchecked and progress drops below 100% from completed/review → move back to 'in-progress'
-      if (completed === false && ['completed', 'review'].includes(task.status) && progressPercentage < 100 && progressPercentage > 0) {
-        setOperations.status = 'in-progress'
-        statusChanged = true
-        newStatus = 'in-progress'
-        
-        // Cancel any pending approval requests for this task
-        await ProjectApprovalRequest.deleteMany({
-          relatedTask: taskId,
-          type: 'task_review',
-          status: 'pending'
-        })
-      }
-      
-      // 4. If progress drops to 0% (all subtasks unchecked) → move back to 'todo'
-      if (completed === false && progressPercentage === 0 && task.status !== 'todo' && !['completed', 'archived'].includes(task.status)) {
-        setOperations.status = 'todo'
-        statusChanged = true
-        newStatus = 'todo'
-        
-        // Cancel any pending approval requests for this task
-        await ProjectApprovalRequest.deleteMany({
-          relatedTask: taskId,
-          type: 'task_review',
-          status: 'pending'
-        })
-      }
-    }
+    const { statusChanged, newStatus, approvalCreated } = await applySubtaskTaskState({
+      task,
+      progressPercentage,
+      markingComplete: completed === true,
+      markingIncomplete: completed === false,
+      shouldAutoCompleteOnFullProgress,
+      setOperations,
+      ProjectApprovalRequest,
+      requesterEmployeeId: userRecord.employeeId
+    })
 
     // Recalculate total task ETA from all subtasks
     const subtasksWithEta = updatedSubtasks.filter(st => st.estimatedDays > 0 || st.estimatedHours > 0)
