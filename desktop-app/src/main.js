@@ -1,5 +1,5 @@
 /**
- * Talio Desktop App v6.0.0
+ * Talio Desktop App v6.0.1
  * Main Electron process
  * 
  * Performance optimized for smooth rendering
@@ -2177,6 +2177,93 @@ function getUpdateAssetName(version) {
   return null;
 }
 
+function decodeXmlEntities(value) {
+  return String(value || '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'");
+}
+
+function extractDmgMountPoint(output) {
+  if (!output) return null;
+
+  var text = String(output);
+  var plistMatch = text.match(/<key>mount-point<\/key>\s*<string>([^<]+)<\/string>/i);
+  if (plistMatch) {
+    return decodeXmlEntities(plistMatch[1].trim());
+  }
+
+  var lines = text.trim().split(/\r?\n/);
+  for (var i = lines.length - 1; i >= 0; i--) {
+    var match = lines[i].match(/(?:\t|\s{2,})(\/(?:private\/)?(?:tmp|Volumes)\/[^\t\r\n]+?)\s*$/);
+    if (match) {
+      return match[1].trim();
+    }
+  }
+
+  return null;
+}
+
+function shellQuote(value) {
+  return "'" + String(value).replace(/'/g, "'\\''") + "'";
+}
+
+function mountDmg(destPath) {
+  return new Promise(function (resolve, reject) {
+    var child = spawn('/usr/bin/hdiutil', ['attach', destPath, '-nobrowse', '-noautoopen', '-mountrandom', '/tmp', '-plist']);
+    var stdout = '';
+    var stderr = '';
+
+    child.stdout.on('data', function (d) { stdout += d.toString(); });
+    child.stderr.on('data', function (d) { stderr += d.toString(); });
+    child.on('error', reject);
+    child.on('close', function (code) {
+      var combinedOutput = [stdout.trim(), stderr.trim()].filter(Boolean).join('\n');
+
+      if (code !== 0) {
+        reject(new Error('Failed to mount DMG (code ' + code + '): ' + (combinedOutput || 'Unknown hdiutil error')));
+        return;
+      }
+
+      var mountPoint = extractDmgMountPoint(stdout) || extractDmgMountPoint(stderr) || extractDmgMountPoint(combinedOutput);
+      if (mountPoint) {
+        resolve(mountPoint);
+        return;
+      }
+
+      reject(new Error('Could not determine DMG mount point from hdiutil output'));
+    });
+  });
+}
+
+async function openDownloadedUpdateFallback(destPath) {
+  if (!destPath || !fs.existsSync(destPath)) return null;
+
+  try {
+    var openError = await shell.openPath(destPath);
+    if (openError) {
+      logger.log('warn', 'Updater', 'Failed to open downloaded installer for manual fallback: ' + openError);
+      return null;
+    }
+
+    logger.log('warn', 'Updater', 'Opened downloaded installer for manual fallback: ' + destPath);
+
+    if (process.platform === 'darwin') {
+      return 'Automatic install failed. The downloaded DMG has been opened so you can drag Talio to Applications.';
+    }
+
+    if (process.platform === 'win32') {
+      return 'Automatic install failed. The downloaded installer has been opened so you can finish the update manually.';
+    }
+  } catch (error) {
+    logger.log('warn', 'Updater', 'Manual installer fallback failed: ' + error.message);
+  }
+
+  return null;
+}
+
 /**
  * Download a file from a URL with progress tracking.
  * Follows redirects (GitHub release assets redirect to S3).
@@ -2311,6 +2398,7 @@ async function showUpdateScreenAndDownload(latestVersion, isForced) {
  */
 async function performUpdateDownload(latestVersion) {
   var assetName = getUpdateAssetName(latestVersion);
+  var installerReady = false;
   if (!assetName) {
     logger.log('error', 'Updater', 'Unsupported platform for update: ' + process.platform);
     sendUpdatePageMessage({ type: 'update-error', message: 'Unsupported platform: ' + process.platform });
@@ -2347,6 +2435,7 @@ async function performUpdateDownload(latestVersion) {
     if (stats.size < 1024) {
       throw new Error('Downloaded file is too small (' + stats.size + ' bytes), may be corrupt');
     }
+    installerReady = true;
     logger.log('info', 'Updater', 'File verified: ' + stats.size + ' bytes');
 
     // Signal download complete
@@ -2366,6 +2455,7 @@ async function performUpdateDownload(latestVersion) {
       var appBundleName = path.basename(appBundlePath); // Talio.app
       var installDir = path.dirname(appBundlePath); // /Applications
       var mountPoint = null;
+      var installSucceeded = false;
 
       logger.log('info', 'Updater', 'Current app bundle: ' + appBundlePath);
       logger.log('info', 'Updater', 'Install directory: ' + installDir);
@@ -2373,27 +2463,7 @@ async function performUpdateDownload(latestVersion) {
       try {
         // Phase B: Mount the DMG programmatically
         logger.log('info', 'Updater', 'Mounting DMG...');
-        mountPoint = await new Promise(function (resolve, reject) {
-          var child = spawn('/usr/bin/hdiutil', ['attach', destPath, '-nobrowse', '-noautoopen', '-mountrandom', '/tmp']);
-          var stdout = '';
-          var stderr = '';
-          child.stdout.on('data', function (d) { stdout += d.toString(); });
-          child.stderr.on('data', function (d) { stderr += d.toString(); });
-          child.on('close', function (code) {
-            if (code !== 0) {
-              reject(new Error('Failed to mount DMG (code ' + code + '): ' + stderr.trim()));
-              return;
-            }
-            // Parse mount point from hdiutil output (last tab-delimited column)
-            var lines = stdout.trim().split('\n');
-            for (var i = lines.length - 1; i >= 0; i--) {
-              var match = lines[i].match(/\t(\/(?:tmp|Volumes)\/[^\t]+)\s*$/);
-              if (match) { resolve(match[1].trim()); return; }
-            }
-            reject(new Error('Could not determine DMG mount point'));
-          });
-          child.on('error', reject);
-        });
+        mountPoint = await mountDmg(destPath);
 
         logger.log('info', 'Updater', 'DMG mounted at: ' + mountPoint);
 
@@ -2418,7 +2488,7 @@ async function performUpdateDownload(latestVersion) {
             var rm = spawn('/bin/rm', ['-rf', targetPath]);
             rm.on('close', function (rmCode) {
               if (rmCode !== 0) { reject(new Error('Failed to remove old app (code ' + rmCode + ')')); return; }
-              var cp = spawn('/bin/cp', ['-R', newAppPath, targetPath]);
+              var cp = spawn('/usr/bin/ditto', [newAppPath, targetPath]);
               cp.on('close', function (cpCode) {
                 if (cpCode === 0) resolve();
                 else reject(new Error('Failed to copy new app (code ' + cpCode + ')'));
@@ -2430,7 +2500,7 @@ async function performUpdateDownload(latestVersion) {
         } else {
           // Phase F: Request admin privileges via AppleScript authorization dialog
           logger.log('info', 'Updater', 'Requesting admin privileges for installation...');
-          var shellCmd = "rm -rf '" + targetPath + "' && cp -R '" + newAppPath + "' '" + targetPath + "'";
+          var shellCmd = '/bin/rm -rf ' + shellQuote(targetPath) + ' && /usr/bin/ditto ' + shellQuote(newAppPath) + ' ' + shellQuote(targetPath);
           await new Promise(function (resolve, reject) {
             var child = spawn('/usr/bin/osascript', ['-e',
               'do shell script ' + JSON.stringify(shellCmd) + ' with administrator privileges'
@@ -2446,6 +2516,7 @@ async function performUpdateDownload(latestVersion) {
         }
 
         logger.log('info', 'Updater', 'App copied successfully to ' + targetPath);
+        installSucceeded = true;
 
       } finally {
         // Phase D: Unmount the DMG and clean up
@@ -2459,8 +2530,10 @@ async function performUpdateDownload(latestVersion) {
             });
           } catch (e) { logger.log('warn', 'Updater', 'DMG unmount warning: ' + e.message); }
         }
-        // Clean up downloaded DMG
-        try { fs.unlinkSync(destPath); } catch (e) { /* ok */ }
+
+        if (installSucceeded) {
+          try { fs.unlinkSync(destPath); } catch (e) { /* ok */ }
+        }
       }
 
       // Phase E: Relaunch using app.relaunch() + app.exit(0)
@@ -2495,10 +2568,17 @@ async function performUpdateDownload(latestVersion) {
 
       var appExePath = process.execPath;
       var batchPath = path.join(app.getPath('temp'), 'talio-update.bat');
+      var batchLogPath = path.join(app.getPath('temp'), 'talio-update.log');
       var batch = '@echo off\r\n' +
+        'setlocal\r\n' +
+        'set "INSTALLER=' + destPath.replace(/"/g, '""') + '"\r\n' +
+        'set "APP_EXE=' + appExePath.replace(/"/g, '""') + '"\r\n' +
+        'set "APP_PID=' + process.pid + '"\r\n' +
+        'set "LOG_FILE=' + batchLogPath.replace(/"/g, '""') + '"\r\n' +
+        'echo [%DATE% %TIME%] Talio update helper started > "%LOG_FILE%"\r\n' +
         // Wait for the Electron process to fully exit (poll by PID)
         ':wait\r\n' +
-        'tasklist /FI "PID eq ' + process.pid + '" 2>NUL | find /I "' + process.pid + '" >NUL\r\n' +
+        'tasklist /FI "PID eq %APP_PID%" 2>NUL | find /I "%APP_PID%" >NUL\r\n' +
         'if "%ERRORLEVEL%"=="0" (\r\n' +
         '    timeout /t 1 /nobreak >NUL\r\n' +
         '    goto wait\r\n' +
@@ -2506,11 +2586,22 @@ async function performUpdateDownload(latestVersion) {
         // Extra delay for file handles to fully release
         'timeout /t 2 /nobreak >NUL\r\n' +
         // Run the NSIS installer silently (/S flag)
-        'start /wait "" "' + destPath + '" /S\r\n' +
+        'echo [%DATE% %TIME%] Launching silent installer: "%INSTALLER%" >> "%LOG_FILE%"\r\n' +
+        'start /wait "" "%INSTALLER%" /S\r\n' +
+        'set "INSTALL_EXIT=%ERRORLEVEL%"\r\n' +
+        'echo [%DATE% %TIME%] Silent installer exit code: %INSTALL_EXIT% >> "%LOG_FILE%"\r\n' +
+        'if not "%INSTALL_EXIT%"=="0" goto interactive\r\n' +
+        'if exist "%INSTALLER%" del /f /q "%INSTALLER%" >NUL 2>&1\r\n' +
         // Launch the updated app from the same install path
-        'start "" "' + appExePath + '"\r\n' +
+        'if exist "%APP_EXE%" start "" "%APP_EXE%"\r\n' +
         // Self-delete the batch file
-        'del "%~f0"\r\n';
+        'del "%~f0"\r\n' +
+        'exit /b 0\r\n' +
+        ':interactive\r\n' +
+        'echo [%DATE% %TIME%] Silent install failed; launching interactive installer fallback. >> "%LOG_FILE%"\r\n' +
+        'start "" "%INSTALLER%"\r\n' +
+        'del "%~f0"\r\n' +
+        'exit /b %INSTALL_EXIT%\r\n';
 
       fs.writeFileSync(batchPath, batch);
       spawn('cmd.exe', ['/c', batchPath], {
@@ -2537,10 +2628,15 @@ async function performUpdateDownload(latestVersion) {
       }, 1500);
     }
   } catch (error) {
+    var fallbackMessage = null;
+    if (installerReady) {
+      fallbackMessage = await openDownloadedUpdateFallback(destPath);
+    }
+
     logger.log('error', 'Updater', 'Update download/install failed: ' + error.message);
     sendUpdatePageMessage({
       type: 'update-error',
-      message: error.message || 'Download failed. Please check your connection and try again.'
+      message: fallbackMessage || error.message || 'Download failed. Please check your connection and try again.'
     });
     isDownloadingUpdate = false;
   }
