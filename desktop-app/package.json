@@ -1,14 +1,10 @@
 {
   "name": "talio-desktop",
-  "version": "6.0.1",
+  "version": "6.0.2",
   "description": "Talio HRMS Desktop - Productivity & Collaboration Hub",
   "main": "src/main.js",
   "author": "MW FutureTech <support@talio.in>",
   "homepage": "https://app.talio.in",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/avirajsharma-ops/Talio.git"
-  },
   "license": "MIT",
   "private": true,
   "scripts": {
@@ -46,13 +42,6 @@
       "output": "dist",
       "buildResources": "build"
     },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "avirajsharma-ops",
-        "repo": "Talio"
-      }
-    ],
     "files": [
       "src/**/*",
       "build/icon.png",

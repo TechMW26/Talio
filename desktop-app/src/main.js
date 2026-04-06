@@ -1,5 +1,5 @@
 /**
- * Talio Desktop App v6.0.1
+ * Talio Desktop App v6.0.2
  * Main Electron process
  * 
  * Performance optimized for smooth rendering
@@ -97,6 +97,9 @@ let isNavigating = false; // Single lock preventing concurrent page navigations
 let navigationSafetyTimer = null; // Fallback to unlock navigation after timeout
 let isDownloadingUpdate = false; // Prevents concurrent update downloads
 let currentUpdateVersion = null; // Version being downloaded
+let shutdownMode = null;
+let shutdownCleanupCompleted = false;
+let shutdownFallbackTimer = null;
 let ipcHandlersRegistered = false;
 let powerMonitorListenersRegistered = false;
 let launchWhitescreenTimeouts = [];
@@ -887,6 +890,11 @@ function showCrashPage() {
  */
 function setupWindowEvents() {
   mainWindow.on('close', function (event) {
+    if (isMaintenanceShutdownActive()) {
+      logger.log('info', 'Main', 'Allowing window close during ' + shutdownMode + ' shutdown');
+      return;
+    }
+
     // FORCE PERSISTENT: Never let the window close
     event.preventDefault();
 
@@ -915,6 +923,17 @@ function setupWindowEvents() {
   });
 
   mainWindow.on('closed', function () {
+    if (windowRecreateTimer) {
+      clearTimeout(windowRecreateTimer);
+      windowRecreateTimer = null;
+    }
+
+    if (isMaintenanceShutdownActive() || isQuitting) {
+      logger.log('info', 'Main', 'Window closed during shutdown - recreation suppressed');
+      mainWindow = null;
+      return;
+    }
+
     logger.log('warn', 'Main', 'Window was closed/destroyed - scheduling recreation');
     mainWindow = null;
     // Auto-recreate window if it was destroyed
@@ -1057,6 +1076,11 @@ function setupWindowEvents() {
  * Acts as a watchdog to ensure the app stays running
  */
 function scheduleWindowRecreation() {
+  if (isMaintenanceShutdownActive() || isQuitting) {
+    logger.log('info', 'Main', 'Skipping window recreation during shutdown');
+    return;
+  }
+
   if (windowRecreateTimer) {
     clearTimeout(windowRecreateTimer);
   }
@@ -1537,8 +1561,8 @@ function setupIPCHandlers() {
   ipcMain.handle('restart-app', function () {
     logger.log('info', 'Main', 'Restart requested');
     crashCount = 0;
-    app.relaunch();
-    app.exit(0);
+    requestControlledShutdown('restart', { relaunch: true });
+    return { success: true };
   });
 
   // Welcome screen completed
@@ -2177,93 +2201,6 @@ function getUpdateAssetName(version) {
   return null;
 }
 
-function decodeXmlEntities(value) {
-  return String(value || '')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'");
-}
-
-function extractDmgMountPoint(output) {
-  if (!output) return null;
-
-  var text = String(output);
-  var plistMatch = text.match(/<key>mount-point<\/key>\s*<string>([^<]+)<\/string>/i);
-  if (plistMatch) {
-    return decodeXmlEntities(plistMatch[1].trim());
-  }
-
-  var lines = text.trim().split(/\r?\n/);
-  for (var i = lines.length - 1; i >= 0; i--) {
-    var match = lines[i].match(/(?:\t|\s{2,})(\/(?:private\/)?(?:tmp|Volumes)\/[^\t\r\n]+?)\s*$/);
-    if (match) {
-      return match[1].trim();
-    }
-  }
-
-  return null;
-}
-
-function shellQuote(value) {
-  return "'" + String(value).replace(/'/g, "'\\''") + "'";
-}
-
-function mountDmg(destPath) {
-  return new Promise(function (resolve, reject) {
-    var child = spawn('/usr/bin/hdiutil', ['attach', destPath, '-nobrowse', '-noautoopen', '-mountrandom', '/tmp', '-plist']);
-    var stdout = '';
-    var stderr = '';
-
-    child.stdout.on('data', function (d) { stdout += d.toString(); });
-    child.stderr.on('data', function (d) { stderr += d.toString(); });
-    child.on('error', reject);
-    child.on('close', function (code) {
-      var combinedOutput = [stdout.trim(), stderr.trim()].filter(Boolean).join('\n');
-
-      if (code !== 0) {
-        reject(new Error('Failed to mount DMG (code ' + code + '): ' + (combinedOutput || 'Unknown hdiutil error')));
-        return;
-      }
-
-      var mountPoint = extractDmgMountPoint(stdout) || extractDmgMountPoint(stderr) || extractDmgMountPoint(combinedOutput);
-      if (mountPoint) {
-        resolve(mountPoint);
-        return;
-      }
-
-      reject(new Error('Could not determine DMG mount point from hdiutil output'));
-    });
-  });
-}
-
-async function openDownloadedUpdateFallback(destPath) {
-  if (!destPath || !fs.existsSync(destPath)) return null;
-
-  try {
-    var openError = await shell.openPath(destPath);
-    if (openError) {
-      logger.log('warn', 'Updater', 'Failed to open downloaded installer for manual fallback: ' + openError);
-      return null;
-    }
-
-    logger.log('warn', 'Updater', 'Opened downloaded installer for manual fallback: ' + destPath);
-
-    if (process.platform === 'darwin') {
-      return 'Automatic install failed. The downloaded DMG has been opened so you can drag Talio to Applications.';
-    }
-
-    if (process.platform === 'win32') {
-      return 'Automatic install failed. The downloaded installer has been opened so you can finish the update manually.';
-    }
-  } catch (error) {
-    logger.log('warn', 'Updater', 'Manual installer fallback failed: ' + error.message);
-  }
-
-  return null;
-}
-
 /**
  * Download a file from a URL with progress tracking.
  * Follows redirects (GitHub release assets redirect to S3).
@@ -2398,7 +2335,6 @@ async function showUpdateScreenAndDownload(latestVersion, isForced) {
  */
 async function performUpdateDownload(latestVersion) {
   var assetName = getUpdateAssetName(latestVersion);
-  var installerReady = false;
   if (!assetName) {
     logger.log('error', 'Updater', 'Unsupported platform for update: ' + process.platform);
     sendUpdatePageMessage({ type: 'update-error', message: 'Unsupported platform: ' + process.platform });
@@ -2435,7 +2371,6 @@ async function performUpdateDownload(latestVersion) {
     if (stats.size < 1024) {
       throw new Error('Downloaded file is too small (' + stats.size + ' bytes), may be corrupt');
     }
-    installerReady = true;
     logger.log('info', 'Updater', 'File verified: ' + stats.size + ' bytes');
 
     // Signal download complete
@@ -2455,7 +2390,6 @@ async function performUpdateDownload(latestVersion) {
       var appBundleName = path.basename(appBundlePath); // Talio.app
       var installDir = path.dirname(appBundlePath); // /Applications
       var mountPoint = null;
-      var installSucceeded = false;
 
       logger.log('info', 'Updater', 'Current app bundle: ' + appBundlePath);
       logger.log('info', 'Updater', 'Install directory: ' + installDir);
@@ -2463,7 +2397,7 @@ async function performUpdateDownload(latestVersion) {
       try {
         // Phase B: Mount the DMG programmatically
         logger.log('info', 'Updater', 'Mounting DMG...');
-        mountPoint = await mountDmg(destPath);
+        mountPoint = await attachDmg(destPath);
 
         logger.log('info', 'Updater', 'DMG mounted at: ' + mountPoint);
 
@@ -2488,7 +2422,7 @@ async function performUpdateDownload(latestVersion) {
             var rm = spawn('/bin/rm', ['-rf', targetPath]);
             rm.on('close', function (rmCode) {
               if (rmCode !== 0) { reject(new Error('Failed to remove old app (code ' + rmCode + ')')); return; }
-              var cp = spawn('/usr/bin/ditto', [newAppPath, targetPath]);
+              var cp = spawn('/bin/cp', ['-R', newAppPath, targetPath]);
               cp.on('close', function (cpCode) {
                 if (cpCode === 0) resolve();
                 else reject(new Error('Failed to copy new app (code ' + cpCode + ')'));
@@ -2500,7 +2434,7 @@ async function performUpdateDownload(latestVersion) {
         } else {
           // Phase F: Request admin privileges via AppleScript authorization dialog
           logger.log('info', 'Updater', 'Requesting admin privileges for installation...');
-          var shellCmd = '/bin/rm -rf ' + shellQuote(targetPath) + ' && /usr/bin/ditto ' + shellQuote(newAppPath) + ' ' + shellQuote(targetPath);
+          var shellCmd = '/bin/rm -rf ' + shellQuote(targetPath) + ' && /bin/cp -R ' + shellQuote(newAppPath) + ' ' + shellQuote(targetPath);
           await new Promise(function (resolve, reject) {
             var child = spawn('/usr/bin/osascript', ['-e',
               'do shell script ' + JSON.stringify(shellCmd) + ' with administrator privileges'
@@ -2516,7 +2450,6 @@ async function performUpdateDownload(latestVersion) {
         }
 
         logger.log('info', 'Updater', 'App copied successfully to ' + targetPath);
-        installSucceeded = true;
 
       } finally {
         // Phase D: Unmount the DMG and clean up
@@ -2530,55 +2463,28 @@ async function performUpdateDownload(latestVersion) {
             });
           } catch (e) { logger.log('warn', 'Updater', 'DMG unmount warning: ' + e.message); }
         }
-
-        if (installSucceeded) {
-          try { fs.unlinkSync(destPath); } catch (e) { /* ok */ }
-        }
+        // Clean up downloaded DMG
+        try { fs.unlinkSync(destPath); } catch (e) { /* ok */ }
       }
 
-      // Phase E: Relaunch using app.relaunch() + app.exit(0)
-      // app.relaunch() schedules the app to launch from the new binary after exit.
-      // app.exit(0) triggers immediate exit, bypassing force-persistent before-quit handler.
       sendUpdatePageMessage({ type: 'update-complete' });
       logger.log('info', 'Updater', 'Update installed successfully. Relaunching...');
 
-      // Clean up all services before exit (before-quit is not fired by app.exit)
-      stopGuardian();
-      screenshotService.stop();
-      socketHandler.disconnect();
-      if (networkCheckInterval) { clearInterval(networkCheckInterval); networkCheckInterval = null; }
-      if (whitescreenCheckInterval) { clearInterval(whitescreenCheckInterval); whitescreenCheckInterval = null; }
-      stopScreenPermissionWatcher();
-      if (updateCheckTimer) { clearInterval(updateCheckTimer); updateCheckTimer = null; }
-      logger.shutdown();
-
       setTimeout(function () {
-        app.relaunch();
-        app.exit(0);
+        requestControlledShutdown('update', { relaunch: true, forceExitAfterMs: 12000 });
       }, 1500);
 
     } else if (process.platform === 'win32') {
       // ── Windows: Quit app, run NSIS installer silently, auto-relaunch ──
-      // The app uses force-persistent mode (before-quit blocks app.quit()),
-      // so we use app.exit(0) which bypasses the handler entirely.
-      // A batch script waits for this process to fully exit before running
-      // the installer, preventing NSIS file-lock errors.
       sendUpdatePageMessage({ type: 'update-complete' });
       logger.log('info', 'Updater', 'Preparing Windows update...');
 
       var appExePath = process.execPath;
       var batchPath = path.join(app.getPath('temp'), 'talio-update.bat');
-      var batchLogPath = path.join(app.getPath('temp'), 'talio-update.log');
       var batch = '@echo off\r\n' +
-        'setlocal\r\n' +
-        'set "INSTALLER=' + destPath.replace(/"/g, '""') + '"\r\n' +
-        'set "APP_EXE=' + appExePath.replace(/"/g, '""') + '"\r\n' +
-        'set "APP_PID=' + process.pid + '"\r\n' +
-        'set "LOG_FILE=' + batchLogPath.replace(/"/g, '""') + '"\r\n' +
-        'echo [%DATE% %TIME%] Talio update helper started > "%LOG_FILE%"\r\n' +
         // Wait for the Electron process to fully exit (poll by PID)
         ':wait\r\n' +
-        'tasklist /FI "PID eq %APP_PID%" 2>NUL | find /I "%APP_PID%" >NUL\r\n' +
+        'tasklist /FI "PID eq ' + process.pid + '" 2>NUL | find /I "' + process.pid + '" >NUL\r\n' +
         'if "%ERRORLEVEL%"=="0" (\r\n' +
         '    timeout /t 1 /nobreak >NUL\r\n' +
         '    goto wait\r\n' +
@@ -2586,22 +2492,11 @@ async function performUpdateDownload(latestVersion) {
         // Extra delay for file handles to fully release
         'timeout /t 2 /nobreak >NUL\r\n' +
         // Run the NSIS installer silently (/S flag)
-        'echo [%DATE% %TIME%] Launching silent installer: "%INSTALLER%" >> "%LOG_FILE%"\r\n' +
-        'start /wait "" "%INSTALLER%" /S\r\n' +
-        'set "INSTALL_EXIT=%ERRORLEVEL%"\r\n' +
-        'echo [%DATE% %TIME%] Silent installer exit code: %INSTALL_EXIT% >> "%LOG_FILE%"\r\n' +
-        'if not "%INSTALL_EXIT%"=="0" goto interactive\r\n' +
-        'if exist "%INSTALLER%" del /f /q "%INSTALLER%" >NUL 2>&1\r\n' +
+        'start /wait "" "' + destPath + '" /S\r\n' +
         // Launch the updated app from the same install path
-        'if exist "%APP_EXE%" start "" "%APP_EXE%"\r\n' +
+        'start "" "' + appExePath + '"\r\n' +
         // Self-delete the batch file
-        'del "%~f0"\r\n' +
-        'exit /b 0\r\n' +
-        ':interactive\r\n' +
-        'echo [%DATE% %TIME%] Silent install failed; launching interactive installer fallback. >> "%LOG_FILE%"\r\n' +
-        'start "" "%INSTALLER%"\r\n' +
-        'del "%~f0"\r\n' +
-        'exit /b %INSTALL_EXIT%\r\n';
+        'del "%~f0"\r\n';
 
       fs.writeFileSync(batchPath, batch);
       spawn('cmd.exe', ['/c', batchPath], {
@@ -2611,32 +2506,15 @@ async function performUpdateDownload(latestVersion) {
       }).unref();
 
       logger.log('info', 'Updater', 'Update script launched, exiting app for installation...');
-
-      // Clean up all services before exit (before-quit is not fired by app.exit)
-      stopGuardian();
-      screenshotService.stop();
-      socketHandler.disconnect();
-      if (networkCheckInterval) { clearInterval(networkCheckInterval); networkCheckInterval = null; }
-      if (whitescreenCheckInterval) { clearInterval(whitescreenCheckInterval); whitescreenCheckInterval = null; }
-      stopScreenPermissionWatcher();
-      if (updateCheckTimer) { clearInterval(updateCheckTimer); updateCheckTimer = null; }
-      logger.shutdown();
-
-      // Force exit — bypasses the before-quit handler (which blocks quit in persistent mode)
       setTimeout(function () {
-        app.exit(0);
+        requestControlledShutdown('update', { forceExitAfterMs: 15000 });
       }, 1500);
     }
   } catch (error) {
-    var fallbackMessage = null;
-    if (installerReady) {
-      fallbackMessage = await openDownloadedUpdateFallback(destPath);
-    }
-
     logger.log('error', 'Updater', 'Update download/install failed: ' + error.message);
     sendUpdatePageMessage({
       type: 'update-error',
-      message: fallbackMessage || error.message || 'Download failed. Please check your connection and try again.'
+      message: error.message || 'Download failed. Please check your connection and try again.'
     });
     isDownloadingUpdate = false;
   }
@@ -2990,6 +2868,159 @@ function stopGuardian() {
   // Clean up files
   try { fs.unlinkSync(paths.heartbeatFile); } catch (e) { /* ignore */ }
   try { fs.unlinkSync(paths.pidFile); } catch (e) { /* ignore */ }
+}
+
+function isMaintenanceShutdownActive() {
+  return shutdownMode === 'update' || shutdownMode === 'restart';
+}
+
+function performShutdownCleanup(reason) {
+  if (shutdownCleanupCompleted) {
+    return;
+  }
+
+  shutdownCleanupCompleted = true;
+  logger.log('info', 'Main', 'Running shutdown cleanup for ' + reason);
+
+  clearTimeout(loaderTimer);
+  loaderTimer = null;
+  clearTimeout(loadTimeout);
+  loadTimeout = null;
+  clearTimeout(navigationSafetyTimer);
+  navigationSafetyTimer = null;
+  clearTimeout(pendingReloadTimeout);
+  pendingReloadTimeout = null;
+
+  if (windowRecreateTimer) {
+    clearTimeout(windowRecreateTimer);
+    windowRecreateTimer = null;
+  }
+
+  if (launchWhitescreenTimeouts.length) {
+    launchWhitescreenTimeouts.forEach(function (timer) {
+      clearTimeout(timer);
+    });
+    launchWhitescreenTimeouts = [];
+  }
+
+  stopGuardian();
+
+  if (screenshotService && typeof screenshotService.stop === 'function') {
+    screenshotService.stop();
+  }
+
+  if (socketHandler && typeof socketHandler.disconnect === 'function') {
+    socketHandler.disconnect();
+  }
+
+  if (networkCheckInterval) {
+    clearInterval(networkCheckInterval);
+    networkCheckInterval = null;
+  }
+
+  if (whitescreenCheckInterval) {
+    clearInterval(whitescreenCheckInterval);
+    whitescreenCheckInterval = null;
+  }
+
+  stopScreenPermissionWatcher();
+
+  if (updateCheckTimer) {
+    clearInterval(updateCheckTimer);
+    updateCheckTimer = null;
+  }
+
+  if (logger && typeof logger.shutdown === 'function') {
+    logger.shutdown();
+  }
+}
+
+function requestControlledShutdown(mode, options) {
+  var shutdownOptions = options || {};
+
+  shutdownMode = mode;
+  isQuitting = true;
+  shutdownCleanupCompleted = false;
+  forceCloseAttempts = Math.max(forceCloseAttempts, 3);
+
+  if (windowRecreateTimer) {
+    clearTimeout(windowRecreateTimer);
+    windowRecreateTimer = null;
+  }
+
+  if (shutdownOptions.relaunch) {
+    app.relaunch();
+  }
+
+  if (shutdownFallbackTimer) {
+    clearTimeout(shutdownFallbackTimer);
+  }
+
+  shutdownFallbackTimer = setTimeout(function () {
+    performShutdownCleanup('forced-' + mode + '-shutdown');
+    app.exit(0);
+  }, shutdownOptions.forceExitAfterMs || 10000);
+
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    try {
+      mainWindow.close();
+    } catch (error) {
+      logger.log('warn', 'Main', 'Primary close during ' + mode + ' shutdown failed: ' + error.message);
+    }
+
+    setTimeout(function () {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        try {
+          mainWindow.destroy();
+        } catch (destroyError) {
+          logger.log('warn', 'Main', 'Forced destroy during ' + mode + ' shutdown failed: ' + destroyError.message);
+        }
+      }
+
+      app.quit();
+    }, shutdownOptions.quitDelayMs || 150);
+
+    return;
+  }
+
+  app.quit();
+}
+
+function shellQuote(value) {
+  return "'" + String(value).split("'").join("'\\''") + "'";
+}
+
+function attachDmg(dmgPath) {
+  return new Promise(function (resolve, reject) {
+    var child = spawn('/usr/bin/hdiutil', ['attach', dmgPath, '-nobrowse', '-noautoopen', '-mountrandom', '/tmp', '-plist']);
+    var stdout = '';
+    var stderr = '';
+
+    child.stdout.on('data', function (data) {
+      stdout += data.toString();
+    });
+
+    child.stderr.on('data', function (data) {
+      stderr += data.toString();
+    });
+
+    child.on('close', function (code) {
+      if (code !== 0) {
+        reject(new Error('Failed to mount DMG (code ' + code + '): ' + stderr.trim()));
+        return;
+      }
+
+      var matches = Array.from(stdout.matchAll(/<key>mount-point<\/key>\s*<string>([^<]+)<\/string>/g));
+      if (!matches.length) {
+        reject(new Error('Could not determine DMG mount point'));
+        return;
+      }
+
+      resolve(matches[matches.length - 1][1].trim());
+    });
+
+    child.on('error', reject);
+  });
 }
 
 /**
@@ -3617,6 +3648,11 @@ app.whenReady().then(async function () {
 });
 
 app.on('window-all-closed', function () {
+  if (isMaintenanceShutdownActive() || isQuitting) {
+    logger.log('info', 'Main', 'All windows closed during shutdown');
+    return;
+  }
+
   // FORCE PERSISTENT: Never quit when windows are closed
   // Instead, recreate the window
   logger.log('warn', 'Main', 'All windows closed - recreating (force persistent mode)');
@@ -3624,6 +3660,12 @@ app.on('window-all-closed', function () {
 });
 
 app.on('before-quit', function (event) {
+  if (isMaintenanceShutdownActive()) {
+    isQuitting = true;
+    performShutdownCleanup(shutdownMode + '-shutdown');
+    return;
+  }
+
   // Intercept quit attempts - only allow after multiple force-close attempts
   if (forceCloseAttempts < 3) {
     event.preventDefault();
@@ -3644,16 +3686,8 @@ app.on('before-quit', function (event) {
 
   // After 3 attempts, allow quit — stop guardian so it doesn't restart us
   isQuitting = true;
-  stopGuardian();
-  screenshotService.stop();
-  socketHandler.disconnect();
-  // Clean up monitoring intervals
-  if (networkCheckInterval) { clearInterval(networkCheckInterval); networkCheckInterval = null; }
-  if (whitescreenCheckInterval) { clearInterval(whitescreenCheckInterval); whitescreenCheckInterval = null; }
-  stopScreenPermissionWatcher();
-  // Flush remaining log buffer to disk
-  logger.shutdown();
   logger.log('info', 'Main', 'App quitting after ' + forceCloseAttempts + ' force-close attempts');
+  performShutdownCleanup('forced-user-quit');
 });
 
 // Handle uncaught exceptions - NEVER let the app crash

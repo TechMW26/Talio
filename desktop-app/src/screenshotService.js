@@ -1,5 +1,5 @@
 /**
- * Screenshot Service v6.0.1
+ * Screenshot Service v6.0.2
  * Handles automatic screen capture with ImageKit uploads
  * Uses main-process desktopCapturer via IPC (Electron 35+ compatibility)
  */
