@@ -2,7 +2,7 @@
  * Seed Initial SuperAdmin User
  * 
  * Run this script to create the first superadmin user:
- * node scripts/seed-superadmin.js
+ * SUPERADMIN_PASSWORD='your-password' node scripts/seed-superadmin.js
  */
 
 const mongoose = require('mongoose');
@@ -79,9 +79,13 @@ async function seedSuperAdmin() {
   console.log('🚀 Starting SuperAdmin seed...');
   
   // SuperAdmin credentials
-  const SUPERADMIN_EMAIL = 'avi2001raj@gmail.com';
-  const SUPERADMIN_PASSWORD = 'Mansiavi@2001';
-  const SUPERADMIN_NAME = 'Aviraj Sharma';
+  const SUPERADMIN_EMAIL = process.env.SUPERADMIN_EMAIL || 'avi2001raj@gmail.com';
+  const SUPERADMIN_PASSWORD = process.env.SUPERADMIN_PASSWORD;
+  const SUPERADMIN_NAME = process.env.SUPERADMIN_NAME || 'Aviraj Sharma';
+
+  if (!SUPERADMIN_PASSWORD) {
+    throw new Error('SUPERADMIN_PASSWORD environment variable is required');
+  }
 
   try {
     // Connect to superadmin database
