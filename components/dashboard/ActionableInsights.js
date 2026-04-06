@@ -82,13 +82,13 @@ function TicTacToeCard() {
   // ── Searching for opponent ──
   if (phase === 'searching') {
     return (
-      <div className="rounded-2xl p-4 bg-white dark:bg-slate-800/60 border border-gray-100 dark:border-slate-700/50 shadow-sm flex flex-col">
+      <div className="rounded-2xl p-4 bg-white dark:bg-zinc-800/60 border border-gray-100 dark:border-zinc-700/50 shadow-sm flex flex-col">
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400">
             <HiOutlineTrophy className="w-4 h-4" />
             <span>Find Opponent</span>
           </div>
-          <button onClick={() => { setPhase('idle'); setSearchQuery(''); setSearchResults([]) }} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700">
+          <button onClick={() => { setPhase('idle'); setSearchQuery(''); setSearchResults([]) }} className="p-1 rounded-lg hover:bg-gray-100 dark:hover:bg-zinc-700">
             <HiOutlineXMark className="w-4 h-4 text-gray-400" />
           </button>
         </div>
@@ -112,7 +112,7 @@ function TicTacToeCard() {
             <button
               key={u._id}
               onClick={() => handleInvite(u)}
-              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors text-left"
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-50 dark:hover:bg-zinc-700/50 transition-colors text-left"
             >
               {u.avatar ? (
                 <img src={u.avatar} alt="" className="w-6 h-6 rounded-full object-cover" />
@@ -131,7 +131,7 @@ function TicTacToeCard() {
 
   // ── Idle state ──
   return (
-    <div className="rounded-2xl bg-white dark:bg-slate-800/60 border border-gray-100 dark:border-slate-700/50 shadow-sm flex flex-col min-h-[140px] relative overflow-hidden">
+    <div className="rounded-2xl bg-white dark:bg-zinc-800/60 border border-gray-100 dark:border-zinc-700/50 shadow-sm flex flex-col min-h-[140px] relative overflow-hidden">
       {hasIncomingInvite && (
         <span className="absolute top-3 right-3 w-3 h-3 rounded-full bg-amber-400 animate-pulse" />
       )}
@@ -216,7 +216,7 @@ function LocationMapCard() {
   }, [])
 
   return (
-    <div className="rounded-2xl bg-white dark:bg-slate-800/60 border border-gray-100 dark:border-slate-700/50 shadow-sm overflow-hidden flex flex-col min-h-[140px]">
+    <div className="rounded-2xl bg-white dark:bg-zinc-800/60 border border-gray-100 dark:border-zinc-700/50 shadow-sm overflow-hidden flex flex-col min-h-[140px]">
       <div className="flex items-center justify-between px-5 pt-4 pb-2">
         <div className="flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400">
           <HiOutlineMapPin className="w-4 h-4" />
@@ -267,10 +267,10 @@ function FocusTimerCard() {
   const [picking, setPicking] = useState(false)
 
   return (
-    <div className={`rounded-2xl p-5 bg-white dark:bg-slate-800/60 border shadow-sm flex flex-col justify-between min-h-[140px] transition-all ${
+    <div className={`rounded-2xl p-5 bg-white dark:bg-zinc-800/60 border shadow-sm flex flex-col justify-between min-h-[140px] transition-all ${
       alarming
         ? 'border-red-300 dark:border-red-500/50 ring-2 ring-red-400/50 animate-pulse'
-        : 'border-gray-100 dark:border-slate-700/50'
+        : 'border-gray-100 dark:border-zinc-700/50'
     }`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400">
@@ -284,7 +284,7 @@ function FocusTimerCard() {
               ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 animate-pulse'
               : done
                 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
-                : 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600'
+                : 'bg-gray-100 text-gray-600 dark:bg-zinc-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-zinc-600'
           } ${running || alarming ? 'cursor-default' : 'cursor-pointer'}`}
         >
           {alarming ? '⏰ Alarm!' : done ? 'Done!' : `${duration} min`}
@@ -300,7 +300,7 @@ function FocusTimerCard() {
               className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${
                 m === duration
                   ? 'bg-indigo-500 text-white'
-                  : 'bg-gray-50 dark:bg-slate-700/50 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700'
+                  : 'bg-gray-50 dark:bg-zinc-700/50 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-700'
               }`}
             >
               {m}m
@@ -316,7 +316,7 @@ function FocusTimerCard() {
       )}
 
       {/* Progress bar */}
-      <div className="h-1.5 rounded-full bg-gray-100 dark:bg-slate-700 overflow-hidden mb-3">
+      <div className="h-1.5 rounded-full bg-gray-100 dark:bg-zinc-700 overflow-hidden mb-3">
         <div
           className="h-full rounded-full transition-all duration-1000"
           style={{ width: `${pct}%`, backgroundColor: alarming ? '#EF4444' : done ? '#10B981' : '#6366F1' }}
@@ -334,7 +334,7 @@ function FocusTimerCard() {
         <div className="flex items-center justify-center gap-3">
           <button
             onClick={toggle}
-            className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+            className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors"
             title={done ? 'Restart' : running ? 'Pause' : 'Start'}
           >
             {done
@@ -346,7 +346,7 @@ function FocusTimerCard() {
           {!done && (
             <button
               onClick={reset}
-              className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+              className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors"
               title="Reset"
             >
               <HiOutlineArrowPath className="w-5 h-5 text-gray-400" />
@@ -410,14 +410,14 @@ function CalculatorCard() {
   const btnClass = 'flex items-center justify-center rounded-xl text-sm font-semibold h-9 transition-colors'
 
   return (
-    <div className="rounded-2xl p-5 bg-white dark:bg-slate-800/60 border border-gray-100 dark:border-slate-700/50 shadow-sm flex flex-col min-h-[140px]">
+    <div className="rounded-2xl p-5 bg-white dark:bg-zinc-800/60 border border-gray-100 dark:border-zinc-700/50 shadow-sm flex flex-col min-h-[140px]">
       <div className="flex items-center gap-2 text-xs font-medium text-gray-500 dark:text-gray-400 mb-3">
         <HiOutlineCalculator className="w-4 h-4" />
         <span>Calculator</span>
       </div>
 
       {/* Display */}
-      <div className="bg-gray-50 dark:bg-slate-900/50 rounded-xl px-4 py-3 mb-3 text-right">
+      <div className="bg-gray-50 dark:bg-zinc-900/50 rounded-xl px-4 py-3 mb-3 text-right">
         {op && <p className="text-[10px] text-gray-400 dark:text-gray-500">{prev} {op}</p>}
         <p className="text-2xl font-extrabold text-gray-900 dark:text-white tabular-nums truncate">{display}</p>
       </div>
@@ -428,17 +428,17 @@ function CalculatorCard() {
         <button onClick={() => operate('÷')} className={`${btnClass} bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100`}>÷</button>
         <button onClick={() => operate('×')} className={`${btnClass} bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100`}>×</button>
 
-        {['7','8','9'].map(d => <button key={d} onClick={() => input(d)} className={`${btnClass} bg-gray-50 dark:bg-slate-700/50 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700`}>{d}</button>)}
+        {['7','8','9'].map(d => <button key={d} onClick={() => input(d)} className={`${btnClass} bg-gray-50 dark:bg-zinc-700/50 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-zinc-700`}>{d}</button>)}
         <button onClick={() => operate('-')} className={`${btnClass} bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100`}>−</button>
 
-        {['4','5','6'].map(d => <button key={d} onClick={() => input(d)} className={`${btnClass} bg-gray-50 dark:bg-slate-700/50 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700`}>{d}</button>)}
+        {['4','5','6'].map(d => <button key={d} onClick={() => input(d)} className={`${btnClass} bg-gray-50 dark:bg-zinc-700/50 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-zinc-700`}>{d}</button>)}
         <button onClick={() => operate('+')} className={`${btnClass} bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100`}>+</button>
 
-        {['1','2','3'].map(d => <button key={d} onClick={() => input(d)} className={`${btnClass} bg-gray-50 dark:bg-slate-700/50 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700`}>{d}</button>)}
+        {['1','2','3'].map(d => <button key={d} onClick={() => input(d)} className={`${btnClass} bg-gray-50 dark:bg-zinc-700/50 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-zinc-700`}>{d}</button>)}
         <button onClick={equals} className={`${btnClass} bg-emerald-500 text-white hover:bg-emerald-600 row-span-2`}>=</button>
 
-        <button onClick={() => input('0')} className={`${btnClass} bg-gray-50 dark:bg-slate-700/50 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700 col-span-2`}>0</button>
-        <button onClick={() => input('.')} className={`${btnClass} bg-gray-50 dark:bg-slate-700/50 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-slate-700`}>.</button>
+        <button onClick={() => input('0')} className={`${btnClass} bg-gray-50 dark:bg-zinc-700/50 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-zinc-700 col-span-2`}>0</button>
+        <button onClick={() => input('.')} className={`${btnClass} bg-gray-50 dark:bg-zinc-700/50 text-gray-800 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-zinc-700`}>.</button>
       </div>
     </div>
   )
@@ -500,13 +500,13 @@ function StickyNoteCard() {
           <textarea
             value={draft}
             onChange={e => setDraft(e.target.value)}
-            className="flex-1 text-sm bg-white dark:bg-slate-800 rounded-xl p-3 border border-amber-200 dark:border-amber-800/50 resize-none focus:outline-none focus:ring-2 focus:ring-amber-400/50 text-gray-800 dark:text-gray-200 min-h-[60px]"
+            className="flex-1 text-sm bg-white dark:bg-zinc-800 rounded-xl p-3 border border-amber-200 dark:border-amber-800/50 resize-none focus:outline-none focus:ring-2 focus:ring-amber-400/50 text-gray-800 dark:text-gray-200 min-h-[60px]"
             placeholder="Type your note..."
             autoFocus
             maxLength={500}
           />
           <div className="flex gap-2 justify-end">
-            <button onClick={() => setEditing(false)} className="text-xs px-3 py-1 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">Cancel</button>
+            <button onClick={() => setEditing(false)} className="text-xs px-3 py-1 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors">Cancel</button>
             <button onClick={save} className="text-xs px-3 py-1 rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors font-medium">Save</button>
           </div>
         </div>

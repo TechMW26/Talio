@@ -182,7 +182,7 @@ export default function CoursesPage() {
                 startContent={<FaSearch className="text-default-400" />}
                 variant="bordered"
                 classNames={{
-                  inputWrapper: "bg-default-50 dark:bg-[#1E293B] shadow-none",
+                  inputWrapper: "bg-default-50 dark:bg-[#18181b] shadow-none",
                 }}
               />
             </div>

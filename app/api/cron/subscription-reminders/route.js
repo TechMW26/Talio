@@ -88,7 +88,7 @@ async function sendReminderToCompany(transporter, company, threshold, remainingD
       <div style="padding: 30px; background: #f8fafc;">
         <h2 style="color: #1e293b;">Subscription Renewal Reminder</h2>
         
-        <p style="color: #475569; font-size: 16px;">
+        <p style="color: #3f3f46; font-size: 16px;">
           Dear <strong>${company.primaryContact?.name || company.name} Admin</strong>,
         </p>
         
@@ -127,7 +127,7 @@ async function sendReminderToCompany(transporter, company, threshold, remainingD
           </table>
         </div>
         
-        <p style="color: #475569; font-size: 16px;">
+        <p style="color: #3f3f46; font-size: 16px;">
           To ensure uninterrupted access to Talio HRMS, please renew your subscription before the expiry date.
         </p>
         

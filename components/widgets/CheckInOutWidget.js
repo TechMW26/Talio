@@ -86,12 +86,12 @@ export default function CheckInOutWidget({
 
   return (
     <Card
-      className="relative shadow-xl overflow-hidden h-full bg-gradient-to-br from-primary-500 via-primary-600 to-secondary-600 dark:from-[#0F172A] dark:via-[#162644] dark:to-[#1a2744]"
+      className="relative shadow-xl overflow-hidden h-full bg-gradient-to-br from-primary-500 via-primary-600 to-secondary-600 dark:from-[#09090b] dark:via-[#09090b] dark:to-[#09090b]"
       radius="lg"
     >
       {/* Decorative elements */}
-      <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 dark:bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
-      <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/10 dark:bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2 blur-2xl" />
+      <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 dark:bg-white/[0.03] rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl" />
+      <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/10 dark:bg-white/[0.03] rounded-full translate-y-1/2 -translate-x-1/2 blur-2xl" />
 
       <CardBody className="p-5 sm:p-6 text-white h-full flex flex-col justify-between relative z-10">
         {/* Profile Row */}

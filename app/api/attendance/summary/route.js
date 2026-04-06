@@ -23,6 +23,80 @@ export async function GET(request) {
     }
 
     const { searchParams } = new URL(request.url)
+    const employeeId = searchParams.get('employeeId')
+
+    // ── Per-employee monthly summary (used by AttendanceSummaryWidget) ──
+    if (employeeId) {
+      if (!employeeId.match(/^[a-f\d]{24}$/i)) {
+        return NextResponse.json({ success: false, message: 'Invalid employeeId' }, { status: 400 })
+      }
+
+      const now = new Date()
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
+
+      const empCacheKey = buildCacheKey({
+        tenantId: tenant?.databaseName,
+        role: user.role,
+        userId: employeeId,
+        namespace: 'attendance-summary-employee',
+        params: { month: now.toISOString().slice(0, 7) }
+      })
+
+      const empCached = await getCache(empCacheKey)
+      if (empCached) {
+        return NextResponse.json(empCached)
+      }
+
+      const records = await Attendance.find({
+        employee: employeeId,
+        date: { $gte: monthStart, $lte: monthEnd }
+      }).lean()
+
+      let presentDays = 0
+      let absentDays = 0
+      let lateDays = 0
+      let totalHours = 0
+      let workedDays = 0
+
+      for (const r of records) {
+        if (r.status === 'present' || r.status === 'in-progress') {
+          presentDays++
+        } else if (r.status === 'absent') {
+          absentDays++
+        } else if (r.status === 'half-day') {
+          presentDays++ // still counts as a day present (partial)
+        }
+
+        if (r.checkInStatus === 'late') {
+          lateDays++
+        }
+
+        const hrs = r.workHours || r.totalLoggedHours || 0
+        if (hrs > 0) {
+          totalHours += hrs
+          workedDays++
+        }
+      }
+
+      const avgHours = workedDays > 0 ? (totalHours / workedDays).toFixed(1) : '0'
+
+      const empResponse = {
+        success: true,
+        data: {
+          presentDays,
+          absentDays,
+          lateDays,
+          avgHours,
+          month: now.toLocaleString('default', { month: 'long' }),
+        }
+      }
+
+      await setCache(empCacheKey, empResponse, 2 * 60)
+      return NextResponse.json(empResponse)
+    }
+
+    // ── Company-wide summary (existing logic) ──
     const daysParam = searchParams.get('days')
     const parsedDays = daysParam ? Number.parseInt(daysParam, 10) : NaN
     const days = Number.isInteger(parsedDays) ? parsedDays : 7
@@ -82,7 +156,7 @@ export async function GET(request) {
           },
           late: {
             $sum: {
-              $cond: [{ $eq: ["$status", "late"] }, 1, 0]
+              $cond: [{ $eq: ["$checkInStatus", "late"] }, 1, 0]
             }
           },
           halfDay: {
@@ -139,29 +213,27 @@ export async function GET(request) {
       },
       {
         $group: {
-          _id: "$status",
-          count: { $sum: 1 }
+          _id: null,
+          present: { $sum: { $cond: [{ $in: ["$status", ["present", "in-progress"]] }, 1, 0] } },
+          absent: { $sum: { $cond: [{ $eq: ["$status", "absent"] }, 1, 0] } },
+          halfDay: { $sum: { $cond: [{ $eq: ["$status", "half-day"] }, 1, 0] } },
+          onLeave: { $sum: { $cond: [{ $eq: ["$status", "on-leave"] }, 1, 0] } },
+          late: { $sum: { $cond: [{ $eq: ["$checkInStatus", "late"] }, 1, 0] } },
+          total: { $sum: 1 }
         }
       }
     ])
 
+    const todayAgg = todayAttendance[0] || {}
     const todayStats = {
-      present: 0,
-      absent: 0,
-      late: 0,
-      halfDay: 0,
-      onLeave: 0
+      present: todayAgg.present || 0,
+      absent: todayAgg.absent || 0,
+      late: todayAgg.late || 0,
+      halfDay: todayAgg.halfDay || 0,
+      onLeave: todayAgg.onLeave || 0
     }
 
-    let todayRecordCount = 0
-    todayAttendance.forEach(item => {
-      todayRecordCount += item.count
-      if (item._id === 'present' || item._id === 'in-progress') todayStats.present += item.count // in-progress = checked in but not checked out
-      else if (item._id === 'absent') todayStats.absent = item.count
-      else if (item._id === 'late') todayStats.late = item.count
-      else if (item._id === 'half-day') todayStats.halfDay = item.count
-      else if (item._id === 'on-leave') todayStats.onLeave = item.count
-    })
+    const todayRecordCount = todayAgg.total || 0
 
     // Calculate employees missing from today's records (no attendance record = effectively absent)
     const todayMissing = Math.max(0, totalEmployees - todayRecordCount)

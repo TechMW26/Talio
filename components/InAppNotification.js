@@ -202,7 +202,7 @@ export default function InAppNotification({ notification, onClose }) {
         }
       }}
       style={{
-        backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+        backgroundColor: isDarkMode ? '#18181b' : '#FFFFFF',
         borderColor: progressColor,
         borderWidth: '2px',
         pointerEvents: 'auto'
@@ -239,7 +239,7 @@ export default function InAppNotification({ notification, onClose }) {
                   handleClose()
                 }}
                 className="flex-shrink-0 transition-colors p-1 rounded-full"
-                style={{ color: isDarkMode ? '#64748B' : '#9CA3AF' }}
+                style={{ color: isDarkMode ? '#71717a' : '#9CA3AF' }}
                 aria-label="Close notification"
               >
                 <FaTimes className="w-3.5 h-3.5" />
@@ -258,7 +258,7 @@ export default function InAppNotification({ notification, onClose }) {
       </div>
 
       {/* Animated progress bar */}
-      <div className="h-1" style={{ backgroundColor: isDarkMode ? '#334155' : '#F3F4F6' }}>
+      <div className="h-1" style={{ backgroundColor: isDarkMode ? '#27272a' : '#F3F4F6' }}>
         <div
           className="h-full transition-all duration-[5000ms] ease-linear"
           style={{

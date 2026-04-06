@@ -210,7 +210,7 @@ export default function ActiveSessionsSection() {
                 className={`p-4 rounded-2xl border transition-colors ${
                   session.isCurrent
                     ? 'bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-800'
-                    : 'bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-700 hover:border-slate-200'
+                    : 'bg-slate-50 dark:bg-zinc-800/50 border-slate-100 dark:border-zinc-700 hover:border-slate-200'
                 }`}
               >
                 <div className="flex items-center gap-3">

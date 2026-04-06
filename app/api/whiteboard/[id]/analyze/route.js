@@ -588,9 +588,9 @@ HEADERS (bold text labels):
 }
 
 ARROWS (show relationships - USE VARIETY):
-• Straight: { "type": "arrow", "points": [{"x": 280, "y": 160}, {"x": 340, "y": 160}], "strokeColor": "#64748B", "strokeWidth": 2, "arrowType": "straight" }
+• Straight: { "type": "arrow", "points": [{"x": 280, "y": 160}, {"x": 340, "y": 160}], "strokeColor": "#71717a", "strokeWidth": 2, "arrowType": "straight" }
 • Curved: { "type": "arrow", "points": [{"x": 280, "y": 160}, {"x": 380, "y": 220}], "strokeColor": "#8B5CF6", "strokeWidth": 2, "arrowType": "curved" }
-• Elbow: { "type": "arrow", "points": [{"x": 280, "y": 160}, {"x": 280, "y": 300}], "strokeColor": "#64748B", "strokeWidth": 2, "arrowType": "elbow" }
+• Elbow: { "type": "arrow", "points": [{"x": 280, "y": 160}, {"x": 280, "y": 300}], "strokeColor": "#71717a", "strokeWidth": 2, "arrowType": "elbow" }
 • Dotted: Add "lineStyle": "dotted" for secondary connections
 • Dashed: Add "lineStyle": "dashed" for optional/weak connections
 
@@ -598,7 +598,7 @@ SHAPES (visual variety - mix these in):
 • Ellipse: { "type": "ellipse", "x": 100, "y": 100, "width": 140, "height": 80, "strokeColor": "#6366F1", "fillColor": "#EEF2FF", "strokeWidth": 2 }
 • Diamond: { "type": "diamond", "x": 100, "y": 100, "width": 100, "height": 100, "strokeColor": "#F59E0B", "fillColor": "#FEF3C7" }
 • Star: { "type": "star", "x": 100, "y": 100, "width": 60, "height": 60, "strokeColor": "#EAB308", "fillColor": "#FEF9C3" }
-• Rect: { "type": "rect", "x": 100, "y": 100, "width": 250, "height": 400, "strokeColor": "#CBD5E1", "fillColor": "transparent", "lineStyle": "dashed" }
+• Rect: { "type": "rect", "x": 100, "y": 100, "width": 250, "height": 400, "strokeColor": "#d4d4d8", "fillColor": "transparent", "lineStyle": "dashed" }
 
 ═══════════════════════════════════════════════════════════
 🎨 COLOR SYSTEM (Professional Pastel Palette)
@@ -618,7 +618,7 @@ Accents:
 
 Strokes/Connectors:
 • Dark Gray: #374151 - Primary text
-• Slate: #64748B - Arrows, borders
+• Slate: #71717a - Arrows, borders
 • Light Slate: #94A3B8 - Secondary connections
 
 ═══════════════════════════════════════════════════════════
@@ -991,7 +991,7 @@ Return ONLY valid JSON:
             return { ...baseObj, fontSize: baseObj.fontSize || 20, fillColor: baseObj.fillColor || '#1F2937', fontWeight: baseObj.fontWeight || 'bold', width: 300, height: 50 };
           } else if (baseObj.type === 'arrow' || baseObj.type === 'line') {
             if (!baseObj.points || baseObj.points.length < 2) return null;
-            return { ...baseObj, strokeColor: baseObj.strokeColor || '#64748B', strokeWidth: baseObj.strokeWidth || 2 };
+            return { ...baseObj, strokeColor: baseObj.strokeColor || '#71717a', strokeWidth: baseObj.strokeWidth || 2 };
           } else {
             return { ...baseObj, strokeColor: baseObj.strokeColor || '#94A3B8', strokeWidth: baseObj.strokeWidth || 2, fillColor: baseObj.fillColor || 'transparent', borderRadius: baseObj.borderRadius || 8 };
           }
@@ -1069,7 +1069,7 @@ RESTRUCTURING RULES:
 6. APPLY professional colors:
    - Stickies: Use pastel colors (#FEF3C7, #A7F3D0, #BAE6FD, #DDD6FE, #FECDD3)
    - Borders: Use #94A3B8 (slate gray)
-   - Text: Use #475569 (slate 600)
+   - Text: Use #3f3f46 (slate 600)
 7. ADD border radius (12-16px) to all rectangles and stickies
 8. PRESERVE all text content exactly as-is
 9. MAINTAIN the logical groupings and relationships
@@ -1115,9 +1115,9 @@ Return ONLY valid JSON array. No explanations.`;
             baseObj.borderRadius = baseObj.borderRadius || 12;
             baseObj.strokeColor = baseObj.strokeColor || '#94A3B8';
           } else if (baseObj.type === 'text') {
-            baseObj.fillColor = baseObj.fillColor || '#475569';
+            baseObj.fillColor = baseObj.fillColor || '#3f3f46';
           } else if (baseObj.type === 'arrow' || baseObj.type === 'line') {
-            baseObj.strokeColor = baseObj.strokeColor || '#64748B';
+            baseObj.strokeColor = baseObj.strokeColor || '#71717a';
           }
 
           // Snap positions to grid (20px)
@@ -2713,7 +2713,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
                   { x: prevCenterX, y: prevBottomY },
                   { x: diamondCenterX, y: diamondPos.y }
                 ],
-                strokeColor: '#64748B',
+                strokeColor: '#71717a',
                 strokeWidth: 2,
                 connectorStyle: 'bezier',
                 curvature: 0.3,
@@ -2902,7 +2902,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
                   { x: prevCenterX, y: prevBottomY },
                   { x: stepCenterX, y: stepPos.y }
                 ],
-                strokeColor: '#64748B',
+                strokeColor: '#71717a',
                 strokeWidth: 2,
                 connectorStyle: 'bezier',
                 curvature: 0.3,
@@ -3028,7 +3028,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
               { x: prevCenterX, y: prevBottomY },
               { x: endPos.x + endWidth/2, y: endPos.y }
             ],
-            strokeColor: '#64748B',
+            strokeColor: '#71717a',
             strokeWidth: 2,
             connectorStyle: 'bezier',
             curvature: 0.3,
@@ -3469,7 +3469,7 @@ Return ONLY the updated JSON structure (same format as input, but modified):
             { fill: '#3B82F6', stroke: '#2563EB', light: '#DBEAFE', text: '#FFFFFF' },
             { fill: '#EF4444', stroke: '#DC2626', light: '#FEE2E2', text: '#FFFFFF' },
             { fill: '#1F2937', stroke: '#111827', light: '#F3F4F6', text: '#FFFFFF' },
-            { fill: '#64748B', stroke: '#475569', light: '#F1F5F9', text: '#FFFFFF' },
+            { fill: '#71717a', stroke: '#3f3f46', light: '#F1F5F9', text: '#FFFFFF' },
             { fill: '#22C55E', stroke: '#16A34A', light: '#DCFCE7', text: '#FFFFFF' },
             { fill: '#7C3AED', stroke: '#6D28D9', light: '#EDE9FE', text: '#FFFFFF' },
           ];

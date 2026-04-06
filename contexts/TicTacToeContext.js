@@ -358,7 +358,7 @@ export function TicTacToeProvider({ children }) {
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={phase === 'result' || phase === 'invite-incoming' ? closeGame : undefined} />
 
           {/* Popup card */}
-          <div className="relative w-full max-w-md bg-white dark:bg-slate-800 rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+          <div className="relative w-full max-w-md bg-white dark:bg-zinc-800 rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
             {/* Header */}
             <div className="flex items-center justify-between px-8 pt-6 pb-4">
               <div className="flex items-center gap-2">
@@ -372,7 +372,7 @@ export function TicTacToeProvider({ children }) {
               </div>
               <button
                 onClick={closeGame}
-                className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+                className="p-1.5 rounded-xl hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors"
               >
                 <HiOutlineXMark className="w-5 h-5 text-gray-400" />
               </button>
@@ -395,7 +395,7 @@ export function TicTacToeProvider({ children }) {
                   <div className="flex gap-4">
                     <button
                       onClick={declineInvite}
-                      className="flex-1 py-3 rounded-xl border border-gray-200 dark:border-slate-600 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                      className="flex-1 py-3 rounded-xl border border-gray-200 dark:border-zinc-600 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-700 transition-colors"
                     >
                       Decline
                     </button>
@@ -435,7 +435,7 @@ export function TicTacToeProvider({ children }) {
                       <div className={`inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-bold ${result?.winner === mySymbol
                         ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
                         : result?.winner === 'draw'
-                          ? 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300'
+                          ? 'bg-gray-100 text-gray-600 dark:bg-zinc-700 dark:text-gray-300'
                           : 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400'
                         }`}>
                         {result?.winner === mySymbol ? '🎉 You won!' : result?.winner === 'draw' ? "🤝 It's a draw!" : '😔 You lost!'}
@@ -475,7 +475,7 @@ export function TicTacToeProvider({ children }) {
                           disabled={!isMyTurn || !!cell || !!result}
                           className={`w-20 h-20 rounded-2xl text-3xl font-extrabold flex items-center justify-center transition-all
                             ${!cell && isMyTurn && !result ? 'hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:scale-105 cursor-pointer' : 'cursor-default'}
-                            ${isWinCell ? 'bg-emerald-100 dark:bg-emerald-900/30 ring-2 ring-emerald-400 scale-105' : 'bg-gray-100 dark:bg-slate-700'}
+                            ${isWinCell ? 'bg-emerald-100 dark:bg-emerald-900/30 ring-2 ring-emerald-400 scale-105' : 'bg-gray-100 dark:bg-zinc-700'}
                             ${cell === 'X' ? 'text-indigo-600 dark:text-indigo-400' : 'text-rose-500 dark:text-rose-400'}
                           `}
                         >
@@ -490,7 +490,7 @@ export function TicTacToeProvider({ children }) {
                     <div className="flex gap-4 mt-6">
                       <button
                         onClick={closeGame}
-                        className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-slate-600 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+                        className="flex-1 py-2.5 rounded-xl border border-gray-200 dark:border-zinc-600 text-sm font-semibold text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-zinc-700 transition-colors"
                       >
                         Close
                       </button>

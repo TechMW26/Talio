@@ -446,11 +446,11 @@ function createWindow() {
     titleBarStyle: 'hidden',
     titleBarOverlay: process.platform === 'win32' ? {
       color: '#00000000',
-      symbolColor: '#64748B',
+      symbolColor: '#71717a',
       height: 36
     } : {
       color: '#ffffff',
-      symbolColor: '#64748B',
+      symbolColor: '#71717a',
       height: 44
     },
     trafficLightPosition: { x: 18, y: 15 },
@@ -1756,7 +1756,7 @@ function setupIPCHandlers() {
       var overlayColor = process.platform === 'win32' ? '#00000000' : hexColor;
       mainWindow.setTitleBarOverlay({
         color: overlayColor,
-        symbolColor: isDark ? '#E2E8F0' : '#64748B',
+        symbolColor: isDark ? '#e4e4e7' : '#71717a',
         height: process.platform === 'win32' ? 32 : 40
       });
       mainWindow.setBackgroundColor(hexColor);

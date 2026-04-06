@@ -227,7 +227,7 @@ export default function EmployeeRatingsPage() {
                 size="sm"
                 variant="bordered"
                 classNames={{
-                  inputWrapper: "bg-default-50 dark:bg-[#1E293B] shadow-none",
+                  inputWrapper: "bg-default-50 dark:bg-[#18181b] shadow-none",
                 }}
               />
             </div>

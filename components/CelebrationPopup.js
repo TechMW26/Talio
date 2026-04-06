@@ -154,7 +154,7 @@ function PersonCard({ person, type, index }) {
         }}
         transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
       >
-        <div className="w-24 h-24 rounded-full bg-white dark:bg-slate-800 overflow-hidden ring-2 ring-white/50 dark:ring-slate-700/50">
+        <div className="w-24 h-24 rounded-full bg-white dark:bg-zinc-800 overflow-hidden ring-2 ring-white/50 dark:ring-zinc-700/50">
           {person.profilePicture ? (
             <img
               src={person.profilePicture}
@@ -178,7 +178,7 @@ function PersonCard({ person, type, index }) {
           {person.firstName} {person.lastName}
         </h3>
         {person.department && (
-          <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">{person.department}</p>
+          <p className="text-sm text-slate-500 dark:text-zinc-400 font-medium">{person.department}</p>
         )}
         {type === 'anniversary' && person.years && (
           <motion.p

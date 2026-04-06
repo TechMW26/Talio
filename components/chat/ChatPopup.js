@@ -974,8 +974,8 @@ export default function ChatPopup({ chat, index }) {
                 e.stopPropagation()
                 closeChat?.(chat._id)
               }}
-              className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-600 rounded-lg transition-all flex-shrink-0 hover:scale-110"
-              style={{ backgroundColor: isDarkMode ? '#334155' : 'white' }}
+              className="p-1.5 hover:bg-gray-100 dark:hover:bg-zinc-600 rounded-lg transition-all flex-shrink-0 hover:scale-110"
+              style={{ backgroundColor: isDarkMode ? '#27272a' : 'white' }}
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512" className="w-3 h-3" fill={primaryDark}>
                 <path d="M342.6 150.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0L192 210.7 86.6 105.4c-12.5-12.5-32.8-12.5-45.3 0s-12.5 32.8 0 45.3L146.7 256 41.4 361.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L192 301.3 297.4 406.6c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L237.3 256 342.6 150.6z" />
@@ -1051,7 +1051,7 @@ export default function ChatPopup({ chat, index }) {
                   setShowMembersPanel(!showMembersPanel)
                 }}
                 className={`p-2 rounded-lg transition-all hover:scale-110 ${showMembersPanel ? 'ring-2 ring-white/50' : ''}`}
-                style={{ backgroundColor: isDarkMode ? '#334155' : 'white' }}
+                style={{ backgroundColor: isDarkMode ? '#27272a' : 'white' }}
                 title="View Members"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512" className="w-3.5 h-3.5" fill={primaryDark}>
@@ -1064,8 +1064,8 @@ export default function ChatPopup({ chat, index }) {
                 e.stopPropagation()
                 setIsExpanded(!isExpanded)
               }}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-slate-600 rounded-lg transition-all hover:scale-110"
-              style={{ backgroundColor: isDarkMode ? '#334155' : 'white' }}
+              className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-600 rounded-lg transition-all hover:scale-110"
+              style={{ backgroundColor: isDarkMode ? '#27272a' : 'white' }}
               title={isExpanded ? 'Collapse' : 'Expand'}
             >
               {isExpanded ? (
@@ -1083,8 +1083,8 @@ export default function ChatPopup({ chat, index }) {
                 e.stopPropagation()
                 handleMinimize()
               }}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-slate-600 rounded-lg transition-all hover:scale-110"
-              style={{ backgroundColor: isDarkMode ? '#334155' : 'white' }}
+              className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-600 rounded-lg transition-all hover:scale-110"
+              style={{ backgroundColor: isDarkMode ? '#27272a' : 'white' }}
               title="Minimize"
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512" className="w-3.5 h-3.5" fill={primaryDark}>
@@ -1096,8 +1096,8 @@ export default function ChatPopup({ chat, index }) {
                 e.stopPropagation()
                 closeChat?.(chat._id)
               }}
-              className="p-2 hover:bg-gray-100 dark:hover:bg-slate-600 rounded-lg transition-all hover:scale-110"
-              style={{ backgroundColor: isDarkMode ? '#334155' : 'white' }}
+              className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-600 rounded-lg transition-all hover:scale-110"
+              style={{ backgroundColor: isDarkMode ? '#27272a' : 'white' }}
               title="Close"
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512" className="w-3.5 h-3.5" fill={primaryDark}>
@@ -1112,7 +1112,7 @@ export default function ChatPopup({ chat, index }) {
           <div
             className="absolute inset-x-0 top-[52px] bottom-0 z-10 overflow-hidden rounded-b-2xl"
             style={{
-              background: isDarkMode ? 'rgba(30, 41, 59, 0.98)' : 'rgba(255, 255, 255, 0.98)',
+              background: isDarkMode ? 'rgba(24, 24, 27, 0.98)' : 'rgba(255, 255, 255, 0.98)',
               animation: 'slideIn 0.2s ease-out',
             }}
           >
@@ -1296,7 +1296,7 @@ export default function ChatPopup({ chat, index }) {
 
         {/* Typing indicator */}
         {typingText && (
-          <div className="px-3 py-1.5" style={{ background: isDarkMode ? 'rgba(30, 41, 59, 0.6)' : 'rgba(255, 255, 255, 0.6)' }}>
+          <div className="px-3 py-1.5" style={{ background: isDarkMode ? 'rgba(24, 24, 27, 0.6)' : 'rgba(255, 255, 255, 0.6)' }}>
             <p className="text-xs text-gray-500 italic flex items-center gap-1">
               <span className="flex gap-0.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0ms' }}></span>
@@ -1309,7 +1309,7 @@ export default function ChatPopup({ chat, index }) {
         )}
 
         {/* Input */}
-        <div className="popup-content p-3" style={{ background: isDarkMode ? 'rgba(30, 41, 59, 0.7)' : 'rgba(255, 255, 255, 0.7)' }}>
+        <div className="popup-content p-3" style={{ background: isDarkMode ? 'rgba(24, 24, 27, 0.7)' : 'rgba(255, 255, 255, 0.7)' }}>
           <div className="flex items-center gap-2">
             <input
               type="file"

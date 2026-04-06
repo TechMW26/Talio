@@ -11,7 +11,7 @@ export default function ThemeMetaTags() {
     if (!theme) return
 
     // Set theme-color based on dark mode
-    const themeColor = isDarkMode ? '#1E293B' : '#ffffff'
+    const themeColor = isDarkMode ? '#18181b' : '#ffffff'
 
     let themeColorMeta = document.querySelector('meta[name="theme-color"]')
     if (!themeColorMeta) {

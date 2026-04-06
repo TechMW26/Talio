@@ -133,11 +133,11 @@ export default function AIAssistant() {
       size="2xl"
       scrollBehavior="inside"
       classNames={{
-        base: 'border border-gray-200 dark:border-slate-600 max-h-[85vh] bg-white dark:bg-[#1a1f2e] rounded-2xl overflow-hidden',
-        header: 'border-b border-gray-200 dark:border-slate-600 pb-3 rounded-t-2xl',
-        footer: 'border-t border-gray-200 dark:border-slate-600 pt-3',
+        base: 'border border-gray-200 dark:border-zinc-600 max-h-[85vh] bg-white dark:bg-[#18181b] rounded-2xl overflow-hidden',
+        header: 'border-b border-gray-200 dark:border-zinc-600 pb-3 rounded-t-2xl',
+        footer: 'border-t border-gray-200 dark:border-zinc-600 pt-3',
         body: 'py-4',
-        closeButton: 'text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700 top-3 right-3',
+        closeButton: 'text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-zinc-700 top-3 right-3',
       }}
     >
       <ModalContent>
@@ -186,7 +186,7 @@ export default function AIAssistant() {
 
               {/* Actionable Steps */}
               {classification && classification.tips.length > 0 && (
-                <div className="bg-gray-50 dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700/60 rounded-xl p-4 mb-4">
+                <div className="bg-gray-50 dark:bg-zinc-800/50 border border-gray-200 dark:border-zinc-700/60 rounded-xl p-4 mb-4">
                   <div className="flex items-center gap-2 mb-3">
                     <FaCheckCircle className="text-primary-500 dark:text-primary-400 text-sm" />
                     <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">Try these steps</span>
@@ -217,7 +217,7 @@ export default function AIAssistant() {
                         className={`max-w-[85%] px-4 py-3 ${
                           msg.role === 'user'
                             ? 'bg-primary-500 text-white rounded-2xl rounded-br-md'
-                            : 'bg-gray-100 dark:bg-slate-700/80 text-gray-800 dark:text-gray-100 rounded-2xl rounded-bl-md'
+                            : 'bg-gray-100 dark:bg-zinc-700/80 text-gray-800 dark:text-gray-100 rounded-2xl rounded-bl-md'
                         }`}
                       >
                         {msg.role === 'assistant' && (
@@ -236,7 +236,7 @@ export default function AIAssistant() {
                   ))
                 ) : aiResponse ? (
                   <div className="flex justify-start">
-                    <div className="max-w-[85%] rounded-2xl rounded-bl-md px-4 py-3 bg-gray-100 dark:bg-slate-700/80 text-gray-800 dark:text-gray-100">
+                    <div className="max-w-[85%] rounded-2xl rounded-bl-md px-4 py-3 bg-gray-100 dark:bg-zinc-700/80 text-gray-800 dark:text-gray-100">
                       <div className="flex items-center gap-1.5 mb-2">
                         <FaRobot className="text-primary-500 dark:text-primary-400 text-xs" />
                         <span className="text-xs font-semibold text-primary-600 dark:text-primary-400">MIRA</span>
@@ -249,7 +249,7 @@ export default function AIAssistant() {
                 {/* Loading indicator */}
                 {isAiLoading && (
                   <div className="flex justify-start">
-                    <div className="rounded-2xl rounded-bl-md px-4 py-3 bg-gray-100 dark:bg-slate-700/80">
+                    <div className="rounded-2xl rounded-bl-md px-4 py-3 bg-gray-100 dark:bg-zinc-700/80">
                       <div className="flex items-center gap-2">
                         <Spinner size="sm" color="primary" />
                         <span className="text-sm text-gray-600 dark:text-gray-300">MIRA is looking into this...</span>
@@ -293,7 +293,7 @@ export default function AIAssistant() {
                     size="md"
                     isDisabled={chatDisabled}
                     classNames={{
-                      inputWrapper: 'bg-gray-50 dark:bg-slate-700/60 border-gray-300 dark:border-slate-600',
+                      inputWrapper: 'bg-gray-50 dark:bg-zinc-700/60 border-gray-300 dark:border-zinc-600',
                       input: 'text-sm text-gray-800 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500',
                     }}
                     startContent={<FaRobot className="text-gray-400 dark:text-gray-500 text-sm" />}

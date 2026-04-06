@@ -234,7 +234,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
           </div>
 
           {/* Separator */}
-          <div className="hidden md:block w-px h-7 bg-slate-400 dark:bg-slate-300/40 mx-1" />
+          <div className="hidden md:block w-px h-7 bg-slate-400 dark:bg-zinc-300/40 mx-1" />
 
           {/* Search Pill Button - opens floating search overlay */}
           <div ref={searchRef}>
@@ -274,12 +274,12 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                 }}
               />
               <div className="relative z-10 flex items-center justify-center rounded-full bg-default-200 dark:bg-white/15" style={{ width: 34, height: 34 }}>
-                <FaSearch className="w-3.5 h-3.5 text-default-600 dark:text-slate-300" />
+                <FaSearch className="w-3.5 h-3.5 text-default-600 dark:text-zinc-300" />
               </div>
-              <span className="text-default-700 dark:text-slate-200 text-sm font-semibold whitespace-nowrap relative z-10 ml-1.5">
+              <span className="text-default-700 dark:text-zinc-200 text-sm font-semibold whitespace-nowrap relative z-10 ml-1.5">
                 AI Search
               </span>
-              <kbd className="hidden md:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-default-300/50 dark:bg-white/10 text-[10px] text-default-600 dark:text-slate-300 font-mono relative z-10 ml-2">
+              <kbd className="hidden md:inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-default-300/50 dark:bg-white/10 text-[10px] text-default-600 dark:text-zinc-300 font-mono relative z-10 ml-2">
                 ⌘K
               </kbd>
             </button>
@@ -456,7 +456,7 @@ export default function Header({ toggleSidebar, sidebarCollapsed }) {
                   }
                   variant="bordered"
                   classNames={{
-                    inputWrapper: "bg-default-50 dark:bg-[#1E293B] shadow-none",
+                    inputWrapper: "bg-default-50 dark:bg-[#18181b] shadow-none",
                   }}
                   autoFocus
                 />
@@ -549,7 +549,7 @@ function FocusTimerPill() {
       {/* Progress ring */}
       <div className="relative w-6 h-6 flex-shrink-0">
         <svg className="w-6 h-6 -rotate-90" viewBox="0 0 24 24">
-          <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" className="text-gray-200 dark:text-slate-700" strokeWidth="2.5" />
+          <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" className="text-gray-200 dark:text-zinc-700" strokeWidth="2.5" />
           <circle cx="12" cy="12" r="10" fill="none" stroke={done ? '#10B981' : '#6366F1'} strokeWidth="2.5" strokeDasharray={`${2 * Math.PI * 10}`} strokeDashoffset={`${2 * Math.PI * 10 * (1 - pct / 100)}`} strokeLinecap="round" className="transition-all duration-1000" />
         </svg>
       </div>

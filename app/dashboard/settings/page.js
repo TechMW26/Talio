@@ -2049,14 +2049,14 @@ function PersonalizationTab() {
       {/* Appearance Mode Selector */}
       <div className="rounded-xl border p-5 mb-6" style={{
         backgroundColor: 'var(--color-bg-card)',
-        borderColor: isDarkMode ? '#334155' : '#E5E7EB'
+        borderColor: isDarkMode ? '#27272a' : '#E5E7EB'
       }}>
         <div className="flex flex-col gap-4">
           <div className="flex items-center gap-4">
             <div
               className="w-12 h-12 rounded-xl flex items-center justify-center"
               style={{
-                backgroundColor: isDarkMode ? '#334155' : '#F1F5F9',
+                backgroundColor: isDarkMode ? '#27272a' : '#F1F5F9',
                 color: isDarkMode ? '#F59E0B' : '#F59E0B',
               }}
             >
@@ -2073,7 +2073,7 @@ function PersonalizationTab() {
               </p>
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-2 p-1 rounded-xl" style={{ backgroundColor: isDarkMode ? '#0F172A' : '#F1F5F9' }}>
+          <div className="grid grid-cols-3 gap-2 p-1 rounded-xl" style={{ backgroundColor: isDarkMode ? '#09090b' : '#F1F5F9' }}>
             {[
               { key: 'auto', label: 'Auto', icon: <FaDesktop className="text-sm" /> },
               { key: 'light', label: 'Light', icon: <FaSun className="text-sm" /> },
@@ -2088,7 +2088,7 @@ function PersonalizationTab() {
                 }}
                 className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${darkModePref === opt.key ? 'shadow-md' : ''}`}
                 style={{
-                  backgroundColor: darkModePref === opt.key ? (isDarkMode ? '#334155' : '#FFFFFF') : 'transparent',
+                  backgroundColor: darkModePref === opt.key ? (isDarkMode ? '#27272a' : '#FFFFFF') : 'transparent',
                   color: darkModePref === opt.key ? (isDarkMode ? '#F1F5F9' : '#111827') : (isDarkMode ? '#94A3B8' : '#6B7280'),
                 }}
               >
@@ -2122,8 +2122,8 @@ function PersonalizationTab() {
                 }}
                 className="relative p-6 rounded-xl border-2 transition-all hover:shadow-lg"
                 style={{
-                  borderColor: isActive ? colors.border : (isDarkMode ? '#334155' : '#E5E7EB'),
-                  backgroundColor: isActive ? (isDarkMode ? '#334155' : colors.bgLight) : (isDarkMode ? '#1E293B' : '#FFFFFF'),
+                  borderColor: isActive ? colors.border : (isDarkMode ? '#27272a' : '#E5E7EB'),
+                  backgroundColor: isActive ? (isDarkMode ? '#27272a' : colors.bgLight) : (isDarkMode ? '#18181b' : '#FFFFFF'),
                 }}
               >
                 {/* Active Indicator */}

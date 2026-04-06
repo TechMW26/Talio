@@ -127,8 +127,8 @@ module.exports = {
         },
         dark: {
           colors: {
-            background: "#0F172A",
-            foreground: "#E2E8F0",
+            background: "#09090b",
+            foreground: "#e4e4e7",
             primary: {
               50: "#1E3A8A",
               100: "#1E40AF",

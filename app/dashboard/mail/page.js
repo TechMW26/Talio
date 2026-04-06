@@ -1049,14 +1049,14 @@ export default function MailPage() {
         {/* Skeleton stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-slate-700/50">
+            <div key={i} className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-zinc-700/50">
               <Skeleton className="h-3 w-16 rounded mb-2" />
               <Skeleton className="h-7 w-10 rounded" />
             </div>
           ))}
         </div>
         {/* Skeleton toolbar */}
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md dark:shadow-none p-4 mb-6">
+        <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-md dark:shadow-none p-4 mb-6">
           <div className="flex items-center gap-3">
             <div className="flex gap-2">
               {[...Array(5)].map((_, i) => (
@@ -1068,7 +1068,7 @@ export default function MailPage() {
           </div>
         </div>
         {/* Skeleton email list */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700/50 overflow-hidden">
+        <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm border border-gray-100 dark:border-zinc-700/50 overflow-hidden">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="flex items-center gap-3 px-4 py-3.5 border-b border-gray-100">
               <Skeleton className="w-5 h-5 rounded" />
@@ -1090,9 +1090,9 @@ export default function MailPage() {
       return (
         <div className="page-container">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-            <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-100">Mail</h1>
+            <h1 className="text-2xl font-bold text-gray-800 dark:text-zinc-100">Mail</h1>
           </div>
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700/50 flex items-center justify-center py-20">
+          <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm border border-gray-100 dark:border-zinc-700/50 flex items-center justify-center py-20">
             <div className="text-center max-w-md px-4">
               <div className="mb-8">
                 <div className="w-20 h-20 mx-auto bg-blue-50 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center">
@@ -1100,13 +1100,13 @@ export default function MailPage() {
                 </div>
               </div>
 
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-slate-100 mb-2">
+              <h2 className="text-2xl font-bold text-gray-800 dark:text-zinc-100 mb-2">
                 Connect Your Email
               </h2>
-              <p className="text-gray-600 dark:text-slate-400 mb-4 text-sm">
+              <p className="text-gray-600 dark:text-zinc-400 mb-4 text-sm">
                 To connect your Gmail account, you need to sign in through your web browser.
               </p>
-              <p className="text-gray-500 dark:text-slate-500 mb-8 text-xs">
+              <p className="text-gray-500 dark:text-zinc-500 mb-8 text-xs">
                 This is required for secure Google authentication. Once connected, you can access your emails here in the desktop app.
               </p>
 
@@ -1126,7 +1126,7 @@ export default function MailPage() {
                 Open in Browser to Connect
               </Button>
 
-              <p className="text-xs text-gray-500 dark:text-slate-500 mt-4">
+              <p className="text-xs text-gray-500 dark:text-zinc-500 mt-4">
                 After connecting in your browser, return here and refresh the page.
               </p>
 
@@ -1146,9 +1146,9 @@ export default function MailPage() {
     return (
       <div className="page-container">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-100">Mail</h1>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-zinc-100">Mail</h1>
         </div>
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700/50 flex items-center justify-center py-20">
+        <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm border border-gray-100 dark:border-zinc-700/50 flex items-center justify-center py-20">
           <div className="text-center max-w-md">
             <div className="mb-8">
               <div className="w-20 h-20 mx-auto bg-red-50 dark:bg-red-900/30 rounded-2xl flex items-center justify-center">
@@ -1156,17 +1156,17 @@ export default function MailPage() {
               </div>
             </div>
 
-            <h2 className="text-2xl font-bold text-gray-800 dark:text-slate-100 mb-2">
+            <h2 className="text-2xl font-bold text-gray-800 dark:text-zinc-100 mb-2">
               Welcome to Mail
             </h2>
-            <p className="text-gray-600 dark:text-slate-400 mb-8 text-sm">
+            <p className="text-gray-600 dark:text-zinc-400 mb-8 text-sm">
               Connect your Gmail account to access your emails directly from Talio
             </p>
 
             <button
               onClick={connectEmail}
               disabled={connectingEmail}
-              className="inline-flex items-center gap-3 bg-white dark:bg-slate-700 border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-slate-200 px-8 py-3 rounded-xl font-medium hover:bg-gray-50 dark:hover:bg-slate-600 hover:shadow-md transition-all disabled:opacity-50 text-base"
+              className="inline-flex items-center gap-3 bg-white dark:bg-zinc-700 border border-gray-300 dark:border-zinc-600 text-gray-700 dark:text-zinc-200 px-8 py-3 rounded-xl font-medium hover:bg-gray-50 dark:hover:bg-zinc-600 hover:shadow-md transition-all disabled:opacity-50 text-base"
             >
               {connectingEmail ? (
                 <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
@@ -1183,7 +1183,7 @@ export default function MailPage() {
               )}
             </button>
 
-            <p className="text-xs text-gray-500 dark:text-slate-500 mt-6">
+            <p className="text-xs text-gray-500 dark:text-zinc-500 mt-6">
               We&apos;ll only access your emails with your permission.<br />
               You can disconnect at any time.
             </p>
@@ -1198,7 +1198,7 @@ export default function MailPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4 flex-shrink-0">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-slate-100">Mail</h1>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-zinc-100">Mail</h1>
           {showAllAccounts && (
             <span className="text-xs text-blue-600 bg-blue-50 dark:bg-blue-900/30 px-2.5 py-1 rounded-full font-medium">
               All Accounts
@@ -1210,7 +1210,7 @@ export default function MailPage() {
           <div className="relative">
             <button
               onClick={() => setShowAccountSwitcher(!showAccountSwitcher)}
-              className="flex items-center gap-2 text-sm text-gray-600 dark:text-slate-300 hover:text-gray-800 dark:hover:text-slate-100 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg px-3 py-2 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors"
+              className="flex items-center gap-2 text-sm text-gray-600 dark:text-zinc-300 hover:text-gray-800 dark:hover:text-slate-100 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-600 rounded-lg px-3 py-2 hover:bg-gray-50 dark:hover:bg-zinc-700 transition-colors"
             >
               <span className="truncate max-w-[180px]">{showAllAccounts ? 'All Accounts' : connectedEmail}</span>
               <MdKeyboardArrowDown className={`transition-transform ${showAccountSwitcher ? 'rotate-180' : ''}`} />
@@ -1218,28 +1218,28 @@ export default function MailPage() {
 
             {/* Account Switcher Dropdown */}
             {showAccountSwitcher && (
-              <div className="absolute top-full right-0 mt-2 bg-white dark:bg-slate-800 rounded-lg shadow-lg border border-gray-200 dark:border-slate-700 py-2 z-50 min-w-[260px]">
-                <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase">Switch Account</div>
+              <div className="absolute top-full right-0 mt-2 bg-white dark:bg-zinc-800 rounded-lg shadow-lg border border-gray-200 dark:border-zinc-700 py-2 z-50 min-w-[260px]">
+                <div className="px-3 py-1.5 text-xs font-semibold text-gray-500 dark:text-zinc-400 uppercase">Switch Account</div>
 
                 <button
                   onClick={viewAllAccountsEmails}
-                  className={`w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors ${showAllAccounts ? 'bg-blue-50 dark:bg-blue-900/30' : ''}`}
+                  className={`w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors ${showAllAccounts ? 'bg-blue-50 dark:bg-blue-900/30' : ''}`}
                 >
-                  <MdAllInbox className="text-lg text-gray-600 dark:text-slate-400" />
+                  <MdAllInbox className="text-lg text-gray-600 dark:text-zinc-400" />
                   <div className="flex-1 text-left">
-                    <p className="text-sm text-gray-800 dark:text-slate-200">All Accounts</p>
-                    <p className="text-xs text-gray-500 dark:text-slate-400">View all emails together</p>
+                    <p className="text-sm text-gray-800 dark:text-zinc-200">All Accounts</p>
+                    <p className="text-xs text-gray-500 dark:text-zinc-400">View all emails together</p>
                   </div>
                   {showAllAccounts && <span className="text-blue-600">✓</span>}
                 </button>
 
-                <div className="border-t border-gray-200 dark:border-slate-700 my-1"></div>
+                <div className="border-t border-gray-200 dark:border-zinc-700 my-1"></div>
 
                 {accounts.map(account => (
                   <button
                     key={account.id}
                     onClick={() => switchAccount(account.id)}
-                    className={`w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors ${activeAccountId === account.id && !showAllAccounts ? 'bg-blue-50 dark:bg-blue-900/30' : ''}`}
+                    className={`w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors ${activeAccountId === account.id && !showAllAccounts ? 'bg-blue-50 dark:bg-blue-900/30' : ''}`}
                   >
                     <div
                       className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-semibold"
@@ -1248,8 +1248,8 @@ export default function MailPage() {
                       {account.email[0].toUpperCase()}
                     </div>
                     <div className="flex-1 text-left min-w-0">
-                      <p className="text-sm text-gray-800 dark:text-slate-200 truncate">{account.email}</p>
-                      <p className="text-xs text-gray-500 dark:text-slate-400">
+                      <p className="text-sm text-gray-800 dark:text-zinc-200 truncate">{account.email}</p>
+                      <p className="text-xs text-gray-500 dark:text-zinc-400">
                         {account.unreadCount > 0 ? `${account.unreadCount} unread` : 'No unread'}
                         {account.isPrimary && ' • Primary'}
                       </p>
@@ -1258,21 +1258,21 @@ export default function MailPage() {
                   </button>
                 ))}
 
-                <div className="border-t border-gray-200 dark:border-slate-700 my-1"></div>
+                <div className="border-t border-gray-200 dark:border-zinc-700 my-1"></div>
 
                 <button
                   onClick={() => { setShowAccountSwitcher(false); connectEmail(); }}
-                  className="w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors text-blue-600"
+                  className="w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors text-blue-600"
                 >
                   <span className="text-lg">+</span>
                   <span className="text-sm">Add another account</span>
                 </button>
 
-                <div className="border-t border-gray-200 dark:border-slate-700 my-1"></div>
+                <div className="border-t border-gray-200 dark:border-zinc-700 my-1"></div>
 
                 <button
                   onClick={() => { setShowAccountSwitcher(false); disconnectEmail(); }}
-                  className="w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors text-red-600"
+                  className="w-full flex items-center gap-3 px-3 py-2 hover:bg-gray-100 dark:hover:bg-zinc-700 transition-colors text-red-600"
                 >
                   <span className="text-sm">Disconnect {showAllAccounts ? 'all accounts' : 'this account'}</span>
                 </button>
@@ -1292,38 +1292,38 @@ export default function MailPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4 flex-shrink-0">
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-slate-700/50">
-          <div className="flex items-center gap-2 text-gray-500 dark:text-slate-400 text-xs font-medium mb-1">
+        <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-zinc-700/50">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-zinc-400 text-xs font-medium mb-1">
             <HiOutlineEnvelope className="text-sm" />
             Unread
           </div>
-          <p className="text-2xl font-bold text-gray-800 dark:text-slate-100">{unreadCount || 0}</p>
+          <p className="text-2xl font-bold text-gray-800 dark:text-zinc-100">{unreadCount || 0}</p>
         </div>
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-slate-700/50">
-          <div className="flex items-center gap-2 text-gray-500 dark:text-slate-400 text-xs font-medium mb-1">
+        <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-zinc-700/50">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-zinc-400 text-xs font-medium mb-1">
             <HiOutlineStar className="text-sm" />
             Starred
           </div>
-          <p className="text-2xl font-bold text-gray-800 dark:text-slate-100">{folderCounts?.starred?.total || 0}</p>
+          <p className="text-2xl font-bold text-gray-800 dark:text-zinc-100">{folderCounts?.starred?.total || 0}</p>
         </div>
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-slate-700/50">
-          <div className="flex items-center gap-2 text-gray-500 dark:text-slate-400 text-xs font-medium mb-1">
+        <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-zinc-700/50">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-zinc-400 text-xs font-medium mb-1">
             <MdLabelImportant className="text-sm" />
             Important
           </div>
-          <p className="text-2xl font-bold text-gray-800 dark:text-slate-100">{folderCounts?.important?.total || 0}</p>
+          <p className="text-2xl font-bold text-gray-800 dark:text-zinc-100">{folderCounts?.important?.total || 0}</p>
         </div>
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-slate-700/50">
-          <div className="flex items-center gap-2 text-gray-500 dark:text-slate-400 text-xs font-medium mb-1">
+        <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm p-4 border border-gray-100 dark:border-zinc-700/50">
+          <div className="flex items-center gap-2 text-gray-500 dark:text-zinc-400 text-xs font-medium mb-1">
             <HiOutlineClock className="text-sm" />
             Snoozed
           </div>
-          <p className="text-2xl font-bold text-gray-800 dark:text-slate-100">{folderCounts?.snoozed?.total || 0}</p>
+          <p className="text-2xl font-bold text-gray-800 dark:text-zinc-100">{folderCounts?.snoozed?.total || 0}</p>
         </div>
       </div>
 
       {/* Toolbar - Folder Pills + Search */}
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow-md p-3 mb-4 flex-shrink-0">
+      <div className="bg-white dark:bg-zinc-800 rounded-lg shadow-md p-3 mb-4 flex-shrink-0">
         <div className="flex flex-col md:flex-row md:items-center gap-3">
           {/* Folder pills */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 flex-shrink-0 scrollbar-hide">
@@ -1339,13 +1339,13 @@ export default function MailPage() {
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
                     isActive
                       ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
-                      : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700'
+                      : 'text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700'
                   }`}
                 >
                   <Icon className="text-base" />
                   {folder.name}
                   {displayCount > 0 && (
-                    <span className={`text-xs ml-0.5 ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-slate-500'}`}>
+                    <span className={`text-xs ml-0.5 ${isActive ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-zinc-500'}`}>
                       {displayCount > 999 ? '999+' : displayCount}
                     </span>
                   )}
@@ -1356,7 +1356,7 @@ export default function MailPage() {
             {/* More folders toggle */}
             <button
               onClick={() => setShowMoreFolders(!showMoreFolders)}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 whitespace-nowrap"
+              className="flex items-center gap-1 px-3 py-1.5 rounded-full text-sm text-gray-500 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 whitespace-nowrap"
             >
               {showMoreFolders ? <FaChevronDown className="text-xs" /> : <FaChevronRight className="text-xs" />}
               More
@@ -1378,7 +1378,7 @@ export default function MailPage() {
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
                       isActive
                         ? 'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
-                        : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700'
+                        : 'text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700'
                     }`}
                   >
                     <Icon className="text-base" />
@@ -1393,14 +1393,14 @@ export default function MailPage() {
               })}
               <button
                 onClick={() => setShowCategoriesModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 whitespace-nowrap"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm text-gray-500 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 whitespace-nowrap"
               >
                 <MdCategory className="text-base" />
                 Categories
               </button>
               <button
                 onClick={() => setShowLabelsModal(true)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 whitespace-nowrap"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm text-gray-500 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 whitespace-nowrap"
               >
                 <MdSettings className="text-base" />
                 Labels
@@ -1421,7 +1421,7 @@ export default function MailPage() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onFocus={() => setShowSearchFocused(true)}
                 onBlur={() => setShowSearchFocused(false)}
-                className="w-full md:w-64 pl-9 pr-8 py-2 bg-gray-50 dark:bg-slate-700/50 hover:bg-gray-100 dark:hover:bg-slate-700 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-blue-500 rounded-full text-sm text-gray-900 dark:text-slate-100 outline-none transition-colors border border-gray-200 dark:border-slate-600 focus:border-blue-300 dark:focus:border-blue-500 dark:placeholder:text-slate-400"
+                className="w-full md:w-64 pl-9 pr-8 py-2 bg-gray-50 dark:bg-zinc-700/50 hover:bg-gray-100 dark:hover:bg-zinc-700 focus:bg-white dark:focus:bg-slate-700 focus:ring-2 focus:ring-blue-500 rounded-full text-sm text-gray-900 dark:text-zinc-100 outline-none transition-colors border border-gray-200 dark:border-zinc-600 focus:border-blue-300 dark:focus:border-blue-500 dark:placeholder:text-slate-400"
               />
               {searchQuery && (
                 <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
@@ -1433,7 +1433,7 @@ export default function MailPage() {
               <button
                 onClick={syncEmails}
                 disabled={syncing}
-                className="p-2 text-gray-500 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-full transition-colors"
+                className="p-2 text-gray-500 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-full transition-colors"
               >
                 <HiOutlineArrowPath className={`text-lg ${syncing ? 'animate-spin' : ''}`} />
               </button>
@@ -1443,7 +1443,7 @@ export default function MailPage() {
       </div>
 
       {/* Mobile Bottom Nav */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700 z-40 flex justify-around py-2 shadow-lg">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-zinc-800 border-t border-gray-200 dark:border-zinc-700 z-40 flex justify-around py-2 shadow-lg">
         {[...primaryFolders.slice(0, 3), { id: 'spam', name: 'Spam', icon: MdReportGmailerrorred }].map(folder => {
           const Icon = folder.icon;
           const isActive = selectedFolder === folder.id;
@@ -1451,7 +1451,7 @@ export default function MailPage() {
             <button
               key={folder.id}
               onClick={() => handleFolderChange(folder.id)}
-              className={`flex flex-col items-center p-2 rounded-lg relative ${isActive ? 'text-blue-600' : 'text-gray-600 dark:text-slate-400'}`}
+              className={`flex flex-col items-center p-2 rounded-lg relative ${isActive ? 'text-blue-600' : 'text-gray-600 dark:text-zinc-400'}`}
             >
               <Icon className="text-xl" />
               <span className="text-xs mt-1">{folder.name}</span>
@@ -1478,11 +1478,11 @@ export default function MailPage() {
       </div>
 
       {/* Email List & Detail Card */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700/50 overflow-hidden flex flex-1 min-h-0 mb-2">
+      <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm border border-gray-100 dark:border-zinc-700/50 overflow-hidden flex flex-1 min-h-0 mb-2">
           {/* Email List */}
-          <div className={`${selectedEmail ? 'hidden lg:flex' : 'flex'} flex-col w-full lg:w-[400px] xl:w-[450px] flex-shrink-0 border-r border-gray-200 dark:border-slate-700`}>
+          <div className={`${selectedEmail ? 'hidden lg:flex' : 'flex'} flex-col w-full lg:w-[400px] xl:w-[450px] flex-shrink-0 border-r border-gray-200 dark:border-zinc-700`}>
             {/* Toolbar */}
-            <div className="flex items-center gap-1 px-2 py-1.5 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+            <div className="flex items-center gap-1 px-2 py-1.5 border-b border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800">
               {/* Selection checkbox */}
               <div className="relative">
                 <button
@@ -1495,11 +1495,11 @@ export default function MailPage() {
                       selectAllEmails();
                     }
                   }}
-                  className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded"
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded"
                   title={selectedEmails.size === 0 ? 'Select all' : 'Deselect all'}
                 >
                   {selectedEmails.size === 0 ? (
-                    <MdCheckBoxOutlineBlank className="text-xl text-gray-600 dark:text-slate-400" />
+                    <MdCheckBoxOutlineBlank className="text-xl text-gray-600 dark:text-zinc-400" />
                   ) : selectedEmails.size === filteredEmails.length ? (
                     <MdCheckBox className="text-xl text-blue-600" />
                   ) : (
@@ -1515,33 +1515,33 @@ export default function MailPage() {
                 <>
                   <button
                     onClick={bulkArchive}
-                    className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded"
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded"
                     title="Archive"
                   >
-                    <MdArchive className="text-xl text-gray-600 dark:text-slate-400" />
+                    <MdArchive className="text-xl text-gray-600 dark:text-zinc-400" />
                   </button>
                   <button
                     onClick={bulkDelete}
-                    className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded"
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded"
                     title={selectedFolder === 'trash' ? 'Move to Inbox' : 'Delete'}
                   >
-                    <MdDelete className="text-xl text-gray-600 dark:text-slate-400" />
+                    <MdDelete className="text-xl text-gray-600 dark:text-zinc-400" />
                   </button>
                   <button
                     onClick={bulkMarkRead}
-                    className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded"
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded"
                     title="Mark as read"
                   >
-                    <FaRegEnvelopeOpen className="text-lg text-gray-600 dark:text-slate-400" />
+                    <FaRegEnvelopeOpen className="text-lg text-gray-600 dark:text-zinc-400" />
                   </button>
                   <button
                     onClick={bulkMarkUnread}
-                    className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded"
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded"
                     title="Mark as unread"
                   >
-                    <FaRegEnvelope className="text-lg text-gray-600 dark:text-slate-400" />
+                    <FaRegEnvelope className="text-lg text-gray-600 dark:text-zinc-400" />
                   </button>
-                  <span className="text-xs text-gray-600 dark:text-slate-400 ml-2">
+                  <span className="text-xs text-gray-600 dark:text-zinc-400 ml-2">
                     {selectedEmails.size} selected
                   </span>
                 </>
@@ -1549,13 +1549,13 @@ export default function MailPage() {
                 <>
                   <button
                     onClick={syncEmails}
-                    className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded"
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded"
                     title="Refresh"
                   >
-                    <MdRefresh className={`text-xl text-gray-600 dark:text-slate-400 ${syncing ? 'animate-spin' : ''}`} />
+                    <MdRefresh className={`text-xl text-gray-600 dark:text-zinc-400 ${syncing ? 'animate-spin' : ''}`} />
                   </button>
-                  <button className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded">
-                    <MdMoreVert className="text-xl text-gray-600 dark:text-slate-400" />
+                  <button className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded">
+                    <MdMoreVert className="text-xl text-gray-600 dark:text-zinc-400" />
                   </button>
                 </>
               )}
@@ -1567,14 +1567,14 @@ export default function MailPage() {
                   </span>
                 )}
               </div>
-              <span className="text-xs text-gray-500 dark:text-slate-400 px-2">
+              <span className="text-xs text-gray-500 dark:text-zinc-400 px-2">
                 {filteredEmails.length > 0 ? `1-${filteredEmails.length}` : '0'}
               </span>
-              <button className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded opacity-50" disabled>
-                <FaAngleLeft className="text-gray-600 dark:text-slate-400" />
+              <button className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded opacity-50" disabled>
+                <FaAngleLeft className="text-gray-600 dark:text-zinc-400" />
               </button>
-              <button className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded opacity-50" disabled>
-                <FaAngleRight className="text-gray-600 dark:text-slate-400" />
+              <button className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded opacity-50" disabled>
+                <FaAngleRight className="text-gray-600 dark:text-zinc-400" />
               </button>
             </div>
 
@@ -1633,20 +1633,20 @@ export default function MailPage() {
                         setAiSummary(null);
                         if (!email.isRead) toggleRead(email);
                       }}
-                      className={`flex items-start gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-slate-700/50 cursor-pointer group transition-all border-l-[3px] ${
+                      className={`flex items-start gap-2 px-3 py-2.5 border-b border-gray-100 dark:border-zinc-700/50 cursor-pointer group transition-all border-l-[3px] ${
                         isSelected
                           ? 'bg-blue-50 dark:bg-blue-900/30 border-l-blue-500'
                           : selectedEmail?.messageId === email.messageId
                             ? 'bg-blue-50/70 dark:bg-blue-900/20 border-l-blue-400'
                             : !email.isRead
-                              ? `bg-white dark:bg-slate-800 hover:bg-gray-50 dark:hover:bg-slate-700 ${priority.borderColor}`
-                              : `hover:bg-gray-50 dark:hover:bg-slate-700 ${priority.level !== 'low' ? priority.borderColor : 'border-l-transparent'}`
+                              ? `bg-white dark:bg-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-700 ${priority.borderColor}`
+                              : `hover:bg-gray-50 dark:hover:bg-zinc-700 ${priority.level !== 'low' ? priority.borderColor : 'border-l-transparent'}`
                       }`}
                     >
                       {/* Checkbox */}
                       <button
                         onClick={(e) => toggleEmailSelection(email, e)}
-                        className={`p-1 hover:bg-gray-200 dark:hover:bg-slate-600 rounded transition-opacity hidden sm:block flex-shrink-0 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                        className={`p-1 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded transition-opacity hidden sm:block flex-shrink-0 ${isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
                       >
                         {isSelected ? (
                           <MdCheckBox className="text-lg text-blue-600" />
@@ -1658,7 +1658,7 @@ export default function MailPage() {
                       {/* Star */}
                       <button
                         onClick={(e) => toggleStar(email, e)}
-                        className="p-1 hover:bg-gray-200 dark:hover:bg-slate-600 rounded flex-shrink-0"
+                        className="p-1 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded flex-shrink-0"
                       >
                         {email.isStarred ? (
                           <MdStar className="text-lg text-yellow-500" />
@@ -1682,7 +1682,7 @@ export default function MailPage() {
                       {/* Content */}
                       <div className="flex-1 min-w-0 flex flex-col sm:flex-row sm:items-center gap-0.5">
                         {/* Sender */}
-                        <div className={`sm:w-44 truncate text-sm ${!email.isRead ? 'font-semibold text-gray-900 dark:text-slate-100' : 'text-gray-600 dark:text-slate-400'}`}>
+                        <div className={`sm:w-44 truncate text-sm ${!email.isRead ? 'font-semibold text-gray-900 dark:text-zinc-100' : 'text-gray-600 dark:text-zinc-400'}`}>
                           {email.from?.name || email.from?.email || '?'}
                           {showAllAccounts && email.accountEmail && (
                             <span className="ml-1 text-xs text-gray-400 font-normal">
@@ -1693,11 +1693,11 @@ export default function MailPage() {
 
                         {/* Subject & Snippet */}
                         <div className="flex-1 flex items-center min-w-0 gap-1">
-                          <span className={`truncate text-sm ${!email.isRead ? 'font-semibold text-gray-900 dark:text-slate-100' : 'text-gray-600 dark:text-slate-400'}`}>
+                          <span className={`truncate text-sm ${!email.isRead ? 'font-semibold text-gray-900 dark:text-zinc-100' : 'text-gray-600 dark:text-zinc-400'}`}>
                             {email.subject || '(no subject)'}
                           </span>
-                          <span className="text-gray-400 dark:text-slate-500 text-sm hidden sm:inline">—</span>
-                          <span className="text-gray-400 dark:text-slate-500 text-sm truncate flex-1 hidden sm:inline">
+                          <span className="text-gray-400 dark:text-zinc-500 text-sm hidden sm:inline">—</span>
+                          <span className="text-gray-400 dark:text-zinc-500 text-sm truncate flex-1 hidden sm:inline">
                             {email.snippet}
                           </span>
                         </div>
@@ -1707,40 +1707,40 @@ export default function MailPage() {
                       <div className="hidden sm:group-hover:flex items-center gap-0.5">
                         <button
                           onClick={(e) => archiveEmail(email, e)}
-                          className="p-1.5 hover:bg-gray-200 dark:hover:bg-slate-600 rounded"
+                          className="p-1.5 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded"
                           title="Archive"
                         >
-                          <MdArchive className="text-lg text-gray-500 dark:text-slate-400" />
+                          <MdArchive className="text-lg text-gray-500 dark:text-zinc-400" />
                         </button>
                         <button
                           onClick={(e) => deleteEmail(email, e)}
-                          className="p-1.5 hover:bg-gray-200 dark:hover:bg-slate-600 rounded"
+                          className="p-1.5 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded"
                           title="Delete"
                         >
-                          <MdDelete className="text-lg text-gray-500 dark:text-slate-400" />
+                          <MdDelete className="text-lg text-gray-500 dark:text-zinc-400" />
                         </button>
                         <button
                           onClick={(e) => toggleRead(email, e)}
-                          className="p-1.5 hover:bg-gray-200 dark:hover:bg-slate-600 rounded"
+                          className="p-1.5 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded"
                           title={email.isRead ? 'Mark as unread' : 'Mark as read'}
                         >
                           {email.isRead ? (
-                            <FaRegEnvelope className="text-sm text-gray-500 dark:text-slate-400" />
+                            <FaRegEnvelope className="text-sm text-gray-500 dark:text-zinc-400" />
                           ) : (
-                            <FaRegEnvelopeOpen className="text-sm text-gray-500 dark:text-slate-400" />
+                            <FaRegEnvelopeOpen className="text-sm text-gray-500 dark:text-zinc-400" />
                           )}
                         </button>
                         <button
                           onClick={(e) => handleSnoozeEmail(email, e)}
-                          className="p-1.5 hover:bg-gray-200 dark:hover:bg-slate-600 rounded"
+                          className="p-1.5 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded"
                           title="Snooze"
                         >
-                          <MdSchedule className="text-lg text-gray-500 dark:text-slate-400" />
+                          <MdSchedule className="text-lg text-gray-500 dark:text-zinc-400" />
                         </button>
                       </div>
 
                       {/* Date */}
-                      <div className={`text-xs w-16 text-right sm:group-hover:hidden flex-shrink-0 ${!email.isRead ? 'font-semibold text-gray-900 dark:text-slate-100' : 'text-gray-500 dark:text-slate-400'}`}>
+                      <div className={`text-xs w-16 text-right sm:group-hover:hidden flex-shrink-0 ${!email.isRead ? 'font-semibold text-gray-900 dark:text-zinc-100' : 'text-gray-500 dark:text-zinc-400'}`}>
                         {formatDate(email.date)}
                       </div>
 
@@ -1769,41 +1769,41 @@ export default function MailPage() {
             {selectedEmail ? (
               <>
                 {/* Detail Toolbar */}
-                <div className="flex items-center gap-1 px-2 py-1.5 border-b border-gray-200 dark:border-slate-700">
+                <div className="flex items-center gap-1 px-2 py-1.5 border-b border-gray-200 dark:border-zinc-700">
                   <button
                     onClick={() => setSelectedEmail(null)}
-                    className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded mr-2"
+                    className="lg:hidden p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded mr-2"
                   >
-                    <FaChevronLeft className="text-gray-600 dark:text-slate-400" />
+                    <FaChevronLeft className="text-gray-600 dark:text-zinc-400" />
                   </button>
                   <button
                     onClick={(e) => archiveEmail(selectedEmail, e)}
-                    className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded"
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded"
                     title="Archive"
                   >
-                    <MdArchive className="text-xl text-gray-600 dark:text-slate-400" />
+                    <MdArchive className="text-xl text-gray-600 dark:text-zinc-400" />
                   </button>
                   <button
                     onClick={(e) => deleteEmail(selectedEmail, e)}
-                    className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded"
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded"
                     title="Delete"
                   >
-                    <MdDelete className="text-xl text-gray-600 dark:text-slate-400" />
+                    <MdDelete className="text-xl text-gray-600 dark:text-zinc-400" />
                   </button>
-                  <div className="h-5 w-px bg-gray-300 dark:bg-slate-600 mx-1"></div>
+                  <div className="h-5 w-px bg-gray-300 dark:bg-zinc-600 mx-1"></div>
                   <button
                     onClick={(e) => toggleRead(selectedEmail, e)}
-                    className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded"
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded"
                     title={selectedEmail.isRead ? 'Mark as unread' : 'Mark as read'}
                   >
-                    <FaRegEnvelope className="text-gray-600 dark:text-slate-400" />
+                    <FaRegEnvelope className="text-gray-600 dark:text-zinc-400" />
                   </button>
                   <button
                     onClick={(e) => handleSnoozeEmail(selectedEmail, e)}
-                    className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded"
+                    className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded"
                     title="Snooze"
                   >
-                    <MdSchedule className="text-xl text-gray-600 dark:text-slate-400" />
+                    <MdSchedule className="text-xl text-gray-600 dark:text-zinc-400" />
                   </button>
 
                   {/* Move to Dropdown */}
@@ -1814,37 +1814,37 @@ export default function MailPage() {
                         setShowLabelsMenu(false);
                         setShowMoreMenu(false);
                       }}
-                      className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded"
+                      className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded"
                       title="Move to"
                     >
-                      <MdMoveToInbox className="text-xl text-gray-600 dark:text-slate-400" />
+                      <MdMoveToInbox className="text-xl text-gray-600 dark:text-zinc-400" />
                     </button>
                     {showMoveToMenu && (
-                      <div className="absolute top-full left-0 mt-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg z-50 py-1 min-w-[160px]">
+                      <div className="absolute top-full left-0 mt-1 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-lg z-50 py-1 min-w-[160px]">
                         <button
                           onClick={(e) => moveToFolder(selectedEmail, 'inbox', e)}
-                          className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2"
                         >
                           <MdInbox className="text-lg" />
                           Move to Inbox
                         </button>
                         <button
                           onClick={(e) => archiveEmail(selectedEmail, e)}
-                          className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2"
                         >
                           <MdArchive className="text-lg" />
                           Archive
                         </button>
                         <button
                           onClick={(e) => reportSpam(selectedEmail, e)}
-                          className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2"
                         >
                           <MdReport className="text-lg" />
                           Report spam
                         </button>
                         <button
                           onClick={(e) => deleteEmail(selectedEmail, e)}
-                          className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2"
                         >
                           <MdDelete className="text-lg" />
                           Move to Trash
@@ -1861,19 +1861,19 @@ export default function MailPage() {
                         setShowMoveToMenu(false);
                         setShowMoreMenu(false);
                       }}
-                      className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded"
+                      className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded"
                       title="Labels"
                     >
-                      <MdLabel className="text-xl text-gray-600 dark:text-slate-400" />
+                      <MdLabel className="text-xl text-gray-600 dark:text-zinc-400" />
                     </button>
                     {showLabelsMenu && (
-                      <div className="absolute top-full left-0 mt-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg z-50 py-1 min-w-[200px]">
-                        <div className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-slate-300 border-b border-gray-100 dark:border-slate-700">
+                      <div className="absolute top-full left-0 mt-1 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-lg z-50 py-1 min-w-[200px]">
+                        <div className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-zinc-300 border-b border-gray-100 dark:border-zinc-700">
                           Apply labels
                         </div>
                         <div className="max-h-[200px] overflow-y-auto">
                           {userLabels.length === 0 ? (
-                            <div className="px-4 py-3 text-sm text-gray-500 dark:text-slate-400">
+                            <div className="px-4 py-3 text-sm text-gray-500 dark:text-zinc-400">
                               No labels created yet
                             </div>
                           ) : (
@@ -1881,7 +1881,7 @@ export default function MailPage() {
                               <button
                                 key={label.id}
                                 onClick={() => setShowLabelsMenu(false)}
-                                className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"
+                                className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2"
                               >
                                 <MdLabel className="text-lg" style={{ color: label.color?.backgroundColor || '#5f6368' }} />
                                 {label.name}
@@ -1889,13 +1889,13 @@ export default function MailPage() {
                             ))
                           )}
                         </div>
-                        <div className="border-t border-gray-100 dark:border-slate-700">
+                        <div className="border-t border-gray-100 dark:border-zinc-700">
                           <button
                             onClick={() => {
                               setShowLabelsMenu(false);
                               setShowLabelsModal(true);
                             }}
-                            className="w-full px-4 py-2 text-left text-sm text-blue-600 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"
+                            className="w-full px-4 py-2 text-left text-sm text-blue-600 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2"
                           >
                             <MdAdd className="text-lg" />
                             Create new label
@@ -1913,16 +1913,16 @@ export default function MailPage() {
                         setShowMoveToMenu(false);
                         setShowLabelsMenu(false);
                       }}
-                      className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded"
+                      className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded"
                       title="More options"
                     >
-                      <MdMoreVert className="text-xl text-gray-600 dark:text-slate-400" />
+                      <MdMoreVert className="text-xl text-gray-600 dark:text-zinc-400" />
                     </button>
                     {showMoreMenu && (
-                      <div className="absolute top-full right-0 mt-1 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-lg z-50 py-1 min-w-[200px]">
+                      <div className="absolute top-full right-0 mt-1 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-lg z-50 py-1 min-w-[200px]">
                         <button
                           onClick={(e) => toggleRead(selectedEmail, e)}
-                          className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2"
                         >
                           {selectedEmail.isRead ? (
                             <>
@@ -1938,7 +1938,7 @@ export default function MailPage() {
                         </button>
                         <button
                           onClick={(e) => toggleStar(selectedEmail, e)}
-                          className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2"
                         >
                           {selectedEmail.isStarred ? (
                             <>
@@ -1954,7 +1954,7 @@ export default function MailPage() {
                         </button>
                         <button
                           onClick={(e) => toggleImportant(selectedEmail, e)}
-                          className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2"
                         >
                           {selectedEmail.labels?.includes('IMPORTANT') ? (
                             <>
@@ -1968,25 +1968,25 @@ export default function MailPage() {
                             </>
                           )}
                         </button>
-                        <div className="border-t border-gray-100 dark:border-slate-700 my-1"></div>
+                        <div className="border-t border-gray-100 dark:border-zinc-700 my-1"></div>
                         <button
                           onClick={(e) => handleSnoozeEmail(selectedEmail, e)}
-                          className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2"
                         >
                           <MdSchedule className="text-lg" />
                           Snooze
                         </button>
                         <button
                           onClick={() => setShowMoreMenu(false)}
-                          className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2"
                         >
                           <MdFilterList className="text-lg" />
                           Filter messages like this
                         </button>
-                        <div className="border-t border-gray-100 dark:border-slate-700 my-1"></div>
+                        <div className="border-t border-gray-100 dark:border-zinc-700 my-1"></div>
                         <button
                           onClick={(e) => reportSpam(selectedEmail, e)}
-                          className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2"
                         >
                           <MdReport className="text-lg" />
                           Report spam
@@ -1997,7 +1997,7 @@ export default function MailPage() {
                             window.print();
                             setShowMoreMenu(false);
                           }}
-                          className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"
+                          className="w-full px-4 py-2 text-left text-sm text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700 flex items-center gap-2"
                         >
                           <MdPrint className="text-lg" />
                           Print
@@ -2013,7 +2013,7 @@ export default function MailPage() {
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-1">
-                        <h1 className="text-xl md:text-2xl font-normal text-gray-900 dark:text-slate-100">
+                        <h1 className="text-xl md:text-2xl font-normal text-gray-900 dark:text-zinc-100">
                           {selectedEmail.subject || '(no subject)'}
                         </h1>
                         {(() => {
@@ -2073,23 +2073,23 @@ export default function MailPage() {
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-gray-900 dark:text-slate-100">
+                        <span className="font-medium text-gray-900 dark:text-zinc-100">
                           {selectedEmail.from?.name || selectedEmail.from?.email}
                         </span>
                         {selectedEmail.from?.name && (
-                          <span className="text-sm text-gray-500 dark:text-slate-400 hidden sm:inline">
+                          <span className="text-sm text-gray-500 dark:text-zinc-400 hidden sm:inline">
                             &lt;{selectedEmail.from?.email}&gt;
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-1 text-sm text-gray-500 dark:text-slate-400">
+                      <div className="flex items-center gap-1 text-sm text-gray-500 dark:text-zinc-400">
                         <span>to me</span>
                         <MdKeyboardArrowDown className="text-lg" />
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2 flex-shrink-0">
-                      <span className="text-xs sm:text-sm text-gray-500 dark:text-slate-400 hidden sm:block">
+                      <span className="text-xs sm:text-sm text-gray-500 dark:text-zinc-400 hidden sm:block">
                         {new Date(selectedEmail.date).toLocaleString([], {
                           month: 'short',
                           day: 'numeric',
@@ -2101,12 +2101,12 @@ export default function MailPage() {
                       </span>
                       <button
                         onClick={(e) => toggleStar(selectedEmail, e)}
-                        className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded"
+                        className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded"
                       >
                         {selectedEmail.isStarred ? (
                           <MdStar className="text-xl text-yellow-500" />
                         ) : (
-                          <MdStarBorder className="text-xl text-gray-400 dark:text-slate-500" />
+                          <MdStarBorder className="text-xl text-gray-400 dark:text-zinc-500" />
                         )}
                       </button>
                       <button
@@ -2123,13 +2123,13 @@ export default function MailPage() {
                           });
                           setShowCompose(true);
                         }}
-                        className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded"
+                        className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded"
                         title="Reply"
                       >
-                        <FaReply className="text-gray-500 dark:text-slate-400" />
+                        <FaReply className="text-gray-500 dark:text-zinc-400" />
                       </button>
-                      <button className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded hidden sm:block">
-                        <MdMoreVert className="text-xl text-gray-500 dark:text-slate-400" />
+                      <button className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded hidden sm:block">
+                        <MdMoreVert className="text-xl text-gray-500 dark:text-zinc-400" />
                       </button>
                     </div>
                   </div>
@@ -2138,27 +2138,27 @@ export default function MailPage() {
                   <div className="md:ml-13 md:pl-10">
                     {selectedEmail.bodyHtml ? (
                       <div
-                        className="prose max-w-none text-gray-800 dark:text-slate-200 dark:prose-invert [&_*]:!max-width-none"
+                        className="prose max-w-none text-gray-800 dark:text-zinc-200 dark:prose-invert [&_*]:!max-width-none"
                         style={{ colorScheme: 'auto' }}
                         dangerouslySetInnerHTML={{ __html: selectedEmail.bodyHtml }}
                       />
                     ) : (
-                      <pre className="whitespace-pre-wrap font-sans text-gray-800 dark:text-slate-200 text-sm md:text-base leading-relaxed">
+                      <pre className="whitespace-pre-wrap font-sans text-gray-800 dark:text-zinc-200 text-sm md:text-base leading-relaxed">
                         {selectedEmail.body || selectedEmail.snippet}
                       </pre>
                     )}
 
                     {/* Attachments */}
                     {selectedEmail.attachments?.length > 0 && (
-                      <div className="mt-6 pt-4 border-t border-gray-200 dark:border-slate-700">
+                      <div className="mt-6 pt-4 border-t border-gray-200 dark:border-zinc-700">
                         <div className="flex flex-wrap gap-2">
                           {selectedEmail.attachments.map((att, idx) => (
                             <div
                               key={idx}
-                              className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-slate-700 rounded-lg border border-gray-200 dark:border-slate-600 hover:bg-gray-200 dark:hover:bg-slate-600 cursor-pointer"
+                              className="flex items-center gap-2 px-3 py-2 bg-gray-100 dark:bg-zinc-700 rounded-lg border border-gray-200 dark:border-zinc-600 hover:bg-gray-200 dark:hover:bg-zinc-600 cursor-pointer"
                             >
-                              <MdAttachFile className="text-gray-500 dark:text-slate-400 -rotate-45" />
-                              <span className="text-sm text-gray-700 dark:text-slate-300">{att.filename}</span>
+                              <MdAttachFile className="text-gray-500 dark:text-zinc-400 -rotate-45" />
+                              <span className="text-sm text-gray-700 dark:text-zinc-300">{att.filename}</span>
                             </div>
                           ))}
                         </div>
@@ -2182,9 +2182,9 @@ export default function MailPage() {
                         });
                         setShowCompose(true);
                       }}
-                      className="flex items-center gap-2 px-5 py-2.5 border border-gray-300 dark:border-slate-600 rounded-full text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 hover:shadow-sm transition-all"
+                      className="flex items-center gap-2 px-5 py-2.5 border border-gray-300 dark:border-zinc-600 rounded-full text-sm text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-700 hover:shadow-sm transition-all"
                     >
-                      <FaReply className="text-gray-500 dark:text-slate-400" />
+                      <FaReply className="text-gray-500 dark:text-zinc-400" />
                       Reply
                     </button>
                     <button
@@ -2201,18 +2201,18 @@ export default function MailPage() {
                         });
                         setShowCompose(true);
                       }}
-                      className="flex items-center gap-2 px-5 py-2.5 border border-gray-300 dark:border-slate-600 rounded-full text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-700 hover:shadow-sm transition-all"
+                      className="flex items-center gap-2 px-5 py-2.5 border border-gray-300 dark:border-zinc-600 rounded-full text-sm text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-700 hover:shadow-sm transition-all"
                     >
-                      <FaForward className="text-gray-500 dark:text-slate-400" />
+                      <FaForward className="text-gray-500 dark:text-zinc-400" />
                       Forward
                     </button>
                   </div>
                 </div>
               </>
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-gray-400 dark:text-slate-500">
-                <MdInbox className="text-8xl mb-4 text-gray-200 dark:text-slate-700" />
-                <p className="text-lg text-gray-500 dark:text-slate-400">Select an email to read</p>
+              <div className="flex-1 flex flex-col items-center justify-center text-gray-400 dark:text-zinc-500">
+                <MdInbox className="text-8xl mb-4 text-gray-200 dark:text-zinc-700" />
+                <p className="text-lg text-gray-500 dark:text-zinc-400">Select an email to read</p>
               </div>
             )}
           </div>
@@ -2221,9 +2221,9 @@ export default function MailPage() {
       {/* AI Compose Modal */}
       {showAiCompose && (
         <div className="modal-overlay">
-          <div className="bg-white dark:bg-slate-800 rounded-[30px] shadow-xl w-full max-w-md p-6 animate-modal-enter">
+          <div className="bg-white dark:bg-zinc-800 rounded-[30px] shadow-xl w-full max-w-md p-6 animate-modal-enter">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-slate-100 flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-zinc-100 flex items-center gap-2">
                 <FaMagic className="text-purple-600 dark:text-purple-400" />
                 Write with AI
               </h3>
@@ -2234,21 +2234,21 @@ export default function MailPage() {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">What should this email say?</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-1">What should this email say?</label>
                 <textarea
                   value={aiPrompt}
                   onChange={(e) => setAiPrompt(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500 h-32 resize-none dark:placeholder:text-slate-400"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-700 text-gray-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-purple-500 h-32 resize-none dark:placeholder:text-slate-400"
                   placeholder="e.g. Write a polite decline to the meeting invitation for next Tuesday..."
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Tone</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-zinc-300 mb-1">Tone</label>
                 <select
                   value={aiTone}
                   onChange={(e) => setAiTone(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-700 text-gray-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-zinc-600 rounded-md bg-white dark:bg-zinc-700 text-gray-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
                   <option value="professional">Professional</option>
                   <option value="casual">Casual</option>
@@ -2261,7 +2261,7 @@ export default function MailPage() {
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   onClick={() => setShowAiCompose(false)}
-                  className="px-4 py-2 text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-md"
+                  className="px-4 py-2 text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded-md"
                 >
                   Cancel
                 </button>
@@ -2282,7 +2282,7 @@ export default function MailPage() {
       {/* Compose Modal - Gmail Style with Full Functionality */}
       {showCompose && (
         <div className={`fixed ${composeFullscreen ? 'inset-0 p-4' : 'bottom-0 right-0 sm:right-8 left-0 sm:left-auto'} z-[99999]`}>
-          <div className={`bg-white dark:bg-slate-800 rounded-t-xl sm:rounded-xl shadow-2xl flex flex-col ${composeFullscreen
+          <div className={`bg-white dark:bg-zinc-800 rounded-t-xl sm:rounded-xl shadow-2xl flex flex-col ${composeFullscreen
             ? 'w-full h-full rounded-xl'
             : composeMinimized
               ? 'w-72 h-10 hidden sm:flex rounded-lg'
@@ -2329,9 +2329,9 @@ export default function MailPage() {
                 <div className="flex-1 flex flex-col overflow-hidden">
                   {/* From indicator */}
                   {accounts.length > 1 && (
-                    <div className="flex items-center border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-700/50 px-3 py-1.5">
-                      <span className="text-xs text-gray-500 dark:text-slate-400 w-12">From</span>
-                      <span className="text-xs text-gray-700 dark:text-slate-300 font-medium">
+                    <div className="flex items-center border-b border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-700/50 px-3 py-1.5">
+                      <span className="text-xs text-gray-500 dark:text-zinc-400 w-12">From</span>
+                      <span className="text-xs text-gray-700 dark:text-zinc-300 font-medium">
                         {composeData.accountId
                           ? accounts.find(a => a.id === composeData.accountId)?.email || connectedEmail
                           : connectedEmail
@@ -2340,19 +2340,19 @@ export default function MailPage() {
                     </div>
                   )}
                   {/* To */}
-                  <div className="flex items-center border-b border-gray-200 dark:border-slate-700">
-                    <span className="pl-4 pr-1 text-sm text-gray-500 dark:text-slate-400 w-14">To</span>
+                  <div className="flex items-center border-b border-gray-200 dark:border-zinc-700">
+                    <span className="pl-4 pr-1 text-sm text-gray-500 dark:text-zinc-400 w-14">To</span>
                     <input
                       type="text"
                       value={composeData.to}
                       onChange={(e) => setComposeData(prev => ({ ...prev, to: e.target.value }))}
-                      className="flex-1 px-2 py-3 bg-transparent focus:outline-none text-gray-900 dark:text-slate-100 text-sm dark:placeholder:text-slate-400"
+                      className="flex-1 px-2 py-3 bg-transparent focus:outline-none text-gray-900 dark:text-zinc-100 text-sm dark:placeholder:text-slate-400"
                       placeholder="Recipients"
                     />
                     {!showCcBcc && (
                       <button
                         onClick={() => setShowCcBcc(true)}
-                        className="px-4 text-sm text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-300"
+                        className="px-4 text-sm text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-slate-300"
                       >
                         Cc Bcc
                       </button>
@@ -2361,108 +2361,108 @@ export default function MailPage() {
 
                   {/* Cc */}
                   {showCcBcc && (
-                    <div className="flex items-center border-b border-gray-200 dark:border-slate-700">
-                      <span className="pl-4 pr-1 text-sm text-gray-500 dark:text-slate-400 w-14">Cc</span>
+                    <div className="flex items-center border-b border-gray-200 dark:border-zinc-700">
+                      <span className="pl-4 pr-1 text-sm text-gray-500 dark:text-zinc-400 w-14">Cc</span>
                       <input
                         type="text"
                         value={composeData.cc}
                         onChange={(e) => setComposeData(prev => ({ ...prev, cc: e.target.value }))}
-                        className="flex-1 px-2 py-3 bg-transparent focus:outline-none text-gray-900 dark:text-slate-100 text-sm"
+                        className="flex-1 px-2 py-3 bg-transparent focus:outline-none text-gray-900 dark:text-zinc-100 text-sm"
                       />
                     </div>
                   )}
 
                   {/* Bcc */}
                   {showCcBcc && (
-                    <div className="flex items-center border-b border-gray-200 dark:border-slate-700">
-                      <span className="pl-4 pr-1 text-sm text-gray-500 dark:text-slate-400 w-14">Bcc</span>
+                    <div className="flex items-center border-b border-gray-200 dark:border-zinc-700">
+                      <span className="pl-4 pr-1 text-sm text-gray-500 dark:text-zinc-400 w-14">Bcc</span>
                       <input
                         type="text"
                         value={composeData.bcc}
                         onChange={(e) => setComposeData(prev => ({ ...prev, bcc: e.target.value }))}
-                        className="flex-1 px-2 py-3 bg-transparent focus:outline-none text-gray-900 dark:text-slate-100 text-sm"
+                        className="flex-1 px-2 py-3 bg-transparent focus:outline-none text-gray-900 dark:text-zinc-100 text-sm"
                       />
                     </div>
                   )}
 
                   {/* Subject */}
-                  <div className="flex items-center border-b border-gray-200 dark:border-slate-700">
+                  <div className="flex items-center border-b border-gray-200 dark:border-zinc-700">
                     <input
                       type="text"
                       value={composeData.subject}
                       onChange={(e) => setComposeData(prev => ({ ...prev, subject: e.target.value }))}
                       placeholder="Subject"
-                      className="flex-1 px-4 py-3 bg-transparent focus:outline-none text-gray-900 dark:text-slate-100 text-sm dark:placeholder:text-slate-400"
+                      className="flex-1 px-4 py-3 bg-transparent focus:outline-none text-gray-900 dark:text-zinc-100 text-sm dark:placeholder:text-slate-400"
                     />
                   </div>
 
                   {/* Formatting Toolbar (shown when enabled) */}
                   {showFormattingToolbar && (
-                    <div className="flex items-center gap-1 px-3 py-1.5 border-b border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-700/50 flex-wrap">
+                    <div className="flex items-center gap-1 px-3 py-1.5 border-b border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-700/50 flex-wrap">
                       <button
                         onClick={() => applyFormatting('bold')}
-                        className="p-2 hover:bg-gray-200 dark:hover:bg-slate-600 rounded"
+                        className="p-2 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded"
                         title="Bold (Ctrl+B)"
                       >
-                        <FaBold className="text-sm text-gray-600 dark:text-slate-300" />
+                        <FaBold className="text-sm text-gray-600 dark:text-zinc-300" />
                       </button>
                       <button
                         onClick={() => applyFormatting('italic')}
-                        className="p-2 hover:bg-gray-200 dark:hover:bg-slate-600 rounded"
+                        className="p-2 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded"
                         title="Italic (Ctrl+I)"
                       >
-                        <FaItalic className="text-sm text-gray-600 dark:text-slate-300" />
+                        <FaItalic className="text-sm text-gray-600 dark:text-zinc-300" />
                       </button>
                       <button
                         onClick={() => applyFormatting('underline')}
-                        className="p-2 hover:bg-gray-200 dark:hover:bg-slate-600 rounded"
+                        className="p-2 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded"
                         title="Underline (Ctrl+U)"
                       >
-                        <FaUnderline className="text-sm text-gray-600 dark:text-slate-300" />
+                        <FaUnderline className="text-sm text-gray-600 dark:text-zinc-300" />
                       </button>
                       <button
                         onClick={() => applyFormatting('strikeThrough')}
-                        className="p-2 hover:bg-gray-200 dark:hover:bg-slate-600 rounded"
+                        className="p-2 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded"
                         title="Strikethrough"
                       >
-                        <FaStrikethrough className="text-sm text-gray-600 dark:text-slate-300" />
+                        <FaStrikethrough className="text-sm text-gray-600 dark:text-zinc-300" />
                       </button>
-                      <div className="h-5 w-px bg-gray-300 dark:bg-slate-600 mx-1"></div>
+                      <div className="h-5 w-px bg-gray-300 dark:bg-zinc-600 mx-1"></div>
                       <button
                         onClick={() => applyFormatting('insertUnorderedList')}
-                        className="p-2 hover:bg-gray-200 dark:hover:bg-slate-600 rounded"
+                        className="p-2 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded"
                         title="Bulleted list"
                       >
-                        <FaListUl className="text-sm text-gray-600 dark:text-slate-300" />
+                        <FaListUl className="text-sm text-gray-600 dark:text-zinc-300" />
                       </button>
                       <button
                         onClick={() => applyFormatting('insertOrderedList')}
-                        className="p-2 hover:bg-gray-200 dark:hover:bg-slate-600 rounded"
+                        className="p-2 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded"
                         title="Numbered list"
                       >
-                        <FaListOl className="text-sm text-gray-600 dark:text-slate-300" />
+                        <FaListOl className="text-sm text-gray-600 dark:text-zinc-300" />
                       </button>
                       <button
                         onClick={() => applyFormatting('formatBlock', 'blockquote')}
-                        className="p-2 hover:bg-gray-200 dark:hover:bg-slate-600 rounded"
+                        className="p-2 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded"
                         title="Quote"
                       >
-                        <FaQuoteRight className="text-sm text-gray-600 dark:text-slate-300" />
+                        <FaQuoteRight className="text-sm text-gray-600 dark:text-zinc-300" />
                       </button>
-                      <div className="h-5 w-px bg-gray-300 dark:bg-slate-600 mx-1"></div>
+                      <div className="h-5 w-px bg-gray-300 dark:bg-zinc-600 mx-1"></div>
                       <button
                         onClick={insertLink}
-                        className="p-2 hover:bg-gray-200 dark:hover:bg-slate-600 rounded"
+                        className="p-2 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded"
                         title="Insert link"
                       >
-                        <FaLink className="text-sm text-gray-600 dark:text-slate-300" />
+                        <FaLink className="text-sm text-gray-600 dark:text-zinc-300" />
                       </button>
                       <button
                         onClick={() => applyFormatting('removeFormat')}
-                        className="p-2 hover:bg-gray-200 dark:hover:bg-slate-600 rounded"
+                        className="p-2 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded"
                         title="Remove formatting"
                       >
-                        <FaTimes className="text-sm text-gray-600 dark:text-slate-300" />
+                        <FaTimes className="text-sm text-gray-600 dark:text-zinc-300" />
                       </button>
                     </div>
                   )}
@@ -2471,7 +2471,7 @@ export default function MailPage() {
                   <div
                     ref={bodyEditorRef}
                     contentEditable
-                    className="compose-body-editor flex-1 px-4 py-3 bg-transparent focus:outline-none resize-none text-gray-900 dark:text-slate-100 text-sm overflow-y-auto"
+                    className="compose-body-editor flex-1 px-4 py-3 bg-transparent focus:outline-none resize-none text-gray-900 dark:text-zinc-100 text-sm overflow-y-auto"
                     style={{ minHeight: '150px' }}
                     data-placeholder="Write your message here..."
                     onInput={(e) => {
@@ -2484,20 +2484,20 @@ export default function MailPage() {
 
                   {/* Attachments List */}
                   {attachments.length > 0 && (
-                    <div className="px-4 py-2.5 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-700/50">
-                      <div className="text-xs text-gray-500 dark:text-slate-400 mb-2">Attachments ({attachments.length})</div>
+                    <div className="px-4 py-2.5 border-t border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-700/50">
+                      <div className="text-xs text-gray-500 dark:text-zinc-400 mb-2">Attachments ({attachments.length})</div>
                       <div className="flex flex-wrap gap-2">
                         {attachments.map((file, idx) => (
                           <div
                             key={idx}
-                            className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-700 rounded-lg border border-gray-200 dark:border-slate-600 text-sm group"
+                            className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-zinc-700 rounded-lg border border-gray-200 dark:border-zinc-600 text-sm group"
                           >
                             <MdAttachFile className="text-gray-400 -rotate-45" />
-                            <span className="text-gray-700 dark:text-slate-300 max-w-[150px] truncate">{file.name}</span>
+                            <span className="text-gray-700 dark:text-zinc-300 max-w-[150px] truncate">{file.name}</span>
                             <span className="text-gray-400 text-xs">({formatFileSize(file.size)})</span>
                             <button
                               onClick={() => removeAttachment(idx)}
-                              className="ml-1 p-1 hover:bg-gray-200 dark:hover:bg-slate-600 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                              className="ml-1 p-1 hover:bg-gray-200 dark:hover:bg-zinc-600 rounded opacity-0 group-hover:opacity-100 transition-opacity"
                             >
                               <FaTimes className="text-xs text-gray-500" />
                             </button>
@@ -2509,10 +2509,10 @@ export default function MailPage() {
 
                   {/* Emoji Picker */}
                   {showEmojiPicker && (
-                    <div className="absolute bottom-16 left-3 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg shadow-xl p-3 z-10 w-80">
+                    <div className="absolute bottom-16 left-3 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-xl p-3 z-10 w-80">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-gray-700 dark:text-slate-300">Emojis</span>
-                        <button onClick={() => setShowEmojiPicker(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded">
+                        <span className="text-sm font-medium text-gray-700 dark:text-zinc-300">Emojis</span>
+                        <button onClick={() => setShowEmojiPicker(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded">
                           <FaTimes className="text-xs text-gray-500" />
                         </button>
                       </div>
@@ -2521,7 +2521,7 @@ export default function MailPage() {
                           <button
                             key={idx}
                             onClick={() => insertEmoji(emoji)}
-                            className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded text-xl"
+                            className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded text-xl"
                           >
                             {emoji}
                           </button>
@@ -2532,7 +2532,7 @@ export default function MailPage() {
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-b-xl">
+                <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 rounded-b-xl">
                   <div className="flex items-center gap-0.5">
                     <button
                       onClick={sendEmail}
@@ -2541,11 +2541,11 @@ export default function MailPage() {
                     >
                       {sending ? <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg> : 'Send'}
                     </button>
-                    <button className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded hidden sm:block">
-                      <MdArrowDropDown className="text-xl text-gray-600 dark:text-slate-400" />
+                    <button className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded hidden sm:block">
+                      <MdArrowDropDown className="text-xl text-gray-600 dark:text-zinc-400" />
                     </button>
 
-                    <div className="h-6 w-px bg-gray-300 dark:bg-slate-600 mx-2"></div>
+                    <div className="h-6 w-px bg-gray-300 dark:bg-zinc-600 mx-2"></div>
 
                     <button
                       onClick={() => setShowAiCompose(true)}
@@ -2561,7 +2561,7 @@ export default function MailPage() {
                     {/* Formatting Toggle */}
                     <button
                       onClick={() => setShowFormattingToolbar(!showFormattingToolbar)}
-                      className={`p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded hidden sm:block ${showFormattingToolbar ? 'bg-gray-200 dark:bg-slate-600' : ''}`}
+                      className={`p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded hidden sm:block ${showFormattingToolbar ? 'bg-gray-200 dark:bg-zinc-600' : ''}`}
                       title="Formatting options"
                     >
                       <FaBold className="text-gray-500 text-sm" />
@@ -2579,7 +2579,7 @@ export default function MailPage() {
                     {/* Attach files */}
                     <button
                       onClick={() => fileInputRef.current?.click()}
-                      className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded relative"
+                      className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded relative"
                       title="Attach files"
                       disabled={uploadingAttachment}
                     >
@@ -2598,19 +2598,19 @@ export default function MailPage() {
                     {/* Insert link */}
                     <button
                       onClick={insertLink}
-                      className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded hidden sm:block"
+                      className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded hidden sm:block"
                       title="Insert link"
                     >
-                      <MdInsertLink className="text-xl text-gray-500 dark:text-slate-400" />
+                      <MdInsertLink className="text-xl text-gray-500 dark:text-zinc-400" />
                     </button>
 
                     {/* Insert emoji */}
                     <button
                       onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                      className={`p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded hidden sm:block ${showEmojiPicker ? 'bg-gray-200 dark:bg-slate-600' : ''}`}
+                      className={`p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded hidden sm:block ${showEmojiPicker ? 'bg-gray-200 dark:bg-zinc-600' : ''}`}
                       title="Insert emoji"
                     >
-                      <MdInsertEmoticon className="text-xl text-gray-500 dark:text-slate-400" />
+                      <MdInsertEmoticon className="text-xl text-gray-500 dark:text-zinc-400" />
                     </button>
 
                     <div className="flex-1"></div>
@@ -2624,10 +2624,10 @@ export default function MailPage() {
                         setShowEmojiPicker(false);
                         setShowFormattingToolbar(false);
                       }}
-                      className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded"
+                      className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-700 rounded"
                       title="Discard draft"
                     >
-                      <MdDelete className="text-xl text-gray-500 dark:text-slate-400" />
+                      <MdDelete className="text-xl text-gray-500 dark:text-zinc-400" />
                     </button>
                   </div>
                 </div>

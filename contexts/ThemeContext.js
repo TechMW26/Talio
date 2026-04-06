@@ -7,19 +7,19 @@ const ThemeContext = createContext()
 // Dark mode background/text overrides applied on top of any color theme
 const darkOverrides = {
   background: {
-    main: '#0F172A',       // Slate-900
-    card: '#1E293B',       // Slate-800
-    sidebar: '#1E293B',    // Slate-800
-    hover: '#334155',      // Slate-700
+    main: '#09090b',       // Zinc-950 (true black)
+    card: '#18181b',       // Zinc-900
+    sidebar: '#18181b',    // Zinc-900
+    hover: '#27272a',      // Zinc-800
   },
   text: {
-    primary: '#F1F5F9',    // Slate-100
-    secondary: '#94A3B8',  // Slate-400
+    primary: '#fafafa',    // Zinc-50
+    secondary: '#a1a1aa',  // Zinc-400
   },
   accent: {
-    profile: '#0F172A',
+    profile: '#09090b',
   },
-  border: '#334155',       // Slate-700
+  border: '#27272a',       // Zinc-800
 }
 
 // Theme configurations
@@ -209,9 +209,9 @@ export function ThemeProvider({ children }) {
         root.style.setProperty('--color-accent-gradient', theme.accent.gradient)
         root.style.setProperty('--color-border', darkOverrides.border)
         // Override light primary shades to dark-appropriate tints
-        root.style.setProperty('--color-primary-50', `color-mix(in srgb, ${theme.primary[500]} 8%, #0F172A)`)
-        root.style.setProperty('--color-primary-100', `color-mix(in srgb, ${theme.primary[500]} 18%, #1E293B)`)
-        root.style.setProperty('--color-primary-200', `color-mix(in srgb, ${theme.primary[500]} 28%, #1E293B)`)
+        root.style.setProperty('--color-primary-50', `color-mix(in srgb, ${theme.primary[500]} 5%, #09090b)`)
+        root.style.setProperty('--color-primary-100', `color-mix(in srgb, ${theme.primary[500]} 10%, #18181b)`)
+        root.style.setProperty('--color-primary-200', `color-mix(in srgb, ${theme.primary[500]} 18%, #18181b)`)
         root.classList.add('dark')
       } else {
         // Light mode: use theme's own values

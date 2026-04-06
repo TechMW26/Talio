@@ -100,7 +100,7 @@ export default function TenantSetupPage({ params }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50 dark:bg-[#0F172A] dark:from-transparent dark:to-transparent">
+      <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50 dark:bg-[#09090b] dark:from-transparent dark:to-transparent">
         <div className="text-center flex flex-col items-center justify-center">
           <Spinner size="lg" color="primary" />
           <p className="mt-4 text-default-600 text-center font-medium">Validating setup link...</p>
@@ -111,8 +111,8 @@ export default function TenantSetupPage({ params }) {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:bg-[#0F172A] dark:from-transparent dark:via-transparent dark:to-transparent flex items-center justify-center p-4">
-        <Card className="max-w-md w-full shadow-2xl border border-default-100 dark:border-slate-700/50 bg-white/80 dark:bg-[#1E293B]/90 backdrop-blur-xl" radius="lg">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:bg-[#09090b] dark:from-transparent dark:via-transparent dark:to-transparent flex items-center justify-center p-4">
+        <Card className="max-w-md w-full shadow-2xl border border-default-100 dark:border-zinc-700/50 bg-white/80 dark:bg-[#18181b]/90 backdrop-blur-xl" radius="lg">
           <CardBody className="p-8 text-center">
             <div className="w-16 h-16 bg-danger-100 dark:bg-danger-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8 text-danger-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -131,7 +131,7 @@ export default function TenantSetupPage({ params }) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:bg-[#0F172A] dark:from-transparent dark:via-transparent dark:to-transparent">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:bg-[#09090b] dark:from-transparent dark:via-transparent dark:to-transparent">
       {/* Decorative background elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary-200 dark:bg-primary-500/10 rounded-full blur-3xl opacity-30" />
@@ -141,7 +141,7 @@ export default function TenantSetupPage({ params }) {
       <div className="min-h-screen flex items-center justify-center px-4 py-8 relative z-10">
         <div className="w-full max-w-md">
           <Card
-            className="shadow-2xl border border-default-100 dark:border-slate-700/50 bg-white/80 dark:bg-[#1E293B]/90 backdrop-blur-xl"
+            className="shadow-2xl border border-default-100 dark:border-zinc-700/50 bg-white/80 dark:bg-[#18181b]/90 backdrop-blur-xl"
             radius="lg"
           >
             <CardBody className="p-8 md:p-10">
@@ -276,7 +276,7 @@ export default function TenantSetupPage({ params }) {
 
             <Divider />
 
-            <CardFooter className="justify-center py-4 bg-default-50/50 dark:bg-slate-800/50">
+            <CardFooter className="justify-center py-4 bg-default-50/50 dark:bg-zinc-800/50">
               <p className="text-default-500 text-xs">
                 Powered by <span className="text-primary-600 dark:text-primary-400 font-semibold">Talio</span>
               </p>

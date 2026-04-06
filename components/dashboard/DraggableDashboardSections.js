@@ -181,7 +181,7 @@ export default function DraggableDashboardSections({
         return (
             <div className="space-y-5 sm:space-y-8 animate-pulse">
                 {sections.map((_, i) => (
-                    <div key={i} className="h-48 bg-gray-200 dark:bg-slate-700 rounded-2xl" />
+                    <div key={i} className="h-48 bg-gray-200 dark:bg-zinc-700 rounded-2xl" />
                 ))}
             </div>
         )

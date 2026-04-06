@@ -72,7 +72,7 @@ nav.sidebar {
 html.dark .sidebar,
 html.dark .sidebar-container,
 html.dark nav.sidebar {
-  border-color: #334155 !important;
+  border-color: #27272a !important;
 }
 
 /* Dark active menu items */
@@ -84,15 +84,15 @@ html.dark .nav-item.active {
 
 /* Dark card borders */
 html.dark .card {
-  border-color: #334155;
+  border-color: #27272a;
 }
 
 html.dark .card-bordered {
-  border-color: #334155 !important;
+  border-color: #27272a !important;
 }
 
 /* Dark theme borders */
 html.dark .border-theme {
-  border-color: #334155 !important;
+  border-color: #27272a !important;
 }
 

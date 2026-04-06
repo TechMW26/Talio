@@ -317,7 +317,7 @@ export default function FloatingChatWidget() {
 
   // Glass morphism styles
   const glassStyle = {
-    background: isDarkMode ? 'rgba(30, 41, 59, 0.95)' : 'rgba(255, 255, 255, 0.9)',
+    background: isDarkMode ? 'rgba(24, 24, 27, 0.95)' : 'rgba(255, 255, 255, 0.9)',
     border: isDarkMode ? '1px solid rgba(51, 65, 85, 0.5)' : '1px solid rgba(255, 255, 255, 0.3)',
     boxShadow: isDarkMode ? '0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05)' : '0 8px 32px rgba(0, 0, 0, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.4)',
   }
@@ -379,8 +379,8 @@ export default function FloatingChatWidget() {
                   setShowNewChat(true)
                   fetchEmployees()
                 }}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-slate-600 rounded-lg transition-colors"
-                style={{ backgroundColor: isDarkMode ? '#334155' : 'white' }}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-600 rounded-lg transition-colors"
+                style={{ backgroundColor: isDarkMode ? '#27272a' : 'white' }}
                 title="New Chat"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512" className="w-4 h-4" fill={primaryDark}>
@@ -389,8 +389,8 @@ export default function FloatingChatWidget() {
               </button>
               <button
                 onClick={closeWidget}
-                className="p-2 hover:bg-gray-100 dark:hover:bg-slate-600 rounded-lg transition-colors"
-                style={{ backgroundColor: isDarkMode ? '#334155' : 'white' }}
+                className="p-2 hover:bg-gray-100 dark:hover:bg-zinc-600 rounded-lg transition-colors"
+                style={{ backgroundColor: isDarkMode ? '#27272a' : 'white' }}
                 title="Close"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512" className="w-4 h-4" fill={primaryDark}>
@@ -420,8 +420,8 @@ export default function FloatingChatWidget() {
             <div className="flex-1 overflow-y-auto overflow-x-hidden" style={{ background: isDarkMode ? 'rgba(15, 23, 42, 0.5)' : 'rgba(248, 250, 252, 0.5)' }}>
               {showNewChat ? (
                 <>
-                  <div className="px-4 py-2.5 flex items-center justify-between" style={{ background: isDarkMode ? 'rgba(30, 41, 59, 0.6)' : 'rgba(255, 255, 255, 0.6)' }}>
-                    <span className="text-sm font-medium" style={{ color: isDarkMode ? '#E2E8F0' : '#374151' }}>Start a conversation</span>
+                  <div className="px-4 py-2.5 flex items-center justify-between" style={{ background: isDarkMode ? 'rgba(24, 24, 27, 0.6)' : 'rgba(255, 255, 255, 0.6)' }}>
+                    <span className="text-sm font-medium" style={{ color: isDarkMode ? '#e4e4e7' : '#374151' }}>Start a conversation</span>
                     <button
                       onClick={() => {
                         setShowNewChat(false)
@@ -512,7 +512,7 @@ export default function FloatingChatWidget() {
                             )}
                           </div>
                           {!chat.isGroup && isChatOnline(chat) && (
-                            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full shadow-sm" style={{ border: isDarkMode ? '2px solid #1E293B' : '2px solid white' }}></div>
+                            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full shadow-sm" style={{ border: isDarkMode ? '2px solid #18181b' : '2px solid white' }}></div>
                           )}
                         </div>
                         {/* Content - takes remaining space */}
@@ -535,7 +535,7 @@ export default function FloatingChatWidget() {
                             >
                               {getChatName(chat)}
                             </span>
-                            <span style={{ flexShrink: 0, fontSize: '10px', color: isDarkMode ? '#64748B' : '#9CA3AF', whiteSpace: 'nowrap' }}>
+                            <span style={{ flexShrink: 0, fontSize: '10px', color: isDarkMode ? '#71717a' : '#9CA3AF', whiteSpace: 'nowrap' }}>
                               {chat.lastMessageAt ? new Date(chat.lastMessageAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                             </span>
                             {unreadCount > 0 && (
@@ -586,8 +586,8 @@ export default function FloatingChatWidget() {
                   >
                     <FaComments className="w-8 h-8" style={{ color: primaryColor }} />
                   </div>
-                  <p className="font-medium" style={{ color: isDarkMode ? '#E2E8F0' : '#4B5563' }}>No conversations yet</p>
-                  <p className="text-sm mt-1" style={{ color: isDarkMode ? '#64748B' : '#9CA3AF' }}>Start chatting with your team!</p>
+                  <p className="font-medium" style={{ color: isDarkMode ? '#e4e4e7' : '#4B5563' }}>No conversations yet</p>
+                  <p className="text-sm mt-1" style={{ color: isDarkMode ? '#71717a' : '#9CA3AF' }}>Start chatting with your team!</p>
                   <button
                     onClick={() => {
                       setShowNewChat(true)

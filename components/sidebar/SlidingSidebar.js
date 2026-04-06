@@ -345,7 +345,7 @@ export default function SlidingSidebar({
               setIsOpen(false)
               setActiveSubmenu(null)
             }}
-            className="p-2 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-slate-700"
+            className="p-2 rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-zinc-700"
             title="Close sidebar"
           >
             <HiOutlineChevronRight className="w-4 h-4 text-gray-600 dark:text-gray-400 rotate-180" />

@@ -44,7 +44,7 @@ export default function SuperAdminLogin() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:bg-[#0F172A] dark:from-transparent dark:via-transparent dark:to-transparent">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:bg-[#09090b] dark:from-transparent dark:via-transparent dark:to-transparent">
       {/* Decorative background elements */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary-200 dark:bg-primary-500/10 rounded-full blur-3xl opacity-30" />
@@ -54,7 +54,7 @@ export default function SuperAdminLogin() {
       <div className="min-h-screen flex items-center justify-center px-4 py-8 relative z-10">
         <div className="w-full max-w-md">
           <Card
-            className="shadow-2xl border border-default-100 dark:border-slate-700/50 bg-white/80 dark:bg-[#1E293B]/90 backdrop-blur-xl"
+            className="shadow-2xl border border-default-100 dark:border-zinc-700/50 bg-white/80 dark:bg-[#18181b]/90 backdrop-blur-xl"
             radius="lg"
           >
             <CardBody className="p-8 md:p-10">
@@ -138,7 +138,7 @@ export default function SuperAdminLogin() {
 
             <Divider />
 
-            <CardFooter className="justify-center py-4 bg-default-50/50 dark:bg-slate-800/50">
+            <CardFooter className="justify-center py-4 bg-default-50/50 dark:bg-zinc-800/50">
               <p className="text-default-500 text-xs">
                 Powered by <span className="text-primary-600 dark:text-primary-400 font-semibold">Talio</span>
               </p>

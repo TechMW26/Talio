@@ -545,7 +545,7 @@ export default function TodoPage() {
                   startContent={<HiOutlineMagnifyingGlass className="w-5 h-5 text-default-400" />}
                   variant="bordered"
                   classNames={{
-                    inputWrapper: "bg-default-50 dark:bg-[#1E293B] shadow-none",
+                    inputWrapper: "bg-default-50 dark:bg-[#18181b] shadow-none",
                   }}
                 />
               </div>

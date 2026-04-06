@@ -85,7 +85,7 @@ async function sendLimitNotification(transporter, company, currentCount, maxUser
         ${isAtLimit ? `
           <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">
             <h4 style="color: #1e293b; margin-top: 0;">What happens now?</h4>
-            <ul style="color: #475569; padding-left: 20px;">
+            <ul style="color: #3f3f46; padding-left: 20px;">
               <li>New employee creation is blocked</li>
               <li>Existing employees are not affected</li>
               <li>Contact Talio to increase your limit</li>

@@ -944,39 +944,39 @@
 
 /* Page title & subtitle */
 html.dark .page-title {
-  color: #F1F5F9;
+  color: #fafafa;
 }
 
 html.dark .page-subtitle {
-  color: #94A3B8;
+  color: #a1a1aa;
 }
 
 /* Buttons */
 html.dark .btn-secondary {
-  background-color: #334155;
-  color: #E2E8F0;
-  border-color: #475569;
+  background-color: #27272a;
+  color: #e4e4e7;
+  border-color: #3f3f46;
 }
 
 html.dark .btn-secondary:hover:not(:disabled) {
-  background-color: #475569;
-  border-color: #64748B;
+  background-color: #3f3f46;
+  border-color: #71717a;
 }
 
 html.dark .btn-ghost {
-  color: #94A3B8;
+  color: #a1a1aa;
 }
 
 html.dark .btn-ghost:hover:not(:disabled) {
-  background-color: #334155;
-  color: #E2E8F0;
+  background-color: #27272a;
+  color: #e4e4e7;
 }
 
 /* Inputs */
 html.dark .input {
-  color: #E2E8F0;
-  background-color: #0F172A;
-  border-color: #475569;
+  color: #e4e4e7;
+  background-color: #09090b;
+  border-color: #3f3f46;
 }
 
 html.dark .input:focus {
@@ -984,89 +984,89 @@ html.dark .input:focus {
 }
 
 html.dark .input::placeholder {
-  color: #64748B;
+  color: #71717a;
 }
 
 html.dark .input:disabled {
-  background-color: #1E293B;
+  background-color: #18181b;
 }
 
 html.dark .input-search {
-  background-color: #1E293B;
-  border-color: #334155;
+  background-color: #18181b;
+  border-color: #27272a;
 }
 
 html.dark .input-search:focus {
-  background-color: #0F172A;
+  background-color: #09090b;
 }
 
 /* Select */
 html.dark .select {
-  color: #E2E8F0;
-  background-color: #0F172A;
-  border-color: #475569;
+  color: #e4e4e7;
+  background-color: #09090b;
+  border-color: #3f3f46;
 }
 
 /* Textarea */
 html.dark .textarea {
-  color: #E2E8F0;
-  background-color: #0F172A;
-  border-color: #475569;
+  color: #e4e4e7;
+  background-color: #09090b;
+  border-color: #3f3f46;
 }
 
 /* Labels */
 html.dark .label {
-  color: #CBD5E1;
+  color: #d4d4d8;
 }
 
 /* Cards */
 html.dark .card {
-  background-color: var(--color-bg-card, #1E293B);
+  background-color: var(--color-bg-card, #18181b);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 html.dark .card-header {
-  border-color: #334155;
+  border-color: #27272a;
 }
 
 html.dark .card-title {
-  color: #F1F5F9;
+  color: #fafafa;
 }
 
 html.dark .card-subtitle {
-  color: #94A3B8;
+  color: #a1a1aa;
 }
 
 html.dark .card-footer {
-  background-color: #0F172A;
-  border-color: #334155;
+  background-color: #09090b;
+  border-color: #27272a;
 }
 
 /* Tables */
 html.dark .table-container {
-  background-color: var(--color-bg-card, #1E293B);
+  background-color: var(--color-bg-card, #18181b);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 html.dark .table th {
-  color: #94A3B8;
-  background-color: #0F172A;
-  border-color: #334155;
+  color: #a1a1aa;
+  background-color: #09090b;
+  border-color: #27272a;
 }
 
 html.dark .table td {
-  color: #CBD5E1;
-  border-color: #334155;
+  color: #d4d4d8;
+  border-color: #27272a;
 }
 
 html.dark .table tbody tr:hover {
-  background-color: #334155;
+  background-color: #27272a;
 }
 
 /* Badges */
 html.dark .badge-gray {
-  background-color: #334155;
-  color: #94A3B8;
+  background-color: #27272a;
+  color: #a1a1aa;
 }
 
 html.dark .badge-success {
@@ -1086,35 +1086,35 @@ html.dark .badge-danger {
 
 /* Modals */
 html.dark .modal {
-  background-color: #1E293B;
+  background-color: #18181b;
 }
 
 html.dark .modal-header {
-  border-color: #334155;
+  border-color: #27272a;
 }
 
 html.dark .modal-title {
-  color: #F1F5F9;
+  color: #fafafa;
 }
 
 html.dark .modal-footer {
-  background-color: #0F172A;
-  border-color: #334155;
+  background-color: #09090b;
+  border-color: #27272a;
 }
 
 /* Dropdowns */
 html.dark .dropdown-menu {
-  background-color: #1E293B;
-  border-color: #334155;
+  background-color: #18181b;
+  border-color: #27272a;
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
 }
 
 html.dark .dropdown-item {
-  color: #CBD5E1;
+  color: #d4d4d8;
 }
 
 html.dark .dropdown-item:hover {
-  background-color: #334155;
+  background-color: #27272a;
 }
 
 html.dark .dropdown-item-danger:hover {
@@ -1122,50 +1122,50 @@ html.dark .dropdown-item-danger:hover {
 }
 
 html.dark .dropdown-divider {
-  background-color: #334155;
+  background-color: #27272a;
 }
 
 /* View Toggle */
 html.dark .view-toggle {
-  background-color: #1E293B;
-  border-color: #334155;
+  background-color: #18181b;
+  border-color: #27272a;
 }
 
 html.dark .view-toggle-btn {
-  color: #94A3B8;
+  color: #a1a1aa;
 }
 
 html.dark .view-toggle-btn:hover {
-  color: #E2E8F0;
+  color: #e4e4e7;
 }
 
 html.dark .view-toggle-btn-active {
-  background-color: #334155;
-  color: #F1F5F9;
+  background-color: #27272a;
+  color: #fafafa;
 }
 
 /* Stat Card */
 html.dark .stat-card {
-  background-color: var(--color-bg-card, #1E293B);
+  background-color: var(--color-bg-card, #18181b);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 html.dark .stat-card-value {
-  color: #F1F5F9;
+  color: #fafafa;
 }
 
 html.dark .stat-card-label {
-  color: #94A3B8;
+  color: #a1a1aa;
 }
 
 /* Section Header */
 html.dark .section-title {
-  color: #94A3B8;
+  color: #a1a1aa;
 }
 
 html.dark .section-count {
-  background-color: #334155;
-  color: #94A3B8;
+  background-color: #27272a;
+  color: #a1a1aa;
 }
 
 /* Alerts */
@@ -1191,42 +1191,42 @@ html.dark .alert-danger {
 
 /* Tabs */
 html.dark .tabs {
-  border-color: #334155;
+  border-color: #27272a;
 }
 
 html.dark .tab {
-  color: #94A3B8;
+  color: #a1a1aa;
 }
 
 html.dark .tab:hover {
-  color: #E2E8F0;
+  color: #e4e4e7;
 }
 
 /* Empty States */
 html.dark .empty-state-title {
-  color: #F1F5F9;
+  color: #fafafa;
 }
 
 html.dark .empty-state-description {
-  color: #94A3B8;
+  color: #a1a1aa;
 }
 
 /* Loading */
 html.dark .loading-spinner {
-  border-color: #334155;
+  border-color: #27272a;
   border-top-color: var(--color-primary-500);
 }
 
 html.dark .loading-text {
-  color: #94A3B8;
+  color: #a1a1aa;
 }
 
 /* Toggle switch */
 html.dark .toggle-slider {
-  background-color: #475569;
+  background-color: #3f3f46;
 }
 
 html.dark .toggle-switch,
 html.dark .toggle-btn {
-  background-color: #475569;
+  background-color: #3f3f46;
 }

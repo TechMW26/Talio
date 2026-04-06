@@ -167,7 +167,7 @@ export default function RecruitmentPage() {
                 isClearable onClear={() => updateFilter('search', '')}
                 variant="bordered"
                 classNames={{
-                  inputWrapper: "bg-default-50 dark:bg-[#1E293B] shadow-none",
+                  inputWrapper: "bg-default-50 dark:bg-[#18181b] shadow-none",
                 }}
               />
               <Select size="sm" placeholder="All Status" selectedKeys={filters.status ? [filters.status] : []} onSelectionChange={(keys) => updateFilter('status', Array.from(keys)[0] || '')}>

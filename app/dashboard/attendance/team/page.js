@@ -373,7 +373,7 @@ export default function TeamAttendancePage() {
                 startContent={<FaSearch className="text-default-400" />}
                 variant="bordered"
                 classNames={{
-                  inputWrapper: "bg-default-50 dark:bg-[#1E293B] shadow-none",
+                  inputWrapper: "bg-default-50 dark:bg-[#18181b] shadow-none",
                 }}
               />
             </div>
@@ -481,7 +481,7 @@ export default function TeamAttendancePage() {
                       key={emp._id}
                       isPressable
                       onPress={() => handleEmployeeClick(emp)}
-                      className={`shadow-md hover:shadow-lg transition-all duration-200 border-l-4 ${deptColor.border} ${isHeadedDept ? 'ring-2 ring-primary ring-offset-1 dark:ring-offset-[#0F172A]' : ''}`}
+                      className={`shadow-md hover:shadow-lg transition-all duration-200 border-l-4 ${deptColor.border} ${isHeadedDept ? 'ring-2 ring-primary ring-offset-1 dark:ring-offset-[#09090b]' : ''}`}
                     >
                       <CardBody className="p-4">
                         <div className="flex items-start gap-3">
@@ -651,7 +651,7 @@ export default function TeamAttendancePage() {
                         ${dayData.day === null ? 'bg-transparent border-transparent' :
                           `${getStatusColor(dayData.record, dayData.isFuture)}`
                         }
-                        ${dayData.isToday ? 'ring-2 ring-primary ring-offset-2 dark:ring-offset-[#1E293B]' : ''}
+                        ${dayData.isToday ? 'ring-2 ring-primary ring-offset-2 dark:ring-offset-[#18181b]' : ''}
                       `}
                     >
                       {dayData.day && (

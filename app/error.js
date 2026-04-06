@@ -22,7 +22,7 @@ export default function Error({ error, reset }) {
   }, [error])
 
   return (
-    <div className="min-h-screen bg-red-50 dark:bg-[#0F172A] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-red-50 dark:bg-[#09090b] flex items-center justify-center p-4">
       <div className="max-w-md w-full">
         {/* Error Icon */}
         <div className="text-center mb-8">

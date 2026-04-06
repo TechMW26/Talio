@@ -156,7 +156,7 @@ export default function CandidatesPage() {
                 isClearable onClear={() => updateFilter('search', '')}
                 variant="bordered"
                 classNames={{
-                  inputWrapper: "bg-default-50 dark:bg-[#1E293B] shadow-none",
+                  inputWrapper: "bg-default-50 dark:bg-[#18181b] shadow-none",
                 }}
               />
               <Select size="sm" placeholder="All Stages"

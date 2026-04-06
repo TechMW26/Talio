@@ -989,7 +989,7 @@ export default function GeneratePayrollPage() {
                       )}
                       variant="bordered"
                       classNames={{
-                        inputWrapper: "bg-default-50 dark:bg-[#1E293B] shadow-none",
+                        inputWrapper: "bg-default-50 dark:bg-[#18181b] shadow-none",
                       }}
                     />
                   </div>

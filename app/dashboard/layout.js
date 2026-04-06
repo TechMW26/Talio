@@ -424,7 +424,7 @@ export default function DashboardLayout({ children }) {
                     <Header toggleSidebar={toggleSidebar} sidebarCollapsed={sidebarCollapsed} />
 
                     {/* Main Content Area - Scrollable */}
-                    <main ref={mainRef} className={`z-0 flex-1 overflow-y-auto relative ${isChatPage ? 'bg-white dark:bg-slate-800 md:bg-transparent' : ''}`}>
+                    <main ref={mainRef} className={`z-0 flex-1 overflow-y-auto relative ${isChatPage ? 'bg-white dark:bg-zinc-800 md:bg-transparent' : ''}`}>
                       {/* Navigation skeleton overlay */}
                       <PageTransitionOverlay />
 

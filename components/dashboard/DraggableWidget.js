@@ -51,7 +51,7 @@ export default function DraggableWidget({
       ref={setNodeRef}
       style={sortableStyle}
       className={`
-        relative group bg-white dark:bg-[#1E293B] border border-gray-100/50 dark:border-transparent h-full rounded-2xl
+        relative group bg-white dark:bg-[#18181b] border border-gray-100/50 dark:border-zinc-800/50 h-full rounded-2xl
         ${isDragging ? '' : 'transition-all duration-500 ease-out'}
         ${entranceClasses}
         ${isDragging ? 'ring-2 ring-primary-500 shadow-2xl' : 'shadow-sm dark:shadow-none hover:shadow-xl dark:hover:shadow-lg dark:hover:shadow-black/20 hover:scale-[1.01]'}

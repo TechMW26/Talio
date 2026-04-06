@@ -96,7 +96,7 @@ export default function GuestJoinPage({ params }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-indigo-50 dark:bg-[#0F172A] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-indigo-50 dark:bg-[#09090b] flex items-center justify-center p-4">
         <div className="text-center">
           <Loader size="lg" className="mb-4" />
           <p className="text-gray-600">Loading meeting information...</p>
@@ -107,7 +107,7 @@ export default function GuestJoinPage({ params }) {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-indigo-50 dark:bg-[#0F172A] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-indigo-50 dark:bg-[#09090b] flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-white rounded-2xl p-8 text-center shadow-xl border border-gray-200">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <HiOutlineVideoCamera className="w-8 h-8 text-red-500" />
