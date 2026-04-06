@@ -8,6 +8,7 @@ import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
 import Loader from '@/components/ui/Loader'
+import { getCurrentUser } from '@/utils/userHelper'
 import {
   FaTasks, FaCalendarAlt, FaFilter, FaSearch, FaProjectDiagram,
   FaCheck, FaPlay, FaEye, FaClock, FaExclamationTriangle,
@@ -93,11 +94,14 @@ function AssignedTasksSkeleton() {
 
 export default function AssignedTasksPage() {
   const router = useRouter()
+  const user = useMemo(() => getCurrentUser(), [])
+  const currentEmployeeId = user?.employeeId?._id || user?.employeeId
   const [filters, setFilters] = useState({
     status: 'all',
     project: 'all'
   })
   const [searchQuery, setSearchQuery] = useState('')
+  const [selfAssigning, setSelfAssigning] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [selectedTask, setSelectedTask] = useState(null)
 
@@ -174,7 +178,7 @@ export default function AssignedTasksPage() {
         const data = await response.json()
         if (data.success) {
           setProjectMembers(data.data?.map(emp => ({
-            employee: emp,
+            user: emp,
             invitationStatus: 'accepted'
           })) || [])
         }
@@ -323,6 +327,46 @@ export default function AssignedTasksPage() {
       toast.error('Failed to reassign task')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  // Self-assign to task
+  const handleSelfAssign = async () => {
+    if (!selectedTask || !currentEmployeeId) return
+
+    // Check if already assigned
+    const alreadyAssigned = selectedTask.assignees?.some(
+      a => (a.user?._id || a.user) === currentEmployeeId
+    )
+    if (alreadyAssigned) {
+      toast.error('You are already assigned to this task')
+      return
+    }
+
+    try {
+      setSelfAssigning(true)
+      const token = localStorage.getItem('token')
+      const response = await fetch(`${getTaskApiBase(selectedTask)}/assign`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ assigneeId: currentEmployeeId })
+      })
+      const data = await response.json()
+      if (data.success) {
+        playNotificationSound(NotificationSoundTypes.SUCCESS)
+        toast.success('You have been assigned to this task')
+        mutateTasks()
+        setSelectedTask(null)
+      } else {
+        toast.error(data.message || 'Failed to self-assign')
+      }
+    } catch (error) {
+      toast.error('Failed to self-assign to task')
+    } finally {
+      setSelfAssigning(false)
     }
   }
 
@@ -1677,6 +1721,19 @@ export default function AssignedTasksPage() {
 
               {/* Action Buttons */}
               <div className="flex flex-wrap gap-3 pt-4 border-t">
+                {/* Assign to Me - only show if not already assigned */}
+                {currentEmployeeId && !selectedTask.assignees?.some(
+                  a => (a.user?._id || a.user)?.toString() === currentEmployeeId?.toString()
+                ) && (
+                  <button
+                    onClick={handleSelfAssign}
+                    disabled={selfAssigning}
+                    className="btn-primary flex items-center gap-2"
+                  >
+                    {selfAssigning ? <Loader size="xs" /> : <FaUserPlus className="w-4 h-4" />}
+                    {selfAssigning ? 'Assigning...' : 'Assign to Me'}
+                  </button>
+                )}
                 <button
                   onClick={() => {
                     fetchProjectMembers(selectedTask.project?._id)
