@@ -14,7 +14,7 @@ import {
   FaCheck, FaPlay, FaEye, FaClock, FaExclamationTriangle,
   FaChevronDown, FaCheckCircle, FaTimes, FaPlus,
   FaTrash, FaChevronUp, FaEdit, FaUserPlus, FaExchangeAlt,
-  FaArrowLeft, FaTh, FaList
+  FaArrowLeft, FaTh, FaList, FaChevronLeft, FaChevronRight
 } from 'react-icons/fa'
 import { playNotificationSound, NotificationSoundTypes } from '@/lib/notificationSounds'
 import Portal from '@/components/ui/Portal'
@@ -96,6 +96,9 @@ export default function AssignedTasksPage() {
   const router = useRouter()
   const user = useMemo(() => getCurrentUser(), [])
   const currentEmployeeId = user?.employeeId?._id || user?.employeeId
+  const now_date = useMemo(() => new Date(), [])
+  const [taskMonth, setTaskMonth] = useState(now_date.getMonth())
+  const [taskYear, setTaskYear] = useState(now_date.getFullYear())
   const [filters, setFilters] = useState({
     status: 'all',
     project: 'all'
@@ -141,13 +144,28 @@ export default function AssignedTasksPage() {
   const [submitting, setSubmitting] = useState(false)
   const [projectMembers, setProjectMembers] = useState([])
 
+  // Month navigation helpers
+  const monthLabel = new Date(taskYear, taskMonth).toLocaleString('default', { month: 'long', year: 'numeric' })
+  const isCurrentMonth = taskMonth === now_date.getMonth() && taskYear === now_date.getFullYear()
+  const goToPrevMonth = () => {
+    if (taskMonth === 0) { setTaskMonth(11); setTaskYear(y => y - 1) }
+    else setTaskMonth(m => m - 1)
+  }
+  const goToNextMonth = () => {
+    if (isCurrentMonth) return
+    if (taskMonth === 11) { setTaskMonth(0); setTaskYear(y => y + 1) }
+    else setTaskMonth(m => m + 1)
+  }
+
   // --- SWR Data Fetching ---
   const tasksQueryString = useMemo(() => {
     const params = new URLSearchParams()
+    params.append('month', taskMonth)
+    params.append('year', taskYear)
     if (filters.status !== 'all') params.append('status', filters.status)
     if (filters.project !== 'all') params.append('projectId', filters.project)
     return params.toString()
-  }, [filters])
+  }, [filters, taskMonth, taskYear])
 
   const { data: tasksData, error: tasksError, isLoading: loading, mutate: mutateTasks } = useAuthedSWR(
     `/api/projects/assigned-tasks?${tasksQueryString}`,
@@ -680,6 +698,27 @@ export default function AssignedTasksPage() {
                 className="input input-search"
               />
             </div>
+
+            {/* Month Navigator */}
+            <div className="flex items-center gap-1 border border-default-300 rounded-lg px-2 py-1.5">
+              <button
+                onClick={goToPrevMonth}
+                className="p-1 rounded hover:bg-default-100 text-default-600 transition-colors"
+                title="Previous month"
+              >
+                <FaChevronLeft className="w-3 h-3" />
+              </button>
+              <span className="text-sm font-medium text-default-700 min-w-[120px] text-center">{monthLabel}</span>
+              <button
+                onClick={goToNextMonth}
+                disabled={isCurrentMonth}
+                className={`p-1 rounded transition-colors ${isCurrentMonth ? 'text-default-300 cursor-not-allowed' : 'hover:bg-default-100 text-default-600'}`}
+                title="Next month"
+              >
+                <FaChevronRight className="w-3 h-3" />
+              </button>
+            </div>
+
             <Button
               variant="bordered"
               onPress={() => setShowFilters(!showFilters)}

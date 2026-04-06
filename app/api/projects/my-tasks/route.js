@@ -22,6 +22,10 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url)
     const filter = searchParams.get('filter') || 'all'
     const projectId = searchParams.get('projectId')
+    const status = searchParams.get('status')
+    const priority = searchParams.get('priority')
+    const month = searchParams.get('month') // 0-indexed
+    const year = searchParams.get('year')
     // Include today's date in cache key so it auto-refreshes daily
     const todayKey = new Date().toISOString().slice(0, 10)
 
@@ -31,7 +35,7 @@ export async function GET(request) {
       role: user.role || 'employee',
       userId: user._id || user.userId,
       namespace: 'my-tasks',
-      params: { filter, projectId, date: todayKey },
+      params: { filter, projectId, status, priority, month, year, date: todayKey },
     })
     const cachedResult = await getCache(cacheKey)
     if (cachedResult) {
@@ -54,30 +58,67 @@ export async function GET(request) {
       taskQuery.project = projectId
     }
 
+    // Status filter from frontend
+    if (status && status !== 'all') {
+      taskQuery.status = status
+    }
+
+    // Priority filter from frontend
+    if (priority && priority !== 'all') {
+      taskQuery.priority = priority
+    }
+
     const now = new Date()
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const tomorrow = new Date(today)
     tomorrow.setDate(tomorrow.getDate() + 1)
 
-    switch (filter) {
-      case 'today':
-        taskQuery.status = { $nin: ['completed', 'archived'] }
-        taskQuery.$or = [
-          { dueDate: { $gte: today, $lt: tomorrow } },
-          { dueDate: { $lt: today } } // Include overdue
-        ]
-        break
-      case 'overdue':
-        taskQuery.status = { $nin: ['completed', 'archived'] }
-        taskQuery.dueDate = { $lt: today }
-        break
-      case 'pending':
-        taskQuery.status = { $nin: ['completed', 'archived'] }
-        break
-      case 'completed':
-        taskQuery.status = 'completed'
-        break
-      // 'all' has no additional filters
+    // Month/year filter — show tasks relevant to a specific month
+    // Includes: created in month, due in month, or incomplete carry-overs
+    if (month !== null && month !== undefined && year) {
+      const filterMonth = parseInt(month)
+      const filterYear = parseInt(year)
+      if (!isNaN(filterMonth) && !isNaN(filterYear)) {
+        const monthStart = new Date(filterYear, filterMonth, 1)
+        const monthEnd = new Date(filterYear, filterMonth + 1, 0, 23, 59, 59, 999)
+        const isCurrentMonth = filterMonth === now.getMonth() && filterYear === now.getFullYear()
+        const isFutureMonth = new Date(filterYear, filterMonth, 1) > now
+
+        if (!isFutureMonth) {
+          taskQuery.$or = [
+            // Tasks created in this month
+            { createdAt: { $gte: monthStart, $lte: monthEnd } },
+            // Tasks with due date in this month
+            { dueDate: { $gte: monthStart, $lte: monthEnd } },
+            // Carry-over: incomplete tasks created before month end
+            { status: { $nin: ['completed'] }, createdAt: { $lte: monthEnd } },
+            // Tasks completed during this month
+            { status: 'completed', updatedAt: { $gte: monthStart, $lte: monthEnd } },
+          ]
+        }
+      }
+    } else {
+      // Legacy filter support (today/overdue/pending/completed)
+      switch (filter) {
+        case 'today':
+          taskQuery.status = { $nin: ['completed', 'archived'] }
+          taskQuery.$or = [
+            { dueDate: { $gte: today, $lt: tomorrow } },
+            { dueDate: { $lt: today } } // Include overdue
+          ]
+          break
+        case 'overdue':
+          taskQuery.status = { $nin: ['completed', 'archived'] }
+          taskQuery.dueDate = { $lt: today }
+          break
+        case 'pending':
+          taskQuery.status = { $nin: ['completed', 'archived'] }
+          break
+        case 'completed':
+          taskQuery.status = 'completed'
+          break
+        // 'all' has no additional filters
+      }
     }
 
     const tasks = await Task.find(taskQuery)

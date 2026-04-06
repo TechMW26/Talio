@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
-import { Card, CardBody, CardHeader, Button, Skeleton, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Select, SelectItem } from '@heroui/react'
+import { useState, useEffect, useMemo, useRef } from 'react'
+import { Card, CardBody, CardHeader, Button, Skeleton, Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Input, Select, SelectItem, Chip, Spinner, Checkbox } from '@heroui/react'
 import toast from '@/utils/toast'
-import { FaPlus, FaEdit, FaUsers, FaCalendarAlt, FaDownload, FaUpload } from 'react-icons/fa'
+import { FaPlus, FaEdit, FaUsers, FaCalendarAlt, FaDownload, FaUpload, FaFileUpload, FaCheckCircle, FaTimesCircle, FaRobot } from 'react-icons/fa'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
 import useApiMutation from '@/hooks/useApiMutation'
 import LoadingButton from '@/components/ui/LoadingButton'
@@ -12,6 +12,16 @@ import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicat
 
 export default function LeaveAllocationsPage() {
   const [showModal, setShowModal] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [importStep, setImportStep] = useState('upload') // 'upload' | 'preview' | 'applying'
+  const [importFile, setImportFile] = useState(null)
+  const [importYear, setImportYear] = useState(new Date().getFullYear())
+  const [importParsing, setImportParsing] = useState(false)
+  const [importPreviewData, setImportPreviewData] = useState([])
+  const [importSummary, setImportSummary] = useState(null)
+  const [selectedImportRows, setSelectedImportRows] = useState([])
+  const [importApplying, setImportApplying] = useState(false)
+  const fileInputRef = useRef(null)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
   const [bulkMode, setBulkMode] = useState(false)
 
@@ -137,6 +147,115 @@ export default function LeaveAllocationsPage() {
     window.URL.revokeObjectURL(url)
   }
 
+  // Bulk Import handlers
+  const resetImport = () => {
+    setImportStep('upload')
+    setImportFile(null)
+    setImportParsing(false)
+    setImportPreviewData([])
+    setImportSummary(null)
+    setSelectedImportRows([])
+    setImportApplying(false)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const handleImportFileChange = (e) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const validTypes = ['text/csv', 'text/plain', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']
+      const validExtensions = ['.csv', '.txt', '.xls', '.xlsx']
+      const ext = file.name.substring(file.name.lastIndexOf('.')).toLowerCase()
+
+      if (!validTypes.includes(file.type) && !validExtensions.includes(ext)) {
+        toast.error('Please upload a CSV or text file')
+        return
+      }
+      setImportFile(file)
+    }
+  }
+
+  const handleImportParse = async () => {
+    if (!importFile) {
+      toast.error('Please select a file first')
+      return
+    }
+    setImportParsing(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', importFile)
+      fd.append('year', String(importYear))
+      fd.append('mode', 'preview')
+
+      const token = localStorage.getItem('token')
+      const res = await fetch('/api/leave/balance/bulk-import', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        toast.error(data.message || 'Failed to parse file')
+        return
+      }
+      setImportPreviewData(data.data)
+      setImportSummary(data.summary)
+      // Auto-select all matched rows
+      setSelectedImportRows(
+        data.data
+          .map((row, idx) => (row.matched ? idx : null))
+          .filter(idx => idx !== null)
+      )
+      setImportStep('preview')
+      toast.success(`AI detected ${data.summary.matched} allocations from the file`)
+    } catch (err) {
+      toast.error('Failed to parse file: ' + (err.message || 'Unknown error'))
+    } finally {
+      setImportParsing(false)
+    }
+  }
+
+  const handleImportApply = async () => {
+    const allocationsToApply = selectedImportRows.map(idx => importPreviewData[idx]).filter(Boolean)
+    if (allocationsToApply.length === 0) {
+      toast.error('No allocations selected')
+      return
+    }
+    setImportApplying(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', importFile)
+      fd.append('year', String(importYear))
+      fd.append('mode', 'apply')
+      fd.append('allocations', JSON.stringify(allocationsToApply))
+
+      const token = localStorage.getItem('token')
+      const res = await fetch('/api/leave/balance/bulk-import', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: fd,
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        toast.error(data.message || 'Failed to apply import')
+        return
+      }
+      toast.success(data.message)
+      setShowImportModal(false)
+      resetImport()
+      refreshBalances()
+    } catch (err) {
+      toast.error('Failed to apply import: ' + (err.message || 'Unknown error'))
+    } finally {
+      setImportApplying(false)
+    }
+  }
+
+  const toggleImportRow = (idx) => {
+    setSelectedImportRows(prev =>
+      prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx]
+    )
+  }
+
   if (error && !leaveBalances.length) {
     return <DataErrorState error={error} onRetry={() => refreshBalances()} />
   }
@@ -162,11 +281,11 @@ export default function LeaveAllocationsPage() {
           <h1 className="text-3xl font-bold text-default-800">Leave Allocations</h1>
           <p className="text-default-500 mt-1">Manage employee leave balances and allocations</p>
         </div>
-        <div className="grid grid-cols-2 md:flex md:gap-3 md:items-center md:flex-row flex-col gap-2 mt-4 md:mt-0">
+        <div className="flex gap-2 md:gap-3 items-center mt-4 md:mt-0 flex-nowrap">
           <Select
             selectedKeys={[String(selectedYear)]}
             onSelectionChange={(keys) => setSelectedYear(parseInt(Array.from(keys)[0]))}
-            className="min-w-[120px]"
+            className="w-[100px] min-w-[100px]"
             size="sm"
             aria-label="Select Year"
           >
@@ -193,6 +312,18 @@ export default function LeaveAllocationsPage() {
           </Button>
 
           <Button
+            color="secondary"
+            variant="flat"
+            startContent={<FaFileUpload className="w-4 h-4" />}
+            onPress={() => {
+              resetImport()
+              setShowImportModal(true)
+            }}
+          >
+            Bulk Import
+          </Button>
+
+          <Button
             color="primary"
             startContent={<FaPlus className="w-4 h-4" />}
             onPress={() => {
@@ -212,7 +343,7 @@ export default function LeaveAllocationsPage() {
           { title: 'Total Employees', value: employees.length, color: 'primary', icon: FaUsers },
           { title: 'Leave Types', value: leaveTypes.length, color: 'success', icon: FaCalendarAlt },
           { title: 'Total Allocations', value: leaveBalances.length, color: 'secondary', icon: FaPlus },
-          { title: 'Pending Allocations', value: employees.length * leaveTypes.length - leaveBalances.length, color: 'warning', icon: FaEdit },
+          { title: 'Pending Allocations', value: Math.max(0, employees.length * leaveTypes.length - leaveBalances.length), color: 'warning', icon: FaEdit },
         ].map((stat, index) => (
           <Card key={index} shadow="sm">
             <CardBody className="p-6">
@@ -392,6 +523,200 @@ export default function LeaveAllocationsPage() {
                 </LoadingButton>
               </ModalFooter>
             </form>
+          )}
+        </ModalContent>
+      </Modal>
+
+      {/* Bulk Import Modal */}
+      <Modal
+        isOpen={showImportModal}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowImportModal(false)
+            resetImport()
+          }
+        }}
+        size="3xl"
+        scrollBehavior="inside"
+      >
+        <ModalContent>
+          {(onClose) => (
+            <>
+              <ModalHeader className="flex flex-col gap-1">
+                <h2 className="text-xl font-bold text-default-800 flex items-center gap-2">
+                  <FaRobot className="text-secondary" />
+                  AI-Powered Bulk Import
+                </h2>
+                <p className="text-sm text-default-500 font-normal">
+                  Upload a CSV/text file and AI will detect employee names, leave types, and days
+                </p>
+              </ModalHeader>
+              <ModalBody>
+                {importStep === 'upload' && (
+                  <div className="space-y-6">
+                    <Select
+                      label="Year"
+                      selectedKeys={[String(importYear)]}
+                      onSelectionChange={(keys) => setImportYear(parseInt(Array.from(keys)[0]))}
+                      size="sm"
+                    >
+                      {[2024, 2025, 2026, 2027].map(year => (
+                        <SelectItem key={String(year)} textValue={String(year)}>{String(year)}</SelectItem>
+                      ))}
+                    </Select>
+
+                    <div
+                      className="border-2 border-dashed border-default-300 rounded-xl p-8 text-center cursor-pointer hover:border-secondary transition-colors"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".csv,.txt,.xls,.xlsx"
+                        onChange={handleImportFileChange}
+                        className="hidden"
+                      />
+                      <FaUpload className="w-10 h-10 text-default-400 mx-auto mb-3" />
+                      {importFile ? (
+                        <div>
+                          <p className="text-default-800 font-medium">{importFile.name}</p>
+                          <p className="text-default-500 text-sm mt-1">{(importFile.size / 1024).toFixed(1)} KB</p>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="text-default-800 font-medium">Click to upload or drag & drop</p>
+                          <p className="text-default-500 text-sm mt-1">Supports CSV, TXT files</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="bg-default-100 rounded-lg p-4">
+                      <p className="text-sm font-medium text-default-700 mb-2">Supported formats:</p>
+                      <ul className="text-sm text-default-500 space-y-1">
+                        <li>• CSV with columns like: Employee Name/Code, Leave Type, Days</li>
+                        <li>• Any tabular text format — AI will auto-detect the structure</li>
+                        <li>• Exported sheets from other HR systems</li>
+                      </ul>
+                    </div>
+                  </div>
+                )}
+
+                {importStep === 'preview' && importPreviewData.length > 0 && (
+                  <div className="space-y-4">
+                    {/* Summary */}
+                    <div className="flex gap-3">
+                      <Chip color="success" variant="flat" startContent={<FaCheckCircle />}>
+                        {importSummary?.matched || 0} matched
+                      </Chip>
+                      <Chip color="danger" variant="flat" startContent={<FaTimesCircle />}>
+                        {importSummary?.unmatched || 0} unmatched
+                      </Chip>
+                      <Chip color="default" variant="flat">
+                        {selectedImportRows.length} selected to import
+                      </Chip>
+                    </div>
+
+                    {/* Preview Table */}
+                    <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+                      <table className="min-w-full divide-y divide-default-200 text-sm">
+                        <thead className="bg-default-50 sticky top-0">
+                          <tr>
+                            <th className="px-3 py-2 text-left">
+                              <Checkbox
+                                isSelected={selectedImportRows.length === importPreviewData.filter(d => d.matched).length}
+                                onValueChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedImportRows(importPreviewData.map((d, i) => d.matched ? i : null).filter(i => i !== null))
+                                  } else {
+                                    setSelectedImportRows([])
+                                  }
+                                }}
+                                size="sm"
+                              />
+                            </th>
+                            <th className="px-3 py-2 text-left text-default-500 font-medium">Employee</th>
+                            <th className="px-3 py-2 text-left text-default-500 font-medium">Leave Type</th>
+                            <th className="px-3 py-2 text-center text-default-500 font-medium">Days</th>
+                            <th className="px-3 py-2 text-center text-default-500 font-medium">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-default-100">
+                          {importPreviewData.map((row, idx) => (
+                            <tr key={idx} className={`${!row.matched ? 'bg-danger-50/50' : selectedImportRows.includes(idx) ? 'bg-success-50/30' : ''}`}>
+                              <td className="px-3 py-2">
+                                <Checkbox
+                                  isSelected={selectedImportRows.includes(idx)}
+                                  onValueChange={() => toggleImportRow(idx)}
+                                  isDisabled={!row.matched}
+                                  size="sm"
+                                />
+                              </td>
+                              <td className="px-3 py-2">
+                                {row.matched ? (
+                                  <div>
+                                    <span className="font-medium text-default-800">{row.employeeName}</span>
+                                    {row.employeeCode && (
+                                      <span className="text-default-500 ml-1">({row.employeeCode})</span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-danger">{row.unmatchedEmployee || 'Unknown'}</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2">
+                                {row.matched ? (
+                                  <span className="text-default-800">{row.leaveTypeName}</span>
+                                ) : (
+                                  <span className="text-danger">{row.unmatchedLeaveType || 'Unknown'}</span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 text-center font-medium text-default-800">{row.totalDays}</td>
+                              <td className="px-3 py-2 text-center">
+                                {row.matched ? (
+                                  <Chip size="sm" color="success" variant="flat">Matched</Chip>
+                                ) : (
+                                  <Chip size="sm" color="danger" variant="flat">Unmatched</Chip>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </ModalBody>
+              <ModalFooter>
+                {importStep === 'upload' && (
+                  <>
+                    <Button variant="flat" onPress={onClose}>Cancel</Button>
+                    <Button
+                      color="secondary"
+                      startContent={importParsing ? <Spinner size="sm" color="white" /> : <FaRobot />}
+                      onPress={handleImportParse}
+                      isDisabled={!importFile || importParsing}
+                    >
+                      {importParsing ? 'AI Detecting...' : 'Detect with AI'}
+                    </Button>
+                  </>
+                )}
+                {importStep === 'preview' && (
+                  <>
+                    <Button variant="flat" onPress={() => { setImportStep('upload'); setImportPreviewData([]); setImportSummary(null) }}>
+                      Back
+                    </Button>
+                    <Button
+                      color="primary"
+                      startContent={importApplying ? <Spinner size="sm" color="white" /> : <FaCheckCircle />}
+                      onPress={handleImportApply}
+                      isDisabled={selectedImportRows.length === 0 || importApplying}
+                    >
+                      {importApplying ? 'Applying...' : `Import ${selectedImportRows.length} Allocations`}
+                    </Button>
+                  </>
+                )}
+              </ModalFooter>
+            </>
           )}
         </ModalContent>
       </Modal>

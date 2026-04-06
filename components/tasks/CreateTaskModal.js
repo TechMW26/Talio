@@ -54,7 +54,7 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated }) {
 
   // Fetch employees for assignee selection
   const { data: employeesData } = useAuthedSWR(
-    isOpen ? '/api/employees/list?includeAdmins=true' : null
+    isOpen ? '/api/employees/list?includeAdmins=true&includeSelf=true' : null
   )
   const employees = employeesData?.data || []
 

@@ -226,7 +226,7 @@ export default function ApplyLeavePage() {
                       isDisabled={formData.isHalfDay || formData.workFromHome}
                     >
                       {leaveTypes.map((type) => (
-                        <SelectItem key={type._id}>
+                        <SelectItem key={type._id} textValue={`${type.name} (${type.code})`}>
                           {type.name} ({type.code})
                         </SelectItem>
                       ))}

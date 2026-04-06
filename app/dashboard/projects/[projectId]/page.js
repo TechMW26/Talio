@@ -13,6 +13,7 @@ import {
   HiOutlineChartBar, HiOutlineCheck, HiOutlineXMark,
   HiOutlineTrash, HiOutlineUserPlus, HiOutlineArchiveBox, HiOutlineChatBubbleOvalLeftEllipsis,
   HiOutlineClock as HiOutlineHistory, HiOutlineChevronDown, HiOutlineChevronUp,
+  HiOutlineChevronLeft, HiOutlineChevronRight,
   HiOutlinePlay, HiOutlineEye, HiOutlineDocumentText, HiOutlineArrowRight,
   HiOutlineLockClosed, HiOutlineArrowPath, HiOutlineArrowsRightLeft,
   HiOutlineMagnifyingGlass
@@ -85,6 +86,23 @@ export default function ProjectDetailPage() {
   // User from localStorage
   const user = useMemo(() => getCurrentUser(), [])
 
+  // Task month filter state
+  const now_date = useMemo(() => new Date(), [])
+  const [taskMonth, setTaskMonth] = useState(now_date.getMonth())
+  const [taskYear, setTaskYear] = useState(now_date.getFullYear())
+
+  const projectTaskMonthLabel = new Date(taskYear, taskMonth).toLocaleString('default', { month: 'long', year: 'numeric' })
+  const isProjectCurrentMonth = taskMonth === now_date.getMonth() && taskYear === now_date.getFullYear()
+  const goToPrevProjectMonth = () => {
+    if (taskMonth === 0) { setTaskMonth(11); setTaskYear(y => y - 1) }
+    else setTaskMonth(m => m - 1)
+  }
+  const goToNextProjectMonth = () => {
+    if (isProjectCurrentMonth) return
+    if (taskMonth === 11) { setTaskMonth(0); setTaskYear(y => y + 1) }
+    else setTaskMonth(m => m + 1)
+  }
+
   // SWR hooks for data fetching (replaces manual fetch + auto-refresh)
   const { data: projectData, error: projectError, isLoading: loading, mutate: mutateProject } = useAuthedSWR(
     projectId ? `/api/projects/${projectId}` : null,
@@ -93,7 +111,7 @@ export default function ProjectDetailPage() {
   const project = projectData?.data || null
 
   const { data: tasksData, mutate: mutateTasks } = useAuthedSWR(
-    projectId ? `/api/projects/${projectId}/tasks` : null,
+    projectId ? `/api/projects/${projectId}/tasks?month=${taskMonth}&year=${taskYear}` : null,
     { refreshInterval: 10000 }
   )
 
@@ -1597,8 +1615,28 @@ export default function ProjectDetailPage() {
           {/* Tasks Tab */}
           {activeTab === 'tasks' && (
             <div>
-              {isAcceptedMember && (
-                <div className="flex justify-end mb-4">
+              <div className="flex items-center justify-between mb-4">
+                {/* Month Navigator */}
+                <div className="flex items-center gap-1 border border-default-300 rounded-lg px-2 py-1.5">
+                  <button
+                    onClick={goToPrevProjectMonth}
+                    className="p-1 rounded hover:bg-default-100 text-default-600 transition-colors"
+                    title="Previous month"
+                  >
+                    <HiOutlineChevronLeft className="w-4 h-4" />
+                  </button>
+                  <span className="text-sm font-medium text-default-700 min-w-[120px] text-center">{projectTaskMonthLabel}</span>
+                  <button
+                    onClick={goToNextProjectMonth}
+                    disabled={isProjectCurrentMonth}
+                    className={`p-1 rounded transition-colors ${isProjectCurrentMonth ? 'text-default-300 cursor-not-allowed' : 'hover:bg-default-100 text-default-600'}`}
+                    title="Next month"
+                  >
+                    <HiOutlineChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {isAcceptedMember && (
                   <Button
                     onPress={() => setShowCreateTask(true)}
                     color="primary"
@@ -1606,8 +1644,8 @@ export default function ProjectDetailPage() {
                   >
                     Add Task
                   </Button>
-                </div>
-              )}
+                )}
+              </div>
 
               {/* Kanban-style Board */}
               <KanbanBoard

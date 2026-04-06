@@ -302,9 +302,8 @@ export default function ApprovalsPage() {
             <Button
               size="sm"
               variant={typeFilter === 'all' ? 'solid' : 'flat'}
-              color={typeFilter === 'all' ? 'default' : 'default'}
+              color={typeFilter === 'all' ? 'primary' : 'default'}
               onPress={() => setTypeFilter('all')}
-              className={typeFilter === 'all' ? 'bg-default-800 text-white' : ''}
             >
               All Types
               <span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-white/20">

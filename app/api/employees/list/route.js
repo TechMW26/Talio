@@ -19,10 +19,11 @@ export async function GET(request) {
     // Get URL params
     const { searchParams } = new URL(request.url)
     const includeAdmins = searchParams.get('includeAdmins') === 'true'
+    const includeSelf = searchParams.get('includeSelf') === 'true'
 
     // Check cache first (per user)
     const userId = user._id || user.userId
-    const cacheKey = queryCache.generateKey('employee-list', userId, includeAdmins ? 'all' : 'no-admin')
+    const cacheKey = queryCache.generateKey('employee-list', userId, includeAdmins ? 'all' : 'no-admin', includeSelf ? 'self' : 'no-self')
     const cached = queryCache.get(cacheKey)
     if (cached) {
       return NextResponse.json(cached)
@@ -35,11 +36,13 @@ export async function GET(request) {
     }
 
     // Optimized: Fetch employees and users in parallel
+    const employeeFilter = { status: 'active' }
+    if (!includeSelf) {
+      employeeFilter._id = { $ne: currentUserDoc.employeeId }
+    }
+
     const [employees, allUsers] = await Promise.all([
-      Employee.find({
-        _id: { $ne: currentUserDoc.employeeId },
-        status: 'active'
-      })
+      Employee.find(employeeFilter)
         .select('firstName lastName employeeCode profilePicture email designation designationLevel designationLevelName department')
         .populate({
           path: 'designation',

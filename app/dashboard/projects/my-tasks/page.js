@@ -20,6 +20,8 @@ import {
   HiOutlineFunnel,
   HiOutlineChevronDown,
   HiOutlineChevronUp,
+  HiOutlineChevronLeft,
+  HiOutlineChevronRight,
   HiOutlineXMark,
   HiOutlineTrash,
   HiOutlineChatBubbleLeftRight,
@@ -123,10 +125,12 @@ export default function MyTasksPage() {
     setMounted(true)
   }, [])
   const [tasks, setTasks] = useState([]) // kept for optimistic local state updates in TaskCard
+  const now_date = useMemo(() => new Date(), [])
+  const [taskMonth, setTaskMonth] = useState(now_date.getMonth())
+  const [taskYear, setTaskYear] = useState(now_date.getFullYear())
   const [filters, setFilters] = useState({
     status: 'all',
     priority: 'all',
-    period: 'all',
     project: 'all'
   })
   const [searchQuery, setSearchQuery] = useState('')
@@ -148,14 +152,29 @@ export default function MyTasksPage() {
   const [showModalStatusDropdown, setShowModalStatusDropdown] = useState(false) // For status dropdown visibility
   const [showCreateTask, setShowCreateTask] = useState(false)
 
+  // Month navigation helpers
+  const monthLabel = new Date(taskYear, taskMonth).toLocaleString('default', { month: 'long', year: 'numeric' })
+  const isCurrentMonth = taskMonth === now_date.getMonth() && taskYear === now_date.getFullYear()
+  const goToPrevMonth = () => {
+    if (taskMonth === 0) { setTaskMonth(11); setTaskYear(y => y - 1) }
+    else setTaskMonth(m => m - 1)
+  }
+  const goToNextMonth = () => {
+    if (isCurrentMonth) return
+    if (taskMonth === 11) { setTaskMonth(0); setTaskYear(y => y + 1) }
+    else setTaskMonth(m => m + 1)
+  }
+
   // --- SWR Data Fetching ---
   const tasksQueryString = useMemo(() => {
     const params = new URLSearchParams()
+    params.append('month', taskMonth)
+    params.append('year', taskYear)
     if (filters.status !== 'all') params.append('status', filters.status)
     if (filters.priority !== 'all') params.append('priority', filters.priority)
-    if (filters.period !== 'all') params.append('period', filters.period)
+    if (filters.project !== 'all') params.append('projectId', filters.project)
     return params.toString()
-  }, [filters])
+  }, [filters, taskMonth, taskYear])
 
   const { data: tasksData, error: tasksError, isLoading: loading, mutate: mutateTasks } = useAuthedSWR(
     `/api/projects/my-tasks?${tasksQueryString}`,
@@ -439,14 +458,8 @@ export default function MyTasksPage() {
     return due.toDateString() === today.toDateString()
   }
 
-  // Filter tasks by search query and project
+  // Filter tasks by search query (project/status/priority are now server-side)
   const filteredTasks = tasks.filter(task => {
-    // Project filter
-    if (filters.project !== 'all' && task.project?._id !== filters.project) {
-      return false
-    }
-
-    // Search filter
     if (!searchQuery) return true
     const query = searchQuery.toLowerCase()
     return (
@@ -466,13 +479,13 @@ export default function MyTasksPage() {
   const currentEmployeeId = user?.employeeId?._id || user?.employeeId
 
   const stats = {
-    total: tasks.length,
-    todo: tasks.filter(t => t.status === 'todo').length,
-    inProgress: tasks.filter(t => t.status === 'in-progress').length,
-    completed: tasks.filter(t => t.status === 'completed').length,
-    overdue: tasks.filter(t => isOverdue(t)).length,
-    pendingAcceptance: tasks.filter(t => t.assignmentStatus === 'pending').length,
-    pending: tasks.filter(t => t.assignmentStatus === 'pending' || t.status === 'todo').length
+    total: filteredTasks.length,
+    todo: filteredTasks.filter(t => t.status === 'todo').length,
+    inProgress: filteredTasks.filter(t => t.status === 'in-progress').length,
+    completed: filteredTasks.filter(t => t.status === 'completed').length,
+    overdue: filteredTasks.filter(t => isOverdue(t)).length,
+    pendingAcceptance: filteredTasks.filter(t => t.assignmentStatus === 'pending').length,
+    pending: filteredTasks.filter(t => t.assignmentStatus === 'pending' || t.status === 'todo').length
   }
 
   // Prevent hydration mismatch
@@ -654,19 +667,25 @@ export default function MyTasksPage() {
               <SelectItem key="critical">Critical</SelectItem>
             </Select>
 
-            <Select
-              selectedKeys={[filters.period]}
-              onSelectionChange={(keys) => setFilters(prev => ({ ...prev, period: Array.from(keys)[0] }))}
-              className="w-[130px]"
-              size="sm"
-              aria-label="Filter by Period"
-            >
-              <SelectItem key="all">All Time</SelectItem>
-              <SelectItem key="today">Today</SelectItem>
-              <SelectItem key="week">This Week</SelectItem>
-              <SelectItem key="month">This Month</SelectItem>
-              <SelectItem key="overdue">Overdue</SelectItem>
-            </Select>
+            {/* Month Navigator */}
+            <div className="flex items-center gap-1 border border-default-300 rounded-lg px-1 py-0.5">
+              <button
+                onClick={goToPrevMonth}
+                className="p-1 rounded hover:bg-default-100 text-default-600 transition-colors"
+                title="Previous month"
+              >
+                <HiOutlineChevronLeft className="w-4 h-4" />
+              </button>
+              <span className="text-sm font-medium text-default-700 min-w-[120px] text-center">{monthLabel}</span>
+              <button
+                onClick={goToNextMonth}
+                disabled={isCurrentMonth}
+                className={`p-1 rounded transition-colors ${isCurrentMonth ? 'text-default-300 cursor-not-allowed' : 'hover:bg-default-100 text-default-600'}`}
+                title="Next month"
+              >
+                <HiOutlineChevronRight className="w-4 h-4" />
+              </button>
+            </div>
 
             {/* Spacer to push view toggle to the right */}
             <div className="flex-1 hidden md:block" />

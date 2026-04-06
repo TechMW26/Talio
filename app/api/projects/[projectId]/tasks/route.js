@@ -26,6 +26,8 @@ export async function GET(request, { params }) {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const assignedTo = searchParams.get('assignedTo')
+    const month = searchParams.get('month')
+    const year = searchParams.get('year')
 
     const userRecord = await User.findById(user._id || user.userId).select('employeeId role')
     if (!userRecord || !userRecord.employeeId) {
@@ -47,6 +49,23 @@ export async function GET(request, { params }) {
     }
     if (!status) {
       query.status = { $ne: 'archived' }
+    }
+
+    // Month/year filter — show tasks relevant to a specific month
+    if (month !== null && month !== undefined && year) {
+      const filterMonth = parseInt(month)
+      const filterYear = parseInt(year)
+      if (!isNaN(filterMonth) && !isNaN(filterYear)) {
+        const monthStart = new Date(filterYear, filterMonth, 1)
+        const monthEnd = new Date(filterYear, filterMonth + 1, 0, 23, 59, 59, 999)
+
+        query.$or = [
+          { createdAt: { $gte: monthStart, $lte: monthEnd } },
+          { dueDate: { $gte: monthStart, $lte: monthEnd } },
+          { status: { $nin: ['completed'] }, createdAt: { $lte: monthEnd } },
+          { status: 'completed', updatedAt: { $gte: monthStart, $lte: monthEnd } },
+        ]
+      }
     }
 
     let tasks = await Task.find(query)
