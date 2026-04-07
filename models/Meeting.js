@@ -1,6 +1,7 @@
 import mongoose from 'mongoose'
 
 const TranscriptSegmentSchema = new mongoose.Schema({
+  segmentId: String,
   speaker: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Employee',
@@ -8,9 +9,11 @@ const TranscriptSegmentSchema = new mongoose.Schema({
   speakerName: String,
   text: String,
   timestamp: Date,
+  startOffsetMs: Number,
+  endOffsetMs: Number,
+  source: String,
   language: {
     type: String,
-    enum: ['en', 'hi', 'hinglish'],
     default: 'en'
   }
 })
@@ -35,6 +38,26 @@ const MOMItemSchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now
+  }
+})
+
+const MeetingParticipantNoteSchema = new mongoose.Schema({
+  employee: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Employee'
+  },
+  speakerName: String,
+  summary: String,
+  keyContributions: [String],
+  actionItems: [String],
+  followUps: [String],
+  generatedAt: {
+    type: Date,
+    default: Date.now
+  },
+  language: {
+    type: String,
+    default: 'en'
   }
 })
 
@@ -178,10 +201,7 @@ const MeetingSchema = new mongoose.Schema({
   },
   // Transcript (for both online and offline)
   transcript: [TranscriptSegmentSchema],
-  transcriptLanguages: [{
-    type: String,
-    enum: ['en', 'hi', 'hinglish']
-  }],
+  transcriptLanguages: [String],
   // Minutes of Meeting
   mom: [MOMItemSchema],
   momGeneratedAt: Date,
@@ -193,12 +213,13 @@ const MeetingSchema = new mongoose.Schema({
     decisions: [String],
     nextSteps: [String],
     generatedAt: Date,
+    sourceUpdatedAt: Date,
     language: {
       type: String,
-      enum: ['en', 'hi', 'hinglish'],
       default: 'en'
     }
   },
+  aiParticipantNotes: [MeetingParticipantNoteSchema],
   // Audio data for offline meetings
   offlineAudio: {
     combinedUrl: String,

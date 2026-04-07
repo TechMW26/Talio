@@ -1,178 +1,82 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
-import OpenAI from 'openai'
+import {
+  hasMeetingInsightSource,
+  generateMeetingInsights,
+  persistMeetingInsights,
+  resolveMeetingEmployee,
+} from '@/lib/meetingAI'
+import { normalizeMeetingLanguage, sortMeetingTranscript } from '@/lib/meetingLanguage'
 
 export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
 
-// Lazy initialization of OpenAI client to avoid build-time errors
-let openai = null
-function getOpenAIClient() {
-  if (!openai && process.env.OPENAI_API_KEY) {
-    openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY
-    })
+function canGenerateMeetingInsights(meeting, employee) {
+  const employeeId = employee?._id?.toString?.()
+  if (!employeeId) return false
+
+  if (meeting.organizer?._id?.toString?.() === employeeId || meeting.organizer?.toString?.() === employeeId) {
+    return true
   }
-  return openai
+
+  return meeting.invitees.some(
+    invitee => invitee.employee?._id?.toString?.() === employeeId || invitee.employee?.toString?.() === employeeId
+  )
 }
 
-// POST - Generate AI summary from transcript or MOM
 export async function POST(request, { params }) {
   try {
     const { id } = await params
-
-    // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Meeting', 'Employee', 'User'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
-    const { Meeting, Employee, User } = models
 
-    const data = await request.json()
-    const { language = 'en' } = data // en, hi, hinglish
+    const { user, models } = auth
+    const { Meeting } = models
+    const body = await request.json().catch(() => ({}))
+    const requestedLanguage = normalizeMeetingLanguage(body?.language || 'auto')
+
+    const employee = await resolveMeetingEmployee(models, user)
+    if (!employee) {
+      return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
+    }
 
     const meeting = await Meeting.findById(id)
-      .populate('organizer', 'firstName lastName')
-      .populate('invitees.employee', 'firstName lastName')
+      .populate('organizer', 'firstName lastName email profilePicture')
+      .populate('invitees.employee', 'firstName lastName email profilePicture department')
 
     if (!meeting) {
       return NextResponse.json({ success: false, message: 'Meeting not found' }, { status: 404 })
     }
 
-    // Get current user's employee record - first check User.employeeId, then Employee.userId
-    const userRecord = await User.findById(user._id || user.userId).select('employeeId').lean()
-    
-    let employee = null
-    if (userRecord?.employeeId) {
-      employee = await Employee.findById(userRecord.employeeId).lean()
-    }
-    
-    // If user doesn't have employeeId directly, try to find employee by userId
-    if (!employee) {
-      employee = await Employee.findOne({ userId: user._id || user.userId }).lean()
+    if (!canGenerateMeetingInsights(meeting, employee)) {
+      return NextResponse.json({ success: false, message: 'You do not have access to generate meeting insights' }, { status: 403 })
     }
 
-    // Only organizer can generate summary
-    if (meeting.organizer._id.toString() !== employee?._id?.toString()) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'Only the organizer can generate AI summary' 
-      }, { status: 403 })
+    const transcript = sortMeetingTranscript(meeting.transcript || [])
+    if (!hasMeetingInsightSource(meeting)) {
+      return NextResponse.json({
+        success: false,
+        message: 'No meeting transcript or notes are available yet for AI summary generation',
+      }, { status: 400 })
     }
 
-    // Build content for AI to summarize
-    let contentToSummarize = `Meeting: ${meeting.title}\n`
-    contentToSummarize += `Date: ${new Date(meeting.scheduledStart).toLocaleDateString()}\n`
-    contentToSummarize += `Duration: ${meeting.duration} minutes\n`
-    contentToSummarize += `Type: ${meeting.type}\n\n`
+    meeting.transcript = transcript
 
-    if (meeting.description) {
-      contentToSummarize += `Description: ${meeting.description}\n\n`
-    }
+    const insights = await generateMeetingInsights(meeting, { language: requestedLanguage })
 
-    if (meeting.agenda?.length > 0) {
-      contentToSummarize += `Agenda:\n`
-      meeting.agenda.forEach((item, i) => {
-        contentToSummarize += `${i + 1}. ${item.title} (${item.duration} min)\n`
-      })
-      contentToSummarize += '\n'
-    }
-
-    if (meeting.transcript?.length > 0) {
-      contentToSummarize += `Transcript:\n`
-      meeting.transcript.forEach(segment => {
-        contentToSummarize += `[${segment.speakerName || 'Unknown'}]: ${segment.text}\n`
-      })
-      contentToSummarize += '\n'
-    }
-
-    if (meeting.mom?.length > 0) {
-      contentToSummarize += `Minutes of Meeting:\n`
-      meeting.mom.forEach((item, i) => {
-        contentToSummarize += `Topic ${i + 1}: ${item.topic}\n`
-        if (item.discussion) contentToSummarize += `Discussion: ${item.discussion}\n`
-        if (item.decisions?.length) contentToSummarize += `Decisions: ${item.decisions.join(', ')}\n`
-        contentToSummarize += '\n'
-      })
-    }
-
-    if (meeting.notes) {
-      contentToSummarize += `Meeting Notes:\n${meeting.notes}\n`
-    }
-
-    // Generate language-specific prompt
-    let languageInstruction = ''
-    switch (language) {
-      case 'hi':
-        languageInstruction = 'Please respond entirely in Hindi (Devanagari script).'
-        break
-      case 'hinglish':
-        languageInstruction = 'Please respond in Hinglish (Hindi words written in Roman script mixed with English).'
-        break
-      default:
-        languageInstruction = 'Please respond in English.'
-    }
-
-    // Get OpenAI client (lazy initialization)
-    const openaiClient = getOpenAIClient()
-    if (!openaiClient) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'OpenAI API key not configured. Please set OPENAI_API_KEY environment variable.' 
-      }, { status: 500 })
-    }
-
-    const completion = await openaiClient.chat.completions.create({
-      model: process.env.NEXT_PUBLIC_OPENAI_MODEL || 'gpt-4o',
-      messages: [
-        {
-          role: 'system',
-          content: `You are a professional meeting summarizer. Your task is to create a comprehensive summary of the meeting content provided. ${languageInstruction}
-          
-          Please provide:
-          1. A brief summary (2-3 paragraphs)
-          2. Key points discussed (bullet list)
-          3. Action items (bullet list with owner if mentioned)
-          4. Decisions made (bullet list)
-          5. Next steps (bullet list)
-          
-          Format your response as JSON with the following structure:
-          {
-            "summary": "...",
-            "keyPoints": ["...", "..."],
-            "actionItems": ["...", "..."],
-            "decisions": ["...", "..."],
-            "nextSteps": ["...", "..."]
-          }`
-        },
-        {
-          role: 'user',
-          content: contentToSummarize
-        }
-      ],
-      temperature: 0.7,
-      response_format: { type: 'json_object' }
+    const persistedInsights = await persistMeetingInsights(Meeting, meeting, insights, {
+      sourceUpdatedAt: meeting.updatedAt,
     })
-
-    const aiResponse = JSON.parse(completion.choices[0].message.content)
-
-    // Update meeting with AI summary
-    meeting.aiSummary = {
-      summary: aiResponse.summary,
-      keyPoints: aiResponse.keyPoints || [],
-      actionItems: aiResponse.actionItems || [],
-      decisions: aiResponse.decisions || [],
-      nextSteps: aiResponse.nextSteps || [],
-      generatedAt: new Date(),
-      language
-    }
-
-    await meeting.save()
 
     return NextResponse.json({
       success: true,
-      message: 'AI summary generated successfully',
-      data: meeting.aiSummary
+      message: 'Meeting summary generated successfully',
+      data: {
+        aiSummary: persistedInsights.aiSummary,
+        participantNotes: persistedInsights.aiParticipantNotes,
+      },
     })
   } catch (error) {
     console.error('Generate AI summary error:', error)
@@ -180,55 +84,39 @@ export async function POST(request, { params }) {
   }
 }
 
-// PUT - Add/Update MOM
 export async function PUT(request, { params }) {
   try {
     const { id } = await params
-
-    // Get authenticated user and tenant-specific models
     const auth = await getAuthAndModels(request, ['Meeting', 'Employee', 'User'])
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
-    const { Meeting, Employee, User } = models
 
+    const { user, models } = auth
+    const { Meeting } = models
     const data = await request.json()
     const { mom, notes } = data
 
-    const meeting = await Meeting.findById(id)
+    const employee = await resolveMeetingEmployee(models, user)
+    if (!employee) {
+      return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
+    }
 
+    const meeting = await Meeting.findById(id)
     if (!meeting) {
       return NextResponse.json({ success: false, message: 'Meeting not found' }, { status: 404 })
     }
 
-    // Get current user's employee record - first check User.employeeId, then Employee.userId
-    const userRecord = await User.findById(user._id || user.userId).select('employeeId').lean()
-    
-    let employee = null
-    if (userRecord?.employeeId) {
-      employee = await Employee.findById(userRecord.employeeId).lean()
-    }
-    
-    // If user doesn't have employeeId directly, try to find employee by userId
-    if (!employee) {
-      employee = await Employee.findOne({ userId: user._id || user.userId }).lean()
-    }
-
-    // Only organizer or accepted invitees can add MOM
-    const isOrganizer = meeting.organizer.toString() === employee?._id?.toString()
+    const isOrganizer = meeting.organizer.toString() === employee._id.toString()
     const isAcceptedInvitee = meeting.invitees.some(
-      i => i.employee.toString() === employee?._id?.toString() && i.status === 'accepted'
+      invitee => invitee.employee.toString() === employee._id.toString() && ['accepted', 'maybe'].includes(invitee.status)
     )
 
     if (!isOrganizer && !isAcceptedInvitee) {
-      return NextResponse.json({ 
-        success: false, 
-        message: 'You do not have permission to add MOM' 
-      }, { status: 403 })
+      return NextResponse.json({ success: false, message: 'You do not have permission to update meeting notes' }, { status: 403 })
     }
 
-    if (mom && Array.isArray(mom)) {
+    if (Array.isArray(mom)) {
       meeting.mom = mom
       meeting.momGeneratedAt = new Date()
     }
@@ -241,8 +129,11 @@ export async function PUT(request, { params }) {
 
     return NextResponse.json({
       success: true,
-      message: 'MOM updated successfully',
-      data: { mom: meeting.mom, notes: meeting.notes }
+      message: 'Meeting notes updated successfully',
+      data: {
+        mom: meeting.mom,
+        notes: meeting.notes,
+      },
     })
   } catch (error) {
     console.error('Update MOM error:', error)

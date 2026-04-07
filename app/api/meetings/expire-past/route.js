@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
+import {
+  inspectExpiredMeetingsForDatabase,
+  processExpiredMeetingsForDatabase,
+} from '@/lib/meetingFinalizer'
 export const dynamic = 'force-dynamic'
 
 /**
@@ -13,71 +17,33 @@ export const dynamic = 'force-dynamic'
  */
 export async function POST(request) {
   try {
-    // Get authenticated user and tenant-specific models
-    const auth = await getAuthAndModels(request, ['Meeting'])
+    const auth = await getAuthAndModels(request)
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { user, models } = auth
-    const { Meeting } = models
 
-    const now = new Date()
-
-    // Find all meetings that:
-    // 1. Have ended (scheduledEnd < now)
-    // 2. Are still in 'scheduled' or 'in-progress' status
-    // 3. Have active links (for online meetings)
-    const expiredMeetings = await Meeting.find({
-      scheduledEnd: { $lt: now },
-      status: { $in: ['scheduled', 'in-progress'] }
+    const result = await processExpiredMeetingsForDatabase(auth.tenant.databaseName, {
+      tenantName: auth.tenant.name || auth.tenant.databaseName,
+      action: 'manual-expire-route',
     })
 
-    let updatedCount = 0
-    let deactivatedLinksCount = 0
-
-    for (const meeting of expiredMeetings) {
-      const updates = {
-        status: 'completed'
-      }
-
-      // Deactivate meeting link for online meetings
-      if (meeting.type === 'online' && meeting.isLinkActive) {
-        updates.isLinkActive = false
-        deactivatedLinksCount++
-      }
-
-      // Set actualEnd if not already set
-      if (!meeting.actualEnd) {
-        updates.actualEnd = meeting.scheduledEnd
-      }
-
-      await Meeting.findByIdAndUpdate(meeting._id, updates)
-      updatedCount++
-    }
-
-    // Also deactivate links for any online meetings that are completed but still have active links
-    const completedWithActiveLinks = await Meeting.updateMany(
-      {
-        type: 'online',
-        status: 'completed',
-        isLinkActive: true,
-        scheduledEnd: { $lt: now }
-      },
-      {
-        $set: { isLinkActive: false }
-      }
+    console.log(
+      `[Meeting Expiry] ${auth.tenant.databaseName}: completed ${result.meetingsCompleted}, `
+      + `deactivated ${result.linksDeactivated}, generated ${result.summariesGenerated} summaries`
     )
-
-    deactivatedLinksCount += completedWithActiveLinks.modifiedCount
-
-    console.log(`[Meeting Expiry] Updated ${updatedCount} meetings to completed, deactivated ${deactivatedLinksCount} meeting links`)
 
     return NextResponse.json({
       success: true,
-      message: `Processed ${updatedCount} expired meetings`,
+      message: result.skipped
+        ? result.message
+        : `Processed ${result.meetingsCompleted} expired meetings and generated ${result.summariesGenerated} AI summaries`,
       data: {
-        meetingsCompleted: updatedCount,
-        linksDeactivated: deactivatedLinksCount
+        meetingsCompleted: result.meetingsCompleted,
+        linksDeactivated: result.linksDeactivated,
+        summariesGenerated: result.summariesGenerated,
+        summaryFailures: result.summaryFailures,
+        meetingsTouched: result.meetingsTouched,
+        skipped: result.skipped,
       }
     })
 
@@ -97,30 +63,16 @@ export async function POST(request) {
  */
 export async function GET(request) {
   try {
-    const auth = await getAuthAndModels(request, ['Meeting'])
+    const auth = await getAuthAndModels(request)
     if (!auth.success) {
       return NextResponse.json({ message: auth.message }, { status: 401 })
     }
-    const { Meeting } = auth.models
-    const now = new Date()
 
-    const expiredCount = await Meeting.countDocuments({
-      scheduledEnd: { $lt: now },
-      status: { $in: ['scheduled', 'in-progress'] }
-    })
-
-    const activeLinksOnExpiredCount = await Meeting.countDocuments({
-      type: 'online',
-      isLinkActive: true,
-      scheduledEnd: { $lt: now }
-    })
+    const counts = await inspectExpiredMeetingsForDatabase(auth.tenant.databaseName)
 
     return NextResponse.json({
       success: true,
-      data: {
-        expiredMeetingsPending: expiredCount,
-        expiredMeetingsWithActiveLinks: activeLinksOnExpiredCount
-      }
+      data: counts
     })
 
   } catch (error) {

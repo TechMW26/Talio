@@ -13,14 +13,12 @@ import {
   HiOutlineCheck,
   HiOutlineXMark,
   HiOutlineQuestionMarkCircle,
-  HiOutlinePencilSquare,
   HiOutlineTrash,
   HiOutlinePlayCircle,
   HiOutlineDocumentText,
   HiOutlineMicrophone,
   HiOutlineSparkles,
   HiOutlineClipboardDocumentList,
-  HiOutlineLink,
   HiOutlineClipboard,
   HiOutlineGlobeAlt
 } from 'react-icons/hi2'
@@ -38,6 +36,15 @@ export default function MeetingDetailPage({ params }) {
   const [showRejectModal, setShowRejectModal] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const currentUser = useMemo(() => {
+    if (typeof window === 'undefined') return null
+    const rawUser = localStorage.getItem('user')
+    return rawUser ? JSON.parse(rawUser) : null
+  }, [])
+  const currentUserName = useMemo(() => {
+    const fullName = `${currentUser?.firstName || ''} ${currentUser?.lastName || ''}`.trim()
+    return fullName || null
+  }, [currentUser])
 
   // SWR data fetching
   const { data: meetingRes, error: meetingError, isLoading: meetingLoading, isValidating: meetingValidating, mutate: refreshMeeting } = useAuthedSWR(
@@ -82,6 +89,16 @@ export default function MeetingDetailPage({ params }) {
     onError: (err) => toast.error(err.message || 'Failed to delete meeting'),
   })
 
+  const summaryMutation = useApiMutation({
+    method: 'POST',
+    invalidateKeys: [id ? `/api/meetings/${id}` : null].filter(Boolean),
+    onSuccess: () => {
+      toast.success('AI meeting notes updated')
+      refreshMeeting()
+    },
+    onError: (err) => toast.error(err.message || 'Failed to generate meeting summary'),
+  })
+
   const toggleGuestAccess = async () => {
     await toggleGuestMutation.execute(`/api/meetings/${id}/guest-access`, {
       enabled: !guestAccess?.guestAccessEnabled
@@ -117,6 +134,10 @@ export default function MeetingDetailPage({ params }) {
     if (data) {
       setShowDeleteModal(false)
     }
+  }
+
+  const handleGenerateSummary = async () => {
+    await summaryMutation.execute(`/api/meetings/${id}/summary`, { language: 'auto' })
   }
 
   const formatDate = (date) => {
@@ -191,6 +212,13 @@ export default function MeetingDetailPage({ params }) {
   const acceptedInvitees = meeting.invitees?.filter(i => i.status === 'accepted') || []
   const pendingInvitees = meeting.invitees?.filter(i => i.status === 'pending') || []
   const rejectedInvitees = meeting.invitees?.filter(i => i.status === 'rejected') || []
+  const canGenerateInsights = (meeting.transcript?.length || 0) > 0 || !!meeting.notes || (meeting.mom?.length || 0) > 0
+  const participantNotes = [...(meeting.aiParticipantNotes || [])].sort((left, right) => {
+    if (!currentUserName) return 0
+    if (left.speakerName === currentUserName) return -1
+    if (right.speakerName === currentUserName) return 1
+    return 0
+  })
 
   return (
     <div className="page-container">
@@ -552,37 +580,158 @@ export default function MeetingDetailPage({ params }) {
             </div>
           )}
 
-          {/* AI Summary (if available) */}
-          {meeting.aiSummary?.summary && (
+          {/* AI Summary */}
+          {(meeting.aiSummary?.summary || canGenerateInsights) && (
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+                <div>
+                  <h3 className="text-sm font-medium text-gray-500 flex items-center gap-2">
+                    <HiOutlineSparkles className="w-5 h-5 text-purple-500" />
+                    AI Summary
+                  </h3>
+                  {meeting.aiSummary?.generatedAt && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      Generated {new Date(meeting.aiSummary.generatedAt).toLocaleString('en-IN')} • {meeting.aiSummary.language || 'auto'}
+                    </p>
+                  )}
+                </div>
+
+                {canGenerateInsights && (
+                  <LoadingButton
+                    size="sm"
+                    color="secondary"
+                    variant="flat"
+                    onPress={handleGenerateSummary}
+                    isLoading={summaryMutation.isLoading}
+                  >
+                    {summaryMutation.isLoading
+                      ? 'Generating...'
+                      : meeting.aiSummary?.summary
+                        ? 'Refresh AI Notes'
+                        : 'Generate AI Notes'}
+                  </LoadingButton>
+                )}
+              </div>
+
+              {meeting.aiSummary?.summary ? (
+                <div className="prose max-w-none">
+                  <p className="text-gray-600">{meeting.aiSummary.summary}</p>
+
+                  {meeting.aiSummary.keyPoints?.length > 0 && (
+                    <div className="mt-4">
+                      <h4 className="text-sm font-medium text-gray-800 mb-2">Key Points</h4>
+                      <ul className="list-disc pl-5 space-y-1">
+                        {meeting.aiSummary.keyPoints.map((point, i) => (
+                          <li key={i} className="text-sm text-gray-600">{point}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {meeting.aiSummary.actionItems?.length > 0 && (
+                    <div className="mt-4">
+                      <h4 className="text-sm font-medium text-gray-800 mb-2">Action Items</h4>
+                      <ul className="list-disc pl-5 space-y-1">
+                        {meeting.aiSummary.actionItems.map((item, i) => (
+                          <li key={i} className="text-sm text-gray-600">{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {meeting.aiSummary.decisions?.length > 0 && (
+                    <div className="mt-4">
+                      <h4 className="text-sm font-medium text-gray-800 mb-2">Decisions</h4>
+                      <ul className="list-disc pl-5 space-y-1">
+                        {meeting.aiSummary.decisions.map((item, i) => (
+                          <li key={i} className="text-sm text-gray-600">{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {meeting.aiSummary.nextSteps?.length > 0 && (
+                    <div className="mt-4">
+                      <h4 className="text-sm font-medium text-gray-800 mb-2">Next Steps</h4>
+                      <ul className="list-disc pl-5 space-y-1">
+                        {meeting.aiSummary.nextSteps.map((item, i) => (
+                          <li key={i} className="text-sm text-gray-600">{item}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 text-sm text-gray-500">
+                  The meeting has transcript or notes available, but AI notes have not been generated yet.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Participant Notes */}
+          {participantNotes.length > 0 && (
             <div className="p-6 border-b border-gray-200">
               <h3 className="text-sm font-medium text-gray-500 mb-4 flex items-center gap-2">
-                <HiOutlineSparkles className="w-5 h-5 text-purple-500" />
-                AI Summary
+                <HiOutlineDocumentText className="w-5 h-5" />
+                Participant Notes
               </h3>
-              <div className="prose max-w-none">
-                <p className="text-gray-600">{meeting.aiSummary.summary}</p>
 
-                {meeting.aiSummary.keyPoints?.length > 0 && (
-                  <div className="mt-4">
-                    <h4 className="text-sm font-medium text-gray-800 mb-2">Key Points</h4>
-                    <ul className="list-disc pl-5 space-y-1">
-                      {meeting.aiSummary.keyPoints.map((point, i) => (
-                        <li key={i} className="text-sm text-gray-600">{point}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {participantNotes.map((note, index) => (
+                  <div
+                    key={`${note.employee?._id || note.speakerName || 'note'}-${index}`}
+                    className={`rounded-xl border p-4 ${note.speakerName === currentUserName
+                      ? 'border-indigo-200 bg-indigo-50'
+                      : 'border-gray-200 bg-gray-50'
+                      }`}
+                  >
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <p className="font-medium text-gray-800">
+                        {note.speakerName}
+                        {note.speakerName === currentUserName && (
+                          <span className="text-indigo-600 ml-1">(You)</span>
+                        )}
+                      </p>
+                      <span className="text-xs text-gray-400 uppercase">{note.language || 'auto'}</span>
+                    </div>
 
-                {meeting.aiSummary.actionItems?.length > 0 && (
-                  <div className="mt-4">
-                    <h4 className="text-sm font-medium text-gray-800 mb-2">Action Items</h4>
-                    <ul className="list-disc pl-5 space-y-1">
-                      {meeting.aiSummary.actionItems.map((item, i) => (
-                        <li key={i} className="text-sm text-gray-600">{item}</li>
-                      ))}
-                    </ul>
+                    <p className="text-sm text-gray-600">{note.summary}</p>
+
+                    {note.keyContributions?.length > 0 && (
+                      <div className="mt-3">
+                        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Key Contributions</h4>
+                        <ul className="list-disc pl-5 space-y-1">
+                          {note.keyContributions.map((item, itemIndex) => (
+                            <li key={itemIndex} className="text-sm text-gray-600">{item}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {note.actionItems?.length > 0 && (
+                      <div className="mt-3">
+                        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Action Items</h4>
+                        <ul className="list-disc pl-5 space-y-1">
+                          {note.actionItems.map((item, itemIndex) => (
+                            <li key={itemIndex} className="text-sm text-gray-600">{item}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {note.followUps?.length > 0 && (
+                      <div className="mt-3">
+                        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Follow Ups</h4>
+                        <ul className="list-disc pl-5 space-y-1">
+                          {note.followUps.map((item, itemIndex) => (
+                            <li key={itemIndex} className="text-sm text-gray-600">{item}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
-                )}
+                ))}
               </div>
             </div>
           )}
@@ -590,16 +739,35 @@ export default function MeetingDetailPage({ params }) {
           {/* Transcript (if available) */}
           {meeting.transcript && meeting.transcript.length > 0 && (
             <div className="p-6">
-              <h3 className="text-sm font-medium text-gray-500 mb-4 flex items-center gap-2">
-                <HiOutlineMicrophone className="w-5 h-5" />
-                Transcript
-              </h3>
+              <div className="flex items-center justify-between gap-3 mb-4">
+                <h3 className="text-sm font-medium text-gray-500 flex items-center gap-2">
+                  <HiOutlineMicrophone className="w-5 h-5" />
+                  Transcript History
+                </h3>
+                {meeting.transcriptLanguages?.length > 0 && (
+                  <div className="flex flex-wrap gap-2 justify-end">
+                    {meeting.transcriptLanguages.map(language => (
+                      <span
+                        key={language}
+                        className="px-2 py-1 rounded-full bg-gray-100 text-xs font-medium text-gray-600 uppercase"
+                      >
+                        {language}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
               <div className="max-h-96 overflow-y-auto space-y-3">
                 {meeting.transcript.map((segment, index) => (
                   <div key={index} className="p-3 bg-gray-50 rounded-lg">
-                    <p className="text-xs text-gray-500 mb-1">
-                      {segment.speakerName || 'Unknown'} • {formatTime(segment.timestamp)}
-                    </p>
+                    <div className="flex items-center justify-between gap-3 mb-1">
+                      <p className="text-xs text-gray-500">
+                        {segment.speakerName || 'Unknown'}
+                      </p>
+                      <p className="text-xs text-gray-400 uppercase">
+                        {segment.language || 'auto'} • {formatTime(segment.timestamp)}
+                      </p>
+                    </div>
                     <p className="text-gray-800">{segment.text}</p>
                   </div>
                 ))}

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getAuthAndModels } from '@/lib/auth'
 import { sendPushToUser } from '@/lib/pushNotification'
+import { resolveMeetingEmployee } from '@/lib/meetingAI'
+import { sortMeetingTranscript } from '@/lib/meetingLanguage'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,6 +26,8 @@ export async function GET(request, { params }) {
       .populate('mom.actionItems.assignedTo', 'firstName lastName')
       .populate('agenda.presenter', 'firstName lastName')
       .populate('attachments.uploadedBy', 'firstName lastName')
+      .populate('transcript.speaker', 'firstName lastName')
+      .populate('aiParticipantNotes.employee', 'firstName lastName email profilePicture')
       .lean()
 
     if (!meeting) {
@@ -60,6 +64,7 @@ export async function GET(request, { params }) {
       success: true,
       data: {
         ...meeting,
+        transcript: sortMeetingTranscript(meeting.transcript || []),
         isOrganizer,
         myInviteStatus: userInvite?.status || null
       }
@@ -86,17 +91,7 @@ export async function PUT(request, { params }) {
     const data = await request.json()
 
     // Get current user's employee record - first check User.employeeId, then Employee.userId
-    const userRecord = await User.findById(user._id || user.userId).select('employeeId').lean()
-    
-    let employee = null
-    if (userRecord?.employeeId) {
-      employee = await Employee.findById(userRecord.employeeId).lean()
-    }
-    
-    // If user doesn't have employeeId directly, try to find employee by userId
-    if (!employee) {
-      employee = await Employee.findOne({ userId: user._id || user.userId }).lean()
-    }
+    const employee = await resolveMeetingEmployee(models, user)
 
     if (!employee) {
       return NextResponse.json({ success: false, message: 'Employee not found' }, { status: 404 })
@@ -119,7 +114,7 @@ export async function PUT(request, { params }) {
     // Fields that can be updated
     const updateableFields = [
       'title', 'description', 'scheduledStart', 'scheduledEnd', 
-      'location', 'priority', 'agenda', 'tags', 'notes', 'status'
+      'location', 'priority', 'agenda', 'tags', 'notes', 'status', 'actualStart', 'actualEnd'
     ]
 
     for (const field of updateableFields) {

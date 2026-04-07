@@ -9,10 +9,8 @@ import {
   HiOutlinePhoneXMark,
   HiOutlineChatBubbleLeftRight,
   HiOutlineUserGroup,
-  HiOutlineCog6Tooth,
   HiOutlineHandRaised,
   HiOutlineDocumentText,
-  HiOutlineEllipsisVertical,
   HiOutlineXMark,
   HiOutlinePaperAirplane,
   HiOutlineStopCircle,
@@ -21,6 +19,19 @@ import {
 } from 'react-icons/hi2'
 import { Skeleton } from '@heroui/react'
 import useAuthedSWR from '@/hooks/useAuthedSWR'
+import { apiMutate } from '@/hooks/useApiMutation'
+import MeetingNotetakerPanel from '@/app/dashboard/meetings/components/MeetingNotetakerPanel'
+import {
+  blobToAudioFloat32Array,
+  getMeetingTranscriber,
+  getSupportedAudioMimeType,
+  normalizeWhisperTranscript,
+} from '@/lib/meetingTranscriber'
+import {
+  detectMeetingLanguage,
+  mergeTranscriptSegments,
+  normalizeMeetingLanguage,
+} from '@/lib/meetingLanguage'
 // Slash icons for muted/off states
 import { HiMicrophone as HiOutlineMicrophoneSlash, HiVideoCamera as HiOutlineVideoCameraSlash } from 'react-icons/hi'
 import { BsPin, BsPinFill, BsEmojiSmile } from 'react-icons/bs'
@@ -41,7 +52,7 @@ export default function MeetingRoomPage({ params }) {
   const { roomId } = use(params)
 
   // --- SWR: Fetch meeting data ---
-  const { data: meetingsRes, isLoading: meetingLoading, error: meetingError } = useAuthedSWR(
+  const { data: meetingsRes, isLoading: meetingLoading } = useAuthedSWR(
     `/api/meetings?roomId=${roomId}`,
     { revalidateOnFocus: false, revalidateIfStale: false }
   )
@@ -52,6 +63,11 @@ export default function MeetingRoomPage({ params }) {
     const storedUser = localStorage.getItem('user')
     return storedUser ? JSON.parse(storedUser) : null
   }, [])
+
+  const userDisplayName = useMemo(() => {
+    const fullName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim()
+    return fullName || 'You'
+  }, [user])
 
   // State
   const [meeting, setMeeting] = useState(null)
@@ -73,6 +89,23 @@ export default function MeetingRoomPage({ params }) {
   const [hasScreenStream, setHasScreenStream] = useState(false) // Track screen stream
   const [previewReady, setPreviewReady] = useState(false) // Track preview camera state
   const [previewError, setPreviewError] = useState(null) // Track preview errors
+  const [showNotetaker, setShowNotetaker] = useState(true)
+  const [liveTranscript, setLiveTranscript] = useState([])
+  const [transcriptLanguages, setTranscriptLanguages] = useState([])
+  const [notetakerLoading, setNotetakerLoading] = useState(false)
+  const [notetakerReady, setNotetakerReady] = useState(false)
+  const [notetakerError, setNotetakerError] = useState(null)
+  const [isTranscribingSegment, setIsTranscribingSegment] = useState(false)
+  const [activeSpeakers, setActiveSpeakers] = useState([])
+
+  const { data: transcriptRes, mutate: refreshTranscript } = useAuthedSWR(
+    isJoined && meeting?._id ? `/api/meetings/${meeting._id}/transcript` : null,
+    {
+      refreshInterval: isJoined ? 5000 : 0,
+      revalidateOnFocus: false,
+      revalidateIfStale: false,
+    }
+  )
 
   // Refs
   const localVideoRef = useRef(null)
@@ -85,6 +118,95 @@ export default function MeetingRoomPage({ params }) {
   const peerConnectionsRef = useRef({})
   const remoteStreamsRef = useRef({})
   const cameraPreviewStartedRef = useRef(false)
+  const meetingStartedRef = useRef(false)
+  const isLeavingRef = useRef(false)
+  const segmentRecorderRef = useRef(null)
+  const segmentChunksRef = useRef([])
+  const silenceTimeoutRef = useRef(null)
+  const isSpeakingRef = useRef(false)
+  const lastTranscriptionPromiseRef = useRef(Promise.resolve())
+  const speakerTimeoutsRef = useRef({})
+
+  const updateTranscriptLanguages = useCallback((segments = []) => {
+    const nextLanguages = segments
+      .map(segment => normalizeMeetingLanguage(segment?.language || 'auto'))
+      .filter(Boolean)
+      .filter(language => language !== 'auto')
+
+    if (nextLanguages.length === 0) return
+
+    setTranscriptLanguages(prev => [...new Set([...prev, ...nextLanguages])])
+  }, [])
+
+  const markSpeakerActive = useCallback((speakerName) => {
+    if (!speakerName) return
+
+    setActiveSpeakers(prev => prev.includes(speakerName) ? prev : [...prev, speakerName])
+
+    if (speakerTimeoutsRef.current[speakerName]) {
+      clearTimeout(speakerTimeoutsRef.current[speakerName])
+    }
+
+    speakerTimeoutsRef.current[speakerName] = setTimeout(() => {
+      delete speakerTimeoutsRef.current[speakerName]
+      setActiveSpeakers(prev => prev.filter(name => name !== speakerName))
+    }, 5000)
+  }, [])
+
+  useEffect(() => {
+    if (!transcriptRes?.success) return
+
+    const nextTranscript = transcriptRes.data?.transcript || []
+    const nextLanguages = transcriptRes.data?.languages || []
+
+    setLiveTranscript(prev => mergeTranscriptSegments(prev, nextTranscript))
+    setTranscriptLanguages(prev => [
+      ...new Set([
+        ...prev,
+        ...nextLanguages
+          .map(language => normalizeMeetingLanguage(language || 'auto'))
+          .filter(Boolean)
+          .filter(language => language !== 'auto')
+      ])
+    ])
+
+    nextTranscript
+      .slice(-3)
+      .filter(segment => segment?.timestamp && Date.now() - new Date(segment.timestamp).getTime() < 6000)
+      .forEach(segment => {
+        if (segment?.speakerName) {
+          markSpeakerActive(segment.speakerName)
+        }
+      })
+  }, [transcriptRes, markSpeakerActive])
+
+  useEffect(() => {
+    if (!isJoined) return undefined
+
+    let cancelled = false
+    setNotetakerError(null)
+    setNotetakerLoading(true)
+
+    getMeetingTranscriber()
+      .then(() => {
+        if (cancelled) return
+        setNotetakerReady(true)
+      })
+      .catch(error => {
+        console.error('Failed to load meeting transcriber:', error)
+        if (cancelled) return
+        setNotetakerError('Could not load on-device transcription. Summary generation will still use saved meeting notes and transcript history.')
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setNotetakerLoading(false)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [isJoined])
 
   const upsertParticipant = useCallback((participantLike) => {
     if (!participantLike?.id) return
@@ -207,6 +329,171 @@ export default function MeetingRoomPage({ params }) {
       }
     }
   }
+
+  const clearSilenceTimer = useCallback(() => {
+    if (silenceTimeoutRef.current) {
+      clearTimeout(silenceTimeoutRef.current)
+      silenceTimeoutRef.current = null
+    }
+  }, [])
+
+  const transcribeRecordedSegment = useCallback(async ({ blob, startedAt, durationMs }) => {
+    if (!meeting?._id || !blob || blob.size < 2048 || durationMs < 1200) {
+      return
+    }
+
+    setIsTranscribingSegment(true)
+    setNotetakerError(null)
+
+    const processingPromise = (async () => {
+      const audioArray = await blobToAudioFloat32Array(blob)
+      if (!audioArray?.length) {
+        return
+      }
+
+      const transcriber = await getMeetingTranscriber()
+      const result = await transcriber(audioArray, {
+        return_timestamps: true,
+        chunk_length_s: 18,
+        stride_length_s: 3,
+      })
+
+      const normalizedSegments = normalizeWhisperTranscript(result, {
+        fallbackStartedAt: startedAt,
+        segmentIdPrefix: `${meeting._id}-${user?._id || 'user'}-${startedAt}`,
+        fallbackLanguage: detectMeetingLanguage(result?.text || '', 'en'),
+      }).map(segment => ({
+        ...segment,
+        speakerName: userDisplayName,
+      }))
+
+      if (normalizedSegments.length === 0) {
+        return
+      }
+
+      await apiMutate(`/api/meetings/${meeting._id}/transcript`, {
+        method: 'POST',
+        body: {
+          language: 'auto',
+          source: 'live-whisper',
+          segments: normalizedSegments,
+        },
+      })
+
+      markSpeakerActive(userDisplayName)
+      setLiveTranscript(prev => mergeTranscriptSegments(prev, normalizedSegments))
+      updateTranscriptLanguages(normalizedSegments)
+      if (refreshTranscript) {
+        await refreshTranscript()
+      }
+    })()
+      .catch(error => {
+        console.error('Failed to transcribe meeting audio segment:', error)
+        setNotetakerError('Live transcription hit an issue for the last segment. Recording will continue and you can still generate the meeting summary afterwards.')
+      })
+      .finally(() => {
+        setIsTranscribingSegment(false)
+      })
+
+    lastTranscriptionPromiseRef.current = processingPromise
+    return processingPromise
+  }, [meeting?._id, refreshTranscript, updateTranscriptLanguages, user?._id, userDisplayName, markSpeakerActive])
+
+  const startSegmentCapture = useCallback(() => {
+    if (segmentRecorderRef.current || !meeting?._id || isMuted || !notetakerReady) {
+      return
+    }
+
+    const sourceTrack = localStreamRef.current
+      ?.getAudioTracks()
+      ?.find(track => track.readyState === 'live' && track.enabled)
+
+    if (!sourceTrack) {
+      return
+    }
+
+    const mimeType = getSupportedAudioMimeType()
+    if (mimeType === null) {
+      setNotetakerError('This browser does not support local audio capture for the AI notetaker.')
+      return
+    }
+
+    const recordingTrack = sourceTrack.clone()
+    const recordingStream = new MediaStream([recordingTrack])
+
+    let mediaRecorder
+    try {
+      mediaRecorder = mimeType
+        ? new MediaRecorder(recordingStream, { mimeType })
+        : new MediaRecorder(recordingStream)
+    } catch (error) {
+      console.error('Failed to start meeting segment recorder:', error)
+      recordingTrack.stop()
+      setNotetakerError('Could not start local audio capture for the AI notetaker.')
+      return
+    }
+
+    segmentChunksRef.current = []
+
+    let resolveStopPromise = null
+    const stopPromise = new Promise(resolve => {
+      resolveStopPromise = resolve
+    })
+
+    const startedAt = Date.now()
+    const recorderState = {
+      mediaRecorder,
+      recordingTrack,
+      startedAt,
+      mimeType: mimeType || 'audio/webm',
+      stopPromise,
+      resolveStopPromise,
+    }
+
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        segmentChunksRef.current.push(event.data)
+      }
+    }
+
+    mediaRecorder.onstop = () => {
+      const durationMs = Date.now() - startedAt
+      const blob = new Blob(segmentChunksRef.current, { type: recorderState.mimeType })
+      segmentChunksRef.current = []
+      recordingTrack.stop()
+      resolveStopPromise?.()
+
+      if (durationMs >= 1200 && blob.size > 2048) {
+        transcribeRecordedSegment({ blob, startedAt, durationMs })
+      }
+    }
+
+    segmentRecorderRef.current = recorderState
+    isSpeakingRef.current = true
+    markSpeakerActive(userDisplayName)
+    mediaRecorder.start(250)
+  }, [isMuted, meeting?._id, notetakerReady, transcribeRecordedSegment, userDisplayName, markSpeakerActive])
+
+  const stopSegmentCapture = useCallback(() => {
+    clearSilenceTimer()
+    isSpeakingRef.current = false
+
+    const recorderState = segmentRecorderRef.current
+    if (!recorderState) {
+      return Promise.resolve()
+    }
+
+    segmentRecorderRef.current = null
+
+    if (recorderState.mediaRecorder.state !== 'inactive') {
+      recorderState.mediaRecorder.stop()
+      return recorderState.stopPromise
+    }
+
+    recorderState.recordingTrack.stop()
+    recorderState.resolveStopPromise?.()
+    return recorderState.stopPromise
+  }, [clearSilenceTimer])
 
   // Initialize WebRTC and Socket connection
   const joinMeeting = useCallback(async () => {
@@ -333,6 +620,125 @@ export default function MeetingRoomPage({ params }) {
       }
     }
   }, [roomId, user, upsertParticipant])
+
+  useEffect(() => {
+    if (!isJoined || !meeting?._id || !meeting.isOrganizer || meetingStartedRef.current) {
+      return
+    }
+
+    meetingStartedRef.current = true
+    const actualStart = meeting.actualStart || new Date().toISOString()
+
+    apiMutate(`/api/meetings/${meeting._id}`, {
+      method: 'PUT',
+      body: {
+        status: 'in-progress',
+        actualStart,
+      },
+    })
+      .then(() => {
+        setMeeting(prev => prev ? {
+          ...prev,
+          status: 'in-progress',
+          actualStart: prev.actualStart || actualStart,
+        } : prev)
+      })
+      .catch(error => {
+        console.error('Failed to mark meeting as started:', error)
+      })
+  }, [isJoined, meeting?._id, meeting?.actualStart, meeting?.isOrganizer])
+
+  useEffect(() => {
+    if (!isJoined || !hasLocalStream || !notetakerReady || isMuted) {
+      return undefined
+    }
+
+    const audioTrack = localStreamRef.current
+      ?.getAudioTracks()
+      ?.find(track => track.readyState === 'live')
+
+    if (!audioTrack) {
+      return undefined
+    }
+
+    const AudioContextCtor = window.AudioContext || window.webkitAudioContext
+    if (!AudioContextCtor) {
+      setNotetakerError('Audio analysis is not available in this browser for live AI notetaking.')
+      return undefined
+    }
+
+    const sourceStream = new MediaStream([audioTrack])
+    const audioContext = new AudioContextCtor()
+    const source = audioContext.createMediaStreamSource(sourceStream)
+    const analyser = audioContext.createAnalyser()
+    analyser.fftSize = 2048
+    analyser.smoothingTimeConstant = 0.85
+    source.connect(analyser)
+
+    const dataArray = new Uint8Array(analyser.fftSize)
+    let animationFrameId = null
+
+    audioContext.resume().catch(() => {})
+
+    const detectSpeech = () => {
+      analyser.getByteTimeDomainData(dataArray)
+
+      let sumSquares = 0
+      for (let index = 0; index < dataArray.length; index += 1) {
+        const normalized = (dataArray[index] - 128) / 128
+        sumSquares += normalized * normalized
+      }
+
+      const volume = Math.sqrt(sumSquares / dataArray.length)
+      const isVoiceDetected = volume > 0.045
+
+      if (isVoiceDetected) {
+        clearSilenceTimer()
+        markSpeakerActive(userDisplayName)
+
+        if (!segmentRecorderRef.current) {
+          startSegmentCapture()
+        }
+      } else if (segmentRecorderRef.current && !silenceTimeoutRef.current) {
+        silenceTimeoutRef.current = setTimeout(() => {
+          silenceTimeoutRef.current = null
+          stopSegmentCapture()
+        }, 1200)
+      }
+
+      animationFrameId = window.requestAnimationFrame(detectSpeech)
+    }
+
+    animationFrameId = window.requestAnimationFrame(detectSpeech)
+
+    return () => {
+      if (animationFrameId) {
+        window.cancelAnimationFrame(animationFrameId)
+      }
+      clearSilenceTimer()
+      source.disconnect()
+      analyser.disconnect()
+      if (audioContext.state !== 'closed') {
+        audioContext.close().catch(() => {})
+      }
+    }
+  }, [
+    isJoined,
+    hasLocalStream,
+    notetakerReady,
+    isMuted,
+    clearSilenceTimer,
+    markSpeakerActive,
+    startSegmentCapture,
+    stopSegmentCapture,
+    userDisplayName,
+  ])
+
+  useEffect(() => {
+    if (!isJoined || isMuted) {
+      stopSegmentCapture().catch?.(() => {})
+    }
+  }, [isJoined, isMuted, stopSegmentCapture])
 
   // Create WebRTC peer connection
   const createPeerConnection = (peerId, peerName, shouldOffer = false) => {
@@ -689,37 +1095,87 @@ export default function MeetingRoomPage({ params }) {
   }
 
   // Leave meeting
-  const leaveMeeting = () => {
-    // Stop all tracks
-    if (localStreamRef.current) {
-      localStreamRef.current.getTracks().forEach(track => track.stop())
-    }
-    if (screenStreamRef.current) {
-      screenStreamRef.current.getTracks().forEach(track => track.stop())
-    }
+  const leaveMeeting = async () => {
+    if (isLeavingRef.current) return
+    isLeavingRef.current = true
 
-    // Close all peer connections
-    Object.values(peerConnectionsRef.current).forEach(pc => pc.close())
-    peerConnectionsRef.current = {}
+    clearSilenceTimer()
 
-    // Disconnect socket
-    if (socketRef.current) {
-      socketRef.current.emit('leave-meeting', { roomId })
-      socketRef.current.disconnect()
-    }
+    try {
+      await stopSegmentCapture()
+      await lastTranscriptionPromiseRef.current.catch(() => {})
 
-    // Redirect to meeting detail page or meetings list
-    router.push(meeting?._id ? `/dashboard/meetings/${meeting._id}` : '/dashboard/meetings')
-  }
+      if (meeting?._id && meeting.isOrganizer) {
+        const actualEnd = new Date().toISOString()
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
+        try {
+          await apiMutate(`/api/meetings/${meeting._id}`, {
+            method: 'PUT',
+            body: {
+              status: 'completed',
+              actualStart: meeting.actualStart || meeting.scheduledStart || actualEnd,
+              actualEnd,
+            },
+          })
+
+          setMeeting(prev => prev ? {
+            ...prev,
+            status: 'completed',
+            actualStart: prev.actualStart || prev.scheduledStart || actualEnd,
+            actualEnd,
+          } : prev)
+        } catch (error) {
+          console.error('Failed to mark meeting as completed:', error)
+        }
+
+        try {
+          await apiMutate(`/api/meetings/${meeting._id}/summary`, {
+            method: 'POST',
+            body: { language: 'auto' },
+          })
+          toast.success('Meeting summary generated and saved to meeting details')
+        } catch (error) {
+          console.error('Failed to generate meeting summary on exit:', error)
+          toast.error('Meeting ended, but the AI summary could not be generated automatically. You can retry from meeting details.')
+        }
+      }
+    } finally {
+      Object.values(speakerTimeoutsRef.current).forEach(clearTimeout)
+      speakerTimeoutsRef.current = {}
+      setActiveSpeakers([])
+
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach(track => track.stop())
       }
       if (screenStreamRef.current) {
         screenStreamRef.current.getTracks().forEach(track => track.stop())
+      }
+
+      Object.values(peerConnectionsRef.current).forEach(pc => pc.close())
+      peerConnectionsRef.current = {}
+
+      if (socketRef.current) {
+        socketRef.current.emit('leave-meeting', { roomId })
+        socketRef.current.disconnect()
+      }
+
+      router.push(meeting?._id ? `/dashboard/meetings/${meeting._id}` : '/dashboard/meetings')
+    }
+  }
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      clearSilenceTimer()
+      Object.values(speakerTimeoutsRef.current).forEach(clearTimeout)
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach(track => track.stop())
+      }
+      if (screenStreamRef.current) {
+        screenStreamRef.current.getTracks().forEach(track => track.stop())
+      }
+      if (segmentRecorderRef.current?.mediaRecorder?.state && segmentRecorderRef.current.mediaRecorder.state !== 'inactive') {
+        segmentRecorderRef.current.mediaRecorder.stop()
       }
       Object.values(peerConnectionsRef.current).forEach(pc => pc.close())
       remoteStreamsRef.current = {}
@@ -727,7 +1183,7 @@ export default function MeetingRoomPage({ params }) {
         socketRef.current.disconnect()
       }
     }
-  }, [])
+  }, [clearSilenceTimer])
 
   if (meetingLoading) {
     return (
@@ -1039,6 +1495,11 @@ export default function MeetingRoomPage({ params }) {
           <span className="text-gray-500 text-xs sm:text-sm">
             {participants.length + 1} <span className="hidden sm:inline">participants</span>
           </span>
+          {liveTranscript.length > 0 && (
+            <span className="hidden sm:inline text-gray-400 text-xs">
+              {liveTranscript.length} transcript segments
+            </span>
+          )}
         </div>
       </div>
 
@@ -1058,7 +1519,7 @@ export default function MeetingRoomPage({ params }) {
         </div>
 
         {/* Video Grid Area */}
-        <div className={`flex-1 p-2 sm:p-4 min-w-0 overflow-hidden ${showChat || showParticipants ? 'hidden sm:block' : ''}`}>
+        <div className={`flex-1 p-2 sm:p-4 min-w-0 overflow-hidden ${showChat || showParticipants || showNotetaker ? 'hidden sm:block' : ''}`}>
           {pinnedTile ? (
             // Pinned Layout
             <div className="h-full flex flex-col gap-2 sm:gap-3">
@@ -1192,6 +1653,19 @@ export default function MeetingRoomPage({ params }) {
             </div>
           </div>
         )}
+
+        {showNotetaker && (
+          <MeetingNotetakerPanel
+            isReady={notetakerReady}
+            isLoading={notetakerLoading}
+            isProcessing={isTranscribingSegment}
+            error={notetakerError}
+            transcript={liveTranscript}
+            languages={transcriptLanguages}
+            activeSpeakers={activeSpeakers}
+            onClose={() => setShowNotetaker(false)}
+          />
+        )}
       </div>
 
       {/* Controls */}
@@ -1274,10 +1748,25 @@ export default function MeetingRoomPage({ params }) {
           )}
         </div>
 
+        {/* AI Notetaker */}
+        <button
+          onClick={() => {
+            setShowNotetaker(!showNotetaker)
+            setShowChat(false)
+            setShowParticipants(false)
+          }}
+          className={`p-2.5 sm:p-4 rounded-full transition-colors ${showNotetaker ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-700 hover:bg-gray-600'
+            }`}
+          title="AI notetaker"
+        >
+          <HiOutlineDocumentText className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
+        </button>
+
         {/* Chat */}
         <button
           onClick={() => {
             setShowChat(!showChat)
+            setShowNotetaker(false)
             setShowParticipants(false)
           }}
           className={`p-2.5 sm:p-4 rounded-full transition-colors ${showChat ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-700 hover:bg-gray-600'
@@ -1292,6 +1781,7 @@ export default function MeetingRoomPage({ params }) {
           onClick={() => {
             setShowParticipants(!showParticipants)
             setShowChat(false)
+            setShowNotetaker(false)
           }}
           className={`p-2.5 sm:p-4 rounded-full transition-colors ${showParticipants ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-gray-700 hover:bg-gray-600'
             }`}

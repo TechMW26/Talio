@@ -97,23 +97,6 @@ export default function MeetingsPage() {
     }
   }, [socket, isConnected, refreshMeetings, onMeetingUpdate, subscribe])
 
-  // Trigger meeting expiry check on page load (handles meetings that have passed)
-  useEffect(() => {
-    const expirePassedMeetings = async () => {
-      try {
-        const token = localStorage.getItem('token')
-        await fetch('/api/meetings/expire-past', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` }
-        })
-      } catch (error) {
-        // Silently fail - this is a background cleanup task
-        console.log('[Meetings] Background expiry check completed')
-      }
-    }
-    expirePassedMeetings()
-  }, [])
-
   const handleMeetingCreated = (newMeeting) => {
     refreshMeetings()
     setShowCreateModal(false)
