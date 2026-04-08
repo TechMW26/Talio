@@ -142,8 +142,14 @@ const nextConfig = {
       };
     }
 
-    // Prevent onnxruntime-node native binary from being loaded server-side (segfaults on Alpine)
+    // Prevent onnxruntime-node native binary from being loaded server-side (segfaults on Alpine/musl)
+    // The @xenova/transformers library is only used client-side for meeting transcription,
+    // but Next.js SSR can still trigger native binary loading which crashes the process.
     if (isServer) {
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        'onnxruntime-node': false,
+      };
       config.externals = config.externals || [];
       config.externals.push('onnxruntime-node');
     }
