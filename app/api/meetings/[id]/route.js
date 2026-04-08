@@ -236,7 +236,22 @@ export async function DELETE(request, { params }) {
 
     // If permanent delete requested, actually delete the meeting
     if (permanentDelete) {
-      await Meeting.findByIdAndDelete(id)
+      const deletedDataSummary = {
+        notesPresent: Boolean(String(meeting.notes || '').trim()),
+        transcriptSegments: Array.isArray(meeting.transcript) ? meeting.transcript.length : 0,
+        participantNotes: Array.isArray(meeting.aiParticipantNotes) ? meeting.aiParticipantNotes.length : 0,
+        summaryHistoryEntries: Array.isArray(meeting.aiSummary?.history) ? meeting.aiSummary.history.length : 0,
+        momEntries: Array.isArray(meeting.mom) ? meeting.mom.length : 0,
+        offlineAudioSegments: Array.isArray(meeting.offlineAudio?.segments) ? meeting.offlineAudio.segments.length : 0,
+        guestEntries: Array.isArray(meeting.guestAccess?.guests) ? meeting.guestAccess.guests.length : 0,
+      }
+
+      await meeting.deleteOne()
+
+      console.info('[Meetings] Permanently deleted meeting and embedded data', {
+        meetingId: meeting._id.toString(),
+        ...deletedDataSummary,
+      })
       
       // Notify all invitees about deletion
       for (const invitee of meeting.invitees) {
@@ -262,7 +277,10 @@ export async function DELETE(request, { params }) {
 
       return NextResponse.json({
         success: true,
-        message: 'Meeting deleted successfully'
+        message: 'Meeting deleted successfully',
+        data: {
+          purged: deletedDataSummary,
+        },
       })
     }
 

@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getAuthAndModels } from '@/lib/auth';
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 /**
  * GET /api/activity/clock-status
  * Check if user is currently clocked in (has checkIn but no checkOut for today)
@@ -22,6 +25,10 @@ export async function GET(request) {
         success: true,
         isClockedIn: false,
         reason: 'User ID not found'
+      }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        },
       });
     }
 
@@ -33,6 +40,10 @@ export async function GET(request) {
         success: true,
         isClockedIn: false,
         reason: 'No employee profile linked'
+      }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        },
       });
     }
 
@@ -59,6 +70,10 @@ export async function GET(request) {
       checkIn: attendance?.checkIn || null,
       checkOut: attendance?.checkOut || null,
       userId: authUser._id
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      },
     });
 
   } catch (error) {

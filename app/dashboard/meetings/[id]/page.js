@@ -30,6 +30,39 @@ import LoadingButton from '@/components/ui/LoadingButton'
 import { DataErrorState } from '@/components/ui/ErrorBoundary'
 import BackgroundRefreshIndicator from '@/components/ui/BackgroundRefreshIndicator'
 
+function getInsightItemClassName(tone = 'slate') {
+  switch (tone) {
+    case 'sky':
+      return 'border-sky-200 bg-white/90 text-sky-900 dark:border-sky-800 dark:bg-sky-950/50 dark:text-sky-100'
+    case 'amber':
+      return 'border-amber-200 bg-white/90 text-amber-900 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-100'
+    case 'emerald':
+      return 'border-emerald-200 bg-white/90 text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-100'
+    case 'violet':
+      return 'border-violet-200 bg-white/90 text-violet-900 dark:border-violet-800 dark:bg-violet-950/50 dark:text-violet-100'
+    case 'indigo':
+      return 'border-indigo-200 bg-white/90 text-indigo-900 dark:border-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-100'
+    default:
+      return 'border-slate-200 bg-white/90 text-slate-900 dark:border-slate-700 dark:bg-slate-950/50 dark:text-slate-100'
+  }
+}
+
+function InsightItems({ items = [], tone = 'slate' }) {
+  return (
+    <div className="mt-3 grid gap-2.5">
+      {items.map((item, itemIndex) => (
+        <div
+          key={`${tone}-${itemIndex}`}
+          className={`flex items-start gap-3 rounded-3xl border px-4 py-3 text-sm font-medium leading-6 shadow-sm ${getInsightItemClassName(tone)}`}
+        >
+          <span className="mt-1.5 h-2.5 w-2.5 flex-shrink-0 rounded-full bg-current opacity-70" />
+          <p className="min-w-0 flex-1 break-words">{item}</p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function MeetingDetailPage({ params }) {
   const router = useRouter()
   const { id } = use(params)
@@ -215,7 +248,7 @@ export default function MeetingDetailPage({ params }) {
   if (loading) {
     return (
       <div className="page-container">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-[1440px] mx-auto">
           <div className="space-y-4">
             <Skeleton className="h-8 w-1/4 rounded-lg" />
             <Skeleton className="h-64 rounded-xl" />
@@ -250,34 +283,70 @@ export default function MeetingDetailPage({ params }) {
     : meeting.aiSummary?.summary
       ? [meeting.aiSummary]
       : []
-  const latestSummary = summaryEntries.length > 0 ? summaryEntries[summaryEntries.length - 1] : null
-  const participantNotes = [...(meeting.aiParticipantNotes || [])].sort((left, right) => {
-    if (!currentUserName) return 0
-    if (left.speakerName === currentUserName) return -1
-    if (right.speakerName === currentUserName) return 1
-    return 0
+  const normalizedSummaryEntries = summaryEntries.map((entry, index) => ({
+    ...entry,
+    sessionNumber: Number(entry?.sessionNumber) || index + 1,
+  }))
+  const fallbackSessionNumber = normalizedSummaryEntries.length > 0
+    ? normalizedSummaryEntries[normalizedSummaryEntries.length - 1].sessionNumber
+    : 1
+  const participantNotes = [...(meeting.aiParticipantNotes || [])].map(note => ({
+    ...note,
+    sessionNumber: Number(note?.sessionNumber) || fallbackSessionNumber,
+  }))
+
+  const timelineSessionNumbers = [...new Set([
+    ...normalizedSummaryEntries.map(entry => entry.sessionNumber),
+    ...participantNotes.map(note => note.sessionNumber),
+  ])].sort((left, right) => left - right)
+
+  const timelineSessions = timelineSessionNumbers.map((sessionNumber, index) => {
+    const summaryEntry = normalizedSummaryEntries.find(entry => entry.sessionNumber === sessionNumber) || null
+    const notes = participantNotes
+      .filter(note => note.sessionNumber === sessionNumber)
+      .sort((left, right) => {
+        if (!currentUserName) return 0
+        if (left.speakerName === currentUserName) return -1
+        if (right.speakerName === currentUserName) return 1
+        return 0
+      })
+
+    return {
+      sessionNumber,
+      sessionTag: summaryEntry?.sessionTag || notes[0]?.sessionTag || `Session ${sessionNumber}`,
+      generatedAt: summaryEntry?.generatedAt || notes[0]?.generatedAt || null,
+      language: summaryEntry?.language || notes[0]?.language || 'auto',
+      summaryEntry,
+      participantNotes: notes,
+      index,
+    }
   })
+
+  const latestSummary = timelineSessions.length > 0
+    ? timelineSessions[timelineSessions.length - 1].summaryEntry
+    : null
+  const hasRightRailContent = canGenerateInsights || timelineSessions.length > 0
 
   return (
     <div className="page-container">
       <BackgroundRefreshIndicator isRefreshing={isValidating && !loading} />
-      <div className="max-w-4xl mx-auto">
+      <div className="mx-auto">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <Link
             href="/dashboard/meetings"
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-800"
+            className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium text-gray-600 transition-colors hover:border-gray-300 hover:text-gray-800"
           >
-            <HiOutlineArrowLeft className="w-5 h-5" />
+            <HiOutlineArrowLeft className="w-4 h-4" />
             Back to Meetings
           </Link>
 
           {meeting.isOrganizer && (
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               {meeting.status === 'scheduled' && (
                 <button
                   onClick={handleCancelMeeting}
-                  className="flex items-center gap-2 px-4 py-2 text-amber-600 border border-amber-600 rounded-lg hover:bg-amber-50"
+                  className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3.5 py-2 text-sm font-medium text-amber-700 transition-colors hover:border-amber-300 hover:bg-amber-100"
                 >
                   <HiOutlineXMark className="w-4 h-4" />
                   Cancel
@@ -285,7 +354,7 @@ export default function MeetingDetailPage({ params }) {
               )}
               <button
                 onClick={() => setShowDeleteModal(true)}
-                className="flex items-center gap-2 px-4 py-2 text-red-600 border border-red-600 rounded-lg hover:bg-red-50"
+                className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-3.5 py-2 text-sm font-medium text-red-700 transition-colors hover:border-red-300 hover:bg-red-100"
               >
                 <HiOutlineTrash className="w-4 h-4" />
                 Delete
@@ -297,45 +366,53 @@ export default function MeetingDetailPage({ params }) {
         {/* Main Content */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
           {/* Meeting Header */}
-          <div className={`p-6 ${meeting.type === 'online' ? 'bg-indigo-50' : 'bg-amber-50'}`}>
-            <div className="flex items-start justify-between">
-              <div className="flex items-start gap-4">
-                <div className={`p-3 rounded-xl ${meeting.type === 'online' ? 'bg-indigo-100' : 'bg-amber-100'}`}>
+          <div className={`border-b border-gray-200 dark:border-gray-800 px-5 py-5 ${meeting.type === 'online' ? 'bg-indigo-50 dark:bg-slate-950' : 'bg-amber-50 dark:bg-slate-950'}`}>
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+              <div className="min-w-0 flex items-start gap-4">
+                <div className={`flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-2xl ${meeting.type === 'online' ? 'bg-indigo-100 text-indigo-600' : 'bg-amber-100 text-amber-600'}`}>
                   {meeting.type === 'online' ? (
-                    <HiOutlineVideoCamera className="w-8 h-8 text-indigo-600" />
+                    <HiOutlineVideoCamera className="w-7 h-7" />
                   ) : (
-                    <HiOutlineMapPin className="w-8 h-8 text-amber-600" />
+                    <HiOutlineMapPin className="w-7 h-7" />
                   )}
                 </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-800 mb-2">
-                    {meeting.title}
-                  </h1>
+                <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-3">
+                    <h1 className="truncate text-2xl font-semibold text-gray-900">
+                      {meeting.title}
+                    </h1>
                     <span className={`px-3 py-1 rounded-full text-sm font-medium capitalize ${getStatusColor(meeting.status)}`}>
                       {meeting.status}
                     </span>
-                    <span className="text-sm text-gray-600 capitalize">
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-gray-600">
+                    <span className="rounded-full border border-gray-200 bg-white px-3 py-1 font-medium capitalize text-gray-700">
                       {meeting.type} Meeting
                     </span>
-                    <span className="text-sm text-gray-500">
-                      • {meeting.priority} priority
+                    <span className="rounded-full border border-gray-200 bg-white px-3 py-1 font-medium text-gray-700">
+                      {meeting.priority} priority
                     </span>
+                    <span className="text-gray-400">{formatDate(meeting.scheduledStart)}</span>
+                    <span className="text-gray-400">{formatTime(meeting.scheduledStart)} - {formatTime(meeting.scheduledEnd)}</span>
                   </div>
+
+                  {meeting.description && (
+                    <p className="mt-3 max-w-3xl text-sm leading-6 text-gray-600">
+                      {meeting.description}
+                    </p>
+                  )}
                 </div>
               </div>
-            </div>
 
-            {/* Join/Response Actions */}
-            {meeting.status !== 'cancelled' && (
-              <div className="mt-6 flex flex-wrap gap-3">
+              {meeting.status !== 'cancelled' && (
+                <div className="flex flex-wrap items-center gap-2 xl:max-w-[460px] xl:justify-end">
                 {/* Join button for online meetings */}
                 {meeting.type === 'online' && (isNow || isUpcoming) && (meeting.isOrganizer || meeting.myInviteStatus === 'accepted') && (
                   <Link
                     href={`/dashboard/meetings/room/${meeting.roomId}`}
-                    className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white font-medium rounded-xl hover:bg-indigo-700 transition-colors"
+                    className="inline-flex items-center gap-2 rounded-full bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
                   >
-                    <HiOutlinePlayCircle className="w-5 h-5" />
+                    <HiOutlinePlayCircle className="w-4 h-4" />
                     {isNow ? 'Join Now' : 'Join Meeting'}
                   </Link>
                 )}
@@ -346,508 +423,521 @@ export default function MeetingDetailPage({ params }) {
                     <button
                       onClick={() => handleRespond('accepted')}
                       disabled={respondMutation.isLoading}
-                      className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white font-medium rounded-xl hover:bg-green-700 transition-colors disabled:opacity-50"
+                      className="inline-flex items-center gap-2 rounded-full bg-green-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-700 disabled:opacity-50"
                     >
-                      <HiOutlineCheck className="w-5 h-5" />
+                      <HiOutlineCheck className="w-4 h-4" />
                       Accept
                     </button>
                     <button
                       onClick={() => setShowRejectModal(true)}
                       disabled={respondMutation.isLoading}
-                      className="flex items-center gap-2 px-6 py-3 bg-red-600 text-white font-medium rounded-xl hover:bg-red-700 transition-colors disabled:opacity-50"
+                      className="inline-flex items-center gap-2 rounded-full bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
                     >
-                      <HiOutlineXMark className="w-5 h-5" />
+                      <HiOutlineXMark className="w-4 h-4" />
                       Decline
                     </button>
                     <button
                       onClick={() => handleRespond('maybe')}
                       disabled={respondMutation.isLoading}
-                      className="flex items-center gap-2 px-6 py-3 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-100 transition-colors disabled:opacity-50"
+                      className="inline-flex items-center gap-2 rounded-full border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-100 disabled:opacity-50"
                     >
-                      <HiOutlineQuestionMarkCircle className="w-5 h-5" />
+                      <HiOutlineQuestionMarkCircle className="w-4 h-4" />
                       Maybe
                     </button>
                   </>
                 )}
-              </div>
-            )}
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Meeting Details */}
-          <div className="p-6 border-b border-gray-200">
-            {meeting.description && (
-              <p className="text-gray-600 mb-6">
-                {meeting.description}
-              </p>
-            )}
-
-            {latestSummary?.summary && (
-              <div className="mb-6 rounded-xl border border-purple-200 bg-purple-50 p-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <h3 className="text-sm font-medium text-purple-700 flex items-center gap-2">
-                      <HiOutlineSparkles className="w-5 h-5" />
-                      Mira Summary
-                    </h3>
-                    <p className="text-xs text-purple-600 mt-1">
-                      {formatSummarySessionTag(latestSummary, summaryEntries.length - 1)}
-                    </p>
-                  </div>
-                  <span className="text-xs uppercase tracking-wide text-purple-600">
-                    {latestSummary.language || 'auto'}
-                  </span>
-                </div>
-
-                <p className="mt-3 text-sm text-purple-950 whitespace-pre-line">
-                  {latestSummary.summary}
-                </p>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Date */}
-              <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
-                <HiOutlineCalendarDays className="w-6 h-6 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-500">Date</p>
-                  <p className="font-medium text-gray-800">
-                    {formatDate(meeting.scheduledStart)}
-                  </p>
-                </div>
-              </div>
-
-              {/* Time */}
-              <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
-                <HiOutlineClock className="w-6 h-6 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-500">Time</p>
-                  <p className="font-medium text-gray-800">
-                    {formatTime(meeting.scheduledStart)} - {formatTime(meeting.scheduledEnd)}
-                    <span className="text-gray-500 ml-2">({meeting.duration} min)</span>
-                  </p>
-                </div>
-              </div>
-
-              {/* Location (offline) or Meeting Link (online) */}
-              {meeting.type === 'offline' && meeting.location && (
-                <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl md:col-span-2">
-                  <HiOutlineMapPin className="w-6 h-6 text-gray-400" />
-                  <div>
-                    <p className="text-sm text-gray-500">Location</p>
-                    <p className="font-medium text-gray-800">
-                      {meeting.location}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {meeting.type === 'online' && meeting.roomId && (
-                <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl md:col-span-2">
-                  <HiOutlineVideoCamera className="w-6 h-6 text-gray-400" />
-                  <div className="flex-1">
-                    <p className="text-sm text-gray-500">Meeting Room</p>
-                    <Link
-                      href={`/dashboard/meetings/room/${meeting.roomId}`}
-                      className="inline-flex items-center gap-2 mt-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
-                    >
-                      <HiOutlinePlayCircle className="w-4 h-4" />
-                      Join Meeting Room
-                    </Link>
-                  </div>
-                </div>
-              )}
-
-              {/* Guest Link Sharing - Only for online meetings and organizer */}
-              {meeting.type === 'online' && meeting.isOrganizer && guestAccess && (
-                <div className="p-4 bg-indigo-50 dark:bg-indigo-950/30 rounded-xl md:col-span-2 border border-indigo-100 dark:border-indigo-800">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <HiOutlineGlobeAlt className="w-5 h-5 text-indigo-600" />
-                      <span className="font-medium text-gray-800">Guest Access</span>
-                    </div>
-                    <button
-                      onClick={toggleGuestAccess}
-                      disabled={toggleGuestMutation.isLoading}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${guestAccess.guestAccessEnabled ? 'bg-indigo-600' : 'bg-gray-300'
-                        } ${toggleGuestMutation.isLoading ? 'opacity-50' : ''}`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${guestAccess.guestAccessEnabled ? 'translate-x-6' : 'translate-x-1'
-                          }`}
-                      />
-                    </button>
-                  </div>
-
-                  <p className="text-sm text-gray-600 mb-3">
-                    Allow anyone with the link to join without signing in
-                  </p>
-
-                  {guestAccess.guestAccessEnabled && guestAccess.guestUrl && (
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600 truncate">
-                        {guestAccess.guestUrl}
-                      </div>
-                      <button
-                        onClick={copyGuestLink}
-                        className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
-                      >
-                        <HiOutlineClipboard className="w-4 h-4" />
-                        Copy
-                      </button>
-                    </div>
-                  )}
-
-                  {guestAccess.guests && guestAccess.guests.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-indigo-100">
-                      <p className="text-xs text-gray-500 mb-2">
-                        {guestAccess.guests.length} guest(s) have joined via link
+          <div className={hasRightRailContent ? 'lg:grid lg:grid-cols-[minmax(0,860px)_minmax(460px,1fr)] lg:items-stretch' : ''}>
+            <div className={hasRightRailContent ? 'min-w-0 lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:border-r lg:border-gray-200 lg:dark:border-gray-700' : 'min-w-0'}>
+              {/* Meeting Details */}
+              <div className="p-6 border-b border-gray-200">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Date */}
+                  <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
+                    <HiOutlineCalendarDays className="w-6 h-6 text-gray-400" />
+                    <div>
+                      <p className="text-sm text-gray-500">Date</p>
+                      <p className="font-medium text-gray-800">
+                        {formatDate(meeting.scheduledStart)}
                       </p>
                     </div>
+                  </div>
+
+                  {/* Time */}
+                  <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl">
+                    <HiOutlineClock className="w-6 h-6 text-gray-400" />
+                    <div>
+                      <p className="text-sm text-gray-500">Time</p>
+                      <p className="font-medium text-gray-800">
+                        {formatTime(meeting.scheduledStart)} - {formatTime(meeting.scheduledEnd)}
+                        <span className="text-gray-500 ml-2">({meeting.duration} min)</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Location (offline) or Meeting Link (online) */}
+                  {meeting.type === 'offline' && meeting.location && (
+                    <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl md:col-span-2">
+                      <HiOutlineMapPin className="w-6 h-6 text-gray-400" />
+                      <div>
+                        <p className="text-sm text-gray-500">Location</p>
+                        <p className="font-medium text-gray-800">
+                          {meeting.location}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {meeting.type === 'online' && meeting.roomId && (
+                    <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl md:col-span-2">
+                      <HiOutlineVideoCamera className="w-6 h-6 text-gray-400" />
+                      <div className="flex-1">
+                        <p className="text-sm text-gray-500">Meeting Room</p>
+                        <Link
+                          href={`/dashboard/meetings/room/${meeting.roomId}`}
+                          className="inline-flex items-center gap-2 mt-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                        >
+                          <HiOutlinePlayCircle className="w-4 h-4" />
+                          Join Meeting Room
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Guest Link Sharing - Only for online meetings and organizer */}
+                  {meeting.type === 'online' && meeting.isOrganizer && guestAccess && (
+                    <div className="p-4 bg-indigo-50 dark:bg-indigo-950/30 rounded-xl md:col-span-2 border border-indigo-100 dark:border-indigo-800">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <HiOutlineGlobeAlt className="w-5 h-5 text-indigo-600" />
+                          <span className="font-medium text-gray-800">Guest Access</span>
+                        </div>
+                        <button
+                          onClick={toggleGuestAccess}
+                          disabled={toggleGuestMutation.isLoading}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${guestAccess.guestAccessEnabled ? 'bg-indigo-600' : 'bg-gray-300'
+                            } ${toggleGuestMutation.isLoading ? 'opacity-50' : ''}`}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${guestAccess.guestAccessEnabled ? 'translate-x-6' : 'translate-x-1'
+                              }`}
+                          />
+                        </button>
+                      </div>
+
+                      <p className="text-sm text-gray-600 mb-3">
+                        Allow anyone with the link to join without signing in
+                      </p>
+
+                      {guestAccess.guestAccessEnabled && guestAccess.guestUrl && (
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-600 truncate">
+                            {guestAccess.guestUrl}
+                          </div>
+                          <button
+                            onClick={copyGuestLink}
+                            className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+                          >
+                            <HiOutlineClipboard className="w-4 h-4" />
+                            Copy
+                          </button>
+                        </div>
+                      )}
+
+                      {guestAccess.guests && guestAccess.guests.length > 0 && (
+                        <div className="mt-3 pt-3 border-t border-indigo-100">
+                          <p className="text-xs text-gray-500 mb-2">
+                            {guestAccess.guests.length} guest(s) have joined via link
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
-          </div>
-
-          {/* Organizer */}
-          <div className="p-6 border-b border-gray-200">
-            <h3 className="text-sm font-medium text-gray-500 mb-3">Organizer</h3>
-            <div className="flex items-center gap-3">
-              {meeting.organizer?.profilePicture ? (
-                <img
-                  src={meeting.organizer.profilePicture}
-                  alt={meeting.organizer.firstName}
-                  className="w-10 h-10 rounded-full object-cover"
-                />
-              ) : (
-                <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
-                  <span className="font-medium text-indigo-600">
-                    {meeting.organizer?.firstName?.[0]}{meeting.organizer?.lastName?.[0]}
-                  </span>
-                </div>
-              )}
-              <div>
-                <p className="font-medium text-gray-800">
-                  {meeting.organizer?.firstName} {meeting.organizer?.lastName}
-                  {meeting.isOrganizer && <span className="text-gray-500 ml-1">(You)</span>}
-                </p>
-                <p className="text-sm text-gray-500">{meeting.organizer?.email}</p>
               </div>
-            </div>
-          </div>
 
-          {/* Invitees */}
-          <div className="p-6 border-b border-gray-200">
-            <h3 className="text-sm font-medium text-gray-500 mb-4 flex items-center gap-2">
-              <HiOutlineUserGroup className="w-5 h-5" />
-              Invitees ({meeting.invitees?.length || 0})
-            </h3>
+              {/* Organizer */}
+              <div className="p-6 border-b border-gray-200">
+                <h3 className="text-sm font-medium text-gray-500 mb-3">Organizer</h3>
+                <div className="flex items-center gap-3">
+                  {meeting.organizer?.profilePicture ? (
+                    <img
+                      src={meeting.organizer.profilePicture}
+                      alt={meeting.organizer.firstName}
+                      className="w-10 h-10 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                      <span className="font-medium text-indigo-600">
+                        {meeting.organizer?.firstName?.[0]}{meeting.organizer?.lastName?.[0]}
+                      </span>
+                    </div>
+                  )}
+                  <div>
+                    <p className="font-medium text-gray-800">
+                      {meeting.organizer?.firstName} {meeting.organizer?.lastName}
+                      {meeting.isOrganizer && <span className="text-gray-500 ml-1">(You)</span>}
+                    </p>
+                    <p className="text-sm text-gray-500">{meeting.organizer?.email}</p>
+                  </div>
+                </div>
+              </div>
 
-            {/* Accepted */}
-            {acceptedInvitees.length > 0 && (
-              <div className="mb-4">
-                <p className="text-xs font-medium text-green-600 mb-2">
-                  Accepted ({acceptedInvitees.length})
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {acceptedInvitees.map(inv => (
-                    <div
-                      key={inv.employee?._id}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-green-50 rounded-full"
-                    >
-                      {inv.employee?.profilePicture ? (
-                        <img
-                          src={inv.employee.profilePicture}
-                          alt=""
-                          className="w-5 h-5 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-5 h-5 rounded-full bg-green-200 flex items-center justify-center">
-                          <span className="text-[10px] font-medium text-green-700">
-                            {inv.employee?.firstName?.[0]}{inv.employee?.lastName?.[0]}
+              {/* Invitees */}
+              <div className="p-6 border-b border-gray-200">
+                <h3 className="text-sm font-medium text-gray-500 mb-4 flex items-center gap-2">
+                  <HiOutlineUserGroup className="w-5 h-5" />
+                  Invitees ({meeting.invitees?.length || 0})
+                </h3>
+
+                {/* Accepted */}
+                {acceptedInvitees.length > 0 && (
+                  <div className="mb-4">
+                    <p className="text-xs font-medium text-green-600 mb-2">
+                      Accepted ({acceptedInvitees.length})
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {acceptedInvitees.map(inv => (
+                        <div
+                          key={inv.employee?._id}
+                          className="flex items-center gap-2 px-3 py-1.5 bg-green-50 rounded-full"
+                        >
+                          {inv.employee?.profilePicture ? (
+                            <img
+                              src={inv.employee.profilePicture}
+                              alt=""
+                              className="w-5 h-5 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-5 h-5 rounded-full bg-green-200 flex items-center justify-center">
+                              <span className="text-[10px] font-medium text-green-700">
+                                {inv.employee?.firstName?.[0]}{inv.employee?.lastName?.[0]}
+                              </span>
+                            </div>
+                          )}
+                          <span className="text-sm text-green-700">
+                            {inv.employee?.firstName} {inv.employee?.lastName}
                           </span>
                         </div>
-                      )}
-                      <span className="text-sm text-green-700">
-                        {inv.employee?.firstName} {inv.employee?.lastName}
-                      </span>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
+                  </div>
+                )}
 
-            {/* Pending */}
-            {pendingInvitees.length > 0 && (
-              <div className="mb-4">
-                <p className="text-xs font-medium text-yellow-600 mb-2">
-                  Pending ({pendingInvitees.length})
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {pendingInvitees.map(inv => (
-                    <div
-                      key={inv.employee?._id}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-yellow-50 rounded-full"
-                    >
-                      <span className="text-sm text-yellow-700">
-                        {inv.employee?.firstName} {inv.employee?.lastName}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Declined */}
-            {rejectedInvitees.length > 0 && (
-              <div>
-                <p className="text-xs font-medium text-red-600 mb-2">
-                  Declined ({rejectedInvitees.length})
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {rejectedInvitees.map(inv => (
-                    <div
-                      key={inv.employee?._id}
-                      className="flex items-center gap-2 px-3 py-1.5 bg-red-50 rounded-full"
-                      title={inv.rejectionReason || 'No reason provided'}
-                    >
-                      <span className="text-sm text-red-700">
-                        {inv.employee?.firstName} {inv.employee?.lastName}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Agenda */}
-          {meeting.agenda && meeting.agenda.length > 0 && (
-            <div className="p-6 border-b border-gray-200">
-              <h3 className="text-sm font-medium text-gray-500 mb-4 flex items-center gap-2">
-                <HiOutlineClipboardDocumentList className="w-5 h-5" />
-                Agenda
-              </h3>
-              <ul className="space-y-2">
-                {meeting.agenda.map((item, index) => (
-                  <li key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <span className="text-gray-800">
-                      {index + 1}. {item.title}
-                    </span>
-                    <span className="text-sm text-gray-500">{item.duration} min</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Mira Summary */}
-          {(meeting.aiSummary?.summary || canGenerateInsights) && (
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
-                <div>
-                  <h3 className="text-sm font-medium text-gray-500 flex items-center gap-2">
-                    <HiOutlineSparkles className="w-5 h-5 text-purple-500" />
-                    Mira Summary
-                  </h3>
-                  {latestSummary?.generatedAt && (
-                    <p className="text-xs text-gray-400 mt-1">
-                      {formatSummarySessionTag(latestSummary, summaryEntries.length - 1)} • {latestSummary.language || 'auto'}
+                {/* Pending */}
+                {pendingInvitees.length > 0 && (
+                  <div className="mb-4">
+                    <p className="text-xs font-medium text-yellow-600 mb-2">
+                      Pending ({pendingInvitees.length})
                     </p>
-                  )}
-                </div>
+                    <div className="flex flex-wrap gap-2">
+                      {pendingInvitees.map(inv => (
+                        <div
+                          key={inv.employee?._id}
+                          className="flex items-center gap-2 px-3 py-1.5 bg-yellow-50 rounded-full"
+                        >
+                          <span className="text-sm text-yellow-700">
+                            {inv.employee?.firstName} {inv.employee?.lastName}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
-                {canGenerateInsights && (
-                  <LoadingButton
-                    size="sm"
-                    color="secondary"
-                    variant="flat"
-                    onPress={handleGenerateSummary}
-                    isLoading={summaryMutation.isLoading}
-                  >
-                    {summaryMutation.isLoading
-                      ? 'Generating...'
-                      : meeting.aiSummary?.summary
-                        ? 'Refresh Mira Summary'
-                        : 'Generate Mira Summary'}
-                  </LoadingButton>
+                {/* Declined */}
+                {rejectedInvitees.length > 0 && (
+                  <div>
+                    <p className="text-xs font-medium text-red-600 mb-2">
+                      Declined ({rejectedInvitees.length})
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {rejectedInvitees.map(inv => (
+                        <div
+                          key={inv.employee?._id}
+                          className="flex items-center gap-2 px-3 py-1.5 bg-red-50 rounded-full"
+                          title={inv.rejectionReason || 'No reason provided'}
+                        >
+                          <span className="text-sm text-red-700">
+                            {inv.employee?.firstName} {inv.employee?.lastName}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
 
-              {summaryEntries.length > 0 ? (
-                <div className="space-y-4">
-                  {summaryEntries.map((summaryEntry, index) => (
-                    <div key={`${summaryEntry.generatedAt || index}-${summaryEntry.sessionNumber || index}`} className="rounded-xl border border-gray-200 bg-gray-50 p-4">
-                      <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
-                        <p className="text-xs font-medium uppercase tracking-wide text-purple-600">
-                          {formatSummarySessionTag(summaryEntry, index)}
-                        </p>
-                        <span className="text-xs text-gray-400">
-                          {summaryEntry.generatedAt ? formatSummaryDateTime(summaryEntry.generatedAt) : 'Pending'}
+              {/* Agenda */}
+              {meeting.agenda && meeting.agenda.length > 0 && (
+                <div className="p-6 border-b border-gray-200">
+                  <h3 className="text-sm font-medium text-gray-500 mb-4 flex items-center gap-2">
+                    <HiOutlineClipboardDocumentList className="w-5 h-5" />
+                    Agenda
+                  </h3>
+                  <ul className="space-y-2">
+                    {meeting.agenda.map((item, index) => (
+                      <li key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <span className="text-gray-800">
+                          {index + 1}. {item.title}
                         </span>
-                      </div>
-
-                      <p className="text-gray-600 whitespace-pre-line">{summaryEntry.summary}</p>
-
-                      {summaryEntry.keyPoints?.length > 0 && (
-                        <div className="mt-4">
-                          <h4 className="text-sm font-medium text-gray-800 mb-2">Key Points</h4>
-                          <ul className="list-disc pl-5 space-y-1">
-                            {summaryEntry.keyPoints.map((point, i) => (
-                              <li key={i} className="text-sm text-gray-600">{point}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {summaryEntry.actionItems?.length > 0 && (
-                        <div className="mt-4">
-                          <h4 className="text-sm font-medium text-gray-800 mb-2">Action Items</h4>
-                          <ul className="list-disc pl-5 space-y-1">
-                            {summaryEntry.actionItems.map((item, i) => (
-                              <li key={i} className="text-sm text-gray-600">{item}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {summaryEntry.decisions?.length > 0 && (
-                        <div className="mt-4">
-                          <h4 className="text-sm font-medium text-gray-800 mb-2">Decisions</h4>
-                          <ul className="list-disc pl-5 space-y-1">
-                            {summaryEntry.decisions.map((item, i) => (
-                              <li key={i} className="text-sm text-gray-600">{item}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {summaryEntry.nextSteps?.length > 0 && (
-                        <div className="mt-4">
-                          <h4 className="text-sm font-medium text-gray-800 mb-2">Next Steps</h4>
-                          <ul className="list-disc pl-5 space-y-1">
-                            {summaryEntry.nextSteps.map((item, i) => (
-                              <li key={i} className="text-sm text-gray-600">{item}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                        <span className="text-sm text-gray-500">{item.duration} min</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-              ) : (
-                <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 text-sm text-gray-500">
-                  The meeting has transcript or notes available, but Mira has not generated a summary yet.
+              )}
+
+              {/* Transcript (if available) */}
+              {meeting.transcript && meeting.transcript.length > 0 && (
+                <div className="flex flex-col overflow-hidden p-6 lg:h-full lg:min-h-0 lg:flex-1">
+                  <div className="flex items-center justify-between gap-3 mb-4">
+                    <h3 className="text-sm font-medium text-gray-500 dark:text-gray-300 flex items-center gap-2">
+                      <HiOutlineMicrophone className="w-5 h-5" />
+                      Transcript History
+                    </h3>
+                    {meeting.transcriptLanguages?.length > 0 && (
+                      <div className="flex flex-wrap gap-2 justify-end">
+                        {meeting.transcriptLanguages.map(language => (
+                          <span
+                            key={language}
+                            className="px-2 py-1 rounded-full bg-gray-100 text-xs font-medium text-gray-600 uppercase dark:bg-gray-800 dark:text-white"
+                          >
+                            {language}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex flex-1 min-h-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/80 p-3 dark:border-slate-800 dark:bg-slate-900/45">
+                    <div className="h-full min-h-0 flex-1 overflow-y-auto space-y-3 pr-1">
+                    {meeting.transcript.map((segment, index) => (
+                      <div key={index} className="rounded-xl border border-slate-200 bg-white/90 p-4 shadow-sm dark:border-slate-800 dark:bg-slate-950/70">
+                        <div className="flex items-center justify-between gap-3 mb-1">
+                          <p className="text-xs text-gray-500 dark:text-gray-300">
+                            {segment.speakerName || 'Unknown'}
+                          </p>
+                          <p className="text-xs text-gray-400 dark:text-gray-300 uppercase">
+                            {segment.language || 'auto'} • {formatTime(segment.timestamp)}
+                          </p>
+                        </div>
+                        <p className="text-gray-900 dark:text-white">{segment.text}</p>
+                      </div>
+                    ))}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
-          )}
 
-          {/* Participant Notes */}
-          {participantNotes.length > 0 && (
-            <div className="p-6 border-b border-gray-200">
-              <h3 className="text-sm font-medium text-gray-500 mb-4 flex items-center gap-2">
-                <HiOutlineDocumentText className="w-5 h-5" />
-                Participant Notes
-              </h3>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {participantNotes.map((note, index) => (
-                  <div
-                    key={`${note.employee?._id || note.speakerName || 'note'}-${index}`}
-                    className={`rounded-xl border p-4 ${note.speakerName === currentUserName
-                      ? 'border-indigo-200 bg-indigo-50'
-                      : 'border-gray-200 bg-gray-50'
-                      }`}
-                  >
-                    <div className="flex items-center justify-between gap-3 mb-2">
-                      <p className="font-medium text-gray-800">
-                        {note.speakerName}
-                        {note.speakerName === currentUserName && (
-                          <span className="text-indigo-600 ml-1">(You)</span>
+            {hasRightRailContent && (
+              <div className="min-w-0 bg-gray-50/60 dark:bg-gray-950/40 lg:flex lg:h-full lg:min-h-0 lg:flex-col">
+                {/* Mira Notes Timeline */}
+                {(timelineSessions.length > 0 || canGenerateInsights) && (
+                  <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+                    <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+                      <div>
+                        <h3 className="text-sm font-medium text-gray-500 dark:text-gray-300 flex items-center gap-2">
+                          <HiOutlineSparkles className="w-5 h-5 text-purple-500 dark:text-purple-300" />
+                          Mira Notes Timeline
+                        </h3>
+                        {latestSummary?.generatedAt && (
+                          <p className="text-xs text-gray-400 dark:text-gray-300 mt-1">
+                            Latest update: {formatSummarySessionTag(latestSummary, timelineSessions.length - 1)} • {latestSummary.language || 'auto'}
+                          </p>
                         )}
-                      </p>
-                      <span className="text-xs text-gray-400 uppercase">{note.language || 'auto'}</span>
+                      </div>
+
+                      {canGenerateInsights && (
+                        <LoadingButton
+                          size="sm"
+                          color="secondary"
+                          variant="flat"
+                          onPress={handleGenerateSummary}
+                          isLoading={summaryMutation.isLoading}
+                        >
+                          {summaryMutation.isLoading
+                            ? 'Generating...'
+                            : meeting.aiSummary?.summary
+                              ? 'Refresh Mira Summary'
+                              : 'Generate Mira Summary'}
+                        </LoadingButton>
+                      )}
                     </div>
 
-                    <p className="text-sm text-gray-600">{note.summary}</p>
+                    {timelineSessions.length > 0 ? (
+                      <div className="space-y-8">
+                        {timelineSessions.map((session, index) => (
+                          <div key={`${session.sessionNumber}-${session.generatedAt || index}`} className="relative">
+                            {index > 0 && (
+                              <div className="mb-6 flex items-center gap-3">
+                                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-purple-200 to-slate-200 dark:via-purple-700 dark:to-slate-700" />
+                                <span className="rounded-full border border-purple-200 bg-purple-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-purple-700 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-200">
+                                  Timeline Break
+                                </span>
+                                <div className="h-px flex-1 bg-gradient-to-l from-transparent via-purple-200 to-slate-200 dark:via-purple-700 dark:to-slate-700" />
+                              </div>
+                            )}
 
-                    {note.keyContributions?.length > 0 && (
-                      <div className="mt-3">
-                        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Key Contributions</h4>
-                        <ul className="list-disc pl-5 space-y-1">
-                          {note.keyContributions.map((item, itemIndex) => (
-                            <li key={itemIndex} className="text-sm text-gray-600">{item}</li>
-                          ))}
-                        </ul>
+                            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                              <div>
+                                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-purple-600 dark:text-purple-300">
+                                  {session.sessionTag}
+                                </p>
+                                <p className="mt-1 text-xs text-gray-400 dark:text-gray-300">
+                                  {session.generatedAt ? formatSummaryDateTime(session.generatedAt) : 'Awaiting Mira generation'}
+                                  {session.language ? ` • ${session.language}` : ''}
+                                </p>
+                              </div>
+
+                              <div className="flex flex-wrap gap-2">
+                                {session.summaryEntry?.summary && (
+                                  <span className="rounded-full border border-purple-200 bg-purple-50 px-3 py-1 text-xs font-medium text-purple-700 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-200">
+                                    Mira Summary
+                                  </span>
+                                )}
+                                {session.participantNotes.length > 0 && (
+                                  <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+                                    {session.participantNotes.length} participant note{session.participantNotes.length === 1 ? '' : 's'}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            {session.summaryEntry?.summary && (
+                              <div className="rounded-2xl border border-purple-200 bg-gradient-to-br from-white via-purple-50/70 to-slate-50 p-5 shadow-sm dark:border-purple-900 dark:from-slate-950 dark:via-purple-950/20 dark:to-slate-950">
+                                <div className="flex items-start gap-3">
+                                  <div className="rounded-2xl bg-purple-100 p-3 text-purple-600 dark:bg-purple-950/60 dark:text-purple-200">
+                                    <HiOutlineSparkles className="h-5 w-5" />
+                                  </div>
+                                  <div>
+                                    <h4 className="text-base font-semibold text-slate-900 dark:text-white">Session Summary</h4>
+                                    <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">
+                                      Mira structured the main discussion, outcomes, and follow-up items for this session.
+                                    </p>
+                                  </div>
+                                </div>
+
+                                <p className="mt-4 whitespace-pre-line text-sm leading-7 text-slate-900 dark:text-white">
+                                  {session.summaryEntry.summary}
+                                </p>
+
+                                <div className="mt-4 grid gap-3">
+                                  {[
+                                    {
+                                      title: 'Key Points',
+                                      items: session.summaryEntry.keyPoints,
+                                      cardClass: 'border-sky-200 bg-sky-50/80 dark:border-sky-900 dark:bg-sky-950/30',
+                                      tone: 'sky',
+                                    },
+                                    {
+                                      title: 'Action Items',
+                                      items: session.summaryEntry.actionItems,
+                                      cardClass: 'border-amber-200 bg-amber-50/80 dark:border-amber-900 dark:bg-amber-950/30',
+                                      tone: 'amber',
+                                    },
+                                    {
+                                      title: 'Decisions',
+                                      items: session.summaryEntry.decisions,
+                                      cardClass: 'border-emerald-200 bg-emerald-50/80 dark:border-emerald-900 dark:bg-emerald-950/30',
+                                      tone: 'emerald',
+                                    },
+                                    {
+                                      title: 'Next Steps',
+                                      items: session.summaryEntry.nextSteps,
+                                      cardClass: 'border-violet-200 bg-violet-50/80 dark:border-violet-900 dark:bg-violet-950/30',
+                                      tone: 'violet',
+                                    },
+                                  ].filter(section => section.items?.length > 0).map(section => (
+                                    <div key={`${session.sessionNumber}-${section.title}`} className={`rounded-xl border p-4 ${section.cardClass}`}>
+                                      <h5 className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-600 dark:text-slate-200">
+                                        {section.title}
+                                      </h5>
+                                      <InsightItems items={section.items} tone={section.tone} />
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {session.participantNotes.length > 0 && (
+                              <div className="mt-4 grid gap-4">
+                                {session.participantNotes.map((note, noteIndex) => (
+                                  <div
+                                    key={`${session.sessionNumber}-${note.employee?._id || note.speakerName || 'note'}-${noteIndex}`}
+                                    className={`rounded-2xl border p-4 shadow-sm ${note.speakerName === currentUserName
+                                      ? 'border-indigo-200 bg-indigo-50/80 dark:border-indigo-800 dark:bg-indigo-950/30'
+                                      : 'border-slate-200 bg-white/90 dark:border-slate-700 dark:bg-slate-900/80'
+                                      }`}
+                                  >
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div>
+                                        <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                                          {note.speakerName}
+                                          {note.speakerName === currentUserName && (
+                                            <span className="ml-1 text-indigo-600 dark:text-indigo-300">(You)</span>
+                                          )}
+                                        </p>
+                                        <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-400 dark:text-slate-300">
+                                          {note.language || 'auto'}
+                                        </p>
+                                      </div>
+                                      <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-200">
+                                        Participant Note
+                                      </span>
+                                    </div>
+
+                                    <p className="mt-3 text-sm leading-7 text-slate-900 dark:text-white">
+                                      {note.summary}
+                                    </p>
+
+                                    <div className="mt-4 space-y-3">
+                                      {[
+                                        {
+                                          title: 'Key Contributions',
+                                          items: note.keyContributions,
+                                          tone: 'sky',
+                                        },
+                                        {
+                                          title: 'Action Items',
+                                          items: note.actionItems,
+                                          tone: 'amber',
+                                        },
+                                        {
+                                          title: 'Follow Ups',
+                                          items: note.followUps,
+                                          tone: 'emerald',
+                                        },
+                                      ].filter(section => section.items?.length > 0).map(section => (
+                                        <div key={`${note.speakerName}-${section.title}`}>
+                                          <h5 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-300">
+                                            {section.title}
+                                          </h5>
+                                          <InsightItems items={section.items} tone={section.tone} />
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-4 text-sm text-gray-600 dark:border-gray-700 dark:bg-gray-900/60 dark:text-white">
+                        The meeting has transcript or notes available, but Mira has not generated a structured timeline yet.
                       </div>
                     )}
-
-                    {note.actionItems?.length > 0 && (
-                      <div className="mt-3">
-                        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Action Items</h4>
-                        <ul className="list-disc pl-5 space-y-1">
-                          {note.actionItems.map((item, itemIndex) => (
-                            <li key={itemIndex} className="text-sm text-gray-600">{item}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-
-                    {note.followUps?.length > 0 && (
-                      <div className="mt-3">
-                        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Follow Ups</h4>
-                        <ul className="list-disc pl-5 space-y-1">
-                          {note.followUps.map((item, itemIndex) => (
-                            <li key={itemIndex} className="text-sm text-gray-600">{item}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Transcript (if available) */}
-          {meeting.transcript && meeting.transcript.length > 0 && (
-            <div className="p-6">
-              <div className="flex items-center justify-between gap-3 mb-4">
-                <h3 className="text-sm font-medium text-gray-500 flex items-center gap-2">
-                  <HiOutlineMicrophone className="w-5 h-5" />
-                  Transcript History
-                </h3>
-                {meeting.transcriptLanguages?.length > 0 && (
-                  <div className="flex flex-wrap gap-2 justify-end">
-                    {meeting.transcriptLanguages.map(language => (
-                      <span
-                        key={language}
-                        className="px-2 py-1 rounded-full bg-gray-100 text-xs font-medium text-gray-600 uppercase"
-                      >
-                        {language}
-                      </span>
-                    ))}
                   </div>
                 )}
               </div>
-              <div className="max-h-96 overflow-y-auto space-y-3">
-                {meeting.transcript.map((segment, index) => (
-                  <div key={index} className="p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center justify-between gap-3 mb-1">
-                      <p className="text-xs text-gray-500">
-                        {segment.speakerName || 'Unknown'}
-                      </p>
-                      <p className="text-xs text-gray-400 uppercase">
-                        {segment.language || 'auto'} • {formatTime(segment.timestamp)}
-                      </p>
-                    </div>
-                    <p className="text-gray-800">{segment.text}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 

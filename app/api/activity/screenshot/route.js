@@ -6,6 +6,9 @@ import { uploadScreenshot, getScreenshot } from '@/lib/gridfs';
 import { uploadImageToImageKit, getImageKitFolder, generateEmployeeFolderName } from '@/lib/imagekit';
 import mongoose from 'mongoose';
 
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 // Check if ImageKit is configured
 const isImageKitConfigured = () => {
   return !!(
@@ -59,6 +62,8 @@ export async function POST(request) {
     const file = formData.get('screenshot');
     const activityData = formData.get('activity');
     const sessionId = formData.get('sessionId');
+    const captureType = String(formData.get('captureType') || 'automatic').trim() || 'automatic'
+    const requestedTimestamp = String(formData.get('timestamp') || '').trim()
 
     if (!file) {
       return NextResponse.json({
@@ -101,34 +106,41 @@ export async function POST(request) {
     const mimeType = file.type || 'image/png';
     const format = mimeType.split('/')[1] || 'png';
 
-    const now = new Date();
-    const dateString = now.toISOString().split('T')[0];
-    const timestamp = now.getTime();
+    const capturedAt = requestedTimestamp ? new Date(requestedTimestamp) : new Date()
+    const safeCapturedAt = Number.isNaN(capturedAt.getTime()) ? new Date() : capturedAt
+    const dateString = safeCapturedAt.toISOString().split('T')[0];
+    const timestamp = safeCapturedAt.getTime();
     const employeeCode = employee?.employeeCode || 'UNKNOWN';
     const filename = `screenshot_${employeeCode}_${timestamp}.webp`;
 
-    // === DEDUPLICATION: Skip if a screenshot already exists for this user within the same 3-minute window ===
-    const windowStart = new Date(now);
-    // Align to 3-minute boundaries (0, 3, 6, 9, ... minutes)
-    const minuteOfHour = windowStart.getMinutes();
-    const windowMinute = minuteOfHour - (minuteOfHour % 3);
-    windowStart.setMinutes(windowMinute, 0, 0);
-    const windowEnd = new Date(windowStart);
-    windowEnd.setMinutes(windowEnd.getMinutes() + 3);
-
-    const existingInWindow = await Screenshot.findOne({
+    // Only deduplicate true retry uploads around the same capture timestamp.
+    const duplicateWindowMs = 15 * 1000
+    const duplicateWindowStart = new Date(safeCapturedAt.getTime() - duplicateWindowMs)
+    const duplicateWindowEnd = new Date(safeCapturedAt.getTime() + duplicateWindowMs)
+    const duplicateQuery = {
       user: userId,
-      capturedAt: { $gte: windowStart, $lt: windowEnd }
-    }).select('_id capturedAt').lean();
+      capturedAt: { $gte: duplicateWindowStart, $lte: duplicateWindowEnd },
+      captureType,
+    }
 
-    if (existingInWindow) {
-      console.log(`[Screenshot] ⏭️ Duplicate skipped for user ${userId} - already captured at ${existingInWindow.capturedAt.toISOString()} (same 3-minute window)`);
+    if (sessionId) {
+      duplicateQuery.sessionId = sessionId
+    }
+
+    const existingDuplicate = await Screenshot.findOne(duplicateQuery)
+      .select('_id capturedAt sessionId')
+      .lean();
+
+    if (existingDuplicate) {
+      console.log(
+        `[Screenshot] ⏭️ Retry duplicate skipped for user ${userId} - existing capture at ${existingDuplicate.capturedAt.toISOString()}`
+      );
       return NextResponse.json({
         success: true,
         deduplicated: true,
-        message: 'Screenshot already exists for this 3-minute window, skipped to save storage',
-        existingScreenshotId: existingInWindow._id.toString(),
-        timestamp: now.toISOString()
+        message: 'Screenshot retry detected and skipped',
+        existingScreenshotId: existingDuplicate._id.toString(),
+        timestamp: safeCapturedAt.toISOString()
       });
     }
 
@@ -188,7 +200,7 @@ export async function POST(request) {
       gridfsResult = await uploadScreenshot(buffer, {
         userId,
         employeeId: employeeId?.toString(),
-        capturedAt: now,
+        capturedAt: safeCapturedAt,
         sessionId,
         mimeType,
         format,
@@ -205,7 +217,7 @@ export async function POST(request) {
       gridfsFileId: gridfsResult?._id || null,
       imagekitFileId: imagekitFileId,
       imagekitUrl: imagekitUrl,
-      capturedAt: now,
+      capturedAt: safeCapturedAt,
       dateString,
       // Add filesystem path for dashboard compatibility
       path: publicPath,
@@ -218,6 +230,7 @@ export async function POST(request) {
         format,
         storage: imagekitUrl ? 'imagekit' : (gridfsResult ? 'gridfs' : 'filesystem')
       },
+      captureType,
       activity: {
         activeWindow: activity.activeWindow || '',
         activeApp: activity.activeApp || '',
@@ -240,7 +253,7 @@ export async function POST(request) {
       imagekitFileId: imagekitFileId,
       imagekitUrl: imagekitUrl,
       path: publicPath,
-      timestamp: now.toISOString(),
+      timestamp: safeCapturedAt.toISOString(),
       fileSize: buffer.length,
       storage: imagekitUrl ? 'imagekit' : (gridfsResult ? 'gridfs' : 'filesystem')
     });

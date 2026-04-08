@@ -4,6 +4,7 @@ import {
   hasMeetingInsightSource,
   generateMeetingInsights,
   persistMeetingInsights,
+  sendMeetingMinutesEmails,
 } from '@/lib/meetingAI'
 import { resolveMeetingEmployee } from '@/lib/meetingParticipants'
 import { normalizeMeetingLanguage, sortMeetingTranscript } from '@/lib/meetingLanguage'
@@ -42,6 +43,19 @@ function getLatestTranscriptTimestamp(transcript = []) {
   }
 
   return latestTimestamp
+}
+
+function getLatestSourceUpdatedAt(meeting, transcript = []) {
+  const candidates = [
+    toOptionalDate(meeting?.updatedAt),
+    getLatestTranscriptTimestamp(transcript),
+  ].filter(Boolean)
+
+  if (candidates.length === 0) {
+    return new Date()
+  }
+
+  return candidates.reduce((latest, candidate) => (candidate > latest ? candidate : latest))
 }
 
 function buildScopedMeetingForSummary(meeting, sessionStartedAt, sessionEndedAt) {
@@ -101,8 +115,10 @@ export async function POST(request, { params }) {
     const body = await request.json().catch(() => ({}))
     const requestedLanguage = normalizeMeetingLanguage(body?.language || 'auto')
     const allowNoContent = body?.allowNoContent === true
+    const shouldSendMomEmails = body?.sendMomEmails === true
     const sessionStartedAt = toOptionalDate(body?.sessionStartedAt)
     const sessionEndedAt = toOptionalDate(body?.sessionEndedAt)
+    const hasSessionWindow = Boolean(sessionStartedAt || sessionEndedAt)
 
     const employee = await resolveMeetingEmployee(models, user)
     if (!employee) {
@@ -150,28 +166,56 @@ export async function POST(request, { params }) {
       }, { status: 400 })
     }
 
-    const latestSourceUpdatedAt = getLatestTranscriptTimestamp(transcriptForSummary)
-      || toOptionalDate(meeting.updatedAt)
-      || new Date()
+    const latestSourceUpdatedAt = getLatestSourceUpdatedAt(meeting, transcriptForSummary)
 
     const insights = await generateMeetingInsights(meetingForSummary, { language: requestedLanguage })
 
     const persistedInsights = await persistMeetingInsights(Meeting, meeting, insights, {
       sourceUpdatedAt: latestSourceUpdatedAt,
-      appendHistory: hasPreviousSummary || Boolean(sessionStartedAt || sessionEndedAt),
+      appendHistory: hasSessionWindow,
+      replaceLatestHistory: hasPreviousSummary && !hasSessionWindow,
       sessionStartedAt,
       sessionEndedAt,
     })
 
+    let momEmails = null
+
+    if (shouldSendMomEmails) {
+      try {
+        momEmails = await sendMeetingMinutesEmails(Meeting, {
+          ...(meeting?.toObject ? meeting.toObject() : meeting),
+          aiSummary: persistedInsights.aiSummary,
+          aiParticipantNotes: persistedInsights.aiParticipantNotes,
+        }, {
+          sourceUpdatedAt: persistedInsights.aiSummary?.sourceUpdatedAt || latestSourceUpdatedAt,
+          origin: new URL(request.url).origin,
+        })
+      } catch (emailError) {
+        momEmails = {
+          skipped: false,
+          sentCount: 0,
+          failedCount: 0,
+          recipients: [],
+          error: emailError.message,
+        }
+        console.error('Meeting MOM email error:', emailError)
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      message: hasPreviousSummary
-        ? 'Mira summary updated with the latest meeting session'
-        : 'Mira summary generated successfully',
+      message: hasSessionWindow
+        ? (hasPreviousSummary
+          ? 'Mira summary updated with the latest meeting session'
+          : 'Mira summary generated successfully')
+        : (hasPreviousSummary
+          ? 'Mira summary refreshed successfully'
+          : 'Mira summary generated successfully'),
       data: {
         generated: true,
         aiSummary: persistedInsights.aiSummary,
         participantNotes: persistedInsights.aiParticipantNotes,
+        momEmails,
       },
     })
   } catch (error) {

@@ -96,6 +96,8 @@ export default function MeetingRoomPage({ params }) {
   const [notetakerMode, setNotetakerMode] = useState('unsupported')
   const [isTranscribingSegment, setIsTranscribingSegment] = useState(false)
   const [activeSpeakers, setActiveSpeakers] = useState([])
+  const [isEndingMeeting, setIsEndingMeeting] = useState(false)
+  const [endingMeetingStatus, setEndingMeetingStatus] = useState('Saving your latest meeting activity...')
 
   const { data: transcriptRes, mutate: refreshTranscript } = useAuthedSWR(
     isJoined && meeting?._id ? `/api/meetings/${meeting._id}/transcript` : null,
@@ -1040,6 +1042,8 @@ export default function MeetingRoomPage({ params }) {
   const leaveMeeting = async () => {
     if (isLeavingRef.current) return
     isLeavingRef.current = true
+    setIsEndingMeeting(true)
+    setEndingMeetingStatus('Saving your latest transcript and meeting activity...')
 
     try {
       await stopTranscriptionRecorder()
@@ -1054,6 +1058,7 @@ export default function MeetingRoomPage({ params }) {
         const nextStatus = isWithinScheduledWindow ? 'in-progress' : 'completed'
 
         try {
+          setEndingMeetingStatus('Saving meeting status...')
           await apiMutate(`/api/meetings/${meeting._id}`, {
             method: 'PUT',
             body: {
@@ -1074,20 +1079,25 @@ export default function MeetingRoomPage({ params }) {
         }
 
         try {
+          setEndingMeetingStatus('Generating Mira summary...')
           const summaryResponse = await apiMutate(`/api/meetings/${meeting._id}/summary`, {
             method: 'POST',
             body: {
               language: 'auto',
               allowNoContent: true,
+              sendMomEmails: nextStatus === 'completed',
               sessionStartedAt,
               sessionEndedAt: actualEnd,
             },
           })
 
           if (summaryResponse?.data?.generated) {
+            const momEmailSentCount = Number(summaryResponse?.data?.momEmails?.sentCount) || 0
             toast.success(
               nextStatus === 'completed'
-                ? 'Mira summary saved to meeting details'
+                ? (momEmailSentCount > 0
+                  ? `Mira summary saved and MOM email sent to ${momEmailSentCount} participant${momEmailSentCount === 1 ? '' : 's'}`
+                  : 'Mira summary saved to meeting details')
                 : 'Mira session summary appended to meeting details'
             )
           }
@@ -1096,6 +1106,8 @@ export default function MeetingRoomPage({ params }) {
           toast.error('Meeting ended, but Mira could not generate the summary automatically. You can retry from meeting details.')
         }
       }
+
+      setEndingMeetingStatus('Closing meeting room...')
     } finally {
       meetingSessionStartedAtRef.current = null
       Object.values(speakerTimeoutsRef.current).forEach(clearTimeout)
@@ -1432,7 +1444,21 @@ export default function MeetingRoomPage({ params }) {
   }
 
   return (
-    <div className="h-screen w-screen bg-gray-100 flex flex-col overflow-hidden">
+    <div className="relative h-screen w-screen bg-gray-100 flex flex-col overflow-hidden">
+      {isEndingMeeting && (
+        <div className="absolute inset-0 z-[120] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm px-6">
+          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-slate-900/90 p-6 shadow-2xl">
+            <div className="flex flex-col items-center text-center">
+              <div className="mb-4 h-14 w-14 rounded-full border-[3px] border-white/15 border-t-cyan-300 animate-spin" />
+              <h2 className="text-lg font-semibold text-white">Ending meeting...</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-300">
+                {endingMeetingStatus}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="h-12 sm:h-14 bg-white border-b border-gray-200 flex items-center justify-between px-3 sm:px-4 shadow-sm flex-shrink-0">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
@@ -1474,7 +1500,7 @@ export default function MeetingRoomPage({ params }) {
         </div>
 
         {/* Video Grid Area */}
-        <div className={`flex-1 p-2 sm:p-4 min-w-0 overflow-hidden ${showChat || showParticipants ? 'hidden sm:block' : ''}`}>
+        <div className={`flex-1 p-2 sm:p-4 min-w-0 overflow-hidden ${showChat || showParticipants || showNotetaker ? 'hidden sm:block' : ''}`}>
           {pinnedTile ? (
             // Pinned Layout
             <div className="h-full flex flex-col gap-2 sm:gap-3">
@@ -1748,7 +1774,8 @@ export default function MeetingRoomPage({ params }) {
         {/* Leave */}
         <button
           onClick={leaveMeeting}
-          className="p-2.5 sm:p-4 rounded-full bg-red-600 hover:bg-red-700 transition-colors ml-2 sm:ml-4"
+          disabled={isEndingMeeting}
+          className={`p-2.5 sm:p-4 rounded-full transition-colors ml-2 sm:ml-4 ${isEndingMeeting ? 'bg-red-400 cursor-wait' : 'bg-red-600 hover:bg-red-700'}`}
           title="Leave meeting"
         >
           <HiOutlinePhoneXMark className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
