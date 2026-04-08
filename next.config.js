@@ -11,6 +11,9 @@ const nextConfig = {
   // Transpile ESM packages
   transpilePackages: ['react-markdown'],
 
+  // Exclude native ONNX runtime from server bundling (causes segfault on Alpine/musl)
+  serverExternalPackages: ['onnxruntime-node', '@xenova/transformers'],
+
   // Increase body size limit for file uploads (10MB)
   experimental: {
     serverActions: {
@@ -137,6 +140,12 @@ const nextConfig = {
         ...config.resolve.alias,
         moment: 'moment/moment.js',
       };
+    }
+
+    // Prevent onnxruntime-node native binary from being loaded server-side (segfaults on Alpine)
+    if (isServer) {
+      config.externals = config.externals || [];
+      config.externals.push('onnxruntime-node');
     }
 
     // Exclude server-only packages from client bundle
